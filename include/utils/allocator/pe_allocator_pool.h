@@ -20,9 +20,17 @@ public:
 
     AllocatorPool(size_t p_size, size_t p_alignment = alignof(std::max_align_t));
 
-    void* allocate(size_t p_size) override;
+    virtual void* allocate(size_t p_size) override;
 
-    void deallocate(void* p_mem) override;
+    virtual void deallocate(void* p_mem) override;
+
+    virtual uint32_t obj_count() const override {
+        return allocated.size();
+    }
+
+    virtual const std::unordered_set<void*>& get_allocated() const override {
+        return allocated;
+    }
 
     size_t get_size() const {
         return size;
@@ -52,7 +60,7 @@ private:
     std::unique_ptr<std::byte[]> mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
-
+    std::unordered_set<void*> allocated;
 };
 
 }

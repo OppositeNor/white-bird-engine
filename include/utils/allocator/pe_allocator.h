@@ -1,8 +1,6 @@
 #ifndef __PE_ALLOCATOR_H__
 #define __PE_ALLOCATOR_H__
 
-#include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <unordered_set>
 namespace PencilEngine {
@@ -16,16 +14,9 @@ public:
 
     virtual void deallocate(void* p_mem) = 0;
 
-    uint32_t obj_count() const {
-        return allocated.size();
-    }
+    virtual uint32_t obj_count() const = 0;
 
-    const std::unordered_set<void*>& get_allocated() {
-        return allocated;
-    }
-
-protected:
-    std::unordered_set<void*> allocated;
+    virtual const std::unordered_set<void*>& get_allocated() const = 0;
 
 };
 

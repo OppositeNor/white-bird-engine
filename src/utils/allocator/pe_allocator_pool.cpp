@@ -17,6 +17,7 @@ void* AllocatorPool::allocate(size_t p_size) {
         if (valid_idle_node->size > p_size) {
             size_t align_size = get_align_size(p_size);
             void* result = acquire_memory(valid_idle_node, align_size);
+            allocated.insert(result);
             return result;
         }
         valid_idle_node = valid_idle_node->next.get();
@@ -37,8 +38,12 @@ void AllocatorPool::deallocate(void* p_mem) {
     while (curr != nullptr) {
         if (curr->next == nullptr || curr->next->mem_start > p_mem) {
             insert_free_memory(curr, static_cast<std::byte*>(p_mem), mem_ptr_iter->second);
+            allocated.erase(p_mem);
+            return;
         }
+        curr = curr->next.get();
     }
+    PE_DEBUG_ASSERT(false); // unreachable
 }
 
 void* AllocatorPool::acquire_memory(IdleListNode* p_node, size_t p_mem_size) {
