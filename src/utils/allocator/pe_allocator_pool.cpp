@@ -1,5 +1,6 @@
 #include "utils/pe_defs.h"
 #include <sstream>
+#include <string>
 #include "utils/allocator/pe_allocator_pool.h"
 
 namespace PencilEngine {
@@ -13,18 +14,18 @@ AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
 }
 
 void* AllocatorPool::allocate(size_t p_size) {
-    IdleListNode* valid_idle_node = idle_list_head.get();
-    while (valid_idle_node->next == nullptr) {
-        if (valid_idle_node->size > p_size) {
-            size_t align_size = get_align_size(p_size);
-            void* result = acquire_memory(valid_idle_node, align_size);
+    std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
+    size_t align_size = get_align_size(p_size);
+    while (valid_idle_node != nullptr) {
+        if ((*valid_idle_node)->size >= p_size) {
+            void* result = acquire_memory(*valid_idle_node, align_size);
             allocated.insert(result);
             size_map[result] = align_size;
             return result;
         }
-        valid_idle_node = valid_idle_node->next.get();
+        valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to create object: not enough space for object pool.");
+    throw std::runtime_error("Failed to create object: not enough space for object pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
 }
 
 void AllocatorPool::deallocate(void* p_mem) {
@@ -49,15 +50,19 @@ void AllocatorPool::deallocate(void* p_mem) {
     PE_DEBUG_ASSERT(false); // unreachable
 }
 
-void* AllocatorPool::acquire_memory(IdleListNode* p_node, size_t p_mem_size) {
+void* AllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
     PE_DEBUG_ASSERT(p_node->size >= p_mem_size);
     p_node->size -= p_mem_size;
     void* mem_start = p_node->mem_start;
     if (p_node->size == 0) {
+        --idle_chunks_count;
+        if (p_node->next == nullptr) {
+            p_node = nullptr;
+            return mem_start;
+        }
         p_node->size = p_node->next->size;
         p_node->mem_start = p_node->next->mem_start;
         p_node->next = std::move(p_node->next->next);
-        --idle_chunks_count;
     }
     else {
         p_node->mem_start += p_mem_size;

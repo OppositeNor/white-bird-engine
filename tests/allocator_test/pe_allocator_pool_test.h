@@ -53,11 +53,15 @@ TEST(PEAllocPoolTestToString, BasicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
 }
 
-TEST(PEAllocPoolTestGeneral, BassicAssersions) {
+TEST(PEAllocPoolTestRemainSize, BassicAssersions) {
     PencilEngine::AllocatorPool pool(1024, 4);
     void* mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1020);
     pool.deallocate(mem);
+    ASSERT_EQ(pool.get_remain_size(), 1024);
+    void* all_mem = pool.allocate(1024);
+    ASSERT_EQ(pool.get_remain_size(), 0);
+    pool.deallocate(all_mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 

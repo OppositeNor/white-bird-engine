@@ -49,7 +49,7 @@ private:
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
-    void* acquire_memory(IdleListNode* p_node, size_t p_mem_size);
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
 
     void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
 
