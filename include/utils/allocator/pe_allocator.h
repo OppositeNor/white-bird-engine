@@ -20,6 +20,10 @@ public:
         return allocated.size();
     }
 
+    const std::unordered_set<void*>& get_allocated() {
+        return allocated;
+    }
+
 protected:
     std::unordered_set<void*> allocated;
 

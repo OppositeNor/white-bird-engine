@@ -2,11 +2,9 @@
 #define __PE_ALLOCATOR_POOL_H__
 
 #include "pe_allocator.h"
-#include "utils/pe_defs.h"
 #include <cmath>
 #include <cstddef>
 #include <memory>
-#include <stdexcept>
 #include <unordered_map>
 
 namespace PencilEngine {
@@ -40,7 +38,7 @@ private:
 
     void* acquire_memory(IdleListNode* p_node, size_t p_mem_size);
 
-    void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size) noexcept;
+    void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
 
     void combine_idle_with_next(IdleListNode* p_node);
 
@@ -50,7 +48,7 @@ private:
 
     size_t size;
     size_t alignment;
-    std::unordered_map<void*, size_t> alloc_mem;
+    std::unordered_map<void*, size_t> size_map;
     std::unique_ptr<std::byte[]> mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
