@@ -4,9 +4,9 @@ project(PencilEngine)
 
 file(GLOB source ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-# set(SDL_TEST OFF)
-# set(SDL_STATIC ON)
-# set(SDL_SHARED OFF)
+set(SDL_TEST OFF)
+set(SDL_STATIC ON)
+set(SDL_SHARED OFF)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,7 +17,7 @@ file(MAKE_DIRECTORY ${RESOURCE_PATH})
 
 option(PE_MAKE_TEST "Export test for Pencil Engine" ON)
 
-# add_subdirectory(dependencies/SDL2)
+add_subdirectory(dependencies/SDL2)
 find_package(Vulkan REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
@@ -55,7 +55,7 @@ add_executable(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
-    # SDL2
+    SDL2
     Vulkan::Vulkan
     ${libs}
 )

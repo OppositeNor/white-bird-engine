@@ -42,6 +42,10 @@ TEST(PEAllocPoolTestToString, BasicAssersions) {
         "};\n"
         "};\n"
         "};";
+    std::string exp_5 = "AllocatorPool: {obj_count: 1;\n"
+        "free_chunk_layout: {\n"
+        "};\n"
+        "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     void* mem1 = pool.allocate(2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
@@ -51,6 +55,8 @@ TEST(PEAllocPoolTestToString, BasicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
+    pool.allocate(1024);
+    ASSERT_EQ(static_cast<std::string>(pool), exp_5);
 }
 
 TEST(PEAllocPoolTestRemainSize, BassicAssersions) {
