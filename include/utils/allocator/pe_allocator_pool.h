@@ -36,6 +36,11 @@ public:
         return size;
     }
 
+    size_t get_remain_size() const;
+
+    virtual operator std::string() const override;
+
+
 private:
     
     struct IdleListNode {
@@ -48,7 +53,7 @@ private:
 
     void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
 
-    void combine_idle_with_next(IdleListNode* p_node);
+    bool combine_idle_with_next(IdleListNode* p_node);
 
     size_t get_align_size(size_t p_size) {
         return (size_t)std::ceil(static_cast<double>(p_size) / alignment) * alignment;

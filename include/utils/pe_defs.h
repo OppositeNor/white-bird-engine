@@ -5,7 +5,7 @@
 #include <cassert>
 #define PE_DEBUG_ASSERT(...) assert(__VA_ARGS__)
 #else
-#define PE_DEBUG_ASSERT(x)
+#define PE_DEBUG_ASSERT(...)
 #endif
 
 #endif

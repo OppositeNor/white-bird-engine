@@ -61,7 +61,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 )
 
 if (PE_MAKE_TEST)
-add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()
 
 # compile shaders

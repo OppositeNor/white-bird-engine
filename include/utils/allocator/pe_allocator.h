@@ -2,6 +2,7 @@
 #define __PE_ALLOCATOR_H__
 
 #include <memory>
+#include <sstream>
 #include <unordered_set>
 namespace PencilEngine {
 
@@ -18,6 +19,11 @@ public:
 
     virtual const std::unordered_set<void*>& get_allocated() const = 0;
 
+    virtual operator std::string() const {
+        std::stringstream ss;
+        ss << "Allocator{obj_count: " << obj_count() << "}";
+        return ss.str();
+    }
 };
 
 template <typename T, typename ...Args>
