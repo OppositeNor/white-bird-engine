@@ -93,5 +93,42 @@ TEST(PEAllocPoolTestConstructDestructCall, BassicAssersions) {
     ASSERT_EQ(test_val, 2);
 }
 
+TEST(PEAllocPoolTestWithDiffInstances, BassicAssersions) {
+    class TestBase {
+    public:
+        TestBase() {
+            (void)placeholder;
+        }
+        uint32_t placeholder;
+    };
+    class TestChild1 : public TestBase {
+    public:
+        TestChild1() {
+            (void)child_placeholder;
+        }
+        uint32_t child_placeholder;
+    };
+    class TestChild2 : public TestBase {
+    public:
+        TestChild2() {
+            (void)child_placeholder1;
+            (void)child_placeholder2;
+        }
+        uint32_t child_placeholder1;
+        uint32_t child_placeholder2;
+    };
+
+    std::shared_ptr<PencilEngine::AllocatorPool> allocator = std::make_shared<PencilEngine::AllocatorPool>(1024, sizeof(uint32_t));
+    TestBase* test_obj = PencilEngine::create_obj<TestBase>(allocator);
+    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase));
+    TestBase* test_obj1 = PencilEngine::create_obj<TestChild1>(allocator);
+    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
+    TestBase* test_obj2 = PencilEngine::create_obj<TestChild2>(allocator);
+    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
+    PencilEngine::delete_obj(allocator, test_obj);
+    PencilEngine::delete_obj(allocator, test_obj1);
+    PencilEngine::delete_obj(allocator, test_obj2);
+}
+
 
 #endif

@@ -32,7 +32,7 @@ public:
         return allocated;
     }
 
-    size_t get_size() const {
+    size_t get_total_size() const {
         return size;
     }
 
