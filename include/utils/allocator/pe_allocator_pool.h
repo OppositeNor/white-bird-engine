@@ -9,7 +9,7 @@
 
 namespace PencilEngine {
 
-class AllocatorPool : Allocator {
+class AllocatorPool : public Allocator {
 public:
     AllocatorPool() : AllocatorPool(1024) {}
     virtual ~AllocatorPool() override {}
