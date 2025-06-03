@@ -1,5 +1,5 @@
-#ifndef __PE_AALOCATOR_POOL_TEST_H__
-#define __PE_AALOCATOR_POOL_TEST_H__
+#ifndef __ALOCATOR_POOL_TEST_H__
+#define __ALOCATOR_POOL_TEST_H__
 
 #include "utils/allocator/allocator.h"
 #include "utils/allocator/allocator_pool.h"
@@ -7,7 +7,7 @@
 #include <memory>
 
 TEST(PEAllocPoolTestToString, BasicAssersions) {
-    PencilEngine::AllocatorPool pool(1024, 4);
+    WhiteBirdEngine::AllocatorPool pool(1024, 4);
     std::string exp_1 = "AllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
@@ -62,7 +62,7 @@ TEST(PEAllocPoolTestToString, BasicAssersions) {
 }
 
 TEST(PEAllocPoolTestRemainSize, BassicAssersions) {
-    PencilEngine::AllocatorPool pool(1024, 4);
+    WhiteBirdEngine::AllocatorPool pool(1024, 4);
     void* mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1020);
     pool.deallocate(mem);
@@ -86,10 +86,10 @@ TEST(PEAllocPoolTestConstructDestructCall, BassicAssersions) {
         }
         uint32_t* test_val_ptr;
     };
-    std::shared_ptr<PencilEngine::AllocatorPool> allocator = std::make_shared<PencilEngine::AllocatorPool>();
-    TestClass* test_obj = PencilEngine::create_obj<TestClass>(allocator, &test_val);
+    std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>();
+    TestClass* test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
-    PencilEngine::destroy_obj(allocator, test_obj);
+    WhiteBirdEngine::destroy_obj(allocator, test_obj);
     ASSERT_EQ(test_val, 2);
 }
 
@@ -118,18 +118,18 @@ TEST(PEAllocPoolTestWithDiffInstances, BassicAssersions) {
         uint32_t child_placeholder2;
     };
 
-    std::shared_ptr<PencilEngine::AllocatorPool> allocator = std::make_shared<PencilEngine::AllocatorPool>(1024, sizeof(uint32_t));
-    TestBase* test_obj = PencilEngine::create_obj<TestBase>(allocator);
+    std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>(1024, sizeof(uint32_t));
+    TestBase* test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase));
-    TestBase* test_obj1 = PencilEngine::create_obj<TestChild1>(allocator);
+    TestBase* test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
-    TestBase* test_obj2 = PencilEngine::create_obj<TestChild2>(allocator);
+    TestBase* test_obj2 = WhiteBirdEngine::create_obj<TestChild2>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
-    PencilEngine::destroy_obj(allocator, test_obj);
+    WhiteBirdEngine::destroy_obj(allocator, test_obj);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
-    PencilEngine::destroy_obj(allocator, test_obj1);
+    WhiteBirdEngine::destroy_obj(allocator, test_obj1);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild2));
-    PencilEngine::destroy_obj(allocator, test_obj2);
+    WhiteBirdEngine::destroy_obj(allocator, test_obj2);
     ASSERT_EQ(allocator->get_remain_size(), 1024);
 }
 
@@ -146,7 +146,7 @@ TEST(PEAllocPoolTestBinded, BassicAssersions) {
         }
         uint32_t* test_val_ptr;
     };
-    PencilEngine::BindedAllocator binded_allocator(std::make_shared<PencilEngine::AllocatorPool>());
+    WhiteBirdEngine::BindedAllocator binded_allocator(std::make_shared<WhiteBirdEngine::AllocatorPool>());
     TestClass* test_obj = binded_allocator.create<TestClass>(&test_val);
     ASSERT_EQ(test_val, 1);
     binded_allocator.destroy(test_obj);

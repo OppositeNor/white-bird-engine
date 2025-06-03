@@ -1,5 +1,5 @@
-#ifndef __PE_ALLOCATOR_POOL_H__
-#define __PE_ALLOCATOR_POOL_H__
+#ifndef __WBE_ALLOCATOR_POOL_H__
+#define __WBE_ALLOCATOR_POOL_H__
 
 #include "allocator.h"
 #include <cmath>
@@ -7,7 +7,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 class AllocatorPool : public Allocator {
 public:

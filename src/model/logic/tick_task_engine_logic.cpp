@@ -1,6 +1,6 @@
 #include "model/logic/tick_task_engine_logic.h"
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 void TickTaskEngineLogic::init() {
 

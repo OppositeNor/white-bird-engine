@@ -1,8 +1,8 @@
-#ifndef __PE_ALLOCATOR_RAM_H__
-#define __PE_ALLOCATOR_RAM_H__
+#ifndef __WBE_ALLOCATOR_RAM_H__
+#define __WBE_ALLOCATOR_RAM_H__
 
 #include "utils/allocator/allocator.h"
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 class AllocatorRam : Allocator {
 public:

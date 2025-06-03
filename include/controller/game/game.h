@@ -1,10 +1,10 @@
-#ifndef __PE_GAME_H__
-#define __PE_GAME_H__
+#ifndef __WBE_GAME_H__
+#define __WBE_GAME_H__
 
 #include "utils/tick_task/tick_task.h"
 #include <memory>
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 class Game {
 public:

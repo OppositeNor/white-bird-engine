@@ -1,7 +1,7 @@
-#ifndef __RENDERER_H__
-#define __RENDERER_H__
+#ifndef __WBE_RENDERER_H__
+#define __WBE_RENDERER_H__
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 class Renderer {
 public:

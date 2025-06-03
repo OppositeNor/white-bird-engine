@@ -3,7 +3,7 @@
 #include <string>
 #include "utils/allocator/allocator_pool.h"
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
     : size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size))) {
     idle_list_head = std::make_unique<IdleListNode>();
@@ -47,11 +47,11 @@ void AllocatorPool::deallocate(void* p_mem) {
         }
         curr = curr->next.get();
     }
-    PE_DEBUG_ASSERT(false); // unreachable
+    WBE_DEBUG_ASSERT(false); // unreachable
 }
 
 void* AllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
-    PE_DEBUG_ASSERT(p_node->size >= p_mem_size);
+    WBE_DEBUG_ASSERT(p_node->size >= p_mem_size);
     p_node->size -= p_mem_size;
     void* mem_start = p_node->mem_start;
     if (p_node->size == 0) {
@@ -101,7 +101,7 @@ void AllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, std::
 }
 
 bool AllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
-    PE_DEBUG_ASSERT(p_node != nullptr);
+    WBE_DEBUG_ASSERT(p_node != nullptr);
     if (p_node->next == nullptr || p_node->mem_start + p_node->size != p_node->next->mem_start) {
         return false;
     }

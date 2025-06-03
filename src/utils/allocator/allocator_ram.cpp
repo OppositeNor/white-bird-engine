@@ -1,6 +1,6 @@
 #include "utils/allocator/allocator_ram.h"
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 AllocatorRam::~AllocatorRam() {
     for (auto& iter : allocated) {

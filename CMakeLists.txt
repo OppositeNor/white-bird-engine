@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(PencilEngine)
+project(WhiteBirdEngine)
 
 file(GLOB source ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
@@ -15,7 +15,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(RESOURCE_PATH ${PROJECT_SOURCE_DIR}/res)
 file(MAKE_DIRECTORY ${RESOURCE_PATH})
 
-option(PE_MAKE_TEST "Export test for Pencil Engine" ON)
+option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
 
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/glm)
@@ -37,7 +37,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/glm
 )
 
-if (PE_MAKE_TEST)
+if (WBE_MAKE_TEST)
     # Export tests
     add_subdirectory(dependencies/googletest)
     set(include_dirs
@@ -65,7 +65,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     ${libs}
 )
 
-if (PE_MAKE_TEST)
+if (WBE_MAKE_TEST)
     add_subdirectory(tests)
 endif()
 

@@ -1,6 +1,6 @@
 #include "model/logic/tick_task_script_logic.h"
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 void TickTaskScriptLogic::init() {
     // TODO

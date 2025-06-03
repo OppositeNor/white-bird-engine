@@ -1,10 +1,10 @@
-#ifndef __PE_ALLOCATOR_H__
-#define __PE_ALLOCATOR_H__
+#ifndef __WBE_ALLOCATOR_H__
+#define __WBE_ALLOCATOR_H__
 
 #include <memory>
 #include <sstream>
 #include <unordered_set>
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 class Allocator {
 public:

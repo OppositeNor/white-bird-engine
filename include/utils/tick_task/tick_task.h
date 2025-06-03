@@ -1,12 +1,12 @@
-#ifndef __PE_FRAME_H__
-#define __PE_FRAME_H__
+#ifndef __WBE_FRAME_H__
+#define __WBE_FRAME_H__
 
 #include <atomic>
 #include <cstdint>
 #include <memory>
 #include <set>
 
-namespace PencilEngine {
+namespace WhiteBirdEngine {
 
 // TODO: test
 class TickTask {
@@ -25,6 +25,9 @@ public:
         // TODO: block until ready
         update(p_delta);
         finish();
+        if (reset_on_finish) {
+            reset();
+        }
     }
 
     bool is_ready() const {
