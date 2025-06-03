@@ -31,11 +31,11 @@ public:
     }
 
     bool is_ready() const {
-        return prev_task_finish_count >= prev_task_total;
+        return prev_task_finish_count.load() >= prev_task_total;
     }
 
     void reset() {
-        prev_task_finish_count = 0;
+        prev_task_finish_count.store(0);
     }
 
     void add_next_task(std::shared_ptr<TickTask> p_next_task) {
@@ -59,7 +59,7 @@ private:
 
     void finish() {
         for (auto next_task : next_tasks) {
-            ++next_task->prev_task_finish_count;
+            next_task->prev_task_finish_count.fetch_add(1);
         }
     }
 
