@@ -2,7 +2,6 @@
 #define __WBE_ALLOCATOR_POOL_H__
 
 #include "allocator.h"
-#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <unordered_map>
@@ -56,7 +55,7 @@ private:
     bool combine_idle_with_next(IdleListNode* p_node);
 
     size_t get_align_size(size_t p_size) {
-        return (size_t)std::ceil(static_cast<double>(p_size) / alignment) * alignment;
+        return ((p_size + alignment - 1) / alignment) * alignment;
     }
 
     size_t size;

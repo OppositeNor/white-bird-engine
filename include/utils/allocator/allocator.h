@@ -38,22 +38,19 @@ inline void destroy_obj(std::shared_ptr<Allocator> p_allocator, T* p_obj) {
     p_allocator->deallocate(p_obj);
 }
 
-struct BindedAllocator {
-    BindedAllocator(std::shared_ptr<Allocator> p_allocator)
-        : allocator(p_allocator) {}
+template <typename T, typename ...Args>
+inline T* create_obj(Allocator& p_allocator, Args&&... args) {
+    T* obj = new(p_allocator.allocate(sizeof(T))) T(std::forward<Args>(args)...);
+    return obj;
+}
 
-    template <typename T, typename ...Args>
-    T* create(Args&&... args) {
-        return create_obj<T, Args...>(allocator, std::forward<Args>(args)...);
-    }
+template <typename T>
+inline void destroy_obj(Allocator& p_allocator, T* p_obj) {
+    p_obj->~T();
+    p_allocator.deallocate(p_obj);
+}
 
-    template <typename T>
-    void destroy(T* p_obj) {
-        return destroy_obj<T>(allocator, p_obj);
-    }
 
-    std::shared_ptr<Allocator> allocator;
-};
 }
 
 #endif

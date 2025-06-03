@@ -2,6 +2,10 @@
 
 namespace WhiteBirdEngine {
 
+TickTaskEngineLogic::~TickTaskEngineLogic() {
+
+}
+
 void TickTaskEngineLogic::init() {
 
 }
