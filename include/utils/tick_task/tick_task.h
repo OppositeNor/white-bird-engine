@@ -4,7 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <vector>
+#include <set>
 
 namespace PencilEngine {
 
@@ -33,14 +33,14 @@ public:
     }
 
     void add_next_semaphore(std::shared_ptr<TickTask> p_next_semaphore) {
-        next_semaphores.push_back(p_next_semaphore);
+        next_semaphores.insert(p_next_semaphore);
         p_next_semaphore->add_total_semaphore_count();
     }
 
 private:
     uint32_t semaphore_count;
     std::atomic<int> semaphore_remain;
-    std::vector<std::shared_ptr<TickTask>> next_semaphores;
+    std::set<std::shared_ptr<TickTask>> next_semaphores;
 
     void add_total_semaphore_count() {
         ++semaphore_count;

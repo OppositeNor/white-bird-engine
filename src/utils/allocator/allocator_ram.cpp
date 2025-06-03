@@ -1,4 +1,4 @@
-#include "utils/allocator/pe_allocator_ram.h"
+#include "utils/allocator/allocator_ram.h"
 
 namespace PencilEngine {
 

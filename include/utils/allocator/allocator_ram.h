@@ -1,7 +1,7 @@
 #ifndef __PE_ALLOCATOR_RAM_H__
 #define __PE_ALLOCATOR_RAM_H__
 
-#include "utils/allocator/pe_allocator.h"
+#include "utils/allocator/allocator.h"
 namespace PencilEngine {
 
 class AllocatorRam : Allocator {

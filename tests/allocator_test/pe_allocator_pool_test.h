@@ -1,8 +1,8 @@
 #ifndef __PE_AALOCATOR_POOL_TEST_H__
 #define __PE_AALOCATOR_POOL_TEST_H__
 
-#include "utils/allocator/pe_allocator.h"
-#include "utils/allocator/pe_allocator_pool.h"
+#include "utils/allocator/allocator.h"
+#include "utils/allocator/allocator_pool.h"
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -89,7 +89,7 @@ TEST(PEAllocPoolTestConstructDestructCall, BassicAssersions) {
     std::shared_ptr<PencilEngine::AllocatorPool> allocator = std::make_shared<PencilEngine::AllocatorPool>();
     TestClass* test_obj = PencilEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
-    PencilEngine::delete_obj(allocator, test_obj);
+    PencilEngine::destroy_obj(allocator, test_obj);
     ASSERT_EQ(test_val, 2);
 }
 
@@ -125,9 +125,32 @@ TEST(PEAllocPoolTestWithDiffInstances, BassicAssersions) {
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
     TestBase* test_obj2 = PencilEngine::create_obj<TestChild2>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
-    PencilEngine::delete_obj(allocator, test_obj);
-    PencilEngine::delete_obj(allocator, test_obj1);
-    PencilEngine::delete_obj(allocator, test_obj2);
+    PencilEngine::destroy_obj(allocator, test_obj);
+    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
+    PencilEngine::destroy_obj(allocator, test_obj1);
+    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild2));
+    PencilEngine::destroy_obj(allocator, test_obj2);
+    ASSERT_EQ(allocator->get_remain_size(), 1024);
+}
+
+TEST(PEAllocPoolTestBinded, BassicAssersions) {
+    uint32_t test_val = 0;
+    class TestClass {
+    public:
+        TestClass(uint32_t* p_test_val) {
+            test_val_ptr = p_test_val;
+            *test_val_ptr = 1;
+        }
+        ~TestClass() {
+            *test_val_ptr = 2;
+        }
+        uint32_t* test_val_ptr;
+    };
+    PencilEngine::BindedAllocator binded_allocator(std::make_shared<PencilEngine::AllocatorPool>());
+    TestClass* test_obj = binded_allocator.create<TestClass>(&test_val);
+    ASSERT_EQ(test_val, 1);
+    binded_allocator.destroy(test_obj);
+    ASSERT_EQ(test_val, 2);
 }
 
 

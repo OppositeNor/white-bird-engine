@@ -18,6 +18,8 @@ file(MAKE_DIRECTORY ${RESOURCE_PATH})
 option(PE_MAKE_TEST "Export test for Pencil Engine" ON)
 
 add_subdirectory(dependencies/SDL2)
+add_subdirectory(dependencies/glm)
+
 find_package(Vulkan REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
@@ -32,6 +34,7 @@ endif()
 set(libs "")
 set(include_dirs 
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/dependencies/glm
 )
 
 if (PE_MAKE_TEST)

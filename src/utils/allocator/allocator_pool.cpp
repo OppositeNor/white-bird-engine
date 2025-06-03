@@ -1,7 +1,7 @@
-#include "utils/pe_defs.h"
+#include "utils/defs.h"
 #include <sstream>
 #include <string>
-#include "utils/allocator/pe_allocator_pool.h"
+#include "utils/allocator/allocator_pool.h"
 
 namespace PencilEngine {
 AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)

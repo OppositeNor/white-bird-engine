@@ -1,7 +1,7 @@
 #ifndef __PE_ALLOCATOR_POOL_H__
 #define __PE_ALLOCATOR_POOL_H__
 
-#include "pe_allocator.h"
+#include "allocator.h"
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -32,13 +32,13 @@ public:
         return allocated;
     }
 
+    virtual operator std::string() const override;
+
     size_t get_total_size() const {
         return size;
     }
 
     size_t get_remain_size() const;
-
-    virtual operator std::string() const override;
 
 
 private:

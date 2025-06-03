@@ -1,7 +1,7 @@
 #ifndef __PE_GAME_H__
 #define __PE_GAME_H__
 
-#include "utils/tick_task/pe_tick_task.h"
+#include "utils/tick_task/tick_task.h"
 #include <memory>
 
 namespace PencilEngine {
