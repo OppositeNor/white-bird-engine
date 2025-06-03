@@ -24,7 +24,7 @@ public:
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) override {
-        return alloc_map.find(p_id)->second.mem_loc;
+        return alloc_map.find(p_id)->second;
     }
 
     virtual uint32_t obj_count() const override {
@@ -66,11 +66,6 @@ private:
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
-    struct MemData {
-        void* mem_loc;
-        size_t size;
-    };
-
     void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
     void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
@@ -80,7 +75,8 @@ private:
     MemID curr_id;
     size_t size;
     size_t alignment;
-    std::unordered_map<MemID, MemData> alloc_map;
+    std::unordered_map<MemID, void*> alloc_map;
+    std::unordered_map<void*, size_t> size_map;
     std::unique_ptr<std::byte[]> mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;

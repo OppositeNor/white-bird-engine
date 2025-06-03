@@ -27,7 +27,8 @@ MemID AllocatorPool::allocate(size_t p_size) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, align_size);
             allocated.insert(curr_id);
-            alloc_map[curr_id] = { .mem_loc = result, .size = align_size };
+            alloc_map[curr_id] = result;
+            size_map[result] = align_size;
             return curr_id++;
         }
         valid_idle_node = &((*valid_idle_node)->next);
@@ -40,10 +41,11 @@ void AllocatorPool::deallocate(MemID p_mem) {
     if (mem_ptr_iter == alloc_map.end()) {
         throw std::runtime_error("Failed to destroy object: object not allocated before in current memory pool.");
     }
-    void* data_loc = mem_ptr_iter->second.mem_loc;
-    size_t data_size = mem_ptr_iter->second.size;
+    void* data_loc = mem_ptr_iter->second;
+    size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);
     alloc_map.erase(p_mem);
+    size_map.erase(data_loc);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, static_cast<std::byte*>(data_loc), data_size);
         return;
@@ -115,11 +117,13 @@ bool AllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
 
 void AllocatorPool::mem_move(MemID p_id1, void* p_loc) {
     std::byte* data_addr = static_cast<std::byte*>(get(p_id1));
-    size_t data_size = alloc_map[p_id1].size;
+    size_t data_size = size_map[data_addr];
     memcpy(p_loc, data_addr, data_size);
-    alloc_map[p_id1].mem_loc = p_loc;
+    alloc_map[p_id1] = p_loc;
+    size_map.erase(data_addr);
+    size_map[data_addr] = data_size;
     IdleListNode* insert_pos = get_idle_node_before(data_addr).get();
-    insert_free_memory(insert_pos, data_addr, alloc_map[p_id1].size);
+    insert_free_memory(insert_pos, data_addr, data_size);
     auto& remove_pos = get_idle_node_before(data_addr);
     acquire_memory(remove_pos, data_size);
 }
