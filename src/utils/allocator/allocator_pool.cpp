@@ -4,6 +4,11 @@
 #include "utils/allocator/allocator_pool.h"
 
 namespace WhiteBirdEngine {
+
+AllocatorPool::~AllocatorPool() {
+    // TODO: warning if not all memory freed (which is probably caused by a memory leak error)
+}
+
 AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
     : size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size))) {
     idle_list_head = std::make_unique<IdleListNode>();
@@ -133,7 +138,6 @@ AllocatorPool::operator std::string() const {
     ss << "};\n};";
     return ss.str();
 }
-
 
 }
 

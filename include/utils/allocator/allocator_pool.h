@@ -11,7 +11,7 @@ namespace WhiteBirdEngine {
 class AllocatorPool : public Allocator {
 public:
     AllocatorPool() : AllocatorPool(1024) {}
-    virtual ~AllocatorPool() override {}
+    virtual ~AllocatorPool() override;
     AllocatorPool(const AllocatorPool&) = delete;
     AllocatorPool(AllocatorPool&&) = delete;
     AllocatorPool& operator=(const AllocatorPool&) = delete;
