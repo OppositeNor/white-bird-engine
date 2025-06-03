@@ -1,4 +1,6 @@
 #include "utils/defs.h"
+#include "utils/utils.h"
+#include <cstring>
 #include <sstream>
 #include <string>
 #include "utils/allocator/allocator_pool.h"
@@ -10,7 +12,7 @@ AllocatorPool::~AllocatorPool() {
 }
 
 AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
-    : size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size))) {
+    : curr_id(0), size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size, alignment))) {
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
     idle_list_head->next = nullptr;
@@ -18,41 +20,36 @@ AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
     idle_chunks_count = 1;
 }
 
-void* AllocatorPool::allocate(size_t p_size) {
+MemID AllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    size_t align_size = get_align_size(p_size);
+    size_t align_size = get_align_size(p_size, alignment);
     while (valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, align_size);
-            allocated.insert(result);
-            size_map[result] = align_size;
-            return result;
+            allocated.insert(curr_id);
+            alloc_map[curr_id] = { .mem_loc = result, .size = align_size };
+            return curr_id++;
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
     throw std::runtime_error("Failed to create object: not enough space for object pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
 }
 
-void AllocatorPool::deallocate(void* p_mem) {
-    auto mem_ptr_iter = size_map.find(p_mem);
-    if (mem_ptr_iter == size_map.end()) {
+void AllocatorPool::deallocate(MemID p_mem) {
+    auto mem_ptr_iter = alloc_map.find(p_mem);
+    if (mem_ptr_iter == alloc_map.end()) {
         throw std::runtime_error("Failed to destroy object: object not allocated before in current memory pool.");
     }
+    void* data_loc = mem_ptr_iter->second.mem_loc;
+    size_t data_size = mem_ptr_iter->second.size;
     allocated.erase(p_mem);
-    size_map.erase(p_mem);
-    if (idle_list_head == nullptr || idle_list_head->mem_start > p_mem) {
-        insert_free_memory(nullptr, static_cast<std::byte*>(p_mem), mem_ptr_iter->second);
+    alloc_map.erase(p_mem);
+    if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
+        insert_free_memory(nullptr, static_cast<std::byte*>(data_loc), data_size);
         return;
     }
-    IdleListNode* curr = idle_list_head.get();
-    while (curr != nullptr) {
-        if (curr->next == nullptr || curr->next->mem_start > p_mem) {
-            insert_free_memory(curr, static_cast<std::byte*>(p_mem), mem_ptr_iter->second);
-            return;
-        }
-        curr = curr->next.get();
-    }
-    WBE_DEBUG_ASSERT(false); // unreachable
+    IdleListNode* insert_pos = get_idle_node_before(data_loc).get();
+    insert_free_memory(insert_pos, static_cast<std::byte*>(data_loc), data_size);
 }
 
 void* AllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
@@ -116,6 +113,29 @@ bool AllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     return true;
 }
 
+void AllocatorPool::mem_move(MemID p_id1, void* p_loc) {
+    std::byte* data_addr = static_cast<std::byte*>(get(p_id1));
+    size_t data_size = alloc_map[p_id1].size;
+    memcpy(p_loc, data_addr, data_size);
+    alloc_map[p_id1].mem_loc = p_loc;
+    IdleListNode* insert_pos = get_idle_node_before(data_addr).get();
+    insert_free_memory(insert_pos, data_addr, alloc_map[p_id1].size);
+    auto& remove_pos = get_idle_node_before(data_addr);
+    acquire_memory(remove_pos, data_size);
+}
+
+std::unique_ptr<AllocatorPool::IdleListNode>& AllocatorPool::get_idle_node_before(void* p_loc) {
+    std::unique_ptr<IdleListNode>* curr = &idle_list_head;
+    while (curr != nullptr) {
+        if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {
+            return *curr;
+        }
+        curr = &((*curr)->next);
+    }
+    throw std::runtime_error("Unreachable code.");
+}
+
+
 size_t AllocatorPool::get_remain_size() const {
     IdleListNode* node = idle_list_head.get();
     size_t total = 0;
@@ -124,6 +144,19 @@ size_t AllocatorPool::get_remain_size() const {
         node = node->next.get();
     }
     return total;
+}
+
+void AllocatorPool::flush() {
+    IdleListNode* node = idle_list_head.get();
+    while (node != nullptr) {
+        // TODO
+    }
+}
+
+bool AllocatorPool::is_flushed() const {
+    return idle_list_head == nullptr
+        || (idle_list_head->next == nullptr
+            && idle_list_head->mem_start + idle_list_head->size == mem_chunk.get() + size);
 }
 
 AllocatorPool::operator std::string() const {

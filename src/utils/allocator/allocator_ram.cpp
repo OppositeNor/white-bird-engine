@@ -3,23 +3,27 @@
 namespace WhiteBirdEngine {
 
 AllocatorRam::~AllocatorRam() {
-    for (auto& iter : allocated) {
-        free(iter);
+    // TODO: warning if not empty
+    for (auto& iter : alloc_map) {
+        free(iter.second);
     }
 }
 
-void* AllocatorRam::allocate(size_t p_size) {
+MemID AllocatorRam::allocate(size_t p_size) {
     void* result = malloc(p_size);
-    allocated.insert(result);
-    return result;
+    allocated.insert(curr_id);
+    alloc_map[curr_id] = result;
+    return curr_id++;
 }
 
-void AllocatorRam::deallocate(void* p_mem) {
+void AllocatorRam::deallocate(MemID p_mem) {
     auto iter = allocated.find(p_mem);
     if (iter == allocated.end()) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated by this allocator.");
     }
-    free(p_mem);
+    allocated.erase(p_mem);
+    alloc_map.erase(p_mem);
+    free(get(p_mem));
 }
 
 

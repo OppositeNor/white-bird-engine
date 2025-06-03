@@ -6,8 +6,10 @@
 #include <gtest/gtest.h>
 #include <memory>
 
+namespace WBE = WhiteBirdEngine;
+
 TEST(WBEAllocPoolTestToString, BasicAssersions) {
-    WhiteBirdEngine::AllocatorPool pool(1024, 4);
+    WBE::AllocatorPool pool(1024, 4);
     std::string exp_1 = "AllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
@@ -49,9 +51,9 @@ TEST(WBEAllocPoolTestToString, BasicAssersions) {
         "};\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-    void* mem1 = pool.allocate(2);
+    WBE::MemID mem1 = pool.allocate(2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
-    void* mem2 = pool.allocate(8);
+    WBE::MemID mem2 = pool.allocate(8);
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
     pool.deallocate(mem1);
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
@@ -63,11 +65,11 @@ TEST(WBEAllocPoolTestToString, BasicAssersions) {
 
 TEST(WBEAllocPoolTestRemainSize, BassicAssersions) {
     WhiteBirdEngine::AllocatorPool pool(1024, 4);
-    void* mem = pool.allocate(2);
+    WBE::MemID mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1020);
     pool.deallocate(mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
-    void* all_mem = pool.allocate(1024);
+    WBE::MemID all_mem = pool.allocate(1024);
     ASSERT_EQ(pool.get_remain_size(), 0);
     pool.deallocate(all_mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
@@ -87,9 +89,9 @@ TEST(WBEAllocPoolTestConstructDestructCall, BassicAssersions) {
         uint32_t* test_val_ptr;
     };
     std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>();
-    TestClass* test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
+    WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
-    WhiteBirdEngine::destroy_obj(allocator, test_obj);
+    WBE::destroy_obj<TestClass>(allocator, test_obj);
     ASSERT_EQ(test_val, 2);
 }
 
@@ -119,19 +121,21 @@ TEST(WBEAllocPoolTestWithDiffInstances, BassicAssersions) {
     };
 
     std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>(1024, sizeof(uint32_t));
-    TestBase* test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
+    WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase));
-    TestBase* test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
+    WBE::MemID test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
-    TestBase* test_obj2 = WhiteBirdEngine::create_obj<TestChild2>(allocator);
+    WBE::MemID test_obj2 = WhiteBirdEngine::create_obj<TestChild2>(allocator);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj(allocator, test_obj);
+    WhiteBirdEngine::destroy_obj<TestBase>(allocator, test_obj);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj(allocator, test_obj1);
+    WhiteBirdEngine::destroy_obj<TestChild1>(allocator, test_obj1);
     ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj(allocator, test_obj2);
+    WhiteBirdEngine::destroy_obj<TestChild2>(allocator, test_obj2);
     ASSERT_EQ(allocator->get_remain_size(), 1024);
 }
+
+// TODO: test flush
 
 
 #endif
