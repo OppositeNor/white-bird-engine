@@ -11,44 +11,52 @@ namespace PencilEngine {
 // TODO: test
 class TickTask {
 public:
-    TickTask() : semaphore_count(0), semaphore_remain(0) {}
-
-    TickTask(uint32_t p_semaphore_count, bool p_is_start_ready = false)
-        : semaphore_count(p_semaphore_count), semaphore_remain(p_is_start_ready ? 0 : p_semaphore_count) {}
+    TickTask(bool p_reset_on_finish) : reset_on_finish(p_reset_on_finish), prev_task_total(0), prev_task_finish_count(0) {}
+    virtual ~TickTask() {
+        for (auto task : next_tasks) {
+            --task->prev_task_total;
+        }
+    }
 
     virtual void init() = 0;
     virtual void update(double p_delta) = 0;
 
-    void tick(double p_delta) {
+    void begin(double p_delta) {
+        // TODO: block until ready
         update(p_delta);
         finish();
     }
 
     bool is_ready() const {
-        return semaphore_remain <= 0;
+        return prev_task_finish_count >= prev_task_total;
     }
 
-    void reset_semaphores() {
-        semaphore_remain = semaphore_count;
+    void reset() {
+        prev_task_finish_count = 0;
     }
 
-    void add_next_semaphore(std::shared_ptr<TickTask> p_next_semaphore) {
-        next_semaphores.insert(p_next_semaphore);
-        p_next_semaphore->add_total_semaphore_count();
+    void add_next_task(std::shared_ptr<TickTask> p_next_task) {
+        next_tasks.insert(p_next_task);
+        ++p_next_task->prev_task_total;
+    }
+
+    bool is_reset_on_finish() const {
+        return reset_on_finish;
+    }
+
+    void set_reset_on_finish(bool p_reset_on_finish) {
+        reset_on_finish = p_reset_on_finish;
     }
 
 private:
-    uint32_t semaphore_count;
-    std::atomic<int> semaphore_remain;
-    std::set<std::shared_ptr<TickTask>> next_semaphores;
-
-    void add_total_semaphore_count() {
-        ++semaphore_count;
-    }
+    bool reset_on_finish;
+    uint32_t prev_task_total;
+    std::atomic<uint32_t> prev_task_finish_count;
+    std::set<std::shared_ptr<TickTask>> next_tasks;
 
     void finish() {
-        for (auto next_semaphore : next_semaphores) {
-            --(next_semaphore->semaphore_remain);
+        for (auto next_task : next_tasks) {
+            ++next_task->prev_task_finish_count;
         }
     }
 
