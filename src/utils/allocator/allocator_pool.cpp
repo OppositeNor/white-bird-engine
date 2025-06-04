@@ -33,13 +33,13 @@ MemID AllocatorPool::allocate(size_t p_size) {
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to create object: not enough space for object pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
+    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
 }
 
 void AllocatorPool::deallocate(MemID p_mem) {
     auto mem_ptr_iter = alloc_map.find(p_mem);
     if (mem_ptr_iter == alloc_map.end()) {
-        throw std::runtime_error("Failed to destroy object: object not allocated before in current memory pool.");
+        throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
     }
     void* data_loc = mem_ptr_iter->second;
     size_t data_size = size_map[data_loc];

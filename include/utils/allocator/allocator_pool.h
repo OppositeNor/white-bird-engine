@@ -47,10 +47,6 @@ public:
         return alignment;
     }
 
-    const void* get_mem_start() const {
-        return mem_chunk.get();
-    }
-
     // TODO: Test
     void flush();
 

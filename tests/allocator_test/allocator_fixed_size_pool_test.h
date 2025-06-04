@@ -1,0 +1,95 @@
+#ifndef __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
+#define __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
+
+#include "utils/allocator/allocator.h"
+#include "utils/allocator/allocator_fixed_size_pool.h"
+#include <cstddef>
+#include <gtest/gtest.h>
+
+namespace WBE = WhiteBirdEngine;
+
+TEST(WBEAllocFSPTestToString, BasicAssersions) {
+    WBE::AllocatorFixedSizePool<4> pool(64);
+
+    std::string exp_1 = "AllocatorFix: {obj_count: 0;\n"
+        "max_obj: 64\n"
+        "};";
+    ASSERT_EQ(static_cast<std::string>(pool), exp_1);
+
+    WBE::MemID mem_1 = pool.allocate();
+    std::string exp_2 = "AllocatorFix: {obj_count: 1;\n"
+        "max_obj: 64\n"
+        "};";
+    ASSERT_EQ(static_cast<std::string>(pool), exp_2);
+
+    WBE::MemID mem_2 = pool.allocate();
+    std::string exp_3 = "AllocatorFix: {obj_count: 2;\n"
+        "max_obj: 64\n"
+        "};";
+    ASSERT_EQ(static_cast<std::string>(pool), exp_3);
+
+    pool.deallocate(mem_1);
+    std::string exp_4 = "AllocatorFix: {obj_count: 1;\n"
+        "max_obj: 64\n"
+        "};";
+    ASSERT_EQ(static_cast<std::string>(pool), exp_4);
+
+    pool.deallocate(mem_2);
+    ASSERT_EQ(static_cast<std::string>(pool), exp_1);
+}
+
+inline size_t mem_diff(void* p_mem1, void* p_mem2) {
+    return reinterpret_cast<size_t>(p_mem1) - reinterpret_cast<size_t>(p_mem2);
+}
+
+template <size_t SIZE, size_t ARR_SIZE>
+void test_continuous(WBE::AllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p_mems[ARR_SIZE]) {
+    // One and only one should be at the beginning
+    bool found_begin = false;
+    WBE::MemID begin_id = p_mems[0];
+    WBE::MemID max_addr_id = p_mems[0];
+    for (uint32_t i = 0; i < ARR_SIZE; ++i) {
+        void* curr_addr = p_pool.get(p_mems[i]);
+        if (curr_addr == p_pool.get_mem_start()) {
+            if (found_begin) {
+                ASSERT_TRUE(false);
+            }
+            found_begin = true;
+            begin_id = p_mems[i];
+        }
+        if (curr_addr > p_pool.get(max_addr_id)) {
+            max_addr_id = p_mems[i];
+        } 
+    }
+    ASSERT_TRUE(found_begin);
+    // they should be ranged within a size of ARR_SIZE * SIZE
+    ASSERT_EQ(mem_diff(p_pool.get(max_addr_id), p_pool.get(begin_id)) + SIZE, ARR_SIZE * SIZE);
+    // for each memid, they should have another id which is SIZE distance apart (except the last one)
+    for (uint32_t i = 0; i < ARR_SIZE; ++i) {
+        if (p_mems[i] == max_addr_id) {
+            continue;
+        }
+        bool found_next = false;
+        for (uint32_t j = 0; j < ARR_SIZE; ++j) {
+            if (mem_diff(p_pool.get(p_mems[j]), p_pool.get(p_mems[i])) == SIZE) {
+                found_next = true;
+            }
+        }
+        ASSERT_TRUE(found_next);
+    }
+}
+
+TEST(WBEAllocFSPTestMemContinuity, BasicAssersions) {
+    WBE::AllocatorFixedSizePool<16> pool(64);
+    WBE::MemID mems[4];
+    mems[0] = pool.allocate();
+    mems[1] = pool.allocate();
+    mems[2] = pool.allocate();
+    mems[3] = pool.allocate();
+    test_continuous<16, 4>(pool, mems);
+    pool.deallocate(mems[1]);
+    mems[1] = mems[3];
+    test_continuous<16, 3>(pool, mems);
+}
+
+#endif
