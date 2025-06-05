@@ -2,6 +2,7 @@
 #define __WBE_ALLOCATOR_POOL_H__
 
 #include "allocator.h"
+#include "utils/defs.h"
 #include <cstddef>
 #include <memory>
 #include <unordered_map>
@@ -77,6 +78,18 @@ private:
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
     std::set<MemID> allocated;
+};
+
+template <>
+struct AllocatorTrait<AllocatorPool> {
+    WBE_TRAIT(AllocatorTrait<AllocatorPool>);
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

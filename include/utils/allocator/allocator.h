@@ -4,10 +4,22 @@
 #include <memory>
 #include <set>
 #include <sstream>
-#include <type_traits>
+
 namespace WhiteBirdEngine {
 
 using MemID = uint64_t;
+
+template <typename T>
+struct AllocatorTrait;
+
+template <typename T>
+concept AllocatorTraitConcept = requires {
+    { bool(T::IS_POOL) } -> std::same_as<bool>;
+    { bool(T::IS_GURANTEED_CONTINUOUS) } -> std::same_as<bool>;
+    { bool(T::IS_LIMITED_SIZE) } -> std::same_as<bool>;
+    { bool(T::IS_ALLOC_FIXED_SIZE) } -> std::same_as<bool>;
+    { bool(T::IS_ATOMIC) } -> std::same_as<bool>;
+};
 
 class Allocator {
 public:
@@ -36,25 +48,26 @@ public:
     }
 };
 
-template <typename T, typename ...Args>
+template <typename T>
+concept FixedSizeAllocatorConcept = bool(AllocatorTrait<T>::IS_GURANTEED_CONTINUOUS);
+
+template <typename T>
+concept AtomicAllocatorConcept = bool(AllocatorTrait<T>::IS_ATOMIC);
+
+template <typename T, typename... Args>
 inline MemID create_obj(std::shared_ptr<Allocator> p_allocator, Args&&... p_args) {
     MemID id = p_allocator->allocate(sizeof(T));
     new(p_allocator->get(id)) T(std::forward<Args>(p_args)...);
     return id;
 }
 
-template <typename T> requires std::is_destructible_v<T>
+template <typename T>
 inline void destroy_obj(std::shared_ptr<Allocator> p_allocator, MemID p_id) {
     p_allocator->get_obj<T>(p_id)->~T();
     p_allocator->deallocate(p_id);
 }
 
-template <typename T> requires (!std::is_destructible_v<T>)
-inline void destroy_obj(std::shared_ptr<Allocator> p_allocator, MemID p_id) {
-    p_allocator->deallocate(p_id);
-}
-
-template <typename T, typename ...Args>
+template <typename T, typename... Args>
 inline MemID create_obj(Allocator& p_allocator, Args&&... p_args) {
     MemID id = p_allocator.allocate(sizeof(T));
     new(p_allocator.get(id)) T(std::forward<Args>(p_args)...);
@@ -66,7 +79,6 @@ inline void destroy_obj(Allocator& p_allocator, MemID p_id) {
     p_allocator.get_obj<T>(p_id)->~T();
     p_allocator.deallocate(p_id);
 }
-
 
 }
 

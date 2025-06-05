@@ -2,13 +2,14 @@
 #define __WBE_ALLOCATOR_RAM_H__
 
 #include "utils/allocator/allocator.h"
+#include "utils/defs.h"
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
 class AllocatorRam : Allocator {
 public:
 
-    AllocatorRam() : curr_id(0) {}
+    AllocatorRam() : curr_id(1) {}
     virtual ~AllocatorRam() override;
 
     virtual MemID allocate(size_t p_size) override;
@@ -32,6 +33,18 @@ private:
     std::set<MemID> allocated;
     std::unordered_map<MemID, void*> alloc_map;
 
+};
+
+template <>
+struct AllocatorTrait<AllocatorRam> {
+    WBE_TRAIT(AllocatorTrait<AllocatorRam>);
+    static constexpr bool IS_POOL = false;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = false;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

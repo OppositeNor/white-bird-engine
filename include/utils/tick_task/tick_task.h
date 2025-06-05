@@ -31,7 +31,7 @@ public:
     }
 
     bool is_ready() const {
-        return prev_task_finish_count.load() >= prev_task_total;
+        return prev_task_finish_count.load(std::memory_order_acquire) >= prev_task_total;
     }
 
     void reset() {
@@ -59,7 +59,7 @@ private:
 
     void finish() {
         for (auto next_task : next_tasks) {
-            next_task->prev_task_finish_count.fetch_add(1);
+            next_task->prev_task_finish_count.fetch_add(1, std::memory_order_acq_rel);
         }
     }
 

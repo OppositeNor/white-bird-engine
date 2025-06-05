@@ -9,6 +9,22 @@
 #define WBE_DEBUG_ASSERT(...)
 #endif
 
+#if __GNUC__
+#define WBE_NO_OPTIMIZE __attribute__((optimize("O0")))
+#else
+#warning "Please indicate the \"no optimization\" attribute for your compiler."
+#endif
+
+// used for meta-parser
+#define WBE_COMPONENT(ConceptName)
+
+#define WBE_REQUIRES(Type, name) requires std::is_same_v<decltype(name), Type>
+
+#define WBE_TRAIT(TraitName) \
+    using TraitType = TraitName
+
+#define WBE_TRAIT_REQURIES(Concept) static_assert(Concept<TraitType>)
+
 namespace WhiteBirdEngine {
 
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;

@@ -8,6 +8,14 @@
 
 namespace WBE = WhiteBirdEngine;
 
+TEST(WBEAllocPoolTraitTest, BasicAssersions) {
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_POOL);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_LIMITED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_ATOMIC);
+}
+
 TEST(WBEAllocPoolTestToString, BasicAssersions) {
     WBE::AllocatorPool pool(1024, 4);
     std::string exp_1 = "AllocatorPool: {obj_count: 0;\n"

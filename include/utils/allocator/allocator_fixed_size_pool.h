@@ -7,10 +7,10 @@
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
+
 template <size_t SIZE>
 class AllocatorFixedSizePool : public Allocator {
 public:
-
     static constexpr uint32_t MAX_OBJ_COUNT = 128;
 
     AllocatorFixedSizePool()
@@ -22,7 +22,7 @@ public:
     AllocatorFixedSizePool& operator=(AllocatorFixedSizePool&&) = delete;
 
     AllocatorFixedSizePool(uint32_t p_max_obj)
-        : curr_id(0), max_obj(p_max_obj), alloc_obj_count(0),
+        : curr_id(1), max_obj(p_max_obj), alloc_obj_count(0),
           mem_chunk(std::make_unique<std::byte[]>(p_max_obj * SIZE)) {
         WBE_DEBUG_ASSERT(p_max_obj < MAX_OBJ_COUNT);
     }
@@ -62,6 +62,18 @@ private:
         alloc_map[p_id] = p_addr;
         alloc_map_reverse[p_addr] = p_id;
     }
+};
+
+template <size_t SIZE>
+struct AllocatorTrait<AllocatorFixedSizePool<SIZE>> {
+    WBE_TRAIT(AllocatorTrait<AllocatorFixedSizePool<SIZE>>);
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = true;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 template <size_t SIZE>
