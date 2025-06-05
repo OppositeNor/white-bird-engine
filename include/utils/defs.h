@@ -18,8 +18,6 @@
 // used for meta-parser
 #define WBE_COMPONENT(ConceptName)
 
-#define WBE_REQUIRES(Type, name) requires std::is_same_v<decltype(name), Type>
-
 #define WBE_TRAIT(TraitName) \
     using TraitType = TraitName
 
