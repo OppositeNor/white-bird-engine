@@ -8,7 +8,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-TEST(WBEAllocFSPPoolTraitTest, BasicAssersions) {
+TEST(WBEAllocFSPTest, Trait) {
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_POOL);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_LIMITED_SIZE);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_GURANTEED_CONTINUOUS);
@@ -16,7 +16,7 @@ TEST(WBEAllocFSPPoolTraitTest, BasicAssersions) {
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_ATOMIC);
 }
 
-TEST(WBEAllocFSPTestToString, BasicAssersions) {
+TEST(WBEAllocFSPTest, ToString) {
     WBE::AllocatorFixedSizePool<4> pool(64);
 
     std::string exp_1 = "AllocatorFix: {obj_count: 0;\n"
@@ -87,7 +87,7 @@ void test_continuous(WBE::AllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p_mem
     }
 }
 
-TEST(WBEAllocFSPTestMemContinuity, BasicAssersions) {
+TEST(WBEAllocFSPTest, MemContinuity) {
     WBE::AllocatorFixedSizePool<16> pool(64);
     WBE::MemID mems[4];
     mems[0] = pool.allocate();

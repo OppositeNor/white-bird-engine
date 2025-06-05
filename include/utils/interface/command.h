@@ -7,6 +7,11 @@ namespace WhiteBirdEngine {
 
 using CommandID = uint64_t;
 
+/**
+ * @class Command
+ * @brief 
+ *
+ */
 class Command {
 public:
     Command() = default;

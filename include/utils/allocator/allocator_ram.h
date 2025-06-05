@@ -6,7 +6,7 @@
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
-class AllocatorRam : Allocator {
+class AllocatorRam final : public Allocator {
 public:
 
     AllocatorRam() : curr_id(1) {}
@@ -17,6 +17,9 @@ public:
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) override {
+        if (p_id == 0) {
+            return nullptr;
+        }
         return alloc_map.find(p_id)->second;
     }
 

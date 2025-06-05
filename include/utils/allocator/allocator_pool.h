@@ -9,7 +9,7 @@
 
 namespace WhiteBirdEngine {
 
-class AllocatorPool : public Allocator {
+class AllocatorPool final : public Allocator {
 public:
     AllocatorPool() : AllocatorPool(1024) {}
     virtual ~AllocatorPool() override;
@@ -25,6 +25,9 @@ public:
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) override {
+        if (p_id == 0) {
+            return nullptr;
+        }
         return alloc_map.find(p_id)->second;
     }
 

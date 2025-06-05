@@ -9,12 +9,25 @@ namespace WhiteBirdEngine {
 
 using EntityID = uint64_t;
 
+/**
+ * @brief Concept for identifying if a system can operate on a component.
+ *
+ * @tparam SysType The type of the system.
+ * @tparam CompType The type of the component.
+ */
 template <typename SysType, typename CompType>
-constexpr bool is_system_of = requires(SysType p_t) {
+concept SystemConcept = requires(SysType p_t) {
     p_t.operate((CompType*)nullptr);
 };
 
-// TODO: test
+/**
+ * @class ComponentsChunk
+ * @brief A chunk of components.
+ * @todo test
+ *
+ * @tparam T The type of the component.
+ * @tparam Alloctype The type of the allocator.
+ */
 template <typename T, FixedSizeAllocatorConcept AllocType = AllocatorFixedSizePool<sizeof(T)>>
 class ComponentsChunk {
 public:
@@ -25,7 +38,14 @@ public:
     ComponentsChunk(Args&&... p_args)
         : component_pool(std::forward<Args>(p_args)...) {}
 
-    // add a component of an entity to the pool.
+    /**
+     * @brief Add a component to the chunk.
+     *
+     * @tparam Args Argument types of the constructor of the component.
+     * @param p_entity_id The entity that owns this component.
+     * @param p_args The arguments of the constructor of the component.
+     * @return The memory ID of the component.
+     */
     template <typename ...Args>
     MemID add(EntityID p_entity_id, Args&&... p_args) {
         MemID mem_id = create_obj(component_pool, std::forward(p_args)...);
@@ -33,21 +53,32 @@ public:
         return mem_id;
     }
 
-    // remove a component of an entity from the pool
-    void remove(EntityID p_entity_id, MemID p_obj, bool p_maybe_not_contained = false) {
+    /**
+     * @brief Remove a component of an entity from the pool.
+     *
+     * @param p_entity_id The ID of the entity.
+     * @param p_obj The ID of the component.
+     * @param p_maybe_not_contained Don't trigger an error if this chunk doesn't contain the component with the corresponding ID.
+     */
+    void remove(EntityID p_entity_id, MemID p_component, bool p_maybe_not_contained = false) {
         auto iter = entity_map.find(p_entity_id);
-        if (iter == entity_map.end()) {
+        if (iter == entity_map.end() || iter->second != p_entity_id) {
             if (p_maybe_not_contained) {
-
+                throw std::runtime_error("Failed to remove component: component not in this chunk.");
             }
             return;
         }
         entity_map.erase(p_entity_id);
-        destroy_obj<T>(component_pool, p_obj);
+        destroy_obj<T>(component_pool, p_component);
     }
 
-    // operate a system on the component chunk
-    template <typename T1>
+    /**
+     * @brief Operate a system on the components.
+     *
+     * @tparam T1 The type of the system.
+     * @param p_system The system to operate on this concept.
+     */
+    template <SystemConcept<T> T1>
     void system_operate(const T1& p_system) {
         WBE_DEBUG_ASSERT(component_pool.is_flushed());
         T* mem_array = static_cast<T*>(component_pool.get_mem_start());
@@ -57,11 +88,18 @@ public:
         }
     }
 
+    /**
+     * @brief Get a component of an entity.
+     *
+     * @param p_entity The entity to get component from.
+     * @return The ID of the entity.
+     */
     MemID get(EntityID p_entity) {
         auto comp_iter = entity_map.find(p_entity);
         if (comp_iter == entity_map.end()) {
             throw std::runtime_error("Failed to get component from entity with id: " + std::to_string(p_entity));
         }
+        return comp_iter->second;
     }
 
 private:

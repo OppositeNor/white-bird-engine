@@ -29,18 +29,33 @@ public:
     Ref(AllocType* p_allocator) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, 0);
+        ref();
     }
     ~Ref() {
         deref();
     }
     Ref(const Ref& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
-        p_other.control_block->strong_ref_counter.fetch_add(1, std::memory_order_acq_rel);
+        p_other.ref();
         control_block = p_other.control_block;
     }
     Ref(Ref&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = p_other.control_block;
+    }
+    Ref& operator=(const Ref& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        deref();
+        p_other.ref();
+        control_block = p_other.control_block;
+        return *this;
+    }
+    Ref& operator=(Ref&& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        deref();
+        p_other.ref();
+        control_block = p_other.control_block;
+        return *this;
     }
 
     Ref(AllocType* p_allocator, MemID p_mem_id) {
@@ -49,12 +64,17 @@ public:
     }
 
     T* operator->() {
-        // TODO
+        return control_block->allocator->get(control_block->mem_id);
     }
 
 private:
+    void ref() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        control_block->strong_ref_counter.fetch_add(1, std::memory_order_acq_rel);
+    }
 
     void deref() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             destroy_obj(*(control_block->allocator), control_block->mem_id);
             if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {

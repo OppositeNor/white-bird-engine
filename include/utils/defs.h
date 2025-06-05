@@ -12,14 +12,13 @@
 #if __GNUC__
 #define WBE_NO_OPTIMIZE __attribute__((optimize("O0")))
 #else
-#warning "Please indicate the \"no optimization\" attribute for your compiler."
+#warning Please indicate the "no optimization" attribute for your compiler.
 #endif
 
 // used for meta-parser
 #define WBE_COMPONENT(ConceptName)
 
-#define WBE_TRAIT(TraitName) \
-    using TraitType = TraitName
+#define WBE_TRAIT(TraitName) using TraitType = TraitName
 
 #define WBE_TRAIT_REQURIES(Concept) static_assert(Concept<TraitType>)
 

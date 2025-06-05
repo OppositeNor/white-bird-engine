@@ -8,7 +8,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-TEST(WBEAllocPoolTraitTest, BasicAssersions) {
+TEST(WBEAllocPoolTest, TraitTest) {
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_POOL);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_LIMITED_SIZE);
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_GURANTEED_CONTINUOUS);
@@ -16,7 +16,7 @@ TEST(WBEAllocPoolTraitTest, BasicAssersions) {
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_ATOMIC);
 }
 
-TEST(WBEAllocPoolTestToString, BasicAssersions) {
+TEST(WBEAllocPoolTest, ToString) {
     WBE::AllocatorPool pool(1024, 4);
     std::string exp_1 = "AllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
@@ -71,7 +71,7 @@ TEST(WBEAllocPoolTestToString, BasicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_5);
 }
 
-TEST(WBEAllocPoolRemoveIdleFront, BassicAssersions) {
+TEST(WBEAllocPoolTest, RemoveIdleFront) {
     WBE::AllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -127,7 +127,7 @@ TEST(WBEAllocPoolRemoveIdleFront, BassicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
-TEST(WBEAllocPoolRemoveIdleBack, BassicAssersions) {
+TEST(WBEAllocPoolTest, RemoveIdleBack) {
     WBE::AllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -183,7 +183,7 @@ TEST(WBEAllocPoolRemoveIdleBack, BassicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
-TEST(WBEAllocPoolRemoveIdleMiddle, BassicAssersions) {
+TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
     WBE::AllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -262,7 +262,7 @@ TEST(WBEAllocPoolRemoveIdleMiddle, BassicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp5);
 }
 
-TEST(WBEAllocPoolRemoveIdleEnd, BassicAssersions) {
+TEST(WBEAllocPoolTest, RemoveIdleEnd) {
     WBE::AllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -304,7 +304,7 @@ TEST(WBEAllocPoolRemoveIdleEnd, BassicAssersions) {
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
-TEST(WBEAllocPoolTestRemainSize, BassicAssersions) {
+TEST(WBEAllocPoolTest, RemainSize) {
     WhiteBirdEngine::AllocatorPool pool(1024, 4);
     WBE::MemID mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1020);
@@ -316,7 +316,7 @@ TEST(WBEAllocPoolTestRemainSize, BassicAssersions) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST(WBEAllocPoolTestConstructDestructCall, BassicAssersions) {
+TEST(WBEAllocPoolTest, ConstructDestructCall) {
     uint32_t test_val = 0;
     class TestClass {
     public:
@@ -336,7 +336,7 @@ TEST(WBEAllocPoolTestConstructDestructCall, BassicAssersions) {
     ASSERT_EQ(test_val, 2);
 }
 
-TEST(WBEAllocPoolTestWithDiffInstances, BassicAssersions) {
+TEST(WBEAllocPoolTest, WithDiffInstances) {
     class TestBase {
     public:
         TestBase() {

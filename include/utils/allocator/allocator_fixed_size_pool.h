@@ -9,7 +9,7 @@
 namespace WhiteBirdEngine {
 
 template <size_t SIZE>
-class AllocatorFixedSizePool : public Allocator {
+class AllocatorFixedSizePool final : public Allocator {
 public:
     static constexpr uint32_t MAX_OBJ_COUNT = 128;
 
@@ -32,6 +32,9 @@ public:
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) override {
+        if (p_id == 0) {
+            return nullptr;
+        }
         return alloc_map[p_id];
     }
 
