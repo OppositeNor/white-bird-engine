@@ -83,6 +83,13 @@ public:
     virtual const std::set<MemID>& get_allocated() const = 0;
 
     /**
+     * @brief Is the allocator empty.
+     *
+     * @return true if allocator is empty, false otherwise.
+     */
+    virtual bool is_empty() const = 0;
+
+    /**
      * @brief Get the pointer pointing to the resource.
      *
      * @tparam T The type of the resource.

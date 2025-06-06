@@ -58,6 +58,10 @@ public:
         return alignment;
     }
 
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
+
     // TODO: Test
     void flush();
 

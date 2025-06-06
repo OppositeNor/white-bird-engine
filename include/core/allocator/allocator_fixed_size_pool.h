@@ -59,6 +59,10 @@ public:
         return mem_chunk.get();
     }
 
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
+
 private:
     MemID curr_id;
     uint32_t max_obj;

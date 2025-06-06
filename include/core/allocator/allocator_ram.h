@@ -38,6 +38,10 @@ public:
         return allocated;
     }
 
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
+
 private:
     MemID curr_id;
     std::set<MemID> allocated;
