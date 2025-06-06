@@ -3,7 +3,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "utils/allocator/allocator_pool.h"
+#include "core/allocator/allocator_pool.h"
 
 namespace WhiteBirdEngine {
 

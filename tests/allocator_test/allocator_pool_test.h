@@ -1,8 +1,7 @@
 #ifndef __ALOCATOR_POOL_TEST_H__
 #define __ALOCATOR_POOL_TEST_H__
 
-#include "utils/allocator/allocator.h"
-#include "utils/allocator/allocator_pool.h"
+#include "core/allocator/allocator_pool.h"
 #include <gtest/gtest.h>
 #include <memory>
 

@@ -1,7 +1,7 @@
 #ifndef __WBE_ALLOCATOR_RAM_H__
 #define __WBE_ALLOCATOR_RAM_H__
 
-#include "utils/allocator/allocator.h"
+#include "core/allocator/allocator.h"
 #include "utils/defs.h"
 #include <unordered_map>
 namespace WhiteBirdEngine {

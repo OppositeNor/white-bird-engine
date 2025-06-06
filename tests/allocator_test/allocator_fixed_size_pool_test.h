@@ -1,8 +1,7 @@
 #ifndef __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
 #define __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
 
-#include "utils/allocator/allocator.h"
-#include "utils/allocator/allocator_fixed_size_pool.h"
+#include "core/allocator/allocator_fixed_size_pool.h"
 #include <cstddef>
 #include <gtest/gtest.h>
 

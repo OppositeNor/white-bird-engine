@@ -1,7 +1,7 @@
 #ifndef __WBE_REFERENCE_STRONG_H__
 #define __WBE_REFERENCE_STRONG_H__
 
-#include "utils/allocator/allocator.h"
+#include "core/allocator/allocator.h"
 #include "utils/defs.h"
 #include <atomic>
 namespace WhiteBirdEngine {

@@ -1,8 +1,7 @@
 #ifndef __WBE_ECS_H__
 #define __WBE_ECS_H__
 
-#include "utils/allocator/allocator.h"
-#include "utils/allocator/allocator_fixed_size_pool.h"
+#include "core/allocator/allocator_fixed_size_pool.h"
 #include "utils/defs.h"
 
 namespace WhiteBirdEngine {

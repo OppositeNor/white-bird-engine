@@ -50,10 +50,8 @@ include_directories(
     ${include_dirs}
 )
 
+add_subdirectory(src/core)
 add_subdirectory(src/utils)
-add_subdirectory(src/model)
-add_subdirectory(src/view)
-add_subdirectory(src/controller)
 
 add_executable(${PROJECT_NAME}
     ${source}
