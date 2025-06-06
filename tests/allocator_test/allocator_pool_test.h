@@ -3,7 +3,6 @@
 
 #include "core/allocator/allocator_pool.h"
 #include <gtest/gtest.h>
-#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -328,7 +327,7 @@ TEST(WBEAllocPoolTest, ConstructDestructCall) {
         }
         uint32_t* test_val_ptr;
     };
-    std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>();
+    WhiteBirdEngine::AllocatorPool allocator = WhiteBirdEngine::AllocatorPool();
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
     WBE::destroy_obj<TestClass>(allocator, test_obj);
@@ -360,19 +359,19 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
         uint32_t child_placeholder2;
     };
 
-    std::shared_ptr<WhiteBirdEngine::AllocatorPool> allocator = std::make_shared<WhiteBirdEngine::AllocatorPool>(1024, sizeof(uint32_t));
+    WhiteBirdEngine::AllocatorPool allocator = WhiteBirdEngine::AllocatorPool(1024, sizeof(uint32_t));
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
-    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase));
     WBE::MemID test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
-    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
     WBE::MemID test_obj2 = WhiteBirdEngine::create_obj<TestChild2>(allocator);
-    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
     WhiteBirdEngine::destroy_obj<TestBase>(allocator, test_obj);
-    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
     WhiteBirdEngine::destroy_obj<TestChild1>(allocator, test_obj1);
-    ASSERT_EQ(allocator->get_remain_size(), 1024 - sizeof(TestChild2));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2));
     WhiteBirdEngine::destroy_obj<TestChild2>(allocator, test_obj2);
-    ASSERT_EQ(allocator->get_remain_size(), 1024);
+    ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
 
 // TODO: test flush

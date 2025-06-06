@@ -35,7 +35,14 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        return alloc_map[p_id];
+        return alloc_map.at(p_id);
+    }
+
+    virtual const void* get(MemID p_id) const override {
+        if (p_id == 0) {
+            return nullptr;
+        }
+        return alloc_map.at(p_id);
     }
 
     virtual uint32_t obj_count() const override {

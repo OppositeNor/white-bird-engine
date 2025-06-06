@@ -4,6 +4,7 @@
 #include "core/allocator/allocator.h"
 #include "utils/defs.h"
 #include <atomic>
+
 namespace WhiteBirdEngine {
 
 // TODO: Test
@@ -18,7 +19,7 @@ public:
         ControlBlock(AllocType* p_alloc_type, MemID p_mem_id)
             : mem_id(p_mem_id), allocator(p_alloc_type) {
             weak_ref_counter.store(0, std::memory_order_release);
-            strong_ref_counter.store(0, std::memory_order_release);
+            strong_ref_counter.store(1, std::memory_order_release);
         }
         MemID mem_id;
         AllocType* allocator;
@@ -63,8 +64,22 @@ public:
         control_block = new ControlBlock(p_allocator, p_mem_id);
     }
 
+    template <typename... Args>
+    static Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
+        return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
+    }
+
     T* operator->() {
         return control_block->allocator->get(control_block->mem_id);
+    }
+
+    T& operator*() {
+        T* ptr = static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return *ptr;
+    }
+
+    const T& operator*() const {
+        return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
     }
 
 private:
@@ -76,14 +91,14 @@ private:
     void deref() {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            destroy_obj(*(control_block->allocator), control_block->mem_id);
+            destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
             if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {
                 delete control_block;
             }
         }
     }
 
-    ControlBlock* control_block;
+    mutable ControlBlock* control_block;
 };
 
 template <typename T, typename AllocType,  typename... Args>
@@ -94,6 +109,5 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
 }
 
 }
-
 
 #endif

@@ -63,6 +63,14 @@ public:
     virtual void* get(MemID p_id) = 0;
 
     /**
+     * @brief Get the pointer pointing to the resource.
+     *
+     * @param p_id The resource id to get the pointer from.
+     * @return The pointer of the resource.
+     */
+    virtual const void* get(MemID p_id) const = 0;
+
+    /**
      * @brief Get the number of allocated resources.
      *
      * @return The number of allocated resources.
@@ -109,35 +117,6 @@ concept AtomicAllocatorConcept = bool(AllocatorTrait<T>::IS_ATOMIC);
  * @return The memory ID of the created object.
  */
 template <typename T, typename... Args>
-inline MemID create_obj(std::shared_ptr<Allocator> p_allocator, Args&&... p_args) {
-    MemID id = p_allocator->allocate(sizeof(T));
-    new(p_allocator->get(id)) T(std::forward<Args>(p_args)...);
-    return id;
-}
-
-/**
- * @brief Destroy an object.
- *
- * @tparam T The type of the object.
- * @param p_allocator The allocator that this object's memory is allocated from.
- * @param p_id The memory ID of the object.
- */
-template <typename T>
-inline void destroy_obj(std::shared_ptr<Allocator> p_allocator, MemID p_id) {
-    p_allocator->get_obj<T>(p_id)->~T();
-    p_allocator->deallocate(p_id);
-}
-
-/**
- * @brief Create an object.
- *
- * @tparam T The type of the object.
- * @tparam Args The types of the constructor arguments to construct the object.
- * @param p_allocator The allocator to allocate memory from.
- * @param p_args The arguments of the constructor.
- * @return The memory ID of the created object.
- */
-template <typename T, typename... Args>
 inline MemID create_obj(Allocator& p_allocator, Args&&... p_args) {
     MemID id = p_allocator.allocate(sizeof(T));
     new(p_allocator.get(id)) T(std::forward<Args>(p_args)...);
@@ -151,9 +130,9 @@ inline MemID create_obj(Allocator& p_allocator, Args&&... p_args) {
  * @param p_allocator The allocator that this object's memory is allocated from.
  * @param p_id The memory ID of the object.
  */
-template <typename T>
-inline void destroy_obj(Allocator& p_allocator, MemID p_id) {
-    p_allocator.get_obj<T>(p_id)->~T();
+template <typename T, typename AllocType>
+inline void destroy_obj(AllocType& p_allocator, MemID p_id) {
+    static_cast<T*>(p_allocator.get(p_id))->~T();
     p_allocator.deallocate(p_id);
 }
 

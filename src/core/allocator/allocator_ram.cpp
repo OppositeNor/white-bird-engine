@@ -21,9 +21,9 @@ void AllocatorRam::deallocate(MemID p_mem) {
     if (iter == allocated.end()) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated by this allocator.");
     }
+    free(get(p_mem));
     allocated.erase(p_mem);
     alloc_map.erase(p_mem);
-    free(get(p_mem));
 }
 
 
