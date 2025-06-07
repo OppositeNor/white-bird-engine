@@ -1,22 +1,22 @@
-#include "core/allocator/allocator_ram.h"
+#include "core/allocator/heap_allocator_ram.h"
 
 namespace WhiteBirdEngine {
 
-AllocatorRam::~AllocatorRam() {
+HeapAllocatorRam::~HeapAllocatorRam() {
     // TODO: warning if not empty
     for (auto& iter : alloc_map) {
         free(iter.second);
     }
 }
 
-MemID AllocatorRam::allocate(size_t p_size) {
+MemID HeapAllocatorRam::allocate(size_t p_size) {
     void* result = malloc(p_size);
     allocated.insert(curr_id);
     alloc_map[curr_id] = result;
     return curr_id++;
 }
 
-void AllocatorRam::deallocate(MemID p_mem) {
+void HeapAllocatorRam::deallocate(MemID p_mem) {
     auto iter = allocated.find(p_mem);
     if (iter == allocated.end()) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated by this allocator.");

@@ -1,14 +1,14 @@
 #ifndef __WBE_REF_STRONG_TEST_H__
 #define __WBE_REF_STRONG_TEST_H__
 
-#include "core/allocator/allocator_ram.h"
-#include "core/reference/reference_strong.h"
+#include "core/allocator/heap_allocator_ram.h"
+#include "core/memory/reference_strong.h"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBERefStrongTest, Allocation) {
-    WBE::AllocatorRam allocator;
+    WBE::HeapAllocatorRam allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 0);
         ASSERT_FALSE(allocator.is_empty());
@@ -18,10 +18,14 @@ TEST(WBERefStrongTest, Allocation) {
         ASSERT_EQ(allocator.get_allocated().size(), 1);
     }
     ASSERT_TRUE(allocator.is_empty());
+    {
+        WBE::Ref<int> ref(&allocator);
+    }
+    ASSERT_TRUE(allocator.is_empty());
 }
 
 TEST(WBERefStrongTest, CopyMove) {
-    WBE::AllocatorRam allocator;
+    WBE::HeapAllocatorRam allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 3);
         ASSERT_FALSE(allocator.is_empty());
@@ -41,6 +45,34 @@ TEST(WBERefStrongTest, CopyMove) {
         ASSERT_EQ(allocator.get_allocated().size(), 1);
     }
     ASSERT_TRUE(allocator.is_empty());
+}
+
+TEST(WBERefStrongTest, ConstructDestruct) {
+    WBE::HeapAllocatorRam allocator;
+    int test_val = 0;
+    class TestClass {
+    public:
+        int* modify_val;
+        TestClass(int* p_modify_val)
+            : modify_val(p_modify_val) {
+            ++(*modify_val);
+        }
+        ~TestClass() {
+            *modify_val = 100;
+        }
+    };
+    {
+        WBE::Ref<TestClass> ref(&allocator);
+        ASSERT_EQ(test_val, 0);
+        ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
+        ASSERT_EQ(test_val, 1);
+        {
+            WBE::Ref<TestClass> ref1 = ref;
+            ASSERT_EQ(test_val, 1);
+        }
+        ASSERT_EQ(test_val, 1);
+    }
+    ASSERT_EQ(test_val, 100);
 }
 
 #endif

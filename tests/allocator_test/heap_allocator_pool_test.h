@@ -1,22 +1,22 @@
-#ifndef __ALOCATOR_POOL_TEST_H__
-#define __ALOCATOR_POOL_TEST_H__
+#ifndef __WBE_ALOCATOR_POOL_TEST_H__
+#define __WBE_ALOCATOR_POOL_TEST_H__
 
-#include "core/allocator/allocator_pool.h"
+#include "core/allocator/heap_allocator_pool.h"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBEAllocPoolTest, TraitTest) {
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_POOL);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_LIMITED_SIZE);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_GURANTEED_CONTINUOUS);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_ALLOC_FIXED_SIZE);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorPool>::IS_ATOMIC);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_POOL);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_LIMITED_SIZE);
+    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_ATOMIC);
 }
 
 TEST(WBEAllocPoolTest, ToString) {
-    WBE::AllocatorPool pool(1024, 4);
-    std::string exp_1 = "AllocatorPool: {obj_count: 0;\n"
+    WBE::HeapAllocatorPool pool(1024, 4);
+    std::string exp_1 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -26,7 +26,7 @@ TEST(WBEAllocPoolTest, ToString) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     WBE::MemID mem1 = pool.allocate(2);
-    std::string exp_2 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp_2 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -36,7 +36,7 @@ TEST(WBEAllocPoolTest, ToString) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
     WBE::MemID mem2 = pool.allocate(8);
-    std::string exp_3 = "AllocatorPool: {obj_count: 2;\n"
+    std::string exp_3 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 12;\n"
@@ -46,7 +46,7 @@ TEST(WBEAllocPoolTest, ToString) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
     pool.deallocate(mem1);
-    std::string exp_4 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp_4 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -62,7 +62,7 @@ TEST(WBEAllocPoolTest, ToString) {
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     pool.allocate(1024);
-    std::string exp_5 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp_5 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "};\n"
         "};";
@@ -70,13 +70,13 @@ TEST(WBEAllocPoolTest, ToString) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleFront) {
-    WBE::AllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(4);
     pool.deallocate(mem3);
-    std::string exp1 = "AllocatorPool: {obj_count: 3;\n"
+    std::string exp1 = "HeapAllocatorPool: {obj_count: 3;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 12;\n"
@@ -90,7 +90,7 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem2);
-    std::string exp2 = "AllocatorPool: {obj_count: 2;\n"
+    std::string exp2 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -104,7 +104,7 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp3 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -114,7 +114,7 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "AllocatorPool: {obj_count: 0;\n"
+    std::string exp4 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -126,13 +126,13 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleBack) {
-    WBE::AllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(12);
     pool.deallocate(mem2);
-    std::string exp1 = "AllocatorPool: {obj_count: 3;\n"
+    std::string exp1 = "HeapAllocatorPool: {obj_count: 3;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -146,7 +146,7 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = "AllocatorPool: {obj_count: 2;\n"
+    std::string exp2 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -160,7 +160,7 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp3 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -170,7 +170,7 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "AllocatorPool: {obj_count: 0;\n"
+    std::string exp4 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -182,14 +182,14 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
-    WBE::AllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(12);
     WBE::MemID mem5 = pool.allocate(128);
     pool.deallocate(mem2);
-    std::string exp1 = "AllocatorPool: {obj_count: 4;\n"
+    std::string exp1 = "HeapAllocatorPool: {obj_count: 4;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -203,7 +203,7 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem4);
-    std::string exp2 = "AllocatorPool: {obj_count: 3;\n"
+    std::string exp2 = "HeapAllocatorPool: {obj_count: 3;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -221,7 +221,7 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem3);
-    std::string exp3 = "AllocatorPool: {obj_count: 2;\n"
+    std::string exp3 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -235,7 +235,7 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp4 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -249,7 +249,7 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
     pool.deallocate(mem5);
-    std::string exp5 = "AllocatorPool: {obj_count: 0;\n"
+    std::string exp5 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -261,17 +261,17 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleEnd) {
-    WBE::AllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024, 4);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(1012);
-    std::string exp1 = "AllocatorPool: {obj_count: 3;\n"
+    std::string exp1 = "HeapAllocatorPool: {obj_count: 3;\n"
         "free_chunk_layout: {\n"
         "};\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = "AllocatorPool: {obj_count: 2;\n"
+    std::string exp2 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 12;\n"
@@ -281,7 +281,7 @@ TEST(WBEAllocPoolTest, RemoveIdleEnd) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem2);
-    std::string exp3 = "AllocatorPool: {obj_count: 1;\n"
+    std::string exp3 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 4;\n"
@@ -291,7 +291,7 @@ TEST(WBEAllocPoolTest, RemoveIdleEnd) {
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "AllocatorPool: {obj_count: 0;\n"
+    std::string exp4 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
@@ -303,7 +303,7 @@ TEST(WBEAllocPoolTest, RemoveIdleEnd) {
 }
 
 TEST(WBEAllocPoolTest, RemainSize) {
-    WhiteBirdEngine::AllocatorPool pool(1024, 4);
+    WhiteBirdEngine::HeapAllocatorPool pool(1024, 4);
     WBE::MemID mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1020);
     pool.deallocate(mem);
@@ -327,7 +327,7 @@ TEST(WBEAllocPoolTest, ConstructDestructCall) {
         }
         uint32_t* test_val_ptr;
     };
-    WhiteBirdEngine::AllocatorPool allocator = WhiteBirdEngine::AllocatorPool();
+    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool();
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
     WBE::destroy_obj<TestClass>(allocator, test_obj);
@@ -359,7 +359,7 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
         uint32_t child_placeholder2;
     };
 
-    WhiteBirdEngine::AllocatorPool allocator = WhiteBirdEngine::AllocatorPool(1024, sizeof(uint32_t));
+    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024, sizeof(uint32_t));
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase));
     WBE::MemID test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);

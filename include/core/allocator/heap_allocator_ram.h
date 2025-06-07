@@ -1,16 +1,16 @@
-#ifndef __WBE_ALLOCATOR_RAM_H__
-#define __WBE_ALLOCATOR_RAM_H__
+#ifndef __WBE_HEAP_ALLOCATOR_RAM_H__
+#define __WBE_HEAP_ALLOCATOR_RAM_H__
 
-#include "core/allocator/allocator.h"
+#include "heap_allocator.h"
 #include "utils/defs.h"
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
-class AllocatorRam final : public Allocator {
+class HeapAllocatorRam final : public HeapAllocator {
 public:
 
-    AllocatorRam() : curr_id(1) {}
-    virtual ~AllocatorRam() override;
+    HeapAllocatorRam() : curr_id(1) {}
+    virtual ~HeapAllocatorRam() override;
 
     virtual MemID allocate(size_t p_size) override;
 
@@ -50,15 +50,15 @@ private:
 };
 
 template <>
-struct AllocatorTrait<AllocatorRam> {
-    WBE_TRAIT(AllocatorTrait<AllocatorRam>);
+struct HeapAllocatorTrait<HeapAllocatorRam> {
+    WBE_TRAIT(HeapAllocatorTrait<HeapAllocatorRam>);
     static constexpr bool IS_POOL = false;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = false;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQURIES(HeapAllocatorTraitConcept);
 };
 
 }

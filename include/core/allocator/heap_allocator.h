@@ -1,7 +1,6 @@
-#ifndef __WBE_ALLOCATOR_H__
-#define __WBE_ALLOCATOR_H__
+#ifndef __WBE_HEAP_ALLOCATOR_H__
+#define __WBE_HEAP_ALLOCATOR_H__
 
-#include <memory>
 #include <set>
 #include <sstream>
 
@@ -10,7 +9,7 @@ namespace WhiteBirdEngine {
 using MemID = uint64_t;
 
 template <typename T>
-struct AllocatorTrait;
+struct HeapAllocatorTrait;
 
 /**
  * @brief The traits of the allocator.
@@ -18,7 +17,7 @@ struct AllocatorTrait;
  * @tparam T The type of the allocator.
  */
 template <typename T>
-concept AllocatorTraitConcept = requires {
+concept HeapAllocatorTraitConcept = requires {
     // Does this allocator allocates from a memory pool.
     { bool(T::IS_POOL) } -> std::same_as<bool>;
     // Is the memory of objects is guranteed to be continuous.
@@ -31,10 +30,10 @@ concept AllocatorTraitConcept = requires {
     { bool(T::IS_ATOMIC) } -> std::same_as<bool>;
 };
 
-class Allocator {
+class HeapAllocator {
 public:
-    Allocator() = default;
-    virtual ~Allocator() {}
+    HeapAllocator() = default;
+    virtual ~HeapAllocator() {}
 
     /**
      * @brief Allocate memory of a specific size.
@@ -103,16 +102,16 @@ public:
 
     virtual operator std::string() const {
         std::stringstream ss;
-        ss << "Allocator{obj_count: " << obj_count() << "}";
+        ss << "HeapAllocator{obj_count: " << obj_count() << "}";
         return ss.str();
     }
 };
 
 template <typename T>
-concept FixedSizeAllocatorConcept = bool(AllocatorTrait<T>::IS_GURANTEED_CONTINUOUS);
+concept FixedSizeHeapAllocatorConcept = bool(HeapAllocatorTrait<T>::IS_GURANTEED_CONTINUOUS);
 
 template <typename T>
-concept AtomicAllocatorConcept = bool(AllocatorTrait<T>::IS_ATOMIC);
+concept AtomicHeapAllocatorConcept = bool(HeapAllocatorTrait<T>::IS_ATOMIC);
 
 /**
  * @brief Create an object.
@@ -124,7 +123,7 @@ concept AtomicAllocatorConcept = bool(AllocatorTrait<T>::IS_ATOMIC);
  * @return The memory ID of the created object.
  */
 template <typename T, typename... Args>
-inline MemID create_obj(Allocator& p_allocator, Args&&... p_args) {
+inline MemID create_obj(HeapAllocator& p_allocator, Args&&... p_args) {
     MemID id = p_allocator.allocate(sizeof(T));
     new(p_allocator.get(id)) T(std::forward<Args>(p_args)...);
     return id;

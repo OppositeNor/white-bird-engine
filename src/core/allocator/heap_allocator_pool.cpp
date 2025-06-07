@@ -3,15 +3,15 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "core/allocator/allocator_pool.h"
+#include "core/allocator/heap_allocator_pool.h"
 
 namespace WhiteBirdEngine {
 
-AllocatorPool::~AllocatorPool() {
+HeapAllocatorPool::~HeapAllocatorPool() {
     // TODO: warning if not all memory freed (which is probably caused by a memory leak error)
 }
 
-AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
+HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)
     : curr_id(1), size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size, alignment))) {
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
@@ -20,7 +20,7 @@ AllocatorPool::AllocatorPool(size_t p_size, size_t p_alignment)
     idle_chunks_count = 1;
 }
 
-MemID AllocatorPool::allocate(size_t p_size) {
+MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
     size_t align_size = get_align_size(p_size, alignment);
     while (valid_idle_node != nullptr) {
@@ -36,7 +36,7 @@ MemID AllocatorPool::allocate(size_t p_size) {
     throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
 }
 
-void AllocatorPool::deallocate(MemID p_mem) {
+void HeapAllocatorPool::deallocate(MemID p_mem) {
     auto mem_ptr_iter = alloc_map.find(p_mem);
     if (mem_ptr_iter == alloc_map.end()) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
@@ -54,7 +54,7 @@ void AllocatorPool::deallocate(MemID p_mem) {
     insert_free_memory(insert_pos, static_cast<std::byte*>(data_loc), data_size);
 }
 
-void* AllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
+void* HeapAllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
     WBE_DEBUG_ASSERT(p_node->size >= p_mem_size);
     p_node->size -= p_mem_size;
     void* mem_start = p_node->mem_start;
@@ -74,7 +74,7 @@ void* AllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_
     return mem_start;
 }
 
-void AllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size) {
+void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size) {
     if (idle_list_head == nullptr) {
         idle_list_head = std::make_unique<IdleListNode>();
         ++idle_chunks_count;
@@ -104,7 +104,7 @@ void AllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, std::
     }
 }
 
-bool AllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
+bool HeapAllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     WBE_DEBUG_ASSERT(p_node != nullptr);
     if (p_node->next == nullptr || p_node->mem_start + p_node->size != p_node->next->mem_start) {
         return false;
@@ -115,7 +115,7 @@ bool AllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     return true;
 }
 
-void AllocatorPool::mem_move(MemID p_id1, void* p_loc) {
+void HeapAllocatorPool::mem_move(MemID p_id1, void* p_loc) {
     std::byte* data_addr = static_cast<std::byte*>(get(p_id1));
     size_t data_size = size_map[data_addr];
     memcpy(p_loc, data_addr, data_size);
@@ -128,7 +128,7 @@ void AllocatorPool::mem_move(MemID p_id1, void* p_loc) {
     acquire_memory(remove_pos, data_size);
 }
 
-std::unique_ptr<AllocatorPool::IdleListNode>& AllocatorPool::get_idle_node_before(void* p_loc) {
+std::unique_ptr<HeapAllocatorPool::IdleListNode>& HeapAllocatorPool::get_idle_node_before(void* p_loc) {
     std::unique_ptr<IdleListNode>* curr = &idle_list_head;
     while (curr != nullptr) {
         if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {
@@ -140,7 +140,7 @@ std::unique_ptr<AllocatorPool::IdleListNode>& AllocatorPool::get_idle_node_befor
 }
 
 
-size_t AllocatorPool::get_remain_size() const {
+size_t HeapAllocatorPool::get_remain_size() const {
     IdleListNode* node = idle_list_head.get();
     size_t total = 0;
     while (node != nullptr) {
@@ -150,22 +150,22 @@ size_t AllocatorPool::get_remain_size() const {
     return total;
 }
 
-void AllocatorPool::flush() {
+void HeapAllocatorPool::flush() {
     IdleListNode* node = idle_list_head.get();
     while (node != nullptr) {
         // TODO
     }
 }
 
-bool AllocatorPool::is_flushed() const {
+bool HeapAllocatorPool::is_flushed() const {
     return idle_list_head == nullptr
         || (idle_list_head->next == nullptr
             && idle_list_head->mem_start + idle_list_head->size == mem_chunk.get() + size);
 }
 
-AllocatorPool::operator std::string() const {
+HeapAllocatorPool::operator std::string() const {
     std::stringstream ss;
-    ss << "AllocatorPool: {obj_count: " << obj_count() << ";\n";
+    ss << "HeapAllocatorPool: {obj_count: " << obj_count() << ";\n";
     ss << "free_chunk_layout: {\n";
     IdleListNode* node = idle_list_head.get();
     while (node != nullptr) {

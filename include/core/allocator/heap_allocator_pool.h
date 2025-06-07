@@ -1,7 +1,7 @@
-#ifndef __WBE_ALLOCATOR_POOL_H__
-#define __WBE_ALLOCATOR_POOL_H__
+#ifndef __WBE_HEAP_ALLOCATOR_POOL_H__
+#define __WBE_HEAP_ALLOCATOR_POOL_H__
 
-#include "allocator.h"
+#include "heap_allocator.h"
 #include "utils/defs.h"
 #include <cstddef>
 #include <memory>
@@ -9,16 +9,16 @@
 
 namespace WhiteBirdEngine {
 
-class AllocatorPool final : public Allocator {
+class HeapAllocatorPool final : public HeapAllocator {
 public:
-    AllocatorPool() : AllocatorPool(1024) {}
-    virtual ~AllocatorPool() override;
-    AllocatorPool(const AllocatorPool&) = delete;
-    AllocatorPool(AllocatorPool&&) = delete;
-    AllocatorPool& operator=(const AllocatorPool&) = delete;
-    AllocatorPool& operator=(AllocatorPool&&) = delete;
+    HeapAllocatorPool() : HeapAllocatorPool(1024) {}
+    virtual ~HeapAllocatorPool() override;
+    HeapAllocatorPool(const HeapAllocatorPool&) = delete;
+    HeapAllocatorPool(HeapAllocatorPool&&) = delete;
+    HeapAllocatorPool& operator=(const HeapAllocatorPool&) = delete;
+    HeapAllocatorPool& operator=(HeapAllocatorPool&&) = delete;
 
-    AllocatorPool(size_t p_size, size_t p_alignment = alignof(std::max_align_t));
+    HeapAllocatorPool(size_t p_size, size_t p_alignment = alignof(std::max_align_t));
 
     virtual MemID allocate(size_t p_size) override;
 
@@ -95,15 +95,15 @@ private:
 };
 
 template <>
-struct AllocatorTrait<AllocatorPool> {
-    WBE_TRAIT(AllocatorTrait<AllocatorPool>);
+struct HeapAllocatorTrait<HeapAllocatorPool> {
+    WBE_TRAIT(HeapAllocatorTrait<HeapAllocatorPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQURIES(HeapAllocatorTraitConcept);
 };
 
 }

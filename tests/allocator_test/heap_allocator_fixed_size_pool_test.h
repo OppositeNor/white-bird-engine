@@ -1,42 +1,42 @@
 #ifndef __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
 #define __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_H__
 
-#include "core/allocator/allocator_fixed_size_pool.h"
+#include "core/allocator/heap_allocator_fixed_size_pool.h"
 #include <cstddef>
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBEAllocFSPTest, Trait) {
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_POOL);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_LIMITED_SIZE);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_GURANTEED_CONTINUOUS);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_ALLOC_FIXED_SIZE);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::AllocatorFixedSizePool<4>>::IS_ATOMIC);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_POOL);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_LIMITED_SIZE);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ATOMIC);
 }
 
 TEST(WBEAllocFSPTest, ToString) {
-    WBE::AllocatorFixedSizePool<4> pool(64);
+    WBE::HeapAllocatorFixedSizePool<4> pool(64);
 
-    std::string exp_1 = "AllocatorFix: {obj_count: 0;\n"
+    std::string exp_1 = "HeapAllocatorFix: {obj_count: 0;\n"
         "max_obj: 64\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
 
     WBE::MemID mem_1 = pool.allocate();
-    std::string exp_2 = "AllocatorFix: {obj_count: 1;\n"
+    std::string exp_2 = "HeapAllocatorFix: {obj_count: 1;\n"
         "max_obj: 64\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
 
     WBE::MemID mem_2 = pool.allocate();
-    std::string exp_3 = "AllocatorFix: {obj_count: 2;\n"
+    std::string exp_3 = "HeapAllocatorFix: {obj_count: 2;\n"
         "max_obj: 64\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
 
     pool.deallocate(mem_1);
-    std::string exp_4 = "AllocatorFix: {obj_count: 1;\n"
+    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\n"
         "max_obj: 64\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
@@ -50,7 +50,7 @@ inline size_t mem_diff(void* p_mem1, void* p_mem2) {
 }
 
 template <size_t SIZE, size_t ARR_SIZE>
-void test_continuous(WBE::AllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p_mems[ARR_SIZE]) {
+void test_continuous(WBE::HeapAllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p_mems[ARR_SIZE]) {
     // One and only one should be at the beginning
     bool found_begin = false;
     WBE::MemID begin_id = p_mems[0];
@@ -87,7 +87,7 @@ void test_continuous(WBE::AllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p_mem
 }
 
 TEST(WBEAllocFSPTest, MemContinuity) {
-    WBE::AllocatorFixedSizePool<16> pool(64);
+    WBE::HeapAllocatorFixedSizePool<16> pool(64);
     WBE::MemID mems[4];
     mems[0] = pool.allocate();
     mems[1] = pool.allocate();

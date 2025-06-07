@@ -1,31 +1,31 @@
 #ifndef __WBE_REFERENCE_STRONG_H__
 #define __WBE_REFERENCE_STRONG_H__
 
-#include "core/allocator/allocator.h"
+#include "core/allocator/heap_allocator.h"
 #include "utils/defs.h"
 #include <atomic>
 
 namespace WhiteBirdEngine {
 
-// TODO: Test
-template <typename T, typename AllocType = Allocator>
+template <typename T>
+class RefWeak;
+
+// TODO: Test multi-thread
+/**
+ * @class
+ * @brief The reference to a memory resource.
+ *
+ * @tparam T The type of the resource.
+ * @tparam AllocType The type of the allocator.
+ */
+template <typename T, typename AllocType = HeapAllocator>
 class Ref {
+    friend class RefWeak<T>;
+    struct ControlBlock;
 public:
 
     using ObjType = T;
-    using AllocatorType = AllocType;
-
-    struct ControlBlock {
-        ControlBlock(AllocType* p_alloc_type, MemID p_mem_id)
-            : mem_id(p_mem_id), allocator(p_alloc_type) {
-            weak_ref_counter.store(0, std::memory_order_release);
-            strong_ref_counter.store(1, std::memory_order_release);
-        }
-        MemID mem_id;
-        AllocType* allocator;
-        std::atomic<uint32_t> weak_ref_counter;
-        std::atomic<uint32_t> strong_ref_counter;
-    };
+    using HeapAllocatorType = AllocType;
 
     Ref(AllocType* p_allocator) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -59,11 +59,26 @@ public:
         p_other.control_block = nullptr;
         return *this;
     }
+
+    /**
+     * @brief Create a reference with a given allocator and memory ID.
+     *
+     * @param p_allocator The allocator that allocated the memory for memory ID.
+     * @param p_mem_id The memory ID.
+     */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, p_mem_id);
     }
 
+    /**
+     * @brief Make a reference with given constructor arguments.
+     *
+     * @tparam Args The argument types of the constructor.
+     * @param p_allocator The allocator to allocate the object.
+     * @param p_args The arguments of the constructor.
+     * @return The created reference.
+     */
     template <typename... Args>
     static Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
         return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
@@ -82,6 +97,24 @@ public:
     }
 
 private:
+
+    Ref(ControlBlock* p_control_block)
+        : control_block(p_control_block) {
+        ref();
+    }
+
+    struct ControlBlock {
+        ControlBlock(AllocType* p_alloc_type, MemID p_mem_id)
+            : mem_id(p_mem_id), allocator(p_alloc_type) {
+            weak_ref_counter.store(0, std::memory_order_release);
+            strong_ref_counter.store(1, std::memory_order_release);
+        }
+        MemID mem_id;
+        AllocType* allocator;
+        std::atomic<uint32_t> weak_ref_counter;
+        std::atomic<uint32_t> strong_ref_counter;
+    };
+
     void ref() const {
         if (control_block == nullptr) {
             return;
