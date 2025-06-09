@@ -1,7 +1,7 @@
 #ifndef __WBE_ECS_H__
 #define __WBE_ECS_H__
 
-#include "core/allocator/allocator_fixed_size_pool.h"
+#include "core/allocator/heap_allocator_fixed_size_pool.h"
 #include "utils/defs.h"
 
 namespace WhiteBirdEngine {
@@ -19,6 +19,13 @@ concept SystemConcept = requires(SysType p_t) {
     p_t.operate((CompType*)nullptr);
 };
 
+template <typename T>
+concept ComponentsChunkAllocatorConcept = requires {
+    AllocatorTrait<T>::HEAP_ALLOCATOR;
+    AllocatorTrait<T>::IS_GURANTEED_CONTINUOUS;
+    AllocatorTrait<T>::IS_ALLOC_FIXED_SIZE;
+};
+
 /**
  * @class ComponentsChunk
  * @brief A chunk of components.
@@ -27,7 +34,7 @@ concept SystemConcept = requires(SysType p_t) {
  * @tparam T The type of the component.
  * @tparam Alloctype The type of the allocator.
  */
-template <typename T, FixedSizeAllocatorConcept AllocType = AllocatorFixedSizePool<sizeof(T)>>
+template <typename T, ComponentsChunkAllocatorConcept AllocType = HeapAllocatorFixedSizePool<sizeof(T)>>
 class ComponentsChunk {
 public:
     using ComponentType = T;
@@ -35,7 +42,7 @@ public:
 
     template <typename... Args>
     ComponentsChunk(Args&&... p_args)
-        : component_pool(std::forward<Args>(p_args)...) {}
+        : component_allocator(std::forward<Args>(p_args)...) {}
 
     /**
      * @brief Add a component to the chunk.
@@ -47,7 +54,7 @@ public:
      */
     template <typename ...Args>
     MemID add(EntityID p_entity_id, Args&&... p_args) {
-        MemID mem_id = create_obj(component_pool, std::forward(p_args)...);
+        MemID mem_id = create_obj(component_allocator, std::forward(p_args)...);
         entity_map[p_entity_id] = mem_id;
         return mem_id;
     }
@@ -68,7 +75,7 @@ public:
             return;
         }
         entity_map.erase(p_entity_id);
-        destroy_obj<T>(component_pool, p_component);
+        destroy_obj<T>(component_allocator, p_component);
     }
 
     /**
@@ -79,9 +86,9 @@ public:
      */
     template <SystemConcept<T> T1>
     void system_operate(const T1& p_system) {
-        WBE_DEBUG_ASSERT(component_pool.is_flushed());
-        T* mem_array = static_cast<T*>(component_pool.get_mem_start());
-        uint32_t obj_count = component_pool.obj_count();
+        WBE_DEBUG_ASSERT(component_allocator.is_flushed());
+        T* mem_array = static_cast<T*>(component_allocator.get_mem_start());
+        uint32_t obj_count = component_allocator.obj_count();
         for (uint32_t i = 0; i < obj_count; ++i) {
             p_system(mem_array + i);
         }
@@ -91,18 +98,18 @@ public:
      * @brief Get a component of an entity.
      *
      * @param p_entity The entity to get component from.
-     * @return The ID of the entity.
+     * @return The ID of the entity. MEM_NULL if not found.
      */
     MemID get(EntityID p_entity) {
         auto comp_iter = entity_map.find(p_entity);
         if (comp_iter == entity_map.end()) {
-            throw std::runtime_error("Failed to get component from entity with id: " + std::to_string(p_entity));
+            return MEM_NULL;
         }
         return comp_iter->second;
     }
 
 private:
-    AllocType component_pool;
+    AllocType component_allocator;
     std::unordered_map<EntityID, MemID> entity_map;
 };
 

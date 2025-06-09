@@ -42,6 +42,12 @@ public:
         return allocated.empty();
     }
 
+    // TODO: Test
+    virtual void clear() override {
+        allocated.clear();
+        alloc_map.clear();
+    }
+
 private:
     MemID curr_id;
     std::set<MemID> allocated;
@@ -50,15 +56,16 @@ private:
 };
 
 template <>
-struct HeapAllocatorTrait<HeapAllocatorRam> {
-    WBE_TRAIT(HeapAllocatorTrait<HeapAllocatorRam>);
+struct AllocatorTrait<HeapAllocatorRam> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorRam>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = false;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = false;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
 
-    WBE_TRAIT_REQURIES(HeapAllocatorTraitConcept);
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

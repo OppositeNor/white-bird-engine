@@ -1,6 +1,7 @@
 #ifndef __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_H__
 #define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_H__
 
+#include "core/allocator/allocator.h"
 #include "heap_allocator.h"
 #include "utils/defs.h"
 #include <cstring>
@@ -64,6 +65,13 @@ public:
         return allocated.empty();
     }
 
+    // TODO: Test
+    virtual void clear() override {
+        alloc_map.clear();
+        alloc_map_reverse.clear();
+        allocated.clear();
+    }
+
 private:
     MemID curr_id;
     uint32_t max_obj;
@@ -80,15 +88,16 @@ private:
 };
 
 template <size_t SIZE>
-struct HeapAllocatorTrait<HeapAllocatorFixedSizePool<SIZE>> {
-    WBE_TRAIT(HeapAllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
+struct AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = true;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = true;
     static constexpr bool IS_ATOMIC = false;
 
-    WBE_TRAIT_REQURIES(HeapAllocatorTraitConcept);
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 template <size_t SIZE>

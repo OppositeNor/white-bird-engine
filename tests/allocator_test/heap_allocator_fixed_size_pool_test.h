@@ -8,11 +8,11 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBEAllocFSPTest, Trait) {
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_POOL);
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_LIMITED_SIZE);
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_GURANTEED_CONTINUOUS);
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ALLOC_FIXED_SIZE);
-    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ATOMIC);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_POOL);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_LIMITED_SIZE);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool<4>>::IS_ATOMIC);
 }
 
 TEST(WBEAllocFSPTest, ToString) {

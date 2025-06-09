@@ -1,6 +1,7 @@
 #ifndef __WBE_REF_STRONG_TEST_H__
 #define __WBE_REF_STRONG_TEST_H__
 
+#include "core/allocator/heap_allocator_pool.h"
 #include "core/allocator/heap_allocator_ram.h"
 #include "core/memory/reference_strong.h"
 #include <gtest/gtest.h>
@@ -72,7 +73,37 @@ TEST(WBERefStrongTest, ConstructDestruct) {
         }
         ASSERT_EQ(test_val, 1);
     }
+    ASSERT_TRUE(allocator.is_empty());
     ASSERT_EQ(test_val, 100);
+}
+
+TEST(WBERefStrongTest, DynamicDispatch) {
+    class A {
+    public:
+        virtual void func() {
+            num = 1;
+        }
+
+        int num = 0;
+    };
+
+    class B : public A {
+        virtual void func() override {
+            num = 2;
+        }
+    };
+    WBE::HeapAllocatorPool allocator;
+    {
+        WBE::Ref<A> ref = WBE::Ref<A>::make_ref(&allocator);
+        ASSERT_EQ(ref->num, 0);
+        ref->func();
+        ASSERT_EQ(ref->num, 1);
+        WBE::Ref<A> ref_b = WBE::Ref<B>::make_ref(&allocator);
+        ASSERT_EQ(ref_b->num, 0);
+        ref_b->func();
+        ASSERT_EQ(ref_b->num, 2);
+    }
+    ASSERT_TRUE(allocator.is_empty());
 }
 
 #endif

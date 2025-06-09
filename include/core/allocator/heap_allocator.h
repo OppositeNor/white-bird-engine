@@ -1,34 +1,11 @@
 #ifndef __WBE_HEAP_ALLOCATOR_H__
 #define __WBE_HEAP_ALLOCATOR_H__
 
+#include "allocator.h"
 #include <set>
 #include <sstream>
 
 namespace WhiteBirdEngine {
-
-using MemID = uint64_t;
-
-template <typename T>
-struct HeapAllocatorTrait;
-
-/**
- * @brief The traits of the allocator.
- *
- * @tparam T The type of the allocator.
- */
-template <typename T>
-concept HeapAllocatorTraitConcept = requires {
-    // Does this allocator allocates from a memory pool.
-    { bool(T::IS_POOL) } -> std::same_as<bool>;
-    // Is the memory of objects is guranteed to be continuous.
-    { bool(T::IS_GURANTEED_CONTINUOUS) } -> std::same_as<bool>;
-    // Is this allocator has limited size.
-    { bool(T::IS_LIMITED_SIZE) } -> std::same_as<bool>;
-    // Is the sizes of memories allocated from this allocator consistant.
-    { bool(T::IS_ALLOC_FIXED_SIZE) } -> std::same_as<bool>;
-    // Is operations on this allocator atomic.
-    { bool(T::IS_ATOMIC) } -> std::same_as<bool>;
-};
 
 class HeapAllocator {
 public:
@@ -89,6 +66,11 @@ public:
     virtual bool is_empty() const = 0;
 
     /**
+     * @brief Clear the allocator.
+     */
+    virtual void clear() = 0;
+
+    /**
      * @brief Get the pointer pointing to the resource.
      *
      * @tparam T The type of the resource.
@@ -106,12 +88,6 @@ public:
         return ss.str();
     }
 };
-
-template <typename T>
-concept FixedSizeHeapAllocatorConcept = bool(HeapAllocatorTrait<T>::IS_GURANTEED_CONTINUOUS);
-
-template <typename T>
-concept AtomicHeapAllocatorConcept = bool(HeapAllocatorTrait<T>::IS_ATOMIC);
 
 /**
  * @brief Create an object.

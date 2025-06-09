@@ -7,11 +7,11 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBEAllocPoolTest, TraitTest) {
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_POOL);
-    ASSERT_TRUE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_LIMITED_SIZE);
-    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_GURANTEED_CONTINUOUS);
-    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_ALLOC_FIXED_SIZE);
-    ASSERT_FALSE(WBE::HeapAllocatorTrait<WBE::HeapAllocatorPool>::IS_ATOMIC);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorPool>::IS_POOL);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorPool>::IS_LIMITED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorPool>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorPool>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorPool>::IS_ATOMIC);
 }
 
 TEST(WBEAllocPoolTest, ToString) {

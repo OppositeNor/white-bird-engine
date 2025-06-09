@@ -7,8 +7,6 @@
 
 namespace WhiteBirdEngine {
 
-template <typename T>
-class RefWeak;
 
 // TODO: Test multi-thread
 /**
@@ -20,7 +18,12 @@ class RefWeak;
  */
 template <typename T, typename AllocType = HeapAllocator>
 class Ref {
-    friend class RefWeak<T>;
+    template <typename T1, typename AllocTyp1>
+    friend class Ref;
+
+    template <typename T1>
+    friend class RefWeak;
+
     struct ControlBlock;
 public:
 
@@ -29,7 +32,7 @@ public:
 
     Ref(AllocType* p_allocator) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        control_block = new ControlBlock(p_allocator, 0);
+        control_block = new ControlBlock(p_allocator, MEM_NULL);
         ref();
     }
     ~Ref() {
@@ -60,6 +63,35 @@ public:
         return *this;
     }
 
+    template <typename T1>
+    Ref(const Ref<T1>& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        p_other.ref();
+        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+    }
+    template <typename T1>
+    Ref(Ref<T1>&& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+        p_other.control_block = nullptr;
+    }
+    template <typename T1>
+    Ref& operator=(const Ref<T1>& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        deref();
+        p_other.ref();
+        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+        return *this;
+    }
+    template <typename T1>
+    Ref& operator=(Ref<T1>&& p_other) {
+        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        deref();
+        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+        p_other.control_block = nullptr;
+        return *this;
+    }
+
     /**
      * @brief Create a reference with a given allocator and memory ID.
      *
@@ -85,21 +117,33 @@ public:
     }
 
     T* operator->() {
-        return control_block->allocator->get(control_block->mem_id);
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
     T& operator*() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return *static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
     const T& operator*() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
+    // TODO: Test
+    bool operator==(const Ref<T>& p_other) {
+        return p_other.control_block == control_block;
     }
 
 private:
 
     Ref(ControlBlock* p_control_block)
         : control_block(p_control_block) {
+        WBE_DEBUG_ASSERT(p_control_block != nullptr);
         ref();
     }
 

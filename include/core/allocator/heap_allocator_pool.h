@@ -63,11 +63,14 @@ public:
     }
 
     // TODO: Test
-    void flush();
-
-    // TODO: Test
-    bool is_flushed() const;
-
+    virtual void clear() override {
+        alloc_map.clear();
+        size_map.clear();
+        allocated.clear();
+        idle_list_head->size = size;
+        idle_list_head->mem_start = mem_chunk.get();
+        idle_list_head->next = nullptr;
+    }
 
 private:
     
@@ -95,15 +98,16 @@ private:
 };
 
 template <>
-struct HeapAllocatorTrait<HeapAllocatorPool> {
-    WBE_TRAIT(HeapAllocatorTrait<HeapAllocatorPool>);
+struct AllocatorTrait<HeapAllocatorPool> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorPool>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
 
-    WBE_TRAIT_REQURIES(HeapAllocatorTraitConcept);
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

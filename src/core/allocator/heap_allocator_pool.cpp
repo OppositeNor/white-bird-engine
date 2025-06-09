@@ -150,19 +150,6 @@ size_t HeapAllocatorPool::get_remain_size() const {
     return total;
 }
 
-void HeapAllocatorPool::flush() {
-    IdleListNode* node = idle_list_head.get();
-    while (node != nullptr) {
-        // TODO
-    }
-}
-
-bool HeapAllocatorPool::is_flushed() const {
-    return idle_list_head == nullptr
-        || (idle_list_head->next == nullptr
-            && idle_list_head->mem_start + idle_list_head->size == mem_chunk.get() + size);
-}
-
 HeapAllocatorPool::operator std::string() const {
     std::stringstream ss;
     ss << "HeapAllocatorPool: {obj_count: " << obj_count() << ";\n";
