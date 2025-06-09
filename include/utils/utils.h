@@ -10,14 +10,11 @@ namespace WhiteBirdEngine {
  * @brief Get the size after alignment.
  *
  * @param p_size Size.
- * @param p_alignment Alignment.
+ * @param p_alignment Alignment. If alignment is 0, no alignment will be made.
  * @return The size after alignment.
  */
-inline size_t get_align_size(size_t p_size, size_t p_alignment) {
-    if (p_alignment == 0) {
-        return p_size;
-    }
-    return ((p_size + p_alignment - 1) / p_alignment) * p_alignment;
+constexpr size_t get_align_size(size_t p_size, size_t p_alignment) {
+    return p_alignment == 0 ? p_size : ((p_size + p_alignment - 1) / p_alignment) * p_alignment;
 }
 
 using HashCode = uint32_t;
@@ -30,9 +27,7 @@ using HashCode = uint32_t;
  */
 constexpr HashCode static_hash(const char* p_str) {
     // from https://stackoverflow.com/questions/2111667/compile-time-string-hashing
-    return *p_str ?
-        static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1) :
-        5381;
+    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1) : 5381;
 }
 
 using TypeID = HashCode;
@@ -45,6 +40,12 @@ struct TypeIDRevTrait {};
 
 
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;
+
+
+struct EngineConfigOptions {
+    // TODO
+};
+
 
 }
 #endif
