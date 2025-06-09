@@ -1,8 +1,6 @@
 #ifndef __WBE_DEFS_H__
 #define __WBE_DEFS_H__
 
-#include <cstdint>
-
 #ifdef _DEBUG
 #include <cassert>
 #define WBE_DEBUG_ASSERT(...) assert(__VA_ARGS__)
@@ -26,17 +24,19 @@
 #endif
 
 
-// used for meta-parser
-#define WBE_COMPONENT(ConceptName)
-
 #define WBE_TRAIT(TraitName) using TraitType = TraitName
 
 #define WBE_TRAIT_REQURIES(Concept) static_assert(Concept<TraitType>)
 
-namespace WhiteBirdEngine {
+#define WBE_TYPE_METADATA(TypeName) template <> struct TypeIDTrait<TypeName> {\
+    static constexpr TypeID TYPE_ID = static_hash(#TypeName);\
+};\
+template <> struct TypeIDRevTrait<TypeIDTrait<TypeName>::TYPE_ID> {\
+    using Type = TypeName;\
+};
 
-constexpr uint64_t MAX_COMPONENT_COUNT = 64;
+#define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type
+#define WBE_TYPE_TO_ID(TypeName) WhiteBirdEngine::TypeIDTrait<TypeName>::TYPE_ID
 
-}
 
 #endif

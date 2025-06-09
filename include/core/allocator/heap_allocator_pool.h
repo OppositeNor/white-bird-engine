@@ -9,6 +9,19 @@
 
 namespace WhiteBirdEngine {
 
+template <>
+struct AllocatorTrait<class HeapAllocatorPool> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorPool>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+};
+
 class HeapAllocatorPool final : public HeapAllocator {
 public:
     HeapAllocatorPool() : HeapAllocatorPool(1024) {}
@@ -95,19 +108,6 @@ private:
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
     std::set<MemID> allocated;
-};
-
-template <>
-struct AllocatorTrait<HeapAllocatorPool> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorPool>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
-    static constexpr bool IS_POOL = true;
-    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
-    static constexpr bool IS_LIMITED_SIZE = true;
-    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
-    static constexpr bool IS_ATOMIC = false;
-
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

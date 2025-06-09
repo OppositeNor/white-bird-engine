@@ -6,6 +6,19 @@
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
+template <>
+struct AllocatorTrait<class HeapAllocatorRam> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorRam>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+    static constexpr bool IS_POOL = false;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = false;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+};
+
 class HeapAllocatorRam final : public HeapAllocator {
 public:
 
@@ -53,19 +66,6 @@ private:
     std::set<MemID> allocated;
     std::unordered_map<MemID, void*> alloc_map;
 
-};
-
-template <>
-struct AllocatorTrait<HeapAllocatorRam> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorRam>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
-    static constexpr bool IS_POOL = false;
-    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
-    static constexpr bool IS_LIMITED_SIZE = false;
-    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
-    static constexpr bool IS_ATOMIC = false;
-
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 }

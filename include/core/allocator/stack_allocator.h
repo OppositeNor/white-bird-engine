@@ -11,6 +11,19 @@
 
 namespace WhiteBirdEngine {
 
+template <>
+struct AllocatorTrait<class StackAllocator> {
+    WBE_TRAIT(AllocatorTrait<StackAllocator>);
+    static constexpr AllocatorType TYPE = AllocatorType::STACK_ALLOCATOR;
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+};
+
 // TODO: Test
 class StackAllocator {
 public:
@@ -118,19 +131,6 @@ private:
     std::vector<size_t> size_stack;
 };
 
-
-template <>
-struct AllocatorTrait<StackAllocator> {
-    WBE_TRAIT(AllocatorTrait<StackAllocator>);
-    static constexpr AllocatorType TYPE = AllocatorType::STACK_ALLOCATOR;
-    static constexpr bool IS_POOL = true;
-    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
-    static constexpr bool IS_LIMITED_SIZE = true;
-    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
-    static constexpr bool IS_ATOMIC = false;
-
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
-};
 
 }
 

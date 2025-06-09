@@ -10,6 +10,19 @@
 
 namespace WhiteBirdEngine {
 
+template <size_t SIZE, template <size_t> class HeapAllocatorFixedSizePool>
+struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = true;
+    static constexpr bool IS_ATOMIC = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+};
+
 template <size_t SIZE>
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
 public:
@@ -85,19 +98,6 @@ private:
         alloc_map[p_id] = p_addr;
         alloc_map_reverse[p_addr] = p_id;
     }
-};
-
-template <size_t SIZE>
-struct AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
-    static constexpr bool IS_POOL = true;
-    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
-    static constexpr bool IS_LIMITED_SIZE = true;
-    static constexpr bool IS_ALLOC_FIXED_SIZE = true;
-    static constexpr bool IS_ATOMIC = false;
-
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
 template <size_t SIZE>
