@@ -8,13 +8,13 @@
 namespace WhiteBirdEngine {
 class Global {
 public:
-
+    ~Global();
 
 
     // global objects
-    static EngineConfig* engine_config;
-    static HeapAllocatorPool* pool_allocator;
-    static StackAllocator* single_frame_allocator;
+    inline static std::unique_ptr<EngineConfig> engine_config;
+    inline static std::unique_ptr<StackAllocator> single_frame_allocator;
+    inline static std::unique_ptr<HeapAllocatorPool> pool_allocator;
 
 
 };

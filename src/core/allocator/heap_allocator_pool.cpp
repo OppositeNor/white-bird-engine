@@ -12,7 +12,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 }
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)
-    : curr_id(1), size(p_size), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(get_align_size(size, alignment))) {
+    : curr_id(1), size(get_align_size(p_size, p_alignment)), alignment(p_alignment), mem_chunk(std::make_unique<std::byte[]>(size)) {
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
     idle_list_head->next = nullptr;

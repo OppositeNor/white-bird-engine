@@ -10,9 +10,20 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class EngineConfig
+ * @brief Engine configuration class.
+ *
+ */
 class EngineConfig {
 public:
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_cla_parser The parser for the command line arguments.
+     * @param p_config_file_parser The parser for the config file.
+     */
     EngineConfig(std::unique_ptr<CLAParser> p_cla_parser, std::unique_ptr<ConfigFileParser> p_config_file_parser)
         : cla_parser(std::move(p_cla_parser)), config_file_parser(std::move(p_config_file_parser)) {
         WBE_DEBUG_ASSERT(cla_parser != nullptr);

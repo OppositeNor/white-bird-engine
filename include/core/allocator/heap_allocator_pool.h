@@ -31,6 +31,12 @@ public:
     HeapAllocatorPool& operator=(const HeapAllocatorPool&) = delete;
     HeapAllocatorPool& operator=(HeapAllocatorPool&&) = delete;
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_size The size of the pool in bytes.
+     * @param p_alignment The alignment of the allocation.
+     */
     HeapAllocatorPool(size_t p_size, size_t p_alignment = alignof(std::max_align_t));
 
     virtual MemID allocate(size_t p_size) override;
