@@ -29,17 +29,19 @@
 
 #define WBE_TRAIT_REQURIES(requires_concept) static_assert(requires_concept<TraitType>)
 
+#define WBE_EXPAND_MACRO_STR(x) #x
+
 #define WBE_TYPE_METADATA(type_name) template <> struct TypeIDTrait<type_name> {\
-    static constexpr TypeID TYPE_ID = static_hash(#type_name);\
-    static constexpr std::string_view TYPE_NAME = #type_name;\
+    static constexpr TypeID TYPE_ID = WhiteBirdEngine::static_hash(WBE_EXPAND_MACRO_STR(type_name));\
+    static constexpr std::string_view TYPE_NAME = WBE_EXPAND_MACRO_STR(type_name);\
 };\
 template <> struct TypeIDRevTrait<TypeIDTrait<type_name>::TYPE_ID> {\
     using Type = type_name;\
 };
 
-#define WBE_LABEL_METADATA(label_name) constexpr HashCode label_name = static_hash(#label_name);\
+#define WBE_DEFINE_LABEL(label_name) constexpr HashCode label_name = static_hash(WBE_EXPAND_MACRO_STR(label_name));\
 template <> struct LabelTrait<label_name> {\
-    static constexpr std::string_view NAME = #label_name;\
+    static constexpr std::string_view NAME = WBE_EXPAND_MACRO_STR(label_name);\
 };
 
 #define WBE_LABEL_NAME(label) LabelTrait<label>::NAME

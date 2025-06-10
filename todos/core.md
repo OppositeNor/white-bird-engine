@@ -10,7 +10,7 @@
 - [ECS](#ecs)
 - [Memory](#memory)
 - [RNG](#rng)
-- [Log](#log)
+- [Loging](#loging)
 - [Localization](#localization)
 
 ### Engine Config
@@ -141,15 +141,7 @@ TODO
 
 - [x] Label
 
-- [ ] Log
-
-    - [x] Interface
-
-    - [ ] Log stream
-
-        - [x] Implementation
-
-        - [ ] Test
+- [x] Log
 
 - [ ] Logging manager
 

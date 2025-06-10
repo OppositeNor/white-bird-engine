@@ -8,8 +8,9 @@ namespace WhiteBirdEngine {
 
 using ChannelID = HashCode;
 
-WBE_LABEL_METADATA(WBE_CHANNEL_UNKNOWN)
-WBE_LABEL_METADATA(WBE_CHANNEL_GLOBAL)
+// default labels
+WBE_DEFINE_LABEL(WBE_CHANNEL_UNKNOWN)
+WBE_DEFINE_LABEL(WBE_CHANNEL_GLOBAL)
 
 class Log {
 public:

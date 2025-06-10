@@ -18,7 +18,7 @@ public:
 
     LogStream(std::ostream& p_ostream)
         : Log(), ostream(&p_ostream) {}
-    virtual ~LogStream() override;
+    virtual ~LogStream() override {}
     LogStream(const LogStream &) = delete;
     LogStream(LogStream &&) = delete;
     LogStream &operator=(const LogStream &) = delete;
