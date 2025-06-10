@@ -18,18 +18,18 @@ namespace WhiteBirdEngine {
  */
 class Global : public Singleton<Global> {
 private:
-    Global(char* p_argc[], int p_argv, const Path& p_config_file_path);
+    Global(int p_argc, char* p_argv[], const Path& p_config_file_path);
     ~Global();
 public:
 
     /**
      * @brief Initialize global objects.
      *
-     * @param p_argc The command line arguments.
-     * @param p_argv The number of command line arguments.
+     * @param p_argc The number of command line arguments.
+     * @param p_argv The command line arguments.
      * @param p_config_file_path The path to the configuration file.
      */
-    static void init(char* p_argc[], int p_argv, const Path& p_config_file_path);
+    static void init(int p_argc, char* p_argv[], const Path& p_config_file_path);
 
     /**
      * @brief Free all the global resources and terminate to the uninitialized state.

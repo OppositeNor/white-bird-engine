@@ -29,7 +29,7 @@ public:
      * @param p_argc argc.
      * @param p_argv argv.
      */
-    virtual void parse(char* p_argc[], int p_argv) = 0;
+    virtual void parse(int p_argc, char* p_argv[]) = 0;
 };
 
 }

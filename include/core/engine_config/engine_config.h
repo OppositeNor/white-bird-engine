@@ -44,7 +44,7 @@ public:
      * @param p_argc argc.
      * @param p_argv argv.
      */
-    void parse_cla(char* p_argc[], int p_argv) {
+    void parse_cla(int p_argc, char* p_argv[]) {
         cla_parser->parse(p_argc, p_argv);
     }
 
