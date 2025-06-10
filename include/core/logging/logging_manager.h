@@ -9,13 +9,13 @@ namespace WhiteBirdEngine {
 
 
 // TODO: Test
-template <template <ChannelID> typename LogType>
-class LoggingManager : public Singleton<LoggingManager<LogType>> {
+template <template <ChannelID> typename LogType, typename T>
+class LoggingManager : public Singleton<LoggingManager<LogType, T>> {
 public:
-    LoggingManager() : Singleton<LoggingManager>() {}
+    LoggingManager(T& p_channel_argument)
+        : Singleton<LoggingManager>(), channel_argument(&p_channel_argument) {}
 
     virtual ~LoggingManager() override {
-        // I don't like how this is implemented... maybe there's a better approach.
         for (auto* log : created_channel_list) {
             delete log;
         }
@@ -26,7 +26,7 @@ public:
         if (channel_log<CHANNEL> == nullptr) {
             std::lock_guard lock(channel_mutex<CHANNEL>);
             if (channel_log<CHANNEL> == nullptr) {
-                channel_log<CHANNEL> = new LogType<CHANNEL>();
+                channel_log<CHANNEL> = new LogType<CHANNEL>(*channel_argument);
                 created_channel_list.push_back(channel_log<CHANNEL>);
             }
         }
@@ -41,6 +41,8 @@ private:
     inline static std::mutex channel_mutex;
 
     std::list<Log*> created_channel_list;
+
+    T* channel_argument;
 };
 
 }

@@ -44,7 +44,7 @@ template <> struct LabelTrait<label_name> {\
     static constexpr std::string_view NAME = WBE_EXPAND_MACRO_STR(label_name);\
 };
 
-#define WBE_LABEL_NAME(label) LabelTrait<label>::NAME
+#define WBE_LABEL_NAME(label) WhiteBirdEngine::LabelTrait<label>::NAME
 
 #define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type
 #define WBE_TYPE_TO_ID(type_name) WhiteBirdEngine::TypeIDTrait<type_name>::TYPE_ID

@@ -143,7 +143,7 @@ TODO
 
 - [x] Log
 
-- [ ] Logging manager
+- [x] Logging manager
 
 ### Localization
 
