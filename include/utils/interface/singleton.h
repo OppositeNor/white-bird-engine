@@ -1,6 +1,7 @@
 #ifndef __WBE_SINGLETON_H__
 #define __WBE_SINGLETON_H__
 
+#include <stdexcept>
 namespace WhiteBirdEngine {
 
 template <typename T>
