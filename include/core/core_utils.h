@@ -7,9 +7,9 @@
 #include <memory>
 namespace WhiteBirdEngine {
 
-template <typename T>
-inline std::unique_ptr<Log>& stdio_log() {
-    return Global::get_singleton()->stdio_logging_manager->get<T>();
+template <ChannelID CHANNEL>
+inline Log* wbe_log() {
+    return Global::get_singleton()->stdio_logging_manager->get_log<CHANNEL>();
 }
 
 }

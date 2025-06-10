@@ -1,3 +1,4 @@
+#include "core/core_utils.h"
 #include "utils/defs.h"
 #include "utils/utils.h"
 #include <cstring>
@@ -8,7 +9,9 @@
 namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
-    // TODO: warning if not all memory freed (which is probably caused by a memory leak error)
+    if (allocated.size() != 0) {
+        wbe_log<WBE_CHANNEL_GLOBAL>()->warning("HeapAllocatorPool not empty during destruction.");
+    }
 }
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)

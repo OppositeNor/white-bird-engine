@@ -31,7 +31,7 @@ public:
     using ObjType = T;
     using HeapAllocatorType = AllocType;
 
-    Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator.get()) {
+    explicit Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator.get()) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, MEM_NULL);
         ref();

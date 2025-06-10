@@ -126,32 +126,58 @@ public:
     int* val;
 };
 
-inline int test_val = 0;
+inline int test_val1 = 0;
+inline int test_val2 = 0;
 
-inline void multithread_ref_test(WBE::Ref<TestClass> p_ref, uint32_t p_iteration_count) {
+inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass> p_ref2, uint32_t p_iteration_count) {
+    std::vector<WBE::Ref<TestClass, WBE::HeapAllocator>> refs;
+    refs.reserve(5);
+    for (uint32_t i = 0; i < 5; ++i) {
+        if (rand() & 0x1) {
+            refs.push_back(p_ref1);
+        }
+        else {
+            refs.push_back(p_ref2);
+        }
+    }
     for (uint32_t i = 0; i < p_iteration_count; ++i) {
-        WBE::Ref<TestClass> ref = p_ref;
-        ASSERT_TRUE(ref.is_valid());
-        ASSERT_EQ(test_val, 1);
+         uint32_t rand_ref_count = rand() % 5;
+        for (uint32_t j = 0; j < rand_ref_count; ++j) {
+            if (rand() & 0x1) {
+                refs[j] = p_ref1;
+            }
+            else {
+                refs[j] = p_ref2;
+            }
+            ASSERT_EQ(test_val1, 1);
+            ASSERT_EQ(test_val2, 1);
+            sleep(rand() % 2);
+        }
     }
 }
 
 TEST(WBERefStrongTest, Multithread) {
+    ASSERT_EQ(test_val1, 0);
+    ASSERT_EQ(test_val2, 0);
     WBE::HeapAllocatorPool allocator;
     {
-        WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
-        std::thread thread1(multithread_ref_test, ref, 1000);
-        std::thread thread2(multithread_ref_test, ref, 1000);
-        std::thread thread3(multithread_ref_test, ref, 1000);
-        std::thread thread4(multithread_ref_test, ref, 1000);
-        std::thread thread5(multithread_ref_test, ref, 1000);
+        WBE::Ref<TestClass> ref1 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val1);
+        WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val2);
+        ASSERT_EQ(test_val1, 1);
+        ASSERT_EQ(test_val2, 1);
+        std::thread thread1(multithread_ref_test, ref1, ref2, 1000);
+        std::thread thread2(multithread_ref_test, ref1, ref2, 1000);
+        std::thread thread3(multithread_ref_test, ref1, ref2, 1000);
+        std::thread thread4(multithread_ref_test, ref1, ref2, 1000);
+        std::thread thread5(multithread_ref_test, ref1, ref2, 1000);
         thread1.join();
         thread2.join();
         thread3.join();
         thread4.join();
         thread5.join();
     }
-    ASSERT_EQ(test_val, -1);
+    ASSERT_EQ(test_val1, -1);
+    ASSERT_EQ(test_val2, -1);
 
 }
 

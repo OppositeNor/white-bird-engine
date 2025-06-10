@@ -1,10 +1,13 @@
 #include "core/allocator/heap_allocator_ram.h"
+#include "core/core_utils.h"
 #include "core/global/global.h"
 
 namespace WhiteBirdEngine {
 
 HeapAllocatorRam::~HeapAllocatorRam() {
-    // TODO: warning if not empty
+    if (allocated.size() != 0) {
+        wbe_log<WBE_CHANNEL_GLOBAL>()->warning("HeapAllocatorPool not empty during destruction.");
+    }
     for (auto& iter : alloc_map) {
         free(iter.second);
     }
