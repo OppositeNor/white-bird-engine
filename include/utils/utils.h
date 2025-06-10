@@ -31,12 +31,16 @@ constexpr HashCode static_hash(const char* p_str) {
 }
 
 using TypeID = HashCode;
+using ConstID = HashCode;
 
 template <typename T>
-struct TypeIDTrait {};
+struct TypeIDTrait;
 
 template <TypeID T>
-struct TypeIDRevTrait {};
+struct TypeIDRevTrait;
+
+template <HashCode CODE>
+struct LabelTrait;
 
 
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;

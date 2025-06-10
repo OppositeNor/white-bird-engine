@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 
 struct TypeA {};
-struct TypeB {};
 
 namespace WhiteBirdEngine {
+struct TypeB {};
 WBE_TYPE_METADATA(TypeA);
 WBE_TYPE_METADATA(TypeB);
 }
@@ -23,9 +23,10 @@ TEST(WBETypeMetadataTest, Hashing) {
 }
 
 TEST(WBETypeMetadataTest, Metadata) {
-    ASSERT_NE(WBE_TYPE_TO_ID(TypeA), WBE_TYPE_TO_ID(TypeB));
+    ASSERT_NE(WBE_TYPE_TO_ID(TypeA), WBE_TYPE_TO_ID(WBE::TypeB));
     ASSERT_TRUE((std::is_same_v<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<TypeA>::TYPE_ID), TypeA>));
-    ASSERT_TRUE((std::is_same_v<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<TypeB>::TYPE_ID), TypeB>));
+    ASSERT_TRUE((std::is_same_v<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<WBE::TypeB>::TYPE_ID), WBE::TypeB>));
+    ASSERT_EQ(WBE_TYPE_ID_NAME(WBE_TYPE_TO_ID(TypeA)), std::string("TypeA"));
 }
 
 #endif

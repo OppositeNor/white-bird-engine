@@ -1,4 +1,5 @@
 #include "core/allocator/heap_allocator_ram.h"
+#include "core/global/global.h"
 
 namespace WhiteBirdEngine {
 

@@ -122,6 +122,12 @@ public:
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
+    const T* operator->() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
     T& operator*() {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
@@ -133,6 +139,29 @@ public:
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
     }
+
+    /**
+     * @brief Get the resource pointer.
+     *
+     * @return The pointer pointing to the resource.
+     */
+    T* get() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
+    /**
+     * @brief Get the resource pointer.
+     *
+     * @return The pointer pointing to the resource.
+     */
+    const T* get() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
 
     // TODO: Test
     bool operator==(const Ref<T>& p_other) {

@@ -114,6 +114,9 @@ inline MemID create_obj(HeapAllocator& p_allocator, Args&&... p_args) {
  */
 template <typename T, typename AllocType>
 inline void destroy_obj(AllocType& p_allocator, MemID p_id) {
+    if (p_id == MEM_NULL) {
+        return;
+    }
     static_cast<T*>(p_allocator.get(p_id))->~T();
     p_allocator.deallocate(p_id);
 }

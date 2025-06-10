@@ -5,6 +5,7 @@
 #include "core/engine_config/config_file_parser.h"
 #include "platform/file_system/path.h"
 #include "utils/defs.h"
+#include "utils/interface/singleton.h"
 #include "utils/utils.h"
 #include <memory>
 
@@ -15,7 +16,7 @@ namespace WhiteBirdEngine {
  * @brief Engine configuration class.
  *
  */
-class EngineConfig {
+class EngineConfig : public Singleton<EngineConfig> {
 public:
 
     /**

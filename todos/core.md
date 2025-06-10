@@ -101,6 +101,8 @@
 
 ### ECS
 
+- [ ] Doc
+
 - [x] Implementation
 
 - [ ] Test
@@ -133,9 +135,23 @@
 
 TODO
 
-### Log
+### Logging
 
-TODO
+- [ ] Doc
+
+- [x] Label
+
+- [ ] Log
+
+    - [x] Interface
+
+    - [ ] Log stream
+
+        - [x] Implementation
+
+        - [ ] Test
+
+- [ ] Logging manager
 
 ### Localization
 

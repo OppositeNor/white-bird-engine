@@ -1,0 +1,44 @@
+#ifndef __WBE_LOG_H__
+#define __WBE_LOG_H__
+
+#include "utils/defs.h"
+#include "utils/utils.h"
+#include <string>
+namespace WhiteBirdEngine {
+
+using ChannelID = HashCode;
+
+WBE_LABEL_METADATA(WBE_CHANNEL_UNKNOWN)
+WBE_LABEL_METADATA(WBE_CHANNEL_GLOBAL)
+
+class Log {
+public:
+
+    Log() = default;
+    virtual ~Log() {}
+
+    /**
+     * @brief Print a message.
+     *
+     * @param p_str The message to print.
+     */
+    virtual void message(const std::string& p_str) = 0;
+
+    /**
+     * @brief Print a warning.
+     *
+     * @param p_str The warning to print.
+     */
+    virtual void warning(const std::string& p_str) = 0;
+
+    /**
+     * @brief Print an error.
+     *
+     * @param p_str The error to print.
+     */
+    virtual void error(const std::string& p_str) = 0;
+};
+
+}
+
+#endif

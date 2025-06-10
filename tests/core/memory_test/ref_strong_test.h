@@ -106,4 +106,10 @@ TEST(WBERefStrongTest, DynamicDispatch) {
     ASSERT_TRUE(allocator.is_empty());
 }
 
+TEST(WBERefStrongTest, NullReference) {
+    WBE::HeapAllocatorPool allocator;
+    WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
+    ASSERT_EQ(ref.get(), nullptr);
+}
+
 #endif

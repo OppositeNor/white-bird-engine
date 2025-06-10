@@ -23,20 +23,29 @@
 
 #endif
 
+#define WBE_EXPAND_STRING(x) #x
 
-#define WBE_TRAIT(TraitName) using TraitType = TraitName
+#define WBE_TRAIT(trait_name) using TraitType = trait_name
 
-#define WBE_TRAIT_REQURIES(Concept) static_assert(Concept<TraitType>)
+#define WBE_TRAIT_REQURIES(requires_concept) static_assert(requires_concept<TraitType>)
 
-#define WBE_TYPE_METADATA(TypeName) template <> struct TypeIDTrait<TypeName> {\
-    static constexpr TypeID TYPE_ID = static_hash(#TypeName);\
+#define WBE_TYPE_METADATA(type_name) template <> struct TypeIDTrait<type_name> {\
+    static constexpr TypeID TYPE_ID = static_hash(#type_name);\
+    static constexpr std::string_view TYPE_NAME = #type_name;\
 };\
-template <> struct TypeIDRevTrait<TypeIDTrait<TypeName>::TYPE_ID> {\
-    using Type = TypeName;\
+template <> struct TypeIDRevTrait<TypeIDTrait<type_name>::TYPE_ID> {\
+    using Type = type_name;\
 };
 
-#define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type
-#define WBE_TYPE_TO_ID(TypeName) WhiteBirdEngine::TypeIDTrait<TypeName>::TYPE_ID
+#define WBE_LABEL_METADATA(label_name) constexpr HashCode label_name = static_hash(#label_name);\
+template <> struct LabelTrait<label_name> {\
+    static constexpr std::string_view NAME = #label_name;\
+};
 
+#define WBE_LABEL_NAME(label) LabelTrait<label>::NAME
+
+#define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type
+#define WBE_TYPE_TO_ID(type_name) WhiteBirdEngine::TypeIDTrait<type_name>::TYPE_ID
+#define WBE_TYPE_ID_NAME(type_id) WhiteBirdEngine::TypeIDTrait<WhiteBirdEngine::TypeIDRevTrait<type_id>::Type>::TYPE_NAME
 
 #endif
