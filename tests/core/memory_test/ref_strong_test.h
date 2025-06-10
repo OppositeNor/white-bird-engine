@@ -4,6 +4,7 @@
 #include "core/allocator/heap_allocator_pool.h"
 #include "core/allocator/heap_allocator_ram.h"
 #include "core/memory/reference_strong.h"
+#include <cstdint>
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -110,6 +111,48 @@ TEST(WBERefStrongTest, NullReference) {
     WBE::HeapAllocatorPool allocator;
     WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
     ASSERT_EQ(ref.get(), nullptr);
+}
+
+class TestClass {
+public:
+    TestClass(int* p_val)
+        : val(p_val) {
+        ++(*p_val);
+    }
+    ~TestClass() {
+        *val = -1;
+    }
+
+    int* val;
+};
+
+inline int test_val = 0;
+
+inline void multithread_ref_test(WBE::Ref<TestClass> p_ref, uint32_t p_iteration_count) {
+    for (uint32_t i = 0; i < p_iteration_count; ++i) {
+        WBE::Ref<TestClass> ref = p_ref;
+        ASSERT_TRUE(ref.is_valid());
+        ASSERT_EQ(test_val, 1);
+    }
+}
+
+TEST(WBERefStrongTest, Multithread) {
+    WBE::HeapAllocatorPool allocator;
+    {
+        WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
+        std::thread thread1(multithread_ref_test, ref, 1000);
+        std::thread thread2(multithread_ref_test, ref, 1000);
+        std::thread thread3(multithread_ref_test, ref, 1000);
+        std::thread thread4(multithread_ref_test, ref, 1000);
+        std::thread thread5(multithread_ref_test, ref, 1000);
+        thread1.join();
+        thread2.join();
+        thread3.join();
+        thread4.join();
+        thread5.join();
+    }
+    ASSERT_EQ(test_val, -1);
+
 }
 
 #endif

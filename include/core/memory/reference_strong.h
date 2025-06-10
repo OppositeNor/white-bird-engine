@@ -2,6 +2,7 @@
 #define __WBE_REFERENCE_STRONG_H__
 
 #include "core/allocator/heap_allocator.h"
+#include "core/global/global.h"
 #include "utils/defs.h"
 #include <atomic>
 
@@ -30,7 +31,7 @@ public:
     using ObjType = T;
     using HeapAllocatorType = AllocType;
 
-    Ref(AllocType* p_allocator) {
+    Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator.get()) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, MEM_NULL);
         ref();
@@ -90,6 +91,10 @@ public:
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
         return *this;
+    }
+
+    bool is_valid() const {
+        return control_block != nullptr;
     }
 
     /**
@@ -203,6 +208,7 @@ private:
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
             if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {
                 delete control_block;
+                control_block = nullptr;
             }
         }
     }

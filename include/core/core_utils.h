@@ -8,8 +8,8 @@
 namespace WhiteBirdEngine {
 
 template <typename T>
-inline std::unique_ptr<Log>& log() {
-    return Global::get_singleton()->logging_manager->get<T>();
+inline std::unique_ptr<Log>& stdio_log() {
+    return Global::get_singleton()->stdio_logging_manager->get<T>();
 }
 
 }

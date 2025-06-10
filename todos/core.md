@@ -109,13 +109,7 @@
 
 ### Memory
 
-- [ ] Ref
-
-    - [x] Implementation
-
-    - [x] General tests
-
-    - [ ] Multi-thread tests
+- [x] Ref
 
 - [ ] WeakRef
 

@@ -29,6 +29,14 @@ public:
         WBE_DEBUG_ASSERT(p_ostream != nullptr);
     }
 
+    static constexpr ChannelID get_channel() {
+        return CHANNEL;
+    }
+
+    virtual ChannelID get_current_channel() const override {
+        return CHANNEL;
+    }
+
     virtual void message(const std::string& p_str) override {
         *ostream << "[" << WBE_LABEL_NAME(CHANNEL) << "] Message: " << p_str << std::endl;
     }

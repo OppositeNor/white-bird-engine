@@ -58,7 +58,7 @@ public:
     /**
      * @brief Manager for logs.
      */
-    std::unique_ptr<LoggingManager<LogStream, std::ostream>> logging_manager;
+    std::unique_ptr<LoggingManager<LogStream, std::ostream>> stdio_logging_manager;
 
 private:
     inline static Global* singleton;

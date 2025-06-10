@@ -19,6 +19,13 @@ public:
     virtual ~Log() {}
 
     /**
+     * @brief Get the channel of the log.
+     *
+     * @return the channel ID.
+     */
+    virtual ChannelID get_current_channel() const = 0;
+
+    /**
      * @brief Print a message.
      *
      * @param p_str The message to print.

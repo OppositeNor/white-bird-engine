@@ -30,6 +30,10 @@ public:
 
     std::ostream* ostream;
 
+    virtual WBE::ChannelID get_current_channel() const override {
+        return CHANNEL;
+    }
+
     virtual void message(const std::string& p_str) override {
         *ostream << "Message " << WBE_LABEL_NAME(CHANNEL) << " " << p_str << std::endl;
     }
