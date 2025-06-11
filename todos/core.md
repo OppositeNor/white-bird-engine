@@ -143,3 +143,10 @@ TODO
 
 TODO
 
+### Profiling
+
+- [ ] Doc
+
+- [x] Profiler
+
+- [x] Profiling manager

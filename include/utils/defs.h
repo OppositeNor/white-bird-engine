@@ -4,8 +4,10 @@
 #ifdef _DEBUG
 #include <cassert>
 #define WBE_DEBUG_ASSERT(...) assert(__VA_ARGS__)
+#define WBE_ENABLE_PROFILING 1
 #else
 #define WBE_DEBUG_ASSERT(...)
+#define WBE_ENABLE_PROFILING 0
 #endif
 
 #if __GNUC__

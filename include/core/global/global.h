@@ -6,6 +6,7 @@
 #include "core/engine_config/engine_config.h"
 #include "core/logging/log_stream.h"
 #include "core/logging/logging_manager.h"
+#include "core/profiling/profiling_manager.h"
 #include "utils/interface/singleton.h"
 #include "platform/file_system/path.h"
 #include <ostream>
@@ -59,6 +60,10 @@ public:
      * @brief Manager for logs.
      */
     std::unique_ptr<LoggingManager<LogStream, std::ostream>> stdio_logging_manager;
+    /**
+     * @brief Manager for profiling.
+     */
+    std::unique_ptr<ProfilingManager> profiling_manager;
 
 private:
     inline static Global* singleton;
