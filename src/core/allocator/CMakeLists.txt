@@ -1,11 +1,7 @@
-file(GLOB allocator_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB wbe_allocator_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-add_library(ALLOCATOR_LIB STATIC
-    ${allocator_src}
-)
-
-set(libs ${libs}
-    ALLOCATOR_LIB
+set(wbe_core_src
+    ${wbe_core_src}
+    ${wbe_allocator_src}
     PARENT_SCOPE
 )
-

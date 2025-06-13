@@ -24,7 +24,9 @@ public:
      *
      * @return The directory of the executable file.
      */
-    static const Directory& get_exe_directory();
+    const Directory& get_exe_directory() const {
+        return exe_directory;
+    }
 
     /**
      * @brief Cast the directory to a string.

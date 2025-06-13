@@ -51,14 +51,8 @@ include_directories(
     ${include_dirs}
 )
 
-if (WBE_BUILD_PLATFORM STREQUAL "Linux")
-    add_subdirectory(platform/linux)
-else()
-    message(FATAL_ERROR "Platform: ${WBE_BUILD_PLATFORM} not supported for white bird engine.")
-endif()
-
 add_subdirectory(src/core)
-add_subdirectory(src/utils)
+add_subdirectory(src/platform)
 
 add_executable(${PROJECT_NAME}
     ${source}

@@ -1,11 +1,7 @@
-file(GLOB global_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB wbe_global_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-add_library(GLOBAL_LIB STATIC
-    ${global_src}
-)
-
-set(libs ${libs}
-    GLOBAL_LIB
+set(wbe_core_src
+    ${wbe_core_src}
+    ${wbe_global_src}
     PARENT_SCOPE
 )
-

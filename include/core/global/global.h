@@ -66,11 +66,6 @@ public:
      */
     std::unique_ptr<ProfilingManager> profiling_manager;
 
-    /**
-     * @brief File system.
-     */
-    std::unique_ptr<FileSystem> file_system;
-
 private:
     inline static Global* singleton;
 };
