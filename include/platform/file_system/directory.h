@@ -1,6 +1,7 @@
 #ifndef __WBE_DIRECTORY_H__
 #define __WBE_DIRECTORY_H__
 
+#include <cstdint>
 #include <string>
 #include <vector>
 namespace WhiteBirdEngine {
@@ -13,7 +14,9 @@ namespace WhiteBirdEngine {
 class Directory {
 public:
 
-    Directory() = default;
+    Directory()
+        : dir_names(), is_absolute(false) {
+    }
     ~Directory() {}
     Directory(const Directory& p_other)
         : dir_names(p_other.dir_names), is_absolute(p_other.is_absolute) {}
@@ -30,6 +33,23 @@ public:
         return *this;
     }
 
+    bool operator==(const Directory& p_other) {
+        if (is_absolute != p_other.is_absolute || dir_names.size() != p_other.dir_names.size()) {
+            return false;
+        }
+        for (uint32_t i = 0; i < dir_names.size(); ++i) {
+            if (dir_names[i] != p_other.dir_names[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const Directory& p_other) {
+        return !(*this == p_other);
+    }
+
+
     /**
      * @brief Constructor.
      *
@@ -38,7 +58,7 @@ public:
      * By relative it means relative to the user current working directory.
      */
     Directory(std::vector<std::string> p_dir_names, bool p_is_absolute)
-        : dir_names(p_dir_names) {}
+        : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
 
 
     // TODO: Other methods

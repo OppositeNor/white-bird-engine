@@ -59,7 +59,7 @@ public:
     }
 
 private:
-    static Directory exe_directory;
+    inline static Directory exe_directory;
 };
 
 }

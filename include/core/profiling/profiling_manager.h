@@ -30,7 +30,7 @@ public:
     /**
      * @brief Get all the profile data from the channel, and calculate the mean.
      * This will also remove all the stashed profiles.
-     *
+     * @todo make channel a template argument and load it statically.
      * @param p_channel The channel to flush.
      */
     void flush_stashed_profiles(ChannelID p_channel);

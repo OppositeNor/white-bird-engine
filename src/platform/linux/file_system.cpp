@@ -1,6 +1,5 @@
 #include "platform/file_system/file_system.h"
 #include "utils/utils.h"
-#include <algorithm>
 #include <string>
 #include <unistd.h>
 
