@@ -16,6 +16,7 @@ set(RESOURCE_PATH ${PROJECT_SOURCE_DIR}/res)
 file(MAKE_DIRECTORY ${RESOURCE_PATH})
 
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
+set(WBE_BUILD_PLATFORM "Linux" CACHE STRING "Build platform.")
 
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/glm)
@@ -49,6 +50,12 @@ endif()
 include_directories(
     ${include_dirs}
 )
+
+if (WBE_BUILD_PLATFORM STREQUAL "Linux")
+    add_subdirectory(platform/linux)
+else()
+    message(FATAL_ERROR "Platform: ${WBE_BUILD_PLATFORM} not supported for white bird engine.")
+endif()
 
 add_subdirectory(src/core)
 add_subdirectory(src/utils)

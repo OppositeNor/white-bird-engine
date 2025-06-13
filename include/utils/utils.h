@@ -3,6 +3,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -45,6 +47,29 @@ struct LabelTrait;
 
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;
 
+// TODO: Test
+inline std::vector<std::string> split_string(std::string p_str, char p_token) {
+    std::vector<std::string> result;
+    auto split_pos = p_str.find(p_token);
+    while (split_pos != std::string::npos) {
+        result.push_back(p_str.substr(0, split_pos));
+        p_str.erase(0, split_pos + 1);
+        split_pos = p_str.find(p_token);
+    }
+    return result;
+}
+
+// TODO: Test
+inline std::vector<std::string> split_string(std::string p_str, const std::string& p_token) {
+    std::vector<std::string> result;
+    auto split_pos = p_str.find(p_token);
+    while (split_pos != std::string::npos) {
+        result.push_back(p_str.substr(0, split_pos));
+        p_str.erase(0, split_pos + p_token.size());
+        split_pos = p_str.find(p_token);
+    }
+    return result;
+}
 
 struct EngineConfigOptions {
     // TODO
