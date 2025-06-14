@@ -10,7 +10,6 @@ class WBEBuilder:
         self.channel_registrator = ChannelRegistrator()
 
     def load_script_config(self, p_load_path : str) -> None:
-        print("Loading configuration for: " + p_load_path)
         spec = importlib.util.spec_from_file_location("config", p_load_path)
         if spec is None:
             raise RuntimeError("Failed to load spec from path: " + p_load_path)
@@ -34,13 +33,13 @@ class WBEBuilder:
         return json.dumps(self.channel_registrator.channels, sort_keys=True)
 
 
-if (len(sys.argv) < 2):
-    print("Usage: " + sys.argv[0] + " <res_path> [config1] [config2] ...")
-    exit(-1)
-builder = WBEBuilder(sys.argv[1])
-
 if __name__ == "__main__":
+    if (len(sys.argv) < 2):
+        print("Usage: " + sys.argv[0] + " <res_path> [config1] [config2] ...")
+        exit(-1)
+
     print("White Bird Engine build script start")
+    builder = WBEBuilder(sys.argv[1])
     for i in range(2, len(sys.argv)):
         builder.load_script_config(sys.argv[i])
     builder.output_resources() # TODO
