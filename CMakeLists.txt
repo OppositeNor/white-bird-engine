@@ -12,11 +12,23 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(RESOURCE_PATH ${PROJECT_SOURCE_DIR}/res)
-file(MAKE_DIRECTORY ${RESOURCE_PATH})
+set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
+file(MAKE_DIRECTORY ${WBE_RESOURCE_DIR})
+set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
+file(MAKE_DIRECTORY ${WBE_RESOURCE_OUTPUT_DIR})
+
+set(WBE_SHADER_DIR ${WBE_RESOURCE_DIR}/shaders)
+file(MAKE_DIRECTORY ${WBE_SHADER_DIR})
+set(WBE_SHADER_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/shaders)
+file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
+
+set(WBE_METADATA_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/metadata)
+file(MAKE_DIRECTORY ${WBE_METADATA_OUTPUT_DIR})
 
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
 set(WBE_BUILD_PLATFORM "Linux" CACHE STRING "Build platform.")
+
+set(WBE_BUILD_CONFIG_SCRIPTS "")
 
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/glm)
@@ -68,15 +80,24 @@ if (WBE_MAKE_TEST)
     add_subdirectory(tests)
 endif()
 
+message("Build config scripts: ${WBE_BUILD_CONFIG_SCRIPTS}")
+
+# runtime reflections
+add_custom_target(wbe_build_script
+    COMMENT "Running White Bird Engine build script"
+    COMMAND python ${PROJECT_SOURCE_DIR}/build_scripts/build.py ${WBE_METADATA_OUTPUT_DIR} ${WBE_BUILD_CONFIG_SCRIPTS}
+)
+add_dependencies(${PROJECT_NAME} wbe_build_script)
+
 # compile shaders
-file(GLOB shader_sources ${PROJECT_SOURCE_DIR}/res/shaders/*.vert ${PROJECT_SOURCE_DIR}/res/shaders/*.frag ${PROJECT_SOURCE_DIR}/res/shaders/*.comp)
+file(GLOB shader_sources ${WBE_SHADER_DIR}/*.vert ${WBE_SHADER_DIR}/*.frag ${WBE_SHADER_DIR}/*.comp)
 
 set(shaders_outputs "")
 
 foreach(shader_source ${shader_sources})
     message("Compiling: ${shader_source}")
     get_filename_component(shader_name ${shader_source} NAME)
-    set(output_file "${RESOURCE_PATH}/${shader_name}.spv")
+    set(output_file "${WBE_SHADER_OUTPUT_DIR}/${shader_name}.spv")
 
     add_custom_command(
         OUTPUT ${output_file}
