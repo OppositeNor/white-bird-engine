@@ -1,6 +1,8 @@
 #ifndef __WBE_DIRECTORY_H__
 #define __WBE_DIRECTORY_H__
 
+#include "utils/defs.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -33,7 +35,7 @@ public:
         return *this;
     }
 
-    bool operator==(const Directory& p_other) {
+    bool operator==(const Directory& p_other) const {
         if (is_absolute != p_other.is_absolute || dir_names.size() != p_other.dir_names.size()) {
             return false;
         }
@@ -45,7 +47,7 @@ public:
         return true;
     }
 
-    bool operator!=(const Directory& p_other) {
+    bool operator!=(const Directory& p_other) const {
         return !(*this == p_other);
     }
 
@@ -61,7 +63,22 @@ public:
         : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
 
 
-    // TODO: Other methods
+    /**
+     * @brief Get the directory after combine this directory with another directory.
+     *
+     * @param p_other The directory to combine to this directory.
+     * @todo Test
+     * @return The combined directory.
+     */
+    Directory combine(const Directory& p_other) const {
+        WBE_DEBUG_ASSERT(!p_other.get_is_absolute());
+        Directory result(*this);
+        result.dir_names.reserve(dir_names.size() + p_other.dir_names.size());
+        for (auto& dir_name : p_other.dir_names) {
+            result.dir_names.push_back(dir_name);
+        }
+        return result;
+    }
 
     /**
      * @brief Get if this directory is absolute.

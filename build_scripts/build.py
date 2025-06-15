@@ -10,6 +10,7 @@ class WBEBuilder:
         self.channel_registrator = ChannelRegistrator()
 
     def load_script_config(self, p_load_path : str) -> None:
+        print("Loading configuration scripts...")
         spec = importlib.util.spec_from_file_location("config", p_load_path)
         if spec is None:
             raise RuntimeError("Failed to load spec from path: " + p_load_path)
@@ -21,7 +22,8 @@ class WBEBuilder:
     def register_channel(self, p_channel_path) -> None:
         self.channel_registrator.register_channel(p_channel_path)
 
-    def output_resources(self) -> None:
+    def dump(self) -> None:
+        print("Exporting...")
         self.write_to_file(os.path.join(self.metadata_dir, "channels.json"),
                            self.serialize_channel_registrator())
 
@@ -32,15 +34,31 @@ class WBEBuilder:
     def serialize_channel_registrator(self) -> str:
         return json.dumps(self.channel_registrator.channels, sort_keys=True)
 
+    def checks(self) -> None:
+        print("Checking...")
+        self.check_hashing_collision("channels", self.channel_registrator.channels)
+
+    def check_hashing_collision(self, p_dict_name : str, p_dictionary : dict) -> None:
+        hash_val_set = set()
+        dict_rev = dict()
+        for channel in p_dictionary.keys():
+            if p_dictionary[channel] in hash_val_set:
+                raise RuntimeError("Hasing collision of \"" + p_dict_name + "\" detected! Hash values of: \"" + channel +
+                                   "\" and \"", dict_rev[p_dictionary[channel]], "\" are identical: ", p_dictionary[channel])
+            dict_rev[p_dictionary[channel]] = channel
+            hash_val_set.add(p_dictionary[channel])
+
 
 if __name__ == "__main__":
     if (len(sys.argv) < 2):
         print("Usage: " + sys.argv[0] + " <res_path> [config1] [config2] ...")
         exit(-1)
 
-    print("White Bird Engine build script start")
+    print("White Bird Engine build script start.")
     builder = WBEBuilder(sys.argv[1])
     for i in range(2, len(sys.argv)):
         builder.load_script_config(sys.argv[i])
-    builder.output_resources() # TODO
+    builder.checks()
+    builder.dump() # TODO
+    print("White Bird Engine build script finish.")
 
