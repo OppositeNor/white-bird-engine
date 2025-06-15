@@ -44,6 +44,7 @@ TEST(LinuxFileSystemTest, DirToString) {
         "directory"
     }, false);
     ASSERT_EQ(WBE::FileSystem::dir_to_string(test_dir), std::string("hello/world/this/is/a/test/directory/"));
+    ASSERT_EQ(std::string(test_dir), std::string("hello/world/this/is/a/test/directory/"));
     WBE::Directory test_dir_absolute({
         "this",
         "is",
@@ -53,6 +54,7 @@ TEST(LinuxFileSystemTest, DirToString) {
         "directory"
     }, true);
     ASSERT_EQ(WBE::FileSystem::dir_to_string(test_dir_absolute), std::string("/this/is/a/absolute/test/directory/"));
+    ASSERT_EQ(std::string(test_dir_absolute), std::string("/this/is/a/absolute/test/directory/"));
 }
 
 TEST(LinuxFileSystemTest, ParseDirectory) {

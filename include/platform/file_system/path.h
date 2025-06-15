@@ -78,6 +78,8 @@ public:
         return directory.get_is_absolute();
     }
 
+    operator std::string() const;
+
 private:
     Directory directory;
     std::string file_name;

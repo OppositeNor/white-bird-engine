@@ -6,6 +6,11 @@
 #include "utils/interface/singleton.h"
 namespace WhiteBirdEngine {
 
+/**
+ * @class FileSystem
+ * @brief Platform API for file systems.
+ *
+ */
 class FileSystem : public Singleton<FileSystem> {
 public:
     FileSystem();
@@ -30,6 +35,8 @@ public:
 
     /**
      * @brief Cast the directory to a string.
+     *
+     * @return The string of the directory.
      */
     static std::string dir_to_string(const Directory& p_directory);
 
@@ -57,6 +64,13 @@ public:
     Path get_file_path(const std::string& p_path) const {
         return Path(get_file_dir(p_path), get_file_name(p_path));
     }
+
+    /**
+     * @brief Cast a path to a string.
+     *
+     * @param p_path The path to cast to string.
+     */
+    static std::string path_to_string(const Path& p_path);
 
 private:
     inline static Directory exe_directory;

@@ -99,6 +99,8 @@ public:
         return dir_names;
     }
 
+    operator std::string() const;
+
 private:
     std::vector<std::string> dir_names;
     bool is_absolute;
