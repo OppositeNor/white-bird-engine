@@ -10,3 +10,6 @@
 [submodule "dependencies/miniaudio"]
 	path = dependencies/miniaudio
 	url = https://github.com/mackron/miniaudio.git
+[submodule "dependencies/json"]
+	path = dependencies/json
+	url = https://github.com/nlohmann/json.git
