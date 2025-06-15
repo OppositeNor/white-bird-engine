@@ -63,6 +63,5 @@ Directory FileSystem::get_file_dir(const std::string& p_path) {
     return Directory(parse_directory(p_path.substr(0, last_slash)));
 }
 
-
 }
 

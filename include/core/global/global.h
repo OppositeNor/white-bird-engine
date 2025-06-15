@@ -4,10 +4,10 @@
 #include "core/allocator/heap_allocator_pool.h"
 #include "core/allocator/stack_allocator.h"
 #include "core/engine_config/engine_config.h"
+#include "core/global/game_metadata.h"
 #include "core/logging/log_stream.h"
 #include "core/logging/logging_manager.h"
 #include "core/profiling/profiling_manager.h"
-#include "platform/file_system/file_system.h"
 #include "utils/interface/singleton.h"
 #include "platform/file_system/path.h"
 #include <ostream>
@@ -66,8 +66,15 @@ public:
      */
     std::unique_ptr<ProfilingManager> profiling_manager;
 
+    /**
+     * @brief Metadata of the game.
+     */
+    std::unique_ptr<GameMetadata> game_metadata;
+
 private:
     inline static Global* singleton;
+
+    static GameMetadata parse_metadata(const Path& p_metadata_config_path);
 };
 
 }

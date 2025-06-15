@@ -23,5 +23,8 @@ Global* Global::get_singleton() {
     return nullptr; // TODO
 }
 
+GameMetadata Global::parse_metadata(const Path& p_metadata_config_path) {
+    return GameMetadata(); // TODO
+}
 
 }
