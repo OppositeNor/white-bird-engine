@@ -6,12 +6,23 @@
 #include <type_traits>
 namespace WhiteBirdEngine {
 
+/**
+ * @class
+ * @brief Parser class.
+ *
+ * @tparam ChildType The type of the child class for CRTP
+ */
 template <typename ChildType>
 class Parser {
 public:
     Parser() = default;
     ~Parser() {}
 
+    /**
+     * @brief Parse a file from a path.
+     *
+     * @param p_path The path to parse file from.
+     */
     void parse(const Path& p_path) {
         return static_cast<ChildType*>(this)->parse(p_path);
     }

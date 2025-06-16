@@ -30,7 +30,7 @@ public:
     }
 
     void parse(const Path& p_path) {
-        data = json::parse(p_path);
+        data = json::parse(static_cast<std::string>(p_path));
     }
 
     template <typename T>
