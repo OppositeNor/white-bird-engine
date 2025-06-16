@@ -35,7 +35,7 @@
 
     - [x] Interface
 
-    - [ ] YAML config file parser
+    - [ ] Config file parser
 
         - [ ] Implementation
 
@@ -72,14 +72,6 @@
 - [x] Stack allocator
 
 - [x] Heap allocator
-
-    - [x] Interface
-
-    - [x] RAM allocator
-
-    - [x] Pool allocator
-
-    - [x] Fixed size pool allocator
 
 ### ECS
 

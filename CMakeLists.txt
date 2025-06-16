@@ -29,7 +29,6 @@ set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
 add_subdirectory(dependencies/SDL2)
-add_subdirectory(dependencies/glm)
 
 find_package(Vulkan REQUIRED)
 
