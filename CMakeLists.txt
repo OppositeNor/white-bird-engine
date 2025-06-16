@@ -2,13 +2,11 @@ cmake_minimum_required(VERSION 3.18)
 
 project(WhiteBirdEngine)
 
-file(GLOB source ${PROJECT_SOURCE_DIR}/src/*.cpp)
-
 set(SDL_TEST OFF)
 set(SDL_STATIC ON)
 set(SDL_SHARED OFF)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -26,7 +24,7 @@ set(WBE_METADATA_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/metadata)
 file(MAKE_DIRECTORY ${WBE_METADATA_OUTPUT_DIR})
 
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
-set(WBE_BUILD_PLATFORM "Linux" CACHE STRING "Build platform.")
+set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
@@ -66,15 +64,19 @@ include_directories(
 add_subdirectory(src/core)
 add_subdirectory(src/platform)
 
-add_executable(${PROJECT_NAME}
-    ${source}
-)
+if (WBE_BUILD_PLATFORM STREQUAL "Android")
+    # TODO: Android build
+else()
+    add_executable(${PROJECT_NAME}
+        ${PROJECT_SOURCE_DIR}/src/main.cpp
+    )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
-    SDL2
-    Vulkan::Vulkan
-    ${libs}
-)
+    target_link_libraries(${PROJECT_NAME} PUBLIC
+        SDL2
+        Vulkan::Vulkan
+        ${libs}
+    )
+endif()
 
 if (WBE_MAKE_TEST)
     add_subdirectory(tests)

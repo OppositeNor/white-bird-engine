@@ -6,6 +6,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class Path
+ * @brief Path class.
+ * @todo Test
+ */
 class Path {
 public:
     Path() : directory(), file_name() {}

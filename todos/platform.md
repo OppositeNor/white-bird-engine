@@ -14,15 +14,11 @@
 
 - [ ] File system
 
-    - [ ] Directory
-
-        - [ ] Implementation
-
-        - [ ] Test
+    - [x] Directory
 
     - [ ] Path
 
-        - [ ] Implementation
+        - [x] Implementation
 
         - [ ] Test
 
