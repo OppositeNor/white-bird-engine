@@ -1,7 +1,9 @@
 #ifndef __WBE_CLA_PARSER_H__
 #define __WBE_CLA_PARSER_H__
 
+#include "utils/interface/singleton.h"
 #include "utils/utils.h"
+
 namespace WhiteBirdEngine {
 
 class EngineConfig;
@@ -9,19 +11,13 @@ class EngineConfig;
 /**
  * @class CLAParser
  * @brief Interface of parsers for command line arguments.
- *
+ * @todo Test
  */
-class CLAParser {
+class CLAParser : public Singleton<CLAParser> {
 public:
-    CLAParser() = default;
+    CLAParser(EngineConfigOptions& p_engine_config)
+        : engine_config(&p_engine_config) {}
     virtual ~CLAParser() {}
-
-    /**
-     * @brief Set the engine config options.
-     *
-     * @param p_config_options The engine config options.
-     */
-    virtual void set_engine_config_options(EngineConfigOptions* p_config_options) = 0;
 
     /**
      * @brief Parse the command line arguments.
@@ -29,7 +25,9 @@ public:
      * @param p_argc argc.
      * @param p_argv argv.
      */
-    virtual void parse(int p_argc, char* p_argv[]) = 0;
+    virtual void parse(int p_argc, char* p_argv[]);
+private:
+    EngineConfigOptions* engine_config;
 };
 
 }

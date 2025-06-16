@@ -47,7 +47,13 @@ struct LabelTrait;
 
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;
 
-// TODO: Test
+/**
+ * @brief Split the string with respect to a token.
+ *
+ * @param p_str The string to split.
+ * @param p_token The token.
+ * @return Array of strings.
+ */
 inline std::vector<std::string> split_string(std::string p_str, char p_token) {
     std::vector<std::string> result;
     auto split_pos = p_str.find(p_token);
@@ -59,7 +65,13 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
     return result;
 }
 
-// TODO: Test
+/**
+ * @brief Split the string with respect to a token.
+ *
+ * @param p_str The string to split.
+ * @param p_token The token.
+ * @return Array of strings.
+ */
 inline std::vector<std::string> split_string(std::string p_str, const std::string& p_token) {
     std::vector<std::string> result;
     auto split_pos = p_str.find(p_token);
@@ -74,7 +86,6 @@ inline std::vector<std::string> split_string(std::string p_str, const std::strin
 struct EngineConfigOptions {
     // TODO
 };
-
 
 }
 #endif

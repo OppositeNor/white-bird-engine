@@ -4,6 +4,7 @@ add_subdirectory(allocator)
 add_subdirectory(global)
 add_subdirectory(logging)
 add_subdirectory(profiling)
+add_subdirectory(engine_config)
 
 add_library(WBE_LIB_CORE STATIC
     ${wbe_core_src}

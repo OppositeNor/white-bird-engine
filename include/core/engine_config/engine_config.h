@@ -3,11 +3,10 @@
 
 #include "core/engine_config/cla_parser.h"
 #include "core/engine_config/config_file_parser.h"
+#include "core/parser/parser_yaml.h"
 #include "platform/file_system/path.h"
-#include "utils/defs.h"
 #include "utils/interface/singleton.h"
 #include "utils/utils.h"
-#include <memory>
 
 namespace WhiteBirdEngine {
 
@@ -22,15 +21,11 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_cla_parser The parser for the command line arguments.
+     * @param p_engine_config The configuration options.
      * @param p_config_file_parser The parser for the config file.
      */
-    EngineConfig(std::unique_ptr<CLAParser> p_cla_parser, std::unique_ptr<ConfigFileParser> p_config_file_parser)
-        : cla_parser(std::move(p_cla_parser)), config_file_parser(std::move(p_config_file_parser)) {
-        WBE_DEBUG_ASSERT(cla_parser != nullptr);
-        WBE_DEBUG_ASSERT(config_file_parser != nullptr);
-        cla_parser->set_engine_config_options(&options);
-        config_file_parser->set_engine_config_options(&options);
+    EngineConfig(EngineConfigOptions& p_engine_config)
+        : cla_parser(p_engine_config), config_file_parser(p_engine_config, ParserYAML()) {
     }
     virtual ~EngineConfig() {}
     EngineConfig(const EngineConfig&) = delete;
@@ -45,7 +40,7 @@ public:
      * @param p_argv argv.
      */
     void parse_cla(int p_argc, char* p_argv[]) {
-        cla_parser->parse(p_argc, p_argv);
+        cla_parser.parse(p_argc, p_argv);
     }
 
     
@@ -55,15 +50,12 @@ public:
      * @param p_path The path to the config file.
      */
     void parse_config_file(const Path& p_path) {
-        config_file_parser->parse(p_path);
+        config_file_parser.parse(p_path);
     }
 
 private:
-    // TODO: configuration properties.
-    EngineConfigOptions options;
-    std::unique_ptr<CLAParser> cla_parser;
-    std::unique_ptr<ConfigFileParser> config_file_parser;
-
+    CLAParser cla_parser;
+    ConfigFileParser<ParserYAML> config_file_parser;
 };
 
 }

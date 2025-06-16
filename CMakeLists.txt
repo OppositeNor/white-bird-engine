@@ -45,6 +45,7 @@ set(libs "")
 set(include_dirs 
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/dependencies/glm
+    ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
 )
 
 if (WBE_MAKE_TEST)

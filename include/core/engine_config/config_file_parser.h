@@ -1,8 +1,10 @@
 #ifndef __WBE_CONFIG_FILE_PARSER_H__
 #define __WBE_CONFIG_FILE_PARSER_H__
 
+#include "core/parser/parser.h"
 #include "platform/file_system/path.h"
 #include "utils/utils.h"
+#include "utils/interface/singleton.h"
 
 namespace WhiteBirdEngine {
 
@@ -10,25 +12,30 @@ namespace WhiteBirdEngine {
  * @class ConfigFileParser
  * @brief Interface of parsers for config file.
  */
-class ConfigFileParser {
+template <ParserConcept ParserType>
+class ConfigFileParser : public Singleton<ConfigFileParser<ParserType>> {
 public:
-    ConfigFileParser() = default;
+    ConfigFileParser(EngineConfigOptions& p_config_options, ParserType p_parser)
+        : config_options(&p_config_options), parser(std::move(p_parser)) {
+    }
     virtual ~ConfigFileParser() {}
-
-    /**
-     * @brief Set the engine config options.
-     *
-     * @param p_config_options The engine config options.
-     */
-    virtual void set_engine_config_options(EngineConfigOptions* p_config_options) = 0;
 
     /**
      * @brief Parse a config file from a path.
      *
      * @param p_path The path of the config file.
      */
-    virtual void parse(const Path& p_path) = 0;
+    void parse(const Path& p_path);
+
+private:
+    EngineConfigOptions* config_options;
+    ParserType parser;
 };
+
+template <ParserConcept ParserType>
+void ConfigFileParser<ParserType>::parse(const Path& p_path) {
+    // TODO
+}
 
 }
 
