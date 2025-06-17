@@ -29,6 +29,7 @@ set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
 add_subdirectory(dependencies/SDL2)
+add_subdirectory(dependencies/yaml-cpp)
 
 find_package(Vulkan REQUIRED)
 
@@ -41,11 +42,12 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG")
 endif()
 
-set(libs "")
+set(libs yaml-cpp::yaml-cpp)
 set(include_dirs 
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/dependencies/glm
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
+    ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
 )
 
 if (WBE_MAKE_TEST)

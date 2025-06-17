@@ -2,6 +2,8 @@
 #define __WBE_PARSER_YAML_H_
 
 #include "parser.h"
+#include "yaml-cpp/node/parse.h"
+#include <yaml-cpp/yaml.h>
 
 namespace WhiteBirdEngine {
 
@@ -13,41 +15,37 @@ namespace WhiteBirdEngine {
 class YAMLData : public ParserData<YAMLData> {
     friend class ParserYAML;
 public:
-    YAMLData() {
-        // TODO
-    }
-
-    ~YAMLData() {
-        // TODO
-    }
-
-    YAMLData(const YAMLData& p_other) {
-        // TODO
-    }
-    YAMLData(YAMLData&& p_other) {
-        // TOOD
-    }
+    YAMLData() {}
+    ~YAMLData() {}
+    YAMLData(const YAMLData& p_other)
+        : node(p_other.node) {}
+    YAMLData(YAMLData&& p_other)
+        : node(std::move(p_other.node)) {}
     YAMLData& operator=(const YAMLData& p_other) {
-        // TODO
+        node = p_other.node;
         return *this;
     }
     YAMLData& operator=(YAMLData&& p_other) {
-        // TODO
+        node = std::move(p_other.node);
         return *this;
     }
+    YAMLData(const YAML::Node& p_node)
+        : node(p_node) {}
+    YAMLData(YAML::Node&& p_node)
+        : node(std::move(p_node)) {}
 
     template <typename T> requires (!std::same_as<T, YAMLData>)
     T get_value(const std::string& p_key) const {
-        return T(); // TODO
+        return node[p_key].as<T>();
     }
 
     template <std::same_as<YAMLData> T>
     YAMLData get_value(const std::string& p_key) const {
-        return YAMLData(); // TODO
+        return YAMLData(node[p_key]);
     }
 
 private:
-    // TODO
+    YAML::Node node;
 };
 
 template <>
@@ -65,43 +63,37 @@ struct ParserTrait<class ParserYAML> {
  */
 class ParserYAML : public Parser<ParserYAML> {
 public:
-    ParserYAML() {
-        // TODO
-    }
-    virtual ~ParserYAML() {
-        // TODO
-    }
-    ParserYAML(const ParserYAML& p_other) {
-        // TODO
-    }
-    ParserYAML(ParserYAML&& p_other) {
-        // TODO
-    }
+    ParserYAML() = default;
+    virtual ~ParserYAML() {}
+    ParserYAML(const ParserYAML& p_other)
+        : data(p_other.data) {}
+    ParserYAML(ParserYAML&& p_other)
+        : data(std::move(p_other.data) ){}
     ParserYAML& operator=(const ParserYAML& p_other) {
-        // TODO
+        data = p_other.data;
         return *this;
     }
     ParserYAML& operator=(ParserYAML&& p_other) {
-        // TODO
+        data = std::move(p_other.data);
         return *this;
     }
 
     void parse(const Path& p_path) {
-        // TODO
+        data.node = YAML::LoadFile(static_cast<std::string>(p_path));
     }
 
     void parse_from_buffer(const std::string& p_buffer) {
-        // TODO
+        data.node = YAML::Load(p_buffer);
     }
 
     template <typename T> requires (!ParserDataConcept<T>)
     T get_value(const std::string& p_key) const {
-        return T(); // TODO
+        return data.get_value<T>(p_key);
     }
 
     template <ParserDataConcept T>
     YAMLData get_value(const std::string& p_key) const {
-        return YAMLData(); // TODO
+        return YAMLData(data.get_value<YAML::Node>(p_key));
     }
 
 private:

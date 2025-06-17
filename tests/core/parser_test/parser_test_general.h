@@ -1,3 +1,6 @@
+#ifndef __WBE_PARSER_TEST_GENERAL_H__
+#define __WBE_PARSER_TEST_GENERAL_H__
+
 #include "core/parser/parser.h"
 
 namespace WBE = WhiteBirdEngine;
@@ -23,3 +26,8 @@ void test_parser_general(T& p_parser,
     ASSERT_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<int32_t>("test_key2"), 123);
     ASSERT_DOUBLE_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<double>("test_key3"), 3.1415926);
 }
+
+
+#endif
+
+
