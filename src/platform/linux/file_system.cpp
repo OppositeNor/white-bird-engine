@@ -32,7 +32,7 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
         }
         path_stack.push_back(dir_name);
     }
-    return Directory(path_stack, p_str[0] == '/');
+    return Directory(path_stack, p_str.size() != 0 && p_str[0] == '/');
 }
 
 // TODO: Test

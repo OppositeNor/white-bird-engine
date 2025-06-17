@@ -84,7 +84,9 @@ inline std::vector<std::string> split_string(std::string p_str, const std::strin
 }
 
 struct EngineConfigOptions {
-    // TODO
+    size_t single_tick_stack_size = 1024;
+    size_t global_pool_size = 2048;
+    size_t thread_pool_size = 2048;
 };
 
 }

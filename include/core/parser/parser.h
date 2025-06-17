@@ -28,6 +28,15 @@ public:
     }
 
     /**
+     * @brief Parse a file from buffer.
+     *
+     * @param p_buffer The buffer to parse from.
+     */
+    void parse_from_buffer(const std::string& p_buffer) {
+        return static_cast<ChildType*>(this)->parse_from_buffer(p_buffer);
+    }
+
+    /**
      * @brief Get the value of a given key.
      *
      * @tparam T The type of the value.

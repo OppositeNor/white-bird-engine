@@ -31,6 +31,18 @@ TEST(LinuxFileSystemTest, DirEquals) {
     }, true);
     ASSERT_FALSE(dir1 == dir2);
     ASSERT_TRUE(dir1 != dir2);
+    WBE::Directory dir_empty1({}, false);
+    WBE::Directory dir_empty2({}, false);
+    WBE::Directory dir_empty3({}, true);
+    WBE::Directory dir_empty4({}, true);
+    ASSERT_TRUE(dir_empty1 == dir_empty2);
+    ASSERT_TRUE(dir_empty3 == dir_empty4);
+    ASSERT_TRUE(dir_empty1 != dir_empty3);
+    ASSERT_TRUE(dir_empty3 != dir_empty1);
+    ASSERT_FALSE(dir_empty1 == dir_empty4);
+    ASSERT_FALSE(dir_empty4 == dir_empty1);
+    ASSERT_FALSE(dir_empty1 != dir_empty2);
+    ASSERT_FALSE(dir_empty3 != dir_empty4);
 }
 
 TEST(LinuxFileSystemTest, DirToString) {
@@ -85,6 +97,12 @@ TEST(LinuxFileSystemTest, ParseDirectory) {
     ASSERT_TRUE(parsed_dir_absolute_1 == expected_absolute);
     WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
     ASSERT_TRUE(parsed_dir_absolute_2 == expected_absolute);
+    WBE::Directory expectd_relative_empty({}, false);
+    WBE::Directory expectd_absolute_empty({}, true);
+    WBE::Directory parsed_dir_relative_empty = WBE::FileSystem::parse_directory("");
+    WBE::Directory parsed_dir_absolute_empty = WBE::FileSystem::parse_directory("/");
+    ASSERT_TRUE(parsed_dir_relative_empty == expectd_relative_empty);
+    ASSERT_TRUE(parsed_dir_absolute_empty == expectd_absolute_empty);
 }
 
 #endif
