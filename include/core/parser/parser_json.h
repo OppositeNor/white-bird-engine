@@ -2,10 +2,60 @@
 #define __WBE_PARSER_JSON_H__
 
 #include "parser.h"
+#include "utils/defs.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @class JSONData
+ * @brief Data class for json.
+ *
+ */
+class JSONData : public ParserData<JSONData> {
+    using json = nlohmann::json;
+    friend class ParserJSON;
+public:
+    JSONData() {}
+    ~JSONData() {}
+    JSONData(const JSONData& p_other) : data(p_other.data) {}
+    JSONData(JSONData&& p_other) : data(std::move(p_other.data)) {}
+    JSONData& operator=(const JSONData& p_other) {
+        data = p_other.data;
+        return *this;
+    }
+    JSONData& operator=(JSONData&& p_other) {
+        data = std::move(p_other.data);
+        return *this;
+    }
+
+    JSONData(const json& p_data)
+        : data(p_data) {}
+    JSONData(json&& p_data)
+        : data(std::move(p_data)) {}
+
+    template <typename T> requires (!std::same_as<T, JSONData>)
+    T get_value(const std::string& p_key) const {
+        return data.at(p_key).get<T>();
+    }
+
+    template <std::same_as<JSONData> T>
+    JSONData get_value(const std::string& p_key) const {
+        return data.at(p_key).get<T>();
+    }
+
+private:
+    json data;
+};
+
+template <>
+struct ParserTrait<class ParserJSON> {
+    WBE_TRAIT(ParserTrait<ParserJSON>);
+    using ParserDataType = JSONData;
+    WBE_TRAIT_REQURIES(ParserTraitConcept);
+
+};
 
 /**
  * @class ParserJSON
@@ -43,13 +93,18 @@ public:
         data = json::parse(p_buffer);
     }
 
-    template <typename T>
-    T get_value(const std::string& p_key) {
-        return data.at(p_key).get<T>();
+    template <typename T> requires (!ParserDataConcept<T>)
+    T get_value(const std::string& p_key) const {
+        return data.data.at(p_key).get<T>();
+    }
+
+    template <ParserDataConcept T>
+    JSONData get_value(const std::string& p_key) const {
+        return JSONData(data.data.at(p_key).get<json>());
     }
 
 private:
-    json data;
+    JSONData data;
 };
 
 }

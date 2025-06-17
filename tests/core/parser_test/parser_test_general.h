@@ -1,0 +1,25 @@
+#include "core/parser/parser.h"
+
+namespace WBE = WhiteBirdEngine;
+
+template <WBE::ParserConcept T>
+void test_parser_general(T& p_parser,
+                 const std::string& p_test_buff1,
+                 const std::string& p_test_buff2,
+                 const std::string& p_test_buff3) {
+    p_parser.parse_from_buffer(p_test_buff1);
+    ASSERT_STREQ(p_parser.template get_value<std::string>("fruit").c_str(), "apple");
+    ASSERT_STREQ(p_parser.template get_value<std::string>("vegetable").c_str(), "lettice");
+    ASSERT_EQ(p_parser.template get_value<int32_t>("number"), 123);
+    p_parser.parse_from_buffer(p_test_buff2);
+    ASSERT_STREQ(p_parser.template get_value<std::string>("vegetable").c_str(), "lettice");
+    ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[0], 123);
+    ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[1], -200);
+    ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[2], 5);
+    ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[3], 60);
+    ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[4], -123);
+    p_parser.parse_from_buffer(p_test_buff3);
+    ASSERT_STREQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<std::string>("test_key1").c_str(), "test_val1");
+    ASSERT_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<int32_t>("test_key2"), 123);
+    ASSERT_DOUBLE_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<double>("test_key3"), 3.1415926);
+}

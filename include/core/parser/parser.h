@@ -8,6 +8,34 @@ namespace WhiteBirdEngine {
 
 /**
  * @class
+ * @brief Data for the parser.
+ *
+ * @tparam ChildType The type of the child class for CRTP
+ */
+template <typename ChildType>
+class ParserData {
+public:
+    /**
+     * @brief Get the value of the parser data from a key.
+     *
+     * @tparam T The type of the value to get.
+     * @param p_key The key of the value.
+     * @return The value of the key.
+     */
+    template <typename T>
+    T get_value(const std::string& p_key) const {
+        return static_cast<ChildType*>(this)->template get_value<T>(p_key);
+    }
+};
+
+template <typename T>
+constexpr bool is_parser_data = std::is_base_of<ParserData<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>();
+
+template <typename T>
+concept ParserDataConcept = is_parser_data<T>;
+
+/**
+ * @class
  * @brief Parser class.
  *
  * @tparam ChildType The type of the child class for CRTP
@@ -44,16 +72,27 @@ public:
      * @return The value of the key.
      */
     template <typename T>
-    T get_value(const std::string& p_key) {
+    T get_value(const std::string& p_key) const {
         return static_cast<ChildType*>(this)->template get_value<T>(p_key);
     }
 };
 
 template <typename T>
-constexpr bool parser_trait = std::is_base_of<Parser<T>, T>();
+constexpr bool is_parser = std::is_base_of_v<Parser<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>;
 
 template <typename T>
-concept ParserConcept = parser_trait<T>;
+concept ParserConcept = is_parser<T>;
+
+template <typename T>
+struct ParserTrait;
+
+template <typename T>
+concept ParserTraitConcept = is_parser_data<typename T::ParserDataType>;
+
+template <ParserConcept T>
+using ParserDataType = ParserTrait<std::remove_cvref_t<T>>::ParserDataType;
+
+#define WBE_PARSER_DATA(x) WhiteBirdEngine::ParserDataType<decltype(x)>
 
 }
 
