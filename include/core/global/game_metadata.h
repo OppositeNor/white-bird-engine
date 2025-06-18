@@ -4,6 +4,7 @@
 #include "utils/defs.h"
 #include "utils/interface/singleton.h"
 #include "utils/utils.h"
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 namespace WhiteBirdEngine {
@@ -29,9 +30,15 @@ public:
         std::unordered_map<HashCode, std::string> hash_code_map_rev;
 
         HashCode operator[](const std::string& p_key) const {
+            if (hash_code_map.find(p_key) == hash_code_map.end()) {
+                throw std::runtime_error("Failed to find metadata with key: " + p_key);
+            }
             return hash_code_map.at(p_key);
         }
         const std::string& operator[](HashCode p_hash_code) const {
+            if (hash_code_map_rev.find(p_hash_code) == hash_code_map_rev.end()) {
+                throw std::runtime_error("Failed to find metadata with hash code: " + std::to_string(p_hash_code));
+            }
             return hash_code_map_rev.at(p_hash_code);
         }
 

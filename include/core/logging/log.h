@@ -11,6 +11,7 @@ using ChannelID = HashCode;
 // default labels
 WBE_DEFINE_LABEL(WBE_CHANNEL_UNKNOWN)
 WBE_DEFINE_LABEL(WBE_CHANNEL_GLOBAL)
+WBE_DEFINE_LABEL(WBE_CHANNEL_USER)
 
 class Log {
 public:
@@ -46,6 +47,8 @@ public:
      */
     virtual void error(const std::string& p_str) = 0;
 };
+
+Log* wbe_log(ChannelID p_channel);
 
 }
 
