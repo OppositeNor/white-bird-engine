@@ -1,4 +1,3 @@
-#include "core/core_utils.h"
 #include "core/logging/log.h"
 #include "core/global/global.h"
 
