@@ -22,9 +22,9 @@ void test_parser_general(T& p_parser,
     ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[3], 60);
     ASSERT_EQ(p_parser.template get_value<std::vector<int32_t>>("numbers")[4], -123);
     p_parser.parse_from_buffer(p_test_buff3);
-    ASSERT_STREQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<std::string>("test_key1").c_str(), "test_val1");
-    ASSERT_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<int32_t>("test_key2"), 123);
-    ASSERT_DOUBLE_EQ(p_parser.template get_value<WBE_PARSER_DATA(p_parser)>("test_pair").template get_value<double>("test_key3"), 3.1415926);
+    ASSERT_STREQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<std::string>("test_key1").c_str(), "test_val1");
+    ASSERT_EQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<int32_t>("test_key2"), 123);
+    ASSERT_DOUBLE_EQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<double>("test_key3"), 3.1415926);
 }
 
 

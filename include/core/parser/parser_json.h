@@ -49,14 +49,6 @@ private:
     json data;
 };
 
-template <>
-struct ParserTrait<class ParserJSON> {
-    WBE_TRAIT(ParserTrait<ParserJSON>);
-    using ParserDataType = JSONData;
-    WBE_TRAIT_REQURIES(ParserTraitConcept);
-
-};
-
 /**
  * @class ParserJSON
  * @brief Parser for JSON files.
@@ -65,6 +57,8 @@ struct ParserTrait<class ParserJSON> {
 class ParserJSON : public Parser<ParserJSON> {
     using json = nlohmann::json;
 public:
+    using DataType = JSONData;
+
     ParserJSON() = default;
     virtual ~ParserJSON() {}
     ParserJSON(const ParserJSON& p_other)
@@ -86,11 +80,11 @@ public:
         if (!f.is_open()) {
             throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
         }
-        data = json::parse(static_cast<std::string>(p_path));
+        data.data = json::parse(static_cast<std::string>(p_path));
     }
 
     void parse_from_buffer(const std::string& p_buffer) {
-        data = json::parse(p_buffer);
+        data.data = json::parse(p_buffer);
     }
 
     template <typename T> requires (!ParserDataConcept<T>)

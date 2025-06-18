@@ -83,17 +83,6 @@ constexpr bool is_parser = std::is_base_of_v<Parser<std::remove_cvref_t<T>>, std
 template <typename T>
 concept ParserConcept = is_parser<T>;
 
-template <typename T>
-struct ParserTrait;
-
-template <typename T>
-concept ParserTraitConcept = is_parser_data<typename T::ParserDataType>;
-
-template <ParserConcept T>
-using ParserDataType = ParserTrait<std::remove_cvref_t<T>>::ParserDataType;
-
-#define WBE_PARSER_DATA(x) WhiteBirdEngine::ParserDataType<decltype(x)>
-
 }
 
 #endif

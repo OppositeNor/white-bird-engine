@@ -48,14 +48,6 @@ private:
     YAML::Node node;
 };
 
-template <>
-struct ParserTrait<class ParserYAML> {
-    WBE_TRAIT(ParserTrait<ParserYAML>);
-    using ParserDataType = YAMLData;
-    WBE_TRAIT_REQURIES(ParserTraitConcept);
-
-};
-
 /**
  * @class ParserYAML
  * @brief Parser for YAML files.
@@ -63,6 +55,9 @@ struct ParserTrait<class ParserYAML> {
  */
 class ParserYAML : public Parser<ParserYAML> {
 public:
+
+    using DataType = YAMLData;
+
     ParserYAML() = default;
     virtual ~ParserYAML() {}
     ParserYAML(const ParserYAML& p_other)
