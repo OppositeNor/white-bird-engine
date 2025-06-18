@@ -1,4 +1,4 @@
-#include "core/core_utils.h"
+#include "core/logging/log.h"
 #include "utils/defs.h"
 #include "utils/utils.h"
 #include <cstring>
@@ -10,7 +10,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
     if (allocated.size() != 0) {
-        wbe_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
+        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
 }
 

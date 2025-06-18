@@ -2,7 +2,7 @@
 #define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_H__
 
 #include "core/allocator/allocator.h"
-#include "core/core_utils.h"
+#include "core/logging/log.h"
 #include "heap_allocator.h"
 #include "utils/defs.h"
 #include <cstring>
@@ -104,7 +104,7 @@ private:
 template <size_t SIZE>
 HeapAllocatorFixedSizePool<SIZE>::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
-        wbe_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
+        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
     }
 }
 
