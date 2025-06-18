@@ -2,7 +2,6 @@
 #define __WBE_PARSER_JSON_H__
 
 #include "parser.h"
-#include "utils/defs.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -45,6 +44,14 @@ public:
         return data.at(p_key).get<T>();
     }
 
+    std::vector<std::string> get_all_keys() const {
+        std::vector<std::string> result;
+        result.reserve(data.size());
+        for (json::const_iterator it = data.begin(); it != data.end(); ++it) {
+            result.push_back(it.key());
+        }
+        return result;
+    }
 private:
     json data;
 };
@@ -95,6 +102,10 @@ public:
     template <ParserDataConcept T>
     JSONData get_value(const std::string& p_key) const {
         return JSONData(data.data.at(p_key).get<json>());
+    }
+
+    std::vector<std::string> get_all_keys() const {
+        return data.get_all_keys();
     }
 
 private:

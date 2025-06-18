@@ -35,29 +35,17 @@
 
     - [x] Interface
 
-    - [ ] Config file parser
-
-        - [ ] Implementation
-
-        - [ ] Test
+    - [ ] Implementation
 
 ### Parsers
 
 - [ ] Doc
 
-- [ ] Interface
+- [x] Interface
 
-- [ ] JSON parser
+- [x] JSON parser
 
-    - [ ] Implementation
-
-    - [ ] Test
-
-- [ ] YAML parser
-
-    - [ ] Implementation
-
-    - [ ] Test
+- [x] YAML parser
 
 ### Global
 
@@ -98,6 +86,12 @@
     - [ ] Implementation
 
     - [ ] Test
+
+- [ ] ComponentRef
+
+    - [ ] Implementation
+
+    - [ ] Tests
 
 ### RNG
 

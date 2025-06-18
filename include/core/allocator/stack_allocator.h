@@ -24,7 +24,6 @@ struct AllocatorTrait<class StackAllocator> {
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
-// TODO: Test
 class StackAllocator {
 public:
     StackAllocator() : StackAllocator(1024) {}

@@ -12,12 +12,13 @@ namespace WhiteBirdEngine {
  *
  * @brief Log the message to a std::ostream
  */
-template <ChannelID CHANNEL = WBE_CHANNEL_UNKNOWN>
 class LogStream : public Log {
 public:
 
+    LogStream(ChannelID p_channel_id, std::ostream& p_ostream)
+        : Log(), ostream(&p_ostream), channel_id(p_channel_id) {}
     LogStream(std::ostream& p_ostream)
-        : Log(), ostream(&p_ostream) {}
+        : Log(), ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
     virtual ~LogStream() override {}
     LogStream(const LogStream &) = delete;
     LogStream(LogStream &&) = delete;
@@ -29,28 +30,19 @@ public:
         WBE_DEBUG_ASSERT(p_ostream != nullptr);
     }
 
-    static constexpr ChannelID get_channel() {
-        return CHANNEL;
+    virtual ChannelID get_channel() const override {
+        return channel_id;
     }
 
-    virtual ChannelID get_current_channel() const override {
-        return CHANNEL;
-    }
+    virtual void message(const std::string& p_str) override;
 
-    virtual void message(const std::string& p_str) override {
-        *ostream << "[" << WBE_LABEL_NAME(CHANNEL) << "] Message: " << p_str << std::endl;
-    }
+    virtual void warning(const std::string& p_str) override;
 
-    virtual void warning(const std::string& p_str) override {
-        *ostream << "[" << WBE_LABEL_NAME(CHANNEL) << "] Warning: " << p_str << std::endl;
-    }
-
-    virtual void error(const std::string& p_str) override {
-        *ostream << "[" << WBE_LABEL_NAME(CHANNEL) << "] Error: " << p_str << std::endl;
-    }
+    virtual void error(const std::string& p_str) override;
 
 private:
     std::ostream* ostream;
+    ChannelID channel_id;
 };
 
 }

@@ -1,12 +1,11 @@
 import json
-import os
 import sys
 import importlib.util
 from channel_registrator import ChannelRegistrator
 
 class WBEBuilder:
-    def __init__(self, p_metadata_dir : str) -> None:
-        self.metadata_dir = p_metadata_dir
+    def __init__(self, p_metadata_path : str) -> None:
+        self.metadata_path = p_metadata_path
         self.channel_registrator = ChannelRegistrator()
 
     def load_script_config(self, p_load_path : str) -> None:
@@ -24,15 +23,13 @@ class WBEBuilder:
 
     def dump(self) -> None:
         print("Exporting...")
-        self.write_to_file(os.path.join(self.metadata_dir, "channels.json"),
-                           self.serialize_channel_registrator())
+        metadata : dict = {}
+        metadata["channels"] = self.channel_registrator.channels
+        self.write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True))
 
     def write_to_file(self, p_path : str, p_str : str) -> None:
         with open(p_path, "w") as channel_file:
-            channel_file.write(json.dumps(p_str, sort_keys=True))
-
-    def serialize_channel_registrator(self) -> str:
-        return json.dumps(self.channel_registrator.channels, sort_keys=True)
+            channel_file.write(p_str)
 
     def checks(self) -> None:
         print("Checking...")

@@ -34,6 +34,15 @@ public:
     }
 
     /**
+     * @brief Get the directory of the resource directory.
+     *
+     * @return The directory of the
+     */
+    const Directory& get_resource_directory() const {
+        return resource_directory;
+    }
+
+    /**
      * @brief Cast the directory to a string.
      *
      * @return The string of the directory.
@@ -73,7 +82,8 @@ public:
     static std::string path_to_string(const Path& p_path);
 
 private:
-    inline static Directory exe_directory;
+    Directory exe_directory;
+    Directory resource_directory;
 };
 
 }

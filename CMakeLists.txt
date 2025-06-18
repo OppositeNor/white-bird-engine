@@ -20,8 +20,7 @@ file(MAKE_DIRECTORY ${WBE_SHADER_DIR})
 set(WBE_SHADER_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/shaders)
 file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
 
-set(WBE_METADATA_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/metadata)
-file(MAKE_DIRECTORY ${WBE_METADATA_OUTPUT_DIR})
+set(WBE_METADATA_OUTPUT_PATH ${WBE_RESOURCE_OUTPUT_DIR}/metadata.json)
 
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
 set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
@@ -89,7 +88,7 @@ message("Build config scripts: ${WBE_BUILD_CONFIG_SCRIPTS}")
 # runtime reflections
 add_custom_target(wbe_build_script
     COMMENT "Running White Bird Engine build script"
-    COMMAND python ${PROJECT_SOURCE_DIR}/build_scripts/build.py ${WBE_METADATA_OUTPUT_DIR} ${WBE_BUILD_CONFIG_SCRIPTS}
+    COMMAND python ${PROJECT_SOURCE_DIR}/build_scripts/build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
 )
 add_dependencies(${PROJECT_NAME} wbe_build_script)
 

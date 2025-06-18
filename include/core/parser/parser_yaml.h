@@ -13,6 +13,7 @@ namespace WhiteBirdEngine {
  *
  */
 class YAMLData : public ParserData<YAMLData> {
+    using yaml = YAML::Node;
     friend class ParserYAML;
 public:
     YAMLData() {}
@@ -44,8 +45,17 @@ public:
         return YAMLData(node[p_key]);
     }
 
+    std::vector<std::string> get_all_keys() const {
+        std::vector<std::string> result;
+        result.reserve(node.size());
+        for (yaml::const_iterator it = node.begin(); it != node.end(); ++it) {
+            result.push_back(it->first.as<std::string>());
+        }
+        return result;
+    }
+
 private:
-    YAML::Node node;
+    yaml node;
 };
 
 /**
@@ -54,6 +64,7 @@ private:
  * @todo Test
  */
 class ParserYAML : public Parser<ParserYAML> {
+    using yaml = YAML::Node;
 public:
 
     using DataType = YAMLData;
@@ -88,7 +99,11 @@ public:
 
     template <ParserDataConcept T>
     YAMLData get_value(const std::string& p_key) const {
-        return YAMLData(data.get_value<YAML::Node>(p_key));
+        return YAMLData(data.get_value<yaml>(p_key));
+    }
+
+    std::vector<std::string> get_all_keys() const {
+        return data.get_all_keys();
     }
 
 private:

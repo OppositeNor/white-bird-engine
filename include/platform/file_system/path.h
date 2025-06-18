@@ -90,6 +90,10 @@ private:
     std::string file_name;
 };
 
+inline std::ostream& operator<<(std::ostream& p_ostream, const Path& p_path) {
+    return p_ostream << static_cast<std::string>(p_path);
+}
+
 }
 
 #endif

@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <sstream>
+#include <type_traits>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -29,7 +30,7 @@ WBE_DEFINE_LABEL(WBE_TEST_LABEL)
 
 TEST(WBELogStreamTest, UserDefinedLabel) {
     std::stringstream ss;
-    WBE::LogStream<WBE::WBE_TEST_LABEL> log_stream(ss);
+    WBE::LogStream log_stream(WBE::WBE_TEST_LABEL, ss);
     log_stream.message("Test message");
     ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL] Message: Test message\n"));
     log_stream.warning("Test warning");
@@ -49,7 +50,7 @@ WBE_DEFINE_LABEL(TEST_LABEL_NAME_MACRO)
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
     std::stringstream ss;
-    WBE::LogStream<WBE::WBE_TEST_LABEL_MACRO> log_stream(ss);
+    WBE::LogStream log_stream(WBE::WBE_TEST_LABEL_MACRO, ss);
     log_stream.message("Test message");
     ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL_MACRO] Message: Test message\n"));
     log_stream.warning("Test warning");
@@ -61,6 +62,7 @@ TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
                                     "[WBE_TEST_LABEL_MACRO] Error: Test error\n"));
 
 }
+
 
 
 #endif

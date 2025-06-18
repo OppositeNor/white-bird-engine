@@ -23,7 +23,7 @@ public:
      *
      * @return the channel ID.
      */
-    virtual ChannelID get_current_channel() const = 0;
+    virtual ChannelID get_channel() const = 0;
 
     /**
      * @brief Print a message.

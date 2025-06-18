@@ -104,7 +104,7 @@ private:
 template <size_t SIZE>
 HeapAllocatorFixedSizePool<SIZE>::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
-        wbe_log<WBE_CHANNEL_GLOBAL>()->warning("HeapAllocatorFixedSizePool not empty during destruction.");
+        wbe_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
     }
 }
 

@@ -8,9 +8,9 @@
 #include "core/logging/log_stream.h"
 #include "core/logging/logging_manager.h"
 #include "core/profiling/profiling_manager.h"
+#include "platform/file_system/file_system.h"
 #include "utils/interface/singleton.h"
 #include "platform/file_system/path.h"
-#include <ostream>
 
 namespace WhiteBirdEngine {
 /**
@@ -20,7 +20,7 @@ namespace WhiteBirdEngine {
  */
 class Global : public Singleton<Global> {
 private:
-    Global(int p_argc, char* p_argv[], const Path& p_config_file_path);
+    Global(int p_argc, char* p_argv[]);
     ~Global();
 public:
 
@@ -31,7 +31,7 @@ public:
      * @param p_argv The command line arguments.
      * @param p_config_file_path The path to the configuration file.
      */
-    static void init(int p_argc, char* p_argv[], const Path& p_config_file_path);
+    static void init(int p_argc, char* p_argv[]);
 
     /**
      * @brief Free all the global resources and terminate to the uninitialized state.
@@ -45,6 +45,10 @@ public:
      */
     static Global* get_singleton();
 
+    /**
+     * @brief File system.
+     */
+    std::unique_ptr<FileSystem> file_system;
     /**
      * @brief Engine configuration.
      */
@@ -74,7 +78,7 @@ public:
 private:
     inline static Global* singleton;
 
-    static GameMetadata parse_metadata(const Path& p_metadata_config_path);
+    static void parse_metadata(const Path& p_metadata_config_path);
 };
 
 }

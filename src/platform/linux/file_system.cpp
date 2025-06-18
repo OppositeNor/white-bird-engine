@@ -13,9 +13,9 @@ FileSystem::FileSystem() {
     }
     buf[len] = '\0';
     exe_directory = parse_directory(std::string(buf));
+    resource_directory = exe_directory.combine(Directory("res/"));
 }
 
-// TODO: Test
 Directory FileSystem::parse_directory(const std::string& p_str) {
     auto splitted = split_string(p_str, '/');
     std::vector<std::string> path_stack;
@@ -35,7 +35,6 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
     return Directory(path_stack, p_str.size() != 0 && p_str[0] == '/');
 }
 
-// TODO: Test
 std::string FileSystem::dir_to_string(const Directory& p_directory) {
     std::string result = p_directory.get_is_absolute() ? "/" : "";
     auto& dir_names = p_directory.get_dir_names();
@@ -45,7 +44,6 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
     return result;
 }
 
-// TODO: Test
 std::string FileSystem::get_file_name(const std::string& p_path) {
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
@@ -54,7 +52,6 @@ std::string FileSystem::get_file_name(const std::string& p_path) {
     return p_path.substr(last_slash);
 }
 
-// TODO: Test
 Directory FileSystem::get_file_dir(const std::string& p_path) {
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {

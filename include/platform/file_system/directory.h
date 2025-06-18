@@ -4,6 +4,7 @@
 #include "utils/defs.h"
 
 #include <cstdint>
+#include <ostream>
 #include <string>
 #include <vector>
 namespace WhiteBirdEngine {
@@ -51,6 +52,12 @@ public:
         return !(*this == p_other);
     }
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_dir_path The path to the directory.
+     */
+    Directory(const std::string& p_dir_path);
 
     /**
      * @brief Constructor.
@@ -59,7 +66,7 @@ public:
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.
      */
-    Directory(std::vector<std::string> p_dir_names, bool p_is_absolute)
+    Directory(std::vector<std::string> p_dir_names, bool p_is_absolute = false)
         : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
 
 
@@ -105,6 +112,10 @@ private:
     std::vector<std::string> dir_names;
     bool is_absolute;
 };
+
+inline std::ostream& operator<<(std::ostream& p_ostream, const Directory& p_directory) {
+    return p_ostream << static_cast<std::string>(p_directory);
+}
 
 }
 

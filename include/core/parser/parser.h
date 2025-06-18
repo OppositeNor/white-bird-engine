@@ -4,6 +4,7 @@
 #include "platform/file_system/path.h"
 #include <string>
 #include <type_traits>
+#include <vector>
 namespace WhiteBirdEngine {
 
 /**
@@ -25,6 +26,13 @@ public:
     template <typename T>
     T get_value(const std::string& p_key) const {
         return static_cast<ChildType*>(this)->template get_value<T>(p_key);
+    }
+
+    /**
+     * @brief Get all the key values.
+     */
+    std::vector<std::string> get_all_keys() const {
+        return static_cast<ChildType*>(this)->get_all_keys();
     }
 };
 
@@ -74,6 +82,13 @@ public:
     template <typename T>
     T get_value(const std::string& p_key) const {
         return static_cast<ChildType*>(this)->template get_value<T>(p_key);
+    }
+
+    /**
+     * @brief Get all the key values.
+     */
+    std::vector<std::string> get_all_keys() const {
+        return static_cast<ChildType*>(this)->get_all_keys();
     }
 };
 

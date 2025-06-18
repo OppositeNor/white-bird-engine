@@ -10,7 +10,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
     if (allocated.size() != 0) {
-        wbe_log<WBE_CHANNEL_GLOBAL>()->warning("HeapAllocatorPool not empty during destruction.");
+        wbe_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
 }
 

@@ -3,44 +3,44 @@
 
 #include "core/logging/log.h"
 #include "utils/interface/singleton.h"
-#include <list>
+#include <memory>
 #include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
 namespace WhiteBirdEngine {
 
 
 // TODO: Test
-template <template <ChannelID> typename LogType, typename T>
+template <typename LogType, typename T>
 class LoggingManager : public Singleton<LoggingManager<LogType, T>> {
 public:
     LoggingManager(T& p_channel_argument)
         : Singleton<LoggingManager>(), channel_argument(&p_channel_argument) {}
 
-    virtual ~LoggingManager() override {
-        for (auto* log : created_channel_list) {
-            delete log;
-        }
-    }
+    virtual ~LoggingManager() override {}
 
-    template <ChannelID CHANNEL>
-    Log* get_log() {
-        if (channel_log<CHANNEL> == nullptr) {
-            std::lock_guard lock(channel_mutex<CHANNEL>);
-            if (channel_log<CHANNEL> == nullptr) {
-                channel_log<CHANNEL> = new LogType<CHANNEL>(*channel_argument);
-                created_channel_list.push_back(channel_log<CHANNEL>);
+    Log* get_log(ChannelID p_channel_id) {
+        {
+            std::shared_lock lock(channel_logs_mutex);
+            auto channel = channel_logs.find(p_channel_id);
+            if (channel != channel_logs.end()) {
+                return channel->second.get();
             }
         }
-        return channel_log<CHANNEL>;
+        {
+            std::unique_lock lock(channel_logs_mutex);
+            auto channel = channel_logs.find(p_channel_id);
+            if (channel != channel_logs.end()) {
+                return channel->second.get();
+            }
+            channel_logs[p_channel_id] = std::make_unique<LogType>(p_channel_id, *channel_argument);
+            return channel_logs.at(p_channel_id).get();
+        }
     }
 
 private:
-    template <ChannelID CHANNEL>
-    inline static Log* channel_log;
-
-    template <ChannelID CHANNEL>
-    inline static std::mutex channel_mutex;
-
-    std::list<Log*> created_channel_list;
+    std::shared_mutex channel_logs_mutex;
+    std::unordered_map<ChannelID, std::unique_ptr<Log>> channel_logs;
 
     T* channel_argument;
 };

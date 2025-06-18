@@ -1,17 +1,15 @@
-#include "core/logging/log_stream.h"
+#include "core/global/global.h"
 #include "utils/defs.h"
-#include <iostream>
 
 namespace WBE = WhiteBirdEngine;
 namespace WhiteBirdEngine {
 WBE_DEFINE_LABEL(WBE_USER)
 }
 
-int main() {
-    WBE::LogStream<WBE::WBE_USER> log(std::cout);
+int main(int argc, char* argv[]) {
+    WBE::Global::init(argc, argv);
 
-    log.message("Hello World!");
-
+    WBE::Global::terminate();
     return 0;
 }
 
