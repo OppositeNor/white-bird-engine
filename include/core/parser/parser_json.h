@@ -87,7 +87,7 @@ public:
         if (!f.is_open()) {
             throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
         }
-        data.data = json::parse(static_cast<std::string>(p_path));
+        data.data = json::parse(f);
     }
 
     void parse_from_buffer(const std::string& p_buffer) {

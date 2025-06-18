@@ -4,3 +4,6 @@ add_subdirectory(memory_test)
 add_subdirectory(logging_test)
 add_subdirectory(parser_test)
 
+set(WBE_BUILD_CONFIG_SCRIPTS ${WBE_BUILD_CONFIG_SCRIPTS}
+    PARENT_SCOPE
+)

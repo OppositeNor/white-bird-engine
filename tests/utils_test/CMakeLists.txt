@@ -9,3 +9,6 @@ target_link_libraries(utils_test
     gtest_main
 )
 
+set(WBE_BUILD_CONFIG_SCRIPTS ${WBE_BUILD_CONFIG_SCRIPTS}
+    PARENT_SCOPE
+)

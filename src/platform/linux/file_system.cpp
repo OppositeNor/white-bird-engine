@@ -12,8 +12,13 @@ FileSystem::FileSystem() {
         throw std::runtime_error("Failed to get the executable path.");
     }
     buf[len] = '\0';
-    exe_directory = parse_directory(std::string(buf));
-    resource_directory = exe_directory.combine(Directory("res/"));
+    root_directory = parse_directory(std::string(buf));
+    resource_directory = root_directory.combine(Directory({"res"}));
+}
+
+FileSystem::FileSystem(const Directory& p_root_dir) {
+    root_directory = p_root_dir;
+    resource_directory = root_directory.combine(Directory({"res"}));
 }
 
 Directory FileSystem::parse_directory(const std::string& p_str) {

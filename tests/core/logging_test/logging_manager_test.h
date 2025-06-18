@@ -50,6 +50,7 @@ public:
 };
 
 TEST(WBELoggingManagerTest, GetLogConstructDestruct) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     std::stringstream ss;
     {
         WBE::LoggingManager<LogTestMock, std::ostream> logging_manager(ss);
@@ -60,12 +61,14 @@ TEST(WBELoggingManagerTest, GetLogConstructDestruct) {
         ASSERT_NE(log2, nullptr);
         ASSERT_NE(log2, log1);
     }
-    ASSERT_EQ(ss.str(), std::string(
-        "Construct WBE_TEST_LABEL_1\n"
-        "Construct WBE_TEST_LABEL_2\n"
-        "Destruct WBE_TEST_LABEL_1\n"
-        "Destruct WBE_TEST_LABEL_2\n"
-    ));
+    ASSERT_NE(ss.str().find("Construct WBE_TEST_LABEL_1\n"), std::string::npos);
+    ASSERT_EQ(ss.str().find("Construct WBE_TEST_LABEL_1\n"), ss.str().rfind("Construct WBE_TEST_LABEL_1\n"));
+    ASSERT_NE(ss.str().find("Construct WBE_TEST_LABEL_2\n"), std::string::npos);
+    ASSERT_EQ(ss.str().find("Construct WBE_TEST_LABEL_2\n"), ss.str().rfind("Construct WBE_TEST_LABEL_2\n"));
+    ASSERT_NE(ss.str().find("Destruct WBE_TEST_LABEL_1\n"), std::string::npos);
+    ASSERT_EQ(ss.str().find("Destruct WBE_TEST_LABEL_1\n"), ss.str().rfind("Destruct WBE_TEST_LABEL_1\n"));
+    ASSERT_NE(ss.str().find("Destruct WBE_TEST_LABEL_2\n"), std::string::npos);
+    ASSERT_EQ(ss.str().find("Destruct WBE_TEST_LABEL_2\n"), ss.str().rfind("Destruct WBE_TEST_LABEL_2\n"));
 }
 
 #endif

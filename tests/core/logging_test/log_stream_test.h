@@ -1,16 +1,18 @@
 #ifndef __WBE_LOG_STREAM_TEST_H__
 #define __WBE_LOG_STREAM_TEST_H__
 
+#include "core/global/global.h"
 #include "core/logging/log_stream.h"
+#include "platform/file_system/directory.h"
 #include "utils/defs.h"
 
 #include <gtest/gtest.h>
 #include <sstream>
-#include <type_traits>
 
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBELogStreamTest, General) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     std::stringstream ss;
     WBE::LogStream log_stream(ss);
     log_stream.message("Test message");
@@ -29,6 +31,7 @@ WBE_DEFINE_LABEL(WBE_TEST_LABEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabel) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     std::stringstream ss;
     WBE::LogStream log_stream(WBE::WBE_TEST_LABEL, ss);
     log_stream.message("Test message");
@@ -49,6 +52,7 @@ WBE_DEFINE_LABEL(TEST_LABEL_NAME_MACRO)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     std::stringstream ss;
     WBE::LogStream log_stream(WBE::WBE_TEST_LABEL_MACRO, ss);
     log_stream.message("Test message");
@@ -60,7 +64,6 @@ TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
     ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL_MACRO] Message: Test message\n"
                                     "[WBE_TEST_LABEL_MACRO] Warning: Test warning\n"
                                     "[WBE_TEST_LABEL_MACRO] Error: Test error\n"));
-
 }
 
 

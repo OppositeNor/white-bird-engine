@@ -17,6 +17,13 @@ public:
     ~FileSystem() {}
 
     /**
+     * @brief Constructor.
+     *
+     * @param p_root_dir The path of the root directory.
+     */
+    FileSystem(const Directory& p_root_dir);
+
+    /**
      * @brief Parse a directory from a string.
      *
      * @param p_str The string to parse directory from.
@@ -29,8 +36,8 @@ public:
      *
      * @return The directory of the executable file.
      */
-    const Directory& get_exe_directory() const {
-        return exe_directory;
+    const Directory& get_root_directory() const {
+        return root_directory;
     }
 
     /**
@@ -82,7 +89,7 @@ public:
     static std::string path_to_string(const Path& p_path);
 
 private:
-    Directory exe_directory;
+    Directory root_directory;
     Directory resource_directory;
 };
 

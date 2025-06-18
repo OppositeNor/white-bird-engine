@@ -19,24 +19,25 @@ namespace WhiteBirdEngine {
  * Terminate and then reinitialize it should result in restarting the game/engine.
  */
 class Global : public Singleton<Global> {
-private:
-    Global(int p_argc, char* p_argv[]);
-    ~Global();
 public:
+    ~Global() {}
 
     /**
-     * @brief Initialize global objects.
+     * @brief Constructor.
      *
-     * @param p_argc The number of command line arguments.
-     * @param p_argv The command line arguments.
-     * @param p_config_file_path The path to the configuration file.
+     * @param p_argc argc.
+     * @param p_argv argv.
      */
-    static void init(int p_argc, char* p_argv[]);
+    Global(int p_argc, char* p_argv[]);
 
     /**
-     * @brief Free all the global resources and terminate to the uninitialized state.
+     * @brief Constructor.
+     *
+     * @param p_argc argc.
+     * @param p_argv argv.
+     * @param p_root_dir The root directory.
      */
-    static void terminate();
+    Global(int p_argc, char* p_argv[], const Directory& p_root_dir);
 
     /**
      * @brief Get the singleton.
@@ -78,7 +79,8 @@ public:
 private:
     inline static Global* singleton;
 
-    static void parse_metadata(const Path& p_metadata_config_path);
+    void parse_metadata(const Path& p_metadata_config_path);
+    void initialize(int p_argc, char* p_argv[]);
 };
 
 }

@@ -55,13 +55,6 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_dir_path The path to the directory.
-     */
-    Directory(const std::string& p_dir_path);
-
-    /**
-     * @brief Constructor.
-     *
      * @param p_dir_names The names of the full path to the directory.
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.

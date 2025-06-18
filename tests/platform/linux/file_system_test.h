@@ -44,7 +44,6 @@ TEST(LinuxFileSystemTest, ParseDirectory) {
     WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
     WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello/world//this/is/not/../a/test/./directory/XD");
     ASSERT_TRUE(parsed_dir == expected);
-    ASSERT_TRUE(parsed_dir == WBE::Directory("hello/world//this/is/not/../a/test/./directory/XD"));
     WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory("../hello/world/this/is/not/../a/test/./directory/XD/../");
     ASSERT_TRUE(parsed_dir_1 == expected);
     WBE::Directory parsed_dir_2 = WBE::FileSystem::parse_directory("./hello/world/this/is/not/../a/test/./directory/XD/../");
@@ -73,8 +72,8 @@ TEST(LinuxFileSystemTest, CombineDirectory) {
     WBE::Directory dir2({ "hello", "world" }, false);
     WBE::Directory dir_rel = dir2.combine(WBE::Directory({ "this", "is", "a", "test", "directory" }, false));
     ASSERT_EQ(expected_relative, dir_rel);
-    ASSERT_EQ(dir1.combine(WBE::Directory("")), dir1);
-    ASSERT_EQ(dir2.combine(WBE::Directory("")), dir2);
+    ASSERT_EQ(dir1.combine(WBE::Directory({""})), dir1);
+    ASSERT_EQ(dir2.combine(WBE::Directory({""})), dir2);
 }
 
 #endif
