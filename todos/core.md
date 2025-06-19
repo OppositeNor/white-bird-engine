@@ -45,7 +45,15 @@
 
 - [x] JSON parser
 
+    - [x] Implementation
+
+    - [x] Test
+
 - [x] YAML parser
+
+    - [x] Implementation
+
+    - [x] Test
 
 ### Allocator
 
@@ -53,7 +61,15 @@
 
 - [x] Stack allocator
 
+    - [x] Implementation
+
+    - [x] Test
+
 - [x] Heap allocator
+
+    - [x] Implementation
+
+    - [x] Test
 
 ### ECS
 
@@ -67,7 +83,15 @@
 
 - [x] Ref
 
+    - [x] Implementation
+
+    - [x] Test
+
 - [x] WeakRef
+
+    - [x] Implementation
+
+    - [x] Test
 
 - [ ] ComponentRef
 
@@ -87,7 +111,15 @@ TODO
 
 - [x] Log
 
+    - [x] Implementation
+
+    - [x] Test
+
 - [x] Logging manager
+
+    - [x] Implementation
+
+    - [x] Test
 
 ### Localization
 

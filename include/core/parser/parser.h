@@ -8,7 +8,7 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class
+ * @class ParserData
  * @brief Data for the parser.
  *
  * @tparam ChildType The type of the child class for CRTP
@@ -43,8 +43,8 @@ template <typename T>
 concept ParserDataConcept = is_parser_data<T>;
 
 /**
- * @class
- * @brief Parser class.
+ * @class Parser
+ * @brief Parser interface.
  *
  * @tparam ChildType The type of the child class for CRTP
  */

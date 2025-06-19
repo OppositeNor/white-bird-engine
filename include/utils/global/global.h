@@ -20,7 +20,7 @@ namespace WhiteBirdEngine {
  */
 class Global : public Singleton<Global> {
 public:
-    ~Global() {}
+    ~Global();
 
     /**
      * @brief Constructor.
@@ -49,32 +49,32 @@ public:
     /**
      * @brief File system.
      */
-    std::unique_ptr<FileSystem> file_system;
+    FileSystem* file_system;
     /**
      * @brief Engine configuration.
      */
-    std::unique_ptr<EngineConfig> engine_config;
+    EngineConfig* engine_config;
     /**
      * @brief Single tick stack allocator. Contents will be cleared every time a tick ends.
      */
-    std::unique_ptr<StackAllocator> single_tick_allocator;
+    StackAllocator* single_tick_allocator;
     /**
      * @brief Global pool allocator.
      */
-    std::unique_ptr<HeapAllocatorPool> pool_allocator;
+    HeapAllocatorPool* pool_allocator;
     /**
      * @brief Manager for logs.
      */
-    std::unique_ptr<LoggingManager<LogStream, std::ostream>> stdio_logging_manager;
+    LoggingManager<LogStream, std::ostream>* stdio_logging_manager;
     /**
      * @brief Manager for profiling.
      */
-    std::unique_ptr<ProfilingManager> profiling_manager;
+    ProfilingManager* profiling_manager;
 
     /**
      * @brief Metadata of the game.
      */
-    std::unique_ptr<GameMetadata> game_metadata;
+    GameMetadata* game_metadata;
 
 private:
     inline static Global* singleton;

@@ -22,6 +22,11 @@ struct AllocatorTrait<class HeapAllocatorPool> {
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
+/**
+ * @class HeapAllocatorPool
+ * @brief Pool allocator. Allocate from a continuous memory pool, to prevent memory fragmentation.
+ *
+ */
 class HeapAllocatorPool final : public HeapAllocator {
 public:
     HeapAllocatorPool() : HeapAllocatorPool(1024) {}

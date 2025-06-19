@@ -10,7 +10,7 @@ namespace WhiteBirdEngine {
 
 
 /**
- * @class
+ * @class Ref
  * @brief The reference to a memory resource.
  *
  * @tparam T The type of the resource.
@@ -30,7 +30,7 @@ public:
     using ObjType = T;
     using HeapAllocatorType = AllocType;
 
-    explicit Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator.get()) {
+    explicit Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, MEM_NULL);
         ref();

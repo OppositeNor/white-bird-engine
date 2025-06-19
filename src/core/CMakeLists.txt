@@ -1,7 +1,7 @@
 set(wbe_core_src "")
 
 add_subdirectory(allocator)
-add_subdirectory(global)
+add_subdirectory(utils)
 add_subdirectory(logging)
 add_subdirectory(profiling)
 add_subdirectory(engine_config)

@@ -8,7 +8,7 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class
+ * @class LogStream
  *
  * @brief Log the message to a std::ostream
  */
