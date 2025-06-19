@@ -151,7 +151,6 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
             }
             ASSERT_EQ(test_val1, 1);
             ASSERT_EQ(test_val2, 1);
-            sleep(rand() % 2);
         }
     }
 }

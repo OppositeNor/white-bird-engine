@@ -9,7 +9,6 @@
 namespace WhiteBirdEngine {
 
 
-// TODO: Test multi-thread
 /**
  * @class
  * @brief The reference to a memory resource.
@@ -148,7 +147,7 @@ public:
     /**
      * @brief Get the resource pointer.
      *
-     * @return The pointer pointing to the resource.
+     * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
     T* get() {
         WBE_DEBUG_ASSERT(control_block != nullptr);
@@ -159,7 +158,7 @@ public:
     /**
      * @brief Get the resource pointer.
      *
-     * @return The pointer pointing to the resource.
+     * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
     const T* get() const {
         WBE_DEBUG_ASSERT(control_block != nullptr);
@@ -167,8 +166,6 @@ public:
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
-
-    // TODO: Test
     bool operator==(const Ref<T>& p_other) {
         return p_other.control_block == control_block;
     }
@@ -208,8 +205,8 @@ private:
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
             if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {
                 delete control_block;
-                control_block = nullptr;
             }
+            control_block = nullptr;
         }
     }
 
