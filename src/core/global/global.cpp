@@ -1,5 +1,5 @@
-#include "core/global/global.h"
-#include "core/global/game_metadata.h"
+#include "utils/global/global.h"
+#include "utils/game_metadata.h"
 #include "core/logging/log_stream.h"
 #include "core/parser/parser_json.h"
 #include "platform/file_system/file_system.h"

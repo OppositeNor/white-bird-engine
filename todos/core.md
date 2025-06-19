@@ -47,12 +47,6 @@
 
 - [x] YAML parser
 
-### Global
-
-- [ ] Doc
-
-- [ ] Implementation
-
 ### Allocator
 
 - [ ] Doc

@@ -1,5 +1,5 @@
 #include "core/logging/log.h"
-#include "core/global/global.h"
+#include "utils/global/global.h"
 
 namespace WhiteBirdEngine {
 Log* wbe_console_log(ChannelID p_channel) {

@@ -4,7 +4,7 @@
 #include "core/allocator/heap_allocator_pool.h"
 #include "core/allocator/stack_allocator.h"
 #include "core/engine_config/engine_config.h"
-#include "core/global/game_metadata.h"
+#include "utils/game_metadata.h"
 #include "core/logging/log_stream.h"
 #include "core/logging/logging_manager.h"
 #include "core/profiling/profiling_manager.h"

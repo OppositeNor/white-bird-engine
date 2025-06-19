@@ -4,39 +4,13 @@
 
 ## Linux
 
-- [ ] RHI
-
-    - [ ] Vulkan
-
-        - [ ] Implementation
-
-        - [ ] Test
-
-- [ ] File system
+- [x] File system
 
     - [x] Directory
 
-    - [ ] Path
-
-        - [x] Implementation
-
-        - [ ] Test
+    - [x] Path
 
 ## Windows
-
-- [ ] RHI
-
-    - [ ] Vulkan
-
-        - [ ] Implementation
-
-        - [ ] Test
-
-    - [ ] DX12 (maybe?)
-
-        - [ ] Implementation
-
-        - [ ] Test
 
 - [ ] File system
 
@@ -54,20 +28,6 @@
 
 ## Android
 
-- [ ] RHI
-
-    - [ ] Vulkan
-
-        - [ ] Implementation
-
-        - [ ] Test
-
-    - [ ] OpenGL ES (maybe?)
-
-        - [ ] Implementation
-
-        - [ ] Test
-
 - [ ] File system
 
     - [ ] Directory
@@ -84,20 +44,6 @@
 
 ## IOS
 
-- [ ] RHI
-
-    - [ ] Vulkan
-
-        - [ ] Implementation
-
-        - [ ] Test
-
-    - [ ] Metal (maybe?)
-
-        - [ ] Implementation
-
-        - [ ] Test
-
 - [ ] File system
 
     - [ ] Directory
@@ -113,20 +59,6 @@
         - [ ] Test
 
 ## MacOS (maybe?)
-
-- [ ] RHI
-
-    - [ ] Vulkan
-
-        - [ ] Implementation
-
-        - [ ] Test
-
-    - [ ] Metal (maybe?)
-
-        - [ ] Implementation
-
-        - [ ] Test
 
 - [ ] File system
 

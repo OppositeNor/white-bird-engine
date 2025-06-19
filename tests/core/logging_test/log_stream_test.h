@@ -1,7 +1,7 @@
 #ifndef __WBE_LOG_STREAM_TEST_H__
 #define __WBE_LOG_STREAM_TEST_H__
 
-#include "core/global/global.h"
+#include "utils/global/global.h"
 #include "core/logging/log_stream.h"
 #include "platform/file_system/directory.h"
 #include "utils/defs.h"
