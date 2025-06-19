@@ -72,8 +72,8 @@ TEST(LinuxFileSystemTest, CombineDirectory) {
     WBE::Directory dir2({ "hello", "world" }, false);
     WBE::Directory dir_rel = dir2.combine(WBE::Directory({ "this", "is", "a", "test", "directory" }, false));
     ASSERT_EQ(expected_relative, dir_rel);
-    ASSERT_EQ(dir1.combine(WBE::Directory({""})), dir1);
-    ASSERT_EQ(dir2.combine(WBE::Directory({""})), dir2);
+    ASSERT_EQ(dir1.combine(WBE::Directory(std::vector<std::string>())), dir1);
+    ASSERT_EQ(dir2.combine(WBE::Directory(std::vector<std::string>())), dir2);
 }
 
 #endif

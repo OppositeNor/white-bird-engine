@@ -8,14 +8,14 @@
 
 namespace WBE = WhiteBirdEngine;
 
-class MockClass {
+class TestClassWeak {
 public:
-    MockClass(std::stringstream& p_ss)
+    TestClassWeak(std::stringstream& p_ss)
         : ss(&p_ss), test_val(0) {
         (*ss) << "Construct.\n";
     }
 
-    virtual ~MockClass() {
+    virtual ~TestClassWeak() {
         (*ss) << "Destruct.\n";
     }
 
@@ -32,9 +32,9 @@ TEST(WBERefWeakTest, General) {
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss;
     {
-        WBE::Ref<MockClass> ref = WBE::Ref<MockClass>::make_ref(&pool_allocator, test_ss);
+        WBE::Ref<TestClassWeak> ref = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss);
         {
-            WBE::RefWeak<MockClass> ref_weak = ref;
+            WBE::RefWeak<TestClassWeak> ref_weak = ref;
             ASSERT_TRUE(ref_weak.is_valid());
             ASSERT_EQ(ref_weak.lock()->test_val, 0);
             ref_weak.lock()->set_test_val(5);
@@ -65,14 +65,14 @@ TEST(WBERefWeakTest, Valid) {
     ASSERT_FALSE(ref_weak.is_valid());
 }
 
-class MockClassChild : public MockClass {
+class TestClassWeakChild : public TestClassWeak {
 public:
-    MockClassChild(std::stringstream& p_ss)
-        : MockClass(p_ss) {
+    TestClassWeakChild(std::stringstream& p_ss)
+        : TestClassWeak(p_ss) {
         (*ss) << "Child construct.\n";
     }
 
-    virtual ~MockClassChild() override {
+    virtual ~TestClassWeakChild() override {
         (*ss) << "Child destruct.\n";
     }
 
@@ -83,15 +83,15 @@ public:
 
 };
 
-TEST(WBERefWeakTest, CopyMove) {
+TEST(WBERefWeakTest, Polymophic) {
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss;
-    WBE::RefWeak<MockClassChild> ref_weak_child;
+    WBE::RefWeak<TestClassWeakChild> ref_weak_child;
     {
-        WBE::Ref<MockClassChild> ref = WBE::Ref<MockClassChild>::make_ref(&pool_allocator, test_ss);
+        WBE::Ref<TestClassWeakChild> ref = WBE::Ref<TestClassWeakChild>::make_ref(&pool_allocator, test_ss);
         ref_weak_child = ref;
         {
-            WBE::RefWeak<MockClass> ref_weak = ref;
+            WBE::RefWeak<TestClassWeak> ref_weak = ref;
             ASSERT_EQ(ref->test_val, 0);
             ref_weak.lock()->set_test_val(5);
             ASSERT_EQ(test_ss.str(), std::string(
@@ -120,6 +120,60 @@ TEST(WBERefWeakTest, CopyMove) {
     ));
     ASSERT_FALSE(ref_weak_child.is_valid());
     
+}
+
+inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeak> p_ref2, uint32_t p_iteration_count) {
+    std::vector<WBE::RefWeak<TestClassWeak>> ref_weaks;
+    ref_weaks.reserve(5);
+    for (uint32_t i = 0; i < 5; ++i) {
+        if (rand() & 0x1) {
+            ref_weaks.push_back(p_ref1);
+        }
+        else {
+            ref_weaks.push_back(p_ref2);
+        }
+    }
+    for (uint32_t i = 0; i < p_iteration_count; ++i) {
+        uint32_t rand_ref_weak_count = rand() % 5;
+        for (uint32_t j = 0; j < rand_ref_weak_count; ++j) {
+            uint32_t choice = rand() % 3;
+            if (choice == 0) {
+                ref_weaks[j] = p_ref1;
+            }
+            else if (choice == 1) {
+                ref_weaks[j] = p_ref2;
+            }
+            else {
+                ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
+            }
+        }
+    }
+}
+
+TEST(WBERefWeak, Multithread) {
+    WBE::HeapAllocatorPool pool_allocator(1024);
+    std::stringstream test_ss1;
+    std::stringstream test_ss2;
+    {
+        WBE::Ref<TestClassWeak> ref1 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss1);
+        WBE::Ref<TestClassWeak> ref2 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss2);
+        ASSERT_EQ(test_ss1.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+        std::thread thread1(multithread_ref_weak_test, ref1, ref2, 500000);
+        std::thread thread2(multithread_ref_weak_test, ref1, ref2, 500000);
+        std::thread thread3(multithread_ref_weak_test, ref1, ref2, 500000);
+        std::thread thread4(multithread_ref_weak_test, ref1, ref2, 500000);
+        std::thread thread5(multithread_ref_weak_test, ref1, ref2, 500000);
+        thread1.join();
+        thread2.join();
+        thread3.join();
+        thread4.join();
+        thread5.join();
+        ASSERT_EQ(test_ss1.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+    }
+    ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
+    ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
 }
 
 #endif

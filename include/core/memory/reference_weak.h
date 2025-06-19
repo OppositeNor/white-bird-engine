@@ -85,10 +85,9 @@ private:
         if (control_block == nullptr) {
             return;
         }
-        control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
-        uint32_t weak_ref_count = control_block->weak_ref_counter.load(std::memory_order_acquire);
+        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel) - 1;
         uint32_t total_count = control_block->strong_ref_counter.load(std::memory_order_acquire) + weak_ref_count;
-        if (total_count == 0) {
+        if (weak_ref_count == 0 && total_count == 0) {
             delete control_block;
         }
         else if (weak_ref_count) {

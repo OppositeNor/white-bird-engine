@@ -73,19 +73,7 @@
 
 - [x] Ref
 
-- [ ] WeakRef
-
-    - [x] Implementation
-
-    - [x] General tests
-
-    - [ ] Multi-thread tests
-
-- [ ] Unique
-
-    - [ ] Implementation
-
-    - [ ] Test
+- [x] WeakRef
 
 - [ ] ComponentRef
 

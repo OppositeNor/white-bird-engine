@@ -141,13 +141,17 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
         }
     }
     for (uint32_t i = 0; i < p_iteration_count; ++i) {
-         uint32_t rand_ref_count = rand() % 5;
+        uint32_t rand_ref_count = rand() % 5;
         for (uint32_t j = 0; j < rand_ref_count; ++j) {
-            if (rand() & 0x1) {
+            uint32_t choice = rand() % 3;
+            if (choice == 0) {
                 refs[j] = p_ref1;
             }
-            else {
+            else if (choice == 1) {
                 refs[j] = p_ref2;
+            }
+            else {
+                refs[j] = refs[rand() % refs.size()];
             }
             ASSERT_EQ(test_val1, 1);
             ASSERT_EQ(test_val2, 1);
@@ -164,11 +168,11 @@ TEST(WBERefStrongTest, Multithread) {
         WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val2);
         ASSERT_EQ(test_val1, 1);
         ASSERT_EQ(test_val2, 1);
-        std::thread thread1(multithread_ref_test, ref1, ref2, 1000);
-        std::thread thread2(multithread_ref_test, ref1, ref2, 1000);
-        std::thread thread3(multithread_ref_test, ref1, ref2, 1000);
-        std::thread thread4(multithread_ref_test, ref1, ref2, 1000);
-        std::thread thread5(multithread_ref_test, ref1, ref2, 1000);
+        std::thread thread1(multithread_ref_test, ref1, ref2, 500000);
+        std::thread thread2(multithread_ref_test, ref1, ref2, 500000);
+        std::thread thread3(multithread_ref_test, ref1, ref2, 500000);
+        std::thread thread4(multithread_ref_test, ref1, ref2, 500000);
+        std::thread thread5(multithread_ref_test, ref1, ref2, 500000);
         thread1.join();
         thread2.join();
         thread3.join();
