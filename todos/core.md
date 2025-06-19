@@ -75,9 +75,9 @@
 
 - [ ] WeakRef
 
-    - [ ] Implementation
+    - [x] Implementation
 
-    - [ ] General tests
+    - [x] General tests
 
     - [ ] Multi-thread tests
 
