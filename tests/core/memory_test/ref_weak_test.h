@@ -137,14 +137,15 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
         uint32_t rand_ref_weak_count = rand() % 5;
         for (uint32_t j = 0; j < rand_ref_weak_count; ++j) {
             uint32_t choice = rand() % 3;
-            if (choice == 0) {
-                ref_weaks[j] = p_ref1;
-            }
-            else if (choice == 1) {
-                ref_weaks[j] = p_ref2;
-            }
-            else {
-                ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
+            switch (choice) {
+                case 0:
+                    ref_weaks[j] = p_ref1;
+                    break;
+                case 1:
+                    ref_weaks[j] = p_ref2;
+                    break;
+                default:
+                    ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
             }
         }
     }
@@ -176,4 +177,82 @@ TEST(WBERefWeak, Multithread) {
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
 }
 
+inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeak> p_ref2, uint32_t p_iteration_count) {
+    std::vector<WBE::RefWeak<TestClassWeak>> ref_weaks;
+    std::vector<WBE::Ref<TestClassWeak>> ref_strongs;
+    ref_weaks.reserve(5);
+    for (uint32_t i = 0; i < 5; ++i) {
+        if (rand() & 0x1) {
+            ref_weaks.push_back(p_ref1);
+        }
+        else {
+            ref_weaks.push_back(p_ref2);
+        }
+        if (rand() & 0x1) {
+            ref_strongs.push_back(p_ref1);
+        }
+        else {
+            ref_strongs.push_back(p_ref2);
+        }
+    }
+    for (uint32_t i = 0; i < p_iteration_count; ++i) {
+        uint32_t rand_ref_weak_count = rand() % 5;
+        for (uint32_t j = 0; j < rand_ref_weak_count; ++j) {
+            if (rand() % 0x1) {
+                uint32_t choice = rand() % 3;
+                switch (choice) {
+                    case 0:
+                        ref_weaks[j] = p_ref1;
+                        break;
+                    case 1:
+                        ref_weaks[j] = p_ref2;
+                        break;
+                    default:
+                        ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
+                }
+            }
+            else {
+                uint32_t choice = rand() % 4;
+                switch (choice) {
+                    case 0:
+                        ref_strongs[j] = p_ref1;
+                        break;
+                    case 1:
+                        ref_strongs[j] = p_ref2;
+                        break;
+                    case 2:
+                        ref_weaks[j] = ref_strongs[rand() % ref_strongs.size()];
+                    default:
+                        ref_strongs[j] = ref_strongs[rand() % ref_strongs.size()];
+                }
+            }
+        }
+    }
+}
+
+TEST(WBERefStrongWeak, Multithread) {
+    WBE::HeapAllocatorPool pool_allocator(1024);
+    std::stringstream test_ss1;
+    std::stringstream test_ss2;
+    {
+        WBE::Ref<TestClassWeak> ref1 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss1);
+        WBE::Ref<TestClassWeak> ref2 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss2);
+        ASSERT_EQ(test_ss1.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+        std::thread thread1(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
+        std::thread thread2(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
+        std::thread thread3(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
+        std::thread thread4(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
+        std::thread thread5(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
+        thread1.join();
+        thread2.join();
+        thread3.join();
+        thread4.join();
+        thread5.join();
+        ASSERT_EQ(test_ss1.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+    }
+    ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
+    ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
+}
 #endif
