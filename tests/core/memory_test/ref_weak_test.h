@@ -24,6 +24,10 @@ public:
         test_val = p_test_val;
     }
 
+    virtual int get_val() {
+        return 1;
+    }
+
     std::stringstream* ss;
     int test_val;
 };
@@ -79,6 +83,10 @@ public:
     virtual void set_test_val(int p_test_val) override {
         (*ss) << "Child set test val: " << p_test_val << ".\n";
         test_val = p_test_val;
+    }
+
+    virtual int get_val() override {
+        return 2;
     }
 
 };
@@ -179,7 +187,7 @@ TEST(WBERefWeak, Multithread) {
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
 }
 
-inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeak> p_ref2, uint32_t p_iteration_count) {
+inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeakChild> p_ref2, uint32_t p_iteration_count) {
     std::vector<WBE::RefWeak<TestClassWeak>> ref_weaks;
     std::vector<WBE::Ref<TestClassWeak>> ref_strongs;
     ref_weaks.reserve(5);
@@ -205,9 +213,15 @@ inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1,
                 switch (choice) {
                     case 0:
                         ref_weaks[j] = p_ref1;
+                        if (rand() & 0x1) {
+                            ASSERT_EQ(ref_weaks[j].lock()->get_val(), 1);
+                        }
                         break;
                     case 1:
                         ref_weaks[j] = p_ref2;
+                        if (rand() & 0x1) {
+                            ASSERT_EQ(ref_weaks[j].lock()->get_val(), 2);
+                        }
                         break;
                     default:
                         ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
@@ -238,9 +252,9 @@ TEST(WBERefStrongWeak, Multithread) {
     std::stringstream test_ss2;
     {
         WBE::Ref<TestClassWeak> ref1 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss1);
-        WBE::Ref<TestClassWeak> ref2 = WBE::Ref<TestClassWeak>::make_ref(&pool_allocator, test_ss2);
+        WBE::Ref<TestClassWeakChild> ref2 = WBE::Ref<TestClassWeakChild>::make_ref(&pool_allocator, test_ss2);
         ASSERT_EQ(test_ss1.str(), "Construct.\n");
-        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\nChild construct.\n");
         std::thread thread1(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
         std::thread thread2(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
         std::thread thread3(multithread_ref_strong_and_weak_test, ref1, ref2, 500000);
@@ -252,9 +266,9 @@ TEST(WBERefStrongWeak, Multithread) {
         thread4.join();
         thread5.join();
         ASSERT_EQ(test_ss1.str(), "Construct.\n");
-        ASSERT_EQ(test_ss2.str(), "Construct.\n");
+        ASSERT_EQ(test_ss2.str(), "Construct.\nChild construct.\n");
     }
     ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
-    ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
+    ASSERT_EQ(test_ss2.str(), std::string("Construct.\nChild construct.\nChild destruct.\nDestruct.\n"));
 }
 #endif

@@ -72,7 +72,7 @@ public:
     }
 
     template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak(Ref<T1> p_ref) {
+    RefWeak(const Ref<T1>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         control_block = reinterpret_cast<decltype(control_block)>(p_ref.control_block);
         ref();
@@ -102,7 +102,7 @@ public:
     }
 
     template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak& operator=(Ref<T1> p_ref) {
+    RefWeak& operator=(const Ref<T1>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         deref();
         control_block = reinterpret_cast<decltype(control_block)>(p_ref.control_block);
