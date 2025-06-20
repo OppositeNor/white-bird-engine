@@ -1,4 +1,4 @@
-#include "utils/global/global.h"
+#include "function/global/global.h"
 #include "utils/game_metadata.h"
 #include "core/logging/log_stream.h"
 #include "core/parser/parser_json.h"

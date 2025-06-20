@@ -1,7 +1,7 @@
 #ifndef __CORE_UTILS_H__
 #define __CORE_UTILS_H__
 
-#include "utils/global/global.h"
+#include "function/global/global.h"
 #include "logging/log.h"
 
 #include <memory>
