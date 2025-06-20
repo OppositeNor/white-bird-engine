@@ -50,6 +50,9 @@ public:
     }
     Ref& operator=(const Ref& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        if (*this == p_other) {
+            return *this;
+        }
         deref();
         p_other.ref();
         control_block = p_other.control_block;
@@ -57,6 +60,9 @@ public:
     }
     Ref& operator=(Ref&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        if (*this == p_other) {
+            return *this;
+        }
         deref();
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
@@ -78,6 +84,9 @@ public:
     template <typename T1>
     Ref& operator=(const Ref<T1>& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        if (*this == p_other) {
+            return *this;
+        }
         deref();
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
@@ -86,6 +95,9 @@ public:
     template <typename T1>
     Ref& operator=(Ref<T1>&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
+        if (*this == p_other) {
+            return *this;
+        }
         deref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
@@ -105,6 +117,7 @@ public:
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, p_mem_id);
+        ref();
     }
 
     /**
@@ -166,8 +179,9 @@ public:
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
-    bool operator==(const Ref<T>& p_other) {
-        return p_other.control_block == control_block;
+    template <typename T1>
+    bool operator==(const Ref<T1>& p_other) const {
+        return control_block == reinterpret_cast<decltype(control_block)>(p_other.control_block);
     }
 
 private:
@@ -182,7 +196,7 @@ private:
         ControlBlock(AllocType* p_alloc_type, MemID p_mem_id)
             : mem_id(p_mem_id), allocator(p_alloc_type) {
             weak_ref_counter.store(0, std::memory_order_release);
-            strong_ref_counter.store(1, std::memory_order_release);
+            strong_ref_counter.store(0, std::memory_order_release);
         }
         MemID mem_id;
         AllocType* allocator;

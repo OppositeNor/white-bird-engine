@@ -145,7 +145,9 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
                     ref_weaks[j] = p_ref2;
                     break;
                 default:
-                    ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
+                    uint32_t pick_index = rand() % ref_weaks.size();
+                    ref_weaks[j] = ref_weaks[pick_index];
+                    break;
             }
         }
     }
