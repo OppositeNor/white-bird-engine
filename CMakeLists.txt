@@ -86,11 +86,11 @@ endif()
 message("Build config scripts: ${WBE_BUILD_CONFIG_SCRIPTS}")
 
 # runtime reflections
-add_custom_target(wbe_build_script
+add_custom_target(wbe_python_script
     COMMENT "Running White Bird Engine build script"
-    COMMAND python ${PROJECT_SOURCE_DIR}/build_scripts/build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
+    COMMAND python ${PROJECT_SOURCE_DIR}/python_scripts/reflect.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
 )
-add_dependencies(${PROJECT_NAME} wbe_build_script)
+add_dependencies(${PROJECT_NAME} wbe_python_script)
 
 # compile shaders
 file(GLOB shader_sources ${WBE_SHADER_DIR}/*.vert ${WBE_SHADER_DIR}/*.frag ${WBE_SHADER_DIR}/*.comp)

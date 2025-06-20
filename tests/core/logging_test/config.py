@@ -1,4 +1,4 @@
-from build import WBEBuilder
+from reflect import WBEBuilder
 
 
 def register(p_builder : WBEBuilder):
