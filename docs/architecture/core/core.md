@@ -4,8 +4,6 @@
 
 ## 模块
 
-### 全局（Global）
-
 ### 引擎配置（Engine Config）
 
 ### 解析器（Parser）
