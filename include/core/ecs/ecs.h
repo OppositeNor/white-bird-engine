@@ -20,11 +20,9 @@ concept SystemConcept = requires(SysType p_t) {
 };
 
 template <typename T>
-concept ComponentsChunkAllocatorConcept = requires {
-    AllocatorTrait<T>::HEAP_ALLOCATOR;
-    AllocatorTrait<T>::IS_GURANTEED_CONTINUOUS;
-    AllocatorTrait<T>::IS_ALLOC_FIXED_SIZE;
-};
+concept ComponentsChunkAllocatorConcept = AllocatorTrait<T>::IS_GURANTEED_CONTINUOUS
+    && AllocatorTrait<T>::TYPE == AllocatorType::HEAP_ALLOCATOR
+    && AllocatorTrait<T>::IS_ALLOC_FIXED_SIZE;
 
 /**
  * @class ComponentsChunk

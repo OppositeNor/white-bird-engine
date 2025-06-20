@@ -61,12 +61,14 @@ TEST(WBEAllocPoolTest, ToString) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-    pool.allocate(1024);
+    auto mem3 = pool.allocate(1024);
     std::string exp_5 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "};\n"
         "};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_5);
+    pool.deallocate(mem3);
+    ASSERT_EQ(static_cast<std::string>(pool), exp_1);
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleFront) {

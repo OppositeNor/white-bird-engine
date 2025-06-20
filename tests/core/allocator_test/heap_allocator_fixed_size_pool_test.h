@@ -97,6 +97,9 @@ TEST(WBEAllocFSPTest, MemContinuity) {
     pool.deallocate(mems[1]);
     mems[1] = mems[3];
     test_continuous<16, 3>(pool, mems);
+    for (uint32_t i = 0; i < 3; ++i) {
+        pool.deallocate(mems[i]);
+    }
 }
 
 #endif
