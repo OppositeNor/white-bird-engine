@@ -44,12 +44,12 @@ public:
         p_other.control_block = nullptr;
         return *this;
     }
-    RefWeak(Ref<T> p_ref) {
+    RefWeak(const Ref<T>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         control_block = p_ref.control_block;
         ref();
     }
-    RefWeak& operator=(Ref<T> p_ref) {
+    RefWeak& operator=(const Ref<T>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         deref();
         control_block = p_ref.control_block;
