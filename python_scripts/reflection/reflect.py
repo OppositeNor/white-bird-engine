@@ -1,9 +1,9 @@
 import json
 import sys
 import importlib.util
-from channel_registrator import ChannelRegistrator
+from reflection.channel_registrator import ChannelRegistrator
 
-class WBEBuilder:
+class WBEReflector:
     def __init__(self, p_metadata_path : str) -> None:
         self.metadata_path = p_metadata_path
         self.channel_registrator = ChannelRegistrator()
@@ -45,17 +45,11 @@ class WBEBuilder:
             dict_rev[p_dictionary[channel]] = channel
             hash_val_set.add(p_dictionary[channel])
 
-
-if __name__ == "__main__":
-    if (len(sys.argv) < 2):
-        print("Usage: " + sys.argv[0] + " <res_path> [config1] [config2] ...")
-        exit(-1)
-
-    print("White Bird Engine build script start.")
-    builder = WBEBuilder(sys.argv[1])
+def reflect(config_scripts_paths):
+    builder = WBEReflector(sys.argv[1])
     for i in range(2, len(sys.argv)):
         builder.load_script_config(sys.argv[i])
     builder.checks()
     builder.dump() # TODO
-    print("White Bird Engine build script finish.")
+
 
