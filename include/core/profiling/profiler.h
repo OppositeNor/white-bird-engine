@@ -7,6 +7,8 @@
 #include <chrono>
 namespace WhiteBirdEngine {
 
+#define WBE_START_PROFILE(CHANNEL) auto profiler_##__LINE__ = WhiteBirdEngine::Profiler(CHANNEL, std::string(__FILE__), __LINE__)
+
 /**
  * @brief The profiler class.
  * This initiates the profiling right after it is constructed, and ends and push data to the manager
@@ -15,15 +17,15 @@ namespace WhiteBirdEngine {
 class Profiler {
 public:
 
-    Profiler(ChannelID p_channel)
-        : channel(p_channel) {
+    Profiler(ChannelID p_channel, const std::string& p_file, uint32_t p_line)
+        : channel(p_channel), file(p_file), line(p_line) {
         start_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     }
 
     ~Profiler() {
         uint64_t delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         delta -= start_time_ms;
-        Global::get_singleton()->profiling_manager->push_profiling_data(channel, delta);
+        Global::get_singleton()->profiling_manager->push_profiling_data(channel, delta, file, line);
     }
 
     Profiler(const Profiler&) = delete;
@@ -32,8 +34,10 @@ public:
     Profiler& operator=(Profiler&&) = delete;
 
 private:
-    uint64_t start_time_ms;
     ChannelID channel;
+    std::string file;
+    uint32_t line;
+    uint64_t start_time_ms;
 };
 
 }

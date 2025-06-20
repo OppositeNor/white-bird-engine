@@ -44,6 +44,7 @@ template <> struct LabelTrait<label_name> {\
     static constexpr std::string_view NAME = WBE_EXPAND_STR(label_name);\
 };
 
+#define WBE_LABEL(label_name) WhiteBirdEngine::static_hash(WBE_EXPAND_STR(label_name))
 #define WBE_LABEL_NAME(label) WhiteBirdEngine::LabelTrait<label>::NAME
 
 #define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type

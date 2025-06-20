@@ -20,35 +20,40 @@ public:
     virtual ~ProfilingManager() override {}
 
     /**
+     * @class ProfileData
+     * @brief Data for profilations.
+     *
+     */
+    struct ProfileData {
+        uint64_t delta;
+        std::string file;
+        uint32_t line;
+    };
+
+    /**
      * @brief Push a profiling data to the profile stash.
      *
      * @param p_channel The channel to push the data to.
      * @param p_delta The delta time that's been pushed into the profiler.
+     * @param p_file The source file that the proflier is created.
+     * @param p_line The line number where the profiler is created.
      */
-    void push_profiling_data(ChannelID p_channel, uint64_t p_delta);
+    void push_profiling_data(ChannelID p_channel, uint64_t p_delta, const std::string& p_file, uint32_t p_line);
 
     /**
-     * @brief Get all the profile data from the channel, and calculate the mean.
-     * This will also remove all the stashed profiles.
-     * @todo make channel a template argument and load it statically.
-     * @param p_channel The channel to flush.
-     */
-    void flush_stashed_profiles(ChannelID p_channel);
-
-    /**
-     * @brief Get the profile data from a channel in seconds.
+     * @brief Get data for profiliing.
      *
-     * @param p_channel The channel to get profile from.
-     * @return The profile of the channel.
+     * @param p_channel The channel to get data from.
+     * @return The profiling data.
      */
-    double get_profile(ChannelID p_channel) const;
+    const std::vector<ProfileData>& get_profile_data(ChannelID p_channel) {
+        return profile_stash[p_channel];
+    }
 
 private:
     mutable std::shared_mutex profile_stash_mutex;
-    std::unordered_map<ChannelID, std::vector<uint64_t>> profile_stash;
+    mutable std::unordered_map<ChannelID, std::vector<ProfileData>> profile_stash;
 
-    mutable std::shared_mutex profile_mutex;
-    std::unordered_map<ChannelID, double> profiles;
 };
 
 }

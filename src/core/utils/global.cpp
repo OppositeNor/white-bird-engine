@@ -1,4 +1,5 @@
 #include "function/global/global.h"
+#include "core/profiling/profiling_manager.h"
 #include "utils/game_metadata.h"
 #include "core/logging/log_stream.h"
 #include "core/parser/parser_json.h"
@@ -21,6 +22,7 @@ Global::Global(int p_argc, char* p_argv[], const Directory& p_root_dir) {
 }
 
 Global::~Global() {
+    delete profiling_manager;
     delete stdio_logging_manager;
     delete game_metadata;
     delete file_system;
@@ -44,6 +46,7 @@ void Global::initialize(int p_argc, char* p_argv[]) {
     game_metadata = new GameMetadata();
     parse_metadata(Path(singleton->file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
+    profiling_manager = new ProfilingManager();
 }
 
 }
