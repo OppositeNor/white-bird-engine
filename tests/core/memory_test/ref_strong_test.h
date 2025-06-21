@@ -6,6 +6,7 @@
 #include "core/memory/reference_strong.h"
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <thread>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -81,6 +82,9 @@ TEST(WBERefStrongTest, ConstructDestruct) {
 TEST(WBERefStrongTest, DynamicDispatch) {
     class A {
     public:
+        A() = default;
+        virtual ~A() {}
+
         virtual void func() {
             num = 1;
         }
@@ -89,6 +93,9 @@ TEST(WBERefStrongTest, DynamicDispatch) {
     };
 
     class B : public A {
+    public:
+        B() = default;
+        virtual ~B() override {}
         virtual void func() override {
             num = 2;
         }

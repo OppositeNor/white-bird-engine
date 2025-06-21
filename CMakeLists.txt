@@ -27,10 +27,11 @@ set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
+set(SDL_STATIC ON)
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/yaml-cpp)
 
-find_package(Vulkan REQUIRED)
+# find_package(Vulkan REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -73,8 +74,8 @@ else()
     )
 
     target_link_libraries(${PROJECT_NAME} PUBLIC
-        SDL2
-        Vulkan::Vulkan
+        SDL2::SDL2-static
+        # Vulkan::Vulkan
         ${libs}
     )
 endif()
@@ -88,7 +89,7 @@ message("Build config scripts: ${WBE_BUILD_CONFIG_SCRIPTS}")
 # runtime reflections
 add_custom_target(wbe_on_build
     COMMENT "Running White Bird Engine build script"
-    COMMAND python ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
+    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
 )
 add_dependencies(${PROJECT_NAME} wbe_on_build)
 

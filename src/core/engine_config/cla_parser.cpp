@@ -3,7 +3,7 @@
 namespace WhiteBirdEngine {
 
 void CLAParser::parse(int p_argc, char* p_argv[]) {
-    // TODO
+    (void)engine_config;
 }
 
 }

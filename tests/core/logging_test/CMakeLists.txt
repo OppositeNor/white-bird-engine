@@ -1,10 +1,12 @@
-file(GLOB wbe_logging_test_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+set(TEST_NAME wbe_logging_test)
 
-add_executable(wbe_logging_test
-    ${wbe_logging_test_src}
+file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+
+add_executable(${TEST_NAME}
+    ${${TEST_NAME}_src}
 )
 
-target_link_libraries(wbe_logging_test
+target_link_libraries(${TEST_NAME}
     ${libs}
     gtest_main
 )
