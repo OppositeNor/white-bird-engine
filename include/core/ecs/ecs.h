@@ -3,6 +3,7 @@
 
 #include "core/allocator/heap_allocator_fixed_size_pool.h"
 #include "utils/defs.h"
+#include <type_traits>
 
 namespace WhiteBirdEngine {
 
@@ -15,8 +16,8 @@ using EntityID = uint64_t;
  * @tparam CompType The type of the component.
  */
 template <typename SysType, typename CompType>
-concept SystemConcept = requires(SysType p_t) {
-    p_t.operate((CompType*)nullptr);
+concept SystemConcept = requires(std::remove_cvref_t<SysType> p_t) {
+    p_t.operate(static_cast<CompType*>(nullptr));
 };
 
 template <typename T>
