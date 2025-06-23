@@ -48,7 +48,7 @@ public:
     virtual void error(const std::string& p_str) = 0;
 };
 
-Log* wbe_console_log(ChannelID p_channel);
+Log* wbe_console_log(ChannelID p_channel = WBE_CHANNEL_GLOBAL);
 
 }
 

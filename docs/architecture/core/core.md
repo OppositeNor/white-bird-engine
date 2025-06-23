@@ -8,7 +8,7 @@
 
 ### 解析器（Parser）
 
-### 分配器（Allocator）
+### [内存分配器（Allocator）](./allocator.md)
 
 ### ECS
 

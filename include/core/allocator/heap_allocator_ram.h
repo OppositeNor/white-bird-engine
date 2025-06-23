@@ -7,8 +7,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorRam> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorRam>);
+struct AllocatorTrait<class HeapAllocatorRAM> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorRAM>);
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = false;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -19,11 +19,11 @@ struct AllocatorTrait<class HeapAllocatorRam> {
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
-class HeapAllocatorRam final : public HeapAllocator {
+class HeapAllocatorRAM final : public HeapAllocator {
 public:
 
-    HeapAllocatorRam() : curr_id(1) {}
-    virtual ~HeapAllocatorRam() override;
+    HeapAllocatorRAM() : curr_id(1) {}
+    virtual ~HeapAllocatorRAM() override;
 
     virtual MemID allocate(size_t p_size) override;
 

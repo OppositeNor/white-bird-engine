@@ -11,7 +11,7 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBERefStrongTest, Allocation) {
-    WBE::HeapAllocatorRam allocator;
+    WBE::HeapAllocatorRAM allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 0);
         ASSERT_FALSE(allocator.is_empty());
@@ -28,7 +28,7 @@ TEST(WBERefStrongTest, Allocation) {
 }
 
 TEST(WBERefStrongTest, CopyMove) {
-    WBE::HeapAllocatorRam allocator;
+    WBE::HeapAllocatorRAM allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 3);
         ASSERT_FALSE(allocator.is_empty());
@@ -51,7 +51,7 @@ TEST(WBERefStrongTest, CopyMove) {
 }
 
 TEST(WBERefStrongTest, ConstructDestruct) {
-    WBE::HeapAllocatorRam allocator;
+    WBE::HeapAllocatorRAM allocator;
     int test_val = 0;
     class TestClass {
     public:

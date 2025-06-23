@@ -5,7 +5,7 @@
 
 TEST(AllocatorTest, TraitTest) {
 
-    ASSERT_FALSE(WBE::ComponentsChunkAllocatorConcept<WBE::HeapAllocatorRam>);
+    ASSERT_FALSE(WBE::ComponentsChunkAllocatorConcept<WBE::HeapAllocatorRAM>);
     ASSERT_TRUE(WBE::ComponentsChunkAllocatorConcept<WBE::HeapAllocatorFixedSizePool<4>>);
 
 }
