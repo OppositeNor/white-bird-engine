@@ -31,8 +31,6 @@ set(SDL_STATIC ON)
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/yaml-cpp)
 
-# find_package(Vulkan REQUIRED)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization
@@ -75,7 +73,6 @@ else()
 
     target_link_libraries(${PROJECT_NAME} PUBLIC
         SDL2::SDL2-static
-        # Vulkan::Vulkan
         ${libs}
     )
 endif()

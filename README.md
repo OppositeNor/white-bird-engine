@@ -4,6 +4,21 @@
 
 ## 如何构建
 
+首先将仓库克隆到本地
+
+```bash
+git clone https://github.com/OppositeNor/white-bird-engine.git --recursive
+cd white-bird-engine
+```
+
+或者
+
+```bash
+git clone https://github.com/OppositeNor/white-bird-engine.git
+cd white-bird-engine
+git submodule init --update
+```
+
 ### Linux
 
 安装构建工具：
@@ -14,21 +29,20 @@
 sudo pacman -S gcc cmake shaderc ninja
 ```
 
-安装 Vulkan 驱动
-
-NVIDIA:
+构建：
 
 ```bash
-sudo pacman -S nvidia-utils
+cmake -B build -G Ninja
+cmake --build build
 ```
 
-AMD:
+### MacOS
+
+使用 Homebrew 安装构建工具
 
 ```bash
-# TODO
+brew install cmake
 ```
-
----
 
 构建：
 
@@ -36,3 +50,8 @@ AMD:
 cmake -B build -G Ninja
 cmake --build build
 ```
+
+### Windows
+
+TODO
+
