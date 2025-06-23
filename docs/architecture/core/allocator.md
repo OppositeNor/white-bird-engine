@@ -2,6 +2,11 @@
 
 白鸟引擎使用自己实现的内存分配器。游戏中的动态内存分配，应当尽量依赖于此系统进行。
 
+引擎在分配内存后，可能会对数据对应的内存位置做出调整，以保证内存连续性或者减少内存碎片。这也
+意味着使用分配器的时候，直接使用内存指针可能会导致访问到错误的数据位置。为了避免这种情况发
+生，每次在内存分配结束后，分配器会返回内存数据对应在分配器中的 ID。这个 ID 是仅在**这个分配
+器**中唯一的。在想要获取数据的时候，可以通过此 ID 以及对应的分配器来找到准确的数据位置。
+
 白鸟引擎提供栈方式分配内存，同时也提供堆方式分配内存。
 
 ## 栈分配器
@@ -12,17 +17,38 @@
 就必须为 `c b a`。
 
 ```cpp
+StackAllocator allocator(1024);
+struct MyData {
+    short val1;
+    int val2;
+    float val3;
+    double val4;
+};
+MemID mem_id = allocator.allocate(sizeof(MyData));
+allocator.get_obj<MyData>(mem_id)->val1 = 5;
+wbe_console_log()->message(std::format("val1: {}", allocator.get_obj<MyData>(mem_id)->val1)); // val1: 5
+```
 
+释放内存时，可以直接使用 `pop_stack` 方法，在栈顶的元素会被自动释放：
+
+```cpp
+allocator.pop_stack();
+```
+
+需要注意的是，`allocate` 方法仅会分配内存，但不会调用对象的构造函数。因此在 `allocate` 之后分
+配的值均为未初始化值。同理，`pop_stack` 的作用也仅是释放内存，不会调用其析构函数。
+
+`StackAllocator` 的构造函数可以传入两个参数：
+
+```cpp
+// 第一个参数为分配器的总大小（单位：字节）。为可选参数。默认值为 1024。
+// 第二个参数为对齐大小（单位：字节）。为可选参数。默认值为 alignof(std::max_align_t)。
+StackAllocator allocator(1024, 8);
 ```
 
 ## 堆分配器
 
 ### 分配/释放内存
-
-引擎在分配内存后，可能会对数据对应的内存位置做出调整，以保证内存连续性或者减少内存碎片。这也
-意味着使用分配器的时候，直接使用内存指针可能会导致访问到错误的数据位置。为了避免这种情况发
-生，每次在内存分配结束后，分配器会返回内存数据对应在分配器中的 ID。这个 ID 是仅在**这个分配
-器**中唯一的。在想要获取数据的时候，可以通过此 ID 以及对应的分配器来找到准确的数据位置。
 
 ```cpp
 HeapAllocatorPool pool_allocator(1024);
@@ -43,14 +69,14 @@ wbe_console_log()->message(std::format("val1: {}", pool_allocator.get_obj<Data>(
 pool_allocator.deallocate(mem_id);
 ```
 
+如果内存分配器在析构的时候，里面的对象没有被完全释放，内存分配器会打印出一个警告，并释放剩余
+内存。通常这种时候都会有潜在的内存泄漏问题发生。
+
 需要注意的是，`allocate` 方法仅会分配内存，但不会调用对象的构造函数。因此在 `allocate` 之后分
 配的值均为未初始化值。同理，`deallocate` 的作用也仅是释放内存，不会调用其析构函数。
 
 如果想要在分配/释放的同时调用构造/析构函数，可以使用 `create_obj` 和 `destroy_obj` 来分配/销
 毁。
-
-如果内存分配器在析构的时候，里面的对象没有被完全释放，内存分配器会打印出一个警告，并释放剩余
-内存。通常这种时候都会有潜在的内存泄漏问题发生。
 
 ```cpp
 class MyClass {
@@ -105,7 +131,7 @@ HeapAllocatorRAM allocator;
 ```cpp
 // 第一个参数为分配的总大小，第二个参数为内存对齐。
 // 第二个参数为可选参数，如果不指定将会默认为 alignof(std::max_align_t)。
-// 如果不想对齐，可以将第二个参数设置为 1 或者 0。
+// 如果不希望对齐，可以将第二个参数设置为 1 或者 0。
 HeapAllocatorPool allocator (1024, 8);
 ```
 
