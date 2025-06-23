@@ -179,7 +179,7 @@ bool IS_ATOMIC;
 例如，`AllocatorRAM` 的总大小不限制，但是不保证连续，可以这样进行萃取：
 
 ```cpp
-static_assert(AllocatorTrait<HeapAllocatorRAM>::IS_LIMITED_SIZE);
-static_assert(!AllocatorTrait<HeapAllocatorRAM>::IS_GURANTEED_CONTINUOUS);
+AllocatorTrait<HeapAllocatorRAM>::IS_LIMITED_SIZE;          // true
+AllocatorTrait<HeapAllocatorRAM>::IS_GURANTEED_CONTINUOUS;  // false
 ```
 
