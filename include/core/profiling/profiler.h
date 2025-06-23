@@ -1,7 +1,7 @@
 #ifndef __WBE_PROFILLER_H__
 #define __WBE_PROFILLER_H__
 
-#include "function/global/global.h"
+#include "global/global.h"
 #include "core/logging/log.h"
 #include "core/profiling/profiling_manager.h"
 #include <chrono>

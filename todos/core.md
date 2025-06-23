@@ -57,13 +57,13 @@
 
 ### Allocator
 
-- [ ] Doc
+- [x] Doc
 
 - [x] Stack allocator
 
     - [x] Implementation
 
-    - [x] Test
+    - [ ] Test
 
 - [x] Heap allocator
 

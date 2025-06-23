@@ -16,7 +16,7 @@
 
 ### 随机数生成器（RNG）
 
-### 日志（Logging）
+### [日志（Logging）](./logging.md)
 
 ### 本地化（Localization）
 

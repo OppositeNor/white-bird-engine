@@ -2,7 +2,7 @@
 #define __WBE_REFERENCE_STRONG_H__
 
 #include "core/allocator/heap_allocator.h"
-#include "function/global/global.h"
+#include "global/global.h"
 #include "utils/defs.h"
 #include <atomic>
 

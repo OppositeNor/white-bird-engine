@@ -6,8 +6,8 @@
 #include <unistd.h>
 
 #include "core/profiling/profiler.h"
-#include "function/global/global.h"
 #include "platform/file_system/directory.h"
+#include "global/global.h"
 
 namespace WBE = WhiteBirdEngine;
 namespace WhiteBirdEngine {

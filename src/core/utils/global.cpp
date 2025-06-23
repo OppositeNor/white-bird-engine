@@ -1,4 +1,4 @@
-#include "function/global/global.h"
+#include "global/global.h"
 #include "core/profiling/profiling_manager.h"
 #include "utils/game_metadata.h"
 #include "core/logging/log_stream.h"

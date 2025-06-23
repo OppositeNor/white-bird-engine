@@ -9,8 +9,14 @@
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
-
-// TODO: Test
+/**
+ * @class LoggingManager
+ * @brief Manages all the log instances.
+ *
+ * @tparam LogType The type of the log.
+ * @tparam T The input parameter of the constructor of the log object.
+ * @param p_channel_argument The input argument of the log object.
+ */
 template <typename LogType, typename T>
 class LoggingManager : public Singleton<LoggingManager<LogType, T>> {
 public:

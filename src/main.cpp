@@ -1,5 +1,5 @@
 #include "core/logging/log.h"
-#include "function/global/global.h"
+#include "global/global.h"
 
 namespace WBE = WhiteBirdEngine;
 
