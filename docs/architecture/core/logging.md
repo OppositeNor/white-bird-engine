@@ -11,11 +11,15 @@
 需要注意的是，如果要使用日志系统，全局（Global）必须被初始化。
 
 ```cpp
-std::unique_ptr<Global> global = std::make_unique<Global>(p_argc, p_argv);
+namespace WBE = WhiteBirdEngine;
 
 ...
 
-LogStream log_stream(WBE_CHANNEL_USER, std::cout);
+std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
+
+...
+
+WBE::LogStream log_stream(WBE::WBE_CHANNEL_USER, std::cout);
 log_stream.message("Hello World!");
 ```
 
@@ -24,7 +28,7 @@ log_stream.message("Hello World!");
 ```cpp
 // 第一个而参数是这个日志对象所属的频道。
 // 第二个对象是一个 std::ostream& 对象，作为日志输出的流。
-LogStream log_stream(WBE_CHANNEL_USER, std::cout);
+WBE::LogStream log_stream(WBE::WBE_CHANNEL_USER, std::cout);
 ```
 
 ## 日志管理器（Logging Manager）
