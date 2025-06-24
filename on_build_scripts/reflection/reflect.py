@@ -9,7 +9,7 @@ class WBEReflector:
         self.channel_registrator = ChannelRegistrator()
 
     def load_script_config(self, p_load_path : str) -> None:
-        print("Loading configuration scripts...")
+        print("Loading configuration script: " + p_load_path)
         spec = importlib.util.spec_from_file_location("config", p_load_path)
         if spec is None:
             raise RuntimeError("Failed to load spec from path: " + p_load_path)

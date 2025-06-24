@@ -3,11 +3,11 @@ import sys
 import subprocess
 
 class WBETest:
-    def run_tests(self) -> None:
+    def run_tests(self, cmd = []) -> None:
         failed_count : int = 0
         for test_path in sys.argv[1:]:
             print(f"Running test: {test_path}")
-            result = subprocess.run([test_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(cmd + [test_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             print(result.stdout)
             if result.returncode != 0:
                 print(f"Test {test_path} failed! returned {result.returncode}", file=sys.stderr)
@@ -25,8 +25,15 @@ if __name__ == "__main__":
         print("Usage: " + sys.argv[0] + " [test_path1] [test_path2] ...")
         exit(-1)
     print("White Bird Engine running tests...")
+
+    VALGRIND_CMD = [
+        'valgrind',
+        '--leak-check=full',
+        '--show-leak-kinds=all',
+        '--error-exitcode=42',
+    ]
     os.chdir(os.getcwd() + "/..")
     test_runner = WBETest()
-    test_runner.run_tests()
+    test_runner.run_tests(VALGRIND_CMD)
     print("White Bird Engine tests finished.")
 
