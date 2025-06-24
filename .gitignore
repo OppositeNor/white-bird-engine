@@ -1,4 +1,5 @@
 .cache
 .vscode
 build
+release
 __pycache__
