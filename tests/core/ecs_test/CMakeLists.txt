@@ -11,3 +11,8 @@ target_link_libraries(${TEST_NAME}
     gtest_main
 )
 
+set(WBE_TEST_EXE ${WBE_TEST_EXE}
+    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}
+    PARENT_SCOPE
+)
+

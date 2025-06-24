@@ -1,16 +1,9 @@
 #ifndef __WBE_GLOBAL_H__
 #define __WBE_GLOBAL_H__
 
-#include "core/allocator/heap_allocator_pool.h"
-#include "core/allocator/stack_allocator.h"
-#include "core/engine_config/engine_config.h"
-#include "utils/game_metadata.h"
-#include "core/logging/log_stream.h"
-#include "core/logging/logging_manager.h"
-#include "core/profiling/profiling_manager.h"
-#include "platform/file_system/file_system.h"
+#include "core/engine_core.h"
+#include "platform/file_system/directory.h"
 #include "utils/interface/singleton.h"
-#include "platform/file_system/path.h"
 
 namespace WhiteBirdEngine {
 /**
@@ -44,43 +37,17 @@ public:
      *
      * @return The singleton instance.
      */
-    static Global* get_singleton();
+    static Global* get_singleton() {
+        return singleton;
+    }
 
     /**
-     * @brief File system.
+     * @brief The fore singleton.
      */
-    FileSystem* file_system;
-    /**
-     * @brief Engine configuration.
-     */
-    EngineConfig* engine_config;
-    /**
-     * @brief Single tick stack allocator. Contents will be cleared every time a tick ends.
-     */
-    StackAllocator* single_tick_allocator;
-    /**
-     * @brief Global pool allocator.
-     */
-    HeapAllocatorPool* pool_allocator;
-    /**
-     * @brief Manager for logs.
-     */
-    LoggingManager<LogStream, std::ostream>* stdio_logging_manager;
-    /**
-     * @brief Manager for profiling.
-     */
-    ProfilingManager* profiling_manager;
-
-    /**
-     * @brief Metadata of the game.
-     */
-    GameMetadata* game_metadata;
+    EngineCore* engine_core;
 
 private:
     inline static Global* singleton;
-
-    void parse_metadata(const Path& p_metadata_config_path);
-    void initialize(int p_argc, char* p_argv[]);
 };
 
 }

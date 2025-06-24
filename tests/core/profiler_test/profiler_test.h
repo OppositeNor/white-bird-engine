@@ -21,7 +21,7 @@ TEST(WBEProfilerTest, Profiling) {
         WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL); line_num = __LINE__;
         sleep(3);
     }
-    const auto& profile_data = global->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
+    const auto& profile_data = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
     ASSERT_EQ(profile_data.size(), 1);
     ASSERT_GT(profile_data[0].delta, 2999);
     ASSERT_NE(profile_data[0].file.find("profiler_test.h"), std::string::npos);

@@ -2,7 +2,7 @@
 #define __WBE_REFERENCE_STRONG_H__
 
 #include "core/allocator/heap_allocator.h"
-#include "global/global.h"
+#include "core/engine_core.h"
 #include "utils/defs.h"
 #include <atomic>
 
@@ -30,7 +30,7 @@ public:
     using ObjType = T;
     using HeapAllocatorType = AllocType;
 
-    explicit Ref(AllocType* p_allocator = Global::get_singleton()->pool_allocator) {
+    explicit Ref(AllocType* p_allocator = EngineCore::get_singleton()->pool_allocator) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
         control_block = new ControlBlock(p_allocator, MEM_NULL);
         ref();

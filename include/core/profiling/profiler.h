@@ -1,7 +1,7 @@
 #ifndef __WBE_PROFILLER_H__
 #define __WBE_PROFILLER_H__
 
-#include "global/global.h"
+#include "core/engine_core.h"
 #include "core/logging/log.h"
 #include "core/profiling/profiling_manager.h"
 #include <chrono>
@@ -25,7 +25,7 @@ public:
     ~Profiler() {
         uint64_t delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         delta -= start_time_ms;
-        Global::get_singleton()->profiling_manager->push_profiling_data(channel, delta, file, line);
+        EngineCore::get_singleton()->profiling_manager->push_profiling_data(channel, delta, file, line);
     }
 
     Profiler(const Profiler&) = delete;

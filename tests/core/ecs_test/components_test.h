@@ -16,8 +16,18 @@ struct MockComponent {
 
 TEST(WBEECSTest, General) {
     WBE::EntityID mock_entity = WBE::static_hash("Mock entity");
-    WBE::ComponentsChunk<MockComponent>mock_component;
-    mock_component.add(mock_entity, 1, 3.5f, 3.1415926);
+    WBE::ComponentsChunk<MockComponent> mock_component;
+    WBE::MemID component_id_1 = mock_component.add(mock_entity, 1, 3.5f, 3.1415926);
+    WBE::MemID component_id_2 = mock_component.add(mock_entity, 2, 4.5f, 3.14);
+    auto* obj_1 = mock_component.get_allocator().get_obj<MockComponent>(component_id_1);
+    ASSERT_EQ(obj_1->val1, 1);
+    ASSERT_FLOAT_EQ(obj_1->val2, 3.5f);
+    ASSERT_DOUBLE_EQ(obj_1->val3, 3.1415926);
+    auto* obj_2 = mock_component.get_allocator().get_obj<MockComponent>(component_id_2);
+    ASSERT_EQ(obj_2->val1, 2);
+    ASSERT_FLOAT_EQ(obj_2->val2, 4.5f);
+    ASSERT_DOUBLE_EQ(obj_2->val3, 3.14);
+    mock_component.clear();
 }
 
 

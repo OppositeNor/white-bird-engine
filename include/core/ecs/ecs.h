@@ -53,7 +53,7 @@ public:
      */
     template <typename ...Args>
     MemID add(EntityID p_entity_id, Args&&... p_args) {
-        MemID mem_id = create_obj(component_allocator, std::forward(p_args)...);
+        MemID mem_id = create_obj<T>(component_allocator, std::forward<Args>(p_args)...);
         entity_map[p_entity_id] = mem_id;
         return mem_id;
     }
@@ -105,6 +105,23 @@ public:
             return MEM_NULL;
         }
         return comp_iter->second;
+    }
+
+    /**
+     * @brief Get the allocator.
+     *
+     * @return The allocator.
+     */
+    const AllocType& get_allocator() const {
+        return component_allocator;
+    }
+
+    /**
+     * @brief Clear all the components.
+     */
+    void clear() {
+        component_allocator.clear();
+        entity_map.clear();
     }
 
 private:

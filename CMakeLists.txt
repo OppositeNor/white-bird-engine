@@ -48,15 +48,6 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
 )
 
-if (WBE_MAKE_TEST)
-    # Export tests
-    add_subdirectory(dependencies/googletest)
-    set(include_dirs
-        ${include_dirs}
-        ${PROJECT_SOURCE_DIR}/dependencies/googletest/googletest
-    )
-endif()
-
 include_directories(
     ${include_dirs}
 )
@@ -77,7 +68,14 @@ else()
     )
 endif()
 
+set(WBE_TEST_EXE "")
 if (WBE_MAKE_TEST)
+    # Export tests
+    add_subdirectory(dependencies/googletest)
+    set(include_dirs
+        ${include_dirs}
+        ${PROJECT_SOURCE_DIR}/dependencies/googletest/googletest
+    )
     add_subdirectory(tests)
 endif()
 
@@ -112,3 +110,12 @@ endforeach()
 
 add_custom_target(compile_shaders DEPENDS ${shaders_outputs})
 add_dependencies(${PROJECT_NAME} compile_shaders)
+
+if (WBE_MAKE_TEST)
+    # Run all tests
+    add_custom_target(wbe_run_tests
+        COMMENT "Running White Bird Engine tests..."
+        COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/run_tests.py ${WBE_TEST_EXE}
+    )
+    add_dependencies(wbe_run_tests ${PROJECT_NAME})
+endif()

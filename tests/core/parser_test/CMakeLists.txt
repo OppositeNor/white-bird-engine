@@ -10,3 +10,13 @@ target_link_libraries(${TEST_NAME}
     ${libs}
     gtest_main
 )
+
+set(WBE_BUILD_CONFIG_SCRIPTS ${WBE_BUILD_CONFIG_SCRIPTS}
+    PARENT_SCOPE
+)
+
+set(WBE_TEST_EXE ${WBE_TEST_EXE}
+    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}
+    PARENT_SCOPE
+)
+

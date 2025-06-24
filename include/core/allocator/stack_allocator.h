@@ -75,7 +75,7 @@ public:
      *
      * @param p_id The ID of the memory to get.
      */
-    const void* get(MemID p_id) const {
+    void* get(MemID p_id) const {
         WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + marker));
         return reinterpret_cast<void*>(p_id);
     }

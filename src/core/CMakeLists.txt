@@ -1,4 +1,4 @@
-set(wbe_core_src "")
+file(GLOB wbe_core_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(allocator)
 add_subdirectory(utils)
