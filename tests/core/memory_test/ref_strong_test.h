@@ -22,7 +22,7 @@ TEST(WBERefStrongTest, Allocation) {
     }
     ASSERT_TRUE(allocator.is_empty());
     {
-        WBE::Ref<int> ref(&allocator);
+        WBE::Ref<int> ref;
     }
     ASSERT_TRUE(allocator.is_empty());
 }
@@ -65,7 +65,7 @@ TEST(WBERefStrongTest, ConstructDestruct) {
         }
     };
     {
-        WBE::Ref<TestClass> ref(&allocator);
+        WBE::Ref<TestClass> ref;
         ASSERT_EQ(test_val, 0);
         ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
         ASSERT_EQ(test_val, 1);
@@ -117,6 +117,9 @@ TEST(WBERefStrongTest, DynamicDispatch) {
 TEST(WBERefStrongTest, NullReference) {
     WBE::HeapAllocatorPool allocator;
     WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
+    ASSERT_EQ(ref, nullptr);
+    ASSERT_EQ(ref, (void*)nullptr);
+    ASSERT_EQ(ref, WBE::MEM_NULL);
     ASSERT_EQ(ref.get(), nullptr);
 }
 

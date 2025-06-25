@@ -5,6 +5,7 @@
 #include "core/engine_core.h"
 #include "utils/defs.h"
 #include <atomic>
+#include <cstddef>
 
 namespace WhiteBirdEngine {
 
@@ -30,26 +31,22 @@ public:
     using ObjType = T;
     using HeapAllocatorType = AllocType;
 
-    explicit Ref(AllocType* p_allocator = EngineCore::get_singleton()->pool_allocator) {
-        WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        control_block = new ControlBlock(p_allocator, MEM_NULL);
+    Ref() {
+        control_block = nullptr;
         ref();
     }
     ~Ref() {
         deref();
     }
     Ref(const Ref& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         p_other.ref();
         control_block = p_other.control_block;
     }
     Ref(Ref&& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
     }
     Ref& operator=(const Ref& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
         }
@@ -59,7 +56,6 @@ public:
         return *this;
     }
     Ref& operator=(Ref&& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
         }
@@ -71,19 +67,16 @@ public:
 
     template <typename T1>
     Ref(const Ref<T1>& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
     }
     template <typename T1>
     Ref(Ref<T1>&& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
     template <typename T1>
     Ref& operator=(const Ref<T1>& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
         }
@@ -94,7 +87,6 @@ public:
     }
     template <typename T1>
     Ref& operator=(Ref<T1>&& p_other) {
-        WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
         }
@@ -104,8 +96,24 @@ public:
         return *this;
     }
 
-    bool is_valid() const {
-        return control_block != nullptr;
+    Ref& operator=(std::nullptr_t) {
+        deref();
+        control_block = nullptr;
+        return *this;
+    }
+
+    Ref& operator=(void* p_ptr) {
+        WBE_DEBUG_ASSERT(p_ptr == nullptr);
+        deref();
+        control_block = nullptr;
+        return *this;
+    }
+
+    Ref& operator=(MemID p_mem_id) {
+        WBE_DEBUG_ASSERT(p_mem_id == MEM_NULL);
+        deref();
+        control_block = nullptr;
+        return *this;
     }
 
     /**
@@ -163,7 +171,9 @@ public:
      * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
     T* get() {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
+        if (control_block == nullptr) {
+            return nullptr;
+        }
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
@@ -174,7 +184,9 @@ public:
      * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
     const T* get() const {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
+        if (control_block == nullptr) {
+            return nullptr;
+        }
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
@@ -184,11 +196,24 @@ public:
         return control_block == reinterpret_cast<decltype(control_block)>(p_other.control_block);
     }
 
+    bool operator==(std::nullptr_t) const {
+        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+    }
+
+    bool operator==(void* p_ptr) const {
+        WBE_DEBUG_ASSERT(p_ptr == nullptr);
+        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+    }
+
+    bool operator==(MemID p_mem_id) const {
+        WBE_DEBUG_ASSERT(p_mem_id == MEM_NULL);
+        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+    }
+
 private:
 
     Ref(ControlBlock* p_control_block)
         : control_block(p_control_block) {
-        WBE_DEBUG_ASSERT(p_control_block != nullptr);
         ref();
     }
 

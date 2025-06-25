@@ -41,7 +41,7 @@ cmake --build build
 使用 Homebrew 安装构建工具
 
 ```bash
-brew install cmake
+brew install cmake shaderc ninja
 ```
 
 构建：

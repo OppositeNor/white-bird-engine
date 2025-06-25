@@ -117,5 +117,5 @@ if (WBE_MAKE_TEST)
         COMMENT "Running White Bird Engine tests..."
         COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/run_tests.py ${WBE_TEST_EXE}
     )
-    add_dependencies(wbe_run_tests ${PROJECT_NAME})
+    add_dependencies(wbe_run_tests wbe_on_build)
 endif()

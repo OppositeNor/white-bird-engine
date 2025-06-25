@@ -36,3 +36,13 @@ WBE::LogStream log_stream(WBE::WBE_CHANNEL_USER, std::cout);
 日志管理器用于管理不同频道中的不同日志对象。可以在程序尝试获取日志对象的时候自动对
 
 TODO
+
+## 简单接口
+
+白鸟引擎也实现了一些简单的接口，来简单快速的进行日志输出：
+
+```cpp
+WBE::wbe_console_log()->message("...");                         // 简单快速在控制台中进行输出
+WBE::wbe_console_log(WBE::WBE_CHANNEL_USER)->warning("...");    // 也可以在参数部分写频道 ID
+```
+

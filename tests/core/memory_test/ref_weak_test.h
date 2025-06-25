@@ -91,7 +91,7 @@ public:
 
 };
 
-TEST(WBERefWeakTest, Polymophic) {
+TEST(WBERefWeakTest, Polymorphic) {
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss;
     WBE::RefWeak<TestClassWeakChild> ref_weak_child;
@@ -185,6 +185,18 @@ TEST(WBERefWeak, Multithread) {
     }
     ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
+}
+
+TEST(WBERefWeak, InvaldLockTest) {
+    WBE::HeapAllocatorPool pool_allocator(1024);
+    WBE::RefWeak<int> ref_weak;
+    ASSERT_EQ(ref_weak.lock(), nullptr);
+    {
+        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&pool_allocator);
+        ref_weak = ref;
+        ASSERT_NE(ref_weak.lock(), nullptr);
+    }
+    ASSERT_EQ(ref_weak.lock(), nullptr);
 }
 
 inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeakChild> p_ref2, uint32_t p_iteration_count) {

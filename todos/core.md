@@ -81,6 +81,8 @@
 
 ### Memory
 
+- [x] Doc
+
 - [x] Ref
 
     - [x] Implementation
@@ -92,12 +94,6 @@
     - [x] Implementation
 
     - [x] Test
-
-- [ ] ComponentRef
-
-    - [ ] Implementation
-
-    - [ ] Tests
 
 ### RNG
 

@@ -111,6 +111,9 @@ public:
     }
 
     Ref<T> lock() {
+        if (!is_valid()) {
+            return Ref<T>(nullptr);
+        }
         return Ref<T>(control_block);
     }
 

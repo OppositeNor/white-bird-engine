@@ -63,11 +63,173 @@ WBE::wbe_console_log()->message(std::format("ref_a: {} {}", ref_a_alt->val1, (*r
 
 ## 弱引用
 
-TODO
+在部分场景中，我们或许只是想要获取一个数据，而在资源需要被释放的时候，依然能够被释放。例如在观察者模式中，对于
+观察者我们希望它在自己该释放的时候释放，并且对于注册的对象来说当观察者被释放的时候，也可以自动注销对应的观察者。
 
-## 注意
+如果我们直接对其引用的话，由于引用的存在，我们无法在不手动注销，或是释放被观察对象的前提下释放对应的资源（因为
+被观察对象总是持有一个引用）
 
-使用引用并不代表完全的内存安全！在出现**循环引用**（Cyclic dependency）的时候，依然会出现内存泄漏问题。例如：
+```cpp
+class Observer {
+public:
+    Observer() {
+        ...
+    }
+    ~Observer() {
+        ...
+    }
+
+    void on_event() {
+        ...
+    }
+};
+
+class ObservedObject {
+public:
+    ObservedObject() {...}
+    ~ObservedObject() {...}
+
+    void register_observer(WBE::Ref<Observer> p_observer) {
+        observer = p_observer;
+    }
+
+    void unregister_observer() {
+        observer = nullptr;
+    }
+
+    void broadcast() {
+        if (observer != nullptr) {
+            observer->on_event();
+        }
+    }
+
+private:
+    WBE::Ref<Observer> observer;
+};
+
+...
+
+ObservedObject observed_object;
+
+{
+    WBE::Ref<Observer> observer = WBE::Ref<Observer>::make_ref(&allocator);
+    observed_object.register_observer(observer);
+}
+
+// 这里退出上下文之后，虽然 observer 已经被释放，但是 observed_object 依然持有一个 observer 的引用！
+// 因此 observer 引用的数据依然没有被释放！
+
+```
+
+这种时候，可以使用**弱引用（Weak reference）**来解决。
+
+```cpp
+WBE::Ref<Observer> observer;
+WBE::WeakRef<Observer> observer_weak = observer;
+```
+
+弱引用可以引用到指向的数据，但是不会参与到引用计数。
+
+弱引用可以获取到当前资源的状态（是否可用？）
+
+```cpp
+struct MyData {
+    ...
+};
+
+WBE::WeakRef<MyData> my_data_weak;
+WBE::wbe_console_log()->message(std::format("{}", my_data_weak.is_valid())); // false
+{
+    WBE::Ref<MyData> my_data;
+    my_data_weak = my_data;
+    WBE::wbe_console_log()->message(std::format("{}", my_data_weak.is_valid())); // true
+}
+// my_data 被释放，my_data_weak 资源状态变为 invalid。
+WBE::wbe_console_log()->message(std::format("{}", my_data_weak.is_valid())); // false
+```
+
+在我们使用数据的时候，我们需要调用 `lock` 函数对数据进行**锁定**，防止我们在使用过程中数据被释放。
+
+`lock` 会返回一个对数据的强引用，从而保证在使用过程中，引用计数不会归零：
+
+```cpp
+// 我们可以先判断是否 valid ，然后再进行锁定
+if (my_data_weak.is_valid()) {
+    WBE::Ref<MyData> data_lock = my_data_weak.lock();
+    ...
+}
+
+// 也可以先获取，然后判断是否为 nullptr
+WBE::Ref<MyData> data_lock = my_data_weak.lock();
+if (data_lock != nullptr) {
+    ...
+}
+```
+
+使用弱引用，我们就可以把前面的 `Observer` 改成：
+
+```cpp
+class Observer {
+public:
+    Observer() {
+        ...
+    }
+    ~Observer() {
+        ...
+    }
+
+    void on_event() {
+        ...
+    }
+};
+
+class ObservedObject {
+public:
+    ObservedObject() {...}
+    ~ObservedObject() {...}
+
+    void register_observer(WBE::Ref<Observer> p_observer) {
+        observer = p_observer;
+    }
+
+    void unregister_observer() {
+        observer = nullptr;
+    }
+
+    void broadcast() {
+        // 发现观察者无法使用，自动将其注销。
+        if (!observer.is_valid()) {
+            observer = nullptr;
+            return;
+        }
+        observer.lock()->on_event();
+    }
+
+private:
+    WBE::WeakRef<Observer> observer;
+};
+
+...
+
+ObservedObject observed_object;
+
+{
+    WBE::Ref<Observer> observer = WBE::Ref<Observer>::make_ref(&allocator);
+    observed_object.register_observer(observer);
+}
+
+observed_object.broadcast();
+
+// 这里退出上下文之后，observer 被释放，引用归 0，资源得到释放
+// 同时 observed_object 发现引用无法使用，观察者就被自动注销。
+
+```
+
+弱引用还可以避免一些内存安全问题，详见下面：
+
+## 需要注意的内存泄漏问题
+
+使用引用并不代表完全的内存安全！例如：
 
 ```cpp
 struct A {
@@ -78,11 +240,41 @@ struct B {
     Ref<A> ref_a;
 };
 
-auto a = Ref<A>::make_ref(&allocator);
-auto b = Ref<B>::make_ref(&allocator);
-a.ref_b = b;
-b.ref_a = a;
+{
+    auto a = Ref<A>::make_ref(&allocator);
+    auto b = Ref<B>::make_ref(&allocator);
+    a.ref_b = b;
+    b.ref_a = a;
+}
+// 注意！这里 a 和 b 的数据都没有被释放！产生了内存泄漏！
 ```
 
-部分 GC 系统会自动识别循环引用（例如 Java 等）但是白鸟引擎的引用系统基于原子计数，并不具备这样的功能。因此上
-述情况发生的时候，即使 `a` 和 `b` 都被释放，它们分配的资源依然不会被释放。所以使用的时候需要格外小心。
+上述情况中，由于 `a` 对应的数据引用了 `b`，而 `b` 的数据引用了 `a`，即使 `a` 和 `b` 两个引用都被释放，它们的
+数据之间还有引用，因此这两个数据依然不会得到释放。这个问题也叫做**循环引用**（Cyclic dependency）。
+
+部分比较高级的垃圾回收（Garbage Collection, GC）系统系统会自动识别循环引用（例如 Java 等）但是白鸟引擎的引用
+系统基于原子计数，并不具备这样的功能。因此上述情况发生的时候，即使 `a` 和 `b` 都被释放，它们分配的资源依然不
+会被释放。所以使用的时候需要格外小心。
+
+这种时候可以在其中一个数据中使用弱引用：
+
+```cpp
+struct A {
+    Ref<B> ref_b;
+};
+
+struct B {
+    WeakRef<A> ref_a;
+};
+
+{
+    auto a = Ref<A>::make_ref(&allocator);
+    auto b = Ref<B>::make_ref(&allocator);
+    a.ref_b = b;
+    b.ref_a = a;
+}
+```
+
+这里虽然 `b` 也引用了 `a`，但是由于是弱引用，在 `a` 被释放的时候，`ref_a` 引用的数据也会一起被释放。这样就
+可以避免内存泄漏。
+
