@@ -1,4 +1,5 @@
 #include "core/engine_core.h"
+#include "core/allocator/heap_allocator_pool.h"
 #include "core/parser/parser_json.h"
 #include <iostream>
 
@@ -9,6 +10,7 @@ EngineCore::~EngineCore() {
     delete stdio_logging_manager;
     delete game_metadata;
     delete file_system;
+    delete pool_allocator;
     singleton = nullptr;
 }
 
@@ -41,6 +43,7 @@ void EngineCore::initialize(int p_argc, char* p_argv[]) {
     parse_metadata(Path(singleton->file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
+    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
 }
 
 }

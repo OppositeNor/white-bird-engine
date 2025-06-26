@@ -8,7 +8,15 @@
 
     - [x] Directory
 
+        - [x] Implementation
+
+        - [x] Test
+
     - [x] Path
+
+        - [x] Implementation
+
+        - [x] Test
 
 ## Windows
 
@@ -58,19 +66,19 @@
 
         - [ ] Test
 
-## MacOS (maybe?)
+## MacOS
 
-- [ ] File system
+- [x] File system
 
-    - [ ] Directory
+    - [x] Directory
 
-        - [ ] Implementation
+        - [x] Implementation
 
-        - [ ] Test
+        - [x] Test
 
-    - [ ] Path
+    - [x] Path
 
-        - [ ] Implementation
+        - [x] Implementation
 
-        - [ ] Test
+        - [x] Test
 

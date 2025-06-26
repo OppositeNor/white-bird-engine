@@ -4,6 +4,7 @@
 #include "core/core_utils.h"
 #include "core/logging/log.h"
 #include "core/logging/logging_manager.h"
+#include "global/global.h"
 #include "utils/defs.h"
 #include <gtest/gtest.h>
 #include <ostream>

@@ -20,11 +20,22 @@ namespace WhiteBirdEngine {
 template <typename LogType, typename T>
 class LoggingManager : public Singleton<LoggingManager<LogType, T>> {
 public:
+    /**
+     * @brief Constructor.
+     *
+     * @param p_channel_argument The argument to input to the constructor of the log object.
+     */
     LoggingManager(T& p_channel_argument)
         : Singleton<LoggingManager>(), channel_argument(&p_channel_argument) {}
 
     virtual ~LoggingManager() override {}
 
+    /**
+     * @brief Get the instance of a log object of a specific channel.
+     *
+     * @param p_channel_id The channel of the log object to get.
+     * @return The log object instance.
+     */
     Log* get_log(ChannelID p_channel_id) {
         {
             std::shared_lock lock(channel_logs_mutex);

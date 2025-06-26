@@ -15,6 +15,7 @@ struct AllocatorTrait<class HeapAllocatorRAM> {
     static constexpr bool IS_LIMITED_SIZE = false;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
+    static constexpr bool WILL_ADDR_MOVE = false;
 
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };

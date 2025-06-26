@@ -51,4 +51,6 @@ template <> struct LabelTrait<label_name> {\
 #define WBE_TYPE_TO_ID(type_name) WhiteBirdEngine::TypeIDTrait<type_name>::TYPE_ID
 #define WBE_TYPE_ID_NAME(type_id) WhiteBirdEngine::TypeIDTrait<WhiteBirdEngine::TypeIDRevTrait<type_id>::Type>::TYPE_NAME
 
+#define WBE_KiB(x) x * 1024
+
 #endif

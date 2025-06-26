@@ -124,7 +124,9 @@ public:
      */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        control_block = new ControlBlock(p_allocator, p_mem_id);
+        MemID control_block_mem_id = create_obj<ControlBlock>(*(p_allocator), p_allocator, p_mem_id);
+        control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
+        control_block->control_block_mem_id = control_block_mem_id;
         ref();
     }
 
@@ -223,6 +225,7 @@ private:
             weak_ref_counter.store(0, std::memory_order_release);
             strong_ref_counter.store(0, std::memory_order_release);
         }
+        MemID control_block_mem_id;
         MemID mem_id;
         AllocType* allocator;
         std::atomic<uint32_t> weak_ref_counter;
@@ -243,7 +246,7 @@ private:
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
             if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {
-                delete control_block;
+                destroy_obj<ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
             }
             control_block = nullptr;
         }

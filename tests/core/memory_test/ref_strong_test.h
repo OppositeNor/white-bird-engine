@@ -4,6 +4,7 @@
 #include "core/allocator/heap_allocator_pool.h"
 #include "core/allocator/heap_allocator_ram.h"
 #include "core/memory/reference_strong.h"
+#include "global/global.h"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <thread>
@@ -11,6 +12,7 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBERefStrongTest, Allocation) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     WBE::HeapAllocatorRAM allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 0);
@@ -18,7 +20,6 @@ TEST(WBERefStrongTest, Allocation) {
         ASSERT_EQ(*ref, 0);
         *ref = 1;
         ASSERT_EQ(*ref, 1);
-        ASSERT_EQ(allocator.get_allocated().size(), 1);
     }
     ASSERT_TRUE(allocator.is_empty());
     {
@@ -28,6 +29,7 @@ TEST(WBERefStrongTest, Allocation) {
 }
 
 TEST(WBERefStrongTest, CopyMove) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     WBE::HeapAllocatorRAM allocator;
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 3);
@@ -45,12 +47,12 @@ TEST(WBERefStrongTest, CopyMove) {
         *ref_move = 2;
         ASSERT_EQ(*ref_move, 2);
         ASSERT_EQ(*ref_copy, 2);
-        ASSERT_EQ(allocator.get_allocated().size(), 1);
     }
     ASSERT_TRUE(allocator.is_empty());
 }
 
 TEST(WBERefStrongTest, ConstructDestruct) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     WBE::HeapAllocatorRAM allocator;
     int test_val = 0;
     class TestClass {
@@ -80,6 +82,7 @@ TEST(WBERefStrongTest, ConstructDestruct) {
 }
 
 TEST(WBERefStrongTest, DynamicDispatch) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     class A {
     public:
         A() = default;
@@ -115,12 +118,18 @@ TEST(WBERefStrongTest, DynamicDispatch) {
 }
 
 TEST(WBERefStrongTest, NullReference) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     WBE::HeapAllocatorPool allocator;
     WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
     ASSERT_EQ(ref, nullptr);
     ASSERT_EQ(ref, (void*)nullptr);
     ASSERT_EQ(ref, WBE::MEM_NULL);
     ASSERT_EQ(ref.get(), nullptr);
+    ref = WBE::Ref<int>::make_ref(&allocator, 5);
+    ASSERT_NE(ref, nullptr);
+    ASSERT_NE(ref, (void*)nullptr);
+    ASSERT_NE(ref, WBE::MEM_NULL);
+    ASSERT_NE(ref.get(), nullptr);
 }
 
 class TestClass {
@@ -141,6 +150,7 @@ inline int test_val2 = 0;
 
 inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass> p_ref2, uint32_t p_iteration_count) {
     std::vector<WBE::Ref<TestClass, WBE::HeapAllocator>> refs;
+    WBE::HeapAllocatorPool allocator;
     refs.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
@@ -153,15 +163,23 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
     for (uint32_t i = 0; i < p_iteration_count; ++i) {
         uint32_t rand_ref_count = rand() % 5;
         for (uint32_t j = 0; j < rand_ref_count; ++j) {
-            uint32_t choice = rand() % 3;
+            uint32_t choice = rand() % 4;
             if (choice == 0) {
                 refs[j] = p_ref1;
             }
             else if (choice == 1) {
                 refs[j] = p_ref2;
             }
-            else {
+            else if (choice == 2) {
                 refs[j] = refs[rand() % refs.size()];
+            }
+            else {
+                int val = 3;
+                {
+                    WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&allocator, &val);
+                    ASSERT_EQ(val, 4);
+                }
+                ASSERT_EQ(val, -1);
             }
             ASSERT_EQ(test_val1, 1);
             ASSERT_EQ(test_val2, 1);
@@ -170,6 +188,7 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
 }
 
 TEST(WBERefStrongTest, Multithread) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
     ASSERT_EQ(test_val1, 0);
     ASSERT_EQ(test_val2, 0);
     WBE::HeapAllocatorPool allocator;
@@ -191,7 +210,6 @@ TEST(WBERefStrongTest, Multithread) {
     }
     ASSERT_EQ(test_val1, -1);
     ASSERT_EQ(test_val2, -1);
-
 }
 
 #endif
