@@ -10,26 +10,27 @@
 
 - [ ] Test
 
-## Resource
+## Resource Chunk
 
 - [ ] Doc
 
-- [ ] Interface
+- [ ] Implementation
 
-- [ ] Resource Indexed
+- [ ] Test
 
-    - [ ] Implementation
+## Resource Unit
 
-    - [ ] Test
+- [ ] Doc
 
-- [ ] Resource Texture
+- [ ] RUAudio
 
-    - [ ] Implementation
+- [ ] RUImage
 
-    - [ ] Test
+- [ ] RUVideo
 
-- [ ] Resource Font
+- [ ] RUText
 
-    - [ ] Implementation
+- [ ] RUBinary
 
-    - [ ] Test
+- [ ] RUFont
+
