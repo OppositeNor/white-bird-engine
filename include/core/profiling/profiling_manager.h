@@ -25,7 +25,7 @@ public:
      *
      */
     struct ProfileData {
-        uint64_t delta;
+        double delta;
         std::string file;
         uint32_t line;
     };
@@ -34,11 +34,11 @@ public:
      * @brief Push a profiling data to the profile stash.
      *
      * @param p_channel The channel to push the data to.
-     * @param p_delta The delta time that's been pushed into the profiler.
+     * @param p_delta The delta time that's been pushed into the profiler in seconds.
      * @param p_file The source file that the proflier is created.
      * @param p_line The line number where the profiler is created.
      */
-    void push_profiling_data(ChannelID p_channel, uint64_t p_delta, const std::string& p_file, uint32_t p_line);
+    void push_profiling_data(ChannelID p_channel, double p_delta, const std::string& p_file, uint32_t p_line);
 
     /**
      * @brief Get data for profiliing.

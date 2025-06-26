@@ -19,12 +19,13 @@ public:
 
     Profiler(ChannelID p_channel, const std::string& p_file, uint32_t p_line)
         : channel(p_channel), file(p_file), line(p_line) {
-        start_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        start_time = std::chrono::high_resolution_clock::now();
     }
 
     ~Profiler() {
-        uint64_t delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        delta -= start_time_ms;
+        const auto end_time = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> diff = end_time - start_time;
+        double delta = diff.count();
         EngineCore::get_singleton()->profiling_manager->push_profiling_data(channel, delta, file, line);
     }
 
@@ -37,7 +38,7 @@ private:
     ChannelID channel;
     std::string file;
     uint32_t line;
-    uint64_t start_time_ms;
+    std::chrono::high_resolution_clock::time_point start_time;
 };
 
 }
