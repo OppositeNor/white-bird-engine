@@ -54,6 +54,7 @@ include_directories(
 
 add_subdirectory(src/core)
 add_subdirectory(src/platform)
+add_subdirectory(src/resource)
 
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android build
