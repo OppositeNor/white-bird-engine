@@ -37,11 +37,32 @@ wbe_console_log()->message(std::format("val1: {}", allocator.get_obj<MyData>(mem
 释放内存时，可以直接使用 `pop_stack` 方法，在栈顶的元素会被自动释放：
 
 ```cpp
-allocator.pop_stack();
+allocator.pop_stack(sizeof(MyData));
 ```
 
 需要注意的是，`allocate` 方法仅会分配内存，但不会调用对象的构造函数。因此在 `allocate` 之后分
 配的值均为未初始化值。同理，`pop_stack` 的作用也仅是释放内存，不会调用其析构函数。
+
+如果想要栈分配/释放，并且调用构造/析构函数，可以使用 `create_stack_obj` 和 `pop_stack_obj` 来
+创建/销毁对象：
+
+```cpp
+class MyClass {
+public:
+    MyClass(int p_val) {
+        WBE::wbe_console_log()->message(std::format("Constructed! Value: {}", p_val));
+    }
+
+    ~MyClass() {
+        WBE::wbe_console_log()->message("Destructed!");
+    }
+};
+
+WBE::StackAllocator allocator;
+WBE::MemID mem_id = WBE::create_stack_obj<MyClass>(allocator, 42); // Constructed! Value: 42
+...
+WBE::pop_stack_obj<MyClass>(allocator); // Destructed!
+```
 
 `StackAllocator` 的构造函数可以传入两个参数：
 
@@ -187,4 +208,10 @@ bool IS_ATOMIC;
 AllocatorTrait<HeapAllocatorRAM>::IS_LIMITED_SIZE;          // true
 AllocatorTrait<HeapAllocatorRAM>::IS_GURANTEED_CONTINUOUS;  // false
 ```
+
+---
+
+值得注意的是，虽然堆内存看起来更灵活，但是实际实现的时候涉及到查表以及查找位置等计算。而且栈分配
+可以完全避免内存碎片的产生（这一点大部分堆分配器是做不到的）因此，栈分配器在性能上要比堆分配器要
+更好一些。
 

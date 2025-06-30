@@ -2,12 +2,12 @@
 #define __WBE_STACK_ALLOCATOR_H__
 
 #include "allocator.h"
+#include "core/logging/log.h"
 #include "utils/defs.h"
 #include "utils/utils.h"
 #include <cstddef>
 #include <memory>
 #include <stddef.h>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -25,10 +25,19 @@ struct AllocatorTrait<class StackAllocator> {
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
 
+/**
+ * @class StackAllocator
+ * @brief Stack style allocation. Can only allocate and deallocate from the top of the stack.
+ * @todo Test
+ */
 class StackAllocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
-    ~StackAllocator() {}
+    ~StackAllocator() {
+        if (marker != 0) {
+            wbe_console_log()->warning("StackAllocator not empty during destruction.");
+        }
+    }
     StackAllocator(const StackAllocator&) = delete;
     StackAllocator(StackAllocator&&) = delete;
     StackAllocator& operator=(const StackAllocator&) = delete;
@@ -43,7 +52,6 @@ public:
     StackAllocator(size_t p_size, size_t p_alignment = alignof(std::max_align_t))
         : total_size(get_align_size(p_size, p_alignment)), alignment(p_alignment), marker(0),
         mem_chunk(std::make_unique<std::byte[]>(total_size)) {
-        size_stack.reserve(64);
     }
 
     /**
@@ -56,9 +64,7 @@ public:
         void* result = mem_chunk.get() + marker;
         size_t aligned_size = get_align_size(p_size, alignment);
         marker += aligned_size;
-        MemID result_id = reinterpret_cast<MemID>(result);
-        size_stack.push_back(result_id);
-        return result_id;
+        return reinterpret_cast<MemID>(result);
     }
 
     /**
@@ -82,11 +88,26 @@ public:
     }
 
     /**
-     * @brief Pop the last element out from the stack.
+     * @brief Get the pointer pointing to the object with a specified memory id.
+     *
+     * @tparam T The type of the object.
+     * @param p_id The memory ID.
+     * @return The pointer to the object.
      */
-    void pop_stack() {
-        marker -= size_stack.back();
-        size_stack.pop_back();
+    template <typename T>
+    T* get_obj(MemID p_id) const {
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        return reinterpret_cast<T*>(p_id);
+    }
+
+    /**
+     * @brief Pop the last element out from the stack.
+     *
+     * @return The pointer to the deallocated object.
+     */
+    void* pop_stack(size_t p_size) {
+        marker -= get_align_size(p_size, alignment);
+        return mem_chunk.get() + marker;
     }
 
     /**
@@ -128,9 +149,19 @@ private:
     size_t alignment;
     size_t marker;
     std::unique_ptr<std::byte[]> mem_chunk;
-    std::vector<size_t> size_stack;
 };
 
+template <typename T, typename... Args>
+MemID create_stack_obj(StackAllocator& p_allocator, Args&&... p_args) {
+    MemID result = p_allocator.allocate(sizeof(T));
+    new(p_allocator.get(result)) T(std::forward<Args>(p_args)...);
+    return result;
+}
+
+template <typename T>
+void pop_stack_obj(StackAllocator& p_allocator) {
+    static_cast<T*>(p_allocator.pop_stack(sizeof(T)))->~T();
+}
 
 }
 

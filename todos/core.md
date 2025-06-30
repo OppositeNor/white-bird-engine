@@ -63,7 +63,7 @@
 
     - [x] Implementation
 
-    - [ ] Test
+    - [x] Test
 
 - [x] Heap allocator
 
