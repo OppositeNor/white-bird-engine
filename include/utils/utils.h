@@ -1,6 +1,7 @@
 #ifndef __WBE_UTILS_H__
 #define __WBE_UTILS_H__
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>

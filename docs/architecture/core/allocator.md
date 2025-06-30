@@ -68,8 +68,7 @@ WBE::pop_stack_obj<MyClass>(allocator); // Destructed!
 
 ```cpp
 // 第一个参数为分配器的总大小（单位：字节）。为可选参数。默认值为 1024。
-// 第二个参数为对齐大小（单位：字节）。为可选参数。默认值为 alignof(std::max_align_t)。
-StackAllocator allocator(1024, 8);
+StackAllocator allocator(1024);
 ```
 
 ## 堆分配器

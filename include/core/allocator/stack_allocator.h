@@ -4,7 +4,6 @@
 #include "allocator.h"
 #include "core/logging/log.h"
 #include "utils/defs.h"
-#include "utils/utils.h"
 #include <cstddef>
 #include <memory>
 #include <stddef.h>
@@ -47,10 +46,9 @@ public:
      * @brief Constructor.
      *
      * @param p_size The size of the allocated buffer in bytes.
-     * @param p_alignment The memory alighment.
      */
-    StackAllocator(size_t p_size, size_t p_alignment = alignof(std::max_align_t))
-        : total_size(get_align_size(p_size, p_alignment)), alignment(p_alignment), marker(0),
+    StackAllocator(size_t p_size)
+        : total_size(p_size), marker(0),
         mem_chunk(std::make_unique<std::byte[]>(total_size)) {
     }
 
@@ -62,8 +60,7 @@ public:
      */
     MemID allocate(size_t p_size) {
         void* result = mem_chunk.get() + marker;
-        size_t aligned_size = get_align_size(p_size, alignment);
-        marker += aligned_size;
+        marker += p_size;
         return reinterpret_cast<MemID>(result);
     }
 
@@ -106,7 +103,7 @@ public:
      * @return The pointer to the deallocated object.
      */
     void* pop_stack(size_t p_size) {
-        marker -= get_align_size(p_size, alignment);
+        marker -= p_size;
         return mem_chunk.get() + marker;
     }
 
@@ -135,18 +132,8 @@ public:
         return total_size;
     }
 
-    /**
-     * @brief Get the alignment of the allocation.
-     *
-     * @return The alignment of the allocation.
-     */
-    size_t get_alignment() const {
-        return alignment;
-    }
-
 private:
     size_t total_size;
-    size_t alignment;
     size_t marker;
     std::unique_ptr<std::byte[]> mem_chunk;
 };
