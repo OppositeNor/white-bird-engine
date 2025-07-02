@@ -3,6 +3,7 @@
 
 #include "core/allocator/allocator.h"
 #include "core/allocator/stack_allocator.h"
+#include "core/parser/parser.h"
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -17,13 +18,16 @@ class ResourceManager;
  */
 class ResourceChunk {
 public:
-    ResourceChunk()
-        : total_size(0) {}
     virtual ~ResourceChunk() {}
     ResourceChunk(const ResourceChunk&) = delete;
     ResourceChunk(ResourceChunk&&) = delete;
     ResourceChunk& operator=(const ResourceChunk&) = delete;
     ResourceChunk& operator=(ResourceChunk&&) = delete;
+
+    template <ParserConcept ParserType>
+    ResourceChunk(const ParserType& p_parser) {
+        // TODO
+    }
 
     /**
      * @brief Get the resource of a specific key.
