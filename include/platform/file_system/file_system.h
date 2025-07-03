@@ -4,6 +4,7 @@
 #include "platform/file_system/directory.h"
 #include "platform/file_system/path.h"
 #include "utils/interface/singleton.h"
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
@@ -87,6 +88,13 @@ public:
      * @param p_path The path to cast to string.
      */
     static std::string path_to_string(const Path& p_path);
+
+    /**
+     * @brief Get the extension name of the file at path.
+     *
+     * @param p_path The path to the file.
+     */
+    static std::string get_ext(const Path& p_path);
 
 private:
     Directory root_directory;

@@ -5,6 +5,7 @@
 #include "core/allocator/stack_allocator.h"
 #include "core/parser/parser.h"
 #include <cstddef>
+#include <cstring>
 #include <string>
 #include <unordered_map>
 namespace WhiteBirdEngine {
@@ -24,6 +25,11 @@ public:
     ResourceChunk& operator=(const ResourceChunk&) = delete;
     ResourceChunk& operator=(ResourceChunk&&) = delete;
 
+    /**
+     * @brief Get the resource from a parser.
+     *
+     * @param p_parser The parser to get resource from.
+     */
     template <ParserConcept ParserType>
     ResourceChunk(const ParserType& p_parser) {
         // TODO
@@ -39,16 +45,46 @@ public:
         return resource_map.at(p_key);
     }
 
+    /**
+     * @brief Get the total size of the chunk.
+     *
+     * @return The total size of the chunk.
+     */
     size_t get_size() const {
         return total_size;
     }
-protected:
 
+    /**
+     * @brief Push a resource unit to the chunk.
+     *
+     * @tparam T The type of the resource unit.
+     * @param p_res_key The key of the resource unit.
+     * @param p_allocator The allocator to allocate memory.
+     * @param p_res The resource unit instance.
+     * @return The memory id of the pushed resource unit.
+     */
     template <typename T>
-    MemID push_res(const std::string& p_res, StackAllocator& p_allocator) {
-        total_size += sizeof(T);
-        MemID result = create_stack_obj<T>(p_allocator);
-        resource_map[p_res] = result;
+    MemID push_res_unit(const std::string& p_res_key, StackAllocator& p_allocator, const T& p_res) {
+        using PureT = std::remove_cvref<T>;
+        total_size += sizeof(PureT);
+        MemID result = p_allocator.allocate(sizeof(PureT));
+        *(p_allocator.get_obj<PureT>(result)) = p_res;
+        resource_map[p_res_key] = result;
+        return result;
+    }
+
+    /**
+     * @brief Push a chunk of data into the chunk. The data will be copied to the allocator.
+     *
+     * @param p_res_size The size of the resource to push to.
+     * @param p_res The pointer to the resource to be pushed into the chunk.
+     * @param p_allocator The allocator to allocate memory.
+     * @return The result memory id.
+     */
+    MemID push_data(size_t p_res_size, void* p_res, StackAllocator& p_allocator) {
+        total_size += p_res_size;
+        MemID result = p_allocator.allocate(p_res_size);
+        memcpy(p_allocator.get(result), p_res, p_res_size);
         return result;
     }
 

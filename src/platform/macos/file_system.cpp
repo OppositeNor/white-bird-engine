@@ -69,5 +69,10 @@ std::string FileSystem::path_to_string(const Path& p_path) {
     return dir_to_string(p_path.get_directory()) + p_path.get_file_name();
 }
 
+std::string FileSystem::get_ext(const Path& p_path) {
+    auto& file_name = p_path.get_file_name();
+    return file_name.substr(file_name.find_last_of('.'));
+}
+
 }
 

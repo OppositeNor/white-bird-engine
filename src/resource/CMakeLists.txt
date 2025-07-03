@@ -2,6 +2,7 @@ file(GLOB wbe_resource_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(resource_manager)
 add_subdirectory(resource_chunk)
+add_subdirectory(resource_unit_loader)
 
 add_library(WBE_LIB_RESOURCE STATIC
     ${wbe_resource_src}

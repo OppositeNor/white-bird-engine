@@ -16,14 +16,14 @@ EngineCore::~EngineCore() {
 
 EngineCore::EngineCore(int p_argc, char* p_argv[])
     : Singleton<EngineCore>() {
-    singleton = this;
+    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
     file_system = new FileSystem();
     initialize(p_argc, p_argv);
 }
 
 EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
     : Singleton<EngineCore>() {
-    singleton = this;
+    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
     file_system = new FileSystem(p_root_dir);
     initialize(p_argc, p_argv);
 }
@@ -43,7 +43,7 @@ void EngineCore::initialize(int p_argc, char* p_argv[]) {
     parse_metadata(Path(singleton->file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
-    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
+    singleton = this;
 }
 
 }

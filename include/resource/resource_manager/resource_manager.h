@@ -1,6 +1,7 @@
 #ifndef __WBE_RESOURCE_MANAGER_H__
 #define __WBE_RESOURCE_MANAGER_H__
 
+#include "core/allocator/allocator.h"
 #include "core/allocator/stack_allocator.h"
 #include "core/memory/reference_strong.h"
 #include "resource/resource_chunk/resource_chunk.h"
@@ -35,6 +36,11 @@ public:
     template <ResourceUnitConcept T>
     T* get_resource(Ref<ResourceChunk> p_chunk, const std::string& p_key) {
         return stack_allocator.get_obj<T>(p_chunk->get_resource(p_key));
+    }
+
+    template <ResourceUnitConcept T>
+    T* get_res_by_memid(MemID p_memid) {
+        return stack_allocator.get_obj<T>(p_memid);
     }
 
 private:
