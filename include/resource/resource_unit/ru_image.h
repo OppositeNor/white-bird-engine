@@ -14,7 +14,7 @@ namespace WhiteBirdEngine {
  *
  * How image should be stored is that the image data should always
  * be pushed as data before pushing this description, and the release
- * process should always be backwards (first release the description
+ * process should always be backwards (first release the resource unit
  * and then remove the data). It is recommended to store the image 
  * data right before the image description in a stack allocator.
  *
