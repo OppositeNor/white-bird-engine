@@ -18,7 +18,7 @@ public:
     RULoaderPPM3& operator=(const RULoaderPPM3&)= delete;
     RULoaderPPM3& operator=(RULoaderPPM3&&) = delete;
 
-    virtual void load(ResourceChunk& p_chunk, const std::string& p_res_key, const Path& p_path) override;
+    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
 
 };
 

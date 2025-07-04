@@ -18,7 +18,7 @@ public:
     RULoaderPNG& operator=(const RULoaderPNG&)= delete;
     RULoaderPNG& operator=(RULoaderPNG&&) = delete;
 
-    virtual void load(ResourceChunk& p_chunk, const std::string& p_res_key, const Path& p_path) override;
+    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
 
 };
 

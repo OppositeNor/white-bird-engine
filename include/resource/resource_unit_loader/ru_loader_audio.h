@@ -18,7 +18,7 @@ public:
     RULoaderAudio& operator=(const RULoaderAudio&)= delete;
     RULoaderAudio& operator=(RULoaderAudio&&) = delete;
 
-    virtual void load(ResourceChunk& p_chunk, const std::string& p_res_key, const Path& p_path) override;
+    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
 
 };
 
