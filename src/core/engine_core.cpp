@@ -7,10 +7,10 @@ namespace WhiteBirdEngine {
 
 EngineCore::~EngineCore() {
     delete profiling_manager;
-    delete stdio_logging_manager;
     delete game_metadata;
     delete file_system;
     delete pool_allocator;
+    delete stdio_logging_manager;
     singleton = nullptr;
 }
 

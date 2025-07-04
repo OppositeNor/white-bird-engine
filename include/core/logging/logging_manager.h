@@ -1,9 +1,10 @@
 #ifndef __LOGGING_MANAGER_H__
 #define __LOGGING_MANAGER_H__
 
+#include "core/allocator/allocator.h"
+#include "core/allocator/stack_allocator.h"
 #include "core/logging/log.h"
 #include "utils/interface/singleton.h"
-#include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
@@ -24,11 +25,17 @@ public:
      * @brief Constructor.
      *
      * @param p_channel_argument The argument to input to the constructor of the log object.
+     * @param p_log_allocator_size The argument to input to the constructor of the log object.
      */
-    LoggingManager(T& p_channel_argument)
-        : Singleton<LoggingManager>(), channel_argument(&p_channel_argument) {}
+    LoggingManager(T& p_channel_argument, size_t p_log_allocator_size = WBE_KiB(1))
+        : Singleton<LoggingManager>(), channel_argument(&p_channel_argument), log_allocator(p_log_allocator_size) {}
 
-    virtual ~LoggingManager() override {}
+    virtual ~LoggingManager() override {
+        for (uint32_t i = 0; i < channel_logs.size(); ++i) {
+            pop_stack_obj<LogType>(log_allocator);
+        }
+        log_allocator.clear();
+    }
 
     /**
      * @brief Get the instance of a log object of a specific channel.
@@ -41,25 +48,27 @@ public:
             std::shared_lock lock(channel_logs_mutex);
             auto channel = channel_logs.find(p_channel_id);
             if (channel != channel_logs.end()) {
-                return channel->second.get();
+                return log_allocator.get_obj<Log>(channel->second);
             }
         }
         {
             std::unique_lock lock(channel_logs_mutex);
             auto channel = channel_logs.find(p_channel_id);
             if (channel != channel_logs.end()) {
-                return channel->second.get();
+                return log_allocator.get_obj<Log>(channel->second);
             }
-            channel_logs[p_channel_id] = std::make_unique<LogType>(p_channel_id, *channel_argument);
-            return channel_logs.at(p_channel_id).get();
+            MemID result = create_stack_obj<LogType>(log_allocator, p_channel_id, *channel_argument);
+            channel_logs[p_channel_id] = result;
+            return log_allocator.get_obj<Log>(result);
         }
     }
 
 private:
     std::shared_mutex channel_logs_mutex;
-    std::unordered_map<ChannelID, std::unique_ptr<Log>> channel_logs;
+    std::unordered_map<ChannelID, MemID> channel_logs;
 
     T* channel_argument;
+    StackAllocator log_allocator;
 };
 
 }
