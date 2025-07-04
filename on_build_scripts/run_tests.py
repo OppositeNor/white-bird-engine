@@ -3,6 +3,9 @@ import sys
 import subprocess
 
 class WBETest:
+    def __init__(self):
+        self.is_failed = True
+
     def run_tests(self, cmd = []) -> None:
         failed_count : int = 0
         for test_path in sys.argv[1:]:
@@ -14,6 +17,7 @@ class WBETest:
                 print(result.stderr, file=sys.stderr)
                 failed_count += 1
         if failed_count == 0:
+            self.is_failed = False
             print("Test finish! all tests passed.")
         elif failed_count == 1:
             print("Test finish! 1 test failed.")
@@ -36,4 +40,6 @@ if __name__ == "__main__":
     test_runner = WBETest()
     test_runner.run_tests(VALGRIND_CMD)
     print("White Bird Engine tests finished.")
+    if (test_runner.is_failed):
+        exit(-1)
 

@@ -40,7 +40,7 @@ void EngineCore::parse_metadata(const Path& p_metadata_config_path) {
 
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
     game_metadata = new GameMetadata();
-    parse_metadata(Path(singleton->file_system->get_resource_directory(), "metadata.json"));
+    parse_metadata(Path(file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
     singleton = this;
