@@ -31,7 +31,10 @@ set(SDL_STATIC ON)
 add_subdirectory(dependencies/SDL2)
 add_subdirectory(dependencies/yaml-cpp)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
+if (NOT MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
+endif()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")

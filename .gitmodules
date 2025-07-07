@@ -19,3 +19,9 @@
 [submodule "dependencies/stb"]
 	path = dependencies/stb
 	url = https://github.com/nothings/stb.git
+[submodule "dependencies/libpng"]
+	path = dependencies/libpng
+	url = https://github.com/pnggroup/libpng.git
+[submodule "dependencies/libjpeg"]
+	path = dependencies/libjpeg
+	url = https://github.com/winlibs/libjpeg.git
