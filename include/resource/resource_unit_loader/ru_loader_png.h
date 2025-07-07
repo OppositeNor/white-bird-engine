@@ -5,7 +5,7 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RULoaderHDR
+ * @class RULoaderPNG
  * @brief Resource unit loader for PNG images.
  *
  */

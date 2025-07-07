@@ -5,7 +5,7 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RULoaderHDR
+ * @class RULoaderPPM3
  * @brief Resource unit loader for PPM P3 images.
  *
  */

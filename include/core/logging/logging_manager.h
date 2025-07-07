@@ -31,7 +31,8 @@ public:
         : Singleton<LoggingManager>(), channel_argument(&p_channel_argument), log_allocator(p_log_allocator_size) {}
 
     virtual ~LoggingManager() override {
-        for (uint32_t i = 0; i < channel_logs.size(); ++i) {
+        size_t channel_logs_size = channel_logs.size();
+        for (uint32_t i = 0; i < channel_logs_size; ++i) {
             pop_stack_obj<LogType>(log_allocator);
         }
         log_allocator.clear();

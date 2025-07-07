@@ -40,7 +40,8 @@ public:
         if (is_absolute != p_other.is_absolute || dir_names.size() != p_other.dir_names.size()) {
             return false;
         }
-        for (uint32_t i = 0; i < dir_names.size(); ++i) {
+        size_t dir_names_size = dir_names.size();
+        for (uint32_t i = 0; i < dir_names_size; ++i) {
             if (dir_names[i] != p_other.dir_names[i]) {
                 return false;
             }
