@@ -7,7 +7,9 @@
 #include "platform/file_system/path.h"
 #include "resource/resource_unit/resource_unit.h"
 #include "resource/resource_unit/ru_image.h"
+#include "resource/resource_unit/ru_text.h"
 #include "resource/resource_unit_loader/ru_loader_image.h"
+#include "resource/resource_unit_loader/ru_loader_text.h"
 #include <cstddef>
 #include <cstring>
 #include <stdint.h>
@@ -108,9 +110,9 @@ private:
     template <ParserDataConcept ParserDataType>
     void load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
 
-    Path get_resource_path(const std::string& p_res_path) {
-        return Path(); // TODO
-    }
+    Path get_resource_path(const std::string& p_res_path);
+
+    RUText::EncodeType get_encode_type(const std::string& p_str);
 };
 
 template <ParserConcept ParserType>
@@ -145,7 +147,13 @@ void ResourceChunk::load_ru_video(const ParserDataType& p_parser_data, StackAllo
 
 template <ParserDataConcept ParserDataType>
 void ResourceChunk::load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
+    RUText ru_text{};
+    std::string key = p_parser_data.template get_value<std::string>("key");
+    auto properties = p_parser_data.template get_value<ParserDataType>("properties");
+    ru_text.encode_type = get_encode_type(p_parser_data.template get_value<std::string>("encode_type"));
+    ru_text.size = p_parser_data.template get_value<size_t>("size");
+    RULoaderText data_loader;
+    ru_text.data = data_loader.load(*this, get_resource_path(properties.template get_value<std::string>("data_path")));
 }
 
 template <ParserDataConcept ParserDataType>

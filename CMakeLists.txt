@@ -2,10 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 project(WhiteBirdEngine)
 
-set(SDL_TEST OFF)
-set(SDL_STATIC ON)
-set(SDL_SHARED OFF)
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -27,8 +23,13 @@ set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
+set(SDL_TEST OFF)
 set(SDL_STATIC ON)
+set(SDL_SHARED OFF)
 add_subdirectory(dependencies/SDL2)
+set(YAML_BUILD_SHARED_LIBS OFF)
+set(YAML_CPP_BUILD_TESTS OFF)
+set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
 
 if (NOT MSVC)
