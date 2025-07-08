@@ -9,16 +9,19 @@ namespace WhiteBirdEngine {
  * @brief Resource unit loader for text resources.
  *
  */
-class RULoaderText : public ResourceUnitLoader {
+class RULoaderText : public ResourceUnitLoader<RULoaderText> {
 public:
     RULoaderText() = default;
-    virtual ~RULoaderText() override {}
+    ~RULoaderText() {}
     RULoaderText(const RULoaderText&) = delete;
     RULoaderText(RULoaderText&&) = delete;
     RULoaderText& operator=(const RULoaderText&)= delete;
     RULoaderText& operator=(RULoaderText&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 
 };
 

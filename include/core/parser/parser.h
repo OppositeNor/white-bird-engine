@@ -90,6 +90,24 @@ public:
     std::vector<std::string> get_all_keys() const {
         return static_cast<ChildType*>(this)->get_all_keys();
     }
+
+    /**
+     * @brief Get the data of the parser.
+     *
+     * @return The data of the paraser.
+     */
+    const auto& get_data() const {
+        return static_cast<ChildType*>(this)->get_data();
+    }
+
+    /**
+     * @brief Get the data of the parser.
+     *
+     * @return The data of the parser.
+     */
+    auto& get_data() {
+        return static_cast<ChildType*>(this)->get_data();
+    }
 };
 
 template <typename T>

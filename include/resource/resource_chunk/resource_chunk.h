@@ -156,7 +156,7 @@ void ResourceChunk::load_ru_text(const ParserDataType& p_parser_data, StackAlloc
     ru_text.encode_type = get_encode_type(p_parser_data.template get_value<std::string>("encode_type"));
     ru_text.size = p_parser_data.template get_value<size_t>("size");
     RULoaderText data_loader;
-    ru_text.data = data_loader.load(*this, get_resource_path(properties.template get_value<std::string>("data_path")));
+    ru_text.data = data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
 }
 
 template <ParserDataConcept ParserDataType>

@@ -14,16 +14,19 @@ namespace WhiteBirdEngine {
  * @brief Resource unit loader for images.
  *
  */
-class RULoaderImage : public ResourceUnitLoader {
+class RULoaderImage : public ResourceUnitLoader<RULoaderImage> {
 public:
     RULoaderImage() = default;
-    virtual ~RULoaderImage() override {}
+    ~RULoaderImage() {}
     RULoaderImage(const RULoaderImage&) = delete;
     RULoaderImage(RULoaderImage&&) = delete;
     RULoaderImage& operator=(const RULoaderImage&)= delete;
     RULoaderImage& operator=(RULoaderImage&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 private:
     RULoaderPNG loader_png;
     RULoaderPPM loader_ppm;

@@ -6,21 +6,25 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RULoaderHDR
- * @brief Resource unit loader for HDR images.
+ * @brief Resource unit loader for hdr images.
  *
  */
-class RULoaderHDR : public ResourceUnitLoader {
+class RULoaderHDR : public ResourceUnitLoader<RULoaderHDR> {
 public:
     RULoaderHDR() = default;
-    virtual ~RULoaderHDR() override {}
+    ~RULoaderHDR() {}
     RULoaderHDR(const RULoaderHDR&) = delete;
     RULoaderHDR(RULoaderHDR&&) = delete;
     RULoaderHDR& operator=(const RULoaderHDR&)= delete;
     RULoaderHDR& operator=(RULoaderHDR&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 
 };
+
 
 }
 

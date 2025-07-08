@@ -9,16 +9,19 @@ namespace WhiteBirdEngine {
  * @brief Loader for audio resource units.
  *
  */
-class RULoaderAudio : public ResourceUnitLoader {
+class RULoaderAudio : public ResourceUnitLoader<RULoaderAudio> {
 public:
     RULoaderAudio() = default;
-    virtual ~RULoaderAudio() override {}
+    ~RULoaderAudio() {}
     RULoaderAudio(const RULoaderAudio&) = delete;
     RULoaderAudio(RULoaderAudio&&) = delete;
     RULoaderAudio& operator=(const RULoaderAudio&)= delete;
     RULoaderAudio& operator=(RULoaderAudio&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 
 };
 

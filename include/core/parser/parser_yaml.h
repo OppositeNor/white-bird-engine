@@ -106,6 +106,14 @@ public:
         return data.get_all_keys();
     }
 
+    const YAMLData& get_data() const {
+        return data;
+    }
+
+    YAMLData& get_data() {
+        return data;
+    }
+
 private:
     YAMLData data;
 };

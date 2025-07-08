@@ -6,19 +6,22 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RULoaderPPM3
- * @brief Resource unit loader for PPM P3 images.
+ * @brief Resource unit loader for ppm3 images.
  *
  */
-class RULoaderPPM3 : public ResourceUnitLoader {
+class RULoaderPPM3 : public ResourceUnitLoader<RULoaderPPM3> {
 public:
     RULoaderPPM3() = default;
-    virtual ~RULoaderPPM3() override {}
+    ~RULoaderPPM3() {}
     RULoaderPPM3(const RULoaderPPM3&) = delete;
     RULoaderPPM3(RULoaderPPM3&&) = delete;
     RULoaderPPM3& operator=(const RULoaderPPM3&)= delete;
     RULoaderPPM3& operator=(RULoaderPPM3&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 
 };
 

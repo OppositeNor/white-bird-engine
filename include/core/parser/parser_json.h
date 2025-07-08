@@ -108,6 +108,14 @@ public:
         return data.get_all_keys();
     }
 
+    const JSONData& get_data() const {
+        return data;
+    }
+
+    JSONData& get_data() {
+        return data;
+    }
+
 private:
     JSONData data;
 };

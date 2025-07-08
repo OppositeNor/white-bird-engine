@@ -6,21 +6,25 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RULoaderPNG
- * @brief Resource unit loader for PNG images.
+ * @brief Resource unit loader for png images.
  *
  */
-class RULoaderPNG : public ResourceUnitLoader {
+class RULoaderPNG : public ResourceUnitLoader<RULoaderPNG> {
 public:
     RULoaderPNG() = default;
-    virtual ~RULoaderPNG() override {}
+    ~RULoaderPNG() {}
     RULoaderPNG(const RULoaderPNG&) = delete;
     RULoaderPNG(RULoaderPNG&&) = delete;
     RULoaderPNG& operator=(const RULoaderPNG&)= delete;
     RULoaderPNG& operator=(RULoaderPNG&&) = delete;
 
-    virtual MemID load(ResourceChunk& p_chunk, const Path& p_path) override;
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+        return MEM_NULL; // TODO
+    }
 
 };
+
 
 }
 

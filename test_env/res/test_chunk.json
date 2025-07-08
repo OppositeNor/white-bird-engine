@@ -1,0 +1,8 @@
+{
+    "text" : {
+        "key" : "Test Text Resource 1",
+        "properties" : {
+            "encode_type" : "utf8"
+        }
+    }
+}
