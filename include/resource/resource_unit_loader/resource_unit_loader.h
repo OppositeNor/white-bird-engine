@@ -25,7 +25,7 @@ public:
      */
     template <ParserDataConcept ParserDataType>
     MemID load(class ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
-        static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data);
+        return static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data);
     }
 };
 

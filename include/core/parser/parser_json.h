@@ -41,7 +41,7 @@ public:
 
     template <std::same_as<JSONData> T>
     JSONData get_value(const std::string& p_key) const {
-        return data.at(p_key).get<T>();
+        return JSONData(data.at(p_key).get<json>());
     }
 
     std::vector<std::string> get_all_keys() const {
