@@ -56,7 +56,7 @@ WBE::Ref<A> ref_a_alt(&allocator);
     WBE::wbe_console_log()->message(std::format("ref_a: {} {}", ref_a->val1, (*ref_a).val2)); // ref_a: 10 -10
 }
 
-// 退出上下文，ref_a 和 ref_b 被析构，其中 ref_b 引用的资源没有任何对象再对它进行引用，ref_b 引用的资源被释放
+// 退出 stack frame，ref_a 和 ref_b 被析构，其中 ref_b 引用的资源没有任何对象再对它进行引用，ref_b 引用的资源被释放
 // 而 ref_a 引用的资源由于还有 ref_a_alt 还在引用，所以这个资源没有被释放。
 WBE::wbe_console_log()->message(std::format("ref_a: {} {}", ref_a_alt->val1, (*ref_a_alt).val2)); // ref_a: 10 -10
 
@@ -117,7 +117,7 @@ ObservedObject observed_object;
     observed_object.register_observer(observer);
 }
 
-// 这里退出上下文之后，虽然 observer 已经被释放，但是 observed_object 依然持有一个 observer 的引用！
+// 这里退出 stack frame 之后，虽然 observer 已经被释放，但是 observed_object 依然持有一个 observer 的引用！
 // 因此 observer 引用的数据依然没有被释放！
 
 ```
@@ -221,7 +221,7 @@ ObservedObject observed_object;
 
 observed_object.broadcast();
 
-// 这里退出上下文之后，observer 被释放，引用归 0，资源得到释放
+// 这里退出 stack frame 之后，observer 被释放，引用归 0，资源得到释放
 // 同时 observed_object 发现引用无法使用，观察者就被自动注销。
 
 ```
