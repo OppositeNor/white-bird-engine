@@ -5,7 +5,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorRAM::~HeapAllocatorRAM() {
     if (allocated.size() != 0) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
+        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorRAM not empty during destruction.");
     }
     for (auto& iter : alloc_map) {
         free(iter.second);

@@ -86,7 +86,7 @@ public:
         size_map.clear();
         allocated.clear();
         idle_list_head->size = size;
-        idle_list_head->mem_start = mem_chunk.get();
+        idle_list_head->mem_start = mem_chunk;
         idle_list_head->next = nullptr;
     }
 
@@ -109,7 +109,7 @@ private:
     size_t alignment;
     std::unordered_map<MemID, void*> alloc_map;
     std::unordered_map<void*, size_t> size_map;
-    std::unique_ptr<std::byte[]> mem_chunk;
+    std::byte* mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
     std::set<MemID> allocated;

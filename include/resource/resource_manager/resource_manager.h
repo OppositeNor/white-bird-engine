@@ -8,6 +8,7 @@
 #include "resource/resource_unit/resource_unit.h"
 #include "utils/interface/singleton.h"
 #include <cstddef>
+#include <utility>
 namespace WhiteBirdEngine {
 
 /**
@@ -26,19 +27,19 @@ public:
     /**
      * @brief Register a resource chunk.
      *
+     * @param p_chunk_id The id of the chunk, used to locate the chunk when getting
+     * resources.
      * @param p_resource_chunk The resource chunk to register.
      */
-    void register_chunk(Ref<ResourceChunk> p_resource_chunk) {
-        resource_chunks.push_back(p_resource_chunk);
+    void register_chunk(ResourceChunkID p_chunk_id, Ref<ResourceChunk> p_resource_chunk) {
+        resource_chunks.push_back(std::make_pair(p_chunk_id, p_resource_chunk));
     }
 
     /**
-     * @brief Pop a resource chunk.
-     *
-     * @param p_resource_chunk The resource chunk to pop out.
+     * @brief Pop a resource chunk from the end of the chunk stack.
      */
-    void pop_chunk(Ref<ResourceChunk> p_resource_chunk) {
-        size_t pop_size = resource_chunks.back()->get_size();
+    void pop_chunk() {
+        size_t pop_size = resource_chunks.back().second->get_size();
         resource_chunks.pop_back();
         stack_allocator.pop_stack(pop_size);
     }
@@ -50,8 +51,8 @@ public:
      * @param p_key The key of the resource.
      */
     template <ResourceUnitConcept T>
-    T* get_resource(Ref<ResourceChunk> p_chunk, const std::string& p_key) {
-        return stack_allocator.get_obj<T>(p_chunk->get_resource(p_key));
+    T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_key) {
+        return stack_allocator.get_obj<T>(get_resource_chunk(p_chunk_id)->get_resource(p_key));
     }
 
     /**
@@ -65,7 +66,9 @@ public:
     }
 
 private:
-    std::vector<Ref<ResourceChunk>> resource_chunks;
+    Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id);
+
+    std::vector<std::pair<ResourceChunkID, Ref<ResourceChunk>>> resource_chunks;
     StackAllocator stack_allocator;
 };
 

@@ -10,6 +10,7 @@
 #include "resource/resource_unit/ru_text.h"
 #include "resource/resource_unit_loader/ru_loader_image.h"
 #include "resource/resource_unit_loader/ru_loader_text.h"
+#include "utils/utils.h"
 #include <cstddef>
 #include <cstring>
 #include <stdint.h>
@@ -18,6 +19,8 @@
 namespace WhiteBirdEngine {
 
 class ResourceManager;
+
+using ResourceChunkID = HashCode;
 
 /**
  * @class ResourceChunk

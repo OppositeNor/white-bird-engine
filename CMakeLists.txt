@@ -50,6 +50,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/glm
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
+    ${PROJECT_SOURCE_DIR}/dependencies/stb
 )
 
 include_directories(
