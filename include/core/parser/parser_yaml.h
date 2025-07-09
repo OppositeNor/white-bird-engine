@@ -2,6 +2,7 @@
 #define __WBE_PARSER_YAML_H_
 
 #include "parser.h"
+#include "yaml-cpp/node/node.h"
 #include "yaml-cpp/node/parse.h"
 #include <yaml-cpp/yaml.h>
 
@@ -52,6 +53,10 @@ public:
             result.push_back(it->first.as<std::string>());
         }
         return result;
+    }
+
+    bool contains(const std::string& p_key) const {
+        return node[p_key].IsDefined();
     }
 
 private:
@@ -112,6 +117,10 @@ public:
 
     YAMLData& get_data() {
         return data;
+    }
+
+    bool contains(const std::string& p_key) const {
+        return data.contains(p_key);
     }
 
 private:

@@ -52,6 +52,11 @@ public:
         }
         return result;
     }
+
+    bool contains(const std::string& p_key) const {
+        return data.contains(p_key);
+    }
+
 private:
     json data;
 };
@@ -114,6 +119,10 @@ public:
 
     JSONData& get_data() {
         return data;
+    }
+
+    bool contains(const std::string& p_key) const {
+        return data.contains(p_key);
     }
 
 private:

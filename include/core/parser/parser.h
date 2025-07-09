@@ -34,6 +34,15 @@ public:
     std::vector<std::string> get_all_keys() const {
         return static_cast<ChildType*>(this)->get_all_keys();
     }
+
+    /**
+     * @brief Check if contains a key.
+     *
+     * @return True if contains a key, false otherwise.
+     */
+    bool contains(const std::string& p_key) const {
+        return static_cast<ChildType*>(this)->contains();
+    }
 };
 
 template <typename T>
@@ -107,6 +116,15 @@ public:
      */
     auto& get_data() {
         return static_cast<ChildType*>(this)->get_data();
+    }
+
+    /**
+     * @brief Check if contains a key.
+     *
+     * @return True if contains a key, false otherwise.
+     */
+    bool contains(const std::string& p_key) const {
+        return static_cast<ChildType*>(this)->contains();
     }
 };
 

@@ -6,8 +6,6 @@
 #include "core/parser/parser.h"
 #include "platform/file_system/path.h"
 #include "resource/resource_unit/resource_unit.h"
-#include "resource/resource_unit/ru_image.h"
-#include "resource/resource_unit/ru_text.h"
 #include "resource/resource_unit_loader/ru_loader_image.h"
 #include "resource/resource_unit_loader/ru_loader_text.h"
 #include "utils/utils.h"
@@ -114,8 +112,6 @@ private:
     void load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
 
     Path get_resource_path(const std::string& p_res_path);
-
-    RUText::EncodeType get_encode_type(const std::string& p_str);
 };
 
 template <ParserConcept ParserType>
@@ -125,17 +121,8 @@ ResourceChunk::ResourceChunk(const ParserType& p_parser) {
 
 template <ParserDataConcept ParserDataType>
 void ResourceChunk::load_ru_image(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    RUImage ru_image{};
-    std::string key = p_parser_data.template get_value<std::string>("key");
-    auto properties = p_parser_data.template get_value<ParserDataType>("properties");
-    ru_image.width = properties.template get_value<uint32_t>("width");
-    ru_image.height = properties.template get_value<uint32_t>("height");
-    ru_image.channel_count = properties.template get_value<uint32_t>("channel_count");
-    ru_image.config.set(RUImage::IS_SRGB, properties.template get_value<uint32_t>("is_srgb"));
-    ru_image.config.set(RUImage::IS_HDR, properties.template get_value<uint32_t>("is_hdr"));
-    RULoaderImage data_loader;
-    ru_image.image_data = data_loader.load(*this, get_resource_path(properties.template get_value<std::string>("data_path")));
-    push_res_unit(key, p_allocator, ru_image);
+    RULoaderImage loader;
+    loader.template load<ParserDataType>(*this, p_parser_data);
 }
 
 template <ParserDataConcept ParserDataType>
@@ -150,13 +137,8 @@ void ResourceChunk::load_ru_video(const ParserDataType& p_parser_data, StackAllo
 
 template <ParserDataConcept ParserDataType>
 void ResourceChunk::load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    RUText ru_text{};
-    std::string key = p_parser_data.template get_value<std::string>("key");
-    auto properties = p_parser_data.template get_value<ParserDataType>("properties");
-    ru_text.encode_type = get_encode_type(p_parser_data.template get_value<std::string>("encode_type"));
-    ru_text.size = p_parser_data.template get_value<size_t>("size");
     RULoaderText data_loader;
-    ru_text.data = data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
+    data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
 }
 
 template <ParserDataConcept ParserDataType>
