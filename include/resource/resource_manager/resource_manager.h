@@ -5,10 +5,10 @@
 #include "core/allocator/stack_allocator.h"
 #include "core/memory/reference_strong.h"
 #include "resource/resource_chunk/resource_chunk.h"
+#include "resource/resource_chunk/resource_chunk_load_file.h"
 #include "resource/resource_unit/resource_unit.h"
 #include "utils/interface/singleton.h"
 #include <cstddef>
-#include <utility>
 namespace WhiteBirdEngine {
 
 /**
@@ -31,7 +31,7 @@ public:
      * resources.
      * @param p_resource_chunk The resource chunk to register.
      */
-    void register_chunk(ResourceChunkID p_chunk_id, Ref<ResourceChunk> p_resource_chunk) {
+    void register_chunk(ResourceChunkID p_chunk_id, Ref<ResourceChunkLoadFile> p_resource_chunk) {
         resource_chunks.push_back(std::make_pair(p_chunk_id, p_resource_chunk));
     }
 
@@ -66,9 +66,9 @@ public:
     }
 
 private:
-    Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id);
+    Ref<ResourceChunkLoadFile> get_resource_chunk(ResourceChunkID p_chunk_id);
 
-    std::vector<std::pair<ResourceChunkID, Ref<ResourceChunk>>> resource_chunks;
+    std::vector<std::pair<ResourceChunkID, Ref<ResourceChunkLoadFile>>> resource_chunks;
     StackAllocator stack_allocator;
 };
 

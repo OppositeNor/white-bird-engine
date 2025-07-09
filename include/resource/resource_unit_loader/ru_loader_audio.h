@@ -18,8 +18,8 @@ public:
     RULoaderAudio& operator=(const RULoaderAudio&)= delete;
     RULoaderAudio& operator=(RULoaderAudio&&) = delete;
 
-    template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const ParserDataType& p_parser_data) {
+    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
+    MemID load(ResChunkType& p_chunk, const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
         return MEM_NULL; // TODO
     }
 

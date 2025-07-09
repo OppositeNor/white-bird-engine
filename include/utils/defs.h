@@ -56,4 +56,7 @@ template <> struct LabelTrait<label_name> {\
 #define WBE_GiB(x) x * WBE_MiB(1024)
 #define WBE_TiB(x) x * WBE_GiB(1024)
 
+#define WBE_DECL_CRTP_CONCEPT(Base) template <typename T>\
+concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>
+
 #endif

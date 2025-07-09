@@ -3,7 +3,7 @@
 
 namespace WhiteBirdEngine {
 
-Ref<ResourceChunk> ResourceManager::get_resource_chunk(ResourceChunkID p_chunk_id) {
+Ref<ResourceChunkLoadFile> ResourceManager::get_resource_chunk(ResourceChunkID p_chunk_id) {
     for (auto& chunk : resource_chunks) {
         if (chunk.first == p_chunk_id) {
             return chunk.second;

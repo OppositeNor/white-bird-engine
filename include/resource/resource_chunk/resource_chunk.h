@@ -3,17 +3,10 @@
 
 #include "core/allocator/allocator.h"
 #include "core/allocator/stack_allocator.h"
-#include "core/parser/parser.h"
-#include "platform/file_system/path.h"
 #include "resource/resource_unit/resource_unit.h"
-#include "resource/resource_unit_loader/ru_loader_image.h"
-#include "resource/resource_unit_loader/ru_loader_text.h"
+#include "utils/defs.h"
 #include "utils/utils.h"
-#include <cstddef>
-#include <cstring>
-#include <stdint.h>
-#include <string>
-#include <unordered_map>
+
 namespace WhiteBirdEngine {
 
 class ResourceManager;
@@ -25,21 +18,11 @@ using ResourceChunkID = HashCode;
  * @brief Chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
  * @todo Test
  */
+template <typename ChildT>
 class ResourceChunk {
 public:
+    ResourceChunk() {}
     virtual ~ResourceChunk() {}
-    ResourceChunk(const ResourceChunk&) = delete;
-    ResourceChunk(ResourceChunk&&) = delete;
-    ResourceChunk& operator=(const ResourceChunk&) = delete;
-    ResourceChunk& operator=(ResourceChunk&&) = delete;
-
-    /**
-     * @brief Get the resource from a parser.
-     *
-     * @param p_parser The parser to get resource from.
-     */
-    template <ParserConcept ParserType>
-    ResourceChunk(const ParserType& p_parser);
 
     /**
      * @brief Get the resource of a specific key.
@@ -47,8 +30,9 @@ public:
      * @param p_key The key to get resource from.
      * @return The MemID of the resource.
      */
-    virtual MemID get_resource(const std::string& p_key) const {
-        return resource_map.at(p_key);
+    template <typename T>
+    MemID get_resource(const std::string& p_key) const {
+        return static_cast<ChildT*>(this)->get_resource(p_key);
     }
 
     /**
@@ -57,7 +41,7 @@ public:
      * @return The total size of the chunk.
      */
     size_t get_size() const {
-        return total_size;
+        return static_cast<ChildT*>(this)->get_size();
     }
 
     /**
@@ -71,12 +55,7 @@ public:
      */
     template <ResourceUnitConcept T>
     MemID push_res_unit(const std::string& p_res_key, StackAllocator& p_allocator, const T& p_res) {
-        using PureT = std::remove_cvref<T>;
-        total_size += sizeof(PureT);
-        MemID result = p_allocator.allocate(sizeof(PureT));
-        *(p_allocator.get_obj<PureT>(result)) = p_res;
-        resource_map[p_res_key] = result;
-        return result;
+        return static_cast<ChildT*>(this)->push_res_unit(p_res_key, p_allocator, p_res);
     }
 
     /**
@@ -88,68 +67,12 @@ public:
      * @return The result memory id.
      */
     MemID push_data(size_t p_res_size, void* p_res, StackAllocator& p_allocator) {
-        total_size += p_res_size;
-        MemID result = p_allocator.allocate(p_res_size);
-        memcpy(p_allocator.get(result), p_res, p_res_size);
-        return result;
+        return static_cast<ChildT*>(this)->push_data(p_res_size, p_res, p_allocator);
     }
 
-private:
-    size_t total_size;
-    std::unordered_map<std::string, MemID> resource_map;
-
-    template <ParserDataConcept ParserDataType>
-    void load_ru_image(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-    template <ParserDataConcept ParserDataType>
-    void load_ru_audio(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-    template <ParserDataConcept ParserDataType>
-    void load_ru_video(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-    template <ParserDataConcept ParserDataType>
-    void load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-    template <ParserDataConcept ParserDataType>
-    void load_ru_font(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-    template <ParserDataConcept ParserDataType>
-    void load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
-
-    Path get_resource_path(const std::string& p_res_path);
 };
 
-template <ParserConcept ParserType>
-ResourceChunk::ResourceChunk(const ParserType& p_parser) {
-    // TODO
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_image(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    RULoaderImage loader;
-    loader.template load<ParserDataType>(*this, p_parser_data);
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_audio(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_video(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    RULoaderText data_loader;
-    data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_font(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
-}
-
-template <ParserDataConcept ParserDataType>
-void ResourceChunk::load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
-}
+WBE_DECL_CRTP_CONCEPT(ResourceChunk);
 
 }
 

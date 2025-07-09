@@ -2,6 +2,7 @@
 #define __WBE_PARSER_H__
 
 #include "platform/file_system/path.h"
+#include "utils/defs.h"
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -45,11 +46,7 @@ public:
     }
 };
 
-template <typename T>
-constexpr bool is_parser_data = std::is_base_of<ParserData<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>();
-
-template <typename T>
-concept ParserDataConcept = is_parser_data<T>;
+WBE_DECL_CRTP_CONCEPT(ParserData);
 
 /**
  * @class Parser
@@ -128,11 +125,7 @@ public:
     }
 };
 
-template <typename T>
-constexpr bool is_parser = std::is_base_of_v<Parser<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>;
-
-template <typename T>
-concept ParserConcept = is_parser<T>;
+WBE_DECL_CRTP_CONCEPT(Parser);
 
 }
 
