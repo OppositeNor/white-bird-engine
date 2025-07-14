@@ -6,7 +6,7 @@
 namespace WBE = WhiteBirdEngine;
 
 template <WBE::ParserConcept T>
-void test_parser_general(T& p_parser,
+void test_parser_general(WBE::Parser<T>& p_parser,
                  const std::string& p_test_buff1,
                  const std::string& p_test_buff2,
                  const std::string& p_test_buff3) {

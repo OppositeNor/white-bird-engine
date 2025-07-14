@@ -1,7 +1,6 @@
 #ifndef __WBE_UTILS_H__
 #define __WBE_UTILS_H__
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -21,6 +20,7 @@ constexpr size_t get_align_size(size_t p_size, size_t p_alignment) {
 }
 
 using HashCode = uint32_t;
+using UUID = uint32_t;
 
 /**
  * @brief Hash a string in compile time.

@@ -87,14 +87,14 @@ public:
      */
     template <typename T>
     T get_value(const std::string& p_key) const {
-        return static_cast<ChildType*>(this)->template get_value<T>(p_key);
+        return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
     }
 
     /**
      * @brief Get all the key values.
      */
     std::vector<std::string> get_all_keys() const {
-        return static_cast<ChildType*>(this)->get_all_keys();
+        return static_cast<const ChildType*>(this)->get_all_keys();
     }
 
     /**
@@ -103,7 +103,7 @@ public:
      * @return The data of the paraser.
      */
     const auto& get_data() const {
-        return static_cast<ChildType*>(this)->get_data();
+        return static_cast<const ChildType*>(this)->get_data();
     }
 
     /**
@@ -121,7 +121,7 @@ public:
      * @return True if contains a key, false otherwise.
      */
     bool contains(const std::string& p_key) const {
-        return static_cast<ChildType*>(this)->contains();
+        return static_cast<const ChildType*>(this)->contains();
     }
 };
 

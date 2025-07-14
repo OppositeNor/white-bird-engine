@@ -1,8 +1,11 @@
+#include "core/allocator/stack_allocator.h"
 #include "core/parser/parser.h"
 #include "resource/resource_chunk/resource_chunk.h"
 #include "resource/resource_unit_loader/ru_loader_image.h"
 #include "resource/resource_unit_loader/ru_loader_text.h"
+#include "utils/utils.h"
 #include <cstring>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
@@ -26,10 +29,10 @@ public:
      * @param p_parser The parser to get resource from.
      */
     template <ParserConcept ParserType>
-    ResourceChunkLoadFile(const ParserType& p_parser);
+    ResourceChunkLoadFile(const Parser<ParserType>& p_parser, StackAllocator& p_allocator);
 
     virtual MemID get_resource(const std::string& p_key) const {
-        return resource_map.at(p_key);
+        return resource_map.at(dynam_hash(p_key.c_str()));
     }
 
     size_t get_size() const {
@@ -42,7 +45,7 @@ public:
         total_size += sizeof(PureT);
         MemID result = p_allocator.allocate(sizeof(PureT));
         *(p_allocator.get_obj<PureT>(result)) = p_res;
-        resource_map[p_res_key] = result;
+        resource_map[dynam_hash(p_res_key.c_str())] = result;
         return result;
     }
 
@@ -55,57 +58,111 @@ public:
 
 private:
     size_t total_size;
-    std::unordered_map<std::string, MemID> resource_map;
+    std::unordered_map<HashCode, MemID> resource_map;
+
+    enum class RUType {
+        AUDIO,
+        BINARY,
+        FONT,
+        IMAGE,
+        TEXT,
+        VIDEO
+    };
+
+    RUType get_res_type(const std::string& p_type);
 
     template <ParserDataConcept ParserDataType>
-    void load_ru_image(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_image(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
     template <ParserDataConcept ParserDataType>
-    void load_ru_audio(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_audio(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
     template <ParserDataConcept ParserDataType>
-    void load_ru_video(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_video(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
     template <ParserDataConcept ParserDataType>
-    void load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_text(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
     template <ParserDataConcept ParserDataType>
-    void load_ru_font(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_font(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
     template <ParserDataConcept ParserDataType>
-    void load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator);
+    void load_ru_binary(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator);
 };
 
+inline ResourceChunkLoadFile::RUType ResourceChunkLoadFile::get_res_type(const std::string& p_type) {
+    if (p_type.starts_with("audio.")) {
+        return RUType::AUDIO;
+    }
+    if (p_type.starts_with("binary.")) {
+        return RUType::BINARY;
+    }
+    if (p_type.starts_with("font.")) {
+        return RUType::FONT;
+    }
+    if (p_type.starts_with("image.")) {
+        return RUType::IMAGE;
+    }
+    if (p_type.starts_with("text.")) {
+        return RUType::TEXT;
+    }
+    if (p_type.starts_with("video.")) {
+        return RUType::VIDEO;
+    }
+    throw std::runtime_error("Failed to get resource type. Type: " + p_type + " not recognized.");
+}
 
 template <ParserConcept ParserType>
-ResourceChunkLoadFile::ResourceChunkLoadFile(const ParserType& p_parser) {
-    // TODO
+ResourceChunkLoadFile::ResourceChunkLoadFile(const Parser<ParserType>& p_parser, StackAllocator& p_allocator) {
+    std::vector<std::string> keys = p_parser.get_all_keys();
+    for (auto& key : keys) {
+        switch (get_res_type(key)) {
+            case RUType::AUDIO:
+                load_ru_audio(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+            case RUType::BINARY:
+                load_ru_binary(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+            case RUType::FONT:
+                load_ru_font(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+            case RUType::IMAGE:
+                load_ru_image(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+            case RUType::TEXT:
+                load_ru_text(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+            case RUType::VIDEO:
+                load_ru_video(p_parser.get_data<ParserType::DataType>>(key), p_allocator);
+                break;
+        }
+    }
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_image(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_image(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     RULoaderImage loader;
-    loader.template load<ParserDataType>(*this, p_parser_data);
+    loader.load<ParserDataType>(*this, p_parser_data);
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_audio(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_audio(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_video(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_video(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_text(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_text(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     RULoaderText data_loader;
     data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_font(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_font(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserDataConcept ParserDataType>
-void ResourceChunkLoadFile::load_ru_binary(const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+void ResourceChunkLoadFile::load_ru_binary(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
     // TODO
 }
 

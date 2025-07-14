@@ -19,7 +19,7 @@ public:
     RULoaderPPM3& operator=(RULoaderPPM3&&) = delete;
 
     template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResChunkType& p_chunk, const ParserDataType& p_parser_data, StackAllocator& p_allocator) {
+    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
         return MEM_NULL; // TODO
     }
 
