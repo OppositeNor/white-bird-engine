@@ -2,6 +2,7 @@
 #define __WBE_PATH_H__
 
 #include "platform/file_system/directory.h"
+#include "utils/utils.h"
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -81,6 +82,10 @@ public:
      */
     bool is_absolute() const {
         return directory.get_is_absolute();
+    }
+
+    HashCode hash() const {
+        return dynam_hash(static_cast<std::string>(*this).c_str());
     }
 
     operator std::string() const;

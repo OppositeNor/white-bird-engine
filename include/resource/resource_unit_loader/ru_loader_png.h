@@ -31,12 +31,15 @@ public:
         if (p_parser_data.contains("desired_channels")) {
             desired_channels = p_parser_data.template get<uint32_t>("desired_channels");
         }
-        RUImage ru_image;
+        RUImage ru_image{};
         auto data = load_image_data(get_resource_path(p_parser_data.template get<std::string>("path")),
                         desired_channels, ru_image.width, ru_image.height, ru_image.channel_count);
         if (desired_channels != 0) {
             ru_image.channel_count = desired_channels;
         }
+        auto properties = p_parser_data.template get<ParserDataType>("properties");
+        ru_image.config.set(RUImage::IS_SRGB, properties.contains("is_srgb") && properties.template get<bool>("is_srgb"));
+        ru_image.config.set(RUImage::IS_HDR, false);
         ru_image.image_data = p_chunk.push_data(ru_image.width * ru_image.height * ru_image.channel_count, data.get(), p_allocator);
         return p_chunk.template push_res_unit<RUImage>(p_parser_data.template get<std::string>("key"), ru_image);
     }

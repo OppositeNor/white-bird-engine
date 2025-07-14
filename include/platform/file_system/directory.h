@@ -1,9 +1,6 @@
 #ifndef __WBE_DIRECTORY_H__
 #define __WBE_DIRECTORY_H__
 
-#include "utils/defs.h"
-
-#include <cstdint>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -25,33 +22,12 @@ public:
         : dir_names(p_other.dir_names), is_absolute(p_other.is_absolute) {}
     Directory(Directory&& p_other)
         : dir_names(std::move(p_other.dir_names)), is_absolute(p_other.is_absolute) {}
-    Directory& operator=(const Directory& p_other) {
-        dir_names = p_other.dir_names;
-        is_absolute = p_other.is_absolute;
-        return *this;
-    }
-    Directory& operator=(Directory&& p_other) {
-        dir_names = std::move(p_other.dir_names);
-        is_absolute = p_other.is_absolute;
-        return *this;
-    }
+    Directory& operator=(const Directory& p_other);
+    Directory& operator=(Directory&& p_other);
 
-    bool operator==(const Directory& p_other) const {
-        if (is_absolute != p_other.is_absolute || dir_names.size() != p_other.dir_names.size()) {
-            return false;
-        }
-        size_t dir_names_size = dir_names.size();
-        for (uint32_t i = 0; i < dir_names_size; ++i) {
-            if (dir_names[i] != p_other.dir_names[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool operator==(const Directory& p_other) const;
 
-    bool operator!=(const Directory& p_other) const {
-        return !(*this == p_other);
-    }
+    bool operator!=(const Directory& p_other) const;
 
     /**
      * @brief Constructor.
@@ -60,9 +36,7 @@ public:
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.
      */
-    Directory(std::vector<std::string> p_dir_names, bool p_is_absolute = false)
-        : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
-
+    Directory(std::vector<std::string> p_dir_names, bool p_is_absolute = false);
 
     /**
      * @brief Get the directory after combine this directory with another directory.
@@ -71,15 +45,7 @@ public:
      * @todo Test
      * @return The combined directory.
      */
-    Directory combine(const Directory& p_other) const {
-        WBE_DEBUG_ASSERT(!p_other.get_is_absolute());
-        Directory result(*this);
-        result.dir_names.reserve(dir_names.size() + p_other.dir_names.size());
-        for (auto& dir_name : p_other.dir_names) {
-            result.dir_names.push_back(dir_name);
-        }
-        return result;
-    }
+    Directory combine(const Directory& p_other) const;
 
     /**
      * @brief Get if this directory is absolute.
@@ -87,18 +53,14 @@ public:
      * @return True if the directory is absolute, false if the directory is relative.
      * By relative it means relative to the user current working directory.
      */
-    bool get_is_absolute() const {
-        return is_absolute;
-    }
+    bool get_is_absolute() const;
 
     /**
      * @brief Get the names of the path to the directory.
      *
      * @return The names of the path to the directory.
      */
-    const std::vector<std::string>& get_dir_names() const {
-        return dir_names;
-    }
+    const std::vector<std::string>& get_dir_names() const;
 
     operator std::string() const;
 

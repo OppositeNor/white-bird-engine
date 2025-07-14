@@ -101,6 +101,28 @@ private:
     Directory resource_directory;
 };
 
+/**
+ * @brief Combine a directory with a path.
+ *
+ * @param p_dir The directory to combine.
+ * @param p_path The path to combine.
+ * @return The combined path: "p_dir/p_path"
+ */
+inline Path combine(const Directory& p_dir, const Path& p_path) {
+    return Path(p_dir.combine(p_path.get_directory()), p_path.get_file_name());
+}
+
+/**
+ * @brief Combine one directory with another.
+ *
+ * @param p_dir1 The base directory.
+ * @param p_dir2 The directory to combine.
+ * @return The combined directory: "p_dir1/p_dir2"
+ */
+inline Directory combine(const Directory& p_dir1, const Directory& p_dir2) {
+    return p_dir1.combine(p_dir2);
+}
+
 }
 
 #endif

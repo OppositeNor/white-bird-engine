@@ -28,9 +28,20 @@ using HashCode = uint32_t;
  * @param p_str The string to hash.
  * @return The hash code of the string.
  */
-constexpr HashCode static_hash(const char* p_str) {
+consteval HashCode static_hash(const char* p_str) {
     // from https://stackoverflow.com/questions/2111667/compile-time-string-hashing
     return *p_str ? static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1) : 5381;
+}
+
+/**
+ * @brief Hash a string.
+ *
+ * @param p_str The string to hash.
+ * @return The hash code of the string.
+ */
+constexpr HashCode dynam_hash(const char* p_str) {
+    // from https://stackoverflow.com/questions/2111667/compile-time-string-hashing
+    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
 }
 
 using TypeID = HashCode;
