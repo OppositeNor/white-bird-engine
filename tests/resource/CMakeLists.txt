@@ -1,4 +1,6 @@
 add_subdirectory(resource_chunk_test)
+add_subdirectory(resource_loader_test)
+add_subdirectory(resource_utils_test)
 
 set(WBE_BUILD_CONFIG_SCRIPTS ${WBE_BUILD_CONFIG_SCRIPTS}
     PARENT_SCOPE

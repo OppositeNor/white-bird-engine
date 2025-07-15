@@ -48,6 +48,59 @@ inline Path get_resource_path(const std::string& p_res_path) {
     return combine(res_directory, parse_res_rel_path(p_res_path));
 }
 
+/**
+ * @brief Flip an image horizontally.
+ *
+ * @param p_data The data of the image to be fliped.
+ * @param p_width The width of the image.
+ * @param p_height The height of the image.
+ * @param p_channels The channel count of the image.
+ */
+void img_flip_h(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+
+/**
+ * @brief Flip an image vertically.
+ *
+ * @param p_data The data of the image to be fliped.
+ * @param p_width The width of the image.
+ * @param p_height The height of the image.
+ * @param p_channels The channel count of the image.
+ */
+void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+
+/**
+ * @brief Load image data from a image file.
+ *
+ * @todo Test
+ * @param p_path The path to the file.
+ * @param p_desired_channels The desired channel count of the image. The image will reformatted according to
+ * this, or will not if this value is 0.
+ * @param p_flip_h Flip the image horizontally if true.
+ * @param p_flip_v Flip the image vertically if true.
+ * @param p_width Output: the width of the image
+ * @param p_height Output: the height of the image.
+ * @param p_file_channels Output: The channel count of the image in its original file.
+ * @return The image data.
+ */
+std::unique_ptr<unsigned char> load_image_data(const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v,
+                                               uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
+
+/**
+ * @brief Get the color space from a string.
+ *
+ * @param p_color_space The string of the color space.
+ * @return The according color space.
+ */
+inline ColorSpace get_color_space(const std::string& p_color_space) {
+    if (p_color_space == "srgb") {
+        return ColorSpace::SRGB;
+    }
+    if (p_color_space == "rgb") {
+        return ColorSpace::RGB;
+    }
+    throw std::runtime_error("Failed to get color space. Color space: \"" + p_color_space + "\" is not supported.");
+}
+
 }
 
 #endif

@@ -73,9 +73,9 @@ include_directories(
 )
 
 # Add engine source
+add_subdirectory(src/resource)
 add_subdirectory(src/core)
 add_subdirectory(src/platform)
-add_subdirectory(src/resource)
 
 # Create executable
 if (WBE_BUILD_PLATFORM STREQUAL "Android")

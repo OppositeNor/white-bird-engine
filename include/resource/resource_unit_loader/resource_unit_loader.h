@@ -6,9 +6,6 @@
 #include "core/parser/parser.h"
 #include "resource/resource_chunk/resource_chunk.h"
 #include "utils/defs.h"
-#include "utils/utils.h"
-#include <stdexcept>
-#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -33,23 +30,9 @@ public:
     MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
         return static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data, p_allocator);
     }
-
-protected:
-    ColorSpace get_color_space(const std::string& p_color_space);
 };
 
 WBE_DECL_CRTP_CONCEPT(ResourceUnitLoader);
-
-template <typename ChildT>
-ColorSpace ResourceUnitLoader<ChildT>::get_color_space(const std::string& p_color_space) {
-    if (p_color_space == "srgb") {
-        return ColorSpace::SRGB;
-    }
-    if (p_color_space == "rgb") {
-        return ColorSpace::RGB;
-    }
-    throw std::runtime_error("Failed to get color space. Colorspace: \"" + p_color_space + "\" not supported.");
-}
 
 }
 
