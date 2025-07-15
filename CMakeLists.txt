@@ -25,6 +25,9 @@ set(WBE_SHADER_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/shaders)
 file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
 set(WBE_METADATA_OUTPUT_PATH ${WBE_RESOURCE_OUTPUT_DIR}/metadata.json)
 
+set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
+set(WBE_TEST_ENV_RES_DIR ${WBE_TEST_ENV_DIR}/res)
+
 set(WBE_BUILD_CONFIG_SCRIPTS "")
 
 # Add dependencies subdirectories
@@ -109,7 +112,6 @@ add_custom_target(wbe_on_build
     COMMENT "Running White Bird Engine build script"
     COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
 )
-add_dependencies(${PROJECT_NAME} wbe_on_build)
 
 # Compile shaders
 file(GLOB shader_sources ${WBE_SHADER_DIR}/*.vert ${WBE_SHADER_DIR}/*.frag ${WBE_SHADER_DIR}/*.comp)
@@ -130,7 +132,6 @@ foreach(shader_source ${shader_sources})
 endforeach()
 
 add_custom_target(compile_shaders DEPENDS ${shaders_outputs})
-add_dependencies(${PROJECT_NAME} compile_shaders)
 
 # Run all tests
 if (WBE_MAKE_TEST)
@@ -138,5 +139,19 @@ if (WBE_MAKE_TEST)
         COMMENT "Running White Bird Engine tests..."
         COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/run_tests.py ${WBE_TEST_EXE}
     )
-    add_dependencies(wbe_run_tests wbe_on_build)
+
+    add_custom_target(wbe_setup_test_env
+        COMMENT "Setting up test_env..."
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${WBE_METADATA_OUTPUT_PATH}"
+            "${WBE_TEST_ENV_RES_DIR}"
+    )
+
+endif()
+
+add_dependencies(${PROJECT_NAME} wbe_on_build)
+add_dependencies(${PROJECT_NAME} compile_shaders)
+
+if (WBE_MAKE_TEST)
+    add_dependencies(wbe_run_tests wbe_setup_test_env)
 endif()
