@@ -9,7 +9,6 @@ namespace WhiteBirdEngine {
 /**
  * @class Directory
  * @brief Directory class.
- * @todo Test
  */
 class Directory {
 public:
@@ -32,7 +31,8 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_dir_names The names of the full path to the directory.
+     * @param p_dir_names The names of the full path to the directory. The root should be
+     * at index 0, and the followings should be ordered according to the depth.
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.
      */
@@ -42,7 +42,6 @@ public:
      * @brief Get the directory after combine this directory with another directory.
      *
      * @param p_other The directory to combine to this directory.
-     * @todo Test
      * @return The combined directory.
      */
     Directory combine(const Directory& p_other) const;
@@ -56,7 +55,8 @@ public:
     bool get_is_absolute() const;
 
     /**
-     * @brief Get the names of the path to the directory.
+     * @brief Get the names of the path to the directory. The rooth directory will be at
+     * index 0, and the followings will be ordered according to the depth.
      *
      * @return The names of the path to the directory.
      */

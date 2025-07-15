@@ -1,4 +1,3 @@
-#include "utils/defs.h"
 #include "platform/file_system/directory.h"
 #include "platform/file_system/file_system.h"
 #include <cstdint>
@@ -43,7 +42,9 @@ Directory::Directory(std::vector<std::string> p_dir_names, bool p_is_absolute)
 
 
 Directory Directory::combine(const Directory& p_other) const {
-    WBE_DEBUG_ASSERT(!p_other.get_is_absolute());
+    if (p_other.is_absolute) {
+        throw std::runtime_error("Only allows to combine with a relative path.");
+    }
     Directory result(*this);
     result.dir_names.reserve(dir_names.size() + p_other.dir_names.size());
     for (auto& dir_name : p_other.dir_names) {

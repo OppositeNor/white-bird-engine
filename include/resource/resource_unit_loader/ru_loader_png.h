@@ -7,6 +7,7 @@
 #include "resource/resource_utils.h"
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -36,7 +37,7 @@ public:
             ru_image.channel_count = desired_channels;
         }
         ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
-        ru_image.config.set(RUImage::IS_SRGB, properties.contains("is_srgb") && properties.template get_value<bool>("is_srgb"));
+        ru_image.color_space = get_color_space(properties.template get_value<std::string>("color_space"));
         ru_image.config.set(RUImage::IS_HDR, false);
         bool flip_h = properties.contains("flip_h") && properties.template get_value<bool>("flip_h");
         bool flip_v = properties.contains("flip_v") && properties.template get_value<bool>("flip_v");

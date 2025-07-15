@@ -56,7 +56,6 @@ struct TypeIDRevTrait;
 template <HashCode CODE>
 struct LabelTrait;
 
-
 constexpr uint64_t MAX_COMPONENT_COUNT = 64;
 
 /**
@@ -99,6 +98,11 @@ struct EngineConfigOptions {
     size_t single_tick_stack_size = 1024;
     size_t global_pool_size = 2048;
     size_t thread_pool_size = 2048;
+};
+
+enum ColorSpace {
+    RGB,
+    SRGB
 };
 
 }

@@ -3,6 +3,7 @@
 
 #include "core/allocator/allocator.h"
 #include "resource_unit.h"
+#include "utils/utils.h"
 #include <bitset>
 #include <cstdint>
 namespace WhiteBirdEngine {
@@ -21,8 +22,6 @@ namespace WhiteBirdEngine {
  */
 struct RUImage : public ResourceUnit {
     enum ImageConfigBit {
-        // Is the image in SRGB space.
-        IS_SRGB = 0,
         // Is the image an HDR image (32 bit instead of 8 bit)
         IS_HDR,
         // To track the total number of bits.
@@ -35,6 +34,8 @@ struct RUImage : public ResourceUnit {
     uint32_t height;
     // The channel count of the image.
     uint32_t channel_count;
+    // The color space of the image.
+    ColorSpace color_space;
     // Image configurations.
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The memory ID of the image data.

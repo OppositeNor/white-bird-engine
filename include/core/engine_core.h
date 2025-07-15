@@ -12,6 +12,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class EngineCore
+ * @brief Core singleton of the engine. Contains all singletons of the core layer.
+ *
+ */
 class EngineCore : public Singleton<EngineCore> {
 public:
     ~EngineCore();
