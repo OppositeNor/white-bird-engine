@@ -30,15 +30,19 @@ if __name__ == "__main__":
         exit(-1)
     print("White Bird Engine running tests...")
 
-    VALGRIND_CMD = [
-        'valgrind',
-        '--leak-check=full',
-        '--show-leak-kinds=all',
-        '--error-exitcode=42',
-    ]
+    RUNNER_CMD = []
+    if os.name == "posix":
+        print("Using Valgrind")
+        RUNNER_CMD = [
+            'valgrind',
+            '--leak-check=full',
+            '--show-leak-kinds=all',
+            '--error-exitcode=42',
+        ]
+
     os.chdir(os.getcwd() + "/..")
     test_runner = WBETest()
-    test_runner.run_tests(VALGRIND_CMD)
+    test_runner.run_tests(RUNNER_CMD)
     print("White Bird Engine tests finished.")
     if (test_runner.is_failed):
         exit(-1)
