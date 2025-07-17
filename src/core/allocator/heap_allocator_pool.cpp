@@ -1,3 +1,4 @@
+#include "core/allocator/allocator.h"
 #include "core/logging/log.h"
 #include "utils/defs.h"
 #include "utils/utils.h"
@@ -17,7 +18,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 }
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)
-    : curr_id(1), size(get_align_size(p_size, p_alignment)), alignment(p_alignment), mem_chunk(static_cast<std::byte*>(malloc(p_size))) {
+    : size(get_align_size(p_size, p_alignment)), alignment(p_alignment), mem_chunk(static_cast<std::byte*>(malloc(p_size))) {
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to allocate memory for pool.");
     }
@@ -32,12 +33,11 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
     size_t align_size = get_align_size(p_size, alignment);
     while (valid_idle_node != nullptr) {
-        if ((*valid_idle_node)->size >= p_size) {
+        if ((*valid_idle_node)->size >= align_size) {
             void* result = acquire_memory(*valid_idle_node, align_size);
-            allocated.insert(curr_id);
-            alloc_map[curr_id] = result;
+            allocated.insert(reinterpret_cast<MemID>(result));
             size_map[result] = align_size;
-            return curr_id++;
+            return reinterpret_cast<MemID>(result);
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
@@ -45,14 +45,12 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {
-    auto mem_ptr_iter = alloc_map.find(p_mem);
-    if (mem_ptr_iter == alloc_map.end()) {
+    if (!is_in_pool(p_mem)) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
     }
-    void* data_loc = mem_ptr_iter->second;
+    void* data_loc = reinterpret_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);
-    alloc_map.erase(p_mem);
     size_map.erase(data_loc);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, static_cast<std::byte*>(data_loc), data_size);
@@ -121,19 +119,6 @@ bool HeapAllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     p_node->next = std::move(p_node->next->next);
     --idle_chunks_count;
     return true;
-}
-
-void HeapAllocatorPool::mem_move(MemID p_id1, void* p_loc) {
-    std::byte* data_addr = static_cast<std::byte*>(get(p_id1));
-    size_t data_size = size_map[data_addr];
-    memcpy(p_loc, data_addr, data_size);
-    alloc_map[p_id1] = p_loc;
-    size_map.erase(data_addr);
-    size_map[data_addr] = data_size;
-    IdleListNode* insert_pos = get_idle_node_before(data_addr).get();
-    insert_free_memory(insert_pos, data_addr, data_size);
-    auto& remove_pos = get_idle_node_before(data_addr);
-    acquire_memory(remove_pos, data_size);
 }
 
 std::unique_ptr<HeapAllocatorPool::IdleListNode>& HeapAllocatorPool::get_idle_node_before(void* p_loc) {

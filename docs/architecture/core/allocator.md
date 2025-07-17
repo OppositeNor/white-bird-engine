@@ -155,7 +155,7 @@ HeapAllocatorRAM allocator;
 
 ```cpp
 // 第一个参数为分配的总大小，第二个参数为内存对齐。
-// 第二个参数为可选参数，如果不指定将会默认为 alignof(std::max_align_t)。
+// 第二个参数为可选参数，如果不指定将会默认为 1.
 // 如果不希望对齐，可以将第二个参数设置为 1 或者 0。
 HeapAllocatorPool allocator (1024, 8);
 ```

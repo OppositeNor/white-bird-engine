@@ -5,6 +5,7 @@
 #include "utils/defs.h"
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
@@ -43,7 +44,7 @@ public:
      * @param p_size The size of the pool in bytes.
      * @param p_alignment The alignment of the allocation.
      */
-    HeapAllocatorPool(size_t p_size, size_t p_alignment = alignof(std::max_align_t));
+    HeapAllocatorPool(size_t p_size, size_t p_alignment = 1);
 
     virtual MemID allocate(size_t p_size) override;
 
@@ -53,7 +54,10 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        return alloc_map.at(p_id);
+        if (!is_in_pool(p_id)) {
+            throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
+        }
+        return reinterpret_cast<void*>(p_id);
     }
 
     virtual uint32_t obj_count() const override {
@@ -82,7 +86,6 @@ public:
 
     // TODO: Test
     virtual void clear() override {
-        alloc_map.clear();
         size_map.clear();
         allocated.clear();
         idle_list_head->size = size;
@@ -101,18 +104,19 @@ private:
     void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
     void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
-    void mem_move(MemID p_id1, void* p_loc);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 
-    MemID curr_id;
     size_t size;
     size_t alignment;
-    std::unordered_map<MemID, void*> alloc_map;
     std::unordered_map<void*, size_t> size_map;
     std::byte* mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
     std::set<MemID> allocated;
+
+    bool is_in_pool(MemID p_id) const {
+        return allocated.find(p_id) != allocated.end();
+    }
 };
 
 }
