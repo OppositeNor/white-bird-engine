@@ -76,6 +76,7 @@ include_directories(
 )
 
 # Add engine source
+add_subdirectory(src/function)
 add_subdirectory(src/resource)
 add_subdirectory(src/core)
 add_subdirectory(src/platform)

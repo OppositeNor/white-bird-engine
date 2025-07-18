@@ -1,25 +1,32 @@
 #ifndef __WBE_SINGLETON_H__
 #define __WBE_SINGLETON_H__
 
+#include <atomic>
+#include <cstdint>
 #include <stdexcept>
 namespace WhiteBirdEngine {
 
+/**
+ * @class Singleton
+ * @brief Singleton class. This class ensures a class has only one instance.
+ *
+ * @tparam T The type of the singleton.
+ */
 template <typename T>
 class Singleton {
 public:
     Singleton() {
-        if (has_instance) {
+        if (instance_count.fetch_add(1, std::memory_order_acq_rel) != 0) {
             throw std::runtime_error("Failed to construct object: trying to construct multiple singletons.");
         }
-        has_instance = true;
     }
 
     virtual ~Singleton() {
-        has_instance = false;
+        instance_count.fetch_sub(1, std::memory_order_acq_rel);
     }
 
 private:
-    inline static bool has_instance = false;
+    inline static std::atomic<uint8_t> instance_count = 0;
 };
 
 }

@@ -22,6 +22,7 @@ public:
     RULoaderText& operator=(const RULoaderText&)= delete;
     RULoaderText& operator=(RULoaderText&&) = delete;
 
+    // TODO: Test
     template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
     MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
         std::string key = p_parser_data.template get_value<std::string>("key");
