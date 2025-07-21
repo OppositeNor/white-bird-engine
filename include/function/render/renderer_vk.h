@@ -2,7 +2,7 @@
 #define __WBE_RENDERER_VK_H__
 
 #include "function/render/renderer.h"
-#include <vulkan/vulkan.h>
+// #include <vulkan/vulkan.h>
 
 namespace WhiteBirdEngine {
 
