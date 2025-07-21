@@ -1,6 +1,7 @@
 #include "platform/file_system/file_system.h"
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
@@ -22,7 +23,7 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
     }
     for (auto& dir_name : splitted) {
         if (dir_name == "..") {
-            if (!path_stack.empty()) {
+            if (path_stack.size() > is_absolute ? 1 : 0) {
                 path_stack.pop_back();
             }
             continue;
@@ -36,7 +37,12 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
 }
 
 std::string FileSystem::dir_to_string(const Directory& p_directory) {
-    return ""; // TODO
+    auto& dir_names = p_directory.get_dir_names();
+    std::stringstream ss;
+    for (auto& dir_name : dir_names) {
+        ss << dir_name << '\\';
+    }
+    return ss.str();
 }
 
 std::string FileSystem::get_file_name(const std::string& p_path) {
@@ -48,10 +54,12 @@ Directory FileSystem::get_file_dir(const std::string& p_path) {
 }
 
 std::string FileSystem::path_to_string(const Path& p_path) {
-    return std::string(); // TODO
+    // TODO: Test
+    return dir_to_string(p_path.get_directory()) + p_path.get_file_name();
 }
 
 std::string FileSystem::get_ext(const Path& p_path) {
+    // TODO: Test
     auto& file_name = p_path.get_file_name();
     auto ext_result = file_name.substr(file_name.find_last_of('.'));
     std::for_each(ext_result.begin(), ext_result.end(), [](char& p_c) { p_c = std::tolower(p_c); });
