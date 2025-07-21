@@ -8,7 +8,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class SceneManager
- * @brief Manages all the scenes.
+ * @brief Manages scene create, change and destroy.
  *
  */
 class SceneManager : public Singleton<SceneManager> {

@@ -5,6 +5,8 @@ namespace WhiteBirdEngine {
 
 class Renderer {
 public:
+    Renderer() = default;
+    virtual ~Renderer() {}
     // TODO
 };
 

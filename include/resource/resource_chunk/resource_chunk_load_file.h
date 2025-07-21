@@ -17,7 +17,7 @@ namespace WhiteBirdEngine {
  */
 class ResourceChunkLoadFile : public ResourceChunk<ResourceChunkLoadFile> {
 public:
-    virtual ~ResourceChunkLoadFile() {}
+    ~ResourceChunkLoadFile() {}
     ResourceChunkLoadFile(const ResourceChunkLoadFile&) = delete;
     ResourceChunkLoadFile(ResourceChunkLoadFile&&) = delete;
     ResourceChunkLoadFile& operator=(const ResourceChunkLoadFile&) = delete;
@@ -31,7 +31,7 @@ public:
     template <ParserConcept ParserType>
     ResourceChunkLoadFile(const Parser<ParserType>& p_parser, StackAllocator& p_allocator);
 
-    virtual MemID get_resource(const std::string& p_key) const {
+    MemID get_resource(const std::string& p_key) const {
         return resource_map.at(dynam_hash(p_key.c_str()));
     }
 
@@ -54,6 +54,10 @@ public:
         MemID result = p_allocator.allocate(p_res_size);
         memcpy(p_allocator.get(result), p_res, p_res_size);
         return result;
+    }
+
+    bool is_already_registered(const std::string& p_res_key) {
+        return resource_map.contains(dynam_hash(p_res_key.c_str()));
     }
 
 private:

@@ -4,7 +4,6 @@
 #include "platform/file_system/path.h"
 #include "utils/defs.h"
 #include <string>
-#include <type_traits>
 #include <vector>
 namespace WhiteBirdEngine {
 

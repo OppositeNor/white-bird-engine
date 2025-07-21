@@ -1,5 +1,6 @@
 #include "core/logging/log.h"
 #include "global/global.h"
+#include "core/serializer/serializer_json.h"
 
 namespace WBE = WhiteBirdEngine;
 
