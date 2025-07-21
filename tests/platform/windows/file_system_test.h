@@ -59,7 +59,8 @@ TEST(MacOSFileSystemTest, ParseDirectory) {
     WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("D:\\..\\hello\\this\\is\\me\\\\");
     ASSERT_TRUE(parsed_dir_absolute_2 == expected_absolute);
     // Colon is only allowed in volume indication.
-    ASSERT_THROW(WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("D:\\..\\hello\\th:is\\is\\me\\\\"), std::runtime_error);
+    ASSERT_THROW(WBE::Directory parsed_dir_absolute_invalid_1 = WBE::FileSystem::parse_directory("D:\\..\\hello\\th:is\\is\\me\\\\"), std::runtime_error);
+    ASSERT_THROW(WBE::Directory parsed_dir_absolute_invalid_2 = WBE::FileSystem::parse_directory("hello\\this\\is\\me\\:\\"), std::runtime_error);
     WBE::Directory expectd_relative_empty({}, false);
     WBE::Directory expectd_absolute_empty({"E:"}, true);
     WBE::Directory parsed_dir_relative_empty = WBE::FileSystem::parse_directory("");
