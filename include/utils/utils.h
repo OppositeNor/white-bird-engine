@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -77,19 +78,38 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
 }
 
 /**
- * @brief Split the string with respect to a token.
+ * @brief Get the position that any of the tokens is first found in the string.
  *
+ * @param p_str The string to find the token.
+ * @param p_tokens The tokens to look for.
+ * @return The index of the token that is first found.
+ */
+inline size_t find_first_pos(const std::string& p_str, const std::string& p_tokens) {
+    if (p_tokens.size() == 0) {
+        return std::string::npos;
+    }
+    size_t min_pos = std::numeric_limits<size_t>::infinity();
+    for (char c : p_tokens) {
+        min_pos = std::min(min_pos, p_str.find(c));
+    }
+    return min_pos;
+}
+
+/**
+ * @brief Split the string with respect to a list of tokens.
+ *
+ * @todo Test
  * @param p_str The string to split.
- * @param p_token The token.
+ * @param p_token The list of tokens.
  * @return Array of strings.
  */
-inline std::vector<std::string> split_string(std::string p_str, const std::string& p_token) {
+inline std::vector<std::string> split_string(std::string p_str, const std::string& p_tokens) {
     std::vector<std::string> result;
-    auto split_pos = p_str.find(p_token);
+    auto split_pos = find_first_pos(p_str, p_tokens);
     while (split_pos != std::string::npos) {
         result.push_back(p_str.substr(0, split_pos));
-        p_str.erase(0, split_pos + p_token.size());
-        split_pos = p_str.find(p_token);
+        p_str.erase(0, split_pos);
+        split_pos = find_first_pos(p_str, p_tokens);
     }
     return result;
 }

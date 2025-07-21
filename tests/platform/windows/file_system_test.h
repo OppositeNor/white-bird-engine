@@ -8,7 +8,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-TEST(MacOSFileSystemTest, DirEquals) {
+TEST(WindowsFileSystemTest, DirEquals) {
     WBE::Directory dir1({ "Hello", "what", "is", "up" }, true);
     ASSERT_TRUE(dir1 == dir1);
     ASSERT_FALSE(dir1 != dir1);
@@ -32,7 +32,7 @@ TEST(MacOSFileSystemTest, DirEquals) {
     ASSERT_FALSE(dir_empty3 != dir_empty4);
 }
 
-TEST(MacOSFileSystemTest, DirToString) {
+TEST(WindowsFileSystemTest, DirToString) {
     WBE::Directory test_dir({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
     ASSERT_EQ(WBE::FileSystem::dir_to_string(test_dir), std::string("hello\\world\\this\\is\\a\\test\\directory\\"));
     ASSERT_EQ(std::string(test_dir), std::string("hello\\world\\this\\is\\a\\test\\directory\\"));
@@ -43,7 +43,7 @@ TEST(MacOSFileSystemTest, DirToString) {
     ASSERT_EQ(std::string(test_dir_absolute), std::string("C:\\this\\is\\a\\absolute\\test\\directory\\"));
 }
 
-TEST(MacOSFileSystemTest, ParseDirectory) {
+TEST(WindowsFileSystemTest, ParseDirectory) {
     WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
     WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello\\world\\\\this\\is\\not\\..\\a\\test\\.\\directory\\XD");
     ASSERT_TRUE(parsed_dir == expected);
@@ -58,6 +58,8 @@ TEST(MacOSFileSystemTest, ParseDirectory) {
     ASSERT_TRUE(parsed_dir_absolute_1 == expected_absolute);
     WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("D:\\..\\hello\\this\\is\\me\\\\");
     ASSERT_TRUE(parsed_dir_absolute_2 == expected_absolute);
+    WBE::Directory parsed_dir_relataive = WBE::FileSystem::parse_directory("C\\this\\is\\relative\\but\\looks\\absolute");
+    WBE::Directory expected_relative({ "C", "this", "is", "relative", "but", "looks", "absolute" }, false);
     // Colon is only allowed in volume indication.
     ASSERT_THROW(WBE::Directory parsed_dir_absolute_invalid_1 = WBE::FileSystem::parse_directory("D:\\..\\hello\\th:is\\is\\me\\\\"), std::runtime_error);
     ASSERT_THROW(WBE::Directory parsed_dir_absolute_invalid_2 = WBE::FileSystem::parse_directory("hello\\this\\is\\me\\:\\"), std::runtime_error);
@@ -69,7 +71,7 @@ TEST(MacOSFileSystemTest, ParseDirectory) {
     ASSERT_TRUE(parsed_dir_absolute_empty == expectd_absolute_empty);
 }
 
-TEST(MacOSFileSystemTest, CombineDirectory) {
+TEST(WindowsFileSystemTest, CombineDirectory) {
     WBE::Directory expected_absolute({ "E:", "hello", "world", "this", "is", "a", "test", "directory" }, true);
     WBE::Directory dir1({ "E:", "hello", "world" }, true);
     WBE::Directory dir = dir1.combine(WBE::Directory({ "this", "is", "a", "test", "directory" }, false));

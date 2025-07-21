@@ -1,6 +1,7 @@
 #include "platform/file_system/file_system.h"
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 FileSystem::FileSystem() {
@@ -8,7 +9,30 @@ FileSystem::FileSystem() {
 }
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
-    return Directory(); // TODO
+    if (p_str.size() == 0) {
+        return Directory();
+    }
+    auto splitted = split_string(p_str, "/\\");
+    std::vector<std::string> path_stack;
+    path_stack.reserve(splitted.size());
+    auto front = path_stack.front();
+    bool is_absolute = front.size() == 2 && front[1] == ':';
+    if (std::count(p_str.begin(), p_str.end(), ':') > is_absolute ? 1 : 0) {
+        throw std::runtime_error("Failed to parse directory: volume indicator ':' not used properly in the path: " + p_str + ".");
+    }
+    for (auto& dir_name : splitted) {
+        if (dir_name == "..") {
+            if (!path_stack.empty()) {
+                path_stack.pop_back();
+            }
+            continue;
+        }
+        if (dir_name == "." || dir_name == "") {
+            continue;
+        }
+        path_stack.push_back(dir_name);
+    }
+    return Directory(path_stack, p_str.size() != 0 && p_str[0] == '/');
 }
 
 std::string FileSystem::dir_to_string(const Directory& p_directory) {
