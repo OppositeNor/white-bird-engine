@@ -1,6 +1,6 @@
 #include "core/logging/log.h"
 #include "global/global.h"
-#include "core/serializer/serializer_json.h"
+#include "core/surface/3d_primitive.hpp"
 
 namespace WBE = WhiteBirdEngine;
 
