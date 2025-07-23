@@ -2,8 +2,6 @@
 #define __WBE_PARSER_YAML_H_
 
 #include "parser.h"
-#include "yaml-cpp/node/node.h"
-#include "yaml-cpp/node/parse.h"
 #include <yaml-cpp/yaml.h>
 
 namespace WhiteBirdEngine {

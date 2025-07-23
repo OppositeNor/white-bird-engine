@@ -16,7 +16,7 @@ concept SerializableJSON = requires (std::remove_cvref_t<T> p_t_inst, nlohmann::
 
 /**
  * @class SerializerJSON.
- * @brief Serializes objects to json.
+ * @brief Serializes objects to json format.
  * @todo Test
  *
  */

@@ -3,6 +3,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class Reflection
+ * @brief Used for reflection.
+ *
+ */
 class Reflection {
 public:
     Reflection() {}
