@@ -18,7 +18,7 @@
 // TODO: fix this
 #define WBE_NO_OPTIMIZE __attribute__((optimize("O0")))
 #else
-#warning Please indicate the "no optimization" attribute here for your compiler.
+#pragma message(Please indicate the "no optimization" attribute here for your compiler.)
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
