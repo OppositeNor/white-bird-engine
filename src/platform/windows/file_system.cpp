@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <windows.h>
 
 namespace WhiteBirdEngine {
@@ -52,12 +53,43 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
     return ss.str();
 }
 
+size_t get_last_splitter_pos(const std::string& p_path) {
+    size_t last_slash = p_path.find_last_of('/');
+    size_t last_bslash = p_path.find_last_of('\\');
+    if (last_slash < last_bslash) {
+        if (last_bslash == std::string::npos) {
+            return last_slash;
+        }
+        else {
+            return last_bslash;
+        }
+    }
+    else {
+        if (last_slash == std::string::npos) {
+            return last_bslash;
+        }
+        else {
+            return last_slash;
+        }
+    }
+}
+
 std::string FileSystem::get_file_name(const std::string& p_path) {
-    return ""; // TODO
+    // TODO: Test
+    size_t target = get_last_splitter_pos(p_path);
+    if (target == std::string::npos) {
+        return p_path;
+    }
+    return p_path.substr(target);
 }
 
 Directory FileSystem::get_file_dir(const std::string& p_path) {
-    return Directory(); // TODO
+    // TODO: Test
+    auto last_slash = get_last_splitter_pos(p_path);
+    if (last_slash == std::string::npos) {
+        Directory();
+    }
+    return Directory(parse_directory(p_path.substr(0, last_slash)));
 }
 
 std::string FileSystem::path_to_string(const Path& p_path) {
@@ -75,7 +107,7 @@ std::string FileSystem::get_ext(const Path& p_path) {
 
 Directory FileSystem::get_executable_dir() {
     char buf[1024];
-    ssize_t len = GetModuleFileName(NULL, buf, sizeof(buf));
+    unsigned long len = GetModuleFileName(NULL, buf, sizeof(buf));
     if (len < 0) {
         throw std::runtime_error("Failed to get the executable path.");
     }
