@@ -21,7 +21,6 @@ TEST(WBEProfilerTest, Profiling) {
     {
         WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL); line_num = __LINE__;
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        sleep(3);
     }
     const auto& profile_data = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
     ASSERT_EQ(profile_data.size(), 1);
