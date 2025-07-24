@@ -1,12 +1,19 @@
 #include "platform/file_system/file_system.h"
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <sstream>
 #include <stdexcept>
+#include <windows.h>
 
 namespace WhiteBirdEngine {
-FileSystem::FileSystem() {
-    // TODO
+FileSystem::FileSystem()
+    : FileSystem(get_executable_dir()) {
+}
+
+FileSystem::FileSystem(const Directory& p_root_dir) {
+    root_directory = p_root_dir;
+    resource_directory = root_directory.combine(Directory({"res"}));
 }
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
@@ -64,6 +71,19 @@ std::string FileSystem::get_ext(const Path& p_path) {
     auto ext_result = file_name.substr(file_name.find_last_of('.'));
     std::for_each(ext_result.begin(), ext_result.end(), [](char& p_c) { p_c = std::tolower(p_c); });
     return ext_result;
+}
+
+Directory FileSystem::get_executable_dir() {
+    char buf[1024];
+    ssize_t len = GetModuleFileName(NULL, buf, sizeof(buf));
+    if (len < 0) {
+        throw std::runtime_error("Failed to get the executable path.");
+    }
+    if (len >= 1024) {
+        throw std::runtime_error("Buffer overflow for executable path finding.");
+    }
+    buf[len] = '\0';
+    return parse_directory(std::string(buf));
 }
 
 }

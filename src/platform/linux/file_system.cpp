@@ -1,19 +1,13 @@
 #include "platform/file_system/file_system.h"
+#include "platform/file_system/directory.h"
 #include "utils/utils.h"
 #include <string>
 #include <unistd.h>
 
 namespace WhiteBirdEngine {
 
-FileSystem::FileSystem() {
-    char buf[1024];
-    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
-    if (len == -1) {
-        throw std::runtime_error("Failed to get the executable path.");
-    }
-    buf[len] = '\0';
-    root_directory = parse_directory(std::string(buf));
-    resource_directory = root_directory.combine(Directory({"res"}));
+FileSystem::FileSystem()
+    : FileSystem(get_executable_dir()) {
 }
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
@@ -77,6 +71,20 @@ std::string FileSystem::get_ext(const Path& p_path) {
     auto& file_name = p_path.get_file_name();
     return file_name.substr(file_name.find_last_of('.'));
 }
+
+Directory FileSystem::get_executable_dir() {
+    char buf[1024];
+    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
+    if (len < 0) {
+        throw std::runtime_error("Failed to get the executable path.");
+    }
+    if (len >= 1024) {
+        throw std::runtime_error("Buffer overflow for executable path finding.");
+    }
+    buf[len] = '\0';
+    return parse_directory(std::string(buf));
+}
+
 
 }
 

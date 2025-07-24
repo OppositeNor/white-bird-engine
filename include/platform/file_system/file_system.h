@@ -99,6 +99,7 @@ public:
 private:
     Directory root_directory;
     Directory resource_directory;
+    Directory get_executable_dir();
 };
 
 /**
