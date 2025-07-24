@@ -6,5 +6,5 @@ if __name__ == "__main__":
         print("Usage: " + sys.argv[0] + " <res_path> [config1] [config2] ...")
         exit(-1)
     print("White Bird Engine build script start.")
-    reflect(sys.argv[1:])
+    reflect()
     print("White Bird Engine build script finish.")
