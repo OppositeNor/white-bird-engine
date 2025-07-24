@@ -3,10 +3,21 @@ import sys
 import subprocess
 
 class WBETest:
+    """Test class. Used for test running.
+
+    Attributes: 
+        is_failed: True if any tests has failed. False otherwise.
+    """
+
     def __init__(self):
         self.is_failed = True
 
     def run_tests(self, cmd = []) -> None:
+        """Run tests.
+
+        Args:
+            cmd (): The runner cmd to run the test. i.g. valgrind
+        """
         failed_count : int = 0
         for test_path in sys.argv[1:]:
             print(f"Running test: {test_path}")
