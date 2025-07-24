@@ -2,6 +2,7 @@
 #define __WBE_SERIALIZER_H__
 
 #include "platform/file_system/path.h"
+#include "utils/defs.h"
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -77,6 +78,8 @@ public:
         return static_cast<const ChildT*>(this)->get_context_depth();
     }
 };
+
+WBE_DECL_CRTP_CONCEPT(Serializer);
 
 }
 

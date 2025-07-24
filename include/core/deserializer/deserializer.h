@@ -3,6 +3,7 @@
 
 namespace WhiteBirdEngine {
 
+template <typename ChildT>
 class Deserializer {
 public:
     Deserializer() = default;
