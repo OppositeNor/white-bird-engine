@@ -2,6 +2,7 @@
 #define __WBE_RU_LOADER_PPM3_H__
 
 #include "resource/resource_unit_loader/resource_unit_loader.h"
+#include <memory>
 namespace WhiteBirdEngine {
 
 /**
@@ -22,6 +23,9 @@ public:
     MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
         return MEM_NULL; // TODO
     }
+private:
+    std::unique_ptr<unsigned char> load_ppm3_content(const Path& p_path, bool p_flip_h, bool p_flip_v,
+                                                     uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
 
 };
 
