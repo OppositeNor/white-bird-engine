@@ -101,6 +101,51 @@ inline ColorSpace get_color_space(const std::string& p_color_space) {
     throw std::runtime_error("Failed to get color space. Color space: \"" + p_color_space + "\" is not supported.");
 }
 
+/**
+ * @brief Flip an image horizontally.
+ *
+ * @todo Test
+ * @param p_data The data of the image.
+ * @param p_width The width of the image.
+ * @param p_height The height of the image.
+ * @param p_channels The channel count of the image.
+ */
+inline void img_flip_h(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+    uint32_t row_size = p_width * p_channels;
+    for (uint32_t i = 0; i < p_height; ++i) {
+        for (uint32_t j = 0; j < p_width / 2; ++j) {
+            for (uint32_t k = 0; k < p_channels; ++k) {
+                std::swap(p_data[i * row_size + j * p_channels + k],
+                          p_data[i * row_size + (p_width - j - 1) * p_channels + k]);
+            }
+        }
+    }
+}
+
+/**
+ * @brief Flip an image vertically.
+ *
+ * @todo Test
+ * @param p_data The data of the image.
+ * @param p_width The width of the image.
+ * @param p_height The height of the image.
+ * @param p_channels The channel count of the image.
+ */
+inline void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+    // Use temporary buffer to increase cache hits.
+    uint32_t row_size = p_width * p_channels;
+    std::unique_ptr<unsigned char[]> temp = std::make_unique<unsigned char[]>(row_size);
+    unsigned char* source_row;
+    unsigned char* target_row;
+    for (uint32_t i = 0; i < p_height / 2; ++i) {
+        source_row = p_data + i * row_size;
+        target_row = p_data + (p_height - i - 1) * row_size;
+        memcpy(temp.get(), target_row, row_size);
+        memcpy(target_row, source_row, row_size);
+        memcpy(source_row, temp.get(), row_size);
+    }
+}
+
 }
 
 #endif

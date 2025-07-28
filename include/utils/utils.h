@@ -3,7 +3,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -114,10 +116,61 @@ inline std::vector<std::string> split_string(std::string p_str, const std::strin
     return result;
 }
 
+/**
+ * @brief Load a text file from a path.
+ * @todo Test
+ *
+ * @param p_path The path to the text file.
+ * @return The content of the text file.
+ */
+inline std::string load_text_file(const char* p_path) {
+    std::string content;
+    std::ifstream file_stream(p_path, std::ios::in);
+    if (!file_stream.is_open()) {
+        throw std::runtime_error("Failed to open text file at path: " + std::string(p_path));
+    }
+    std::string line = "";
+    while (!file_stream.eof()) {
+        std::getline(file_stream, line);
+        content.append(line + "\n");
+    }
+    return content;
+}
+
+/**
+ * @brief Remove hashtag comments.
+ * @todo Test
+ *
+ * @param str The string to remove comment.
+ * @return The string that all the hashtag comments that are all removed.
+ */
+inline std::string remove_hashtag_comments(std::string str) {
+    while (str.find('#') != std::string::npos) {
+        size_t pos = str.find('#');
+        size_t end = str.find('\n', pos);
+        str.erase(pos, end - pos);
+    }
+    return str;
+}
+
+/**
+ * @class EngineConfigOptions
+ * @brief Engine configurations.
+ *
+ */
 struct EngineConfigOptions {
+    /**
+     * @brief The size of the tick stack.
+     */
     size_t single_tick_stack_size = 1024;
-    size_t global_pool_size = 2048;
-    size_t thread_pool_size = 2048;
+    /**
+     * @brief The size of the global memory pool.
+     */
+    size_t global_mem_pool_size = 2048;
+    /**
+     * @brief The size of the thread memory pool.
+     */
+    size_t thread_mem_pool_size = 2048;
 };
 
 enum ColorSpace {
