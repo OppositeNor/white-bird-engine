@@ -66,7 +66,7 @@
 
 - [ ] RULoaderPNG
 
-    - [ ] Implementation
+    - [x] Implementation
 
     - [ ] Test
 
@@ -84,7 +84,7 @@
 
 - [ ] RULoaderPPM3
 
-    - [ ] Implementation
+    - [x] Implementation
 
     - [ ] Test
 
@@ -96,13 +96,13 @@
 
 - [ ] RUText
 
-    - [ ] Implementation
+    - [x] Implementation
 
     - [ ] Test
 
 - [ ] RUBinary
 
-    - [ ] Implementation
+    - [x] Implementation
 
     - [ ] Test
 

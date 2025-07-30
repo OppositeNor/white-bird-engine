@@ -1,8 +1,10 @@
 #ifndef __WBE_UTILS_H__
 #define __WBE_UTILS_H__
 
+#include "utils/defs.h"
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
@@ -117,13 +119,41 @@ inline std::vector<std::string> split_string(std::string p_str, const std::strin
 }
 
 /**
+ * @brief Get an encode type from a string.
+ *
+ * @param p_str The string to get the encode type.
+ * @return The encode type.
+ */
+inline EncodeType get_encode_type_from_str(const std::string& p_str) {
+    if (p_str == "utf8") {
+        return EncodeType::UTF8;
+    }
+    if (p_str == "utf16le") {
+        return EncodeType::UTF16LE;
+    }
+    if (p_str == "utf16be") {
+        return EncodeType::UTF16BE;
+    }
+    if (p_str == "utf32le") {
+        return EncodeType::UTF32LE;
+    }
+    if (p_str == "utf32be") {
+        return EncodeType::UTF32BE;
+    }
+    return EncodeType::UNKNOWN;
+}
+
+/**
  * @brief Load a text file from a path.
  * @todo Test
  *
  * @param p_path The path to the text file.
  * @return The content of the text file.
  */
-inline std::string load_text_file(const char* p_path) {
+inline std::string load_text_file(const char* p_path, EncodeType p_encode_type = EncodeType::UTF8) {
+    if (p_encode_type != EncodeType::UTF8) {
+        return ""; // TODO
+    }
     std::string content;
     std::ifstream file_stream(p_path, std::ios::in);
     if (!file_stream.is_open()) {
@@ -133,6 +163,28 @@ inline std::string load_text_file(const char* p_path) {
     while (!file_stream.eof()) {
         std::getline(file_stream, line);
         content.append(line + "\n");
+    }
+    return content;
+}
+
+/**
+ * @brief Load a binary file from a path.
+ *
+ * @todo Test
+ * @param p_path The path tot he binary file.
+ * @return The content of the binary file.
+ */
+inline std::vector<char> load_binary_file(const char* p_path) {
+    std::ifstream file_stream(p_path, std::ios::binary);
+    if (!file_stream.is_open()) {
+        throw std::runtime_error("Failed to open file at path: " + std::string(p_path));
+    }
+    file_stream.seekg(0, std::ios::end);
+    size_t size = file_stream.tellg();
+    file_stream.seekg(0, std::ios::beg);
+    std::vector<char> content(size);
+    if (!file_stream.read(content.data(), size)) {
+        throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
     }
     return content;
 }
