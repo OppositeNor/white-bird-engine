@@ -1,10 +1,10 @@
-#ifndef __WBE_RESOURCE_UTILS_H__
-#define __WBE_RESOURCE_UTILS_H__
+#ifndef __WBE_RESOURCE_UTILS_HH__
+#define __WBE_RESOURCE_UTILS_HH__
 
-#include "core/engine_core.h"
-#include "platform/file_system/directory.h"
-#include "platform/file_system/file_system.h"
-#include "platform/file_system/path.h"
+#include "core/engine_core.hh"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/file_system.hh"
+#include "platform/file_system/path.hh"
 #include <string>
 namespace WhiteBirdEngine {
 

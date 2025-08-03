@@ -1,8 +1,8 @@
-#ifndef __CORE_UTILS_H__
-#define __CORE_UTILS_H__
+#ifndef __CORE_UTILS_HH__
+#define __CORE_UTILS_HH__
 
-#include "core/engine_core.h"
-#include "logging/log.h"
+#include "core/engine_core.hh"
+#include "logging/log.hh"
 
 namespace WhiteBirdEngine {
 

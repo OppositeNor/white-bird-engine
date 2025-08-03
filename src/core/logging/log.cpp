@@ -1,5 +1,5 @@
-#include "core/logging/log.h"
-#include "core/engine_core.h"
+#include "core/logging/log.hh"
+#include "core/engine_core.hh"
 
 namespace WhiteBirdEngine {
 Log* wbe_console_log(ChannelID p_channel) {

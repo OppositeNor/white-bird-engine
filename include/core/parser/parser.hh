@@ -1,8 +1,8 @@
-#ifndef __WBE_PARSER_H__
-#define __WBE_PARSER_H__
+#ifndef __WBE_PARSER_HH__
+#define __WBE_PARSER_HH__
 
-#include "platform/file_system/path.h"
-#include "utils/defs.h"
+#include "platform/file_system/path.hh"
+#include "utils/defs.hh"
 #include <string>
 #include <vector>
 namespace WhiteBirdEngine {

@@ -1,10 +1,10 @@
-#ifndef __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_H__
-#define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_H__
+#ifndef __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_HH__
+#define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_HH__
 
-#include "core/allocator/allocator.h"
-#include "core/logging/log.h"
-#include "heap_allocator.h"
-#include "utils/defs.h"
+#include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
+#include "heap_allocator.hh"
+#include "utils/defs.hh"
 #include <cstring>
 #include <memory>
 #include <unordered_map>

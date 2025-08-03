@@ -1,8 +1,8 @@
-#ifndef __WBE_CLA_PARSER_H__
-#define __WBE_CLA_PARSER_H__
+#ifndef __WBE_CLA_PARSER_HH__
+#define __WBE_CLA_PARSER_HH__
 
-#include "utils/interface/singleton.h"
-#include "utils/utils.h"
+#include "utils/interface/singleton.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 

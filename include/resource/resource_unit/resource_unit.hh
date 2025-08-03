@@ -1,5 +1,5 @@
-#ifndef __WBE_RESOURCE_UNIT_H__
-#define __WBE_RESOURCE_UNIT_H__
+#ifndef __WBE_RESOURCE_UNIT_HH__
+#define __WBE_RESOURCE_UNIT_HH__
 
 #include <type_traits>
 namespace WhiteBirdEngine {

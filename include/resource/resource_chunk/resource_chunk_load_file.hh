@@ -1,10 +1,12 @@
-#include "core/allocator/stack_allocator.h"
-#include "core/parser/parser.h"
-#include "resource/resource_chunk/resource_chunk.h"
-#include "resource/resource_unit_loader/ru_loader_binary.h"
-#include "resource/resource_unit_loader/ru_loader_image.h"
-#include "resource/resource_unit_loader/ru_loader_text.h"
-#include "utils/utils.h"
+#ifndef __WBE_RESOURCE_CHUNK_LOADER_HH__
+#define __WBE_RESOURCE_CHUNK_LOADER_HH__
+#include "core/allocator/stack_allocator.hh"
+#include "core/parser/parser.hh"
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_unit_loader/ru_loader_binary.hh"
+#include "resource/resource_unit_loader/ru_loader_image.hh"
+#include "resource/resource_unit_loader/ru_loader_text.hh"
+#include "utils/utils.hh"
 #include <cstring>
 #include <stdexcept>
 #include <unordered_map>
@@ -173,3 +175,5 @@ void ResourceChunkLoadFile::load_ru_binary(const ParserData<ParserDataType>& p_p
 }
 
 }
+
+#endif

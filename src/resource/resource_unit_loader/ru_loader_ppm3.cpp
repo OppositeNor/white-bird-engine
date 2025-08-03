@@ -1,6 +1,6 @@
-#include "resource/resource_unit_loader/ru_loader_ppm3.h"
-#include "resource/resource_utils.h"
-#include "utils/utils.h"
+#include "resource/resource_unit_loader/ru_loader_ppm3.hh"
+#include "resource/resource_utils.hh"
+#include "utils/utils.hh"
 #include <sstream>
 
 namespace WhiteBirdEngine {

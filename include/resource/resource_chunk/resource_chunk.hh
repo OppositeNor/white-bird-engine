@@ -1,11 +1,11 @@
-#ifndef __WBE_RESOURCE_CHUNK_H__
-#define __WBE_RESOURCE_CHUNK_H__
+#ifndef __WBE_RESOURCE_CHUNK_HH__
+#define __WBE_RESOURCE_CHUNK_HH__
 
-#include "core/allocator/allocator.h"
-#include "core/allocator/stack_allocator.h"
-#include "resource/resource_unit/resource_unit.h"
-#include "utils/defs.h"
-#include "utils/utils.h"
+#include "core/allocator/allocator.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 

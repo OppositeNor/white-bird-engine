@@ -1,7 +1,7 @@
-#ifndef __WBE_2D_SURFACE_UTILS_H__
-#define __WBE_2D_SURFACE_UTILS_H__
+#ifndef __WBE_2D_SURFACE_UTILS_HH__
+#define __WBE_2D_SURFACE_UTILS_HH__
 
-#include "2d_primitive.h"
+#include "2d_primitive.hh"
 
 namespace WhiteBirdEngine {
 

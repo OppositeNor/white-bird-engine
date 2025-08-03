@@ -1,6 +1,6 @@
-#include "platform/file_system/file_system.h"
-#include "platform/file_system/directory.h"
-#include "utils/utils.h"
+#include "platform/file_system/file_system.hh"
+#include "platform/file_system/directory.hh"
+#include "utils/utils.hh"
 #include <string>
 #include <unistd.h>
 

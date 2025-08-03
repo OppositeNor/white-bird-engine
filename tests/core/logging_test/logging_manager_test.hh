@@ -1,11 +1,11 @@
-#ifndef __WBE_LOGGING_MANAGER_TEST_H__
-#define __WBE_LOGGING_MANAGER_TEST_H__
+#ifndef __WBE_LOGGING_MANAGER_TEST_HH__
+#define __WBE_LOGGING_MANAGER_TEST_HH__
 
-#include "core/core_utils.h"
-#include "core/logging/log.h"
-#include "core/logging/logging_manager.h"
-#include "global/global.h"
-#include "utils/defs.h"
+#include "core/core_utils.hh"
+#include "core/logging/log.hh"
+#include "core/logging/logging_manager.hh"
+#include "global/global.hh"
+#include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <ostream>
 

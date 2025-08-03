@@ -1,12 +1,12 @@
-#ifndef __WBE_ENGINE_CONFIG_H__
-#define __WBE_ENGINE_CONFIG_H__
+#ifndef __WBE_ENGINE_CONFIG_HH__
+#define __WBE_ENGINE_CONFIG_HH__
 
-#include "core/engine_config/cla_parser.h"
-#include "core/engine_config/config_file_parser.h"
-#include "core/parser/parser_yaml.h"
-#include "platform/file_system/path.h"
-#include "utils/interface/singleton.h"
-#include "utils/utils.h"
+#include "core/engine_config/cla_parser.hh"
+#include "core/engine_config/config_file_parser.hh"
+#include "core/parser/parser_yaml.hh"
+#include "platform/file_system/path.hh"
+#include "utils/interface/singleton.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 

@@ -1,9 +1,9 @@
-#ifndef __WBE_RU_LOADER_JPEG_H__
-#define __WBE_RU_LOADER_JPEG_H__
+#ifndef __WBE_RU_LOADER_JPEG_HH__
+#define __WBE_RU_LOADER_JPEG_HH__
 
-#include "resource/resource_unit/ru_image.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
-#include "resource/resource_utils.h"
+#include "resource/resource_unit/ru_image.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "resource/resource_utils.hh"
 namespace WhiteBirdEngine {
 
 /**

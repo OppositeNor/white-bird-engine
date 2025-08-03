@@ -1,9 +1,9 @@
-#ifndef __WBE_STACK_ALLOCATOR_H__
-#define __WBE_STACK_ALLOCATOR_H__
+#ifndef __WBE_STACK_ALLOCATOR_HH__
+#define __WBE_STACK_ALLOCATOR_HH__
 
-#include "allocator.h"
-#include "core/logging/log.h"
-#include "utils/defs.h"
+#include "allocator.hh"
+#include "core/logging/log.hh"
+#include "utils/defs.hh"
 #include <cstddef>
 #include <memory>
 #include <stddef.h>

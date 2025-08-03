@@ -1,5 +1,5 @@
-#ifndef __WBE_PRIMITIVE_SLOTS_H__
-#define __WBE_PRIMITIVE_SLOTS_H__
+#ifndef __WBE_PRIMITIVE_SLOTS_HH__
+#define __WBE_PRIMITIVE_SLOTS_HH__
 
 #include <cstdint>
 #include <glm/glm.hpp>

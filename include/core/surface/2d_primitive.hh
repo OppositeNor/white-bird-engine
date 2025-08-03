@@ -1,7 +1,7 @@
-#ifndef __WBE_2D_PRIMITIVES_H__
-#define __WBE_2D_PRIMITIVES_H__
+#ifndef __WBE_2D_PRIMITIVES_HH__
+#define __WBE_2D_PRIMITIVES_HH__
 
-#include "primitive_slots.h"
+#include "primitive_slots.hh"
 #include <glm/glm.hpp>
 
 namespace WhiteBirdEngine {

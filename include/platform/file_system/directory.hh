@@ -1,5 +1,5 @@
-#ifndef __WBE_DIRECTORY_H__
-#define __WBE_DIRECTORY_H__
+#ifndef __WBE_DIRECTORY_HH__
+#define __WBE_DIRECTORY_HH__
 
 #include <ostream>
 #include <string>

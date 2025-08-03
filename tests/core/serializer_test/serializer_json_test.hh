@@ -1,7 +1,7 @@
-#ifndef __WBE_SERIALIZER_JSON_TEST_H__
-#define __WBE_SERIALIZER_JSON_TEST_H__
+#ifndef __WBE_SERIALIZER_JSON_TEST_HH__
+#define __WBE_SERIALIZER_JSON_TEST_HH__
 
-#include "core/serializer/serializer_json.h"
+#include "core/serializer/serializer_json.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>

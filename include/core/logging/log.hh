@@ -1,8 +1,8 @@
-#ifndef __WBE_LOG_H__
-#define __WBE_LOG_H__
+#ifndef __WBE_LOG_HH__
+#define __WBE_LOG_HH__
 
-#include "utils/defs.h"
-#include "utils/utils.h"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <string>
 namespace WhiteBirdEngine {
 

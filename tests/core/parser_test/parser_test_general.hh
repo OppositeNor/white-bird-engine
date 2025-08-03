@@ -1,7 +1,7 @@
-#ifndef __WBE_PARSER_TEST_GENERAL_H__
-#define __WBE_PARSER_TEST_GENERAL_H__
+#ifndef __WBE_PARSER_TEST_GENERAL_HH__
+#define __WBE_PARSER_TEST_GENERAL_HH__
 
-#include "core/parser/parser.h"
+#include "core/parser/parser.hh"
 
 namespace WBE = WhiteBirdEngine;
 

@@ -1,7 +1,7 @@
-#ifndef __WBE_REFERENCE_WEAK_H__
-#define __WBE_REFERENCE_WEAK_H__
+#ifndef __WBE_REFERENCE_WEAK_HH__
+#define __WBE_REFERENCE_WEAK_HH__
 
-#include "reference_strong.h"
+#include "reference_strong.hh"
 #include <concepts>
 
 namespace WhiteBirdEngine {

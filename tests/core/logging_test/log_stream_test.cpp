@@ -1,2 +1,2 @@
-#include "log_stream_test.h"
-#include "logging_manager_test.h"
+#include "log_stream_test.hh"
+#include "logging_manager_test.hh"

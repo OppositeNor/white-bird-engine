@@ -1,5 +1,5 @@
-#ifndef __WBE_SINGLETON_H__
-#define __WBE_SINGLETON_H__
+#ifndef __WBE_SINGLETON_HH__
+#define __WBE_SINGLETON_HH__
 
 #include <atomic>
 #include <cstdint>

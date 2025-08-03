@@ -1,8 +1,8 @@
-#include "heap_allocator_pool_test.h"
-#include "heap_allocator_fixed_size_pool_test.h"
-#include "stack_allocator_test.h"
-#include "core/allocator/heap_allocator_ram.h"
-#include "core/ecs/ecs.h"
+#include "heap_allocator_pool_test.hh"
+#include "heap_allocator_fixed_size_pool_test.hh"
+#include "stack_allocator_test.hh"
+#include "core/allocator/heap_allocator_ram.hh"
+#include "core/ecs/ecs.hh"
 
 TEST(AllocatorTest, TraitTest) {
 

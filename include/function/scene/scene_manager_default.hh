@@ -1,7 +1,7 @@
-#ifndef __WBE_SCENE_MANAGER_DEFAULT_H__
-#define __WBE_SCENE_MANAGER_DEFAULT_H__
+#ifndef __WBE_SCENE_MANAGER_DEFAULT_HH__
+#define __WBE_SCENE_MANAGER_DEFAULT_HH__
 
-#include "scene_manager.h"
+#include "scene_manager.hh"
 namespace WhiteBirdEngine {
 
 class SceneManagerDefault : public SceneManager {

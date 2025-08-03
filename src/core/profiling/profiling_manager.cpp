@@ -1,4 +1,4 @@
-#include "core/profiling/profiling_manager.h"
+#include "core/profiling/profiling_manager.hh"
 #include <mutex>
 
 namespace WhiteBirdEngine {

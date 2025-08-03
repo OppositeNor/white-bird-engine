@@ -1,5 +1,5 @@
-#ifndef __WBE_DEFS_H__
-#define __WBE_DEFS_H__
+#ifndef __WBE_DEFS_HH__
+#define __WBE_DEFS_HH__
 
 #ifdef _DEBUG
 #include <cassert>

@@ -1,7 +1,7 @@
-#ifndef __WBE_RESOURCE_UTILS_TEST_H__
-#define __WBE_RESOURCE_UTILS_TEST_H__
+#ifndef __WBE_RESOURCE_UTILS_TEST_HH__
+#define __WBE_RESOURCE_UTILS_TEST_HH__
 
-#include "resource/resource_utils.h"
+#include "resource/resource_utils.hh"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;

@@ -1,7 +1,7 @@
-#ifndef __WBE_SERILIAZER_JSON_H__
-#define __WBE_SERILIAZER_JSON_H__
+#ifndef __WBE_SERILIAZER_JSON_HH__
+#define __WBE_SERILIAZER_JSON_HH__
 
-#include "serializer.h"
+#include "serializer.hh"
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>

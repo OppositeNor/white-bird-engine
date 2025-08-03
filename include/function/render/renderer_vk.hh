@@ -1,7 +1,7 @@
-#ifndef __WBE_RENDERER_VK_H__
-#define __WBE_RENDERER_VK_H__
+#ifndef __WBE_RENDERER_VK_HH__
+#define __WBE_RENDERER_VK_HH__
 
-#include "function/render/renderer.h"
+#include "function/render/renderer.hh"
 // #include <vulkan/vulkan.h>
 
 namespace WhiteBirdEngine {

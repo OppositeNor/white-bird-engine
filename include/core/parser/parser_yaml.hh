@@ -1,7 +1,7 @@
-#ifndef __WBE_PARSER_YAML_H_
-#define __WBE_PARSER_YAML_H_
+#ifndef __WBE_PARSER_YAML_HH__
+#define __WBE_PARSER_YAML_HH__
 
-#include "parser.h"
+#include "parser.hh"
 #include <yaml-cpp/yaml.h>
 
 namespace WhiteBirdEngine {

@@ -1,10 +1,10 @@
-#ifndef __WBE_CONFIG_FILE_PARSER_H__
-#define __WBE_CONFIG_FILE_PARSER_H__
+#ifndef __WBE_CONFIG_FILE_PARSER_HH__
+#define __WBE_CONFIG_FILE_PARSER_HH__
 
-#include "core/parser/parser.h"
-#include "platform/file_system/path.h"
-#include "utils/utils.h"
-#include "utils/interface/singleton.h"
+#include "core/parser/parser.hh"
+#include "platform/file_system/path.hh"
+#include "utils/utils.hh"
+#include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
 

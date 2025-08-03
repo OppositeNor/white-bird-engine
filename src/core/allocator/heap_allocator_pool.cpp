@@ -1,11 +1,11 @@
-#include "core/allocator/allocator.h"
-#include "core/logging/log.h"
-#include "utils/defs.h"
-#include "utils/utils.h"
+#include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstring>
 #include <sstream>
 #include <string>
-#include "core/allocator/heap_allocator_pool.h"
+#include "core/allocator/heap_allocator_pool.hh"
 
 namespace WhiteBirdEngine {
 

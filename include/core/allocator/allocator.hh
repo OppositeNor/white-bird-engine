@@ -1,5 +1,5 @@
-#ifndef __WBE_ALLOCATOR_H__
-#define __WBE_ALLOCATOR_H__
+#ifndef __WBE_ALLOCATOR_HH__
+#define __WBE_ALLOCATOR_HH__
 #include <concepts>
 #include <cstdint>
 namespace WhiteBirdEngine {

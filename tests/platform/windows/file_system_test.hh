@@ -1,8 +1,8 @@
-#ifndef __WBE_FILE_SYSTEM_TEST_H__
-#define __WBE_FILE_SYSTEM_TEST_H__
+#ifndef __WBE_FILE_SYSTEM_TEST_HH__
+#define __WBE_FILE_SYSTEM_TEST_HH__
 
-#include "platform/file_system/directory.h"
-#include "platform/file_system/file_system.h"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/file_system.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
 

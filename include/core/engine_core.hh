@@ -1,14 +1,14 @@
-#ifndef __WBE_ENGINE_CORE_H__
-#define __WBE_ENGINE_CORE_H__
-#include "core/allocator/heap_allocator_pool.h"
-#include "core/allocator/stack_allocator.h"
-#include "core/engine_config/engine_config.h"
-#include "utils/game_metadata.h"
-#include "core/logging/log_stream.h"
-#include "core/logging/logging_manager.h"
-#include "core/profiling/profiling_manager.h"
-#include "platform/file_system/file_system.h"
-#include "utils/interface/singleton.h"
+#ifndef __WBE_ENGINE_CORE_HH__
+#define __WBE_ENGINE_CORE_HH__
+#include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "core/engine_config/engine_config.hh"
+#include "utils/game_metadata.hh"
+#include "core/logging/log_stream.hh"
+#include "core/logging/logging_manager.hh"
+#include "core/profiling/profiling_manager.hh"
+#include "platform/file_system/file_system.hh"
+#include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
 

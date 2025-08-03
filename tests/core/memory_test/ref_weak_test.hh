@@ -1,9 +1,9 @@
-#ifndef __WBE_REF_WEAK_TEST_H__
-#define __WBE_REF_WEAK_TEST_H__
+#ifndef __WBE_REF_WEAK_TEST_HH__
+#define __WBE_REF_WEAK_TEST_HH__
 
-#include "core/allocator/heap_allocator_pool.h"
-#include "core/memory/reference_weak.h"
-#include "global/global.h"
+#include "core/allocator/heap_allocator_pool.hh"
+#include "core/memory/reference_weak.hh"
+#include "global/global.hh"
 #include <gtest/gtest.h>
 #include <sstream>
 

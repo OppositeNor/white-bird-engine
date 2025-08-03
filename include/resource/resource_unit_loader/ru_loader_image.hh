@@ -1,12 +1,12 @@
-#ifndef __WBE_RU_LOADER_IMAGE_H__
-#define __WBE_RU_LOADER_IMAGE_H__
+#ifndef __WBE_RU_LOADER_IMAGE_HH__
+#define __WBE_RU_LOADER_IMAGE_HH__
 
-#include "core/allocator/allocator.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
-#include "resource/resource_unit_loader/ru_loader_hdr.h"
-#include "resource/resource_unit_loader/ru_loader_jpeg.h"
-#include "resource/resource_unit_loader/ru_loader_png.h"
-#include "resource/resource_unit_loader/ru_loader_ppm.h"
+#include "core/allocator/allocator.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "resource/resource_unit_loader/ru_loader_hdr.hh"
+#include "resource/resource_unit_loader/ru_loader_jpeg.hh"
+#include "resource/resource_unit_loader/ru_loader_png.hh"
+#include "resource/resource_unit_loader/ru_loader_ppm.hh"
 
 namespace WhiteBirdEngine {
 

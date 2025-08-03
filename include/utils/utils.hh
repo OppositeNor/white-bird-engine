@@ -1,7 +1,7 @@
-#ifndef __WBE_UTILS_H__
-#define __WBE_UTILS_H__
+#ifndef __WBE_UTILS_HH__
+#define __WBE_UTILS_HH__
 
-#include "utils/defs.h"
+#include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

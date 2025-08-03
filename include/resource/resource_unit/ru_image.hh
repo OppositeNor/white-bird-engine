@@ -1,9 +1,9 @@
-#ifndef __WBE_RU_IMAGE_H__
-#define __WBE_RU_IMAGE_H__
+#ifndef __WBE_RU_IMAGE_HH__
+#define __WBE_RU_IMAGE_HH__
 
-#include "core/allocator/allocator.h"
-#include "resource_unit.h"
-#include "utils/utils.h"
+#include "core/allocator/allocator.hh"
+#include "resource_unit.hh"
+#include "utils/utils.hh"
 #include <bitset>
 #include <cstdint>
 namespace WhiteBirdEngine {

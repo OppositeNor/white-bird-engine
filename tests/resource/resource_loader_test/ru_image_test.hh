@@ -1,12 +1,12 @@
-#ifndef __WBE_RU_IMAGE_TEST_H__
-#define __WBE_RU_IMAGE_TEST_H__
+#ifndef __WBE_RU_IMAGE_TEST_HH__
+#define __WBE_RU_IMAGE_TEST_HH__
 
 #include <gtest/gtest.h>
 
-#include "global/global.h"
-#include "resource/resource_chunk/resource_chunk.h"
-#include "resource/resource_manager/resource_manager.h"
-#include "resource/resource_unit_loader/ru_loader_png.h"
+#include "global/global.hh"
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
+#include "resource/resource_unit_loader/ru_loader_png.hh"
 
 namespace WBE = WhiteBirdEngine;
 

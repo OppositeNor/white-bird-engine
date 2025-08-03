@@ -1,8 +1,8 @@
-#ifndef __WBE_SCENE_MANAGER_H__
-#define __WBE_SCENE_MANAGER_H__
+#ifndef __WBE_SCENE_MANAGER_HH__
+#define __WBE_SCENE_MANAGER_HH__
 
-#include "core/ecs/ecs.h"
-#include "utils/interface/singleton.h"
+#include "core/ecs/ecs.hh"
+#include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
 

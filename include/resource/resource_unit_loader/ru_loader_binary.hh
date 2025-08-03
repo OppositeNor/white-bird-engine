@@ -1,8 +1,8 @@
-#ifndef __WBE_RU_LOADER_BINARY_H__
-#define __WBE_RU_LOADER_BINARY_H__
+#ifndef __WBE_RU_LOADER_BINARY_HH__
+#define __WBE_RU_LOADER_BINARY_HH__
 
-#include "resource/resource_unit/ru_binary.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
+#include "resource/resource_unit/ru_binary.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 namespace WhiteBirdEngine {
 
 class RULoaderBinary : public ResourceUnitLoader<RULoaderBinary> {

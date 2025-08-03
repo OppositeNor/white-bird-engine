@@ -1,5 +1,5 @@
-#include "global/global.h"
-#include "core/engine_core.h"
+#include "global/global.hh"
+#include "core/engine_core.hh"
 
 namespace WhiteBirdEngine {
 

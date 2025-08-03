@@ -1,7 +1,7 @@
-#ifndef __WBE_SERIALIZER_YAML_H__
-#define __WBE_SERIALIZER_YAML_H__
+#ifndef __WBE_SERIALIZER_YAML_HH__
+#define __WBE_SERIALIZER_YAML_HH__
 
-#include "serializer.h"
+#include "serializer.hh"
 
 #include <fstream>
 #include <sstream>

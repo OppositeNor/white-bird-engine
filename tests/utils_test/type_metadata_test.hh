@@ -1,7 +1,7 @@
-#ifndef __WBE_TYPE_METADATA_TEST_H__
-#define __WBE_TYPE_METADATA_TEST_H__
-#include "utils/defs.h"
-#include "utils/utils.h"
+#ifndef __WBE_TYPE_METADATA_TEST_HH__
+#define __WBE_TYPE_METADATA_TEST_HH__
+#include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <gtest/gtest.h>
 
 struct TypeA {};

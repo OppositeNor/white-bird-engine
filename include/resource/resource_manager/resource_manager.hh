@@ -1,13 +1,13 @@
-#ifndef __WBE_RESOURCE_MANAGER_H__
-#define __WBE_RESOURCE_MANAGER_H__
+#ifndef __WBE_RESOURCE_MANAGER_HH__
+#define __WBE_RESOURCE_MANAGER_HH__
 
-#include "core/allocator/allocator.h"
-#include "core/allocator/stack_allocator.h"
-#include "core/memory/reference_strong.h"
-#include "resource/resource_chunk/resource_chunk.h"
-#include "resource/resource_chunk/resource_chunk_load_file.h"
-#include "resource/resource_unit/resource_unit.h"
-#include "utils/interface/singleton.h"
+#include "core/allocator/allocator.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "utils/interface/singleton.hh"
 #include <cstddef>
 namespace WhiteBirdEngine {
 

@@ -1,4 +1,4 @@
-#include "resource/resource_manager/resource_manager.h"
+#include "resource/resource_manager/resource_manager.hh"
 #include <stdexcept>
 
 namespace WhiteBirdEngine {

@@ -1,9 +1,9 @@
-#ifndef __WBE_FILE_SYSTEM_H__
-#define __WBE_FILE_SYSTEM_H__
+#ifndef __WBE_FILE_SYSTEM_HH__
+#define __WBE_FILE_SYSTEM_HH__
 
-#include "platform/file_system/directory.h"
-#include "platform/file_system/path.h"
-#include "utils/interface/singleton.h"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
+#include "utils/interface/singleton.hh"
 #include <string>
 namespace WhiteBirdEngine {
 

@@ -1,11 +1,11 @@
-#ifndef __WBE_RU_LOADER_TEXT_H__
-#define __WBE_RU_LOADER_TEXT_H__
+#ifndef __WBE_RU_LOADER_TEXT_HH__
+#define __WBE_RU_LOADER_TEXT_HH__
 
-#include "core/allocator/allocator.h"
-#include "resource/resource_chunk/resource_chunk.h"
-#include "resource/resource_unit/ru_text.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
-#include "utils/utils.h"
+#include "core/allocator/allocator.hh"
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_unit/ru_text.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "utils/utils.hh"
 #include <string>
 namespace WhiteBirdEngine {
 

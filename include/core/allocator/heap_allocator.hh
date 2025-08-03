@@ -1,7 +1,7 @@
-#ifndef __WBE_HEAP_ALLOCATOR_H__
-#define __WBE_HEAP_ALLOCATOR_H__
+#ifndef __WBE_HEAP_ALLOCATOR_HH__
+#define __WBE_HEAP_ALLOCATOR_HH__
 
-#include "allocator.h"
+#include "allocator.hh"
 #include <set>
 #include <sstream>
 

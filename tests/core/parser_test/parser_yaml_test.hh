@@ -1,8 +1,8 @@
-#ifndef __WBE_PARSER_YAML_TEST_H__
-#define __WBE_PARSER_YAML_TEST_H__
+#ifndef __WBE_PARSER_YAML_TEST_HH__
+#define __WBE_PARSER_YAML_TEST_HH__
 
-#include "core/parser/parser_yaml.h"
-#include "parser_test_general.h"
+#include "core/parser/parser_yaml.hh"
+#include "parser_test_general.hh"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;

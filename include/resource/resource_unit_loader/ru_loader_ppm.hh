@@ -1,9 +1,9 @@
-#ifndef __WBE_RU_LOADER_PPM_H__
-#define __WBE_RU_LOADER_PPM_H__
+#ifndef __WBE_RU_LOADER_PPM_HH__
+#define __WBE_RU_LOADER_PPM_HH__
 
-#include "platform/file_system/path.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
-#include "resource/resource_unit_loader/ru_loader_ppm3.h"
+#include "platform/file_system/path.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "resource/resource_unit_loader/ru_loader_ppm3.hh"
 #include <stdexcept>
 #include <string>
 namespace WhiteBirdEngine {

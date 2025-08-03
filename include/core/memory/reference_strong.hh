@@ -1,9 +1,9 @@
-#ifndef __WBE_REFERENCE_STRONG_H__
-#define __WBE_REFERENCE_STRONG_H__
+#ifndef __WBE_REFERENCE_STRONG_HH__
+#define __WBE_REFERENCE_STRONG_HH__
 
-#include "core/allocator/heap_allocator.h"
-#include "core/engine_core.h"
-#include "utils/defs.h"
+#include "core/allocator/heap_allocator.hh"
+#include "core/engine_core.hh"
+#include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
 

@@ -1,6 +1,6 @@
-#include "core/engine_core.h"
-#include "core/allocator/heap_allocator_pool.h"
-#include "core/parser/parser_json.h"
+#include "core/engine_core.hh"
+#include "core/allocator/heap_allocator_pool.hh"
+#include "core/parser/parser_json.hh"
 #include <iostream>
 
 namespace WhiteBirdEngine {

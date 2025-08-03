@@ -1,8 +1,8 @@
-#ifndef __WBE_SERIALIZER_H__
-#define __WBE_SERIALIZER_H__
+#ifndef __WBE_SERIALIZER_HH__
+#define __WBE_SERIALIZER_HH__
 
-#include "platform/file_system/path.h"
-#include "utils/defs.h"
+#include "platform/file_system/path.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <string>
 #include <utility>

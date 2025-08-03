@@ -1,7 +1,7 @@
-#ifndef __WBE_SERIALIZER_YAML_TEST_H__
-#define __WBE_SERIALIZER_YAML_TEST_H__
+#ifndef __WBE_SERIALIZER_YAML_TEST_HH__
+#define __WBE_SERIALIZER_YAML_TEST_HH__
 
-#include "core/serializer/serializer_yaml.h"
+#include "core/serializer/serializer_yaml.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>

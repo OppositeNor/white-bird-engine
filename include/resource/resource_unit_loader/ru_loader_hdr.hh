@@ -1,7 +1,7 @@
-#ifndef __WBE_RU_LOADER_HDR_H__
-#define __WBE_RU_LOADER_HDR_H__
+#ifndef __WBE_RU_LOADER_HDR_HH__
+#define __WBE_RU_LOADER_HDR_HH__
 
-#include "resource/resource_unit_loader/resource_unit_loader.h"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 namespace WhiteBirdEngine {
 
 /**

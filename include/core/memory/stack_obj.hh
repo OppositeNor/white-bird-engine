@@ -1,8 +1,8 @@
-#ifndef __WBE_STACK_OBJ_H__
-#define __WBE_STACK_OBJ_H__
+#ifndef __WBE_STACK_OBJ_HH__
+#define __WBE_STACK_OBJ_HH__
 
-#include "core/allocator/stack_allocator.h"
-#include "utils/defs.h"
+#include "core/allocator/stack_allocator.hh"
+#include "utils/defs.hh"
 
 namespace WhiteBirdEngine {
 

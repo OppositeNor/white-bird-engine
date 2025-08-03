@@ -1,9 +1,9 @@
-#ifndef __WBE_PROFILLER_H__
-#define __WBE_PROFILLER_H__
+#ifndef __WBE_PROFILLER_HH__
+#define __WBE_PROFILLER_HH__
 
-#include "core/engine_core.h"
-#include "core/logging/log.h"
-#include "core/profiling/profiling_manager.h"
+#include "core/engine_core.hh"
+#include "core/logging/log.hh"
+#include "core/profiling/profiling_manager.hh"
 #include <chrono>
 namespace WhiteBirdEngine {
 

@@ -1,10 +1,10 @@
-#ifndef __WBE_RU_LOADER_PNG_H__
-#define __WBE_RU_LOADER_PNG_H__
+#ifndef __WBE_RU_LOADER_PNG_HH__
+#define __WBE_RU_LOADER_PNG_HH__
 
-#include "platform/file_system/path.h"
-#include "resource/resource_unit/ru_image.h"
-#include "resource/resource_unit_loader/resource_unit_loader.h"
-#include "resource/resource_utils.h"
+#include "platform/file_system/path.hh"
+#include "resource/resource_unit/ru_image.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "resource/resource_utils.hh"
 #include <cstdint>
 #include <memory>
 #include <string>

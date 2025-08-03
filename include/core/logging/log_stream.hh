@@ -1,8 +1,8 @@
-#ifndef __WBE_LOG_STREAM_H__
-#define __WBE_LOG_STREAM_H__
+#ifndef __WBE_LOG_STREAM_HH__
+#define __WBE_LOG_STREAM_HH__
 
-#include "log.h"
-#include "utils/defs.h"
+#include "log.hh"
+#include "utils/defs.hh"
 #include <ostream>
 
 namespace WhiteBirdEngine {

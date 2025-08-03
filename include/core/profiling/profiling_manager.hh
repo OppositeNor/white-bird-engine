@@ -1,8 +1,8 @@
-#ifndef __WBE_PROFILLING_MANAGER_H__
-#define __WBE_PROFILLING_MANAGER_H__
+#ifndef __WBE_PROFILLING_MANAGER_HH__
+#define __WBE_PROFILLING_MANAGER_HH__
 
-#include "core/logging/log.h"
-#include "utils/interface/singleton.h"
+#include "core/logging/log.hh"
+#include "utils/interface/singleton.hh"
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>

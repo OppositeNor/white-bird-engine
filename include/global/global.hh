@@ -1,9 +1,9 @@
-#ifndef __WBE_GLOBAL_H__
-#define __WBE_GLOBAL_H__
+#ifndef __WBE_GLOBAL_HH__
+#define __WBE_GLOBAL_HH__
 
-#include "core/engine_core.h"
-#include "platform/file_system/directory.h"
-#include "utils/interface/singleton.h"
+#include "core/engine_core.hh"
+#include "platform/file_system/directory.hh"
+#include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
 /**

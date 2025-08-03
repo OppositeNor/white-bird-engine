@@ -1,5 +1,5 @@
-#include "core/logging/log_stream.h"
-#include "core/engine_core.h"
+#include "core/logging/log_stream.hh"
+#include "core/engine_core.hh"
 
 namespace WhiteBirdEngine {
 void LogStream::message(const std::string& p_str) {

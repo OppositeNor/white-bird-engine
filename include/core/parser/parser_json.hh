@@ -1,7 +1,7 @@
-#ifndef __WBE_PARSER_JSON_H__
-#define __WBE_PARSER_JSON_H__
+#ifndef __WBE_PARSER_JSON_HH__
+#define __WBE_PARSER_JSON_HH__
 
-#include "parser.h"
+#include "parser.hh"
 #include <fstream>
 #include <nlohmann/json.hpp>
 

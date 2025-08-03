@@ -1,6 +1,6 @@
-#include "resource/resource_utils.h"
-#include "platform/file_system/file_system.h"
-#include "utils/defs.h"
+#include "resource/resource_utils.hh"
+#include "platform/file_system/file_system.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <cstring>
 #include <memory>

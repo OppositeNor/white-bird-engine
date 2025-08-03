@@ -1,5 +1,5 @@
-#include "core/allocator/heap_allocator_ram.h"
-#include "core/logging/log.h"
+#include "core/allocator/heap_allocator_ram.hh"
+#include "core/logging/log.hh"
 
 namespace WhiteBirdEngine {
 

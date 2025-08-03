@@ -1,5 +1,5 @@
-#ifndef __WBE_COMMAND_H__
-#define __WBE_COMMAND_H__
+#ifndef __WBE_COMMAND_HH__
+#define __WBE_COMMAND_HH__
 
 #include <cstdint>
 #include <string>

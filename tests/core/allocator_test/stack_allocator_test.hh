@@ -1,7 +1,7 @@
-#ifndef __WBE_STACK_ALLOCATOR_TEST_H__
-#define __WBE_STACK_ALLOCATOR_TEST_H__
+#ifndef __WBE_STACK_ALLOCATOR_TEST_HH__
+#define __WBE_STACK_ALLOCATOR_TEST_HH__
 
-#include "core/allocator/stack_allocator.h"
+#include "core/allocator/stack_allocator.hh"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;

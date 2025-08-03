@@ -1,9 +1,9 @@
-#ifndef __WBE_GAME_METADATA_H__
-#define __WBE_GAME_METADATA_H__
+#ifndef __WBE_GAME_METADATA_HH__
+#define __WBE_GAME_METADATA_HH__
 
-#include "utils/defs.h"
-#include "utils/interface/singleton.h"
-#include "utils/utils.h"
+#include "utils/defs.hh"
+#include "utils/interface/singleton.hh"
+#include "utils/utils.hh"
 #include <stdexcept>
 #include <string>
 #include <unordered_map>

@@ -1,8 +1,8 @@
-#ifndef __WBE_PATH_H__
-#define __WBE_PATH_H__
+#ifndef __WBE_PATH_HH__
+#define __WBE_PATH_HH__
 
-#include "platform/file_system/directory.h"
-#include "utils/utils.h"
+#include "platform/file_system/directory.hh"
+#include "utils/utils.hh"
 #include <string>
 
 namespace WhiteBirdEngine {

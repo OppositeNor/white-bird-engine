@@ -1,5 +1,5 @@
-#ifndef __WBE_RENDERER_H__
-#define __WBE_RENDERER_H__
+#ifndef __WBE_RENDERER_HH__
+#define __WBE_RENDERER_HH__
 
 namespace WhiteBirdEngine {
 

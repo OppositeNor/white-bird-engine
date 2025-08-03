@@ -1,10 +1,10 @@
-#ifndef __WBE_LOG_STREAM_TEST_H__
-#define __WBE_LOG_STREAM_TEST_H__
+#ifndef __WBE_LOG_STREAM_TEST_HH__
+#define __WBE_LOG_STREAM_TEST_HH__
 
-#include "global/global.h"
-#include "core/logging/log_stream.h"
-#include "platform/file_system/directory.h"
-#include "utils/defs.h"
+#include "global/global.hh"
+#include "core/logging/log_stream.hh"
+#include "platform/file_system/directory.hh"
+#include "utils/defs.hh"
 
 #include <gtest/gtest.h>
 #include <sstream>

@@ -1,10 +1,10 @@
-#ifndef __LOGGING_MANAGER_H__
-#define __LOGGING_MANAGER_H__
+#ifndef __LOGGING_MANAGER_HH__
+#define __LOGGING_MANAGER_HH__
 
-#include "core/allocator/allocator.h"
-#include "core/allocator/stack_allocator.h"
-#include "core/logging/log.h"
-#include "utils/interface/singleton.h"
+#include "core/allocator/allocator.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "core/logging/log.hh"
+#include "utils/interface/singleton.hh"
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>

@@ -1,5 +1,5 @@
-#include "platform/file_system/path.h"
-#include "platform/file_system/file_system.h"
+#include "platform/file_system/path.hh"
+#include "platform/file_system/file_system.hh"
 
 namespace WhiteBirdEngine {
 

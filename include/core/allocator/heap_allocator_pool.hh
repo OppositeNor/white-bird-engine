@@ -1,8 +1,8 @@
-#ifndef __WBE_HEAP_ALLOCATOR_POOL_H__
-#define __WBE_HEAP_ALLOCATOR_POOL_H__
+#ifndef __WBE_HEAP_ALLOCATOR_POOL_HH__
+#define __WBE_HEAP_ALLOCATOR_POOL_HH__
 
-#include "heap_allocator.h"
-#include "utils/defs.h"
+#include "heap_allocator.hh"
+#include "utils/defs.hh"
 #include <cstddef>
 #include <memory>
 #include <stdexcept>

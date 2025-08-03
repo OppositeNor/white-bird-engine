@@ -1,7 +1,7 @@
-#ifndef __WBE_RU_VIDEO_H__
-#define __WBE_RU_VIDEO_H__
+#ifndef __WBE_RU_VIDEO_HH__
+#define __WBE_RU_VIDEO_HH__
 
-#include "resource_unit.h"
+#include "resource_unit.hh"
 namespace WhiteBirdEngine {
 
 struct RUVideo : public ResourceUnit {

@@ -1,10 +1,10 @@
-#ifndef __WBE_REF_STRONG_TEST_H__
-#define __WBE_REF_STRONG_TEST_H__
+#ifndef __WBE_REF_STRONG_TEST_HH__
+#define __WBE_REF_STRONG_TEST_HH__
 
-#include "core/allocator/heap_allocator_pool.h"
-#include "core/allocator/heap_allocator_ram.h"
-#include "core/memory/reference_strong.h"
-#include "global/global.h"
+#include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/heap_allocator_ram.hh"
+#include "core/memory/reference_strong.hh"
+#include "global/global.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <thread>

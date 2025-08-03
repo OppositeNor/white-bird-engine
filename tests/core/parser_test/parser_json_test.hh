@@ -1,9 +1,9 @@
-#ifndef __WBE_PARSER_JSON_TEST_H__
-#define __WBE_PARSER_JSON_TEST_H__
+#ifndef __WBE_PARSER_JSON_TEST_HH__
+#define __WBE_PARSER_JSON_TEST_HH__
 
 #include <gtest/gtest.h>
-#include "core/parser/parser_json.h"
-#include "parser_test_general.h"
+#include "core/parser/parser_json.hh"
+#include "parser_test_general.hh"
 
 namespace WBE = WhiteBirdEngine;
 

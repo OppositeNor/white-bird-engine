@@ -1,5 +1,5 @@
-#ifndef __WBE_REFLECTION_H__
-#define __WBE_REFLECTION_H__
+#ifndef __WBE_REFLECTION_HH__
+#define __WBE_REFLECTION_HH__
 
 namespace WhiteBirdEngine {
 

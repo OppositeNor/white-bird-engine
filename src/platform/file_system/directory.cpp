@@ -1,5 +1,5 @@
-#include "platform/file_system/directory.h"
-#include "platform/file_system/file_system.h"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/file_system.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {

@@ -1,7 +1,7 @@
-#ifndef __WBE_COMPONENTS_TEST_H__
-#define __WBE_COMPONENTS_TEST_H__
+#ifndef __WBE_COMPONENTS_TEST_HH__
+#define __WBE_COMPONENTS_TEST_HH__
 #include <gtest/gtest.h>
-#include "core/ecs/ecs.h"
+#include "core/ecs/ecs.hh"
 
 namespace WBE = WhiteBirdEngine;
 

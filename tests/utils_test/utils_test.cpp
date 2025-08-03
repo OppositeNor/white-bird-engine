@@ -1,2 +1,2 @@
-#include "type_metadata_test.h"
+#include "type_metadata_test.hh"
 

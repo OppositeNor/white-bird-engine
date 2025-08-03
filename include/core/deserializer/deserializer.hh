@@ -1,5 +1,5 @@
-#ifndef __WBE_DESERIALIZER_H__
-#define __WBE_DESERIALIZER_H__
+#ifndef __WBE_DESERIALIZER_HH__
+#define __WBE_DESERIALIZER_HH__
 
 namespace WhiteBirdEngine {
 

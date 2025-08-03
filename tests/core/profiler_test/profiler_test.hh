@@ -1,14 +1,14 @@
-#ifndef __WBE_PROFILER_TEST_H__
-#define __WBE_PROFILER_TEST_H__
+#ifndef __WBE_PROFILER_TEST_HH__
+#define __WBE_PROFILER_TEST_HH__
 
 #include <gtest/gtest.h>
 #include <memory>
 #include <chrono>
 #include <thread>
 
-#include "core/profiling/profiler.h"
-#include "platform/file_system/directory.h"
-#include "global/global.h"
+#include "core/profiling/profiler.hh"
+#include "platform/file_system/directory.hh"
+#include "global/global.hh"
 
 namespace WBE = WhiteBirdEngine;
 namespace WhiteBirdEngine {
@@ -25,7 +25,7 @@ TEST(WBEProfilerTest, Profiling) {
     const auto& profile_data = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
     ASSERT_EQ(profile_data.size(), 1);
     ASSERT_GT(profile_data[0].delta, 0.4999);
-    ASSERT_NE(profile_data[0].file.find("profiler_test.h"), std::string::npos);
+    ASSERT_NE(profile_data[0].file.find("profiler_test.hh"), std::string::npos);
     ASSERT_EQ(profile_data[0].line, line_num);
     uint32_t line_num_1 = 0;
     {
@@ -34,10 +34,10 @@ TEST(WBEProfilerTest, Profiling) {
     }
     ASSERT_EQ(profile_data.size(), 2);
     ASSERT_GT(profile_data[1].delta, 0.099);
-    ASSERT_NE(profile_data[1].file.find("profiler_test.h"), std::string::npos);
+    ASSERT_NE(profile_data[1].file.find("profiler_test.hh"), std::string::npos);
     ASSERT_EQ(profile_data[1].line, line_num_1);
     ASSERT_GT(profile_data[0].delta, 0.4999);
-    ASSERT_NE(profile_data[0].file.find("profiler_test.h"), std::string::npos);
+    ASSERT_NE(profile_data[0].file.find("profiler_test.hh"), std::string::npos);
     ASSERT_EQ(profile_data[0].line, line_num);
 }
 
