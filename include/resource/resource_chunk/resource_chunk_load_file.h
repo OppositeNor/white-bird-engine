@@ -1,6 +1,7 @@
 #include "core/allocator/stack_allocator.h"
 #include "core/parser/parser.h"
 #include "resource/resource_chunk/resource_chunk.h"
+#include "resource/resource_unit_loader/ru_loader_binary.h"
 #include "resource/resource_unit_loader/ru_loader_image.h"
 #include "resource/resource_unit_loader/ru_loader_text.h"
 #include "utils/utils.h"
@@ -156,8 +157,8 @@ void ResourceChunkLoadFile::load_ru_video(const ParserData<ParserDataType>& p_pa
 
 template <ParserDataConcept ParserDataType>
 void ResourceChunkLoadFile::load_ru_text(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
-    RULoaderText data_loader;
-    data_loader.template load<ParserDataType>(*this, p_parser_data.get_data());
+    RULoaderText loader;
+    loader.load<ParserDataType>(*this, p_parser_data.get_data());
 }
 
 template <ParserDataConcept ParserDataType>
@@ -167,7 +168,8 @@ void ResourceChunkLoadFile::load_ru_font(const ParserData<ParserDataType>& p_par
 
 template <ParserDataConcept ParserDataType>
 void ResourceChunkLoadFile::load_ru_binary(const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
-    // TODO
+    RULoaderBinary loader;
+    loader.load<ParserDataType>(*this, p_parser_data.get_data());
 }
 
 }
