@@ -2,7 +2,8 @@
 #define __WBE_RENDERER_VK_HH__
 
 #include "function/render/renderer.hh"
-// #include <vulkan/vulkan.h>
+#include <SDL.h>
+#include <vulkan/vulkan.h>
 
 namespace WhiteBirdEngine {
 
@@ -24,6 +25,13 @@ public:
 private:
     void init();
     void terminate();
+
+    void init_window();
+    void init_vulkan();
+
+    void create_instance();
+
+    SDL_Window* window;
 };
 
 }

@@ -69,7 +69,7 @@ set(include_dirs
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories
 else()
-    set(include_dirs ${include_dirs} ${PROJECT_SOURCE_DIR}/dependencies/SDL2)
+    set(include_dirs ${include_dirs} ${PROJECT_SOURCE_DIR}/dependencies/SDL2/include)
 endif()
 include_directories(
     ${include_dirs}

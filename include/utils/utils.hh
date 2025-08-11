@@ -212,6 +212,23 @@ inline std::string remove_hashtag_comments(std::string str) {
  */
 struct EngineConfigOptions {
     /**
+     * @brief Name of the engine.
+     */
+    const char* engine_name = "White Bird Engine";
+    /**
+     * @brief Engine version major.
+     */
+    const uint32_t version_major = 0;
+    /**
+     * @brief Engine version minor.
+     */
+    const uint32_t version_minor = 0;
+    /**
+     * @brief Engine version patch.
+     */
+    const uint32_t version_patch = 1;
+
+    /**
      * @brief The size of the tick stack.
      */
     size_t single_tick_stack_size = 1024;
@@ -225,7 +242,22 @@ struct EngineConfigOptions {
     size_t thread_mem_pool_size = 2048;
 };
 
-enum ColorSpace {
+struct GameConfigOptions {
+    /**
+     * @brief The name of the game.
+     */
+    std::string game_name;
+    /**
+     * @brief The width of the window.
+     */
+    uint32_t window_width;
+    /**
+     * @brief The height of the window.
+     */
+    uint32_t window_height;
+};
+
+enum class ColorSpace {
     RGB,
     SRGB
 };
