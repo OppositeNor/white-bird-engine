@@ -83,20 +83,8 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 // Labels an component. Used for reflection.
 #define WBE_COMPONENT(...)
 
-// Types of encoding
-enum class EncodeType {
-    // Unknown encode type.
-    UNKNOWN,
-    // UTF8 (most recommended)
-    UTF8,
-    // UTF16 little endian
-    UTF16LE,
-    // UTF16 big endian
-    UTF16BE,
-    // UTF32 little endian
-    UTF32LE,
-    // UTF32 big endian
-    UTF32BE
-};
+#ifdef _DEBUG
+#define WBE_VK_ENABLE_VALIDATION
+#endif
 
 #endif

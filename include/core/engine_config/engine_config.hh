@@ -24,8 +24,8 @@ public:
      * @param p_engine_config The configuration options.
      * @param p_config_file_parser The parser for the config file.
      */
-    EngineConfig(EngineConfigOptions& p_engine_config)
-        : config_file_parser(p_engine_config, ParserYAML()) {
+    EngineConfig()
+        : config_file_parser(config_options, ParserYAML()) {
     }
     virtual ~EngineConfig() {}
     EngineConfig(const EngineConfig&) = delete;
@@ -43,7 +43,6 @@ public:
         // TODO
     }
 
-    
     /**
      * @brief Parse the config file from a path.
      *
@@ -53,8 +52,13 @@ public:
         config_file_parser.parse(p_path);
     }
 
+    const EngineConfigOptions& get_config_options(){
+        return config_options;
+    }
+
 private:
     ConfigFileParser<ParserYAML> config_file_parser;
+    EngineConfigOptions config_options;
 };
 
 }

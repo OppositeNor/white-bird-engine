@@ -1,5 +1,6 @@
 #include "core/engine_core.hh"
 #include "core/allocator/heap_allocator_pool.hh"
+#include "core/engine_config/engine_config.hh"
 #include "core/parser/parser_json.hh"
 #include <iostream>
 
@@ -11,19 +12,22 @@ EngineCore::~EngineCore() {
     delete file_system;
     delete pool_allocator;
     delete stdio_logging_manager;
+    delete engine_config;
     singleton = nullptr;
 }
 
 EngineCore::EngineCore(int p_argc, char* p_argv[])
     : Singleton<EngineCore>() {
-    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
+    engine_config = new EngineConfig();
+    pool_allocator = new HeapAllocatorPool(WBE_KiB(128)); // TODO: use config
     file_system = new FileSystem();
     initialize(p_argc, p_argv);
 }
 
 EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
     : Singleton<EngineCore>() {
-    pool_allocator = new HeapAllocatorPool(WBE_KiB(128));
+    engine_config = new EngineConfig();
+    pool_allocator = new HeapAllocatorPool(WBE_KiB(128)); // TODO: use config
     file_system = new FileSystem(p_root_dir);
     initialize(p_argc, p_argv);
 }

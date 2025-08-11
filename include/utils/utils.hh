@@ -1,7 +1,6 @@
 #ifndef __WBE_UTILS_HH__
 #define __WBE_UTILS_HH__
 
-#include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -12,6 +11,22 @@
 #include <vector>
 
 namespace WhiteBirdEngine {
+
+// Types of encoding
+enum class EncodeType {
+    // Unknown encode type.
+    UNKNOWN,
+    // UTF8 (most recommended)
+    UTF8,
+    // UTF16 little endian
+    UTF16LE,
+    // UTF16 big endian
+    UTF16BE,
+    // UTF32 little endian
+    UTF32LE,
+    // UTF32 big endian
+    UTF32BE
+};
 
 /**
  * @brief Get the size after alignment.
@@ -242,11 +257,28 @@ struct EngineConfigOptions {
     size_t thread_mem_pool_size = 2048;
 };
 
+/**
+ * @class GameConfigOptions
+ * @brief Configuration options for game.
+ *
+ */
 struct GameConfigOptions {
     /**
      * @brief The name of the game.
      */
     std::string game_name;
+    /**
+     * @brief Game version major.
+     */
+    uint32_t version_major;
+    /**
+     * @brief Game version minor.
+     */
+    uint32_t version_minor;
+    /**
+     * @brief Game version patch.
+     */
+    uint32_t version_patch;
     /**
      * @brief The width of the window.
      */
@@ -255,13 +287,19 @@ struct GameConfigOptions {
      * @brief The height of the window.
      */
     uint32_t window_height;
+    /**
+     * @brief The index of the render device.
+     */
+    uint32_t render_device_index;
 };
 
+// Color space
 enum class ColorSpace {
+    // RGB space
     RGB,
+    // SRGB space
     SRGB
 };
-
 }
 #endif
 
