@@ -1,5 +1,5 @@
-#ifndef __WBE_CONFIG_FILE_PARSER_HH__
-#define __WBE_CONFIG_FILE_PARSER_HH__
+#ifndef __WBE_ENGINE_CONFIG_FILE_PARSER_HH__
+#define __WBE_ENGINE_CONFIG_FILE_PARSER_HH__
 
 #include "core/parser/parser.hh"
 #include "platform/file_system/path.hh"
@@ -13,12 +13,12 @@ namespace WhiteBirdEngine {
  * @brief Interface of parsers for config file.
  */
 template <ParserConcept ParserType>
-class ConfigFileParser : public Singleton<ConfigFileParser<ParserType>> {
+class EngineConfigFileParser : public Singleton<EngineConfigFileParser<ParserType>> {
 public:
-    ConfigFileParser(EngineConfigOptions& p_config_options, Parser<ParserType> p_parser)
+    EngineConfigFileParser(EngineConfigOptions& p_config_options, ParserType p_parser)
         : config_options(&p_config_options), parser(p_parser) {
     }
-    ~ConfigFileParser() {}
+    ~EngineConfigFileParser() {}
 
     /**
      * @brief Parse a config file from a path.
@@ -29,11 +29,11 @@ public:
 
 private:
     EngineConfigOptions* config_options;
-    Parser<ParserType> parser;
+    ParserType parser;
 };
 
 template <ParserConcept ParserType>
-void ConfigFileParser<ParserType>::parse(const Path& p_path) {
+void EngineConfigFileParser<ParserType>::parse(const Path& p_path) {
     parser.parse(p_path);
     config_options->single_tick_stack_size = parser.template get_value<size_t>("single_tick_stack_size");
     config_options->global_mem_pool_size = parser.template get_value<size_t>("global_mem_pool_size");

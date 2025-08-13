@@ -2,7 +2,7 @@
 #define __WBE_ENGINE_CONFIG_HH__
 
 #include "core/cla/cla_parser.hh"
-#include "core/engine_config/config_file_parser.hh"
+#include "core/engine_config/engine_config_file_parser.hh"
 #include "core/parser/parser_yaml.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
@@ -52,15 +52,19 @@ public:
         config_file_parser.parse(p_path);
     }
 
+    /**
+     * @brief Get the configuration options.
+     *
+     * @return The configuration options.
+     */
     const EngineConfigOptions& get_config_options(){
         return config_options;
     }
 
 private:
-    ConfigFileParser<ParserYAML> config_file_parser;
+    EngineConfigFileParser<ParserYAML> config_file_parser;
     EngineConfigOptions config_options;
 };
-
 }
 
 #endif

@@ -29,7 +29,7 @@ public:
         node = std::move(p_other.node);
         return *this;
     }
-    YAMLData(const YAML::Node& p_node)
+    YAMLData(const yaml& p_node)
         : node(p_node) {}
     YAMLData(YAML::Node&& p_node)
         : node(std::move(p_node)) {}
