@@ -2,6 +2,7 @@
 #define __WBE_ENGINE_FUNCTION_HH__
 
 #include "function/game_config/game_config.hh"
+#include "function/render/renderer.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
@@ -17,6 +18,7 @@ public:
     }
 
     GameConfig* game_config = nullptr;
+    Renderer* renderer = nullptr;
 private:
 
     inline static EngineFunction* singleton;

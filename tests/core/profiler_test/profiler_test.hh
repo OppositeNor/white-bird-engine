@@ -16,7 +16,7 @@ WBE_DEFINE_LABEL(WBE_TEST_PROFILING_CHANNEL)
 }
 
 TEST(WBEProfilerTest, Profiling) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     uint32_t line_num = 0;
     {
         WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL); line_num = __LINE__;

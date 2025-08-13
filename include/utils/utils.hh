@@ -1,6 +1,7 @@
 #ifndef __WBE_UTILS_HH__
 #define __WBE_UTILS_HH__
 
+#include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -246,15 +247,15 @@ struct EngineConfigOptions {
     /**
      * @brief The size of the tick stack.
      */
-    size_t single_tick_stack_size = 1024;
+    size_t single_tick_stack_size = WBE_KiB(64);
     /**
      * @brief The size of the global memory pool.
      */
-    size_t global_mem_pool_size = 2048;
+    size_t global_mem_pool_size = WBE_KiB(128);
     /**
      * @brief The size of the thread memory pool.
      */
-    size_t thread_mem_pool_size = 2048;
+    size_t thread_mem_pool_size = WBE_KiB(16);
 };
 
 /**
@@ -266,31 +267,41 @@ struct GameConfigOptions {
     /**
      * @brief The name of the game.
      */
-    std::string game_name;
+    std::string game_name = "White Bird Engine Demo";
     /**
      * @brief Game version major.
      */
-    uint32_t version_major;
+    uint32_t version_major = 1;
     /**
      * @brief Game version minor.
      */
-    uint32_t version_minor;
+    uint32_t version_minor = 0;
     /**
      * @brief Game version patch.
      */
-    uint32_t version_patch;
+    uint32_t version_patch = 0;
     /**
      * @brief The width of the window.
      */
-    uint32_t window_width;
+    uint32_t window_width = 1920;
     /**
      * @brief The height of the window.
      */
-    uint32_t window_height;
+    uint32_t window_height = 1080;
     /**
      * @brief The index of the render device.
+     * -1 if not specified, and white bird engine will automatically
+     *  choose the most optimal one.
      */
-    uint32_t render_device_index;
+    int32_t render_device_index = -1;
+
+    /**
+     * @brief Render API
+     */
+    enum class RenderAPI {
+        // Vulkan render API
+        VULKAN
+    } render_api = RenderAPI::VULKAN;
 };
 
 // Color space

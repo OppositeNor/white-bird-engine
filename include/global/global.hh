@@ -2,6 +2,7 @@
 #define __WBE_GLOBAL_HH__
 
 #include "core/engine_core.hh"
+#include "function/engine_function.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/interface/singleton.hh"
 
@@ -42,9 +43,14 @@ public:
     }
 
     /**
-     * @brief The fore singleton.
+     * @brief The core singleton.
      */
     EngineCore* engine_core;
+
+    /**
+     * @brief The function singleton.
+     */
+    EngineFunction* engine_function;
 
 private:
     inline static Global* singleton;

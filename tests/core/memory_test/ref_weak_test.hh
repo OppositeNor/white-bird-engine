@@ -34,7 +34,7 @@ public:
 };
 
 TEST(WBERefWeakTest, General) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss;
     {
@@ -60,7 +60,7 @@ TEST(WBERefWeakTest, General) {
 }
 
 TEST(WBERefWeakTest, Valid) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     WBE::RefWeak<int> ref_weak;
     ASSERT_FALSE(ref_weak.is_valid());
@@ -95,7 +95,7 @@ public:
 };
 
 TEST(WBERefWeakTest, Polymorphic) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss;
     WBE::RefWeak<TestClassWeakChild> ref_weak_child;
@@ -166,7 +166,7 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
 }
 
 TEST(WBERefWeak, Multithread) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss1;
     std::stringstream test_ss2;
@@ -193,7 +193,7 @@ TEST(WBERefWeak, Multithread) {
 }
 
 TEST(WBERefWeak, InvaldLockTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     WBE::RefWeak<int> ref_weak;
     ASSERT_EQ(ref_weak.lock(), nullptr);
@@ -265,7 +265,7 @@ inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1,
 }
 
 TEST(WBERefStrongWeak, Multithread) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool_allocator(1024);
     std::stringstream test_ss1;
     std::stringstream test_ss2;

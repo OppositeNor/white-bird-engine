@@ -21,11 +21,11 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_engine_config The configuration options.
-     * @param p_config_file_parser The parser for the config file.
+     * @param p_config_file_path The path to the config file.
      */
-    EngineConfig()
+    EngineConfig(const Path& p_config_file_path)
         : config_file_parser(config_options, ParserYAML()) {
+        config_file_parser.parse(p_config_file_path);
     }
     virtual ~EngineConfig() {}
     EngineConfig(const EngineConfig&) = delete;

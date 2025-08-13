@@ -44,7 +44,6 @@ set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
-set(libs yaml-cpp::yaml-cpp)
 
 # Set C++ build flags
 if (NOT MSVC)
@@ -76,6 +75,7 @@ include_directories(
 )
 
 # Add engine source
+add_subdirectory(src/global)
 add_subdirectory(src/function)
 add_subdirectory(src/resource)
 add_subdirectory(src/core)
@@ -89,7 +89,6 @@ else()
         ${PROJECT_SOURCE_DIR}/src/main.cpp
     )
     target_link_libraries(${PROJECT_NAME} PUBLIC
-        SDL2::SDL2-static
         ${libs}
     )
 endif()

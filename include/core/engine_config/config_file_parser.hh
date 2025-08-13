@@ -15,10 +15,10 @@ namespace WhiteBirdEngine {
 template <ParserConcept ParserType>
 class ConfigFileParser : public Singleton<ConfigFileParser<ParserType>> {
 public:
-    ConfigFileParser(EngineConfigOptions& p_config_options, ParserType p_parser)
-        : config_options(&p_config_options), parser(std::move(p_parser)) {
+    ConfigFileParser(EngineConfigOptions& p_config_options, Parser<ParserType> p_parser)
+        : config_options(&p_config_options), parser(p_parser) {
     }
-    virtual ~ConfigFileParser() {}
+    ~ConfigFileParser() {}
 
     /**
      * @brief Parse a config file from a path.
@@ -29,12 +29,15 @@ public:
 
 private:
     EngineConfigOptions* config_options;
-    ParserType parser;
+    Parser<ParserType> parser;
 };
 
 template <ParserConcept ParserType>
 void ConfigFileParser<ParserType>::parse(const Path& p_path) {
-    // TODO
+    parser.parse(p_path);
+    config_options->single_tick_stack_size = parser.template get_value<size_t>("single_tick_stack_size");
+    config_options->global_mem_pool_size = parser.template get_value<size_t>("global_mem_pool_size");
+    config_options->thread_mem_pool_size = parser.template get_value<size_t>("thread_mem_pool_size");
 }
 
 }

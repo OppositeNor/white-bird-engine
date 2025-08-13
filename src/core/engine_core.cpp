@@ -18,16 +18,12 @@ EngineCore::~EngineCore() {
 
 EngineCore::EngineCore(int p_argc, char* p_argv[])
     : Singleton<EngineCore>() {
-    engine_config = new EngineConfig();
-    pool_allocator = new HeapAllocatorPool(WBE_KiB(128)); // TODO: use config
     file_system = new FileSystem();
     initialize(p_argc, p_argv);
 }
 
 EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
     : Singleton<EngineCore>() {
-    engine_config = new EngineConfig();
-    pool_allocator = new HeapAllocatorPool(WBE_KiB(128)); // TODO: use config
     file_system = new FileSystem(p_root_dir);
     initialize(p_argc, p_argv);
 }
@@ -43,6 +39,8 @@ void EngineCore::parse_metadata(const Path& p_metadata_config_path) {
 }
 
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
+    engine_config = new EngineConfig(Path(file_system->get_root_directory(), "engine_config.yaml"));
+    pool_allocator = new HeapAllocatorPool(engine_config->get_config_options().global_mem_pool_size);
     game_metadata = new GameMetadata();
     parse_metadata(Path(file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
