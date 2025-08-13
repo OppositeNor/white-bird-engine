@@ -51,7 +51,7 @@ public:
 };
 
 TEST(WBELoggingManagerTest, GetLogConstructDestruct) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"build"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::stringstream ss;
     {
         WBE::LoggingManager<LogTestMock, std::ostream> logging_manager(ss);
