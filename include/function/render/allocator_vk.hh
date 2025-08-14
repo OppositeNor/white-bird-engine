@@ -31,14 +31,16 @@ public:
      *
      * @return The allocation callback.
      */
-    VkAllocationCallbacks* get_allocation_callback();
+    VkAllocationCallbacks get_allocation_callback() {
+        return allocator_callbacks;
+    }
 
 private:
-    static void* allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
-    static void* reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
-    static void* free(AllocatorVK* p_this, void* p_memory);
+    static void* allocation(void* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
+    static void* reallocation(void* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
+    static void free(void* p_this, void* p_memory);
 
-    VkAllocationCallbacks allocator_callbacks;
+    VkAllocationCallbacks allocator_callbacks{};
     HeapAllocator* allocator;
 };
 
