@@ -1,6 +1,8 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
+#include "core/memory/reference_strong.hh"
+#include "function/render/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "utils/defs.hh"
 
@@ -29,6 +31,7 @@ public:
 
 private:
 
+    Ref<AllocatorVK> allocator;     // TODO: use allocator
     SDL_Window* window;
     VkInstance vk_instance;
 
