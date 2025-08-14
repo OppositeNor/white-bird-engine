@@ -299,6 +299,8 @@ struct GameConfigOptions {
      * @brief Render API
      */
     enum class RenderAPI {
+        // Dummy renderer
+        DUMMY,
         // Vulkan render API
         VULKAN
     } render_api = RenderAPI::VULKAN;

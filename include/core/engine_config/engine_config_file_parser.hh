@@ -35,9 +35,6 @@ private:
 template <ParserConcept ParserType>
 void EngineConfigFileParser<ParserType>::parse(const Path& p_path) {
     parser.parse(p_path);
-    config_options->single_tick_stack_size = parser.template get_value<size_t>("single_tick_stack_size");
-    config_options->global_mem_pool_size = parser.template get_value<size_t>("global_mem_pool_size");
-    config_options->thread_mem_pool_size = parser.template get_value<size_t>("thread_mem_pool_size");
 }
 
 }

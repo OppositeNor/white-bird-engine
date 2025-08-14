@@ -39,7 +39,7 @@ void EngineCore::parse_metadata(const Path& p_metadata_config_path) {
 }
 
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
-    engine_config = new EngineConfig(Path(file_system->get_config_directory(), "engine_config.yaml"));
+    engine_config = new EngineConfig(Path(file_system->get_config_directory(), "engine_config.yaml"), p_argc, p_argv);
     pool_allocator = new HeapAllocatorPool(engine_config->get_config_options().global_mem_pool_size);
     game_metadata = new GameMetadata();
     parse_metadata(Path(file_system->get_resource_directory(), "metadata.json"));

@@ -22,35 +22,19 @@ public:
      * @brief Constructor.
      *
      * @param p_config_file_path The path to the config file.
+     * @param p_argc argc
+     * @param p_argv argv
      */
-    EngineConfig(const Path& p_config_file_path)
+    EngineConfig(const Path& p_config_file_path, int p_argc, char* p_argv[])
         : config_file_parser(config_options, ParserYAML()) {
-        config_file_parser.parse(p_config_file_path);
+        parse_config_file(p_config_file_path);
+        parse_cla(p_argc, p_argv);
     }
     virtual ~EngineConfig() {}
     EngineConfig(const EngineConfig&) = delete;
     EngineConfig(EngineConfig&&) = delete;
     EngineConfig& operator=(const EngineConfig&) = delete;
     EngineConfig& operator=(EngineConfig&&) = delete;
-
-    /**
-     * @brief Parse the command line argument configurations.
-     *
-     * @param p_argc argc.
-     * @param p_argv argv.
-     */
-    void parse_cla(int p_argc, char* p_argv[]) {
-        // TODO
-    }
-
-    /**
-     * @brief Parse the config file from a path.
-     *
-     * @param p_path The path to the config file.
-     */
-    void parse_config_file(const Path& p_path) {
-        config_file_parser.parse(p_path);
-    }
 
     /**
      * @brief Get the configuration options.
@@ -64,6 +48,15 @@ public:
 private:
     EngineConfigFileParser<ParserYAML> config_file_parser;
     EngineConfigOptions config_options;
+
+    void parse_cla(int p_argc, char* p_argv[]) {
+        // TODO
+    }
+
+    void parse_config_file(const Path& p_path) {
+        config_file_parser.parse(p_path);
+    }
+
 };
 }
 
