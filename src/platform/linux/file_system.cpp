@@ -13,6 +13,7 @@ FileSystem::FileSystem()
 FileSystem::FileSystem(const Directory& p_root_dir) {
     root_directory = p_root_dir;
     resource_directory = root_directory.combine(Directory({"res"}));
+    config_directory = resource_directory.combine(Directory({"config"}));
 }
 
 Directory FileSystem::parse_directory(const std::string& p_str) {

@@ -44,10 +44,19 @@ public:
     /**
      * @brief Get the directory of the resource directory.
      *
-     * @return The directory of the
+     * @return The resource directory.
      */
     const Directory& get_resource_directory() const {
         return resource_directory;
+    }
+
+    /**
+     * @brief Get the directory of the config directory.
+     *
+     * @return The config directory.
+     */
+    const Directory& get_config_directory() const {
+        return config_directory;
     }
 
     /**
@@ -99,6 +108,7 @@ public:
 private:
     Directory root_directory;
     Directory resource_directory;
+    Directory config_directory;
     Directory get_executable_dir();
 };
 

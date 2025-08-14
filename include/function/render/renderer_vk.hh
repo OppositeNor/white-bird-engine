@@ -5,8 +5,11 @@
 #include "utils/defs.hh"
 
 #include <SDL.h>
+#include <optional>
+#include <set>
 #include <vector>
 #include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -25,18 +28,28 @@ public:
     RendererVK& operator=(RendererVK&&) = delete;
 
 private:
-    void init();
-    void terminate();
-
-    void init_window();
-    void init_vulkan();
-
-    void create_instance();
-
-    bool check_validation_layer_support();
 
     SDL_Window* window;
     VkInstance vk_instance;
+
+    VkPhysicalDevice physical_device;
+    VkDevice logical_device;
+
+    VkSurfaceKHR surface;
+    VkSwapchainKHR swap_chain;
+
+    VkQueue graphics_queue;
+    VkQueue compute_queue;
+    VkQueue present_queue;
+
+    std::vector<VkImage> swap_chain_images;
+    VkFormat swap_chain_image_format;
+    VkExtent2D swap_chain_extent;
+
+    std::vector<VkImageView> swap_chain_image_views;
+
+    VkViewport viewport{};
+    VkRect2D scissor{};
 
     std::vector<const char*> validation_layers = {
         "VK_LAYER_KHRONOS_validation"
@@ -51,6 +64,64 @@ private:
 #else
     constexpr static bool enable_validation_layer = false;
 #endif
+
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphics;   // For basic pipeline rendering
+        std::optional<uint32_t> compute;    // For compute shader
+        std::optional<uint32_t> present;    // For presenting contents in window
+        bool is_complete() {
+            return graphics.has_value()
+                && compute.has_value()
+                && present.has_value();
+        }
+        std::set<int> get_unique_indices() {
+            std::set<int> result;
+            result.insert(graphics.value());
+            result.insert(compute.value());
+            result.insert(present.value());
+            return result;
+        }
+    } queue_family_indices;
+
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> present_modes;
+        bool is_adequate() {
+            return !formats.empty() && !present_modes.empty();
+        }
+    };
+
+    std::vector<VkDynamicState> dynamic_states = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    void init();
+    void terminate();
+
+    void init_window();
+    void init_vulkan();
+
+    void create_instance();
+    void create_window_surface();
+    void create_device();
+    void create_swap_chain();
+
+    bool check_device_extension_support(VkPhysicalDevice p_device);
+    bool check_validation_layer_support();
+    void pick_physical_device(const std::vector<VkPhysicalDevice>& p_physical_devices);
+    void create_physical_device();
+    void create_logical_device();
+
+    bool is_device_suitable(VkPhysicalDevice p_device);
+
+    QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
+    SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
+    VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& p_available_present_modes);
+    VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
+
 };
 
 }
