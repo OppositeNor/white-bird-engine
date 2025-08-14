@@ -13,7 +13,7 @@ namespace WhiteBirdEngine {
 class AllocatorVK {
 public:
 
-    ~AllocatorVK();
+    ~AllocatorVK() {}
     AllocatorVK(const AllocatorVK&) = delete;
     AllocatorVK(AllocatorVK&&) = delete;
     AllocatorVK& operator=(const AllocatorVK&) = delete;
