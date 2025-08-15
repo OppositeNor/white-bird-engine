@@ -1,0 +1,110 @@
+#ifndef __WBE_HEAP_ALLOCATOR_ALIGNED_POOL_HH__
+#define __WBE_HEAP_ALLOCATOR_ALIGNED_POOL_HH__
+
+#include "core/allocator/allocator.hh"
+#include "core/allocator/heap_allocator_aligned.hh"
+#include "utils/defs.hh"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <unordered_map>
+
+namespace WhiteBirdEngine {
+
+template <>
+struct AllocatorTrait<class HeapAllocatorAlignedPool> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorAlignedPool>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_ALIGNABLE = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+    static constexpr bool WILL_ADDR_MOVE = false;
+
+    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+};
+
+/**
+ * @class HeapAllocatorAlignedPool
+ * @brief Heap allocator pool with memory alignment support.
+ *
+ */
+class HeapAllocatorAlignedPool : public HeapAllocatorAligned {
+public:
+    HeapAllocatorAlignedPool()
+        : HeapAllocatorAlignedPool(WBE_KiB(1)) {}
+    virtual ~HeapAllocatorAlignedPool() override;
+    HeapAllocatorAlignedPool(const HeapAllocatorAlignedPool&) = delete;
+    HeapAllocatorAlignedPool(HeapAllocatorAlignedPool&&) = delete;
+    HeapAllocatorAlignedPool& operator=(const HeapAllocatorAlignedPool&) = delete;
+    HeapAllocatorAlignedPool& operator=(HeapAllocatorAlignedPool&&) = delete;
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_size The total size of the pool.
+     */
+    HeapAllocatorAlignedPool(size_t p_size);
+
+    virtual MemID allocate(size_t p_size, size_t p_alignment) override;
+
+    virtual void deallocate(MemID p_mem) override;
+
+    virtual void* get(MemID p_id) const override;
+
+    virtual uint32_t obj_count() const override {
+        return allocated.size();
+    }
+
+    virtual const std::set<MemID>& get_allocated() const override {
+        return allocated;
+    }
+
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
+
+    virtual void clear() override {
+        size_map.clear();
+        allocated.clear();
+        idle_list_head->size = size;
+        idle_list_head->mem_start = mem_chunk;
+        idle_list_head->next = nullptr;
+    }
+
+    size_t get_total_size() const {
+        return size;
+    }
+
+    size_t get_remain_size() const;
+
+private:
+    
+    struct IdleListNode {
+        size_t size;
+        char* mem_start;
+        std::unique_ptr<IdleListNode> next = nullptr;
+    };
+
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    bool combine_idle_with_next(IdleListNode* p_node);
+    std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
+
+    size_t size;
+    std::unordered_map<void*, size_t> size_map;
+    char* mem_chunk;
+    uint32_t idle_chunks_count;
+    std::unique_ptr<IdleListNode> idle_list_head;
+    std::set<MemID> allocated;
+
+    bool is_in_pool(MemID p_id) const {
+        return allocated.find(p_id) != allocated.end();
+    }
+};
+
+}
+
+#endif

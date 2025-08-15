@@ -28,6 +28,8 @@ concept AllocatorTraitConcept = requires {
     { AllocatorType(T::TYPE) } -> std::same_as<AllocatorType>;
     // Does this allocator allocates from a memory pool.
     { bool(T::IS_POOL) } -> std::same_as<bool>;
+    // Is alignable
+    { bool(T::IS_ALIGNABLE) } -> std::same_as<bool>;
     // Is the memory of objects is guranteed to be continuous.
     { bool(T::IS_GURANTEED_CONTINUOUS) } -> std::same_as<bool>;
     // Is this allocator has limited size.

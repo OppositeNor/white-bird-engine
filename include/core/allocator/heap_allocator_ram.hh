@@ -12,6 +12,7 @@ struct AllocatorTrait<class HeapAllocatorRAM> {
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = false;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_ALIGNABLE = false;
     static constexpr bool IS_LIMITED_SIZE = false;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;

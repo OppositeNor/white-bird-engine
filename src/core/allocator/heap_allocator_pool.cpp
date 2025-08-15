@@ -1,7 +1,6 @@
 #include "core/allocator/allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
-#include "utils/utils.hh"
 #include "core/allocator/heap_allocator_pool.hh"
 #include <cstring>
 #include <sstream>
@@ -17,8 +16,8 @@ HeapAllocatorPool::~HeapAllocatorPool() {
     mem_chunk = nullptr;
 }
 
-HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)
-    : size(get_align_size(p_size, p_alignment)), alignment(p_alignment), mem_chunk(static_cast<std::byte*>(malloc(p_size))) {
+HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
+    : size(p_size), mem_chunk(static_cast<std::byte*>(malloc(p_size))) {
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to allocate memory for pool.");
     }
@@ -31,17 +30,16 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size, size_t p_alignment)
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    size_t align_size = get_align_size(p_size, alignment);
     while (valid_idle_node != nullptr) {
-        if ((*valid_idle_node)->size >= align_size) {
-            void* result = acquire_memory(*valid_idle_node, align_size);
+        if ((*valid_idle_node)->size >= p_size) {
+            void* result = acquire_memory(*valid_idle_node, p_size);
             allocated.insert(reinterpret_cast<MemID>(result));
-            size_map[result] = align_size;
+            size_map[result] = p_size;
             return reinterpret_cast<MemID>(result);
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(align_size) + " bytes.");
+    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(p_size) + " bytes.");
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {

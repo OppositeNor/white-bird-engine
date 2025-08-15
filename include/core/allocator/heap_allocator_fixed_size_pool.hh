@@ -17,6 +17,7 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> {
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = true;
+    static constexpr bool IS_ALIGNABLE = false;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = true;
     static constexpr bool IS_ATOMIC = false;

@@ -7,6 +7,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class HeapAllocator
+ * @brief Heap allocator.
+ *
+ */
 class HeapAllocator {
 public:
     HeapAllocator() = default;

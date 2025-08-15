@@ -20,6 +20,7 @@ struct AllocatorTrait<class HeapAllocatorPool> {
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
     static constexpr bool WILL_ADDR_MOVE = false;
+    static constexpr bool IS_ALIGNABLE = true;
 
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };
@@ -31,7 +32,7 @@ struct AllocatorTrait<class HeapAllocatorPool> {
  */
 class HeapAllocatorPool final : public HeapAllocator {
 public:
-    HeapAllocatorPool() : HeapAllocatorPool(1024) {}
+    HeapAllocatorPool() : HeapAllocatorPool(WBE_KiB(1)) {}
     virtual ~HeapAllocatorPool() override;
     HeapAllocatorPool(const HeapAllocatorPool&) = delete;
     HeapAllocatorPool(HeapAllocatorPool&&) = delete;
@@ -42,9 +43,8 @@ public:
      * @brief Constructor.
      *
      * @param p_size The size of the pool in bytes.
-     * @param p_alignment The alignment of the allocation.
      */
-    HeapAllocatorPool(size_t p_size, size_t p_alignment = 1);
+    HeapAllocatorPool(size_t p_size);
 
     virtual MemID allocate(size_t p_size) override;
 
@@ -76,10 +76,6 @@ public:
 
     size_t get_remain_size() const;
 
-    size_t get_alignment() const {
-        return alignment;
-    }
-
     virtual bool is_empty() const override {
         return allocated.empty();
     }
@@ -107,7 +103,6 @@ private:
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 
     size_t size;
-    size_t alignment;
     std::unordered_map<void*, size_t> size_map;
     std::byte* mem_chunk;
     uint32_t idle_chunks_count;

@@ -15,7 +15,7 @@ TEST(WBEAllocPoolTest, TraitTest) {
 }
 
 TEST(WBEAllocPoolTest, ToString) {
-    WBE::HeapAllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024);
     std::string exp_1 = "HeapAllocatorPool: {obj_count: 0;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
@@ -29,8 +29,8 @@ TEST(WBEAllocPoolTest, ToString) {
     std::string exp_2 = "HeapAllocatorPool: {obj_count: 1;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
-        "begin: 4;\n"
-        "size: 1020;\n"
+        "begin: 2;\n"
+        "size: 1022;\n"
         "};\n"
         "};\n"
         "};";
@@ -39,8 +39,8 @@ TEST(WBEAllocPoolTest, ToString) {
     std::string exp_3 = "HeapAllocatorPool: {obj_count: 2;\n"
         "free_chunk_layout: {\n"
         "chunk: {\n"
-        "begin: 12;\n"
-        "size: 1012;\n"
+        "begin: 10;\n"
+        "size: 1014;\n"
         "};\n"
         "};\n"
         "};";
@@ -50,11 +50,11 @@ TEST(WBEAllocPoolTest, ToString) {
         "free_chunk_layout: {\n"
         "chunk: {\n"
         "begin: 0;\n"
-        "size: 4;\n"
+        "size: 2;\n"
         "};\n"
         "chunk: {\n"
-        "begin: 12;\n"
-        "size: 1012;\n"
+        "begin: 10;\n"
+        "size: 1014;\n"
         "};\n"
         "};\n"
         "};";
@@ -72,7 +72,7 @@ TEST(WBEAllocPoolTest, ToString) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleFront) {
-    WBE::HeapAllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -128,7 +128,7 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleBack) {
-    WBE::HeapAllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -184,7 +184,7 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
-    WBE::HeapAllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -263,7 +263,7 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleEnd) {
-    WBE::HeapAllocatorPool pool(1024, 4);
+    WBE::HeapAllocatorPool pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(1012);
@@ -305,9 +305,9 @@ TEST(WBEAllocPoolTest, RemoveIdleEnd) {
 }
 
 TEST(WBEAllocPoolTest, RemainSize) {
-    WhiteBirdEngine::HeapAllocatorPool pool(1024, 4);
+    WhiteBirdEngine::HeapAllocatorPool pool(1024);
     WBE::MemID mem = pool.allocate(2);
-    ASSERT_EQ(pool.get_remain_size(), 1020);
+    ASSERT_EQ(pool.get_remain_size(), 1022);
     pool.deallocate(mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
     WBE::MemID all_mem = pool.allocate(1024);
@@ -361,7 +361,7 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
         uint32_t child_placeholder2;
     };
 
-    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024, sizeof(uint32_t));
+    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase));
     WBE::MemID test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
