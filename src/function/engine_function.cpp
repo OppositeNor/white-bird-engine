@@ -30,6 +30,7 @@ EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
 
 EngineFunction::~EngineFunction() {
     delete renderer;
+    delete renderer_allocator;
     delete game_config;
     singleton = nullptr;
 }
