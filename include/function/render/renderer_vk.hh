@@ -126,7 +126,7 @@ private:
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
-        return &(allocator->get_allocation_callbacks());
+        return allocator->get_allocation_callbacks();
     }
 };
 

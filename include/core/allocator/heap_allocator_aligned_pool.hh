@@ -30,6 +30,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> {
  * @class HeapAllocatorAlignedPool
  * @brief Heap allocator pool with memory alignment support.
  *
+ * @todo Test
  */
 class HeapAllocatorAlignedPool : public HeapAllocatorAligned {
 public:
@@ -84,8 +85,21 @@ public:
 
     size_t get_remain_size() const;
 
+    virtual operator std::string() const override {
+        std::stringstream ss;
+        ss << "HeapAllocatorAlignedPool: {obj_count: " << obj_count() << ";\n";
+        ss << "free_chunk_layout: {\n";
+        IdleListNode* node = idle_list_head.get();
+        while (node != nullptr) {
+            ss << "chunk: {\nbegin: " << node->mem_start - mem_chunk << ";\nsize: " << node->size << ";\n};\n";
+            node = node->next.get();
+        }
+        ss << "};\n};";
+        return ss.str();
+    }
+
 private:
-    
+
     struct IdleListNode {
         size_t size;
         char* mem_start;

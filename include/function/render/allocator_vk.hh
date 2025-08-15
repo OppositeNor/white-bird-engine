@@ -39,8 +39,8 @@ public:
      *
      * @return The allocation callback.
      */
-    VkAllocationCallbacks& get_allocation_callbacks() {
-        return allocator_callbacks;
+    VkAllocationCallbacks* get_allocation_callbacks() {
+        return &allocator_callbacks;
     }
 
 private:
