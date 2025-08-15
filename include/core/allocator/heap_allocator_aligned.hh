@@ -64,6 +64,14 @@ public:
     virtual void clear() = 0;
 
     /**
+     * @brief Get the size of an allocated memory.
+     *
+     * @param p_mem_id The memory ID of the allocated memory.
+     * @return The size of the allocated memory.
+     */
+    virtual size_t get_allocated_data_size(MemID p_mem_id) const = 0;
+
+    /**
      * @brief Get the pointer pointing to the resource.
      *
      * @tparam T The type of the resource.

@@ -24,12 +24,12 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     // TODO: alignment
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    while (valid_idle_node != nullptr) {
+    while (*valid_idle_node != nullptr) {
         uintptr_t mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start);
         char* idle_node_mem_start = reinterpret_cast<char*>(
             (mem_start_addr / p_alignment) * p_alignment == mem_start_addr ? mem_start_addr : (mem_start_addr / p_alignment + 1) * p_alignment
         );
-        if (idle_node_mem_start < (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
+        if (idle_node_mem_start + p_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
             void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, p_size);
             allocated.insert(reinterpret_cast<MemID>(result));
             size_map[result] = p_size;
@@ -61,7 +61,8 @@ void* HeapAllocatorAlignedPool::get(MemID p_id) const {
 }
 
 void* HeapAllocatorAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {
-    WBE_DEBUG_ASSERT(p_mem_start > p_node->mem_start && p_mem_start < p_node->mem_start + p_node->size);
+    WBE_DEBUG_ASSERT(p_mem_start >= p_node->mem_start);
+    WBE_DEBUG_ASSERT(p_mem_start + p_mem_size <= p_node->mem_start + p_node->size);
     if (p_node->mem_start == p_mem_start) {
         p_node->size -= p_mem_size;
         void* node_mem_start = p_node->mem_start;

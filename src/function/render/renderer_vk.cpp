@@ -3,6 +3,7 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
+#include "function/render/allocator_vk.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
@@ -12,7 +13,8 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK() {
+RendererVK::RendererVK(Ref<AllocatorVK> p_allocator)
+    : allocator(p_allocator) {
     init();
 }
 
@@ -27,12 +29,12 @@ void RendererVK::init() {
 
 void RendererVK::terminate() {
     for (auto image_view : swap_chain_image_views) {
-        vkDestroyImageView(logical_device, image_view, nullptr);
+        vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
     }
-    vkDestroySwapchainKHR(logical_device, swap_chain, nullptr);
+    vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
     vkDestroySurfaceKHR(vk_instance, surface, nullptr);
-    vkDestroyDevice(logical_device, nullptr);
-    vkDestroyInstance(vk_instance, nullptr);
+    vkDestroyDevice(logical_device, get_allocation_callbacks());
+    vkDestroyInstance(vk_instance, get_allocation_callbacks());
     SDL_DestroyWindow(window);
     SDL_Vulkan_UnloadLibrary();
     SDL_Quit();
@@ -86,7 +88,7 @@ void RendererVK::create_instance() {
     create_info.enabledExtensionCount = extensions_count;
     create_info.ppEnabledExtensionNames = extension_names.data();
 
-    if (vkCreateInstance(&create_info, nullptr, &vk_instance) != VK_SUCCESS) {
+    if (vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan instance.");
     }
 }
@@ -148,7 +150,7 @@ void RendererVK::create_swap_chain() {
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = VK_NULL_HANDLE;
 
-    if (vkCreateSwapchainKHR(logical_device, &create_info, nullptr, &swap_chain) != VK_SUCCESS) {
+    if (vkCreateSwapchainKHR(logical_device, &create_info, get_allocation_callbacks(), &swap_chain) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swap chain.");
     }
 
@@ -219,7 +221,7 @@ void RendererVK::create_logical_device() {
     VkPhysicalDeviceFeatures device_features{};
     create_info.pEnabledFeatures = &device_features;
 
-    if (vkCreateDevice(physical_device, &create_info, nullptr, &logical_device) != VK_SUCCESS) {
+    if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device.");
     }
     vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &graphics_queue);

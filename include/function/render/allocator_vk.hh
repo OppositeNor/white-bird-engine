@@ -1,7 +1,8 @@
 #ifndef __WBE_ALLOCATOR_VK_HH__
 #define __WBE_ALLOCATOR_VK_HH__
 
-#include "core/allocator/heap_allocator.hh"
+#include "core/allocator/allocator.hh"
+#include "core/allocator/heap_allocator_aligned.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -24,14 +25,21 @@ public:
      *
      * @param p_allocator The allocator.
      */
-    AllocatorVK(HeapAllocator* p_allocator);
+    template <typename AllocType> requires (AllocatorTrait<AllocType>::IS_ALIGNABLE && !AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
+    AllocatorVK(AllocType* p_allocator) {
+        allocator = p_allocator;
+        allocator_callbacks.pUserData = this;
+        allocator_callbacks.pfnAllocation = AllocatorVK::allocation;
+        allocator_callbacks.pfnReallocation = AllocatorVK::reallocation;
+        allocator_callbacks.pfnFree = AllocatorVK::free;
+    }
 
     /**
      * @brief Get the allocation callback.
      *
      * @return The allocation callback.
      */
-    VkAllocationCallbacks get_allocation_callback() {
+    VkAllocationCallbacks& get_allocation_callbacks() {
         return allocator_callbacks;
     }
 
@@ -41,7 +49,7 @@ private:
     static void free(void* p_this, void* p_memory);
 
     VkAllocationCallbacks allocator_callbacks{};
-    HeapAllocator* allocator;
+    HeapAllocatorAligned* allocator;
 };
 
 }

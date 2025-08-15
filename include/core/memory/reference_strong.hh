@@ -2,7 +2,6 @@
 #define __WBE_REFERENCE_STRONG_HH__
 
 #include "core/allocator/heap_allocator.hh"
-#include "core/engine_core.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
@@ -258,7 +257,7 @@ private:
 template <typename T, typename AllocType,  typename... Args>
 Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
-    MemID id = create_obj(*p_allocator, std::forward<Args>(p_args)...);
+    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Ref<T, AllocType>(p_allocator, id);
 }
 

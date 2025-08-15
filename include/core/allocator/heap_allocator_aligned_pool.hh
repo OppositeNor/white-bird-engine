@@ -17,7 +17,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> {
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
-    static constexpr bool IS_ALIGNABLE = false;
+    static constexpr bool IS_ALIGNABLE = true;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
@@ -72,6 +72,10 @@ public:
         idle_list_head->size = size;
         idle_list_head->mem_start = mem_chunk;
         idle_list_head->next = nullptr;
+    }
+
+    virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
+        return size_map.at(get(p_mem_id));
     }
 
     size_t get_total_size() const {

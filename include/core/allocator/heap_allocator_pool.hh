@@ -20,7 +20,7 @@ struct AllocatorTrait<class HeapAllocatorPool> {
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;
     static constexpr bool WILL_ADDR_MOVE = false;
-    static constexpr bool IS_ALIGNABLE = true;
+    static constexpr bool IS_ALIGNABLE = false;
 
     WBE_TRAIT_REQURIES(AllocatorTraitConcept);
 };

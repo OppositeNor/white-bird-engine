@@ -30,7 +30,7 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    while (valid_idle_node != nullptr) {
+    while (*valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
             allocated.insert(reinterpret_cast<MemID>(result));

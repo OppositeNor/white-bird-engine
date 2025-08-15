@@ -22,13 +22,13 @@ namespace WhiteBirdEngine {
  */
 class RendererVK : public Renderer {
 public:
-    RendererVK();
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
     RendererVK(RendererVK&&) = delete;
     RendererVK& operator=(const RendererVK&) = delete;
     RendererVK& operator=(RendererVK&&) = delete;
 
+    RendererVK(Ref<AllocatorVK> p_allocator);
 private:
 
     Ref<AllocatorVK> allocator;     // TODO: use allocator
@@ -125,6 +125,9 @@ private:
     VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
+    VkAllocationCallbacks* get_allocation_callbacks() {
+        return &(allocator->get_allocation_callbacks());
+    }
 };
 
 }
