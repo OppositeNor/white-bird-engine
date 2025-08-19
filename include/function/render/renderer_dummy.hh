@@ -13,7 +13,7 @@ class RendererDummy : public Renderer {
 public:
     RendererDummy() = default;
     virtual ~RendererDummy() override {}
-    // TODO
+
 };
 
 }

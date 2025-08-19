@@ -39,9 +39,7 @@ public:
      * @brief Pop a resource chunk from the end of the chunk stack.
      */
     void pop_chunk() {
-        size_t pop_size = resource_chunks.back().second->get_size();
         resource_chunks.pop_back();
-        stack_allocator.pop_stack(pop_size);
     }
 
     /**

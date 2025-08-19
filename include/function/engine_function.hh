@@ -25,6 +25,8 @@ private:
     inline static EngineFunction* singleton;
     
     HeapAllocatorAlignedPool* renderer_allocator;
+
+    void init_render_api();
 };
 
 }

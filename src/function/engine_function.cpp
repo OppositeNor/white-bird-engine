@@ -15,6 +15,17 @@ EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
     singleton = this;
     game_config = new GameConfig(p_game_config_file_path);
     renderer_allocator = new HeapAllocatorAlignedPool(WBE_MiB(500));
+    // TODO: Initialize render api
+}
+
+EngineFunction::~EngineFunction() {
+    delete renderer;
+    delete renderer_allocator;
+    delete game_config;
+    singleton = nullptr;
+}
+
+void EngineFunction::init_render_api() {
     auto render_api = game_config->get_config_options().render_api;
     switch (render_api) {
         case GameConfigOptions::RenderAPI::DUMMY:
@@ -27,13 +38,5 @@ EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
         break;
     }
 }
-
-EngineFunction::~EngineFunction() {
-    delete renderer;
-    delete renderer_allocator;
-    delete game_config;
-    singleton = nullptr;
-}
-
 
 }

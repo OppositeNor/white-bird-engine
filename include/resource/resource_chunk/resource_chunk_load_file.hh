@@ -20,7 +20,9 @@ namespace WhiteBirdEngine {
  */
 class ResourceChunkLoadFile : public ResourceChunk<ResourceChunkLoadFile> {
 public:
-    ~ResourceChunkLoadFile() {}
+    ~ResourceChunkLoadFile() {
+        allocator->pop_stack(total_size);
+    }
     ResourceChunkLoadFile(const ResourceChunkLoadFile&) = delete;
     ResourceChunkLoadFile(ResourceChunkLoadFile&&) = delete;
     ResourceChunkLoadFile& operator=(const ResourceChunkLoadFile&) = delete;
@@ -43,19 +45,19 @@ public:
     }
 
     template <ResourceUnitConcept T>
-    MemID push_res_unit(const std::string& p_res_key, StackAllocator& p_allocator, const T& p_res) {
+    MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
         using PureT = std::remove_cvref<T>;
         total_size += sizeof(PureT);
-        MemID result = p_allocator.allocate(sizeof(PureT));
-        *(p_allocator.get_obj<PureT>(result)) = p_res;
+        MemID result = allocator->allocate(sizeof(PureT));
+        *(allocator->get_obj<PureT>(result)) = p_res;
         resource_map[dynam_hash(p_res_key.c_str())] = result;
         return result;
     }
 
-    MemID push_data(size_t p_res_size, void* p_res, StackAllocator& p_allocator) {
+    MemID push_data(size_t p_res_size, void* p_res) {
         total_size += p_res_size;
-        MemID result = p_allocator.allocate(p_res_size);
-        memcpy(p_allocator.get(result), p_res, p_res_size);
+        MemID result = allocator->allocate(p_res_size);
+        memcpy(allocator->get(result), p_res, p_res_size);
         return result;
     }
 
@@ -66,6 +68,7 @@ public:
 private:
     size_t total_size;
     std::unordered_map<HashCode, MemID> resource_map;
+    StackAllocator* allocator;
 
     enum class RUType {
         AUDIO,
@@ -116,6 +119,7 @@ inline ResourceChunkLoadFile::RUType ResourceChunkLoadFile::get_res_type(const s
 
 template <ParserConcept ParserType>
 ResourceChunkLoadFile::ResourceChunkLoadFile(const Parser<ParserType>& p_parser, StackAllocator& p_allocator) {
+    allocator = &p_allocator;
     std::vector<std::string> keys = p_parser.get_all_keys();
     for (auto& key : keys) {
         switch (get_res_type(key)) {

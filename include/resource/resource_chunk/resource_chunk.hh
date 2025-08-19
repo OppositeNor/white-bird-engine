@@ -2,7 +2,6 @@
 #define __WBE_RESOURCE_CHUNK_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/stack_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -54,8 +53,8 @@ public:
      * @return The memory id of the pushed resource unit.
      */
     template <ResourceUnitConcept T>
-    MemID push_res_unit(const std::string& p_res_key, StackAllocator& p_allocator, const T& p_res) {
-        return static_cast<ChildT*>(this)->push_res_unit(p_res_key, p_allocator, p_res);
+    MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
+        return static_cast<ChildT*>(this)->push_res_unit(p_res_key, p_res);
     }
 
     /**
@@ -66,8 +65,8 @@ public:
      * @param p_allocator The allocator to allocate memory.
      * @return The result memory id.
      */
-    MemID push_data(size_t p_res_size, void* p_res, StackAllocator& p_allocator) {
-        return static_cast<ChildT*>(this)->push_data(p_res_size, p_res, p_allocator);
+    MemID push_data(size_t p_res_size, void* p_res) {
+        return static_cast<ChildT*>(this)->push_data(p_res_size, p_res);
     }
 
 };

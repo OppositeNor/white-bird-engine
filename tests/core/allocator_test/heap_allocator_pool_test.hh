@@ -376,7 +376,4 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
 
-// TODO: test flush
-
-
 #endif
