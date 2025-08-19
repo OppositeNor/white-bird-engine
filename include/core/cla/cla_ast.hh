@@ -71,12 +71,21 @@ public:
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
+    /**
+     * @brief Get the operation name.
+     *
+     * @return The operation name.
+     */
+    const std::string& get_operation_name() const {
+        return operation_name;
+    }
+
 private:
     std::string operation_name;
 };
 
 class CLAASTNodeOperation : public CLAASTNode {
-
+public:
     /**
      * @brief Constructor.
      *
@@ -88,6 +97,24 @@ class CLAASTNodeOperation : public CLAASTNode {
     virtual ~CLAASTNodeOperation() override {}
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
+
+    /**
+     * @brief Get operation name.
+     *
+     * @return The name of the operation.
+     */
+    const std::string& get_operation_name() const {
+        return operation_name;
+    }
+
+    /**
+     * @brief Get the arguments.
+     *
+     * @return The arguments of the operation.
+     */
+    const std::vector<std::string>& get_arguments() const {
+        return arguments;
+    }
 private:
     std::string operation_name;
     std::vector<std::string> arguments;

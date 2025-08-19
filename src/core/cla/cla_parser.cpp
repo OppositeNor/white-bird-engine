@@ -1,6 +1,7 @@
 #include "core/cla/cla_parser.hh"
 #include "core/allocator/allocator.hh"
 #include "core/cla/cla_ast.hh"
+#include "core/memory/reference_strong.hh"
 
 namespace WhiteBirdEngine {
 

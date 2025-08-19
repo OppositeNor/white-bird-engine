@@ -149,7 +149,7 @@ inline int test_val1 = 0;
 inline int test_val2 = 0;
 
 inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass> p_ref2, uint32_t p_iteration_count) {
-    std::vector<WBE::Ref<TestClass, WBE::HeapAllocator>> refs;
+    std::vector<WBE::Ref<TestClass>> refs;
     WBE::HeapAllocatorPool allocator;
     refs.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {

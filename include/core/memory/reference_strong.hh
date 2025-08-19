@@ -18,9 +18,9 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocator>
+template <typename T>
 class Ref {
-    template <typename T1, typename AllocTyp1>
+    template <typename T1>
     friend class Ref;
 
     template <typename T1>
@@ -30,7 +30,7 @@ class Ref {
 public:
 
     using ObjType = T;
-    using HeapAllocatorType = AllocType;
+    using AllocType = HeapAllocator;
 
     Ref() {
         control_block = nullptr;
@@ -264,11 +264,11 @@ private:
     mutable ControlBlock* control_block;
 };
 
-template <typename T, typename AllocType,  typename... Args>
-Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
+template <typename T,  typename... Args>
+Ref<T> make_ref(HeapAllocator* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
-    return Ref<T, AllocType>(p_allocator, id);
+    return Ref<T>(p_allocator, id);
 }
 
 }

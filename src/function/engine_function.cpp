@@ -1,5 +1,4 @@
 #include "function/engine_function.hh"
-#include "core/allocator/heap_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/game_config/game_config.hh"
@@ -32,7 +31,7 @@ void EngineFunction::init_render_api() {
             renderer = new RendererDummy();
         break;
         case GameConfigOptions::RenderAPI::VULKAN:
-            Ref<AllocatorVK> vulkan_allocator = make_ref<AllocatorVK, HeapAllocator>(
+            Ref<AllocatorVK> vulkan_allocator = make_ref<AllocatorVK>(
                 Global::get_singleton()->engine_core->pool_allocator, renderer_allocator);
             renderer = new RendererVK(vulkan_allocator);
         break;

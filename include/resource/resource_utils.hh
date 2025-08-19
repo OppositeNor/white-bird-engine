@@ -132,7 +132,7 @@ inline void img_flip_h(unsigned char* p_data, uint32_t p_width, uint32_t p_heigh
  * @param p_channels The channel count of the image.
  */
 inline void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
-    // Use temporary buffer to increase cache hits.
+    // Use temporary buffer to increase locality
     uint32_t row_size = p_width * p_channels;
     std::unique_ptr<unsigned char[]> temp = std::make_unique<unsigned char[]>(row_size);
     unsigned char* source_row;
