@@ -1,5 +1,6 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/allocator.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 
@@ -22,22 +23,22 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 }
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
-    // TODO: alignment
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
+    size_t aligned_size = get_align_size(p_size, p_alignment);
     while (*valid_idle_node != nullptr) {
         uintptr_t mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start);
         char* idle_node_mem_start = reinterpret_cast<char*>(
             (mem_start_addr / p_alignment) * p_alignment == mem_start_addr ? mem_start_addr : (mem_start_addr / p_alignment + 1) * p_alignment
         );
-        if (idle_node_mem_start + p_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
-            void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, p_size);
+        if (idle_node_mem_start + aligned_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
+            void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
             allocated.insert(reinterpret_cast<MemID>(result));
-            size_map[result] = p_size;
+            size_map[result] = aligned_size;
             return reinterpret_cast<MemID>(result);
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(p_size) + " bytes.");
+    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(aligned_size) + " bytes.");
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {

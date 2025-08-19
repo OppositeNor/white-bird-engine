@@ -1,17 +1,15 @@
 #ifndef __WBE_CLA_PARSER_HH__
 #define __WBE_CLA_PARSER_HH__
 
+#include "core/cla/cla_ast.hh"
 #include "core/cla/cla_token.hh"
+#include "core/memory/reference_strong.hh"
 #include "utils/interface/singleton.hh"
 #include <vector>
 
 namespace WhiteBirdEngine {
 
 class EngineConfig;
-
-class CLAAST {
-    // TODO
-};
 
 /**
  * @class CLAParser
@@ -27,7 +25,13 @@ public:
     CLAParser& operator=(const CLAParser&) = default;
     CLAParser& operator=(CLAParser&&) = default;
 
-    CLAAST parse(const std::vector<CLAToken>& p_tokens);
+    /**
+     * @brief Parse tokens into ast.
+     *
+     * @param p_tokens The tokens to parse.
+     * @return 
+     */
+    Ref<CLAASTNode> parse(const std::vector<CLAToken>& p_tokens);
     
 private:
 };

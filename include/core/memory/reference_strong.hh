@@ -1,10 +1,12 @@
 #ifndef __WBE_REFERENCE_STRONG_HH__
 #define __WBE_REFERENCE_STRONG_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
@@ -62,6 +64,14 @@ public:
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
         return *this;
+    }
+
+    Ref(MemID p_mem_id) {
+        if (p_mem_id == MEM_NULL) {
+            control_block = nullptr;
+            return;
+        }
+        throw std::runtime_error("Cannot directly asign an memory id to a reference unless it's MEM_NULL.");
     }
 
     template <typename T1>

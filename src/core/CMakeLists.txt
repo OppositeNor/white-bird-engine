@@ -1,6 +1,7 @@
 file(GLOB wbe_core_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(allocator)
+add_subdirectory(cla)
 add_subdirectory(utils)
 add_subdirectory(logging)
 add_subdirectory(profiling)

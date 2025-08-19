@@ -256,6 +256,11 @@ struct EngineConfigOptions {
      * @brief The size of the thread memory pool.
      */
     size_t thread_mem_pool_size = WBE_KiB(16);
+
+    /**
+     * @brief The utility name while running the program.
+     */
+    std::string utility_name;
 };
 
 /**

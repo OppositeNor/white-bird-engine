@@ -34,8 +34,8 @@ public:
     std::vector<CLAToken> apply(uint32_t p_argc, const char* p_argv[]) {
         WBE_DEBUG_ASSERT(p_argc > 1);
         std::vector<CLAToken> result;
-        result.push_back({ .value = std::string(p_argv[0]), .type = CLAToken::Type::UTILITY_NAME });
         result.reserve(p_argc);
+        result.push_back({ .value = std::string(p_argv[0]), .type = CLAToken::Type::UTILITY_NAME });
         for (uint32_t i = 1; i < p_argc; ++i) {
             CLAToken token{};
             token.value = std::string(p_argv[i]);
