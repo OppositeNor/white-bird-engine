@@ -16,7 +16,7 @@ void* AllocatorVK::allocation(AllocatorVK* p_this, size_t p_size, size_t p_align
 
 void* AllocatorVK::reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
     if (p_size == 0) {
-        p_this->allocator->deallocate(reinterpret_cast<MemID>(p_original));
+        free(p_this, p_original);
         return nullptr;
     }
     size_t original_size = p_this->allocator->get_allocated_data_size(reinterpret_cast<MemID>(p_original));
