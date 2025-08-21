@@ -51,6 +51,7 @@ public:
     virtual void deallocate(MemID p_mem) override {
         WBE_DEBUG_ASSERT(size_map.contains(p_mem));
         size_map.erase(p_mem);
+        allocated.erase(p_mem);
         free(reinterpret_cast<void*>(p_mem));
     }
 
@@ -76,6 +77,16 @@ public:
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         return size_map.at(p_mem_id);
+    }
+
+    virtual operator std::string() const override {
+        std::stringstream ss;
+        ss << "HeapAllocatorAlignedRAM{obj_count: " << obj_count() << ";\n";
+        for (auto& mem_id : allocated) {
+            ss << "{ mem_id: " << mem_id << ", size: " << size_map.at(mem_id) << "; }\n";
+        }
+        ss << "}\n";
+        return ss.str();
     }
 
 private:
