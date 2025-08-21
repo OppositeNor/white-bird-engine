@@ -2,7 +2,7 @@
 #define __WBE_RU_LOADER_PNG_HH__
 
 #include "platform/file_system/path.hh"
-#include "resource/resource_unit/ru_image.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_utils.hh"
 #include <cstdint>

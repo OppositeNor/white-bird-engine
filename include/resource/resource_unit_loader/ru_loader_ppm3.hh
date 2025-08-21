@@ -1,7 +1,7 @@
 #ifndef __WBE_RU_LOADER_PPM3_HH__
 #define __WBE_RU_LOADER_PPM3_HH__
 
-#include "resource/resource_unit/ru_image.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include <memory>
 namespace WhiteBirdEngine {

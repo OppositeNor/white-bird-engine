@@ -3,7 +3,7 @@
 
 #include "core/allocator/allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_unit/ru_text.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "utils/utils.hh"
 #include <string>
