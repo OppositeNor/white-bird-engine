@@ -47,7 +47,8 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
     if (!is_in_pool(p_mem)) {
-        throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
+        throw std::runtime_error("Failed to deallocate memory: memory id: " + std::to_string(p_mem) + " not allocated in this memory pool.\n"
+                                 "Pool status: " + (std::string)*this);
     }
     void* data_loc = reinterpret_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
