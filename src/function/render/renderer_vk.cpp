@@ -15,6 +15,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(Ref<AllocatorVK> p_allocator)
     : allocator(p_allocator) {
+    init();
 }
 
 RendererVK::~RendererVK() {

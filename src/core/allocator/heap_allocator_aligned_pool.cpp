@@ -3,6 +3,7 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -38,7 +39,10 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(aligned_size) + " bytes.");
+    std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
+        "Trying to allocate: " + std::to_string(aligned_size) + " bytes.\n"
+        "Pool status: " + (std::string)*this;
+    throw std::runtime_error(err_msg);
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
