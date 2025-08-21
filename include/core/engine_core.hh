@@ -1,6 +1,6 @@
 #ifndef __WBE_ENGINE_CORE_HH__
 #define __WBE_ENGINE_CORE_HH__
-#include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/engine_config/engine_config.hh"
 #include "utils/game_metadata.hh"
@@ -62,7 +62,7 @@ public:
     /**
      * @brief Global pool allocator.
      */
-    HeapAllocatorPool* pool_allocator;
+    HeapAllocatorAlignedPool* pool_allocator;
     /**
      * @brief Manager for logs.
      */

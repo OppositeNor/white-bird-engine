@@ -330,9 +330,9 @@ TEST(WBEAllocAlignedPoolTest, ConstructDestructCall) {
         uint32_t* test_val_ptr;
     };
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool();
-    WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestClass>(allocator, 1, &test_val);
+    WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
-    WBE::destroy_obj_align<TestClass>(allocator, test_obj);
+    WBE::destroy_obj<TestClass>(allocator, test_obj);
     ASSERT_EQ(test_val, 2);
 }
 
@@ -362,17 +362,17 @@ TEST(WBEAllocAlignedPoolTest, WithDiffInstances) {
     };
 
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
-    WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestBase>(allocator, 1);
+    WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestBase>(allocator);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase));
-    WBE::MemID test_obj1 = WhiteBirdEngine::create_obj_align<TestChild1>(allocator, 1);
+    WBE::MemID test_obj1 = WhiteBirdEngine::create_obj_align<TestChild1>(allocator);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1));
-    WBE::MemID test_obj2 = WhiteBirdEngine::create_obj_align<TestChild2>(allocator, 1);
+    WBE::MemID test_obj2 = WhiteBirdEngine::create_obj_align<TestChild2>(allocator);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj_align<TestBase>(allocator, test_obj);
+    WhiteBirdEngine::destroy_obj<TestBase>(allocator, test_obj);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj_align<TestChild1>(allocator, test_obj1);
+    WhiteBirdEngine::destroy_obj<TestChild1>(allocator, test_obj1);
     ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2));
-    WhiteBirdEngine::destroy_obj_align<TestChild2>(allocator, test_obj2);
+    WhiteBirdEngine::destroy_obj<TestChild2>(allocator, test_obj2);
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
 

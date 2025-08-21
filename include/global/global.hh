@@ -1,7 +1,7 @@
 #ifndef __WBE_GLOBAL_HH__
 #define __WBE_GLOBAL_HH__
 
-#include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
 #include "function/engine_function.hh"
 #include "platform/file_system/directory.hh"
@@ -57,7 +57,7 @@ private:
     inline static Global* singleton;
 };
 
-inline HeapAllocatorPool* global_allocator() {
+inline HeapAllocatorAlignedPool* global_allocator() {
     return Global::get_singleton()->engine_core->pool_allocator;
 }
 

@@ -100,8 +100,8 @@ public:
  * @return The memory ID of the created object.
  */
 template <typename T, typename... Args>
-inline MemID create_obj_align(HeapAllocatorAligned& p_allocator, size_t p_alignment, Args&&... p_args) {
-    MemID id = p_allocator.allocate(sizeof(T), p_alignment);
+inline MemID create_obj_align(HeapAllocatorAligned& p_allocator, Args&&... p_args) {
+    MemID id = p_allocator.allocate(sizeof(T), alignof(T));
     new(p_allocator.get(id)) T(std::forward<Args>(p_args)...);
     return id;
 }
@@ -114,7 +114,7 @@ inline MemID create_obj_align(HeapAllocatorAligned& p_allocator, size_t p_alignm
  * @param p_id The memory ID of the object.
  */
 template <typename T>
-inline void destroy_obj_align(HeapAllocatorAligned& p_allocator, MemID p_id) {
+inline void destroy_obj(HeapAllocatorAligned& p_allocator, MemID p_id) {
     if (p_id == MEM_NULL) {
         return;
     }

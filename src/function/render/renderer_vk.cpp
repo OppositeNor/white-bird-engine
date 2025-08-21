@@ -1,9 +1,12 @@
 #include "function/render/renderer_vk.hh"
 #include "SDL_vulkan.h"
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
+#include "function/function_utils.hh"
 #include "function/render/allocator_vk.hh"
+#include "global/stl_allocator.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
@@ -82,7 +85,7 @@ void RendererVK::create_instance() {
 
     uint32_t extensions_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
-    std::vector<const char*> extension_names(extensions_count);
+    vector<const char*, HeapAllocatorAlignedPool> extension_names(extensions_count, get_render_allocator());
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
 
     create_info.enabledExtensionCount = extensions_count;
@@ -132,7 +135,7 @@ void RendererVK::create_swap_chain() {
     // If we have to use the image between multiple queue families, we have to specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we don't have to explicitly transfer ownership.
-        std::vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end());
+        vector<uint32_t, HeapAllocatorAlignedPool> unique_indices_array(unique_indices.begin(), unique_indices.end(), get_render_allocator());
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = unique_indices_array.data();
@@ -179,7 +182,7 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
+    vector<VkPhysicalDevice, HeapAllocatorAlignedPool> physical_devices(physical_device_count, get_render_allocator());
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
@@ -195,7 +198,7 @@ void RendererVK::create_logical_device() {
 
     float queue_priority = 1.0;
     std::set<int> indices = queue_family_indices.get_unique_indices();
-    std::vector<VkDeviceQueueCreateInfo> queues_create_info;
+    vector<VkDeviceQueueCreateInfo, HeapAllocatorAlignedPool> queues_create_info(get_render_allocator());
     queues_create_info.reserve(indices.size());
     for (int elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
@@ -231,7 +234,7 @@ void RendererVK::create_logical_device() {
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
     uint32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, nullptr);
-    std::vector<VkExtensionProperties> extension_properties(extension_count);
+    vector<VkExtensionProperties, HeapAllocatorAlignedPool> extension_properties(extension_count, get_render_allocator());
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, extension_properties.data());
     std::set<std::string> enabled_extensions(enabled_device_extensions.begin(), enabled_device_extensions.end());
     for (const auto& extension : extension_properties) {
@@ -243,7 +246,7 @@ bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
 bool RendererVK::check_validation_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-    std::vector<VkLayerProperties> layer_properties(layer_count);
+    vector<VkLayerProperties, HeapAllocatorAlignedPool> layer_properties(layer_count, get_render_allocator());
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
     for (auto* name : validation_layers) {
         bool layer_found = false;
@@ -261,7 +264,7 @@ bool RendererVK::check_validation_layer_support() {
     return true;
 }
 
-void RendererVK::pick_physical_device(const std::vector<VkPhysicalDevice>& p_physical_devices) {
+void RendererVK::pick_physical_device(const vector<VkPhysicalDevice, HeapAllocatorAlignedPool>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
@@ -322,7 +325,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     QueueFamilyIndices indices{};
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
-    std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
+    vector<VkQueueFamilyProperties, HeapAllocatorAlignedPool> queue_family_properties(queue_family_count, get_render_allocator());
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
     int i = 0;
     for (auto& queue_family_property : queue_family_properties) {
@@ -346,7 +349,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 }
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
-    SwapChainSupportDetails details;
+    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool>(get_render_allocator()),
+        .present_modes = vector<VkPresentModeKHR, HeapAllocatorAlignedPool>(get_render_allocator())};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -359,7 +363,7 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
     return details;
 }
 
-VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& p_available_formats) {
+VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool>& p_available_formats) {
     for (const auto& available_format : p_available_formats) {
         if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB
             && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -369,7 +373,7 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const std::vector<VkSu
     return p_available_formats[0];
 }
 
-VkPresentModeKHR RendererVK::choose_swap_present_mode(const std::vector<VkPresentModeKHR>& p_available_present_modes) {
+VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR, HeapAllocatorAlignedPool>& p_available_present_modes) {
     // TODO: get from configuration
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {

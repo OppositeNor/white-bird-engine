@@ -1,9 +1,11 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/allocator_vk.hh"
 #include "function/render/renderer.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
 #include <SDL.h>
@@ -88,8 +90,8 @@ private:
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> present_modes;
+        vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool> formats;
+        vector<VkPresentModeKHR, HeapAllocatorAlignedPool> present_modes;
         bool is_adequate() {
             return !formats.empty() && !present_modes.empty();
         }
@@ -113,7 +115,7 @@ private:
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();
-    void pick_physical_device(const std::vector<VkPhysicalDevice>& p_physical_devices);
+    void pick_physical_device(const vector<VkPhysicalDevice, HeapAllocatorAlignedPool>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
 
@@ -121,8 +123,8 @@ private:
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
     SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
-    VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& p_available_formats);
-    VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& p_available_present_modes);
+    VkSurfaceFormatKHR choose_swap_surface_format(const vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const vector<VkPresentModeKHR, HeapAllocatorAlignedPool>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
     VkAllocationCallbacks* get_allocation_callbacks() {

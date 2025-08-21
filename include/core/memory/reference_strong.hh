@@ -3,6 +3,7 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator.hh"
+#include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
@@ -30,7 +31,7 @@ class Ref {
 public:
 
     using ObjType = T;
-    using AllocType = HeapAllocator;
+    using AllocType = HeapAllocatorAligned;
 
     Ref() {
         control_block = nullptr;
@@ -133,7 +134,7 @@ public:
      */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        MemID control_block_mem_id = create_obj<ControlBlock>(*(p_allocator), p_allocator, p_mem_id);
+        MemID control_block_mem_id = create_obj_align<ControlBlock>(*(p_allocator), p_allocator, p_mem_id);
         control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
         control_block->control_block_mem_id = control_block_mem_id;
         ref();
@@ -149,7 +150,7 @@ public:
      */
     template <typename... Args>
     static Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
-        return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
+        return Ref(p_allocator, create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
     T* operator->() {
@@ -265,9 +266,9 @@ private:
 };
 
 template <typename T,  typename... Args>
-Ref<T> make_ref(HeapAllocator* p_allocator, Args&&... p_args) {
+Ref<T> make_ref(HeapAllocatorAligned* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
-    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
+    MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Ref<T>(p_allocator, id);
 }
 
