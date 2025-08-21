@@ -1,23 +1,106 @@
 #ifndef __WBE_2D_SURFACE_UTILS_HH__
 #define __WBE_2D_SURFACE_UTILS_HH__
 
-#include "2d_primitive.hh"
+#include "glm/fwd.hpp"
+#include "glm/geometric.hpp"
+#include <cstdint>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
 /**
- * @brief Triangulate a list of vertices.
+ * @class SurfaceUtils2D
+ * @brief 2D surface utility class.
  *
- * @tparam VertSlot The type of the vertex slot.
- * @tparam TriaSlot The type of the triangle slot.
- * @param p_vertex_list The list of the vertices.
- * @param p_vertex_count The number of vertices to be triangulated.
- * @param p_triangle_list The list of triangles. The generated triangles will be pushed into this list.
  */
-template <typename VertSlot, typename TriaSlot>
-void triangulate(const VertSlot* p_vertex_list, uint32_t p_vertex_count, TriaSlot* p_triangle_list) {
-    // TODO: Ear clipping
-}
+class SurfaceUtils2D {
+public:
+    SurfaceUtils2D() = delete;
+
+    /**
+     * @brief Triangulate a list of vertices.
+     *
+     * @todo Test
+     * @tparam VertType The type of the vertex slot.
+     * @tparam TriaType The type of the triangle slot.
+     * @param p_vertex_list The list of the vertices. This will be altered by this method.
+     * @param p_vertex_count The number of vertices to be triangulated.
+     * @param p_triangle_list The list of triangles. The generated triangles will be pushed into this list.
+     */
+    template <typename VertType, typename TriaType>
+    static void triangulate(VertType* p_vertex_list, uint32_t p_vertex_count, TriaType* p_triangle_list) {
+        if (p_vertex_list == nullptr) {
+            throw std::runtime_error("Failed to triangulate: vertex list is null.");
+        }
+        if (p_triangle_list == nullptr) {
+            throw std::runtime_error("Failed to triangulate: triangle list is null.");
+        }
+        uint32_t ear_check_index = 0;
+        uint32_t triangle_index = 0;
+        while (p_vertex_count > 3) {
+            glm::vec2 prev_to_this = get_vert(p_vertex_list, p_vertex_count, ear_check_index)->position
+                - get_vert(p_vertex_list, p_vertex_count, ear_check_index - 1)->position;
+            glm::vec2 this_to_next = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1)->position
+                - get_vert(p_vertex_list, p_vertex_count, ear_check_index)->position;
+            float cross_prev_next = cross_vec2(prev_to_this, this_to_next);
+            if (cross_prev_next == 0.0) {
+                remove_vertex(p_vertex_list, p_vertex_count, ear_check_index);
+                --p_vertex_count;
+            }
+            else if (is_vertex_ear(p_vertex_list, p_vertex_count, ear_check_index)) {
+                TriaType triangle{};
+                triangle.vert1 = get_vert(p_vertex_list, p_vertex_count, ear_check_index - 1);
+                triangle.vert2 = get_vert(p_vertex_list, p_vertex_count, ear_check_index);
+                triangle.vert3 = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1);
+                p_triangle_list[triangle_index] = triangle;
+                remove_vertex(p_vertex_list, p_vertex_count, ear_check_index);
+                --p_vertex_count;
+            }
+            else {
+                ear_check_index = (ear_check_index + 1) % p_vertex_count;
+            }
+        }
+    }
+
+private:
+
+    static float cross_vec2(glm::vec2 p_vec1, glm::vec2 p_vec2) {
+        return glm::cross(glm::vec3(p_vec1.x, p_vec1.y, 0.0), glm::vec3(p_vec2.x, p_vec2.y, 0)).z;
+    }
+
+    template <typename VertType>
+    static void remove_vertex(VertType* p_vert_list, uint32_t p_vert_count, uint32_t p_index) {
+        for (uint32_t i = p_index; i < p_vert_count; ++i) {
+            p_vert_list[i] = p_vert_list[i + 1];
+        }
+    }
+
+    template <typename VertType>
+    static constexpr VertType* get_vert(const VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
+        return p_vertex_list[p_index % p_vertex_list];
+    }
+
+    template <typename VertType>
+    static bool is_vertex_ear(const VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
+        for (uint32_t i = p_index + 2; i != p_index - 2; ++i) {
+            glm::vec2 prev_to_this = get_vert(p_vertex_list, p_vert_count, i)->position
+                - get_vert(p_vertex_list, p_vert_count, i - 1)->position;
+            glm::vec2 this_to_next = get_vert(p_vertex_list, p_vert_count, i + 1)->position
+                - get_vert(p_vertex_list, p_vert_count, i)->position;
+            glm::vec2 i_pos = get_vert(p_vertex_list, p_vert_count, i).position;
+            glm::vec2 vert_next_pos = get_vert(p_vertex_list, p_vert_count, p_index + 1).position;
+            glm::vec2 vert_prev_pos = get_vert(p_vertex_list, p_vert_count, p_index - 1).position;
+            glm::vec2 vert_pos = get_vert(p_vertex_list, p_vert_count, p_index).position;
+            if (cross_vec2(i_pos - vert_prev_pos, vert_next_pos - vert_pos) < 0.0f
+                && cross_vec2(i_pos - vert_next_pos, vert_pos - i_pos) < 0.0f
+                && cross_vec2(i_pos - vert_pos, vert_prev_pos - i_pos) < 0.0f)
+                return false;
+        }
+        return true;
+    }
+};
+
+
 
 }
 

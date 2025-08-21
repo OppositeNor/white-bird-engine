@@ -63,7 +63,7 @@ using Triangle2DColored = Triangle2D<SlotColor>;
 /**
  * @brief Textured triangle.
  */
-using Triangle2DTextured = Triangle2D<SlotUV>;
+using Triangle2DTextured = Triangle2D<SlotTextured>;
 
 /**
  * @brief Textured skinned triangle.

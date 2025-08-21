@@ -1,7 +1,6 @@
 #ifndef __WBE_PRIMITIVE_SLOTS_HH__
 #define __WBE_PRIMITIVE_SLOTS_HH__
 
-#include <cstdint>
 #include <glm/glm.hpp>
 
 namespace WhiteBirdEngine {
@@ -18,11 +17,15 @@ struct EmptySlot {};
  * @brief Slot for uv.
  *
  */
-struct SlotUV {
+struct SlotTextured {
     /**
      * @brief The uv value.
      */
     glm::vec2 uv;
+    /**
+     * @brief Is the texture opaque.
+     */
+    bool is_opaque;
 };
 
 /**
@@ -35,6 +38,10 @@ struct SlotColor {
      * @brief The color value.
      */
     glm::vec4 color;
+    /**
+     * @brief Is the color opaque.
+     */
+    bool is_opaque;
 };
 
 struct SlotUVBone {

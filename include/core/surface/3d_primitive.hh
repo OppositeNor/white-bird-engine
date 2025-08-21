@@ -71,7 +71,7 @@ using Triangle3DColored = Triangle3D<SlotColor>;
 /**
  * @brief Textured triangle.
  */
-using Triangle3DTextured = Triangle3D<SlotUV>;
+using Triangle3DTextured = Triangle3D<SlotTextured>;
 
 /**
  * @brief Textured skinned triangle.
