@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #include "function/render/allocator_vk.hh"
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"

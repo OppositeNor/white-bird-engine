@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #include "function/engine_function.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"

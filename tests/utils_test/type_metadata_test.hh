@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #ifndef __WBE_TYPE_METADATA_TEST_HH__
 #define __WBE_TYPE_METADATA_TEST_HH__
 #include "utils/defs.hh"

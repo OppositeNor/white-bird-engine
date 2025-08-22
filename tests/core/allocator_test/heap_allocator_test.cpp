@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #include "heap_allocator_pool_test.hh"
 #include "heap_allocator_align_pool_test.hh"
 #include "heap_allocator_fixed_size_pool_test.hh"

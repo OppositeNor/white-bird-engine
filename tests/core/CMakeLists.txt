@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 add_subdirectory(allocator_test)
 add_subdirectory(ecs_test)
 add_subdirectory(memory_test)

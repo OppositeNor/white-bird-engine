@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 cmake_minimum_required(VERSION 3.20)
 
 project(WhiteBirdEngine)

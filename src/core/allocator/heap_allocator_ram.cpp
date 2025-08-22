@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #include "core/allocator/heap_allocator_ram.hh"
 #include "core/logging/log.hh"
 

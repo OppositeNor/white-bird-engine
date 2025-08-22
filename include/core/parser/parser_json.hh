@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #ifndef __WBE_PARSER_JSON_HH__
 #define __WBE_PARSER_JSON_HH__
 

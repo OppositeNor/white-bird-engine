@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 def to_uint32(x):
     """Convert a uint64 integer to uint32 to match the usage in the C++ file.
 

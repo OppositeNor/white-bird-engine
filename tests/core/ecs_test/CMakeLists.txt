@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 set(TEST_NAME wbe_ecs_test)
 
 file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)

@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 from reflection.reflect import WBEReflector
 
 def register(p_builder : WBEReflector):

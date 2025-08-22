@@ -1,5 +1,3 @@
-// Copyright (c) 2025 OppositeNor.
-// Licensed under GPL-3.0
 #include "resource/resource_unit_loader/ru_loader_ppm3.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"

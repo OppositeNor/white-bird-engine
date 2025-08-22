@@ -1,5 +1,3 @@
-# Copyright (c) 2025 OppositeNor.
-# Licensed under GPL-3.0
 add_subdirectory(core)
 add_subdirectory(platform)
 add_subdirectory(utils_test)
