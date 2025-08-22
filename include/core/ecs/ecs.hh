@@ -4,6 +4,7 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "utils/defs.hh"
 #include <type_traits>
+#include <unordered_map>
 
 namespace WhiteBirdEngine {
 

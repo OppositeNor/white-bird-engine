@@ -41,7 +41,15 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    virtual void* get(MemID p_id) const = 0;
+    virtual void* get(MemID p_id) = 0;
+
+    /**
+     * @brief Get the pointer pointing to the resource.
+     *
+     * @param p_id The resource id to get the pointer from.
+     * @return The pointer of the resource.
+     */
+    virtual const void* get(MemID p_id) const = 0;
 
     /**
      * @brief Get the number of allocated resources.
@@ -75,8 +83,20 @@ public:
      * @return The pointer of the resource.
      */
     template <typename T>
-    T* get_obj(MemID p_id) const {
+    T* get_obj(MemID p_id) {
         return static_cast<T*>(get(p_id));
+    }
+
+    /**
+     * @brief Get the pointer pointing to the resource.
+     *
+     * @tparam T The type of the resource.
+     * @param p_id The resource id to get the pointer from.
+     * @return The pointer of the resource.
+     */
+    template <typename T>
+    const T* get_obj(MemID p_id) const {
+        return static_cast<const T*>(get(p_id));
     }
 
     virtual operator std::string() const {

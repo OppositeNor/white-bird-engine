@@ -31,7 +31,14 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual void* get(MemID p_id) const override {
+    virtual void* get(MemID p_id) override {
+        if (p_id == 0) {
+            return nullptr;
+        }
+        return alloc_map.at(p_id);
+    }
+
+    virtual const void* get(MemID p_id) const override {
         if (p_id == 0) {
             return nullptr;
         }

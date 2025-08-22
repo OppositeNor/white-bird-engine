@@ -18,31 +18,25 @@ TEST(WBEAllocFSPTest, Trait) {
 TEST(WBEAllocFSPTest, ToString) {
     WBE::HeapAllocatorFixedSizePool<4> pool(64);
 
-    std::string exp_1 = "HeapAllocatorFix: {obj_count: 0;\n"
-        "max_obj: 64\n"
-        "};";
+    std::string exp_1 = "HeapAllocatorFix: {obj_count: 0;\nmax_obj: 64\n};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
 
     WBE::MemID mem_1 = pool.allocate();
-    std::string exp_2 = "HeapAllocatorFix: {obj_count: 1;\n"
-        "max_obj: 64\n"
-        "};";
+    std::string exp_2 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 1;\n};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
 
     WBE::MemID mem_2 = pool.allocate();
-    std::string exp_3 = "HeapAllocatorFix: {obj_count: 2;\n"
-        "max_obj: 64\n"
-        "};";
+    std::string exp_3 = "HeapAllocatorFix: {obj_count: 2;\nmax_obj: 64\nallocated: 1;\nallocated: 2;\n};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
 
     pool.deallocate(mem_1);
-    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\n"
-        "max_obj: 64\n"
-        "};";
+    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 1;\n};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
 
     pool.deallocate(mem_2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
+
+    ASSERT_TRUE(pool.is_empty());
 }
 
 inline size_t mem_diff(void* p_mem1, void* p_mem2) {
@@ -100,6 +94,7 @@ TEST(WBEAllocFSPTest, MemContinuity) {
     for (uint32_t i = 0; i < 3; ++i) {
         pool.deallocate(mems[i]);
     }
+    ASSERT_TRUE(pool.is_empty());
 }
 
 #endif

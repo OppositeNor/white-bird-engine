@@ -50,7 +50,17 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual void* get(MemID p_id) const override {
+    virtual void* get(MemID p_id) override {
+        if (p_id == 0) {
+            return nullptr;
+        }
+        if (!is_in_pool(p_id)) {
+            throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
+        }
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual const void* get(MemID p_id) const override {
         if (p_id == 0) {
             return nullptr;
         }
