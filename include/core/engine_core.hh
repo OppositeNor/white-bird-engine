@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #ifndef __WBE_ENGINE_CORE_HH__
 #define __WBE_ENGINE_CORE_HH__
 #include "core/allocator/heap_allocator_aligned_pool.hh"

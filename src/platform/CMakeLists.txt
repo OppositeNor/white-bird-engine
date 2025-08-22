@@ -1,3 +1,5 @@
+# Copyright (c) 2025 OppositeNor.
+# Licensed under GPL-3.0
 set(wbe_platform_src "")
 
 if (WBE_BUILD_PLATFORM STREQUAL "Linux")

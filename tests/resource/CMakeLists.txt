@@ -1,3 +1,5 @@
+# Copyright (c) 2025 OppositeNor.
+# Licensed under GPL-3.0
 add_subdirectory(resource_chunk_test)
 add_subdirectory(resource_loader_test)
 add_subdirectory(resource_utils_test)

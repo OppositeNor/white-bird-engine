@@ -1,3 +1,5 @@
+# Copyright (c) 2025 OppositeNor.
+# Licensed under GPL-3.0
 file(GLOB wbe_engine_config_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 set(wbe_core_src

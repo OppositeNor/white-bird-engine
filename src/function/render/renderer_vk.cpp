@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #include "function/render/renderer_vk.hh"
 #include "SDL_vulkan.h"
 #include "core/allocator/heap_allocator_aligned_pool.hh"

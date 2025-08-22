@@ -1,5 +1,7 @@
 # 白鸟引擎
 
+Licensed under [GPL-v3](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
+
 一个为音游打造的多平台游戏引擎
 
 ## 如何构建

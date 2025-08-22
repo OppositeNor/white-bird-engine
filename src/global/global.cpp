@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #include "global/global.hh"
 #include "core/engine_core.hh"
 #include "function/engine_function.hh"

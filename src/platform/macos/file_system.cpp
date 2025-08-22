@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #include "platform/file_system/file_system.hh"
 #include "utils/utils.hh"
 #include <string>

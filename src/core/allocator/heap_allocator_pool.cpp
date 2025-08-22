@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #include "core/allocator/allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"

@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #ifndef __LOGGING_MANAGER_HH__
 #define __LOGGING_MANAGER_HH__
 

@@ -1,3 +1,5 @@
+// Copyright (c) 2025 OppositeNor.
+// Licensed under GPL-3.0
 #ifndef __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH__
 #define __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH__
 

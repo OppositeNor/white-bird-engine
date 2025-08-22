@@ -1,3 +1,5 @@
+# Copyright (c) 2025 OppositeNor.
+# Licensed under GPL-3.0
 if (WBE_BUILD_PLATFORM STREQUAL "Linux")
     add_subdirectory(linux)
 elseif(WBE_BUILD_PLATFORM STREQUAL "Windows")
