@@ -68,14 +68,14 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        return get_mem_loc_at_index(p_id);
+        return get_mem_loc_at_id(p_id);
     }
 
     virtual void* get(MemID p_id) override {
         if (p_id == 0) {
             return nullptr;
         }
-        return get_mem_loc_at_index(p_id);
+        return get_mem_loc_at_id(p_id);
     }
 
     virtual uint32_t obj_count() const override {
@@ -126,19 +126,19 @@ private:
         return *((InternalID*)index_chunk_rev_start() + p_data_index - 1);
     }
 
-    void* get_mem_loc_at_index(InternalID p_id) {
-        if (p_id > alloc_obj_count) {
-            return nullptr;
-        }
-        uintptr_t offset = get_data_index(p_id) * SIZE;
-        return data_chunk_start() + offset;
-    }
-
-    const void* get_mem_loc_at_index(InternalID p_id) const {
+    void* get_mem_loc_at_id(InternalID p_id) {
         if (p_id > max_obj) {
             return nullptr;
         }
-        uintptr_t offset = get_data_index(p_id) * SIZE;
+        uintptr_t offset = (get_data_index(p_id) - 1) * SIZE;
+        return data_chunk_start() + offset;
+    }
+
+    const void* get_mem_loc_at_id(InternalID p_id) const {
+        if (p_id > max_obj) {
+            return nullptr;
+        }
+        uintptr_t offset = (get_data_index(p_id) - 1) * SIZE;
         return data_chunk_start() + offset;
     }
 
@@ -218,13 +218,16 @@ template <size_t SIZE>
 inline void HeapAllocatorFixedSizePool<SIZE>::deallocate(MemID p_mem) {
     // TODO: fix bug
     DataIndex data_index = get_data_index(p_mem);
-    if (data_index == MEM_NULL) {
+    if (data_index == MEM_NULL || p_mem > max_obj) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated in this memory pool.");
     }
-    void* data_loc = get_mem_loc_at_index(p_mem);
-    void* copy_from = get_mem_loc_at_index(alloc_obj_count);
-    memcpy(data_loc, copy_from, SIZE);
-    write_info(get_internal_id(alloc_obj_count), data_index);
+    if (alloc_obj_count > 1 && data_index != alloc_obj_count) {
+        void* data_loc = get_mem_loc_at_id(p_mem);
+        InternalID copy_from_id = get_internal_id(alloc_obj_count);
+        void* copy_from = get_mem_loc_at_id(copy_from_id);
+        memcpy(data_loc, copy_from, SIZE);
+        write_info(copy_from_id, data_index);
+    }
     write_data_index(alloc_obj_count, MEM_NULL);
     --alloc_obj_count;
 }

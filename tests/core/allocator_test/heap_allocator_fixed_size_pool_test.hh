@@ -2,6 +2,7 @@
 #define __WBE_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH__
 
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
+#include "global/global.hh"
 #include <cstddef>
 #include <gtest/gtest.h>
 
@@ -81,6 +82,7 @@ void test_continuous(WBE::HeapAllocatorFixedSizePool<SIZE>& p_pool, WBE::MemID p
 }
 
 TEST(WBEAllocFSPTest, MemContinuity) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorFixedSizePool<16> pool(64);
     WBE::MemID mems[4];
     mems[0] = pool.allocate();
