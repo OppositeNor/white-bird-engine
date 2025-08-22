@@ -30,7 +30,7 @@ TEST(WBEAllocFSPTest, ToString) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
 
     pool.deallocate(mem_1);
-    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 1;\n};";
+    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 2;\n};";
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
 
     pool.deallocate(mem_2);

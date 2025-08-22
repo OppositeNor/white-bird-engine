@@ -31,7 +31,7 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> {
 template <size_t SIZE>
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
     using DataIndex = uint8_t;
-    using InternalID = MemID;
+    using InternalID = uint8_t;
 public:
 
     HeapAllocatorFixedSizePool()
@@ -42,22 +42,22 @@ public:
     HeapAllocatorFixedSizePool& operator=(const HeapAllocatorFixedSizePool&) = delete;
     HeapAllocatorFixedSizePool& operator=(HeapAllocatorFixedSizePool&&) = delete;
 
-    static constexpr uint8_t MAX_OBJ_COUNT = 127;
+    static constexpr uint8_t MAX_OBJ = 127;
 
     HeapAllocatorFixedSizePool(uint32_t p_max_obj)
-        : curr_id(1), max_obj(p_max_obj), alloc_obj_count(0) {
-        if (p_max_obj > MAX_OBJ_COUNT) {
-            throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ_COUNT) + " objects");
+        : max_obj(p_max_obj), alloc_obj_count(0) {
+        if (p_max_obj > MAX_OBJ) {
+            throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }
-        static_assert(MAX_OBJ_COUNT <= std::numeric_limits<InternalID>::max());
+        static_assert(MAX_OBJ < std::numeric_limits<InternalID>::max());
         // The memory chunk is separated by the "index space", "reverse index space" and the "address space".
-        // index space matches MemID (casted to InternalID) to DataIndex, which represents the index of slot of the data it's referencing
-        // reverse index space matches DataIndex to InteralID.
+        // index space maps MemID (casted to InternalID) to DataIndex, which represents the index of slot of the data it's referencing
+        // reverse index space maps DataIndex to InteralID.
         // data space stores the data.
-        // Notice that when DataIndex or InternalID is 0 it matches to MEM_NULL,
+        // Notice that when DataIndex or InternalID is 0 it maps to MEM_NULL,
         // so for offseting, the true offset for the reverse data is internal id - 1.
         mem_chunk = (char*)malloc(SIZE * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj);
-        clear_index();
+        clear_indices();
     }
 
     virtual MemID allocate(size_t p_size = SIZE) override;
@@ -103,23 +103,26 @@ public:
 
     // TODO: Test
     virtual void clear() override {
-        clear_index();
+        clear_indices();
         alloc_obj_count = 0;
     }
 
 private:
-    MemID curr_id;
     DataIndex max_obj;
     char* mem_chunk;
     DataIndex alloc_obj_count;
 
     DataIndex get_data_index(InternalID p_id) const {
-        // TODO: bound check
+        if (p_id > max_obj) {
+            return MEM_NULL;
+        }
         return *((DataIndex*)index_chunk_start() + p_id - 1);
     }
 
     InternalID get_internal_id(DataIndex p_data_index) const {
-        // TODO: bound check
+        if (p_data_index > max_obj) {
+            return MEM_NULL;
+        }
         return *((InternalID*)index_chunk_rev_start() + p_data_index - 1);
     }
 
@@ -139,14 +142,31 @@ private:
         return data_chunk_start() + offset;
     }
 
-    void write_index(InternalID p_id, DataIndex p_data_index) {
+    void write_id(InternalID p_id, DataIndex p_data_index) {
         *(index_chunk_start() + p_id - 1) = p_data_index;
+    }
+
+    void write_data_index(DataIndex p_data_index, InternalID p_id) {
         *(index_chunk_rev_start() + p_data_index - 1) = p_id;
     }
 
-    void clear_index() {
+    void write_info(InternalID p_id, DataIndex p_data_index) {
+        write_id(p_id, p_data_index);
+        write_data_index(p_data_index, p_id);
+    }
+
+    void clear_indices() {
         memset(index_chunk_start(), MEM_NULL, max_obj * sizeof(DataIndex));
         memset(index_chunk_rev_start(), MEM_NULL, max_obj * sizeof(InternalID));
+    }
+
+    InternalID retrieve_valid_index() {
+        for (InternalID id = 1; id <= max_obj; ++id) {
+            if (get_data_index(id) == MEM_NULL) {
+                return id;
+            }
+        }
+        throw std::runtime_error("Failed to retrieve valid index: memory chunk is full.");
     }
 
     DataIndex* index_chunk_start() {
@@ -189,8 +209,9 @@ inline MemID HeapAllocatorFixedSizePool<SIZE>::allocate(size_t p_size) {
     if (alloc_obj_count >= max_obj) {
         throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.");
     }
-    write_index(curr_id, ++alloc_obj_count);
-    return curr_id++;
+    InternalID curr_id = retrieve_valid_index();
+    write_info(curr_id, ++alloc_obj_count);
+    return curr_id;
 }
 
 template <size_t SIZE>
@@ -203,7 +224,8 @@ inline void HeapAllocatorFixedSizePool<SIZE>::deallocate(MemID p_mem) {
     void* data_loc = get_mem_loc_at_index(p_mem);
     void* copy_from = get_mem_loc_at_index(alloc_obj_count);
     memcpy(data_loc, copy_from, SIZE);
-    write_index(p_mem, data_index);
+    write_info(get_internal_id(alloc_obj_count), data_index);
+    write_data_index(alloc_obj_count, MEM_NULL);
     --alloc_obj_count;
 }
 
