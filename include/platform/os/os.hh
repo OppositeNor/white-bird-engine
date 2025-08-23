@@ -52,16 +52,30 @@ public:
     static PID execute(bool p_background, const char* p_exec_path, const char* p_argv[]);
 
     /**
-     * @brief Fork a process.
+     * @brief Fork a process. For every forked process, the process should be released
+     * by calling wait_process or wait_all, or else it will turn into a zombie process
+     * and keeps consuming resources.
      *
      * @return The process's pid.
      */
     static PID fork_process();
 
     /**
-     * @brief Wait a process to finish.
+     * @brief Wait for a process to finish. This will also release the process resources
+     * after called.
+     *
+     * @param p_pid The process to wait.
+     * @param p_silent Should mute the output messages.
      */
-    static void wait_process(PID p_pid);
+    static void wait_process(PID p_pid, bool p_silent = true);
+
+    /**
+     * @brief Wait for all processes to finish. This will release all the process resources,
+     * and is sugestted to be called every time exiting this program.
+     *
+     * @param p_silent Should mute the output messages.
+     */
+    static void wait_all(bool p_silent = true);
 };
 
 }

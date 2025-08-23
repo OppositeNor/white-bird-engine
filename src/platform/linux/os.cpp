@@ -31,7 +31,8 @@ PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[]
     if (pid == 0) {
         int ret_val;
         if ((ret_val = execve(p_exec_path, (char* const*)p_argv, (char* const*)p_envp)) < 0) {
-            printf("Process exited with a return value: %d.", ret_val);
+            printf("Failed to run program: %s.\n", p_exec_path);
+            exit(-1);
         }
     }
     if (!p_background) {
@@ -53,10 +54,38 @@ PID OS::fork_process() {
     return pid;
 }
 
-void OS::wait_process(PID p_pid) {
+void OS::wait_process(PID p_pid, bool p_silent) {
     int status;
     if (waitpid(p_pid, &status, 0) < 0) {
         throw std::runtime_error("Failed to wait for process pid: " + std::to_string(p_pid) + " to finish: " + std::string(strerror(errno)));
+    }
+    if (p_silent) {
+        return;
+    }
+    if (WIFEXITED(status)) {
+        printf("Process with pid: %d terminated normally with exit status: %d.\n", p_pid, WEXITSTATUS(status));
+    }
+    else {
+        printf("Process with pid: %d terminated abnormally with exit status: %d.\n", p_pid, WEXITSTATUS(status));
+    }
+}
+
+void OS::wait_all(bool p_silent) {
+    PID pid;
+    int status;
+    while ((pid = waitpid(-1, &status, 0)) > 0) {
+        if (p_silent) {
+            continue;
+        }
+        if (WIFEXITED(status)) {
+            printf("Process with pid: %d terminated normally with exit status: %d.\n", pid, WEXITSTATUS(status));
+        }
+        else {
+            printf("Process with pid: %d terminated abnormally with exit status: %d.\n", pid, WEXITSTATUS(status));
+        }
+    }
+    if (errno != ECHILD) {
+        throw std::runtime_error("Failed to wait for all process to finish: " + std::string(strerror(errno)));
     }
 }
 
