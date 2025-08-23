@@ -113,4 +113,20 @@ TEST(WBEAllocFSPTest, MemContinuity) {
     ASSERT_TRUE(pool.is_empty());
 }
 
+// TODO: Fill the whole allocator pool and test the behavior
+
+TEST(WBEAllocFSPTest, AllocDeallocMany) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WBE::HeapAllocatorFixedSizePool<8> pool(WBE::HeapAllocatorFixedSizePool<8>::MAX_OBJ);
+    const int num_allocs = 127;
+    WBE::MemID mems[num_allocs];
+    for (int i = 0; i < num_allocs; ++i) {
+        mems[i] = pool.allocate();
+    }
+    for (int i = 0; i < num_allocs; ++i) {
+        pool.deallocate(mems[i]);
+    }
+    ASSERT_TRUE(pool.is_empty());
+}
+
 #endif

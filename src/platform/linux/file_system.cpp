@@ -59,16 +59,14 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
 }
 
 std::string FileSystem::get_file_name(const std::string& p_path) {
-    // TODO: Test
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
         return p_path;
     }
-    return p_path.substr(last_slash);
+    return p_path.substr(last_slash + 1);
 }
 
 Directory FileSystem::get_file_dir(const std::string& p_path) {
-    // TODO: Test
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
         Directory();
@@ -77,7 +75,6 @@ Directory FileSystem::get_file_dir(const std::string& p_path) {
 }
 
 std::string FileSystem::path_to_string(const Path& p_path) {
-    // TODO: Test
     return dir_to_string(p_path.get_directory()) + p_path.get_file_name();
 }
 

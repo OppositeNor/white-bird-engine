@@ -13,26 +13,21 @@
    limitations under the License.
 */
 #include "platform/file_system/file_system.hh"
+#include "platform/file_system/directory.hh"
 #include "utils/utils.hh"
 #include <string>
 #include <unistd.h>
 
 namespace WhiteBirdEngine {
 
-FileSystem::FileSystem() {
-    char buf[1024];
-    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
-    if (len == -1) {
-        throw std::runtime_error("Failed to get the executable path.");
-    }
-    buf[len] = '\0';
-    root_directory = parse_directory(std::string(buf));
-    resource_directory = root_directory.combine(Directory({"res"}));
+FileSystem::FileSystem()
+    : FileSystem(get_executable_dir()) {
 }
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
     root_directory = p_root_dir;
     resource_directory = root_directory.combine(Directory({"res"}));
+    config_directory = resource_directory.combine(Directory({"config"}));
 }
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
@@ -64,16 +59,14 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
 }
 
 std::string FileSystem::get_file_name(const std::string& p_path) {
-    // TODO: Test
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
         return p_path;
     }
-    return p_path.substr(last_slash);
+    return p_path.substr(last_slash + 1);
 }
 
 Directory FileSystem::get_file_dir(const std::string& p_path) {
-    // TODO: Test
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
         Directory();
@@ -82,7 +75,6 @@ Directory FileSystem::get_file_dir(const std::string& p_path) {
 }
 
 std::string FileSystem::path_to_string(const Path& p_path) {
-    // TODO: Test
     return dir_to_string(p_path.get_directory()) + p_path.get_file_name();
 }
 
@@ -91,6 +83,20 @@ std::string FileSystem::get_ext(const Path& p_path) {
     auto& file_name = p_path.get_file_name();
     return file_name.substr(file_name.find_last_of('.'));
 }
+
+Directory FileSystem::get_executable_dir() {
+    char buf[1024];
+    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
+    if (len < 0) {
+        throw std::runtime_error("Failed to get the executable path.");
+    }
+    if (len >= 1024) {
+        throw std::runtime_error("Buffer overflow for executable path finding.");
+    }
+    buf[len] = '\0';
+    return parse_directory(std::string(buf));
+}
+
 
 }
 
