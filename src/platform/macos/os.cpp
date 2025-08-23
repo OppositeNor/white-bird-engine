@@ -31,7 +31,8 @@ PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[]
     if (pid == 0) {
         int ret_val;
         if ((ret_val = execve(p_exec_path, (char* const*)p_argv, (char* const*)p_envp)) < 0) {
-            printf("Process exited with a return value: %d.", ret_val);
+            printf("Failed to run process: %s.", p_exec_path);
+            exit(0);
         }
     }
     if (!p_background) {
