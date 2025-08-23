@@ -25,15 +25,22 @@ namespace WhiteBirdEngine {
 using PID = pid_t;
 #endif
 
+/**
+ * @class OS
+ * @brief Interface to operating system utilities.
+ *
+ */
 class OS {
 public:
     OS() = delete;
 
     /**
-     * @brief Execute a program on a separate process.
+     * @brief Execute a program on a separate process. The execution can be a separate
+     * program, or a script starting with a '#!' notion indicating the program to run it.
      *
      * @todo: Test
-     * @param p_background Is the process running in background.
+     * @param p_background Is the process running in background. If set to true, the process's
+     * resource should be released by calling wait_process or wait_all.
      * @param p_exec_path The path to the process executable. 
      * @param p_argv Argv passed to the process.
      * @param p_envp Environment variables passed to the process.
@@ -44,7 +51,8 @@ public:
     /**
      * @brief Execute a program on a separate process.
      *
-     * @param p_background Is the process running in background.
+     * @param p_background Is the process running in background. If set to true, the process's
+     * resource should be released by calling wait_process or wait_all.
      * @param p_exec_path The path to the process executable. 
      * @param p_argv Argv passed to the process.
      * @return The process ID if p_background is true. -1 otherwise.
@@ -53,7 +61,7 @@ public:
 
     /**
      * @brief Fork a process. For every forked process, the process should be released
-     * by calling wait_process or wait_all, or else it will turn into a zombie process
+     * by calling wait_process or wait_all.
      * and keeps consuming resources.
      *
      * @return The process's pid.
