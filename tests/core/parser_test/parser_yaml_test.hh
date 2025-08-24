@@ -68,5 +68,27 @@ TEST(ParserYAMLTest, ParseFromBuffer) {
     test_parser_general(parser, general_test_str1, general_test_str2_ident, general_test_str3);
 }
 
+// Test edge cases
+TEST(ParserYAMLTest, ParseFromBufferEdgeCases) {
+    WBE::ParserYAML parser;
+    // Empty YAML
+    parser.parse_from_buffer(R"({})");
+    ASSERT_TRUE(parser.get_data().get_all_keys().empty());
+    // Nested empty objects
+    parser.parse_from_buffer(R"({ empty_obj: {} })");
+    ASSERT_TRUE(parser.get_data().template get_value<WBE::ParserYAML::DataType>("empty_obj").get_all_keys().empty());
+    // Deeply nested structures
+    parser.parse_from_buffer(R"({ level1: { level2: { level3: { level4: deep_value } } } })");
+    ASSERT_STREQ(parser.get_data()
+                     .template get_value<WBE::ParserYAML::DataType>("level1")
+                     .template get_value<WBE::ParserYAML::DataType>("level2")
+                     .template get_value<WBE::ParserYAML::DataType>("level3")
+                     .template get_value<std::string>("level4")
+                     .c_str(),
+                 "deep_value");
+    // Null values
+    // TODO
+}
+
 
 #endif

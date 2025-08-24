@@ -53,9 +53,19 @@ public:
         return node[p_key].as<T>();
     }
 
+    template <typename T> requires (!std::same_as<T, YAMLData>)
+    T get_value() const {
+        return node.as<T>();
+    }
+
     template <std::same_as<YAMLData> T>
     YAMLData get_value(const std::string& p_key) const {
         return YAMLData(node[p_key]);
+    }
+
+    template <std::same_as<YAMLData> T>
+    YAMLData get_value() const {
+        return YAMLData(node);
     }
 
     std::vector<std::string> get_all_keys() const {
@@ -114,9 +124,19 @@ public:
         return data.get_value<T>(p_key);
     }
 
+    template <typename T> requires (!ParserDataConcept<T>)
+    T get_value() const requires (!std::same_as<T, YAMLData>) {
+        return data.get_value<T>();
+    }
+
     template <ParserDataConcept T>
     YAMLData get_value(const std::string& p_key) const {
         return YAMLData(data.get_value<yaml>(p_key));
+    }
+
+    template <ParserDataConcept T>
+    YAMLData get_value() const {
+        return YAMLData(data.get_value<yaml>());
     }
 
     std::vector<std::string> get_all_keys() const {

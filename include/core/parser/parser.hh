@@ -43,6 +43,17 @@ public:
     }
 
     /**
+     * @brief Get the value of the parser data.
+     *
+     * @tparam T The type of the value to get.
+     * @return The value of the parser data.
+     */
+    template <typename T>
+    T get_value() const {
+        return static_cast<ChildType*>(this)->template get_value<T>();
+    }
+
+    /**
      * @brief Get all the key values.
      */
     std::vector<std::string> get_all_keys() const {

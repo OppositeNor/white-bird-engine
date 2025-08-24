@@ -33,4 +33,31 @@ TEST(ParserJSONTest, ParseFromBuffer) {
                             }, "numbers" : [123, -200, 5, 60, -123] })");
 }
 
+// Test edge cases
+
+TEST(ParserJSONTest, ParseFromBufferEdgeCases) {
+    WBE::ParserJSON parser;
+    // Empty JSON
+    parser.parse_from_buffer(R"({})");
+    ASSERT_TRUE(parser.get_data().get_all_keys().empty());
+
+    // Nested empty objects
+    parser.parse_from_buffer(R"({ "empty_obj": {} })");
+    ASSERT_TRUE(parser.get_data().template get_value<WBE::ParserJSON::DataType>("empty_obj").get_all_keys().empty());
+
+    // Deeply nested structures
+    parser.parse_from_buffer(R"({ "level1": { "level2": { "level3": { "level4": "deep_value" } } } })");
+    ASSERT_STREQ(parser.get_data()
+                     .template get_value<WBE::ParserJSON::DataType>("level1")
+                     .template get_value<WBE::ParserJSON::DataType>("level2")
+                     .template get_value<WBE::ParserJSON::DataType>("level3")
+                     .template get_value<std::string>("level4")
+                     .c_str(),
+                 "deep_value");
+
+    // Null values
+    parser.parse_from_buffer(R"({ "key_with_null": null })");
+    ASSERT_TRUE(parser.get_data().template get_value<std::nullptr_t>("key_with_null") == nullptr);
+}
+
 #endif

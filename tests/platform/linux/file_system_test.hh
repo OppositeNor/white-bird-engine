@@ -116,14 +116,16 @@ TEST(LinuxFileSystemTest, GetFileDir) {
     ASSERT_EQ(WBE::FileSystem::get_file_dir("hello/world/this/is/a/test/directory/"), expected5);
     WBE::Directory expected6({ "hello", "world", "this", "is", "a", "test", "directory" }, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/hello/world/this/is/a/test/directory/"), expected6);
+    WBE::Directory expected5_alt({ "hello", "world", "this", "is", "a", "test" }, false);
+    ASSERT_EQ(WBE::FileSystem::get_file_dir("hello/world/this/is/a/test/directory"), expected5_alt);
+    WBE::Directory expected6_alt({ "hello", "world", "this", "is", "a", "test" }, true);
+    ASSERT_EQ(WBE::FileSystem::get_file_dir("/hello/world/this/is/a/test/directory"), expected6_alt);
     WBE::Directory expected7({}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir(""), expected7);
     WBE::Directory expected8({}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/"), expected8);
-    WBE::Directory expected9({}, false);
+    WBE::Directory expected9({}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/////"), expected9);
-    WBE::Directory expected10({}, true);
-    ASSERT_EQ(WBE::FileSystem::get_file_dir("/////"), expected10);
 }
 
 TEST(LinuxFileSystemTest, PathToString) {

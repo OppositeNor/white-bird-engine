@@ -53,9 +53,19 @@ public:
         return data.at(p_key).get<T>();
     }
 
+    template <typename T> requires (!std::same_as<T, JSONData>)
+    T get_value() const {
+        return data.get<T>();
+    }
+
     template <std::same_as<JSONData> T>
     JSONData get_value(const std::string& p_key) const {
         return JSONData(data.at(p_key).get<json>());
+    }
+
+    template <std::same_as<JSONData> T>
+    JSONData get_value() const {
+        return JSONData(data.get<json>());
     }
 
     std::vector<std::string> get_all_keys() const {
@@ -118,9 +128,19 @@ public:
         return data.data.at(p_key).get<T>();
     }
 
+    template <typename T> requires (!std::same_as<T, JSONData>)
+    T get_value() const {
+        return data.data.get<T>();
+    }
+
     template <ParserDataConcept T>
     JSONData get_value(const std::string& p_key) const {
         return JSONData(data.data.at(p_key).get<json>());
+    }
+
+    template <ParserDataConcept T>
+    JSONData get_value() const {
+        return JSONData(data.data.get<json>());
     }
 
     std::vector<std::string> get_all_keys() const {
