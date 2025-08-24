@@ -66,6 +66,14 @@ TEST(SerializerYAMLTest, Edge) {
     ASSERT_EQ(serializer.get_current_context(), "base");
     ASSERT_EQ(serializer.get_context_depth(), 0);
     ASSERT_EQ(serializer.dump(), "");
+
+    serializer.push_context("test_context1");
+    ASSERT_EQ(serializer.get_current_context(), "test_context1");
+    ASSERT_EQ(serializer.get_context_depth(), 1);
+    serializer.pop_context();
+    ASSERT_EQ(serializer.get_current_context(), "base");
+    ASSERT_EQ(serializer.get_context_depth(), 0);
+    ASSERT_EQ(serializer.dump(), "test_context1: ~");
 }
 
 #endif
