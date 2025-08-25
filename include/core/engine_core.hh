@@ -17,6 +17,7 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/engine_config/engine_config.hh"
+#include "core/clock/clock.hh"
 #include "utils/game_metadata.hh"
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
@@ -60,6 +61,11 @@ public:
     static EngineCore* get_singleton() {
         return singleton;
     }
+
+    /**
+     * @brief The global clock starts recording when the engine core is constructed.
+     */
+    Clock* global_clock;
 
     /**
      * @brief File system.

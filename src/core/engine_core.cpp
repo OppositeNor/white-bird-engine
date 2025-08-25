@@ -14,6 +14,7 @@
 */
 #include "core/engine_core.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
 #include "core/parser/parser_json.hh"
 #include <iostream>
@@ -32,6 +33,7 @@ EngineCore::~EngineCore() {
 
 EngineCore::EngineCore(int p_argc, char* p_argv[])
     : Singleton<EngineCore>() {
+    global_clock = new Clock();
     file_system = new FileSystem();
     initialize(p_argc, p_argv);
 }

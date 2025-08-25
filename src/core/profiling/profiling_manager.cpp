@@ -17,9 +17,9 @@
 
 namespace WhiteBirdEngine {
 
-void ProfilingManager::push_profiling_data(ChannelID p_channel, double p_delta, const std::string& p_file, uint32_t p_line) {
+void ProfilingManager::push_profiling_data(ChannelID p_channel, double p_start_time, double p_delta, const std::string& p_file, uint32_t p_line) {
     std::unique_lock lock(profile_stash_mutex);
-    profile_stash[p_channel].push_back({.delta = p_delta, .file = p_file, .line = p_line});
+    profile_stash[p_channel].push_back({.start_time = p_start_time, .delta = p_delta, .file = p_file, .line = p_line});
 }
 
 }

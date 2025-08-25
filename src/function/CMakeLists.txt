@@ -13,6 +13,7 @@
 # limitations under the License.
 file(GLOB wbe_function_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
+add_subdirectory(application)
 add_subdirectory(render)
 
 add_library(WBE_LIB_FUNCTION STATIC

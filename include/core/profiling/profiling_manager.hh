@@ -39,6 +39,7 @@ public:
      *
      */
     struct ProfileData {
+        double start_time;
         double delta;
         std::string file;
         uint32_t line;
@@ -52,7 +53,7 @@ public:
      * @param p_file The source file that the proflier is created.
      * @param p_line The line number where the profiler is created.
      */
-    void push_profiling_data(ChannelID p_channel, double p_delta, const std::string& p_file, uint32_t p_line);
+    void push_profiling_data(ChannelID p_channel, double p_start_time, double p_delta, const std::string& p_file, uint32_t p_line);
 
     /**
      * @brief Get data for profiliing.

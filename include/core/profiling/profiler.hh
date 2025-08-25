@@ -18,7 +18,6 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/profiling/profiling_manager.hh"
-#include <chrono>
 namespace WhiteBirdEngine {
 
 #define WBE_START_PROFILE(CHANNEL) auto profiler_##__LINE__ = WhiteBirdEngine::Profiler(CHANNEL, std::string(__FILE__), __LINE__)
@@ -33,14 +32,12 @@ public:
 
     Profiler(ChannelID p_channel, const std::string& p_file, uint32_t p_line)
         : channel(p_channel), file(p_file), line(p_line) {
-        start_time = std::chrono::high_resolution_clock::now();
+        start_time = EngineCore::get_singleton()->global_clock->get_duration();
     }
 
     ~Profiler() {
-        const auto end_time = std::chrono::high_resolution_clock::now();
-        const std::chrono::duration<double> diff = end_time - start_time;
-        double delta = diff.count();
-        EngineCore::get_singleton()->profiling_manager->push_profiling_data(channel, delta, file, line);
+        double delta = EngineCore::get_singleton()->global_clock->get_duration();
+        EngineCore::get_singleton()->profiling_manager->push_profiling_data(channel, start_time, delta, file, line);
     }
 
     Profiler(const Profiler&) = delete;
@@ -52,7 +49,7 @@ private:
     ChannelID channel;
     std::string file;
     uint32_t line;
-    std::chrono::high_resolution_clock::time_point start_time;
+    double start_time;
 };
 
 }
