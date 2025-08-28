@@ -202,7 +202,7 @@ void RendererVK::create_physical_device() {
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
     std::string device_name(device_properties.deviceName);
-    wbe_console_log()->message("Picked device: \"" + device_name + "\".");
+    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Picked device: \"" + device_name + "\".");
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
@@ -284,7 +284,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice, HeapAllocat
     int32_t pick_device_index = game_config.render_device_index;
     if (pick_device_index >= 0) {
         if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
-            wbe_console_log()->warning("Failed to use the device provided by the configuration: Index " + std::to_string(pick_device_index)
+            wbe_console_log(WBE_CHANNEL_DEBUG)->warning("Failed to use the device provided by the configuration: Index " + std::to_string(pick_device_index)
                                        + " out of range. (total devices: " + std::to_string(pick_device_index) + ")White Bird Engine is picking"
                                        " an alternative device.");
         }
@@ -292,7 +292,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice, HeapAllocat
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             std::string device_name(device_properties.deviceName);
-            wbe_console_log()->warning("Failed to use the device provided by the configuration: device \"" + device_name + "\" is not suitable."
+            wbe_console_log(WBE_CHANNEL_DEBUG)->warning("Failed to use the device provided by the configuration: device \"" + device_name + "\" is not suitable."
                                        " White Bird Engine is picking an alternative device.");
         }
         else {
@@ -300,7 +300,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice, HeapAllocat
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             std::string device_name(device_properties.deviceName);
             physical_device = p_physical_devices[pick_device_index];
-            wbe_console_log()->message("Picked device: \"" + device_name + "\".");
+            wbe_console_log(WBE_CHANNEL_DEBUG)->message("Picked device: \"" + device_name + "\".");
             return;
         }
     }

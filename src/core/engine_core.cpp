@@ -40,6 +40,7 @@ EngineCore::EngineCore(int p_argc, char* p_argv[])
 
 EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
     : Singleton<EngineCore>() {
+    global_clock = new Clock();
     file_system = new FileSystem(p_root_dir);
     initialize(p_argc, p_argv);
 }
