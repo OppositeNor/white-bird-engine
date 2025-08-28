@@ -1,14 +1,14 @@
 # 白鸟引擎
 
-Licensed under [Apache License Version 2.0](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
+> 为音游打造的开源多平台游戏引擎
+>
+> Licensed under [Apache License Version 2.0](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
 
 [English](./README.md)
 
-一个为音游打造的多平台游戏引擎
-
 ## 如何构建
 
-首先将仓库克隆到本地
+将仓库克隆到本地
 
 ```sh
 git clone https://github.com/OppositeNor/white-bird-engine.git --recursive
@@ -23,15 +23,26 @@ cd white-bird-engine
 git submodule init --update
 ```
 
-### Linux
+### 根据平台构建
+
+<details>
+<summary> Linux </summary>
 
 安装构建工具：
 
-#### Arch
+- Arch
 
-```sh
-sudo pacman -S gcc cmake shaderc ninja
-```
+    ```sh
+    sudo pacman -S gcc cmake shaderc ninja
+    ```
+
+    TODO: install Vulkan SDK
+
+- Debian
+
+    ```sh
+    TODO
+    ```
 
 构建：
 
@@ -40,7 +51,10 @@ cmake -B build -G Ninja
 cmake --build build
 ```
 
-### MacOS
+</details>
+
+<details>
+<summary> MacOS </summary>
 
 使用 Homebrew 安装构建工具
 
@@ -55,7 +69,8 @@ cmake -B build -G Ninja
 cmake --build build
 ```
 
-### Windows
+</details>
 
+<summary> Windows </summary>
 TODO
-
+</details>

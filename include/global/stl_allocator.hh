@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class STLAllocator
- * @brief Allocator for C++ standard library.
+ * @brief Adapter allocator for C++ standard library.
  * @todo Test
  *
  */
@@ -39,6 +39,11 @@ struct STLAllocator {
         using other = STLAllocator<U, AllocType>;
     };
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_allocator The allocator that this STL allocator uses.
+     */
     STLAllocator(AllocType* p_allocator)
         : allocator(p_allocator) {}
     ~STLAllocator() {}
@@ -58,25 +63,60 @@ struct STLAllocator {
         return *this;
     }
 
+    /**
+     * @brief Copy constructor for another instance with a different value type.
+     *
+     * @tparam T1 The type of the value.
+     * @param p_other The allocator to be copied.
+     */
     template <typename T1>
     STLAllocator(const STLAllocator<T1, AllocType>& p_other) noexcept
         : allocator(p_other.allocator) {}
 
     
+    /**
+     * @brief Allocate memory.
+     *
+     * @param p_num The number of instances to be allocated.
+     * @return The allocated memory.
+     */
     T* allocate(size_t p_num) {
         return reinterpret_cast<T*>(allocator->allocate(p_num * sizeof(T), alignof(T)));
     }
-    void deallocate(T* p_ptr, size_t p_num) {
-        allocator->deallocate(reinterpret_cast<MemID>(p_ptr));
+    /**
+     * @brief Deallocate memory
+     *
+     * @param p_ptr The pointer to the memory been allocated.
+     * @param p_num Not used.
+     */
+    void deallocate(T* p_ptr, size_t) {
+        allocator->deallocate((MemID)p_ptr);
     }
 };
 
+/**
+ * @brief STL vector that uses a custom allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
 template <typename T, typename AllocType = HeapAllocatorAlignedPool>
 using vector = std::vector<T, STLAllocator<T, AllocType>>;
 
+/**
+ * @brief STL set that uses a custom allocator.
+ *
+ * @tparam T The type of the values in the set.
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
 template <typename T, typename AllocType = HeapAllocatorAlignedPool>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType>>;
 
+/**
+ * @brief STL string that uses a custom allocator.
+ *
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
 template <typename AllocType = HeapAllocatorAlignedPool>
 using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType>>;
 

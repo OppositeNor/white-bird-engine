@@ -1,10 +1,10 @@
 # White Bird Engine
 
-[简体中文](./README.zh-Hans.md)
+> A free game engine built for rhythm game development.
+>
+> Licensed under [Apache License Version 2.0](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
 
-Licensed under [Apache License Version 2.0](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
-
-A game engine built for rhythm game development.
+- [简体中文](./README.zh-Hans.md)
 
 ## How to build
 
@@ -70,6 +70,7 @@ cmake --build build
 </details>
 
 <details>
+
 <summary> Windows </summary>
 TODO
 </details>

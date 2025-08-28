@@ -28,6 +28,7 @@ EngineCore::~EngineCore() {
     delete pool_allocator;
     delete stdio_logging_manager;
     delete engine_config;
+    delete global_clock;
     singleton = nullptr;
 }
 

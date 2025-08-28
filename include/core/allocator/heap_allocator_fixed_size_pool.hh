@@ -44,8 +44,9 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> {
 
 template <size_t SIZE>
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
-    using DataIndex = uint8_t;
-    using InternalID = uint8_t;
+    // TODO: make this type generically adaptive to all integer types.
+    using DataIndex = uint16_t;
+    using InternalID = uint16_t;
 public:
 
     HeapAllocatorFixedSizePool()
@@ -56,14 +57,23 @@ public:
     HeapAllocatorFixedSizePool& operator=(const HeapAllocatorFixedSizePool&) = delete;
     HeapAllocatorFixedSizePool& operator=(HeapAllocatorFixedSizePool&&) = delete;
 
-    static constexpr uint8_t MAX_OBJ = 127;
+    /**
+     * @brief The maximum number of objects the pool can hold.
+     */
+    static constexpr uint32_t MAX_OBJ = std::numeric_limits<InternalID>::max() - 1;
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_max_obj The maximum objects this allocator could hold. Up to MAX_OBJ maximum.
+     */
     HeapAllocatorFixedSizePool(uint32_t p_max_obj)
         : max_obj(p_max_obj), alloc_obj_count(0) {
         if (p_max_obj > MAX_OBJ) {
             throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }
         static_assert(MAX_OBJ < std::numeric_limits<InternalID>::max());
+        static_assert(MAX_OBJ < std::numeric_limits<DataIndex>::max());
         // The memory chunk is separated by the "index space", "reverse index space" and the "address space".
         // index space maps MemID (casted to InternalID) to DataIndex, which represents the index of slot of the data it's referencing
         // reverse index space maps DataIndex to InteralID.
@@ -230,7 +240,6 @@ inline MemID HeapAllocatorFixedSizePool<SIZE>::allocate(size_t p_size) {
 
 template <size_t SIZE>
 inline void HeapAllocatorFixedSizePool<SIZE>::deallocate(MemID p_mem) {
-    // TODO: fix bug
     DataIndex data_index = get_data_index(p_mem);
     if (data_index == MEM_NULL || p_mem > max_obj) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated in this memory pool.");
