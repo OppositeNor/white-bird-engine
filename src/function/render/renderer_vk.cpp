@@ -99,7 +99,7 @@ void RendererVK::create_instance() {
 
     uint32_t extensions_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
-    vector<const char*, HeapAllocatorAlignedPool> extension_names(extensions_count, get_render_allocator());
+    vector<const char*> extension_names(extensions_count, get_render_allocator());
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
 
     create_info.enabledExtensionCount = extensions_count;
@@ -149,7 +149,7 @@ void RendererVK::create_swap_chain() {
     // If we have to use the image between multiple queue families, we have to specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we don't have to explicitly transfer ownership.
-        vector<uint32_t, HeapAllocatorAlignedPool> unique_indices_array(unique_indices.begin(), unique_indices.end(), get_render_allocator());
+        vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), get_render_allocator());
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = unique_indices_array.data();
@@ -196,13 +196,13 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    vector<VkPhysicalDevice, HeapAllocatorAlignedPool> physical_devices(physical_device_count, get_render_allocator());
+    vector<VkPhysicalDevice> physical_devices(physical_device_count, get_render_allocator());
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    std::string device_name(device_properties.deviceName);
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Picked device: \"" + device_name + "\".");
+    string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
+    wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
@@ -211,8 +211,8 @@ void RendererVK::create_logical_device() {
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
     float queue_priority = 1.0;
-    std::set<int> indices = queue_family_indices.get_unique_indices();
-    vector<VkDeviceQueueCreateInfo, HeapAllocatorAlignedPool> queues_create_info(get_render_allocator());
+    set<int> indices = queue_family_indices.get_unique_indices();
+    vector<VkDeviceQueueCreateInfo> queues_create_info(get_render_allocator());
     queues_create_info.reserve(indices.size());
     for (int elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
@@ -248,7 +248,7 @@ void RendererVK::create_logical_device() {
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
     uint32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, nullptr);
-    vector<VkExtensionProperties, HeapAllocatorAlignedPool> extension_properties(extension_count, get_render_allocator());
+    vector<VkExtensionProperties> extension_properties(extension_count, get_render_allocator());
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, extension_properties.data());
     std::set<std::string> enabled_extensions(enabled_device_extensions.begin(), enabled_device_extensions.end());
     for (const auto& extension : extension_properties) {
@@ -260,7 +260,7 @@ bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
 bool RendererVK::check_validation_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-    vector<VkLayerProperties, HeapAllocatorAlignedPool> layer_properties(layer_count, get_render_allocator());
+    vector<VkLayerProperties> layer_properties(layer_count, get_render_allocator());
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
     for (auto* name : validation_layers) {
         bool layer_found = false;
@@ -278,29 +278,30 @@ bool RendererVK::check_validation_layer_support() {
     return true;
 }
 
-void RendererVK::pick_physical_device(const vector<VkPhysicalDevice, HeapAllocatorAlignedPool>& p_physical_devices) {
+void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
     if (pick_device_index >= 0) {
         if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
-            wbe_console_log(WBE_CHANNEL_DEBUG)->warning("Failed to use the device provided by the configuration: Index " + std::to_string(pick_device_index)
-                                       + " out of range. (total devices: " + std::to_string(pick_device_index) + ")White Bird Engine is picking"
-                                       " an alternative device.");
+            wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
+                "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). White Bird Engine is picking"
+                " an alternative device.", pick_device_index, p_physical_devices.size()));
         }
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            std::string device_name(device_properties.deviceName);
-            wbe_console_log(WBE_CHANNEL_DEBUG)->warning("Failed to use the device provided by the configuration: device \"" + device_name + "\" is not suitable."
-                                       " White Bird Engine is picking an alternative device.");
+            string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
+            wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
+                "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
+                " White Bird Engine is picking an alternative device.", device_name));
         }
         else {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            std::string device_name(device_properties.deviceName);
+            string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
             physical_device = p_physical_devices[pick_device_index];
-            wbe_console_log(WBE_CHANNEL_DEBUG)->message("Picked device: \"" + device_name + "\".");
+            wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
         }
     }
@@ -339,7 +340,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     QueueFamilyIndices indices{};
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
-    vector<VkQueueFamilyProperties, HeapAllocatorAlignedPool> queue_family_properties(queue_family_count, get_render_allocator());
+    vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, get_render_allocator());
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
     int i = 0;
     for (auto& queue_family_property : queue_family_properties) {
@@ -363,8 +364,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 }
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
-    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool>(get_render_allocator()),
-        .present_modes = vector<VkPresentModeKHR, HeapAllocatorAlignedPool>(get_render_allocator())};
+    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(get_render_allocator()),
+        .present_modes = vector<VkPresentModeKHR>(get_render_allocator())};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -377,7 +378,7 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
     return details;
 }
 
-VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurfaceFormatKHR, HeapAllocatorAlignedPool>& p_available_formats) {
+VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats) {
     for (const auto& available_format : p_available_formats) {
         if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB
             && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -387,7 +388,7 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurface
     return p_available_formats[0];
 }
 
-VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR, HeapAllocatorAlignedPool>& p_available_present_modes) {
+VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes) {
     // TODO: get from configuration
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {

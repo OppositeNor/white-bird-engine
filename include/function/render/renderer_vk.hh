@@ -17,6 +17,7 @@
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/function_utils.hh"
 #include "function/render/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "global/stl_allocator.hh"
@@ -24,7 +25,6 @@
 
 #include <SDL.h>
 #include <optional>
-#include <set>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -93,8 +93,8 @@ private:
                 && compute.has_value()
                 && present.has_value();
         }
-        std::set<int> get_unique_indices() {
-            std::set<int> result;
+        set<int> get_unique_indices() const {
+            set<int> result(get_render_allocator());
             result.insert(graphics.value());
             result.insert(compute.value());
             result.insert(present.value());

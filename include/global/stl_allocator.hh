@@ -16,8 +16,10 @@
 #define __WBE_STL_ALLOCATOR_HH__
 
 #include "core/allocator/allocator.hh"
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include <cstddef>
 #include <set>
+#include <string>
 #include <vector>
 namespace WhiteBirdEngine {
 
@@ -32,8 +34,34 @@ struct STLAllocator {
     using value_type = T;
     AllocType* allocator = nullptr;
 
+    template <typename U>
+    struct rebind {
+        using other = STLAllocator<U, AllocType>;
+    };
+
     STLAllocator(AllocType* p_allocator)
         : allocator(p_allocator) {}
+    ~STLAllocator() {}
+    STLAllocator(const STLAllocator& p_other)
+        : allocator(p_other.allocator) {}
+    STLAllocator(STLAllocator&& p_other)
+        : allocator(p_other.allocator) {
+        p_other.allocator = nullptr;
+    }
+    STLAllocator& operator=(const STLAllocator& p_other) {
+        allocator = p_other.allocator;
+        return *this;
+    }
+    STLAllocator& operator=(STLAllocator&& p_other) {
+        allocator = p_other.allocator;
+        p_other.allocator = nullptr;
+        return *this;
+    }
+
+    template <typename T1>
+    STLAllocator(const STLAllocator<T1, AllocType>& p_other) noexcept
+        : allocator(p_other.allocator) {}
+
     
     T* allocate(size_t p_num) {
         return reinterpret_cast<T*>(allocator->allocate(p_num * sizeof(T), alignof(T)));
@@ -43,11 +71,14 @@ struct STLAllocator {
     }
 };
 
-template <typename T, typename AllocType>
+template <typename T, typename AllocType = HeapAllocatorAlignedPool>
 using vector = std::vector<T, STLAllocator<T, AllocType>>;
 
-template <typename T, typename AllocType>
-using set = std::set<T, STLAllocator<T, AllocType>>;
+template <typename T, typename AllocType = HeapAllocatorAlignedPool>
+using set = std::set<T, std::less<T>, STLAllocator<T, AllocType>>;
+
+template <typename AllocType = HeapAllocatorAlignedPool>
+using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType>>;
 
 }
 

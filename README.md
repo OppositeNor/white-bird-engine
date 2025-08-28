@@ -1,59 +1,76 @@
-# 白鸟引擎
+# White Bird Engine
 
-Licensed under [Apache 2.0 License](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
+[简体中文](./README.zh-Hans.md)
 
-一个为音游打造的多平台游戏引擎
+Licensed under [Apache License Version 2.0](https://github.com/OppositeNor/white-bird-engine/blob/main/LICENSE).
 
-## 如何构建
+A game engine built for rhythm game development.
 
-首先将仓库克隆到本地
+## How to build
 
-```bash
+Clone the repository:
+
+```sh
 git clone https://github.com/OppositeNor/white-bird-engine.git --recursive
 cd white-bird-engine
 ```
 
-或者
+Or:
 
-```bash
+```sh
 git clone https://github.com/OppositeNor/white-bird-engine.git
 cd white-bird-engine
 git submodule init --update
 ```
 
-### Linux
+### Build according to your system
 
-安装构建工具：
+<details>
+<summary> Linux </summary>
 
-#### Arch
+Install build dependencies:
 
-```bash
-sudo pacman -S gcc cmake shaderc ninja
-```
+- Arch
 
-构建：
+    ```sh
+    sudo pacman -S gcc cmake shaderc ninja
+    ```
 
-```bash
+    TODO: install Vulkan SDK
+
+- Debian
+
+    TODO
+
+Build:
+
+```sh
 cmake -B build -G Ninja
 cmake --build build
 ```
 
-### MacOS
+</details>
 
-使用 Homebrew 安装构建工具
+<details>
+<summary> MacOS </summary>
 
-```bash
+Install build dependencies with homebrew:
+
+```sh
 brew install cmake shaderc ninja
 ```
 
-构建：
+Build:
 
-```bash
+```sh
 cmake -B build -G Ninja
 cmake --build build
 ```
 
-### Windows
+</details>
 
+<details>
+<summary> Windows </summary>
 TODO
+</details>
 
