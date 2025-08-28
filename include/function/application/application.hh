@@ -14,11 +14,6 @@ public:
     virtual ~Application() {}
 
     /**
-     * @brief Function that's called once before starting the application.
-     */
-    virtual void init() = 0;
-
-    /**
      * @brief Function that ticks the rendering frames.
      *
      * @param p_delta The difference of time of the last two calls for this function.

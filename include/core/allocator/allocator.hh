@@ -52,7 +52,9 @@ concept AllocatorTraitConcept = requires {
     { bool(T::IS_ALLOC_FIXED_SIZE) } -> std::same_as<bool>;
     // Is operations on this allocator atomic.
     { bool(T::IS_ATOMIC) } -> std::same_as<bool>;
-    // Will the memory address be moved after allocated.
+    // Will the memory address be moved after allocated. If set to false,
+    // the memory ID will be guranteed to be set to the memory address of
+    // the allocated resource.
     { bool(T::WILL_ADDR_MOVE) } -> std::same_as<bool>;
 };
 }

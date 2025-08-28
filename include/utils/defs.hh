@@ -107,6 +107,7 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 
 #ifdef _DEBUG
 #define WBE_VK_ENABLE_VALIDATION
+#define WBE_ENABLE_HEAP_ALLOCATOR_TRACKER
 #endif
 
 #endif
