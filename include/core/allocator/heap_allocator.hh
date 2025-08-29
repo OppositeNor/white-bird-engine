@@ -75,7 +75,7 @@ public:
     /**
      * @brief Get the allocated memories' ids
      */
-    virtual const std::set<MemID>& get_allocated() const = 0;
+    virtual std::set<MemID> get_allocated() const = 0;
 
     /**
      * @brief Is the allocator empty.

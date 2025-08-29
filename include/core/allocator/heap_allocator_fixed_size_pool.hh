@@ -106,9 +106,8 @@ public:
         return alloc_obj_count;
     }
 
-    virtual const std::set<MemID>& get_allocated() const override {
-        static std::set<MemID> result;
-        result.clear();
+    virtual std::set<MemID> get_allocated() const override {
+        std::set<MemID> result;
         for (uint32_t i = 0; i < alloc_obj_count; ++i) {
             result.insert(*(index_chunk_rev_start() + i));
         }

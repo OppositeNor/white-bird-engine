@@ -77,7 +77,7 @@ public:
         return allocated.size();
     }
 
-    virtual const std::set<MemID>& get_allocated() const override {
+    virtual std::set<MemID> get_allocated() const override {
         return allocated;
     }
 

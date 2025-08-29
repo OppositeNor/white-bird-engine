@@ -19,6 +19,11 @@
 #include "function/engine_function.hh"
 namespace WhiteBirdEngine {
 
+/**
+ * @brief Get the allocator for renderer.
+ *
+ * @return The allocator for renderer.
+ */
 inline HeapAllocatorAlignedPool* get_render_allocator() {
     return EngineFunction::get_singleton()->renderer_allocator;
 }
