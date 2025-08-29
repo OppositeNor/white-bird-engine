@@ -323,6 +323,18 @@ struct GameConfigOptions {
         // Vulkan render API
         VULKAN
     } render_api = RenderAPI::VULKAN;
+
+    /**
+     * @brief Set limit to the rendering fps. -1 stands for unlimited.
+     */
+    int32_t limit_render_fps = -1;
+
+    /**
+     * @brief Set limit to the logic fps. -1 stands for unlimited.
+     * Unlimited logic FPS is strongly unrecognized, since logic computation will consume
+     * substancial amount of CPU resources.
+     */
+    int32_t limit_logic_fps = 60;
 };
 
 // Color space

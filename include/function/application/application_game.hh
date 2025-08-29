@@ -19,6 +19,11 @@ public:
     virtual void render_tick(double p_delta) override;
     virtual void logic_tick(double p_delta) override;
 
+    /**
+     * @brief Get the allocator for the renderer.
+     *
+     * @return The allocator for the renderer.
+     */
     Ref<const HeapAllocatorAlignedPool> get_renderer_allocator() const {
         return renderer_allocator;
     }

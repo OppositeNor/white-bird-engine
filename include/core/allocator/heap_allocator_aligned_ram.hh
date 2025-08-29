@@ -19,6 +19,7 @@
 #include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <bit>
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
@@ -56,7 +57,7 @@ public:
     virtual MemID allocate(size_t p_size, size_t p_alignment) override {
         size_t align_size = get_align_size(p_size, p_alignment);
         void* mem = aligned_alloc(p_alignment, align_size);
-        MemID result = reinterpret_cast<MemID>(mem);
+        MemID result = std::bit_cast<MemID>(mem);
         allocated.insert(result);
         size_map[result] = align_size;
         return result;
@@ -66,11 +67,11 @@ public:
         WBE_DEBUG_ASSERT(size_map.contains(p_mem));
         size_map.erase(p_mem);
         allocated.erase(p_mem);
-        free(reinterpret_cast<void*>(p_mem));
+        free(std::bit_cast<void*>(p_mem));
     }
 
     virtual void* get(MemID p_id) const override {
-        return reinterpret_cast<void*>(p_id);
+        return std::bit_cast<void*>(p_id);
     }
 
     virtual uint32_t obj_count() const override {

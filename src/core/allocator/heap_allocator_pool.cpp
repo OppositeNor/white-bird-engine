@@ -16,6 +16,7 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "core/allocator/heap_allocator_pool.hh"
+#include <bit>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -47,9 +48,9 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
     while (*valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
-            allocated.insert(reinterpret_cast<MemID>(result));
+            allocated.insert(std::bit_cast<MemID>(result));
             size_map[result] = p_size;
-            return reinterpret_cast<MemID>(result);
+            return std::bit_cast<MemID>(result);
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
@@ -60,7 +61,7 @@ void HeapAllocatorPool::deallocate(MemID p_mem) {
     if (!is_in_pool(p_mem)) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
     }
-    void* data_loc = reinterpret_cast<void*>(p_mem);
+    void* data_loc = std::bit_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);
     size_map.erase(data_loc);

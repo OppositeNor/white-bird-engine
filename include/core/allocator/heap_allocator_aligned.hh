@@ -21,6 +21,11 @@
 #include <string>
 
 namespace WhiteBirdEngine {
+/**
+ * @class HeapAllocatorAligned
+ * @brief Heap allocator that has alignment allocation support.
+ *
+ */
 class HeapAllocatorAligned {
 public:
     HeapAllocatorAligned() = default;

@@ -18,6 +18,7 @@
 #include "allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
+#include <bit>
 #include <cstddef>
 #include <memory>
 #include <stddef.h>
@@ -76,7 +77,7 @@ public:
     MemID allocate(size_t p_size) {
         void* result = mem_chunk.get() + marker;
         marker += p_size;
-        return reinterpret_cast<MemID>(result);
+        return std::bit_cast<MemID>(result);
     }
 
     /**
@@ -85,8 +86,8 @@ public:
      * @param p_id The ID of the memory to get.
      */
     void* get(MemID p_id) {
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + marker));
-        return reinterpret_cast<void*>(p_id);
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        return std::bit_cast<void*>(p_id);
     }
 
     /**
@@ -95,8 +96,8 @@ public:
      * @param p_id The ID of the memory to get.
      */
     void* get(MemID p_id) const {
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + marker));
-        return reinterpret_cast<void*>(p_id);
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        return std::bit_cast<void*>(p_id);
     }
 
     /**
@@ -108,8 +109,8 @@ public:
      */
     template <typename T>
     T* get_obj(MemID p_id) const {
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + marker));
-        return reinterpret_cast<T*>(p_id);
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        return std::bit_cast<T*>(p_id);
     }
 
     /**

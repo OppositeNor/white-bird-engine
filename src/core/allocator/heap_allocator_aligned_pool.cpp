@@ -16,6 +16,7 @@
 #include "core/allocator/allocator.hh"
 #include "utils/utils.hh"
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -42,13 +43,13 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
     size_t aligned_size = get_align_size(p_size, p_alignment);
     while (*valid_idle_node != nullptr) {
-        uintptr_t mem_start_addr = (uintptr_t)((*valid_idle_node)->mem_start);
-        char* idle_node_mem_start = reinterpret_cast<char*>(
+        uintptr_t mem_start_addr = std::bit_cast<uintptr_t>((*valid_idle_node)->mem_start);
+        char* idle_node_mem_start = std::bit_cast<char*>(
             (mem_start_addr / p_alignment) * p_alignment == mem_start_addr ? mem_start_addr : (mem_start_addr / p_alignment + 1) * p_alignment
         );
         if (idle_node_mem_start + aligned_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
             void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
-            allocated.insert((MemID)(result));
+            allocated.insert(std::bit_cast<MemID>(result));
             size_map[result] = aligned_size;
 #ifdef WBE_ENABLE_HEAP_ALLOCATOR_TRACKER
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + aligned_size - (size_t)mem_chunk);
@@ -59,16 +60,16 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     }
     std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
         "Trying to allocate: " + std::to_string(aligned_size) + " bytes.\n"
-        "Pool status: " + (std::string)*this;
+        "Pool status: " + static_cast<std::string>(*this);
     throw std::runtime_error(err_msg);
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
     if (!is_in_pool(p_mem)) {
         throw std::runtime_error("Failed to deallocate memory: memory id: " + std::to_string(p_mem) + " not allocated in this memory pool.\n"
-                                 "Pool status: " + (std::string)*this);
+                                 "Pool status: " + static_cast<std::string>(*this));
     }
-    void* data_loc = reinterpret_cast<void*>(p_mem);
+    void* data_loc = std::bit_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);
     size_map.erase(data_loc);
@@ -81,7 +82,7 @@ void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
 }
 
 void* HeapAllocatorAlignedPool::get(MemID p_id) const {
-    return reinterpret_cast<void*>(p_id);
+    return std::bit_cast<void*>(p_id);
 }
 
 void* HeapAllocatorAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {

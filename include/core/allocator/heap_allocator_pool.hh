@@ -17,6 +17,7 @@
 
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
+#include <bit>
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
@@ -71,7 +72,7 @@ public:
         if (!is_in_pool(p_id)) {
             throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
         }
-        return reinterpret_cast<void*>(p_id);
+        return std::bit_cast<void*>(p_id);
     }
 
     virtual const void* get(MemID p_id) const override {
@@ -81,7 +82,7 @@ public:
         if (!is_in_pool(p_id)) {
             throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
         }
-        return reinterpret_cast<void*>(p_id);
+        return std::bit_cast<void*>(p_id);
     }
 
     virtual uint32_t obj_count() const override {
