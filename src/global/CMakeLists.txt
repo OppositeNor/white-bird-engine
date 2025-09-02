@@ -22,10 +22,6 @@ set(libs ${libs}
     PARENT_SCOPE
 )
 
-set(WBE_BUILD_CONFIG_SCRIPTS ${WBE_BUILD_CONFIG_SCRIPTS}
-    PARENT_SCOPE
-)
-
 set(WBE_SOURCES ${WBE_SOURCES}
     ${wbe_global_src}
     PARENT_SCOPE

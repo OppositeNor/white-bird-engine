@@ -13,7 +13,6 @@
 # limitations under the License.
 import json
 import os
-import sys
 import importlib.util
 from reflection.channel_registrator import ChannelRegistrator
 
@@ -83,26 +82,5 @@ class WBEReflector:
             dict_rev[p_dictionary[channel]] = channel
             hash_val_set.add(p_dictionary[channel])
 
-def _load_indices(p_index_file : str):
-    if not os.path.exists(p_index_file):
-        raise FileNotFoundError(f"Python file not found: {p_index_file}")
-    spec = importlib.util.spec_from_file_location("indices", p_index_file)
-    if spec is None:
-        raise RuntimeError(f"Failed to create module spec for file: {p_index_file}")
-    module_config = importlib.util.module_from_spec(spec)
-    if spec.loader is None:
-        raise RuntimeError(f"Failed to create module spec for file: {p_index_file}")
-    spec.loader.exec_module(module_config)
-    return module_config.indices
-
-
-def reflect():
-    """Run reflection."""
-    builder = WBEReflector(sys.argv[1])
-    indices = _load_indices(sys.argv[2])
-    for index_file in indices:
-        builder.load_script_config(index_file)
-    builder.checks()
-    builder.dump()
 
 

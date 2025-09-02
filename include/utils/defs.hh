@@ -63,11 +63,19 @@ template <> struct TypeIDRevTrait<TypeIDTrait<type_name>::TYPE_ID> {\
     using Type = type_name;\
 };
 
+#ifdef WBE_REFLECTION_PARSER
+// Define a label.
+#define WBE_DEFINE_LABEL(label_name) constexpr HashCode label_name  __attribute__((annotate("WBE_LABEL"))) = static_hash(WBE_EXPAND_STR(label_name));\
+template <> struct LabelTrait<label_name> {\
+    static constexpr std::string_view NAME = WBE_EXPAND_STR(label_name);\
+};
+#else
 // Define a label.
 #define WBE_DEFINE_LABEL(label_name) constexpr HashCode label_name = static_hash(WBE_EXPAND_STR(label_name));\
 template <> struct LabelTrait<label_name> {\
     static constexpr std::string_view NAME = WBE_EXPAND_STR(label_name);\
 };
+#endif
 
 // Get the label of a label name.
 #define WBE_LABEL(label_name) WhiteBirdEngine::static_hash(WBE_EXPAND_STR(label_name))

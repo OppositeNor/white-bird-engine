@@ -15,7 +15,7 @@
 #ifndef __WBE_REFLECTION_HH__
 #define __WBE_REFLECTION_HH__
 
-#if defined (WBE_REFLECTION_PARSER)
+#ifdef WBE_REFLECTION_PARSER
 #define WBE_META(...) __attribute__((annotate(#__VA_ARGS__)))
 #define WBE_CLASS(class_name, ...) class __attribute__((annotate(#__VA_ARGS__))) class_name
 #define WBE_STRUCT(struct_name, ...) struct __attribute__((annotate(#__VA_ARGS__))) struct_name
