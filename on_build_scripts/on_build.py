@@ -24,8 +24,8 @@ clang_args = [
 ]
 
 def main():
-    if (len(sys.argv) != 3):
-        print("Usage: " + sys.argv[0] + " <res_path> <source_index_file>")
+    if (len(sys.argv) != 4):
+        print("Usage: " + sys.argv[0] + " <res_path> <source_index_file> <metadata_cache>")
         exit(-1)
     print("White Bird Engine build script start.")
     _reflect(clang_args)
@@ -35,9 +35,10 @@ def _reflect(p_metaparser_clang_args):
     """Run reflection."""
     reflector = WBEReflector(sys.argv[1])
     indices = _load_indices(sys.argv[2])
-    metaparser = WBEMetaparser(reflector, p_metaparser_clang_args)
+    metaparser = WBEMetaparser(reflector, p_metaparser_clang_args, sys.argv[3])
     for index_file in indices:
         metaparser.parse(index_file)
+    metaparser.export()
     reflector.checks()
     reflector.dump()
 

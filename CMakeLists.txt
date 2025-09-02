@@ -47,6 +47,9 @@ set(WBE_SOURCES_INDEX_FILE ${CMAKE_CURRENT_BINARY_DIR}/sources.py)
 
 file(COPY ${WBE_CONFIG_DIR} DESTINATION ${WBE_RESOURCE_OUTPUT_DIR})
 
+set(WBE_METADATA_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/metadata_cache)
+file(MAKE_DIRECTORY ${WBE_METADATA_CACHE_DIR})
+
 set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
 set(WBE_TEST_ENV_RES_DIR ${WBE_TEST_ENV_DIR}/res)
 
@@ -141,7 +144,7 @@ write_index_file(${WBE_SOURCES_INDEX_FILE} ${WBE_SOURCES})
 # Runtime reflections
 add_custom_target(wbe_on_build
     COMMENT "Running White Bird Engine build script"
-    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_SOURCES_INDEX_FILE}
+    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_SOURCES_INDEX_FILE} ${WBE_METADATA_CACHE_DIR}
 )
 
 # Compile shaders

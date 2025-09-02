@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import hashlib
+
 def to_uint32(x):
     """Convert a uint64 integer to uint32 to match the usage in the C++ file.
 
@@ -36,3 +39,29 @@ def hash_str(p_str : str) -> int:
     else:
         return 5381
 
+def hash_file(p_path : str):
+    """Hash a file.
+
+    Args:
+        p_path: The path to the file to get the hashcode.
+
+    Returns: The hashcode of the file's content.
+        
+    """
+    hasher = hashlib.sha256()
+    with open(p_path, "rb") as f:
+        hasher.update(f.read())
+    return hasher.hexdigest()
+
+def hash_str_sha256(p_str : str) -> str:
+    """Hash a string with sha256, has smaller collision posibility compared to hash_str method.
+
+    Args:
+        p_str: The string to be hashed.
+
+    Returns:
+        The hashed result.
+    """
+    hasher = hashlib.sha256()
+    hasher.update(p_str.encode("utf-8"))
+    return hasher.hexdigest()
