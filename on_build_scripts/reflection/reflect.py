@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
 import sys
 import importlib.util
 from reflection.channel_registrator import ChannelRegistrator
@@ -38,9 +39,11 @@ class WBEReflector:
             RuntimeError: If the config script is not runnable.
         """
         print("Loading configuration script: " + p_load_path)
+        if not os.path.exists(p_load_path):
+            raise FileNotFoundError(f"File not found: {p_load_path}")
         spec = importlib.util.spec_from_file_location("config", p_load_path)
         if spec is None:
-            raise RuntimeError("Failed to load spec from path: " + p_load_path)
+            raise RuntimeError(f"Failed to load spec from path: {p_load_path}")
         module_config = importlib.util.module_from_spec(spec)
         if spec.loader is not None:
             spec.loader.exec_module(module_config)
@@ -59,47 +62,46 @@ class WBEReflector:
         print("Exporting...")
         metadata : dict = {}
         metadata["channels"] = self.channel_registrator.channels
-        self.write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True))
-
-    def write_to_file(self, p_path : str, p_str : str) -> None:
-        """Helper function to write to a file.
-
-        Args:
-            p_path: The path to the file to write.
-            p_str: The content to write into the file.
-        """
-        with open(p_path, "w") as channel_file:
-            channel_file.write(p_str)
+        self._write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True))
 
     def checks(self) -> None:
         """Do checkings."""
         print("Checking...")
-        self.check_hashing_collision("channels", self.channel_registrator.channels)
+        self._check_hashing_collision("channels", self.channel_registrator.channels)
 
-    def check_hashing_collision(self, p_dict_name : str, p_dictionary : dict) -> None:
-        """Check if there are hashing collisions.
+    def _write_to_file(self, p_path : str, p_str : str) -> None:
+        with open(p_path, "w") as channel_file:
+            channel_file.write(p_str)
 
-        Args:
-            p_dict_name: The dictionary name.
-            p_dictionary: The dictioniary content.
-
-        Raises:
-            RuntimeError: If a hashing collision is detected.
-        """
+    def _check_hashing_collision(self, p_dict_name : str, p_dictionary : dict) -> None:
         hash_val_set = set()
         dict_rev = dict()
         for channel in p_dictionary.keys():
             if p_dictionary[channel] in hash_val_set:
-                raise RuntimeError("Hasing collision of \"" + p_dict_name + "\" detected! Hash values of: \"" + channel +
-                                   "\" and \"", dict_rev[p_dictionary[channel]], "\" are identical: ", p_dictionary[channel])
+                raise RuntimeError(f"Hasing collision of \"{p_dict_name}\" detected! Hash values of: \"{channel}\" "
+                    "and \"{dict_rev[p_dictionary[channel]]}\" are identical: {p_dictionary[channel]}")
             dict_rev[p_dictionary[channel]] = channel
             hash_val_set.add(p_dictionary[channel])
+
+def _load_indices(p_index_file : str):
+    if not os.path.exists(p_index_file):
+        raise FileNotFoundError(f"Python file not found: {p_index_file}")
+    spec = importlib.util.spec_from_file_location("indices", p_index_file)
+    if spec is None:
+        raise RuntimeError(f"Failed to create module spec for file: {p_index_file}")
+    module_config = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise RuntimeError(f"Failed to create module spec for file: {p_index_file}")
+    spec.loader.exec_module(module_config)
+    return module_config.indices
+
 
 def reflect():
     """Run reflection."""
     builder = WBEReflector(sys.argv[1])
-    for i in range(2, len(sys.argv)):
-        builder.load_script_config(sys.argv[i])
+    indices = _load_indices(sys.argv[2])
+    for index_file in indices:
+        builder.load_script_config(index_file)
     builder.checks()
     builder.dump()
 

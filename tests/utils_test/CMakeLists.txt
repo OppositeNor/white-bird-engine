@@ -40,3 +40,8 @@ else()
     )
 endif()
 
+set(WBE_SOURCES ${WBE_SOURCES}
+    ${${TEST_NAME}_src}
+    PARENT_SCOPE
+)
+

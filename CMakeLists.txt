@@ -43,12 +43,23 @@ file(MAKE_DIRECTORY ${WBE_SHADER_DIR})
 set(WBE_CONFIG_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/config)
 file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
 
+set(WBE_SOURCES_INDEX_FILE ${CMAKE_CURRENT_BINARY_DIR}/sources.py)
+set(WBE_CONFIG_SCRIPTS_INDEX_FILE ${CMAKE_CURRENT_BINARY_DIR}/config_scripts.py)
+
 file(COPY ${WBE_CONFIG_DIR} DESTINATION ${WBE_RESOURCE_OUTPUT_DIR})
 
 set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
 set(WBE_TEST_ENV_RES_DIR ${WBE_TEST_ENV_DIR}/res)
 
 set(WBE_BUILD_CONFIG_SCRIPTS "")
+
+macro(write_index_file index_file_path)
+    file(WRITE ${index_file_path} "indices = [\n")
+    foreach(index ${ARGN})
+        file(APPEND ${index_file_path} "\"${index}\",\n")
+    endforeach()
+    file(APPEND ${index_file_path} "]\n")
+endmacro()
 
 # Add dependencies subdirectories
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
@@ -94,6 +105,9 @@ include_directories(
     ${include_dirs}
 )
 
+set(WBE_SOURCES "")
+file(GLOB_RECURSE WBE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hh)
+
 # Add engine source
 add_subdirectory(src/global)
 add_subdirectory(src/function)
@@ -125,12 +139,15 @@ if (WBE_MAKE_TEST)
     add_subdirectory(tests)
 endif()
 
-message("Build config scripts: ${WBE_BUILD_CONFIG_SCRIPTS}")
+write_index_file(${WBE_SOURCES_INDEX_FILE} ${WBE_SOURCES})
+write_index_file(${WBE_CONFIG_SCRIPTS_INDEX_FILE} ${WBE_BUILD_CONFIG_SCRIPTS})
+
+message("Config scripts index file: ${WBE_CONFIG_SCRIPTS_INDEX_FILE}")
 
 # Runtime reflections
 add_custom_target(wbe_on_build
     COMMENT "Running White Bird Engine build script"
-    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_BUILD_CONFIG_SCRIPTS}
+    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_CONFIG_SCRIPTS_INDEX_FILE}
 )
 
 # Compile shaders

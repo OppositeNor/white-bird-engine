@@ -29,3 +29,8 @@ set(WBE_TEST_EXE ${WBE_TEST_EXE}
     PARENT_SCOPE
 )
 
+set(WBE_SOURCES ${WBE_SOURCES}
+    ${${TEST_NAME}_src}
+    PARENT_SCOPE
+)
+
