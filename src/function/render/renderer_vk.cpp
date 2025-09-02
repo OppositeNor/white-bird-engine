@@ -242,6 +242,7 @@ void RendererVK::create_logical_device() {
         throw std::runtime_error("Failed to create logical device.");
     }
     vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &graphics_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &compute_queue);
     vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &present_queue);
 }
 
