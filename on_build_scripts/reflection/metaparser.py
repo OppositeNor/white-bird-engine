@@ -21,7 +21,8 @@ import json
 from dataclasses import dataclass
 
 @dataclass
-class FileMetadata:
+class WBEFileMetadata:
+    hashcode : str
     labels : List[str]
 
 
@@ -45,7 +46,6 @@ class WBEMetaparser:
         self.reflector = p_reflector
         self.clang_args = p_clang_args
         self.cache_dir = p_cache_dir
-        self._files_content_hashcodes = self._get_files_content_hashcodes()
         self._metadata = {}
 
     def parse(self, p_cpp_file_path : str):
@@ -54,47 +54,24 @@ class WBEMetaparser:
         Args:
             p_cpp_file_path: The path to the C++ file.
         """
-        file_hashcode = hash_file(p_cpp_file_path)
-        if self._files_content_hashcodes.get(p_cpp_file_path) == file_hashcode:
-            self._read_from_cache(p_cpp_file_path)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        file_cache_path = os.path.join(self.cache_dir, f"{hash_str_sha256(p_cpp_file_path)}.json")
+        if os.path.exists(file_cache_path):
+            self._read_from_cache(p_cpp_file_path, file_cache_path)
         else:
-            self._register_from_clang(p_cpp_file_path)
-        self._files_content_hashcodes[p_cpp_file_path] = file_hashcode
+            self._register_from_clang(p_cpp_file_path, file_cache_path)
 
     def export(self):
         """Export"""
-        self._export_cache()
         self._export_metadata()
 
     def _export_metadata(self):
         for _, metadata in self._metadata.items():
             self._register_metadata(metadata)
 
-    def _export_cache(self):
-        os.makedirs(self.cache_dir, exist_ok=True)
-
-        for file_path, metadata in self._metadata.items():
-            file_name_hash = hash_str_sha256(file_path)
-            cache_file_path = os.path.join(self.cache_dir, f"{file_name_hash}.json")
-            data = metadata.__dict__
-
-            with open(cache_file_path, "w") as f:
-                json.dump(data, f, indent=4)
-
-        content_hash_file = os.path.join(self.cache_dir, "content_hashcodes.json")
-        with open(content_hash_file, "w") as f:
-            json.dump(self._files_content_hashcodes, f, indent=4)
-
-    def _get_files_content_hashcodes(self):
-        file_path = os.path.join(self.cache_dir, "content_hashcodes.json")
-        if not os.path.exists(file_path):
-            return {}
-        with open(file_path) as f:
-            return json.load(f)
-
-    def _register_from_clang(self, p_cpp_file_path):
+    def _register_from_clang(self, p_cpp_file_path, p_cache_path):
         print(f"WBEMetaparser: parsing {p_cpp_file_path}...")
-        metadata = FileMetadata([])
+        metadata = WBEFileMetadata("", [])
         index = clang.cindex.Index.create()
         tu = index.parse(
             p_cpp_file_path,
@@ -102,9 +79,12 @@ class WBEMetaparser:
             options=clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
         )
         self._register_labels(tu, metadata)
+        metadata.hashcode = hash_file(p_cpp_file_path)
         self._metadata[p_cpp_file_path] = metadata
+        with open(p_cache_path, "w") as f:
+            json.dump(metadata.__dict__, f, indent=4)
 
-    def _register_labels(self, p_tu, p_metadata : FileMetadata):
+    def _register_labels(self, p_tu, p_metadata : WBEFileMetadata):
         for label in self._visit_labels(p_tu.cursor):
             p_metadata.labels.append(label)
 
@@ -117,17 +97,20 @@ class WBEMetaparser:
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
                 yield from self._visit_labels(child)
 
-    def _read_from_cache(self, p_cpp_file_path):
-        file_name_hash = hash_str_sha256(p_cpp_file_path)
-        file_metadata_path = os.path.join(self.cache_dir, f"{file_name_hash}.json")
-        if not os.path.exists(file_metadata_path):
-            self._register_from_clang(p_cpp_file_path)
-        else:
-            with open(file_metadata_path) as f:
+    def _read_from_cache(self, p_cpp_file_path, p_cache_path):
+        try:
+            with open(p_cache_path) as f:
                 data = json.load(f)
-            self._metadata[p_cpp_file_path] = FileMetadata(**data)
+            metadata = WBEFileMetadata(**data)
+            file_content_hashcode = hash_file(p_cpp_file_path)
+            if metadata.hashcode != file_content_hashcode:
+                self._register_from_clang(p_cpp_file_path, p_cache_path)
+            else:
+                self._metadata[p_cpp_file_path] = WBEFileMetadata(**data)
+        except:
+            self._register_from_clang(p_cpp_file_path, p_cache_path)
 
-    def _register_metadata(self, p_metadata : FileMetadata):
+    def _register_metadata(self, p_metadata : WBEFileMetadata):
         for label in p_metadata.labels:
             self.reflector.register_channel(label)
 
