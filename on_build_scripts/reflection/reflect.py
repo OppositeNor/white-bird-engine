@@ -14,7 +14,7 @@
 import json
 import os
 import importlib.util
-from reflection.channel_registrator import ChannelRegistrator
+from reflection.channel_registrator import WBEChannelRegistrator
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
@@ -26,7 +26,7 @@ class WBEReflector:
 
     def __init__(self, p_metadata_path : str) -> None:
         self.metadata_path = p_metadata_path
-        self.channel_registrator = ChannelRegistrator()
+        self.channel_registrator = WBEChannelRegistrator()
 
     def load_script_config(self, p_load_path : str) -> None:
         """Load config scripts.
@@ -37,7 +37,7 @@ class WBEReflector:
         Raises:
             RuntimeError: If the config script is not runnable.
         """
-        print("Loading configuration script: " + p_load_path)
+        print("WBEReflect: Loading configuration script: " + p_load_path)
         if not os.path.exists(p_load_path):
             raise FileNotFoundError(f"File not found: {p_load_path}")
         spec = importlib.util.spec_from_file_location("config", p_load_path)
@@ -58,14 +58,14 @@ class WBEReflector:
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
-        print("Exporting...")
+        print("WBEReflect: Exporting metadata...")
         metadata : dict = {}
         metadata["channels"] = self.channel_registrator.channels
         self._write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True))
 
     def checks(self) -> None:
         """Do checkings."""
-        print("Checking...")
+        print("WBEReflect: Checking...")
         self._check_hashing_collision("channels", self.channel_registrator.channels)
 
     def _write_to_file(self, p_path : str, p_str : str) -> None:
@@ -78,7 +78,7 @@ class WBEReflector:
         for channel in p_dictionary.keys():
             if p_dictionary[channel] in hash_val_set:
                 raise RuntimeError(f"Hasing collision of \"{p_dict_name}\" detected! Hash values of: \"{channel}\" "
-                    "and \"{dict_rev[p_dictionary[channel]]}\" are identical: {p_dictionary[channel]}")
+                    f"and \"{dict_rev[p_dictionary[channel]]}\" are identical: {p_dictionary[channel]}")
             dict_rev[p_dictionary[channel]] = channel
             hash_val_set.add(p_dictionary[channel])
 

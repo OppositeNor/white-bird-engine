@@ -13,7 +13,7 @@
 # limitations under the License.
 from utils import hash_str
 
-class ChannelRegistrator:
+class WBEChannelRegistrator:
     """Channel registrator. Used to keep track on the registrated channels.
 
     Attributes: 
