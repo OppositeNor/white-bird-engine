@@ -493,4 +493,22 @@ TEST(WBEAllocAlignedPoolTest, GetNullMemoryAddress) {
     ASSERT_EQ(addr, nullptr);
 }
 
+TEST(WBEAllocAlignedPoolTest, MaxDataSizeTracker) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
+    ASSERT_EQ(allocator.get_max_data_size(), 0);
+    WBE::MemID mem1 = allocator.allocate(100, 8);
+    ASSERT_EQ(allocator.get_max_data_size(), 104);
+    WBE::MemID mem2 = allocator.allocate(200, 16);
+    ASSERT_EQ(allocator.get_max_data_size(), 320);
+    allocator.deallocate(mem1);
+    ASSERT_EQ(allocator.get_max_data_size(), 320);
+    WBE::MemID mem3 = allocator.allocate(50, 4);
+    ASSERT_EQ(allocator.get_max_data_size(), 320);
+    allocator.deallocate(mem2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320);
+    allocator.deallocate(mem3);
+    ASSERT_EQ(allocator.get_max_data_size(), 320);
+}
+
 #endif

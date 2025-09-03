@@ -50,6 +50,7 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
             allocated.insert(std::bit_cast<MemID>(result));
             size_map[result] = p_size;
+            max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + p_size - (size_t)mem_chunk);
             return std::bit_cast<MemID>(result);
         }
         valid_idle_node = &((*valid_idle_node)->next);

@@ -52,9 +52,7 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
             void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
             allocated.insert(std::bit_cast<MemID>(result));
             size_map[result] = aligned_size;
-#ifdef WBE_ENABLE_HEAP_ALLOCATOR_TRACKER
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + aligned_size - (size_t)mem_chunk);
-#endif
             return (MemID)result;
         }
         valid_idle_node = &((*valid_idle_node)->next);

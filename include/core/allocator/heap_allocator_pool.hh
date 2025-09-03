@@ -109,6 +109,10 @@ public:
         idle_list_head->next = nullptr;
     }
 
+    size_t get_max_data_size() const {
+        return max_data_loc_tracker;
+    }
+
 private:
     
     struct IdleListNode {
@@ -128,6 +132,8 @@ private:
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
     std::set<MemID> allocated;
+
+    size_t max_data_loc_tracker = 0;
 
     bool is_in_pool(MemID p_id) const {
         return allocated.find(p_id) != allocated.end();
