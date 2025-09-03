@@ -140,7 +140,8 @@ class WBEMetaparser:
             return True
         for dep in p_metadata.deps:
             dep_metadata_file_path = os.path.join(self.cache_dir, f"{hash_str_sha256(dep)}.json")
-            if self._is_label_registered(self._get_metadata(dep, dep_metadata_file_path), p_label):
+            dep_metadata = self._get_metadata(dep, dep_metadata_file_path)
+            if p_label in dep_metadata.labels:
                 return True
         return False
 
