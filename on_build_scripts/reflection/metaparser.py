@@ -91,7 +91,7 @@ class WBEMetaparser:
     def _visit_labels(self, p_cursor):
         if p_cursor.kind == clang.cindex.CursorKind.VAR_DECL:
             for attr in p_cursor.get_children():
-                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR and attr.displayname == "WBE_LABEL":
+                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR and attr.displayname == "WBE_CHANNEL":
                     yield p_cursor.spelling
         for child in p_cursor.get_children():
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
@@ -106,7 +106,7 @@ class WBEMetaparser:
             if metadata.hashcode != file_content_hashcode:
                 self._register_from_clang(p_cpp_file_path, p_cache_path)
             else:
-                self._metadata[p_cpp_file_path] = WBEFileMetadata(**data)
+                self._metadata[p_cpp_file_path] = metadata
         except:
             self._register_from_clang(p_cpp_file_path, p_cache_path)
 

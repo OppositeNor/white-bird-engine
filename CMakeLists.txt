@@ -106,7 +106,7 @@ include_directories(
 )
 
 set(WBE_SOURCES "")
-file(GLOB_RECURSE WBE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hh)
+file(GLOB_RECURSE WBE_SOURCES "")
 
 # Add engine source
 add_subdirectory(src/global)

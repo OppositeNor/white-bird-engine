@@ -41,28 +41,28 @@ TEST(WBELogStreamTest, General) {
 }
 
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(WBE_TEST_LABEL)
+WBE_DEFINE_LABEL(WBE_TEST_CHANNEL, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabel) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::stringstream ss;
-    WBE::LogStream log_stream(WBE::WBE_TEST_LABEL, ss);
+    WBE::LogStream log_stream(WBE::WBE_TEST_CHANNEL, ss);
     log_stream.message("Test message");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL] Message: Test message\n"));
+    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] Message: Test message\n"));
     log_stream.warning("Test warning");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL] Message: Test message\n"
-                                    "[WBE_TEST_LABEL] Warning: Test warning\n"));
+    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] Message: Test message\n"
+                                    "[WBE_TEST_CHANNEL] Warning: Test warning\n"));
     log_stream.error("Test error");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL] Message: Test message\n"
-                                    "[WBE_TEST_LABEL] Warning: Test warning\n"
-                                    "[WBE_TEST_LABEL] Error: Test error\n"));
+    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] Message: Test message\n"
+                                    "[WBE_TEST_CHANNEL] Warning: Test warning\n"
+                                    "[WBE_TEST_CHANNEL] Error: Test error\n"));
 }
 
 #define TEST_LABEL_NAME_MACRO WBE_TEST_LABEL_MACRO
 
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(TEST_LABEL_NAME_MACRO)
+WBE_DEFINE_LABEL(TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
