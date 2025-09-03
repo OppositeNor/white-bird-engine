@@ -64,8 +64,9 @@ class WBEMetaparser:
         self._export_metadata()
 
     def _get_metadata(self, p_cpp_file_path, p_cache_path):
-        if self._metadata.get(p_cpp_file_path) is not None:
-            return self._metadata.get(p_cpp_file_path)
+        preloaded = self._metadata.get(p_cpp_file_path)
+        if preloaded is not None:
+            return preloaded
         if not os.path.exists(p_cache_path):
             return self._register_from_clang(p_cpp_file_path, p_cache_path)
         try:
