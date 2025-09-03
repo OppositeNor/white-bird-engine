@@ -257,12 +257,21 @@ inline void HeapAllocatorFixedSizePool<SIZE>::deallocate(MemID p_mem) {
 template <size_t SIZE>
 inline HeapAllocatorFixedSizePool<SIZE>::operator std::string() const {
     std::stringstream ss;
-    ss << "HeapAllocatorFix: {obj_count: " << obj_count() << ";\n" << "max_obj: " << static_cast<uint32_t>(max_obj) << "\n";
+    ss << "{";
+    ss << "\"type\":\"HeapAllocatorFixedSizePool\",";
+    ss << "\"size\":" << SIZE << ",";
+    ss << "\"obj_count\":" << obj_count() << ",";
+    ss << "\"max_obj\":" << static_cast<uint32_t>(max_obj) << ",";
+    ss << "\"allocated\":[";
     std::set<MemID> alloc_mems = get_allocated();
+    bool first = true;
     for (auto alloc_mem : alloc_mems) {
-        ss << "allocated: " << alloc_mem << ";\n";
+        if (!first) ss << ",";
+        first = false;
+        ss << alloc_mem;
     }
-    ss << "};";
+    ss << "]";
+    ss << "}";
     return ss.str();
 }
 

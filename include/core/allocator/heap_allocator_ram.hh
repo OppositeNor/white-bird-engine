@@ -18,6 +18,7 @@
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
 #include <unordered_map>
+#include <sstream>
 namespace WhiteBirdEngine {
 
 template <>
@@ -75,6 +76,23 @@ public:
     virtual void clear() override {
         allocated.clear();
         alloc_map.clear();
+    }
+
+    virtual operator std::string() const override {
+        std::stringstream ss;
+        ss << "{";
+        ss << "\"type\":\"HeapAllocatorRAM\",";
+        ss << "\"obj_count\":" << obj_count() << ",";
+        ss << "\"allocated\":[";
+        bool first = true;
+        for (auto& mem_id : allocated) {
+            if (!first) ss << ",";
+            first = false;
+            ss << mem_id;
+        }
+        ss << "]";
+        ss << "}";
+        return ss.str();
     }
 
 private:

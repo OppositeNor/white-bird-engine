@@ -24,6 +24,7 @@
 
 #include <SDL_vulkan.h>
 #include <cstdint>
+#include <format>
 #include <stdexcept>
 #include <string>
 #include <vulkan/vulkan_core.h>

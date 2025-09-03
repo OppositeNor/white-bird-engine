@@ -96,11 +96,21 @@ public:
 
     virtual operator std::string() const override {
         std::stringstream ss;
-        ss << "HeapAllocatorAlignedRAM{obj_count: " << obj_count() << ";\n";
+        ss << "{";
+        ss << "\"type\":\"HeapAllocatorAlignedRAM\",";
+        ss << "\"obj_count\":" << obj_count() << ",";
+        ss << "\"allocated\":[";
+        bool first = true;
         for (auto& mem_id : allocated) {
-            ss << "{ mem_id: " << mem_id << ", size: " << size_map.at(mem_id) << "; }\n";
+            if (!first) ss << ",";
+            first = false;
+            ss << "{"
+               << "\"mem_id\":" << mem_id << ","
+               << "\"size\":" << size_map.at(mem_id)
+               << "}";
         }
-        ss << "}\n";
+        ss << "]";
+        ss << "}";
         return ss.str();
     }
 

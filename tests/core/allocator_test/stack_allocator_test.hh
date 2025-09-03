@@ -50,4 +50,27 @@ TEST(StackAllocator, General) {
     ASSERT_EQ(val, 2);
 }
 
+TEST(StackAllocator, ToString) {
+    WBE::StackAllocator allocator(1024);
+    std::string exp_1 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":0,\"available\":1024}";
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_1);
+
+    WBE::create_stack_obj<int>(allocator, 42);
+    std::string exp_2 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":4,\"available\":1020}";
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_2);
+
+    WBE::create_stack_obj<double>(allocator, 3.14);
+    std::string exp_3 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":12,\"available\":1012}";
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_3);
+
+    WBE::pop_stack_obj<double>(allocator);
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_2);
+
+    WBE::pop_stack_obj<int>(allocator);
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_1);
+
+    allocator.clear();
+    ASSERT_EQ(static_cast<std::string>(allocator), exp_1);
+}
+
 #endif

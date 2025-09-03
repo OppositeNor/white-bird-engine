@@ -33,19 +33,19 @@ TEST(WBEAllocFSPTest, Trait) {
 TEST(WBEAllocFSPTest, ToString) {
     WBE::HeapAllocatorFixedSizePool<4> pool(64);
 
-    std::string exp_1 = "HeapAllocatorFix: {obj_count: 0;\nmax_obj: 64\n};";
+    std::string exp_1 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":0,\"max_obj\":64,\"allocated\":[]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
 
     WBE::MemID mem_1 = pool.allocate();
-    std::string exp_2 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 1;\n};";
+    std::string exp_2 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":1,\"max_obj\":64,\"allocated\":[1]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
 
     WBE::MemID mem_2 = pool.allocate();
-    std::string exp_3 = "HeapAllocatorFix: {obj_count: 2;\nmax_obj: 64\nallocated: 1;\nallocated: 2;\n};";
+    std::string exp_3 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":2,\"max_obj\":64,\"allocated\":[1,2]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
 
     pool.deallocate(mem_1);
-    std::string exp_4 = "HeapAllocatorFix: {obj_count: 1;\nmax_obj: 64\nallocated: 2;\n};";
+    std::string exp_4 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":1,\"max_obj\":64,\"allocated\":[2]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
 
     pool.deallocate(mem_2);

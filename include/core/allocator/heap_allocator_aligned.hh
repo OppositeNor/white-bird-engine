@@ -104,7 +104,7 @@ public:
 
     virtual operator std::string() const {
         std::stringstream ss;
-        ss << "HeapAllocatorAligned{obj_count: " << obj_count() << "}";
+        ss << "{\"type\":\"HeapAllocatorAligned\",\"obj_count\":" << obj_count() << "}";
         return ss.str();
     }
 };

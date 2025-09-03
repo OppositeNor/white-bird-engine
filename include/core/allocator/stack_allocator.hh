@@ -21,6 +21,7 @@
 #include <bit>
 #include <cstddef>
 #include <memory>
+#include <sstream>
 #include <stddef.h>
 
 namespace WhiteBirdEngine {
@@ -65,7 +66,7 @@ public:
      */
     StackAllocator(size_t p_size)
         : total_size(p_size), marker(0),
-        mem_chunk(std::make_unique<std::byte[]>(total_size)) {
+        mem_chunk(std::make_unique<char[]>(total_size)) {
     }
 
     /**
@@ -148,10 +149,18 @@ public:
         return total_size;
     }
 
+    operator std::string() const {
+        std::stringstream ss;
+        ss << "{\"type\":\"StackAllocator\",\"total_size\":" << total_size
+           << ",\"marker\":" << marker
+           << ",\"available\":" << (total_size - marker) << "}";
+        return ss.str();
+    }
+
 private:
     size_t total_size;
     size_t marker;
-    std::unique_ptr<std::byte[]> mem_chunk;
+    std::unique_ptr<char[]> mem_chunk;
 };
 
 template <typename T, typename... Args>

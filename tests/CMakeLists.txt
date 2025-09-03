@@ -15,6 +15,7 @@ add_subdirectory(core)
 add_subdirectory(platform)
 add_subdirectory(utils_test)
 add_subdirectory(resource)
+add_subdirectory(global)
 
 set(WBE_TEST_EXE ${WBE_TEST_EXE}
     PARENT_SCOPE

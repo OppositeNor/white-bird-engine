@@ -157,14 +157,23 @@ size_t HeapAllocatorPool::get_remain_size() const {
 
 HeapAllocatorPool::operator std::string() const {
     std::stringstream ss;
-    ss << "HeapAllocatorPool: {obj_count: " << obj_count() << ";\n";
-    ss << "free_chunk_layout: {\n";
+    ss << "{";
+    ss << "\"type\":\"HeapAllocatorPool\",";
+    ss << "\"obj_count\":" << obj_count() << ",";
+    ss << "\"free_chunk_layout\":[";
     IdleListNode* node = idle_list_head.get();
+    bool first = true;
     while (node != nullptr) {
-        ss << "chunk: {\nbegin: " << node->mem_start - mem_chunk << ";\nsize: " << node->size << ";\n};\n";
+        if (!first) ss << ",";
+        first = false;
+        ss << "{"
+           << "\"begin\":" << (node->mem_start - mem_chunk) << ","
+           << "\"size\":" << node->size
+           << "}";
         node = node->next.get();
     }
-    ss << "};\n};";
+    ss << "]";
+    ss << "}";
     return ss.str();
 }
 
