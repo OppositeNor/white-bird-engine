@@ -20,7 +20,6 @@
 #include <bit>
 #include <cstddef>
 #include <memory>
-#include <stdexcept>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
@@ -69,9 +68,7 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        if (!is_in_pool(p_id)) {
-            throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
-        }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
         return std::bit_cast<void*>(p_id);
     }
 
@@ -79,9 +76,7 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        if (!is_in_pool(p_id)) {
-            throw std::runtime_error("Failed to get memory from ID: " + std::to_string(p_id) + ". ID not belongs to this allocator.");
-        }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
         return std::bit_cast<void*>(p_id);
     }
 

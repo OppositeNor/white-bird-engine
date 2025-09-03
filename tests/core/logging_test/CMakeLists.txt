@@ -13,6 +13,9 @@
 # limitations under the License.
 set(TEST_NAME wbe_logging_test)
 
+# ---
+
+file(GLOB ${TEST_NAME}_headers ${CMAKE_CURRENT_SOURCE_DIR}/*.hh)
 file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${TEST_NAME}
@@ -37,6 +40,8 @@ else()
 endif()
 
 set(WBE_SOURCES ${WBE_SOURCES}
+    ${${TEST_NAME}_headers}
     ${${TEST_NAME}_src}
     PARENT_SCOPE
 )
+

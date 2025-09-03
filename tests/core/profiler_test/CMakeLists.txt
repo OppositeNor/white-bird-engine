@@ -13,7 +13,10 @@
 # limitations under the License.
 set(TEST_NAME wbe_profiler_test)
 
+# ---
+
 file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB ${TEST_NAME}_headers ${CMAKE_CURRENT_SOURCE_DIR}/*.hh)
 
 add_executable(${TEST_NAME}
     ${${TEST_NAME}_src}

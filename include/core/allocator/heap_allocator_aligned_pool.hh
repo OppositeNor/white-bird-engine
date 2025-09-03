@@ -143,7 +143,7 @@ private:
 #endif
 
     bool is_in_pool(MemID p_id) const {
-        return allocated.find(p_id) != allocated.end();
+        return allocated.contains(p_id);
     }
 };
 

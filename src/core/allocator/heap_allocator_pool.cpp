@@ -58,9 +58,7 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {
-    if (!is_in_pool(p_mem)) {
-        throw std::runtime_error("Failed to deallocate memory: memory not allocated before in this memory pool.");
-    }
+    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
     void* data_loc = std::bit_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);

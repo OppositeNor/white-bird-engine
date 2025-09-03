@@ -35,7 +35,7 @@ def _reflect(p_metaparser_clang_args):
     """Run reflection."""
     reflector = WBEReflector(sys.argv[1])
     indices = _load_indices(sys.argv[2])
-    metaparser = WBEMetaparser(reflector, p_metaparser_clang_args, sys.argv[3])
+    metaparser = WBEMetaparser(reflector, p_metaparser_clang_args, sys.argv[3], indices)
     for index_file in indices:
         metaparser.parse(index_file)
     metaparser.export()

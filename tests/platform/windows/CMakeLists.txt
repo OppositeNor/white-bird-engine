@@ -13,6 +13,9 @@
 # limitations under the License.
 set(TEST_NAME wbe_platform_windows_test)
 
+# ---
+
+file(GLOB ${TEST_NAME}_headers ${CMAKE_CURRENT_SOURCE_DIR}/*.hh)
 file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${TEST_NAME}
@@ -24,12 +27,20 @@ target_link_libraries(${TEST_NAME}
     gtest_main
 )
 
-set(WBE_TEST_EXE ${WBE_TEST_EXE}
-    ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.exe
-    PARENT_SCOPE
-)
+if(WBE_BUILD_PLATFORM STREQUAL "Windows")
+    set(WBE_TEST_EXE ${WBE_TEST_EXE}
+        ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.exe
+        PARENT_SCOPE
+    )
+else()
+    set(WBE_TEST_EXE ${WBE_TEST_EXE}
+        ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}
+        PARENT_SCOPE
+    )
+endif()
 
 set(WBE_SOURCES ${WBE_SOURCES}
+    ${${TEST_NAME}_headers}
     ${${TEST_NAME}_src}
     PARENT_SCOPE
 )

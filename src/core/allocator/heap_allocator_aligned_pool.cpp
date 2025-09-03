@@ -14,6 +14,7 @@
 */
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/allocator.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <bit>
@@ -65,10 +66,7 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
-    if (!is_in_pool(p_mem)) {
-        throw std::runtime_error("Failed to deallocate memory: memory id: " + std::to_string(p_mem) + " not allocated in this memory pool.\n"
-                                 "Pool status: " + static_cast<std::string>(*this));
-    }
+    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
     void* data_loc = std::bit_cast<void*>(p_mem);
     size_t data_size = size_map[data_loc];
     allocated.erase(p_mem);
@@ -82,6 +80,10 @@ void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
 }
 
 void* HeapAllocatorAlignedPool::get(MemID p_id) const {
+    if (p_id == MEM_NULL) {
+        return nullptr;
+    }
+    WBE_DEBUG_ASSERT(is_in_pool(p_id));
     return std::bit_cast<void*>(p_id);
 }
 

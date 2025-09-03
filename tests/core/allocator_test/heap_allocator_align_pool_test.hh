@@ -18,6 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "global/global.hh"
+#include <bit>
 #include <gtest/gtest.h>
 #include <string>
 
@@ -461,6 +462,35 @@ TEST(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
 
+TEST(WBEAllocAlignedPoolTest, GetMemoryAddress) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
+    WBE::MemID mem1 = allocator.allocate(16, 8);
+    WBE::MemID mem2 = allocator.allocate(32, 16);
+    WBE::MemID mem3 = allocator.allocate(64, 32);
 
+    void* addr1 = allocator.get(mem1);
+    void* addr2 = allocator.get(mem2);
+    void* addr3 = allocator.get(mem3);
+
+    ASSERT_NE(addr1, nullptr);
+    ASSERT_NE(addr2, nullptr);
+    ASSERT_NE(addr3, nullptr);
+
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr1), mem1);
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr2), mem2);
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr3), mem3);
+
+    allocator.deallocate(mem1);
+    allocator.deallocate(mem2);
+    allocator.deallocate(mem3);
+}
+
+TEST(WBEAllocAlignedPoolTest, GetNullMemoryAddress) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
+    void* addr = allocator.get(WBE::MEM_NULL);
+    ASSERT_EQ(addr, nullptr);
+}
 
 #endif

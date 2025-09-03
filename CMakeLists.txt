@@ -105,8 +105,7 @@ include_directories(
     ${include_dirs}
 )
 
-set(WBE_SOURCES "")
-file(GLOB_RECURSE WBE_SOURCES "")
+file(GLOB_RECURSE WBE_SOURCES ${PROJECT_SOURCE_DIR}/include/*.hh)
 
 # Add engine source
 add_subdirectory(src/global)

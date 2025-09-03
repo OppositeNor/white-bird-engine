@@ -16,6 +16,7 @@
 #define __WBE_ALOCATOR_POOL_TEST_HH__
 
 #include "core/allocator/heap_allocator_pool.hh"
+#include "global/global.hh"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -390,4 +391,34 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
 
+TEST(WBEAllocPoolTest, GetMemoryAddress) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);
+    WBE::MemID mem1 = allocator.allocate(16);
+    WBE::MemID mem2 = allocator.allocate(32);
+    WBE::MemID mem3 = allocator.allocate(64);
+
+    void* addr1 = allocator.get(mem1);
+    void* addr2 = allocator.get(mem2);
+    void* addr3 = allocator.get(mem3);
+
+    ASSERT_NE(addr1, nullptr);
+    ASSERT_NE(addr2, nullptr);
+    ASSERT_NE(addr3, nullptr);
+
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr1), mem1);
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr2), mem2);
+    ASSERT_EQ(std::bit_cast<WBE::MemID>(addr3), mem3);
+
+    allocator.deallocate(mem1);
+    allocator.deallocate(mem2);
+    allocator.deallocate(mem3);
+}
+
+TEST(WBEAllocPoolTest, GetNullMemoryAddress) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);
+    void* addr = allocator.get(WBE::MEM_NULL);
+    ASSERT_EQ(addr, nullptr);
+}
 #endif
