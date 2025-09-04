@@ -55,11 +55,20 @@ public:
      *
      * @param p_utility_name The name of the utility.
      */
-    CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>> p_operations)
-        : utility_name(p_utility_name), operations(p_operations) {}
+    CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
+        : utility_name(p_utility_name), operations(std::move(p_operations)) {}
     virtual ~CLAASTNodeRoot() override {}
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
+
+    /**
+     * @brief Get the operations.
+     *
+     * @return The operations.
+     */
+    const std::vector<Ref<CLAASTNode>>& get_operations() {
+        return operations;
+    }
 
 private:
     std::string utility_name;
@@ -67,45 +76,28 @@ private:
 };
 
 /**
- * @class CLAASTNodeOperationNA
- * @brief Operation node that contains no arguments for CLA AST.
+ * @class CLAASTNodeOperation
+ * @brief Operation node for CLA AST.
  *
  */
-class CLAASTNodeOperationNA : public CLAASTNode {
-public:
-    /**
-     * @brief Constructor.
-     *
-     * @param p_operation_name The name of the operation.
-     */
-    CLAASTNodeOperationNA(const std::string& p_operation_name)
-        : operation_name(p_operation_name) {}
-
-    virtual ~CLAASTNodeOperationNA() override {}
-
-    virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
-
-    /**
-     * @brief Get the operation name.
-     *
-     * @return The operation name.
-     */
-    const std::string& get_operation_name() const {
-        return operation_name;
-    }
-
-private:
-    std::string operation_name;
-};
-
 class CLAASTNodeOperation : public CLAASTNode {
 public:
     /**
      * @brief Constructor.
      *
      * @param p_operation_name The name of the operation.
+     * @param p_is_short Is the name a short notation.
      */
-    CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments)
+    CLAASTNodeOperation(const std::string& p_operation_name, bool p_is_short)
+        : operation_name(p_operation_name), arguments() {}
+    /**
+     * @brief Constructor.
+     *
+     * @param p_operation_name The name of the operation.
+     * @param p_arguments The arguments of the operation.
+     * @param p_is_short Is the name a short notation.
+     */
+    CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
         : operation_name(p_operation_name), arguments(std::move(p_arguments)) {}
 
     virtual ~CLAASTNodeOperation() override {}
@@ -129,9 +121,46 @@ public:
     const std::vector<std::string>& get_arguments() const {
         return arguments;
     }
+
+    void push_argument(const std::string& p_argument) {
+        arguments.push_back(p_argument);
+    }
 private:
+    bool is_short;
     std::string operation_name;
     std::vector<std::string> arguments;
+};
+
+/**
+ * @class CLAASTNodeRootOperand
+ * @brief Root operand.
+ *
+ */
+class CLAASTNodeRootOperand : public CLAASTNode {
+public:
+    /**
+     * @brief Constructor.
+     *
+     * @param p_operand_name The name of the operand.
+     */
+    CLAASTNodeRootOperand(const std::string& p_operand_name)
+        : operand_name(p_operand_name) {}
+
+    virtual ~CLAASTNodeRootOperand() override {}
+
+    virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
+
+    /**
+     * @brief Get operation name.
+     *
+     * @return The name of the operation.
+     */
+    const std::string& get_operand_name() const {
+        return operand_name;
+    }
+
+private:
+    std::string operand_name;
 };
 
 }

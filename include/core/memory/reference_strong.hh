@@ -236,6 +236,11 @@ public:
         return control_block == nullptr || control_block->mem_id == MEM_NULL;
     }
 
+    template <typename T1>
+    bool operator!=(T1 p_obj) const {
+        return !(*this == p_obj);
+    }
+
 private:
 
     Ref(ControlBlock* p_control_block)

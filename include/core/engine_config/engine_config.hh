@@ -15,7 +15,6 @@
 #ifndef __WBE_ENGINE_CONFIG_HH__
 #define __WBE_ENGINE_CONFIG_HH__
 
-#include "core/cla/cla_parser.hh"
 #include "core/engine_config/engine_config_file_parser.hh"
 #include "core/parser/parser_yaml.hh"
 #include "platform/file_system/path.hh"

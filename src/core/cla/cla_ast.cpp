@@ -24,7 +24,7 @@ void CLAASTNodeRoot::accept(CLAASTVisitor* p_cla_ast_visitor) {
     }
 }
 
-void CLAASTNodeOperationNA::accept(CLAASTVisitor* p_cla_ast_visitor) {
+void CLAASTNodeRootOperand::accept(CLAASTVisitor* p_cla_ast_visitor) {
     p_cla_ast_visitor->visit(this);
 }
 

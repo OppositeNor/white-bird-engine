@@ -14,9 +14,6 @@
 */
 #ifndef __WBE_CLA_AST_VISITOR_HH__
 #define __WBE_CLA_AST_VISITOR_HH__
-#include <map>
-#include <string>
-#include <vector>
 namespace WhiteBirdEngine {
 
 /**
@@ -46,7 +43,7 @@ public:
      *
      * @param p_node The operation node.
      */
-    virtual void visit(class CLAASTNodeOperationNA* p_node) = 0;
+    virtual void visit(class CLAASTNodeRootOperand* p_node) = 0;
 
     /**
      * @brief Visit operations.
@@ -55,25 +52,6 @@ public:
      */
     virtual void visit(class CLAASTNodeOperation* p_node) = 0;
 
-};
-
-class CLAASTVisitorParamCheck : public CLAASTVisitor {
-public:
-    virtual ~CLAASTVisitorParamCheck() override {}
-    CLAASTVisitorParamCheck(const CLAASTVisitorParamCheck&) = delete;
-    CLAASTVisitorParamCheck(CLAASTVisitorParamCheck&&) = delete;
-    CLAASTVisitorParamCheck& operator=(const CLAASTVisitorParamCheck&) = delete;
-    CLAASTVisitorParamCheck& operator=(CLAASTVisitorParamCheck&&) = delete;
-
-    CLAASTVisitorParamCheck(std::map<std::string, std::vector<std::string>>& p_operations)
-        : operations(&p_operations) {}
-
-    virtual void visit(class CLAASTNodeRoot* p_node) override;
-    virtual void visit(class CLAASTNodeOperationNA* p_node) override;
-    virtual void visit(class CLAASTNodeOperation* p_node) override;
-
-private:
-    std::map<std::string, std::vector<std::string>>* operations;
 };
 
 }

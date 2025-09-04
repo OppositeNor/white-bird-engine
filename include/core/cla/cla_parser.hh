@@ -15,10 +15,12 @@
 #ifndef __WBE_CLA_PARSER_HH__
 #define __WBE_CLA_PARSER_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_token.hh"
 #include "core/memory/reference_strong.hh"
 #include "utils/interface/singleton.hh"
+#include <string>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -48,6 +50,21 @@ public:
     Ref<CLAASTNode> parse(const std::vector<CLAToken>& p_tokens);
     
 private:
+
+    enum class ParseState {
+        START,
+        GET_ROOT_OPERAND,
+        GET_OPTION,
+        GET_OPERAND
+    } parse_state;
+
+    Ref<CLAASTNodeOperation> curr_option = MEM_NULL;
+
+    void process_token(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_start(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_root_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_option(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
 };
 
 }
