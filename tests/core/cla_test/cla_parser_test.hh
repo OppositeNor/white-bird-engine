@@ -82,7 +82,7 @@ TEST(CLAParser, UtilityWithLongOptionOnly) {
 
     std::string expected = "utility: test_utility\n"
         "operations:\n"
-        "  - operation: --help\n";
+        "  - operation: help\n";
     ASSERT_EQ(result, expected);
 }
 
@@ -125,7 +125,7 @@ TEST(CLAParser, LongOptionWithArgument) {
 
     std::string expected = "utility: compiler\n"
         "operations:\n"
-        "  - operation: --output\n"
+        "  - operation: output\n"
         "    arguments:\n"
         "      - program.exe\n";
     ASSERT_EQ(result, expected);
@@ -174,7 +174,7 @@ TEST(CLAParser, OptionWithMultipleArguments) {
 
     std::string expected = "utility: compiler\n"
         "operations:\n"
-        "  - operation: --include\n"
+        "  - operation: include\n"
         "    arguments:\n"
         "      - /usr/include\n"
         "      - /opt/include\n";
@@ -204,13 +204,13 @@ TEST(CLAParser, MultipleOperationsAndOperands) {
     std::string expected = "utility: gcc\n"
         "operations:\n"
         "  - operand: main.cpp\n"
-        "  - operation: --output\n"
+        "  - operation: output\n"
         "    arguments:\n"
         "      - program\n"
         "  - operation: -O\n"
         "    arguments:\n"
         "      - 3\n"
-        "  - operation: --verbose\n";
+        "  - operation: verbose\n";
     ASSERT_EQ(result, expected);
 }
 
@@ -237,7 +237,7 @@ TEST(CLAParser, MixedRootOperandsAndOptions) {
         "operations:\n"
         "  - operand: file1.txt\n"
         "  - operand: file2.txt\n"
-        "  - operation: --format\n"
+        "  - operation: format\n"
         "    arguments:\n"
         "      - json\n"
         "  - operation: -v\n";
@@ -274,20 +274,20 @@ TEST(CLAParser, ComplexRealWorldExample) {
         "operations:\n"
         "  - operand: main.cpp\n"
         "  - operand: utils.cpp\n"
-        "  - operation: --std\n"
+        "  - operation: std\n"
         "    arguments:\n"
         "      - c++17\n"
         "  - operation: -O\n"
         "    arguments:\n"
         "      - 3\n"
-        "  - operation: --output\n"
+        "  - operation: output\n"
         "    arguments:\n"
         "      - program\n"
-        "  - operation: --include\n"
+        "  - operation: include\n"
         "    arguments:\n"
         "      - /usr/include\n"
         "      - /opt/include\n"
-        "  - operation: --debug\n";
+        "  - operation: debug\n";
     ASSERT_EQ(result, expected);
 }
 
@@ -311,10 +311,10 @@ TEST(CLAParser, ConsecutiveOptions) {
 
     std::string expected = "utility: utility\n"
         "operations:\n"
-        "  - operation: --verbose\n"
-        "  - operation: --debug\n"
+        "  - operation: verbose\n"
+        "  - operation: debug\n"
         "  - operation: -h\n"
-        "  - operation: --help\n";
+        "  - operation: help\n";
     ASSERT_EQ(result, expected);
 }
 
@@ -362,8 +362,8 @@ TEST(CLAParser, OptionsWithNoArgumentsFollowedByMoreOptions) {
     std::string expected = "utility: test\n"
         "operations:\n"
         "  - operation: -v\n"
-        "  - operation: --debug\n"
-        "  - operation: --output\n"
+        "  - operation: debug\n"
+        "  - operation: output\n"
         "    arguments:\n"
         "      - file.txt\n";
     ASSERT_EQ(result, expected);
@@ -412,6 +412,144 @@ TEST(CLAParser, MultipleRootOperands) {
         "  - operand: file1.txt\n"
         "  - operand: file2.txt\n"
         "  - operand: file3.txt\n";
+    ASSERT_EQ(result, expected);
+}
+
+TEST(CLAParser, MultipleShortOptionsInOnePrefix) {
+    // Test multiple short options in one '-' prefix (like -abc)
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::vector<WBE::CLAToken> tokens = {
+        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
+        {"-abc", WBE::CLAToken::Type::OPTION_SHORT}
+    };
+    
+    auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
+    auto ast = parser->parse(tokens);
+    
+    WBE::CLAASTVisitorToString visitor;
+    ast->accept(&visitor);
+    std::string result = visitor.get_string();
+    
+    std::string expected = "utility: tool\n"
+                          "operations:\n"
+                          "  - operation: a\n"
+                          "  - operation: b\n"
+                          "  - operation: c\n";
+    ASSERT_EQ(result, expected);
+}
+
+TEST(CLAParser, SingleShortOptionWithArgument) {
+    // Test single short option can take arguments
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::vector<WBE::CLAToken> tokens = {
+        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
+        {"-o", WBE::CLAToken::Type::OPTION_SHORT},
+        {"output.txt", WBE::CLAToken::Type::OPERAND}
+    };
+    
+    auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
+    auto ast = parser->parse(tokens);
+    
+    WBE::CLAASTVisitorToString visitor;
+    ast->accept(&visitor);
+    std::string result = visitor.get_string();
+    
+    std::string expected = "utility: tool\n"
+                          "operations:\n"
+                          "  - operation: -o\n"
+                          "    arguments:\n"
+                          "      - output.txt\n";
+    ASSERT_EQ(result, expected);
+}
+
+TEST(CLAParser, MultipleShortOptionsFollowedByLongOption) {
+    // Test multiple short options followed by long option with argument
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::vector<WBE::CLAToken> tokens = {
+        {"compiler", WBE::CLAToken::Type::UTILITY_NAME},
+        {"-gO", WBE::CLAToken::Type::OPTION_SHORT},
+        {"--std", WBE::CLAToken::Type::OPTION_LONG},
+        {"c++17", WBE::CLAToken::Type::OPERAND}
+    };
+    
+    auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
+    auto ast = parser->parse(tokens);
+    
+    WBE::CLAASTVisitorToString visitor;
+    ast->accept(&visitor);
+    std::string result = visitor.get_string();
+    
+    std::string expected = "utility: compiler\n"
+                          "operations:\n"
+                          "  - operation: g\n"
+                          "  - operation: O\n"
+                          "  - operation: std\n"
+                          "    arguments:\n"
+                          "      - c++17\n";
+    ASSERT_EQ(result, expected);
+}
+
+TEST(CLAParser, MixedSingleAndMultipleShortOptions) {
+    // Test mixing single short options (with args) and multiple short options (no args)
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::vector<WBE::CLAToken> tokens = {
+        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
+        {"-f", WBE::CLAToken::Type::OPTION_SHORT},
+        {"file.txt", WBE::CLAToken::Type::OPERAND},
+        {"-vdx", WBE::CLAToken::Type::OPTION_SHORT},
+        {"-o", WBE::CLAToken::Type::OPTION_SHORT},
+        {"output.txt", WBE::CLAToken::Type::OPERAND}
+    };
+    
+    auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
+    auto ast = parser->parse(tokens);
+    
+    WBE::CLAASTVisitorToString visitor;
+    ast->accept(&visitor);
+    std::string result = visitor.get_string();
+    
+    std::string expected = "utility: tool\n"
+                          "operations:\n"
+                          "  - operation: -f\n"
+                          "    arguments:\n"
+                          "      - file.txt\n"
+                          "  - operation: v\n"
+                          "  - operation: d\n"
+                          "  - operation: x\n"
+                          "  - operation: -o\n"
+                          "    arguments:\n"
+                          "      - output.txt\n";
+    ASSERT_EQ(result, expected);
+}
+
+TEST(CLAParser, MultipleShortOptionsWithOperands) {
+    // Test multiple short options followed by root operands
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::vector<WBE::CLAToken> tokens = {
+        {"ls", WBE::CLAToken::Type::UTILITY_NAME},
+        {"-la", WBE::CLAToken::Type::OPTION_SHORT},
+        {"file1.txt", WBE::CLAToken::Type::OPERAND},
+        {"file2.txt", WBE::CLAToken::Type::OPERAND}
+    };
+    
+    auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
+    auto ast = parser->parse(tokens);
+    
+    WBE::CLAASTVisitorToString visitor;
+    ast->accept(&visitor);
+    std::string result = visitor.get_string();
+    
+    std::string expected = "utility: ls\n"
+                          "operations:\n"
+                          "  - operation: l\n"
+                          "  - operation: a\n"
+                          "  - operand: file1.txt\n"
+                          "  - operand: file2.txt\n";
     ASSERT_EQ(result, expected);
 }
 

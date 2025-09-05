@@ -80,13 +80,15 @@ void CLAParser::parse_get_root_operand(const CLAToken& p_token, std::string& p_u
 void CLAParser::parse_get_option(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (p_token.type) {
         case CLAToken::Type::OPTION_SHORT: {
+            WBE_DEBUG_ASSERT(p_token.value.size() >= 1);
+            WBE_DEBUG_ASSERT(p_token.value.rfind("-", 0) == 0);
             std::string options = p_token.value.substr(1);
             if (options.size() > 1) {
                 for (auto operation : options) {
                     curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), std::string(1, operation), true);
                     p_operations.push_back(curr_option);
                 }
-                parse_state = ParseState::GET_OPTION;
+                parse_state = ParseState::GET_ROOT_OPERAND;
             }
             else {
                 curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value, true);
@@ -96,7 +98,9 @@ void CLAParser::parse_get_option(const CLAToken& p_token, std::string& p_utility
             break;
         }
         case CLAToken::Type::OPTION_LONG:
-            curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value, false);
+            WBE_DEBUG_ASSERT(p_token.value.size() >= 2);
+            WBE_DEBUG_ASSERT(p_token.value.rfind("--", 0) == 0);
+            curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value.substr(2), false);
             p_operations.push_back(curr_option);
             parse_state = ParseState::GET_OPERAND;
             break;
