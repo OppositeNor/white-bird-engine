@@ -12,10 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/cla/cla_ast_visitor.hh"
-
-namespace WhiteBirdEngine {
-
-// TODO
-
-}
+#include <gtest/gtest.h>
+#include "cla_ast_visitor_test.hh"
+#include "cla_lexer_test.hh"
+#include "cla_parser_test.hh"

@@ -62,11 +62,20 @@ public:
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
     /**
+     * @brief Get the utility name.
+     *
+     * @return The utility name.
+     */
+    const std::string& get_utility_name() const {
+        return utility_name;
+    }
+
+    /**
      * @brief Get the operations.
      *
      * @return The operations.
      */
-    const std::vector<Ref<CLAASTNode>>& get_operations() {
+    std::vector<Ref<CLAASTNode>> get_operations() {
         return operations;
     }
 

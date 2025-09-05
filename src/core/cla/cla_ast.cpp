@@ -19,9 +19,6 @@ namespace WhiteBirdEngine {
 
 void CLAASTNodeRoot::accept(CLAASTVisitor* p_cla_ast_visitor) {
     p_cla_ast_visitor->visit(this);
-    for (auto& operation : operations) {
-        operation->accept(p_cla_ast_visitor);
-    }
 }
 
 void CLAASTNodeRootOperand::accept(CLAASTVisitor* p_cla_ast_visitor) {

@@ -14,6 +14,9 @@
 */
 #ifndef __WBE_CLA_AST_VISITOR_HH__
 #define __WBE_CLA_AST_VISITOR_HH__
+#include <cstdint>
+#include <sstream>
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
@@ -52,6 +55,34 @@ public:
      */
     virtual void visit(class CLAASTNodeOperation* p_node) = 0;
 
+};
+
+/**
+ * @class CLAASTVisitorPrint
+ * @brief AST visitor which prints the structure of the tree.
+ *
+ */
+class CLAASTVisitorToString : public CLAASTVisitor {
+public:
+    CLAASTVisitorToString()
+        : indent_depth(0) {}
+    virtual ~CLAASTVisitorToString() override {}
+
+    virtual void visit(class CLAASTNodeRoot* p_node) override;
+    virtual void visit(class CLAASTNodeRootOperand* p_node) override;
+    virtual void visit(class CLAASTNodeOperation* p_node) override;
+
+    /**
+     * @brief Get the string of the visited AST.
+     *
+     * @return The string of the visited AST.
+     */
+    std::string get_string() const {
+        return ss.str();
+    }
+private:
+    uint32_t indent_depth;
+    std::stringstream ss;
 };
 
 }

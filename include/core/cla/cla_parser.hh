@@ -32,7 +32,7 @@ class EngineConfig;
  * @brief Interface of parsers for command line arguments.
  * @todo Test
  */
-class CLAParser : public Singleton<CLAParser> {
+class CLAParser {
 public:
     CLAParser() = default;
     ~CLAParser() {}

@@ -46,7 +46,7 @@ public:
      * @param p_argv The argument list.
      */
     std::vector<CLAToken> apply(uint32_t p_argc, const char* p_argv[]) {
-        WBE_DEBUG_ASSERT(p_argc > 1);
+        WBE_DEBUG_ASSERT(p_argc >= 1);
         std::vector<CLAToken> result;
         result.reserve(p_argc);
         result.push_back({ .value = std::string(p_argv[0]), .type = CLAToken::Type::UTILITY_NAME });
