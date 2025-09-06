@@ -16,6 +16,7 @@
 #define __WBE_CLA_TOKEN_HH__
 
 #include <string>
+#include <vector>
 namespace WhiteBirdEngine {
 
 /**
@@ -42,6 +43,41 @@ struct CLAToken {
     } type;
 };
 
+/**
+ * @class CLARoot
+ * @brief The root informations of the CLA.
+ *
+ */
+struct CLARoot {
+    /**
+     * @brief The name of the utility.
+     */
+    std::string util_name;
+    /**
+     * @brief The operands.
+     */
+    std::vector<std::string> operands;
+    /**
+     * @brief The operations.
+     */
+    std::vector<struct CLAOperation> operations;
+};
+
+/**
+ * @class CLAOperation
+ * @brief The operation informations of the CLA.
+ *
+ */
+struct CLAOperation {
+    /**
+     * @brief The name of the operation.
+     */
+    std::string operation_name;
+    /**
+     * @brief The arguments of the operation.
+     */
+    std::vector<std::string> arguments;
+};
 
 }
 

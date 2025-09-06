@@ -15,7 +15,6 @@
 #include "core/cla/cla_parser.hh"
 #include "core/allocator/allocator.hh"
 #include "core/cla/cla_ast.hh"
-#include "core/cla/cla_token.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/global.hh"
 #include <jack/types.h>

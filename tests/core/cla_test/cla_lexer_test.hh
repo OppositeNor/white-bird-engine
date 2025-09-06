@@ -16,7 +16,6 @@
 #define __WBE_CLA_LEXER_TEST_HH__
 
 #include "core/cla/cla_lexer.hh"
-#include "core/cla/cla_token.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <vector>

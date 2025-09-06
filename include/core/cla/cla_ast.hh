@@ -77,9 +77,10 @@ public:
      *
      * @return The operations.
      */
-    std::vector<Ref<CLAASTNode>> get_operations() {
+    const std::vector<Ref<CLAASTNode>>& get_operations() const {
         return operations;
     }
+
 
 private:
     std::string utility_name;

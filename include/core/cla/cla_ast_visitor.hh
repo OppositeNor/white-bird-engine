@@ -14,6 +14,7 @@
 */
 #ifndef __WBE_CLA_AST_VISITOR_HH__
 #define __WBE_CLA_AST_VISITOR_HH__
+#include "core/cla/cla_utils.hh"
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -94,21 +95,35 @@ private:
  */
 class CLAASTVisitorAssembler : public CLAASTVisitor {
 public:
-    CLAASTVisitorAssembler() = default;
+    CLAASTVisitorAssembler()
+        : root({}) {
+    }
     virtual ~CLAASTVisitorAssembler() override {}
+
+    virtual void visit(class CLAASTNodeRoot* p_node) override;
+    virtual void visit(class CLAASTNodeRootOperand* p_node) override;
+    virtual void visit(class CLAASTNodeOperation* p_node) override;
 
     void register_option(const std::string& p_option_name, uint32_t p_arg_count) {
         arg_count_long[p_option_name] = p_arg_count;
     }
 
-    void register_option(const std::string& p_option_name, const std::string& p_option_name_short, uint32_t p_arg_count) {
+    void register_option(const std::string& p_option_name, char p_option_name_short, uint32_t p_arg_count) {
         arg_count_long[p_option_name] = p_arg_count;
-        arg_count_short[p_option_name_short] = p_arg_count;
+        arg_short_to_long[p_option_name_short] = p_option_name;
+    }
+
+    CLARoot get_cla_info() const {
+        return root;
     }
 
 private:
-    std::unordered_map<std::string, uint32_t> arg_count_long;
-    std::unordered_map<std::string, uint32_t> arg_count_short;
+    std::unordered_map<std::string, int32_t> arg_count_long;
+    std::unordered_map<char, std::string> arg_short_to_long;
+    bool get_operation_arg_count(std::string p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num);
+    CLAOperation get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num);
+
+    CLARoot root;
 };
 
 }

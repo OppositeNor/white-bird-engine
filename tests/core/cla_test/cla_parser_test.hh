@@ -16,7 +16,6 @@
 #define __WBE_CLA_PARSER_TEST_HH__
 
 #include "core/cla/cla_parser.hh"
-#include "core/cla/cla_token.hh"
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_ast_visitor.hh"
 #include "global/global.hh"
