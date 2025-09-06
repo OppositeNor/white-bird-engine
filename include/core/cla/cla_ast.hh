@@ -16,6 +16,8 @@
 #define __WBE_CLA_AST_HH__
 
 #include "core/memory/reference_strong.hh"
+#include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <vector>
 namespace WhiteBirdEngine {
@@ -131,9 +133,37 @@ public:
         return arguments;
     }
 
+    /**
+     * @brief Push argument into this operation node.
+     *
+     * @param p_argument The argument to be pushed.
+     */
     void push_argument(const std::string& p_argument) {
         arguments.push_back(p_argument);
     }
+
+    /**
+     * @brief Remove the argument of a specific index.
+     *
+     * @param p_index The index to be removed.
+     */
+    void remove_argument(uint32_t p_index) {
+        if (arguments.size() >= p_index) {
+            throw std::runtime_error("Failed to remove argument: index " + std::to_string(p_index) + " out of range."
+                                     " arguments size: " + std::to_string(arguments.size()));
+        }
+        arguments.erase(arguments.begin() + p_index);
+    }
+
+    /**
+     * @brief Is the name of this operation short.
+     *
+     * @return True if the name of this operation is short. False otherwise.
+     */
+    bool is_name_short() const {
+        return is_short;
+    }
+
 private:
     bool is_short;
     std::string operation_name;

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 namespace WhiteBirdEngine {
 
 /**
@@ -83,6 +84,31 @@ public:
 private:
     uint32_t indent_depth;
     std::stringstream ss;
+};
+
+/**
+ * @class CLAASTOrganizer
+ * @brief AST visitor which assembles the operations according
+ * to the number of arguments each option accepts.
+ *
+ */
+class CLAASTVisitorAssembler : public CLAASTVisitor {
+public:
+    CLAASTVisitorAssembler() = default;
+    virtual ~CLAASTVisitorAssembler() override {}
+
+    void register_option(const std::string& p_option_name, uint32_t p_arg_count) {
+        arg_count_long[p_option_name] = p_arg_count;
+    }
+
+    void register_option(const std::string& p_option_name, const std::string& p_option_name_short, uint32_t p_arg_count) {
+        arg_count_long[p_option_name] = p_arg_count;
+        arg_count_short[p_option_name_short] = p_arg_count;
+    }
+
+private:
+    std::unordered_map<std::string, uint32_t> arg_count_long;
+    std::unordered_map<std::string, uint32_t> arg_count_short;
 };
 
 }

@@ -17,9 +17,8 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/cla/cla_ast.hh"
-#include "core/cla/cla_token.hh"
+#include "core/cla/cla_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "utils/interface/singleton.hh"
 #include <string>
 #include <vector>
 

@@ -16,7 +16,7 @@
 #define __WBE_CLA_LEXER_HH__
 
 #include "utils/defs.hh"
-#include "cla_token.hh"
+#include "cla_utils.hh"
 
 #include <cstdint>
 #include <string>
