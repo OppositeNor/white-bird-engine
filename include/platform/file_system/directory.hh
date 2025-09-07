@@ -40,7 +40,9 @@ public:
 
     bool operator==(const Directory& p_other) const;
 
-    bool operator!=(const Directory& p_other) const;
+    bool operator!=(const Directory& p_other) const {
+        return !(*this == p_other);
+    }
 
     /**
      * @brief Constructor.
@@ -66,7 +68,9 @@ public:
      * @return True if the directory is absolute, false if the directory is relative.
      * By relative it means relative to the user current working directory.
      */
-    bool get_is_absolute() const;
+    bool get_is_absolute() const {
+        return is_absolute;
+    }
 
     /**
      * @brief Get the names of the path to the directory. The rooth directory will be at
@@ -74,7 +78,9 @@ public:
      *
      * @return The names of the path to the directory.
      */
-    const std::vector<std::string>& get_dir_names() const;
+    const std::vector<std::string>& get_dir_names() const {
+        return dir_names;
+    }
 
     operator std::string() const;
 

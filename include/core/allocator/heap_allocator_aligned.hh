@@ -15,6 +15,7 @@
 #ifndef __WBE_HEAP_ALLOCATOR_POOL_ALIGNED_HH__
 #define __WBE_HEAP_ALLOCATOR_POOL_ALIGNED_HH__
 #include "core/allocator/allocator.hh"
+#include "utils/defs.hh"
 #include <cstddef>
 #include <set>
 #include <sstream>
@@ -41,7 +42,7 @@ public:
      * @param p_alignment Alignment.
      * @return The memory ID of the allocated resource.
      */
-    virtual MemID allocate(size_t p_size, size_t p_alignment) = 0;
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) = 0;
 
     /**
      * @brief Deallocate memroy.

@@ -32,6 +32,7 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
     auto splitted = split_string(p_str, '/');
+    splitted.pop_back();
     std::vector<std::string> path_stack;
     path_stack.reserve(splitted.size());
     for (auto& dir_name : splitted) {

@@ -26,7 +26,6 @@ namespace WhiteBirdEngine {
 /**
  * @class STLAllocator
  * @brief Adapter allocator for C++ standard library.
- * @todo Test
  *
  */
 template <typename T, typename AllocType> requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE && AllocatorTrait<AllocType>::IS_ALIGNABLE)

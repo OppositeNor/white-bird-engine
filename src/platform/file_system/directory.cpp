@@ -47,10 +47,6 @@ bool Directory::operator==(const Directory& p_other) const {
     return true;
 }
 
-bool Directory::operator!=(const Directory& p_other) const {
-    return !(*this == p_other);
-}
-
 Directory::Directory(std::vector<std::string> p_dir_names, bool p_is_absolute)
 : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
 
@@ -65,14 +61,6 @@ Directory Directory::combine(const Directory& p_other) const {
         result.dir_names.push_back(dir_name);
     }
     return result;
-}
-
-bool Directory::get_is_absolute() const {
-    return is_absolute;
-}
-
-const std::vector<std::string>& Directory::get_dir_names() const {
-    return dir_names;
 }
 
 }

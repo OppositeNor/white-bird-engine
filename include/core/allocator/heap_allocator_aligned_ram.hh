@@ -54,7 +54,7 @@ public:
     HeapAllocatorAlignedRAM& operator=(const HeapAllocatorAlignedRAM&) = delete;
     HeapAllocatorAlignedRAM& operator=(HeapAllocatorAlignedRAM&&) = delete;
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment) override {
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
         size_t align_size = get_align_size(p_size, p_alignment);
         void* mem = aligned_alloc(p_alignment, align_size);
         MemID result = std::bit_cast<MemID>(mem);

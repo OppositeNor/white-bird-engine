@@ -57,24 +57,24 @@ TEST(MacOSFileSystemTest, DirToString) {
 TEST(MacOSFileSystemTest, ParseDirectory) {
     WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
     WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello/world//this/is/not/../a/test/./directory/XD");
-    ASSERT_TRUE(parsed_dir == expected);
+    ASSERT_EQ(parsed_dir, expected);
     WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory("../hello/world/this/is/not/../a/test/./directory/XD/../");
-    ASSERT_TRUE(parsed_dir_1 == expected);
+    ASSERT_EQ(parsed_dir_1, expected);
     WBE::Directory parsed_dir_2 = WBE::FileSystem::parse_directory("./hello/world/this/is/not/../a/test/./directory/XD/../");
-    ASSERT_TRUE(parsed_dir_2 == expected);
+    ASSERT_EQ(parsed_dir_2, expected);
     WBE::Directory expected_absolute({ "hello", "this", "is", "me" }, true);
     WBE::Directory parsed_dir_absolute = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
-    ASSERT_TRUE(parsed_dir_absolute == expected_absolute);
+    ASSERT_EQ(parsed_dir_absolute, expected_absolute);
     WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory("/./../hello/that/../this/is/me/XD");
-    ASSERT_TRUE(parsed_dir_absolute_1 == expected_absolute);
+    ASSERT_EQ(parsed_dir_absolute_1, expected_absolute);
     WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
-    ASSERT_TRUE(parsed_dir_absolute_2 == expected_absolute);
+    ASSERT_EQ(parsed_dir_absolute_2, expected_absolute);
     WBE::Directory expectd_relative_empty({}, false);
     WBE::Directory expectd_absolute_empty({}, true);
     WBE::Directory parsed_dir_relative_empty = WBE::FileSystem::parse_directory("");
     WBE::Directory parsed_dir_absolute_empty = WBE::FileSystem::parse_directory("/");
-    ASSERT_TRUE(parsed_dir_relative_empty == expectd_relative_empty);
-    ASSERT_TRUE(parsed_dir_absolute_empty == expectd_absolute_empty);
+    ASSERT_EQ(parsed_dir_relative_empty, expectd_relative_empty);
+    ASSERT_EQ(parsed_dir_absolute_empty, expectd_absolute_empty);
 }
 
 TEST(MacOSFileSystemTest, CombineDirectory) {

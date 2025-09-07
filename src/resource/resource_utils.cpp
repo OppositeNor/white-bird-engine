@@ -82,6 +82,10 @@ unsigned char* get_pixel(unsigned char* p_data, int p_row, int p_col, int p_widt
     return p_data + (p_row * p_width + p_col) * p_channel;
 }
 
+unsigned char* get_pixel(unsigned char* p_data, int p_index, int p_width, int p_channel) {
+    return p_data + p_index * p_channel;
+}
+
 void sq_img_transpose(unsigned char* p_data, int p_width, int p_height, int p_channel) {
     for (int i = 0; i < p_height; ++i) {
         for (int j = i; j < p_width; ++j) {
@@ -110,10 +114,11 @@ void img_rotate_ccw(unsigned char* p_data, int p_width, int p_height, int p_chan
 
 void img_rotate_180(unsigned char* p_data, int p_width, int p_height, int p_channel) {
     int image_size = p_width * p_height;
-    int half_img_size = image_size << 1;
+    int half_img_size = image_size >> 1;
     for (int i = 0; i < half_img_size; ++i) {
         for (int j = 0; j < p_channel; ++j) {
-            std::swap(p_data[i * p_channel + j], p_data[(image_size - i - 1) * p_channel + j]);
+            std::swap(get_pixel(p_data, i, p_width, p_channel)[j],
+                      get_pixel(p_data, (image_size - i - 1), p_width, p_channel)[j]);
         }
     }
 }

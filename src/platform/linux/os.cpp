@@ -17,6 +17,7 @@
 #include <alloca.h>
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sched.h>
 #include <stdexcept>
@@ -32,7 +33,7 @@ PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[]
         int ret_val;
         if ((ret_val = execve(p_exec_path, (char* const*)p_argv, (char* const*)p_envp)) < 0) {
             printf("Failed to run program: %s.\n", p_exec_path);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
     }
     if (!p_background) {

@@ -63,7 +63,7 @@ public:
      */
     HeapAllocatorAlignedPool(size_t p_size);
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment) override;
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
 
     virtual void deallocate(MemID p_mem) override;
 

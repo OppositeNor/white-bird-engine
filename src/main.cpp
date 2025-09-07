@@ -15,6 +15,7 @@
 #include "core/logging/log.hh"
 #include "function/application/application_game.hh"
 #include "global/global.hh"
+#include <cstdlib>
 #include <format>
 
 namespace WBE = WhiteBirdEngine;
@@ -29,6 +30,6 @@ int main(int p_argc, char* p_argv[]) {
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 

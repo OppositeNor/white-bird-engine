@@ -108,6 +108,7 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
         p_str.erase(0, split_pos + 1);
         split_pos = p_str.find(p_token);
     }
+    result.push_back(p_str);
     return result;
 }
 

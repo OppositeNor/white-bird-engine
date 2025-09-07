@@ -16,7 +16,12 @@
 #define __WBE_RESOURCE_UTILS_TEST_HH__
 
 #include "resource/resource_utils.hh"
+#include "global/global.hh"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include <gtest/gtest.h>
+#include <memory>
+#include <cstring>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -76,4 +81,198 @@ TEST(ResourceUtilsTest, FlipV4CH) {
     WBE::img_flip_v(mock_image, MOCK_IMAGE_WIDTH, MOCK_IMAGE_HEIGHT, MOCK_IMAGE_CHANNELS);
     ASSERT_TRUE(test_image_equals(mock_image, mock_image_flip_v, MOCK_IMAGE_WIDTH * MOCK_IMAGE_HEIGHT * MOCK_IMAGE_CHANNELS));
 }
+
+TEST(ResourceUtilsTest, ParseResRelPathSimple) {
+    std::string res_path = "textures/player.png";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "player.png");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "textures/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathNested) {
+    std::string res_path = "textures/characters/enemies/goblin.png";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "goblin.png");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "textures/characters/enemies/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathWithDots) {
+    std::string res_path = "textures/../sounds/music/theme.ogg";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "theme.ogg");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "sounds/music/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathWithCurrentDir) {
+    std::string res_path = "textures/./characters/player.png";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "player.png");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "textures/characters/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathWithMultipleDots) {
+    std::string res_path = "textures/characters/../sounds/../music/theme.ogg";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "theme.ogg");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "textures/music/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathRootFile) {
+    std::string res_path = "config.json";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "config.json");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathWithEmptyDirs) {
+    std::string res_path = "textures//characters///player.png";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "player.png");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "textures/characters/");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathMoreDotsThanDirs) {
+    std::string res_path = "textures/../../../config.json";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "config.json");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "");
+}
+
+TEST(ResourceUtilsTest, ParseResRelPathComplexPath) {
+    std::string res_path = "assets/./textures/../models/../../sounds/./effects/../music/background.wav";
+    WBE::Path result = WBE::parse_res_rel_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "background.wav");
+    ASSERT_EQ(static_cast<std::string>(result.get_directory()), "sounds/music/");
+}
+
+TEST(ResourceUtilsTest, ImageRotation180) {
+    constexpr uint32_t WIDTH = 2;
+    constexpr uint32_t HEIGHT = 2;
+    constexpr uint32_t CHANNELS = 3;
+    
+    unsigned char original[WIDTH * HEIGHT * CHANNELS] = {
+        1, 2, 3,    4, 5, 6,
+        7, 8, 9,    10, 11, 12
+    };
+    
+    unsigned char expected[WIDTH * HEIGHT * CHANNELS] = {
+        10, 11, 12,    7, 8, 9,
+        4, 5, 6,       1, 2, 3
+    };
+    
+    unsigned char test_image[WIDTH * HEIGHT * CHANNELS];
+    std::memcpy(test_image, original, sizeof(original));
+    
+    WBE::img_rotate_180(test_image, WIDTH, HEIGHT, CHANNELS);
+    ASSERT_TRUE(test_image_equals(test_image, expected, WIDTH * HEIGHT * CHANNELS));
+}
+
+TEST(ResourceUtilsTest, ImageFlipHorizontal3Channel) {
+    constexpr uint32_t WIDTH = 3;
+    constexpr uint32_t HEIGHT = 2;
+    constexpr uint32_t CHANNELS = 3;
+    
+    unsigned char original[WIDTH * HEIGHT * CHANNELS] = {
+        1, 2, 3,    4, 5, 6,    7, 8, 9,
+        10, 11, 12, 13, 14, 15, 16, 17, 18
+    };
+    
+    unsigned char expected[WIDTH * HEIGHT * CHANNELS] = {
+        7, 8, 9,    4, 5, 6,    1, 2, 3,
+        16, 17, 18, 13, 14, 15, 10, 11, 12
+    };
+    
+    unsigned char test_image[WIDTH * HEIGHT * CHANNELS];
+    std::memcpy(test_image, original, sizeof(original));
+    
+    WBE::img_flip_h(test_image, WIDTH, HEIGHT, CHANNELS);
+    ASSERT_TRUE(test_image_equals(test_image, expected, WIDTH * HEIGHT * CHANNELS));
+}
+
+TEST(ResourceUtilsTest, ImageFlipVertical1Channel) {
+    constexpr uint32_t WIDTH = 3;
+    constexpr uint32_t HEIGHT = 3;
+    constexpr uint32_t CHANNELS = 1;
+    
+    unsigned char original[WIDTH * HEIGHT * CHANNELS] = {
+        1, 2, 3,
+        4, 5, 6,
+        7, 8, 9
+    };
+    
+    unsigned char expected[WIDTH * HEIGHT * CHANNELS] = {
+        7, 8, 9,
+        4, 5, 6,
+        1, 2, 3
+    };
+    
+    unsigned char test_image[WIDTH * HEIGHT * CHANNELS];
+    std::memcpy(test_image, original, sizeof(original));
+    
+    WBE::img_flip_v(test_image, WIDTH, HEIGHT, CHANNELS);
+    ASSERT_TRUE(test_image_equals(test_image, expected, WIDTH * HEIGHT * CHANNELS));
+}
+
+TEST(ResourceUtilsTest, ImageFlipHorizontalSinglePixel) {
+    constexpr uint32_t WIDTH = 1;
+    constexpr uint32_t HEIGHT = 1;
+    constexpr uint32_t CHANNELS = 4;
+    
+    unsigned char original[WIDTH * HEIGHT * CHANNELS] = {255, 128, 64, 32};
+    unsigned char expected[WIDTH * HEIGHT * CHANNELS] = {255, 128, 64, 32};
+    
+    unsigned char test_image[WIDTH * HEIGHT * CHANNELS];
+    std::memcpy(test_image, original, sizeof(original));
+    
+    WBE::img_flip_h(test_image, WIDTH, HEIGHT, CHANNELS);
+    ASSERT_TRUE(test_image_equals(test_image, expected, WIDTH * HEIGHT * CHANNELS));
+}
+
+TEST(ResourceUtilsTest, ImageFlipVerticalSingleRow) {
+    constexpr uint32_t WIDTH = 4;
+    constexpr uint32_t HEIGHT = 1;
+    constexpr uint32_t CHANNELS = 2;
+    
+    unsigned char original[WIDTH * HEIGHT * CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8};
+    unsigned char expected[WIDTH * HEIGHT * CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8};
+    
+    unsigned char test_image[WIDTH * HEIGHT * CHANNELS];
+    std::memcpy(test_image, original, sizeof(original));
+    
+    WBE::img_flip_v(test_image, WIDTH, HEIGHT, CHANNELS);
+    ASSERT_TRUE(test_image_equals(test_image, expected, WIDTH * HEIGHT * CHANNELS));
+}
+
+TEST(ResourceUtilsTest, GetResourcePath) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::string res_path = "textures/player.png";
+    WBE::Path result = WBE::get_resource_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "player.png");
+    std::string dir_str = static_cast<std::string>(result.get_directory());
+    ASSERT_TRUE(dir_str.find("textures") != std::string::npos);
+}
+
+TEST(ResourceUtilsTest, GetResourcePathNested) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    
+    std::string res_path = "sounds/music/theme.ogg";
+    WBE::Path result = WBE::get_resource_path(res_path);
+    
+    ASSERT_EQ(result.get_file_name(), "theme.ogg");
+    std::string dir_str = static_cast<std::string>(result.get_directory());
+    ASSERT_TRUE(dir_str.find("sounds") != std::string::npos);
+    ASSERT_TRUE(dir_str.find("music") != std::string::npos);
+}
+
 #endif
