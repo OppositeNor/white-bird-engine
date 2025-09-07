@@ -14,7 +14,6 @@
 */
 #include "function/render/renderer_vk.hh"
 #include "SDL_vulkan.h"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
@@ -202,7 +201,7 @@ void RendererVK::create_physical_device() {
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
+    string<> device_name(device_properties.deviceName, get_render_allocator());
     wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
 }
@@ -293,7 +292,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
+            string<> device_name(device_properties.deviceName, get_render_allocator());
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
                 " White Bird Engine is picking an alternative device.", device_name));
@@ -301,7 +300,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
         else {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<HeapAllocatorAlignedPool> device_name(device_properties.deviceName, get_render_allocator());
+            string<> device_name(device_properties.deviceName, get_render_allocator());
             physical_device = p_physical_devices[pick_device_index];
             wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;

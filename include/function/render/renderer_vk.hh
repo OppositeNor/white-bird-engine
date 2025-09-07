@@ -47,7 +47,7 @@ public:
     RendererVK(Ref<AllocatorVK> p_allocator);
 private:
 
-    Ref<AllocatorVK> allocator;     // TODO: use allocator
+    Ref<AllocatorVK> allocator;
     SDL_Window* window;
     VkInstance vk_instance;
 
