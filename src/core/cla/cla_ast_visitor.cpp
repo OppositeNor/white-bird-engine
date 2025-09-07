@@ -75,10 +75,10 @@ void CLAASTVisitorAssembler::visit(CLAASTNodeOperation* p_node) {
         throw std::runtime_error("Failed to parse operation: " + operation_name + ", not enough arguments. Expected: "
                                  + std::to_string(arg_num) + ", inputed: " + std::to_string(input_arg_num) + ".");
     }
-    root.operations.push_back(get_operation(p_node, operation_name, arg_num));
+    get_operation(p_node, operation_name, arg_num);
 }
 
-bool CLAASTVisitorAssembler::get_operation_arg_count(std::string p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num) {
+bool CLAASTVisitorAssembler::get_operation_arg_count(std::string& p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num) {
     if (p_node->is_name_short()) {
         auto arg_name_short = arg_short_to_long.find(p_op_name[0]);
         if (arg_name_short == arg_short_to_long.end()) {
@@ -97,7 +97,7 @@ bool CLAASTVisitorAssembler::get_operation_arg_count(std::string p_op_name, CLAA
     return true;
 }
 
-CLAOperation CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num) {
+void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num) {
     auto& arguments = p_node->get_arguments();
     int32_t input_arg_num = p_node->get_arguments().size();
     if (p_arg_num < 0) {
@@ -109,11 +109,10 @@ CLAOperation CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, 
     for (i = 0; i < p_arg_num; ++i) {
         operation.arguments.push_back(arguments[i]);
     }
-    root.operations.push_back(operation);
     for (; i < input_arg_num; ++i) {
         root.operands.push_back(arguments[i]);
     }
-    return operation;
+    root.operations.push_back(operation);
 }
 
 }

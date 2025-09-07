@@ -120,8 +120,8 @@ public:
 private:
     std::unordered_map<std::string, int32_t> arg_count_long;
     std::unordered_map<char, std::string> arg_short_to_long;
-    bool get_operation_arg_count(std::string p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num);
-    CLAOperation get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num);
+    bool get_operation_arg_count(std::string& p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num);
+    void get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num);
 
     CLARoot root;
 };

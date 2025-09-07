@@ -210,10 +210,8 @@ TEST(CLAASTVisitorToString, OperationArgumentManipulation) {
 }
 
 TEST(CLAASTVisitor, MultipleShortOptionsYAMLFormat) {
-    // Test YAML formatting for multiple short options in one prefix
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
-    // Create AST manually for multiple short options like -abc
     auto op_a = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "a", true);
     auto op_b = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "b", true);
     auto op_c = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "c", true);
@@ -237,18 +235,14 @@ TEST(CLAASTVisitor, MultipleShortOptionsYAMLFormat) {
 }
 
 TEST(CLAASTVisitor, MixedSingleAndMultipleShortOptionsYAMLFormat) {
-    // Test YAML formatting for mixed single and multiple short options
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
-    // Single short option with argument
     auto op_f = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "-f", true);
     op_f->push_argument("input.txt");
     
-    // Multiple short options (no arguments)
     auto op_v = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "v", true);
     auto op_d = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "d", true);
     
-    // Another single short option with argument
     auto op_o = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "-o", true);
     op_o->push_argument("output.txt");
     

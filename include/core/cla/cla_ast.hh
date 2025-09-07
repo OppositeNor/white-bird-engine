@@ -101,7 +101,7 @@ public:
      * @param p_is_short Is the name a short notation.
      */
     CLAASTNodeOperation(const std::string& p_operation_name, bool p_is_short)
-        : operation_name(p_operation_name), arguments() {}
+        : CLAASTNodeOperation(p_operation_name, {}, p_is_short) {}
     /**
      * @brief Constructor.
      *
@@ -110,7 +110,7 @@ public:
      * @param p_is_short Is the name a short notation.
      */
     CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
-        : operation_name(p_operation_name), arguments(std::move(p_arguments)) {}
+        : is_short(p_is_short), operation_name(p_operation_name), arguments(std::move(p_arguments)) {}
 
     virtual ~CLAASTNodeOperation() override {}
 
