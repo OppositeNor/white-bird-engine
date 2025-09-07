@@ -17,7 +17,6 @@
 #include "core/cla/cla_ast.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/global.hh"
-#include <jack/types.h>
 #include <stdexcept>
 #include <string>
 

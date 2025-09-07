@@ -67,8 +67,12 @@ class WBEMetaparser:
         preloaded = self._metadata.get(p_cpp_file_path)
         if preloaded is not None:
             return preloaded
-        if not os.path.exists(p_cache_path):
+        if os.path.exists(p_cache_path):
+            return self._register_from_cache(p_cpp_file_path, p_cache_path)
+        else:
             return self._register_from_clang(p_cpp_file_path, p_cache_path)
+
+    def _register_from_cache(self, p_cpp_file_path, p_cache_path):
         try:
             with open(p_cache_path) as f:
                 data = json.load(f)
