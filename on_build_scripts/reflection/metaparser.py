@@ -13,19 +13,11 @@
 # limitations under the License.
 
 import os
-from typing import List
 from utils import hash_file, hash_str_sha256
 from reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from dataclasses import dataclass
-
-@dataclass
-class WBEFileMetadata:
-    file_path : str
-    hashcode : str
-    labels : List[str]
-    deps : List[str]
+from reflection.metadata_types import WBEClassMetadata, WBEFileMetadata, WBELabelMetadata
 
 class WBEMetaparser:
     """Metaparser
@@ -80,7 +72,6 @@ class WBEMetaparser:
             file_content_hashcode = hash_file(p_cpp_file_path)
             if metadata.hashcode != file_content_hashcode:
                 return self._register_from_clang(p_cpp_file_path, p_cache_path)
-            metadata = WBEFileMetadata(**data)
             self._metadata[p_cpp_file_path] = metadata
             return metadata
         except:
@@ -88,38 +79,56 @@ class WBEMetaparser:
 
     def _export_metadata(self):
         for _, metadata in self._metadata.items():
-            self._register_metadata(metadata)
+            for label in metadata.labels:
+                if "WBE_CHANNEL" in label.attribute.split(", "):
+                    self.reflector.register_channel(label.label_name)
 
     def _register_from_clang(self, p_cpp_file_path, p_cache_path):
-        print(f"WBEMetaparser: parsing {p_cpp_file_path}...")
+        print(f"WBEMetaparser: parsing {p_cpp_file_path}")
         index = clang.cindex.Index.create()
         tu = index.parse(
             p_cpp_file_path,
             args=self.clang_args,
             options=clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
         )
-        metadata = WBEFileMetadata("", "", [], self._get_include_deps(tu))
+        metadata = WBEFileMetadata()
+        metadata.deps = self._get_include_deps(tu)
         metadata.file_path = p_cpp_file_path
         self._register_labels(tu, metadata)
         metadata.hashcode = hash_file(p_cpp_file_path)
         self._metadata[p_cpp_file_path] = metadata
         with open(p_cache_path, "w") as f:
-            json.dump(metadata.__dict__, f, indent=4)
+            json.dump(metadata.model_dump(), f, indent=4)
         return metadata
 
     def _register_labels(self, p_tu, p_metadata : WBEFileMetadata):
-        for label in self._visit_labels(p_metadata, p_tu.cursor):
-            p_metadata.labels.append(label)
+        for attribute, data in self._visit_attributes(p_metadata, p_tu.cursor):
+            getattr(p_metadata, attribute).append(data)
 
-    def _visit_labels(self, p_metadata, p_cursor):
+    def _visit_attributes(self, p_metadata, p_cursor):
         if p_cursor.kind == clang.cindex.CursorKind.VAR_DECL:
             for attr in p_cursor.get_children():
-                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR and attr.displayname == "WBE_CHANNEL":
-                    if not self._is_label_registered(p_metadata, p_cursor.spelling):
-                        yield p_cursor.spelling
+                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                    if not self._any_all(p_metadata, lambda p_metadata:
+                            any(p_cursor.spelling == label.label_name for label in p_metadata.labels)):
+                        yield "labels", WBELabelMetadata(label_name=p_cursor.spelling, attribute=attr.spelling)
+        elif p_cursor.kind == clang.cindex.CursorKind.CLASS_DECL:
+            for attr in p_cursor.get_children():
+                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                    if not self._any_all(p_metadata, lambda p_metadata:
+                            any(p_cursor.spelling == metad_class.class_name for metad_class in p_metadata.classes)):
+                        yield "classes", self._get_class_metadata(p_cursor, attr.displayname)
+
         for child in p_cursor.get_children():
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
-                yield from self._visit_labels(p_metadata, child)
+                yield from self._visit_attributes(p_metadata, child)
+
+    def _get_class_metadata(self, p_cursor, p_attribute):
+        result = WBEClassMetadata()
+        result.class_name = p_cursor.spelling
+        result.attribute = p_attribute
+        # TODO
+        return WBEClassMetadata(class_name=p_cursor.spelling)
 
     def _read_from_cache(self, p_cpp_file_path, p_cache_path):
         with open(p_cache_path) as f:
@@ -127,10 +136,6 @@ class WBEMetaparser:
         metadata = WBEFileMetadata(**data)
         self._metadata[p_cpp_file_path] = metadata
         return metadata
-
-    def _register_metadata(self, p_metadata : WBEFileMetadata):
-        for label in p_metadata.labels:
-            self.reflector.register_channel(label)
 
     def _get_include_deps(self, p_tu):
         deps = set()
@@ -140,13 +145,13 @@ class WBEMetaparser:
                 deps.add(incl_path_abs)
         return list(deps)
 
-    def _is_label_registered(self, p_metadata, p_label):
-        if p_label in p_metadata.labels:
+    def _any_all(self, p_metadata, p_predicate):
+        if p_predicate(p_metadata):
             return True
         for dep in p_metadata.deps:
             dep_metadata_file_path = os.path.join(self.cache_dir, f"{hash_str_sha256(dep)}.json")
             dep_metadata = self._get_metadata(dep, dep_metadata_file_path)
-            if p_label in dep_metadata.labels:
+            if p_predicate(dep_metadata):
                 return True
         return False
 

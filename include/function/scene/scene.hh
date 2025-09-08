@@ -15,9 +15,15 @@
 #ifndef __WBE_SCENE_HH__
 #define __WBE_SCENE_HH__
 
+#include "core/reflection/reflection_defs.hh"
+
 namespace WhiteBirdEngine {
 
-class Scene {
+/**
+ * @class Scene
+ * @brief Scene class.
+ */
+WBE_CLASS(Scene, WBE_SERIALIZABLE) {
 public:
     // TODO
 };
