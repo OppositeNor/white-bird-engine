@@ -24,10 +24,41 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 namespace WhiteBirdEngine {
 
+int get_mmap_prot(OS::MMapProt p_prot) {
+    int result = 0;
+    if (p_prot.test(OS::MMapProtBit::READ)) {
+        result |= PROT_EXEC;
+    }
+    if (p_prot.test(OS::MMapProtBit::WRITE)) {
+        result |= PROT_WRITE;
+    }
+    if (p_prot.test(OS::MMapProtBit::EXEC)) {
+        result |= PROT_EXEC;
+    }
+    return result;
+}
+
+int get_mmap_flags(OS::MMapFlags p_prot) {
+    int result = 0;
+    if (p_prot.test(OS::MMapFlagBit::SHARED)) {
+        result |= MAP_SHARED_VALIDATE;
+    }
+    if (p_prot.test(OS::MMapFlagBit::PRIVATE)) {
+        result |= MAP_PRIVATE;
+    }
+    if (p_prot.test(OS::MMapFlagBit::ANON)) {
+        result |= MAP_ANON;
+    }
+    return result;
+}
+
 PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[], const char* p_envp[]) {
+    MAP_ANON;
     pid_t pid = fork_process();
     if (pid == 0) {
         int ret_val;
@@ -88,6 +119,14 @@ void OS::wait_all(bool p_silent) {
     if (errno != ECHILD) {
         throw std::runtime_error("Failed to wait for all process to finish: " + std::string(strerror(errno)));
     }
+}
+
+void* OS::memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags p_flags, FileDescrip p_fd, off_t p_offset) {
+    void* mapped = mmap(p_start, p_length, get_mmap_prot(p_prot), get_mmap_flags(p_flags), p_fd, p_offset);
+    if (mapped == MAP_FAILED) {
+        throw std::runtime_error("Failed to map memory: " + std::string(strerror(errno)));
+    }
+    return mapped;
 }
 
 }

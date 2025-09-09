@@ -122,13 +122,6 @@ class WBEMetaparser:
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
                 yield from self._visit_attributes(p_metadata, child)
 
-    def _get_class_metadata(self, p_cursor, p_attribute):
-        result = WBEClassMetadata()
-        result.class_name = p_cursor.spelling
-        result.attribute = p_attribute
-        # TODO
-        return WBEClassMetadata(class_name=p_cursor.spelling)
-
     def _read_from_cache(self, p_cpp_file_path, p_cache_path):
         with open(p_cache_path) as f:
             data = json.load(f)
@@ -153,4 +146,11 @@ class WBEMetaparser:
             if p_predicate(dep_metadata):
                 return True
         return False
+
+    def _get_class_metadata(self, p_cursor, p_attribute):
+        result = WBEClassMetadata()
+        result.class_name = p_cursor.spelling
+        result.attribute = p_attribute
+        # TODO
+        return WBEClassMetadata(class_name=p_cursor.spelling)
 

@@ -15,6 +15,9 @@
 #ifndef __WBE_OS_HH__
 #define __WBE_OS_HH__
 
+#include <bitset>
+#include <cstddef>
+#include <sys/types.h>
 #ifdef __unix__
 #include <sched.h>
 #endif
@@ -23,6 +26,7 @@ namespace WhiteBirdEngine {
 
 #ifdef __unix__
 using PID = pid_t;
+using FileDescrip = int;
 #endif
 
 /**
@@ -33,6 +37,38 @@ using PID = pid_t;
 class OS {
 public:
     OS() = delete;
+
+    /**
+     * @brief Memory mapping protocols control bits.
+     */
+    enum MMapProtBit {
+        // Page may be read.
+        READ = 0,
+        // Page may be written.
+        WRITE,
+        // Page may be executed.
+        EXEC,
+        // Used for tracking total protocols.
+        TOTAL_PROT
+    };
+
+    using MMapProt = std::bitset<MMapProtBit::TOTAL_PROT>;
+
+    /**
+     * @brief Mapping types.
+     */
+    enum MMapFlagBit {
+        // Shared.
+        SHARED,
+        // Private.
+        PRIVATE,
+        // Map to an anonymous file.
+        ANON,
+        // Used for tracking total types.
+        TOTAL_FLAGS
+    };
+
+    using MMapFlags = std::bitset<MMapFlagBit::TOTAL_FLAGS>;
 
     /**
      * @brief Execute a program on a separate process. The execution can be a separate
@@ -84,6 +120,18 @@ public:
      * @param p_silent Should mute the output messages.
      */
     static void wait_all(bool p_silent = true);
+
+    /**
+     * @brief Memory mapping.
+     *
+     * @param p_start The start of the virtual memory to map. Could set to nullptr if not specified.
+     * @param p_length The length of the memory to be mapped in bytes.
+     * @param p_prot The protocol of the memory mapping.
+     * @param p_flags The flags of the memory mapping.
+     * @param p_fd The file descriptor referencing to the file to map to.
+     * @param p_offset The offset of the file that this memory is going to mapt to.
+     */
+    static void* memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags p_flags, FileDescrip p_fd, off_t p_offset);
 };
 
 }

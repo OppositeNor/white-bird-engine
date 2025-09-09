@@ -83,6 +83,9 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Distribute")
+    ## for distribution
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG -DWBE_BUILD_TEST=OFF")
 else()
     ## for gdb or valgrind
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG")
