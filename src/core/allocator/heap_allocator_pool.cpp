@@ -16,15 +16,15 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "core/allocator/heap_allocator_pool.hh"
-#include <bit>
 #include <cstring>
+#include <iostream>
 #include <sstream>
 #include <string>
 
 namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
-    if (allocated.size() != 0) {
+    if (!is_empty()) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
     free(mem_chunk);
@@ -32,7 +32,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 }
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
-    : size(p_size), mem_chunk(static_cast<std::byte*>(malloc(p_size))) {
+    : size(p_size), mem_chunk(static_cast<char*>(malloc(p_size))) {
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to allocate memory for pool.");
     }
@@ -45,13 +45,16 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
+    p_size += sizeof(size_t);
     while (*valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
-            allocated.insert(std::bit_cast<MemID>(result));
-            size_map[result] = p_size;
+            *reinterpret_cast<size_t*>(result) = p_size;
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + p_size - (size_t)mem_chunk);
-            return std::bit_cast<MemID>(result);
+            return reinterpret_cast<MemID>(result) + sizeof(size_t);
+        }
+        if ((*valid_idle_node)->next == nullptr) {
+            break;
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
@@ -59,17 +62,14 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {
-    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
-    void* data_loc = std::bit_cast<void*>(p_mem);
-    size_t data_size = size_map[data_loc];
-    allocated.erase(p_mem);
-    size_map.erase(data_loc);
+    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(size_t));
+    size_t data_size = get_allocated_data_size(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
-        insert_free_memory(nullptr, static_cast<std::byte*>(data_loc), data_size);
+        insert_free_memory(nullptr, data_loc, data_size);
         return;
     }
     IdleListNode* insert_pos = get_idle_node_before(data_loc).get();
-    insert_free_memory(insert_pos, static_cast<std::byte*>(data_loc), data_size);
+    insert_free_memory(insert_pos, data_loc, data_size);
 }
 
 void* HeapAllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
@@ -92,7 +92,7 @@ void* HeapAllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, s
     return mem_start;
 }
 
-void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size) {
+void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
     if (idle_list_head == nullptr) {
         idle_list_head = std::make_unique<IdleListNode>();
         ++idle_chunks_count;
@@ -159,7 +159,7 @@ HeapAllocatorPool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
     ss << "\"type\":\"HeapAllocatorPool\",";
-    ss << "\"obj_count\":" << obj_count() << ",";
+    ss << "\"total_size\":" << get_total_size() << ",";
     ss << "\"free_chunk_layout\":[";
     IdleListNode* node = idle_list_head.get();
     bool first = true;

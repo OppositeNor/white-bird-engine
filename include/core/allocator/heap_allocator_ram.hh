@@ -17,7 +17,8 @@
 
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
-#include <unordered_map>
+#include <bit>
+#include <set>
 #include <sstream>
 namespace WhiteBirdEngine {
 
@@ -39,7 +40,7 @@ struct AllocatorTrait<class HeapAllocatorRAM> {
 class HeapAllocatorRAM final : public HeapAllocator {
 public:
 
-    HeapAllocatorRAM() : curr_id(1) {}
+    HeapAllocatorRAM() {}
     virtual ~HeapAllocatorRAM() override;
 
     virtual MemID allocate(size_t p_size) override;
@@ -50,21 +51,21 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        return alloc_map.at(p_id);
+        return std::bit_cast<void*>(p_id);
     }
 
     virtual const void* get(MemID p_id) const override {
         if (p_id == 0) {
             return nullptr;
         }
-        return alloc_map.at(p_id);
+        return std::bit_cast<void*>(p_id);
     }
 
-    virtual uint32_t obj_count() const override {
+    uint32_t obj_count() const {
         return allocated.size();
     }
 
-    virtual std::set<MemID> get_allocated() const override {
+    std::set<MemID> get_allocated() const {
         return allocated;
     }
 
@@ -75,7 +76,6 @@ public:
     // TODO: Test
     virtual void clear() override {
         allocated.clear();
-        alloc_map.clear();
     }
 
     virtual operator std::string() const override {
@@ -96,9 +96,7 @@ public:
     }
 
 private:
-    MemID curr_id;
     std::set<MemID> allocated;
-    std::unordered_map<MemID, void*> alloc_map;
 
 };
 

@@ -22,6 +22,14 @@
 #include <string>
 
 namespace WhiteBirdEngine {
+
+template <>
+struct AllocatorTrait<class HeapAllocatorAligned> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorAligned>);
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+    static constexpr bool IS_ALIGNABLE = true;
+};
+
 /**
  * @class HeapAllocatorAligned
  * @brief Heap allocator that has alignment allocation support.

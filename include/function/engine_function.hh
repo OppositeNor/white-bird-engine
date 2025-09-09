@@ -15,7 +15,6 @@
 #ifndef __WBE_ENGINE_FUNCTION_HH__
 #define __WBE_ENGINE_FUNCTION_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
@@ -33,8 +32,6 @@ public:
     }
 
     GameConfig* game_config = nullptr;
-    
-    HeapAllocatorAlignedPool* renderer_allocator;
 private:
 
     inline static EngineFunction* singleton;

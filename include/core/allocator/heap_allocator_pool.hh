@@ -17,10 +17,8 @@
 
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
-#include <bit>
 #include <cstddef>
 #include <memory>
-#include <unordered_map>
 
 namespace WhiteBirdEngine {
 
@@ -68,27 +66,21 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        WBE_DEBUG_ASSERT(is_in_pool(p_id));
-        return std::bit_cast<void*>(p_id);
+        return reinterpret_cast<void*>(p_id);
     }
 
     virtual const void* get(MemID p_id) const override {
         if (p_id == 0) {
             return nullptr;
         }
-        WBE_DEBUG_ASSERT(is_in_pool(p_id));
-        return std::bit_cast<void*>(p_id);
-    }
-
-    virtual uint32_t obj_count() const override {
-        return allocated.size();
-    }
-
-    virtual std::set<MemID> get_allocated() const override {
-        return allocated;
+        return reinterpret_cast<void*>(p_id);
     }
 
     virtual operator std::string() const override;
+
+    size_t get_allocated_data_size(MemID p_mem_id) const {
+        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(size_t));
+    }
 
     size_t get_total_size() const {
         return size;
@@ -97,13 +89,11 @@ public:
     size_t get_remain_size() const;
 
     virtual bool is_empty() const override {
-        return allocated.empty();
+        return idle_list_head != nullptr && idle_list_head->size == size;
     }
 
     // TODO: Test
     virtual void clear() override {
-        size_map.clear();
-        allocated.clear();
         idle_list_head->size = size;
         idle_list_head->mem_start = mem_chunk;
         idle_list_head->next = nullptr;
@@ -117,27 +107,21 @@ private:
     
     struct IdleListNode {
         size_t size;
-        std::byte* mem_start;
+        char* mem_start;
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
     void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
-    void insert_free_memory(IdleListNode* p_node_before_insert, std::byte* p_insert_start, size_t p_insert_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 
     size_t size;
-    std::unordered_map<void*, size_t> size_map;
-    std::byte* mem_chunk;
+    char* mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
-    std::set<MemID> allocated;
 
     size_t max_data_loc_tracker = 0;
-
-    bool is_in_pool(MemID p_id) const {
-        return allocated.find(p_id) != allocated.end();
-    }
 };
 
 }

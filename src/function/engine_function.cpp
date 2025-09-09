@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/engine_function.hh"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "function/game_config/game_config.hh"
 
 namespace WhiteBirdEngine {
@@ -21,11 +20,9 @@ namespace WhiteBirdEngine {
 EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
     singleton = this;
     game_config = new GameConfig(p_game_config_file_path);
-    renderer_allocator = new HeapAllocatorAlignedPool(WBE_MiB(512));
 }
 
 EngineFunction::~EngineFunction() {
-    delete renderer_allocator;
     delete game_config;
     singleton = nullptr;
 }

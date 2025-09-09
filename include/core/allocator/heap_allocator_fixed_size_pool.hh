@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <set>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
@@ -102,11 +103,11 @@ public:
         return get_mem_loc_at_id(p_id);
     }
 
-    virtual uint32_t obj_count() const override {
+    uint32_t obj_count() const {
         return alloc_obj_count;
     }
 
-    virtual std::set<MemID> get_allocated() const override {
+    std::set<MemID> get_allocated() const {
         std::set<MemID> result;
         for (uint32_t i = 0; i < alloc_obj_count; ++i) {
             result.insert(*(index_chunk_rev_start() + i));
@@ -122,6 +123,10 @@ public:
 
     virtual bool is_empty() const override {
         return alloc_obj_count == 0;
+    }
+
+    size_t get_allocated_data_size(MemID p_mem_id) const {
+        return SIZE;
     }
 
     // TODO: Test

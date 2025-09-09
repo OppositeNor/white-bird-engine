@@ -104,6 +104,7 @@ public:
         ss << "{";
         ss << "\"type\":\"HeapAllocatorAlignedPool\",";
         ss << "\"obj_count\":" << obj_count() << ",";
+        ss << "\"total_size\":" << get_total_size() << ",";
         ss << "\"free_chunk_layout\":[";
         IdleListNode* node = idle_list_head.get();
         bool first = true;
@@ -111,9 +112,9 @@ public:
             if (!first) ss << ",";
             first = false;
             ss << "{"
-               << "\"begin\":" << (node->mem_start - mem_chunk) << ","
-               << "\"size\":" << node->size
-               << "}";
+                << "\"begin\":" << (node->mem_start - mem_chunk) << ","
+                << "\"size\":" << node->size
+                << "}";
             node = node->next.get();
         }
         ss << "]";

@@ -17,9 +17,9 @@
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/function_utils.hh"
 #include "function/render/allocator_vk.hh"
 #include "function/render/renderer.hh"
+#include "global/global.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
@@ -94,7 +94,7 @@ private:
                 && present.has_value();
         }
         set<int> get_unique_indices() const {
-            set<int> result(get_render_allocator());
+            set<int> result(global_allocator());
             result.insert(graphics.value());
             result.insert(compute.value());
             result.insert(present.value());

@@ -12,7 +12,7 @@ ApplicationGame::ApplicationGame() {
 }
 
 void ApplicationGame::init() {
-    renderer_allocator = make_ref<HeapAllocatorAlignedPool>(global_allocator(), WBE_MiB(1));
+    renderer_allocator = make_ref<HeapAllocatorAlignedPool>(global_allocator(), WBE_KiB(500));
     renderer = make_ref<RendererVK>(global_allocator(), make_ref<AllocatorVK>(global_allocator(), renderer_allocator.get()));
     // TODO
 }

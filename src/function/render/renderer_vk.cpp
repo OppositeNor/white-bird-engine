@@ -17,8 +17,8 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
-#include "function/function_utils.hh"
 #include "function/render/allocator_vk.hh"
+#include "global/global.hh"
 #include "global/stl_allocator.hh"
 
 #include <SDL_vulkan.h>
@@ -99,7 +99,7 @@ void RendererVK::create_instance() {
 
     uint32_t extensions_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
-    vector<const char*> extension_names(extensions_count, get_render_allocator());
+    vector<const char*> extension_names(extensions_count, global_allocator());
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
 
     create_info.enabledExtensionCount = extensions_count;
@@ -149,7 +149,7 @@ void RendererVK::create_swap_chain() {
     // If we have to use the image between multiple queue families, we have to specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we don't have to explicitly transfer ownership.
-        vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), get_render_allocator());
+        vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), global_allocator());
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = unique_indices_array.data();
@@ -196,12 +196,12 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    vector<VkPhysicalDevice> physical_devices(physical_device_count, get_render_allocator());
+    vector<VkPhysicalDevice> physical_devices(physical_device_count, global_allocator());
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    string<> device_name(device_properties.deviceName, get_render_allocator());
+    string<> device_name(device_properties.deviceName, global_allocator());
     wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
 }
@@ -212,7 +212,7 @@ void RendererVK::create_logical_device() {
 
     float queue_priority = 1.0;
     set<int> indices = queue_family_indices.get_unique_indices();
-    vector<VkDeviceQueueCreateInfo> queues_create_info(get_render_allocator());
+    vector<VkDeviceQueueCreateInfo> queues_create_info(global_allocator());
     queues_create_info.reserve(indices.size());
     for (int elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
@@ -249,7 +249,7 @@ void RendererVK::create_logical_device() {
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
     uint32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, nullptr);
-    vector<VkExtensionProperties> extension_properties(extension_count, get_render_allocator());
+    vector<VkExtensionProperties> extension_properties(extension_count, global_allocator());
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, extension_properties.data());
     std::set<std::string> enabled_extensions(enabled_device_extensions.begin(), enabled_device_extensions.end());
     for (const auto& extension : extension_properties) {
@@ -261,7 +261,7 @@ bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
 bool RendererVK::check_validation_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-    vector<VkLayerProperties> layer_properties(layer_count, get_render_allocator());
+    vector<VkLayerProperties> layer_properties(layer_count, global_allocator());
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
     for (auto* name : validation_layers) {
         bool layer_found = false;
@@ -292,7 +292,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<> device_name(device_properties.deviceName, get_render_allocator());
+            string<> device_name(device_properties.deviceName, global_allocator());
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
                 " White Bird Engine is picking an alternative device.", device_name));
@@ -300,7 +300,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
         else {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<> device_name(device_properties.deviceName, get_render_allocator());
+            string<> device_name(device_properties.deviceName, global_allocator());
             physical_device = p_physical_devices[pick_device_index];
             wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
@@ -341,7 +341,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     QueueFamilyIndices indices{};
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
-    vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, get_render_allocator());
+    vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, global_allocator());
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
     int i = 0;
     for (auto& queue_family_property : queue_family_properties) {
@@ -365,8 +365,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 }
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
-    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(get_render_allocator()),
-        .present_modes = vector<VkPresentModeKHR>(get_render_allocator())};
+    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(global_allocator()),
+        .present_modes = vector<VkPresentModeKHR>(global_allocator())};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -390,7 +390,6 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurface
 }
 
 VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes) {
-    // TODO: get from configuration
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
             return VK_PRESENT_MODE_IMMEDIATE_KHR;
