@@ -129,5 +129,11 @@ void* OS::memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags 
     return mapped;
 }
 
+void OS::memory_unmap(void* p_start, size_t p_length) {
+    if (munmap(p_start, p_length) < 0) {
+        throw std::runtime_error("Failed to unmap memory: " + std::string(strerror(errno)));
+    }
+}
+
 }
 

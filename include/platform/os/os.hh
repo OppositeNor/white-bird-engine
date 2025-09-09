@@ -132,6 +132,14 @@ public:
      * @param p_offset The offset of the file that this memory is going to mapt to.
      */
     static void* memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags p_flags, FileDescrip p_fd, off_t p_offset);
+
+    /**
+     * @brief Unmap an memory.
+     *
+     * @param p_start The memory that was previously mapped.
+     * @param p_length The length of the memory to be unmapped.
+     */
+    static void memory_unmap(void* p_start, size_t p_length);
 };
 
 }

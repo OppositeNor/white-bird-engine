@@ -33,7 +33,7 @@ Install build dependencies:
 - Arch
 
     ```sh
-    sudo pacman -S gcc cmake shaderc ninja
+    sudo pacman -S gcc cmake shaderc
     ```
 
     TODO: install Vulkan SDK
@@ -45,7 +45,7 @@ Install build dependencies:
 Build:
 
 ```sh
-cmake -B build -G Ninja
+cmake -B build
 cmake --build build
 ```
 
@@ -57,13 +57,13 @@ cmake --build build
 Install build dependencies with homebrew:
 
 ```sh
-brew install cmake shaderc ninja
+brew install cmake shaderc
 ```
 
 Build:
 
 ```sh
-cmake -B build -G Ninja
+cmake -B build
 cmake --build build
 ```
 
