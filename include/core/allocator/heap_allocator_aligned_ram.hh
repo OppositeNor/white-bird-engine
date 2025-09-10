@@ -17,9 +17,11 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <bit>
+#include <set>
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
@@ -44,11 +46,18 @@ struct AllocatorTrait<class HeapAllocatorAlignedRAM> {
  *
  * @todo Test
  */
-class HeapAllocatorAlignedRAM : public HeapAllocatorAligned {
+class HeapAllocatorAlignedRAM final : public HeapAllocatorAligned {
 public:
 
     HeapAllocatorAlignedRAM() {}
-    virtual ~HeapAllocatorAlignedRAM() override {}
+    virtual ~HeapAllocatorAlignedRAM() override {
+        if (!allocated.empty()) {
+            wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
+        }
+        for (auto data : allocated) {
+            free(reinterpret_cast<void*>(data));
+        }
+    }
     HeapAllocatorAlignedRAM(const HeapAllocatorAlignedRAM&) = delete;
     HeapAllocatorAlignedRAM(HeapAllocatorAlignedRAM&&) = delete;
     HeapAllocatorAlignedRAM& operator=(const HeapAllocatorAlignedRAM&) = delete;
@@ -74,11 +83,11 @@ public:
         return std::bit_cast<void*>(p_id);
     }
 
-    virtual uint32_t obj_count() const override {
+    uint32_t obj_count() const {
         return allocated.size();
     }
 
-    virtual std::set<MemID> get_allocated() const override {
+    std::set<MemID> get_allocated() const {
         return allocated;
     }
 

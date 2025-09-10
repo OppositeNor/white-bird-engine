@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <unordered_map>
 
 namespace WhiteBirdEngine {
 
@@ -46,7 +45,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> {
  *
  * @todo Test
  */
-class HeapAllocatorAlignedPool : public HeapAllocatorAligned {
+class HeapAllocatorAlignedPool final : public HeapAllocatorAligned {
 public:
     HeapAllocatorAlignedPool()
         : HeapAllocatorAlignedPool(WBE_KiB(64)) {}
@@ -69,28 +68,18 @@ public:
 
     virtual void* get(MemID p_id) const override;
 
-    virtual uint32_t obj_count() const override {
-        return allocated.size();
-    }
-
-    virtual std::set<MemID> get_allocated() const override {
-        return allocated;
-    }
-
     virtual bool is_empty() const override {
-        return allocated.empty();
+        return idle_list_head != nullptr && idle_list_head->size == size;
     }
 
     virtual void clear() override {
-        size_map.clear();
-        allocated.clear();
         idle_list_head->size = size;
         idle_list_head->mem_start = mem_chunk;
         idle_list_head->next = nullptr;
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return size_map.at(get(p_mem_id));
+        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(size_t));
     }
 
     size_t get_total_size() const {
@@ -99,28 +88,7 @@ public:
 
     size_t get_remain_size() const;
 
-    virtual operator std::string() const override {
-        std::stringstream ss;
-        ss << "{";
-        ss << "\"type\":\"HeapAllocatorAlignedPool\",";
-        ss << "\"obj_count\":" << obj_count() << ",";
-        ss << "\"total_size\":" << get_total_size() << ",";
-        ss << "\"free_chunk_layout\":[";
-        IdleListNode* node = idle_list_head.get();
-        bool first = true;
-        while (node != nullptr) {
-            if (!first) ss << ",";
-            first = false;
-            ss << "{"
-                << "\"begin\":" << (node->mem_start - mem_chunk) << ","
-                << "\"size\":" << node->size
-                << "}";
-            node = node->next.get();
-        }
-        ss << "]";
-        ss << "}";
-        return ss.str();
-    }
+    virtual operator std::string() const override;
 
     size_t get_max_data_size() const {
         return max_data_loc_tracker;
@@ -140,17 +108,11 @@ private:
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 
     size_t size;
-    std::unordered_map<void*, size_t> size_map;
     char* mem_chunk;
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
-    std::set<MemID> allocated;
 
     size_t max_data_loc_tracker = 0;
-
-    bool is_in_pool(MemID p_id) const {
-        return allocated.contains(p_id);
-    }
 };
 
 }

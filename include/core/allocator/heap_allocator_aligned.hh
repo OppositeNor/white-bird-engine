@@ -17,7 +17,6 @@
 #include "core/allocator/allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
-#include <set>
 #include <sstream>
 #include <string>
 
@@ -68,18 +67,6 @@ public:
     virtual void* get(MemID p_id) const = 0;
 
     /**
-     * @brief Get the number of allocated resources.
-     *
-     * @return The number of allocated resources.
-     */
-    virtual uint32_t obj_count() const = 0;
-
-    /**
-     * @brief Get the allocated memories' ids
-     */
-    virtual std::set<MemID> get_allocated() const = 0;
-
-    /**
      * @brief Is the allocator empty.
      *
      * @return true if allocator is empty, false otherwise.
@@ -113,7 +100,7 @@ public:
 
     virtual operator std::string() const {
         std::stringstream ss;
-        ss << "{\"type\":\"HeapAllocatorAligned\",\"obj_count\":" << obj_count() << "}";
+        ss << "{\"type\":\"HeapAllocatorAligned\"}";
         return ss.str();
     }
 };

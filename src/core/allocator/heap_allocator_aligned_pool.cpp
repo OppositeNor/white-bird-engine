@@ -14,12 +14,13 @@
 */
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -37,23 +38,29 @@ HeapAllocatorAlignedPool::HeapAllocatorAlignedPool(size_t p_size)
 }
 
 HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
+    if (!is_empty()) {
+        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
+    }
     delete[] mem_chunk;
 }
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    size_t aligned_size = get_align_size(p_size, p_alignment);
+    size_t aligned_size = get_align_size(p_size, p_alignment) + sizeof(size_t);
     while (*valid_idle_node != nullptr) {
-        uintptr_t mem_start_addr = std::bit_cast<uintptr_t>((*valid_idle_node)->mem_start);
-        char* idle_node_mem_start = std::bit_cast<char*>(
-            (mem_start_addr / p_alignment) * p_alignment == mem_start_addr ? mem_start_addr : (mem_start_addr / p_alignment + 1) * p_alignment
-        );
+        // Find the aligned starting point.
+        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start) + sizeof(size_t);
+        char* idle_node_mem_start = reinterpret_cast<char*>(
+            (proxy_mem_start_addr / p_alignment) * p_alignment == proxy_mem_start_addr ?
+                proxy_mem_start_addr : (proxy_mem_start_addr / p_alignment + 1) * p_alignment
+        ) - sizeof(size_t);
+        // If idle node valid, insert.
         if (idle_node_mem_start + aligned_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
-            void* result = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
-            allocated.insert(std::bit_cast<MemID>(result));
-            size_map[result] = aligned_size;
-            max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + aligned_size - (size_t)mem_chunk);
-            return (MemID)result;
+            void* result_loc = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
+            MemID result_id = reinterpret_cast<MemID>(result_loc) + sizeof(size_t);
+            *static_cast<size_t*>(result_loc) = aligned_size;
+            max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result_loc + aligned_size - (size_t)mem_chunk);
+            return result_id;
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
@@ -64,25 +71,21 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
-    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
-    void* data_loc = std::bit_cast<void*>(p_mem);
-    size_t data_size = size_map[data_loc];
-    allocated.erase(p_mem);
-    size_map.erase(data_loc);
+    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(size_t));
+    size_t data_size = get_allocated_data_size(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
-        insert_free_memory(nullptr, static_cast<char*>(data_loc), data_size);
+        insert_free_memory(nullptr, data_loc, data_size);
         return;
     }
     IdleListNode* insert_pos = get_idle_node_before(data_loc).get();
-    insert_free_memory(insert_pos, static_cast<char*>(data_loc), data_size);
+    insert_free_memory(insert_pos, data_loc, data_size);
 }
 
 void* HeapAllocatorAlignedPool::get(MemID p_id) const {
     if (p_id == MEM_NULL) {
         return nullptr;
     }
-    WBE_DEBUG_ASSERT(is_in_pool(p_id));
-    return std::bit_cast<void*>(p_id);
+    return reinterpret_cast<void*>(p_id);
 }
 
 void* HeapAllocatorAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {
@@ -181,6 +184,28 @@ size_t HeapAllocatorAlignedPool::get_remain_size() const {
         node = node->next.get();
     }
     return total;
+}
+
+HeapAllocatorAlignedPool::operator std::string() const {
+    std::stringstream ss;
+    ss << "{";
+    ss << "\"type\":\"HeapAllocatorAlignedPool\",";
+    ss << "\"total_size\":" << get_total_size() << ",";
+    ss << "\"free_chunk_layout\":[";
+    IdleListNode* node = idle_list_head.get();
+    bool first = true;
+    while (node != nullptr) {
+        if (!first) ss << ",";
+        first = false;
+        ss << "{"
+            << "\"begin\":" << (node->mem_start - mem_chunk) << ","
+            << "\"size\":" << node->size
+            << "}";
+        node = node->next.get();
+    }
+    ss << "]";
+    ss << "}";
+    return ss.str();
 }
 
 }
