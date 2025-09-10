@@ -56,7 +56,7 @@ public:
     HeapAllocatorAlignedPool& operator=(const HeapAllocatorAlignedPool&) = delete;
     HeapAllocatorAlignedPool& operator=(HeapAllocatorAlignedPool&&) = delete;
 
-    using Header = uint32_t;
+    using Header = uint64_t;
 
     /**
      * @brief The size of the allocated memory header.

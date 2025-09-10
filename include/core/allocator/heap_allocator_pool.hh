@@ -53,7 +53,7 @@ public:
     HeapAllocatorPool& operator=(const HeapAllocatorPool&) = delete;
     HeapAllocatorPool& operator=(HeapAllocatorPool&&) = delete;
 
-    using Header = uint64_t;
+    using Header = uint32_t;
 
     /**
      * @brief The size of the allocated memory header.

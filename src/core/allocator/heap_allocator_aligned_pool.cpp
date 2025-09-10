@@ -51,7 +51,8 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    size_t aligned_size = get_align_size(p_size, p_alignment) + HEADER_SIZE;
+    // Clamp the padding size to the default alignment
+    size_t aligned_size = get_align_size(p_size, std::min<size_t>(p_alignment, WBE_DEFAULT_ALIGNMENT)) + HEADER_SIZE;
     while (*valid_idle_node != nullptr) {
         // Find the aligned starting point.
         uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start) + HEADER_SIZE;
