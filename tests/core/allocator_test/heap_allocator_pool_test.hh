@@ -17,9 +17,12 @@
 
 #include "core/allocator/heap_allocator_pool.hh"
 #include "global/global.hh"
+#include "test_utilities.hh"
 #include <gtest/gtest.h>
 
 namespace WBE = WhiteBirdEngine;
+
+constexpr size_t APT_HEADER_SIZE = WBE::HeapAllocatorPool::HEADER_SIZE;
 
 TEST(WBEAllocPoolTest, TraitTest) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
@@ -33,21 +36,37 @@ TEST(WBEAllocPoolTest, TraitTest) {
 TEST(WBEAllocPoolTest, ToString) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
-    std::string exp_1 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":1024}]}";
+    WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
+    std::string exp_1 = behv_test({
+        {false, 1024}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     WBE::MemID mem1 = pool.allocate(2);
-    std::string exp_2 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":10,\"size\":1014}]}";
+    std::string exp_2 = behv_test({
+        {true, 2},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
     WBE::MemID mem2 = pool.allocate(8);
-    std::string exp_3 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":26,\"size\":998}]}";
+    std::string exp_3 = behv_test({
+        {true, 2},
+        {true, 8},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
     pool.deallocate(mem1);
-    std::string exp_4 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":10},{\"begin\":26,\"size\":998}]}";
+    std::string exp_4 = behv_test({
+        {false, 2 + APT_HEADER_SIZE},
+        {true, 8},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-    auto mem3 = pool.allocate(1024 - sizeof(size_t));
-    std::string exp_5 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[]}";
+    auto mem3 = pool.allocate(1024 - APT_HEADER_SIZE);
+    std::string exp_5 = behv_test({
+        {true, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp_5);
     pool.deallocate(mem3);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
@@ -56,86 +75,160 @@ TEST(WBEAllocPoolTest, ToString) {
 TEST(WBEAllocPoolTest, RemoveIdleFront) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
+    WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(4);
     pool.deallocate(mem3);
-    std::string exp1 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":28,\"size\":12},{\"begin\":52,\"size\":972}]}";
+    std::string exp1 = behv_test({
+        {true, 4},
+        {true, 8},
+        {false, 4 + APT_HEADER_SIZE},
+        {true, 4},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem2);
-    std::string exp2 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":28},{\"begin\":52,\"size\":972}]}";
+    std::string exp2 = behv_test({
+        {true, 4},
+        {false, 12 + APT_HEADER_SIZE * 2},
+        {true, 4},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":1012}]}";
+    std::string exp3 = behv_test({
+        {true, 4},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":1024}]}";
+    std::string exp4 = behv_test({
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleBack) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
+    WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(12);
     pool.deallocate(mem2);
-    std::string exp1 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":16},{\"begin\":60,\"size\":964}]}";
+    std::string exp1 = behv_test({
+        {true, 4},
+        {false, 8 + APT_HEADER_SIZE},
+        {true, 4},
+        {true, 12},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":28},{\"begin\":60,\"size\":964}]}";
+    std::string exp2 = behv_test({
+        {true, 4},
+        {false, 12 + APT_HEADER_SIZE * 2},
+        {true, 12},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":1012}]}";
+    std::string exp3 = behv_test({
+        {true, 4},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":1024}]}";
+    std::string exp4 = behv_test({
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
+    WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(12);
     WBE::MemID mem5 = pool.allocate(128);
     pool.deallocate(mem2);
-    std::string exp1 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":16},{\"begin\":196,\"size\":828}]}";
+    std::string exp1 = behv_test({
+        {true, 4},
+        {false, 8 + APT_HEADER_SIZE},
+        {true, 4},
+        {true, 12},
+        {true, 128},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem4);
-    std::string exp2 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":16},{\"begin\":40,\"size\":20},{\"begin\":196,\"size\":828}]}";
+    std::string exp2 = behv_test({
+        {true, 4},
+        {false, 8 + APT_HEADER_SIZE},
+        {true, 4},
+        {false, 12 + APT_HEADER_SIZE},
+        {true, 128},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem3);
-    std::string exp3 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":48},{\"begin\":196,\"size\":828}]}";
+    std::string exp3 = behv_test({
+        {true, 4},
+        {false, 24 + APT_HEADER_SIZE * 3},
+        {true, 128},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":60},{\"begin\":196,\"size\":828}]}";
+    std::string exp4 = behv_test({
+        {false, 28 + APT_HEADER_SIZE * 4},
+        {true, 128},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
     pool.deallocate(mem5);
-    std::string exp5 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":1024}]}";
+    std::string exp5 = behv_test({
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp5);
 }
 
 TEST(WBEAllocPoolTest, RemoveIdleEnd) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
+    WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
-    WBE::MemID mem3 = pool.allocate(1012 - 3 * sizeof(size_t));
-    std::string exp1 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[]}";
+    WBE::MemID mem3 = pool.allocate(1012 - 3 * APT_HEADER_SIZE);
+    std::string exp1 = behv_test({
+        {true, 4},
+        {true, 8},
+        {true, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":28,\"size\":996}]}";
+    std::string exp2 = behv_test({
+        {true, 4},
+        {true, 8},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem2);
-    std::string exp3 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":12,\"size\":1012}]}";
+    std::string exp3 = behv_test({
+        {true, 4},
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = "{\"type\":\"HeapAllocatorPool\",\"total_size\":1024,\"free_chunk_layout\":[{\"begin\":0,\"size\":1024}]}";
+    std::string exp4 = behv_test({
+        {false, -1}
+    });
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
@@ -144,10 +237,10 @@ TEST(WBEAllocPoolTest, RemainSize) {
     
     WhiteBirdEngine::HeapAllocatorPool pool(1024);
     WBE::MemID mem = pool.allocate(2);
-    ASSERT_EQ(pool.get_remain_size(), 1022 - sizeof(size_t));
+    ASSERT_EQ(pool.get_remain_size(), 1022 - APT_HEADER_SIZE);
     pool.deallocate(mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
-    WBE::MemID all_mem = pool.allocate(1024 - sizeof(size_t));
+    WBE::MemID all_mem = pool.allocate(1024 - APT_HEADER_SIZE);
     ASSERT_EQ(pool.get_remain_size(), 0);
     pool.deallocate(all_mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
@@ -202,15 +295,15 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
 
     WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);
     WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestBase>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - APT_HEADER_SIZE);
     WBE::MemID test_obj1 = WhiteBirdEngine::create_obj<TestChild1>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - 2 * APT_HEADER_SIZE);
     WBE::MemID test_obj2 = WhiteBirdEngine::create_obj<TestChild2>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2) - 3 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2) - 3 * APT_HEADER_SIZE);
     WhiteBirdEngine::destroy_obj<TestBase>(allocator, test_obj);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2) - 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2) - 2 * APT_HEADER_SIZE);
     WhiteBirdEngine::destroy_obj<TestChild1>(allocator, test_obj1);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2) - sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2) - APT_HEADER_SIZE);
     WhiteBirdEngine::destroy_obj<TestChild2>(allocator, test_obj2);
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
@@ -251,17 +344,17 @@ TEST(WBEAllocPoolTest, MaxDataSizeTracker) {
     WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);
     ASSERT_EQ(allocator.get_max_data_size(), 0);
     WBE::MemID mem1 = allocator.allocate(100);
-    ASSERT_EQ(allocator.get_max_data_size(), 100 + sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 100 + APT_HEADER_SIZE);
     WBE::MemID mem2 = allocator.allocate(200);
-    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * APT_HEADER_SIZE);
     allocator.deallocate(mem1);
-    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * APT_HEADER_SIZE);
     WBE::MemID mem3 = allocator.allocate(50);
-    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * APT_HEADER_SIZE);
     allocator.deallocate(mem2);
-    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * APT_HEADER_SIZE);
     allocator.deallocate(mem3);
-    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 300 + 2 * APT_HEADER_SIZE);
 }
 
 #endif

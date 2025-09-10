@@ -46,6 +46,7 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
     }
     free(mem_chunk);
+    mem_chunk = nullptr;
 }
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
@@ -63,7 +64,7 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
             void* result_loc = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
             MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
             *static_cast<Header*>(result_loc) = aligned_size;
-            max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result_loc + aligned_size - (size_t)mem_chunk);
+            internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + aligned_size - (size_t)mem_chunk);
             return result_id;
         }
         valid_idle_node = &((*valid_idle_node)->next);

@@ -20,6 +20,7 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -33,9 +34,13 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 }
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
-    : size(p_size), mem_chunk(static_cast<char*>(malloc(p_size))) {
+    : size(p_size) {
+    if (p_size > MAX_TOTAL_SIZE) {
+        throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) + " exceeds maximum: " + std::to_string(MAX_TOTAL_SIZE) + ".");
+    }
+    mem_chunk = static_cast<char*>(malloc(p_size));
     if (mem_chunk == nullptr) {
-        throw std::runtime_error("Failed to allocate memory for pool.");
+        throw std::runtime_error("Failed to create pool: malloc failed.");
     }
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
@@ -46,13 +51,13 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    p_size += sizeof(uint64_t);
+    p_size += HEADER_SIZE;
     while (*valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
             *reinterpret_cast<uint64_t*>(result) = p_size;
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + p_size - (size_t)mem_chunk);
-            return reinterpret_cast<MemID>(result) + sizeof(uint64_t);
+            return reinterpret_cast<MemID>(result) + HEADER_SIZE;
         }
         if ((*valid_idle_node)->next == nullptr) {
             break;
@@ -63,7 +68,7 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {
-    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(uint64_t));
+    char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
     size_t data_size = get_allocated_data_size(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, data_loc, data_size);

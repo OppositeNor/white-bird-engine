@@ -56,7 +56,7 @@ public:
     HeapAllocatorAlignedPool& operator=(const HeapAllocatorAlignedPool&) = delete;
     HeapAllocatorAlignedPool& operator=(HeapAllocatorAlignedPool&&) = delete;
 
-    using Header = uint64_t;
+    using Header = uint32_t;
 
     /**
      * @brief The size of the allocated memory header.
@@ -92,7 +92,7 @@ public:
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return *reinterpret_cast<size_t*>((p_mem_id - sizeof(uint64_t)) & MAX_TOTAL_SIZE);
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
     }
 
     size_t get_total_size() const {
@@ -103,8 +103,8 @@ public:
 
     virtual operator std::string() const override;
 
-    size_t get_max_data_size() const {
-        return max_data_loc_tracker;
+    size_t get_internal_fragmentation_tracker() const {
+        return internal_fragmentation_tracker;
     }
 
 private:
@@ -125,7 +125,7 @@ private:
     uint32_t idle_chunks_count;
     std::unique_ptr<IdleListNode> idle_list_head;
 
-    size_t max_data_loc_tracker = 0;
+    size_t internal_fragmentation_tracker = 0;
 };
 
 }
