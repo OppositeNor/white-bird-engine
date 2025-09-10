@@ -79,7 +79,7 @@ public:
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(size_t));
+        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(uint64_t));
     }
 
     size_t get_total_size() const {

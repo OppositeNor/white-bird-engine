@@ -46,19 +46,19 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    size_t aligned_size = get_align_size(p_size, p_alignment) + sizeof(size_t);
+    size_t aligned_size = get_align_size(p_size, p_alignment) + sizeof(uint64_t);
     while (*valid_idle_node != nullptr) {
         // Find the aligned starting point.
-        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start) + sizeof(size_t);
+        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start) + sizeof(uint64_t);
         char* idle_node_mem_start = reinterpret_cast<char*>(
             (proxy_mem_start_addr / p_alignment) * p_alignment == proxy_mem_start_addr ?
                 proxy_mem_start_addr : (proxy_mem_start_addr / p_alignment + 1) * p_alignment
-        ) - sizeof(size_t);
+        ) - sizeof(uint64_t);
         // If idle node valid, insert.
         if (idle_node_mem_start + aligned_size <= (*valid_idle_node)->mem_start + (*valid_idle_node)->size) {
             void* result_loc = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
-            MemID result_id = reinterpret_cast<MemID>(result_loc) + sizeof(size_t);
-            *static_cast<size_t*>(result_loc) = aligned_size;
+            MemID result_id = reinterpret_cast<MemID>(result_loc) + sizeof(uint64_t);
+            *static_cast<uint64_t*>(result_loc) = aligned_size;
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result_loc + aligned_size - (size_t)mem_chunk);
             return result_id;
         }
@@ -71,7 +71,8 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
-    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(size_t));
+    // The first 64 bits are used to store the header.
+    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(uint64_t));
     size_t data_size = get_allocated_data_size(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, data_loc, data_size);

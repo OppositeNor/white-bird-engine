@@ -16,6 +16,7 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "core/allocator/heap_allocator_pool.hh"
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -45,13 +46,13 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    p_size += sizeof(size_t);
+    p_size += sizeof(uint64_t);
     while (*valid_idle_node != nullptr) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
-            *reinterpret_cast<size_t*>(result) = p_size;
+            *reinterpret_cast<uint64_t*>(result) = p_size;
             max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + p_size - (size_t)mem_chunk);
-            return reinterpret_cast<MemID>(result) + sizeof(size_t);
+            return reinterpret_cast<MemID>(result) + sizeof(uint64_t);
         }
         if ((*valid_idle_node)->next == nullptr) {
             break;
@@ -62,7 +63,7 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {
-    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(size_t));
+    char* data_loc = reinterpret_cast<char*>(p_mem - sizeof(uint64_t));
     size_t data_size = get_allocated_data_size(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, data_loc, data_size);

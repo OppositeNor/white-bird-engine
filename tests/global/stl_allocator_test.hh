@@ -27,19 +27,21 @@ namespace WBE = WhiteBirdEngine;
 TEST(WBEStlAllocatorTest, Basic) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::STLAllocator<int, WBE::HeapAllocatorAlignedPool> allocator(WBE::global_allocator());
+    std::string expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":0,\"size\":131072}]}";
+    ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
     int* p = allocator.allocate(10);
-    std::string expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"obj_count\":1,\"free_chunk_layout\":[{\"begin\":40,\"size\":131032}]}";
+    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":48,\"size\":131024}]}";
     ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
     int* p1 = allocator.allocate(20);
 
 
-    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"obj_count\":2,\"free_chunk_layout\":[{\"begin\":120,\"size\":130952}]}";
+    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":136,\"size\":130936}]}";
     ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
     allocator.deallocate(p, 10);
-    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"obj_count\":1,\"free_chunk_layout\":[{\"begin\":0,\"size\":40},{\"begin\":120,\"size\":130952}]}";
+    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":0,\"size\":48},{\"begin\":136,\"size\":130936}]}";
     ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
     allocator.deallocate(p1, 20);
-    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"obj_count\":0,\"free_chunk_layout\":[{\"begin\":0,\"size\":131072}]}";
+    expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":0,\"size\":131072}]}";
     ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
 }
 

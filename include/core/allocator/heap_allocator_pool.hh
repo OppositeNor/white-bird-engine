@@ -18,6 +18,7 @@
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 
 namespace WhiteBirdEngine {
@@ -79,7 +80,7 @@ public:
     virtual operator std::string() const override;
 
     size_t get_allocated_data_size(MemID p_mem_id) const {
-        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(size_t));
+        return *reinterpret_cast<size_t*>(p_mem_id - sizeof(uint64_t));
     }
 
     size_t get_total_size() const {

@@ -19,6 +19,7 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "global/global.hh"
 #include <bit>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
 
@@ -48,7 +49,7 @@ TEST(WBEAllocAlignedPoolTest, ToString) {
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-    auto mem3 = pool.allocate(1024 - sizeof(size_t), 1);
+    auto mem3 = pool.allocate(1024 - sizeof(uint64_t), 1);
     std::string exp_5 = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":1024,\"free_chunk_layout\":[]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp_5);
     pool.deallocate(mem3);
@@ -127,7 +128,7 @@ TEST(WBEAllocAlignedPoolTest, RemoveIdleEnd) {
     WBE::HeapAllocatorAlignedPool pool(1024);
     WBE::MemID mem1 = pool.allocate(4, 1);
     WBE::MemID mem2 = pool.allocate(8, 1);
-    WBE::MemID mem3 = pool.allocate(pool.get_remain_size() - sizeof(size_t), 1);
+    WBE::MemID mem3 = pool.allocate(pool.get_remain_size() - sizeof(uint64_t), 1);
     std::string exp1 = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":1024,\"free_chunk_layout\":[]}";
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
@@ -145,10 +146,10 @@ TEST(WBEAllocAlignedPoolTest, RemainSize) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WhiteBirdEngine::HeapAllocatorAlignedPool pool(1024);
     WBE::MemID mem = pool.allocate(2, 1);
-    ASSERT_EQ(pool.get_remain_size(), 1022 - sizeof(size_t));
+    ASSERT_EQ(pool.get_remain_size(), 1022 - sizeof(uint64_t));
     pool.deallocate(mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
-    WBE::MemID all_mem = pool.allocate(1024 - sizeof(size_t), 1);
+    WBE::MemID all_mem = pool.allocate(1024 - sizeof(uint64_t), 1);
     ASSERT_EQ(pool.get_remain_size(), 0);
     pool.deallocate(all_mem);
     ASSERT_EQ(pool.get_remain_size(), 1024);
@@ -203,15 +204,15 @@ TEST(WBEAllocAlignedPoolTest, WithDiffInstances) {
 
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
     WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestBase>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(uint64_t));
     WBE::MemID test_obj1 = WhiteBirdEngine::create_obj_align<TestChild1>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(uint64_t) * 2);
     WBE::MemID test_obj2 = WhiteBirdEngine::create_obj_align<TestChild2>(allocator);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2) - sizeof(size_t) * 3);
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestBase) - sizeof(TestChild1) - sizeof(TestChild2) - sizeof(uint64_t) * 3);
     WhiteBirdEngine::destroy_obj<TestBase>(allocator, test_obj);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2) - sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild1) - sizeof(TestChild2) - sizeof(uint64_t) * 2);
     WhiteBirdEngine::destroy_obj<TestChild1>(allocator, test_obj1);
-    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2) - sizeof(size_t));
+    ASSERT_EQ(allocator.get_remain_size(), 1024 - sizeof(TestChild2) - sizeof(uint64_t));
     WhiteBirdEngine::destroy_obj<TestChild2>(allocator, test_obj2);
     ASSERT_EQ(allocator.get_remain_size(), 1024);
 }
@@ -257,7 +258,7 @@ TEST(WBEAllocAlignedPoolTest, AlignmentTest) {
 TEST(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     const int num_allocs = 256; // 256 * 4 = 1024
-    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024 + sizeof(size_t) * num_allocs);
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024 + sizeof(uint64_t) * num_allocs);
     WBE::MemID mems[num_allocs];
     for (int i = 0; i < num_allocs; ++i) {
         mems[i] = allocator.allocate(4, 4);
@@ -270,7 +271,7 @@ TEST(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     for (int i = 0; i < num_allocs; ++i) {
         allocator.deallocate(mems[i]);
     }
-    ASSERT_EQ(allocator.get_remain_size(), 1024 + sizeof(size_t) * num_allocs);
+    ASSERT_EQ(allocator.get_remain_size(), 1024 + sizeof(uint64_t) * num_allocs);
 }
 
 TEST(WBEAllocAlignedPoolTest, GetMemoryAddress) {
@@ -309,17 +310,17 @@ TEST(WBEAllocAlignedPoolTest, MaxDataSizeTracker) {
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024);
     ASSERT_EQ(allocator.get_max_data_size(), 0);
     WBE::MemID mem1 = allocator.allocate(100, 8);
-    ASSERT_EQ(allocator.get_max_data_size(), 104 + sizeof(size_t));
+    ASSERT_EQ(allocator.get_max_data_size(), 104 + sizeof(uint64_t));
     WBE::MemID mem2 = allocator.allocate(200, 16);
-    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(uint64_t) * 2);
     allocator.deallocate(mem1);
-    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(uint64_t) * 2);
     WBE::MemID mem3 = allocator.allocate(50, 4);
-    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(uint64_t) * 2);
     allocator.deallocate(mem2);
-    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(uint64_t) * 2);
     allocator.deallocate(mem3);
-    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(size_t) * 2);
+    ASSERT_EQ(allocator.get_max_data_size(), 320 + sizeof(uint64_t) * 2);
 }
 
 #endif
