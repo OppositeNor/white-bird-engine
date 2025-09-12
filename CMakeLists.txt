@@ -28,38 +28,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Define output paths
 set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
-file(MAKE_DIRECTORY ${WBE_RESOURCE_DIR})
 set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
-file(MAKE_DIRECTORY ${WBE_RESOURCE_OUTPUT_DIR})
 
 set(WBE_SHADER_DIR ${WBE_RESOURCE_DIR}/shaders)
-file(MAKE_DIRECTORY ${WBE_SHADER_DIR})
 set(WBE_SHADER_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/shaders)
-file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
 set(WBE_METADATA_OUTPUT_PATH ${WBE_RESOURCE_OUTPUT_DIR}/metadata.json)
 
 set(WBE_CONFIG_DIR ${WBE_RESOURCE_DIR}/config)
-file(MAKE_DIRECTORY ${WBE_SHADER_DIR})
 set(WBE_CONFIG_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/config)
-file(MAKE_DIRECTORY ${WBE_SHADER_OUTPUT_DIR})
-
-set(WBE_SOURCES_INDEX_FILE ${CMAKE_CURRENT_BINARY_DIR}/sources.py)
-
-file(COPY ${WBE_CONFIG_DIR} DESTINATION ${WBE_RESOURCE_OUTPUT_DIR})
 
 set(WBE_METADATA_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/metadata_cache)
-file(MAKE_DIRECTORY ${WBE_METADATA_CACHE_DIR})
 
 set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
 set(WBE_TEST_ENV_RES_DIR ${WBE_TEST_ENV_DIR}/res)
-
-macro(write_index_file index_file_path)
-    file(WRITE ${index_file_path} "indices = [\n")
-    foreach(index ${ARGN})
-        file(APPEND ${index_file_path} "\"${index}\",\n")
-    endforeach()
-    file(APPEND ${index_file_path} "]\n")
-endmacro()
 
 # Add dependencies subdirectories
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
@@ -83,12 +64,13 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
-elseif (CMAKE_BUILD_TYPE STREQUAL "Distribute")
-    ## for distribution
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG -DWBE_BUILD_TEST=OFF")
 else()
     ## for gdb or valgrind
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG")
+endif()
+
+if (WBE_MAKE_TEST)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWBE_BUILD_TEST=OFF")
 endif()
 
 # Set include directories
@@ -107,8 +89,6 @@ endif()
 include_directories(
     ${include_dirs}
 )
-
-file(GLOB_RECURSE WBE_SOURCES ${PROJECT_SOURCE_DIR}/include/*.hh)
 
 # Add engine source
 add_subdirectory(src/global)
@@ -140,14 +120,6 @@ if (WBE_MAKE_TEST)
     )
     add_subdirectory(tests)
 endif()
-
-write_index_file(${WBE_SOURCES_INDEX_FILE} ${WBE_SOURCES})
-
-# Runtime reflections
-add_custom_target(wbe_on_build
-    COMMENT "Running White Bird Engine build script"
-    COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/on_build.py ${WBE_METADATA_OUTPUT_PATH} ${WBE_SOURCES_INDEX_FILE} ${WBE_METADATA_CACHE_DIR}
-)
 
 # Compile shaders
 file(GLOB shader_sources ${WBE_SHADER_DIR}/*.vert ${WBE_SHADER_DIR}/*.frag ${WBE_SHADER_DIR}/*.comp)
@@ -185,7 +157,6 @@ if (WBE_MAKE_TEST)
 
 endif()
 
-add_dependencies(${PROJECT_NAME} wbe_on_build)
 add_dependencies(${PROJECT_NAME} compile_shaders)
 
 if (WBE_MAKE_TEST)

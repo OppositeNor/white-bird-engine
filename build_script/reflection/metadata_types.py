@@ -53,6 +53,12 @@ class WBEClassMetadata(BaseModel):
     methods : list[WBEMethodMetadata] = Field(default_factory=list)
 
 class WBELabelMetadata(BaseModel):
+    """Label metadata.
+
+    Attributes: 
+        attribute: The attribute of the label.
+        label_name: The name of the label.
+    """
     attribute : str = ""
     label_name : str = ""
 

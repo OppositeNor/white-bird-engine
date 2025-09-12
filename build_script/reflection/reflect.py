@@ -14,7 +14,7 @@
 import json
 import os
 import importlib.util
-from reflection.channel_registrator import WBEChannelRegistrator
+from build_script.reflection.channel_registrator import WBEChannelRegistrator
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
@@ -69,7 +69,7 @@ class WBEReflector:
         self._check_hashing_collision("channels", self.channel_registrator.channels)
 
     def _write_to_file(self, p_path : str, p_str : str) -> None:
-        with open(p_path, "w") as channel_file:
+        with open(p_path, "w+") as channel_file:
             channel_file.write(p_str)
 
     def _check_hashing_collision(self, p_dict_name : str, p_dictionary : dict) -> None:

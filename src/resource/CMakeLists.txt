@@ -26,8 +26,3 @@ set(libs ${libs}
     PARENT_SCOPE
 )
 
-set(WBE_SOURCES ${WBE_SOURCES}
-    ${wbe_resource_src}
-    PARENT_SCOPE
-)
-

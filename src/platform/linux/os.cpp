@@ -24,7 +24,6 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <unistd.h>
 #include <sys/mman.h>
 
 namespace WhiteBirdEngine {

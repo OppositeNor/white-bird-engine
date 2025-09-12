@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import hashlib
+from pathlib import Path
 
 def to_uint32(x):
     """Convert a uint64 integer to uint32 to match the usage in the C++ file.
@@ -64,3 +65,22 @@ def hash_str_sha256(p_str : str) -> str:
     hasher = hashlib.sha256()
     hasher.update(p_str.encode("utf-8"))
     return hasher.hexdigest()
+
+def gather_files(p_dir, p_file_ext : set[str]) -> list[str]:
+    """Gather files that has the specific file extensions in a directory recursively
+
+    Args:
+        p_dir (): The directory to gather file from.
+        p_file_ext: The list of extensions to get.
+
+    Returns:
+        The list of file paths that matches the extensions in p_dir.
+    """
+    sources = []
+    dir_path = Path(p_dir)
+    # Gather include files
+    for dir_file in dir_path.rglob("*"):
+        if dir_file.suffix in p_file_ext:
+            sources.append(str(dir_file))
+    return sources
+

@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from utils import hash_file, hash_str_sha256
-from reflection.reflect import WBEReflector
+from build_script.utils import hash_file, hash_str_sha256
+from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from reflection.metadata_types import WBEClassMetadata, WBEFileMetadata, WBELabelMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEFileMetadata, WBELabelMetadata
 
 class WBEMetaparser:
     """Metaparser
@@ -46,7 +46,6 @@ class WBEMetaparser:
         Args:
             p_cpp_file_path: The path to the C++ file.
         """
-        os.makedirs(self.cache_dir, exist_ok=True)
         file_cache_path = os.path.join(self.cache_dir, f"{hash_str_sha256(p_cpp_file_path)}.json")
         self._get_metadata(p_cpp_file_path, file_cache_path)
 

@@ -1,8 +1,11 @@
 .vs
 .cache
 .vscode
+
 build
 release
+deploy
+
 __pycache__
 vgcore*
 
