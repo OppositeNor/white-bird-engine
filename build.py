@@ -26,6 +26,8 @@ metaparser_clang_args = [
     "-DWBE_REFLECTION_PARSER"
 ]
 
+print("WBEBuilder: Setting up...")
+
 # SETUP
 # Parse CLA
 arg_parser = ArgumentParser(
@@ -89,8 +91,12 @@ if build_target["generate-tests"]:
     sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
 
 # Run reflection script
+print("WBEBuilder: Running reflections...")
 on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sources)
 
 # Build project with CMake
+print("WBEBuilder: Running cmake...")
 subprocess.run(_get_cmake_command_from_info(build_target))
 subprocess.run(["cmake", "--build", build_target["export-directory"]])
+
+print("WBEBuilder: Finished!")
