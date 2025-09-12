@@ -27,9 +27,7 @@ It is suggested to use Anaconda for setting up the build environment.
 
 You can install Anaconda from [here](https://github.com/conda-forge/miniforge).
 
-### Build according to your system
-
-#### Setting up build environment
+### Setting up build environment
 
 First create a conda environment.
 
@@ -46,6 +44,8 @@ pip install -r requirements.txt
 
 Run the python script to build the project.
 
+### Build
+
 ```sh
 python ./build.py
 ```
@@ -53,6 +53,10 @@ python ./build.py
 You can also indicate the build target.
 
 ```sh
-python ./build.py -t debug  # Debug target (default)
-python ./build.py -t release  # Debug target (default)
+python ./build.py -t debug          # Debug target
+python ./build.py -t release        # Release target
+python ./build.py -t deploy         # Deploy target (default)
+python ./build.py -t debug-gcc      # Debug target with GCC compiler
+python ./build.py -t release-gcc    # Release target with GCC compiler
+python ./build.py -t deploy         # Deploy target with GCC compiler
 ```
