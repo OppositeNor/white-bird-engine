@@ -16,6 +16,8 @@ target_info = {
     },
 }
 
+default_target = "deploy"
+
 source_extensions = set([".cpp", ".hh"])
 include_dir = "include"
 source_dir = "src"

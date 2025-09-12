@@ -18,7 +18,7 @@ import subprocess
 from build_script import on_build
 from build_script import utils
 import shutil
-from build_config import target_info, source_extensions, include_dir, source_dir, test_dir, resource_dir
+import build_config
 
 metaparser_clang_args = [
     "-std=c++20",
@@ -32,19 +32,20 @@ arg_parser = ArgumentParser(
     prog=sys.argv[0],
     description="Build script to build White Bird Engine."
 )
-arg_parser.add_argument("-t", "--target", help="Build target.", choices=list(target_info.keys()), default=list(target_info.keys())[0])
+arg_parser.add_argument("-t", "--target", help="Build target.", choices=list(build_config.target_info.keys()), default=build_config.default_target)
 args = arg_parser.parse_args()
 
-build_target = target_info[args.target]
+build_target = build_config.target_info[args.target]
 
 # Setup directories
 root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 # Sources dirs
-include_dir = os.path.join(root_dir, include_dir)
-source_dir = os.path.join(root_dir, source_dir)
+include_dir = os.path.join(root_dir, build_config.include_dir)
+source_dir = os.path.join(root_dir, build_config.source_dir)
+test_dir = os.path.join(root_dir, build_config.test_dir)
 build_dir = os.path.join(root_dir, build_target["export-directory"])
-resource_dir = os.path.join(root_dir, resource_dir)
 # Resource dirs
+resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(build_dir, "res")
 config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
@@ -78,10 +79,10 @@ def _get_cmake_command_from_info(p_build_info):
 # Gather sources for reflection
 print("WBEBuilder: Gathering sources...")
 sources = []
-sources.extend(utils.gather_files(include_dir, source_extensions))
-sources.extend(utils.gather_files(source_dir, source_extensions))
+sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
+sources.extend(utils.gather_files(source_dir, build_config.source_extensions))
 if build_target["generate-tests"]:
-    sources.extend(utils.gather_files(test_dir, source_extensions))
+    sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
 
 # Run reflection script
 on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sources)

@@ -23,55 +23,36 @@ cd white-bird-engine
 git submodule init --update
 ```
 
+It is suggested to use Anaconda for setting up the build environment.
+
+You can install Anaconda from [here](https://github.com/conda-forge/miniforge).
+
 ### Build according to your system
 
-<details>
-<summary> Linux </summary>
+#### Setting up build environment
 
-Install build dependencies:
-
-- Arch
-
-    ```sh
-    sudo pacman -S gcc cmake shaderc
-    ```
-
-    TODO: install Vulkan SDK
-
-- Debian
-
-    TODO
-
-Build:
+First create a conda environment.
 
 ```sh
-cmake -B build
-cmake --build build
+conda env create -n white-bird-engine python=3.13
+conda activate white-bird-engine
 ```
 
-</details>
-
-<details>
-<summary> MacOS </summary>
-
-Install build dependencies with homebrew:
+Install the dependencies from `requirements.txt`
 
 ```sh
-brew install cmake shaderc
+pip install -r requirements.txt
 ```
 
-Build:
+Run the python script to build the project.
 
 ```sh
-cmake -B build
-cmake --build build
+python ./build.py
 ```
 
-</details>
+You can also indicate the build target.
 
-<details>
-
-<summary> Windows </summary>
-TODO
-</details>
-
+```sh
+python ./build.py -t debug  # Debug target (default)
+python ./build.py -t release  # Debug target (default)
+```
