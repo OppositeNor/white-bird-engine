@@ -17,7 +17,7 @@
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/allocator_vk.hh"
+#include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "global/global.hh"
 #include "global/stl_allocator.hh"

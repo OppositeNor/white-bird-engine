@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render/allocator_vk.hh"
+#include "function/render_vk/allocator_vk.hh"
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
 #include <algorithm>

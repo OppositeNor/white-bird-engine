@@ -14,7 +14,8 @@
 file(GLOB wbe_function_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(application)
-add_subdirectory(render)
+add_subdirectory(render_vk)
+add_subdirectory(scene)
 
 add_library(WBE_LIB_FUNCTION STATIC
     ${wbe_function_src}

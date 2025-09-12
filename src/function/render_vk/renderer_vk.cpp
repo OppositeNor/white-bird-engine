@@ -12,12 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render/renderer_vk.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "SDL_vulkan.h"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
-#include "function/render/allocator_vk.hh"
+#include "function/render_vk/allocator_vk.hh"
 #include "global/global.hh"
 #include "global/stl_allocator.hh"
 

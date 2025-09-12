@@ -23,7 +23,7 @@ namespace WhiteBirdEngine {
  * @class Scene
  * @brief Scene class.
  */
-WBE_CLASS(Scene, WBE_SERIALIZABLE) {
+WBE_CLASS(Scene, WBE_SERIALIZE_SCRIPT) {
 public:
     // TODO
 };

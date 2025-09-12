@@ -17,9 +17,15 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class Shader
+ * @brief Shader interface.
+ *
+ */
 class Shader {
 public:
-    // TODO
+    Shader() = default;
+    virtual ~Shader() {}
 };
 
 }
