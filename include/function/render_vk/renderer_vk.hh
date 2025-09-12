@@ -15,6 +15,7 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/allocator_vk.hh"
@@ -45,9 +46,16 @@ public:
     RendererVK& operator=(RendererVK&&) = delete;
 
     RendererVK(Ref<AllocatorVK> p_allocator);
+
+    virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) override;
+    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_id) override {
+        return MEM_NULL; // TODO
+    }
 private:
 
     Ref<AllocatorVK> allocator;
+
+    // Vulkan properties
     SDL_Window* window;
     VkInstance vk_instance;
 

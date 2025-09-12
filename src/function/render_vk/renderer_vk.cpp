@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/renderer_vk.hh"
 #include "SDL_vulkan.h"
+#include "core/allocator/allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "function/engine_function.hh"
@@ -42,6 +43,10 @@ RendererVK::~RendererVK() {
 void RendererVK::init() {
     init_window();
     init_vulkan();
+}
+
+Ref<Shader> RendererVK::create_shader_instance(const std::string& p_shader_res) {
+    return MEM_NULL; // TODO
 }
 
 void RendererVK::terminate() {
