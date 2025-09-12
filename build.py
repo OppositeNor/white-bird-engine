@@ -22,7 +22,7 @@ from build_config import target_info, source_extensions, include_dir, source_dir
 
 metaparser_clang_args = [
     "-std=c++20",
-    "-I../include",
+    "-I./include",
     "-DWBE_REFLECTION_PARSER"
 ]
 
