@@ -67,6 +67,10 @@ def _get_cmake_command_from_info(p_build_info):
     result.append("-B")
     result.append(p_build_info["export-directory"])
     result.append(f"-DCMAKE_BUILD_TYPE={p_build_info["cmake-build-type"]}")
+    if p_build_info.get("cpp-compiler") is not None:
+        result.append(f"-DCMAKE_CXX_COMPILER={p_build_info["cpp-compiler"]}")
+    if p_build_info.get("c-compiler") is not None:
+        result.append(f"-DCMAKE_C_COMPILER={p_build_info["c-compiler"]}")
     if p_build_info["generate-tests"]:
         result.append("-DWBE_MAKE_TEST=ON")
     else:

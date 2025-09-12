@@ -2,7 +2,7 @@
 .cache
 .vscode
 
-build
+debug
 release
 deploy
 

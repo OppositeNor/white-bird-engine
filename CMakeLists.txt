@@ -145,7 +145,7 @@ add_custom_target(compile_shaders DEPENDS ${shaders_outputs})
 if (WBE_MAKE_TEST)
     add_custom_target(wbe_run_tests
         COMMENT "Running White Bird Engine tests..."
-        COMMAND python3 ${PROJECT_SOURCE_DIR}/on_build_scripts/run_tests.py ${WBE_TEST_EXE}
+        COMMAND python3 ${PROJECT_SOURCE_DIR}/test_script/run_tests.py ${WBE_TEST_EXE}
     )
 
     add_custom_target(wbe_setup_test_env
