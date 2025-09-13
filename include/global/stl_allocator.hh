@@ -16,6 +16,7 @@
 #define __WBE_STL_ALLOCATOR_HH__
 
 #include "core/allocator/allocator.hh"
+#include "core/allocator/heap_allocator_aligned.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include <cstddef>
 #include <set>
@@ -28,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief Adapter allocator for C++ standard library.
  *
  */
-template <typename T, typename AllocType> requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE && AllocatorTrait<AllocType>::IS_ALIGNABLE)
+template <typename T, typename AllocType = HeapAllocatorAligned>
 struct STLAllocator {
     using value_type = T;
     AllocType* allocator = nullptr;
@@ -99,8 +100,17 @@ struct STLAllocator {
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename T, typename AllocType = HeapAllocatorAlignedPool>
+template <typename T, typename AllocType = HeapAllocatorAligned>
 using vector = std::vector<T, STLAllocator<T, AllocType>>;
+
+/**
+ * @brief STL vector that uses a pool allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
+template <typename T>
+using vectorp = vector<T, HeapAllocatorAlignedPool>;
 
 /**
  * @brief STL set that uses a custom allocator.
@@ -108,16 +118,41 @@ using vector = std::vector<T, STLAllocator<T, AllocType>>;
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename T, typename AllocType = HeapAllocatorAlignedPool>
+template <typename T, typename AllocType = HeapAllocatorAligned>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType>>;
+
+/**
+ * @brief STL set that uses a pool allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
+template <typename T>
+using setp = set<T, HeapAllocatorAlignedPool>;
 
 /**
  * @brief STL string that uses a custom allocator.
  *
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename AllocType = HeapAllocatorAlignedPool>
+template <typename AllocType = HeapAllocatorAligned>
 using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType>>;
+
+/**
+ * @brief STL string that uses a pool allocator.
+ *
+ * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ */
+template <typename T>
+using stringp = std::basic_string<T, HeapAllocatorAlignedPool>;
+
+/**
+ * @brief Short name for stl allocator that uses HeapAllocatorAlignedPool.
+ *
+ * @tparam T 
+ */
+template <typename T>
+using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool>;
 
 }
 

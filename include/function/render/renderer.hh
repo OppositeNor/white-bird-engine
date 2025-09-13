@@ -19,11 +19,8 @@
 #include "function/render/render_pipeline.hh"
 #include "function/render/shader.hh"
 #include "utils/interface/singleton.hh"
-#include <cstdint>
 #include <string>
 namespace WhiteBirdEngine {
-
-using RenderID = uint32_t;
 
 /**
  * @class Renderer
@@ -44,11 +41,18 @@ public:
     virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) = 0;
 
     /**
-     * @brief Get the render pipeline of a specific ID.
+     * @brief Get the render pipeline from the name of the pipeline..
      *
      * @param p_pipeline_id The ID of the render pipeline to get.
      */
-    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_id) = 0;
+    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_name) = 0;
+
+protected:
+    virtual void add_render_pipeline(Ref<RenderPipeline> p_render_pipeline) = 0;
+
+private:
+    void initialize_render_pipeline();
+
 };
 
 }

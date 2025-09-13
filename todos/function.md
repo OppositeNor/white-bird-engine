@@ -23,7 +23,7 @@ For example, the final pipeline file should be:
             "vulkan" : "RenderTaskVK1",
             "dx12" : "RenderTaskDX12_1",
         },
-        "render-task_2" :
+        "render_task_2" :
         {
             "vulkan" : "RenderTaskVK2",
             "dx12" : "RenderTaskDX12_2",
@@ -33,7 +33,7 @@ For example, the final pipeline file should be:
     "pipelines" :
     [
         {
-            "name" : "pipeline-name-1",
+            "name" : "pipeline_name_1",
             "pipeline" :
             [
                 "render_task_1",
@@ -41,6 +41,16 @@ For example, the final pipeline file should be:
                 ...
             ],
         },
+        {
+            "name" : "pipeline_name_2",
+            "pipeline" :
+            [
+                "render_task_1",
+                "render_task_2",
+                ...
+            ],
+        },
+        ...
     ],
 }
 ```

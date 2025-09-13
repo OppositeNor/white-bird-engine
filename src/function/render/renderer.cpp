@@ -12,26 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDERER_DUMMY_H__
-#define __WBE_RENDERER_DUMMY_H__
-
 #include "function/render/renderer.hh"
+
 namespace WhiteBirdEngine {
 
-/**
- * @class RendererDummy
- * @brief A dummy renderer that does nothing.
- *
- */
-class RendererDummy : public Renderer {
-public:
-    RendererDummy() = default;
-    virtual ~RendererDummy() override {}
-
-};
-
+void Renderer::initialize_render_pipeline() {
+    // TODO
 }
 
-
-
-#endif
+}

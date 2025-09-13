@@ -18,6 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include <cstddef>
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
@@ -28,6 +29,12 @@ namespace WhiteBirdEngine {
 class RenderPipeline {
 public:
     RenderPipeline() = default;
+    virtual ~RenderPipeline() {}
+
+    /**
+     * @brief Get the name of the pipeline.
+     */
+    virtual const std::string& get_pipeline_name() = 0;
 
     /**
      * @brief Setup the render pipline. Will be called once after the render tasks are added.

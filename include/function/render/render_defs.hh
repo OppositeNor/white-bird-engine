@@ -15,10 +15,27 @@
 #ifndef __WBE_RENDER_DEFS_HH__
 #define __WBE_RENDER_DEFS_HH__
 
-// Used for render task reflection
+#ifdef WBE_REFLECTION_PARSER
+
+__attribute__((annotate("WBE_DEFINE_RENDER_TASK")))
+void define_wbe_render_task(const char* task_name, const char* render_task_vk) {}
+
+__attribute__((annotate("WBE_DEFINE_RENDER_PIPELINE")))
+void define_wbe_render_pipeline(const char* pipeline_name, ...)
+
+// Define a render task.
+#define WBE_RENDER_TASK(task_name, RenderTaskVK) define_wbe_render_task(#task_name, #RenderTaskVK)
+// Define a render pipeline.
+#define WBE_RENDER_PIPELINE(pipeline_name, ...) define_wbe_render_pipeline(#pipeline_name, __VA_ARGS__)
+
+#else
+
+// Define a render task.
 #define WBE_RENDER_TASK(task_name, RenderTaskVK)
-// Used for render pipeline reflection.
+// Define a render pipeline.
 #define WBE_RENDER_PIPELINE(...)
+
+#endif
 
 
 
