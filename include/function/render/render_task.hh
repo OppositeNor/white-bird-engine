@@ -43,7 +43,12 @@ public:
      * @param p_input 
      * @return 
      */
-    virtual RenderData* input(RenderData* p_input);
+    virtual RenderData* input(RenderData* p_input) = 0;
+
+    /**
+     * @brief Clean up the task.
+     */
+    virtual void cleanup() = 0;
 };
 
 }

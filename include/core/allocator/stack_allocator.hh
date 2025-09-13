@@ -77,7 +77,7 @@ public:
      */
     MemID allocate(size_t p_size) {
         void* result = mem_chunk.get() + marker;
-        marker += p_size;
+        marker += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
         return std::bit_cast<MemID>(result);
     }
 
@@ -120,7 +120,7 @@ public:
      * @return The pointer to the deallocated object.
      */
     void* pop_stack(size_t p_size) {
-        marker -= p_size;
+        marker -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
         return mem_chunk.get() + marker;
     }
 

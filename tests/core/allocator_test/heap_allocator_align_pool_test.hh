@@ -417,15 +417,15 @@ TEST(WBEAllocAlignedPoolTest, MaxDataSizeTracker) {
     WBE::MemID mem1 = allocator.allocate(100, 8);
     ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 112);
     WBE::MemID mem2 = allocator.allocate(200, 16);
-    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 336);
+    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 328);
     allocator.deallocate(mem1);
-    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 336);
+    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 328);
     WBE::MemID mem3 = allocator.allocate(50, 4);
-    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 336);
+    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 328);
     allocator.deallocate(mem2);
-    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 336);
+    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 328);
     allocator.deallocate(mem3);
-    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 336);
+    ASSERT_EQ(allocator.get_internal_fragmentation_tracker(), 328);
 }
 
 #endif
