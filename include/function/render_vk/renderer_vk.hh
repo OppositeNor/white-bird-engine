@@ -18,6 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_pass.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "global/global.hh"
@@ -48,12 +49,12 @@ public:
     RendererVK(HeapAllocatorAlignedPool* p_allocator);
 
     virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) override;
-    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_id) override {
+    virtual Ref<RenderPass> get_render_pass(const std::string& p_pipeline_id) override {
         return MEM_NULL; // TODO
     }
 
 protected:
-    virtual void add_render_pipeline(Ref<RenderPipeline> p_render_pipeline) override;
+    virtual void add_render_pass(Ref<RenderPass> p_render_pipeline) override;
 private:
 
     template <typename T>
@@ -85,11 +86,13 @@ private:
     VkViewport viewport{};
     VkRect2D scissor{};
 
-    std::vector<const char*> validation_layers = {
+    VkRenderPass render_pass;
+
+    std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
     };
 
-    const std::vector<const char*> enabled_device_extensions = {
+    const std::vector<const char*> enabled_device_extensions {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
@@ -141,6 +144,8 @@ private:
     void create_window_surface();
     void create_device();
     void create_swap_chain();
+    void create_swap_chain_image_views();
+    void create_render_pass();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();

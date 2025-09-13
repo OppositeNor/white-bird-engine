@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDER_PIPELINE_HH__
-#define __WBE_RENDER_PIPELINE_HH__
+#ifndef __WBE_RENDER_PASS_HH__
+#define __WBE_RENDER_PASS_HH__
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
@@ -26,10 +26,10 @@ namespace WhiteBirdEngine {
  * @brief Render pipeline interface.
  *
  */
-class RenderPipeline {
+class RenderPass {
 public:
-    RenderPipeline() = default;
-    virtual ~RenderPipeline() {}
+    RenderPass() = default;
+    virtual ~RenderPass() {}
 
     /**
      * @brief Get the name of the pipeline.

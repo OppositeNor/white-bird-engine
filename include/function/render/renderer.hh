@@ -16,7 +16,7 @@
 #define __WBE_RENDERER_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_pipeline.hh"
+#include "function/render/render_pass.hh"
 #include "function/render/shader.hh"
 #include "utils/interface/singleton.hh"
 #include <string>
@@ -41,14 +41,14 @@ public:
     virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) = 0;
 
     /**
-     * @brief Get the render pipeline from the name of the pipeline..
+     * @brief Get the render passs from the name of the pass.
      *
-     * @param p_pipeline_id The ID of the render pipeline to get.
+     * @param p_pass_id The ID of the render pass to get.
      */
-    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_name) = 0;
+    virtual Ref<RenderPass> get_render_pipeline(const std::string& p_pipeline_name) = 0;
 
 protected:
-    virtual void add_render_pipeline(Ref<RenderPipeline> p_render_pipeline) = 0;
+    virtual void add_render_pipeline(Ref<RenderPass> p_render_pipeline) = 0;
 
 private:
     void initialize_render_pipeline();
