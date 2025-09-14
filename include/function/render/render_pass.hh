@@ -15,8 +15,6 @@
 #ifndef __WBE_RENDER_PASS_HH__
 #define __WBE_RENDER_PASS_HH__
 
-#include "core/memory/reference_strong.hh"
-#include "function/render/render_task.hh"
 #include <cstddef>
 #include <string>
 namespace WhiteBirdEngine {
@@ -54,13 +52,6 @@ public:
      * @param p_num The number of tasks to be preserved.
      */
     virtual void preserve(size_t p_num) = 0;
-
-    /**
-     * @brief Add a render task to the pipeline.
-     *
-     * @param p_render_task The render task to be added.
-     */
-    virtual void add_render_task(Ref<RenderTask> p_render_task) = 0;
 };
 
 }

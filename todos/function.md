@@ -14,44 +14,78 @@ There are two options to construct a render pipeline:
 
 For example, the final pipeline file should be:
 
+<!-- ```json -->
+<!-- { -->
+<!--     "render-tasks" : -->
+<!--     { -->
+<!--         "render_task_1" : -->
+<!--         { -->
+<!--             "vulkan" : "RenderTaskVK1", -->
+<!--             "dx12" : "RenderTaskDX12_1", -->
+<!--         }, -->
+<!--         "render_task_2" : -->
+<!--         { -->
+<!--             "vulkan" : "RenderTaskVK2", -->
+<!--             "dx12" : "RenderTaskDX12_2", -->
+<!--         }, -->
+<!--         ... -->
+<!--     }, -->
+<!--     "pipelines" : -->
+<!--     [ -->
+<!--         { -->
+<!--             "name" : "pipeline_name_1", -->
+<!--             "pipeline" : -->
+<!--             [ -->
+<!--                 "render_task_1", -->
+<!--                 "render_task_2", -->
+<!--                 ... -->
+<!--             ], -->
+<!--         }, -->
+<!--         { -->
+<!--             "name" : "pipeline_name_2", -->
+<!--             "pipeline" : -->
+<!--             [ -->
+<!--                 "render_task_1", -->
+<!--                 "render_task_2", -->
+<!--                 ... -->
+<!--             ], -->
+<!--         }, -->
+<!--         ... -->
+<!--     ], -->
+<!-- } -->
+<!-- ``` -->
+
 ```json
 {
-    "render-tasks" :
-    {
-        "render_task_1" :
-        {
-            "vulkan" : "RenderTaskVK1",
-            "dx12" : "RenderTaskDX12_1",
-        },
-        "render_task_2" :
-        {
-            "vulkan" : "RenderTaskVK2",
-            "dx12" : "RenderTaskDX12_2",
-        },
-        ...
-    },
-    "pipelines" :
+    "render_passes" :
     [
+        "render_pass_0" :
         {
-            "name" : "pipeline_name_1",
-            "pipeline" :
-            [
-                "render_task_1",
-                "render_task_2",
-                ...
-            ],
+            "input" : [],
+            "output" : "data_1"
         },
+        "render_pass_1" :
         {
-            "name" : "pipeline_name_2",
-            "pipeline" :
+            "input" :
             [
-                "render_task_1",
-                "render_task_2",
+                "data_1",
+                "data_2",
                 ...
             ],
+            "output" : "data_3"
+        },
+        "render_pass_2" :
+        {
+            "input" :
+            [
+                "data_2",
+                "data_3",
+                ...
+            ],
+            "output" : "data_4"
         },
         ...
-    ],
+    ]
 }
 ```
 
@@ -62,12 +96,10 @@ The pipelines the engine uses should be constructed with non-implemented macros,
 be reflected. Such as:
 
 ```cpp
-WBE_RENDER_TASK(render_task_1, RenderTaskVK1, RenderTaskDX12_1)  // No semicolons!
-WBE_RENDER_TASK(render_task_2, RenderTaskVK2, RenderTaskDX12_2)
-// ...
-WBE_RENDER_PIPELINE(
-    render_task1,
-    render_task2,
+WBE_RENDER_PASSES(
+    RENDER_PASS_0(INPUT, OUTPUT, data_1),
+    RENDER_PASS_1(INPUT, data_1, data_2,/*, ...,*/ OUTPUT, data_3),
+    RENDER_PASS_2(INPUT, data_2, data_3,/*, ...,*/ OUTPUT, data_4),
     // ...
 )
 

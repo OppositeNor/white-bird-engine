@@ -52,7 +52,7 @@ Ref<Shader> RendererVK::create_shader_instance(const std::string& p_shader_res) 
     return MEM_NULL; // TODO
 }
 
-void RendererVK::add_render_pipeline(Ref<RenderPipeline> p_render_pipeline) {
+void RendererVK::add_render_pass(Ref<RenderPass> p_render_pass) {
     // TODO
 }
 

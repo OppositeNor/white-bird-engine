@@ -45,13 +45,13 @@ public:
      *
      * @param p_pass_id The ID of the render pass to get.
      */
-    virtual Ref<RenderPass> get_render_pipeline(const std::string& p_pipeline_name) = 0;
+    virtual Ref<RenderPass> get_render_pass(const std::string& p_pass_name) = 0;
 
 protected:
-    virtual void add_render_pipeline(Ref<RenderPass> p_render_pipeline) = 0;
+    virtual void add_render_pass(Ref<RenderPass> p_render_pass) = 0;
 
 private:
-    void initialize_render_pipeline();
+    void initialize_render_pass();
 
 };
 

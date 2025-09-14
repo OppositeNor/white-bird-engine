@@ -16,7 +16,7 @@
 
 namespace WhiteBirdEngine {
 
-void Renderer::initialize_render_pipeline() {
+void Renderer::initialize_render_pass() {
     // TODO
 }
 
