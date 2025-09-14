@@ -21,6 +21,7 @@
 #include "function/render/render_pass.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
+#include "function/render_vk/render_database_vk.hh"
 #include "global/global.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
@@ -62,6 +63,8 @@ private:
 
     HeapAllocatorAlignedPool* allocator;
     Ref<AllocatorVK> allocator_vk;
+
+    Ref<RenderDatabaseVK> render_database;
 
     // Vulkan properties
     SDL_Window* window;

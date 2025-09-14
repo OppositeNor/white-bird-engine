@@ -63,6 +63,10 @@ struct STLAllocator {
         return *this;
     }
 
+    bool operator==(const STLAllocator& p_other) {
+        return allocator == p_other.allocator;
+    }
+
     /**
      * @brief Copy constructor for another instance with a different value type.
      *
