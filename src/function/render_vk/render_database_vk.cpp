@@ -42,12 +42,12 @@ void RenderDatabaseVK::set_static_opaque_triangles(vectorp<std::pair<MaterialID,
         const TriType& p_tri1, const TriType& p_tri2) -> bool {
               return p_tri1.first < p_tri2.first;
               });
-    MaterialID track_id = 0;
+    MaterialID current_id = MATERIAL_INVALID;
     for (auto& tri : p_triangles) {
-        if (tri.first != track_id) {
+        if (tri.first != current_id) {
             static_opaque_triangle_map[tri.first].first = 0;
-            static_opaque_triangle_map[tri.first].second = &(tri.second);
-            track_id = tri.first;
+            static_opaque_triangle_map[tri.first].second = static_opaque_triangles.data() + static_opaque_triangles.size();
+            current_id = tri.first;
         }
         static_opaque_triangles.push_back(tri.second);
         ++(static_opaque_triangle_map[tri.first].first);
@@ -78,23 +78,25 @@ void RenderDatabaseVK::set_dynamic_opaque_triangles(MaterialID p_material_id, ve
     else {
         iter->second = std::move(p_triangles);
     }
+    is_dynamic_opaque_triangles_dirty = true;
 }
 
 void RenderDatabaseVK::update_cached_dynamic_opaque_triangles() const {
     if (!is_dynamic_opaque_triangles_dirty) {
         return;
     }
-    size_t tracker = 0;
+    size_t total_triangles = 0;
     for (auto& triangles : dynamic_opaque_triangle_map) {
-        tracker += triangles.second.size();
+        total_triangles += triangles.second.size();
     }
-    dynamic_opaque_triangles = vectorp<Triangle3DTextured>(tracker, allocator);
-    tracker = 0;
+    dynamic_opaque_triangles = vectorp<Triangle3DTextured>(allocator);
+    dynamic_opaque_triangles.reserve(total_triangles);
     for (auto& triangles : dynamic_opaque_triangle_map) {
-        memcpy(dynamic_opaque_triangles.data() + tracker, triangles.second.data(), triangles.second.size() * sizeof(Triangle3DTextured));
-        tracker += triangles.second.size() * sizeof(Triangle3DTextured);
+        dynamic_opaque_triangles.insert(dynamic_opaque_triangles.end(), 
+                                      triangles.second.begin(), 
+                                      triangles.second.end());
     }
-    is_dynamic_opaque_triangles_dirty = true;
+    is_dynamic_opaque_triangles_dirty = false;
 }
 
 void RenderDatabaseVK::add_dynamic_opaque_triangles(MaterialID p_mat_id, Triangle3DTextured* p_triangles, size_t p_num) {
@@ -103,8 +105,9 @@ void RenderDatabaseVK::add_dynamic_opaque_triangles(MaterialID p_mat_id, Triangl
         throw std::runtime_error("Failed to add triangle");
     }
     is_dynamic_opaque_triangles_dirty = true;
-    iter->second.resize(iter->second.size() + p_num);
-    memcpy(iter->second.data(), p_triangles, p_num * sizeof(Triangle3DTextured));
+    size_t old_size = iter->second.size();
+    iter->second.resize(old_size + p_num);
+    memcpy(iter->second.data() + old_size, p_triangles, p_num * sizeof(Triangle3DTextured));
 }
 
 }
