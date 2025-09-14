@@ -18,9 +18,11 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
+#include "function/render/texture.hh"
 #include "global/stl_allocator.hh"
 #include <map>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
@@ -74,6 +76,12 @@ public:
         }
         return static_opaque_triangle_map.at(p_mat_id);
     }
+
+    /**
+     * @brief Update dynamic opaque triangles. This method will be called automatically when reading cached data.
+     * This method is to give manual control for updating caches.
+     */
+    void update_cached_dynamic_opaque_triangles() const;
     
     /**
      * @brief Set the dynamic opaque triangle data.
@@ -82,7 +90,15 @@ public:
      * @param p_update_immediate If true, all cached values will be updated immediatly after calling this function.
      * Otherwise they will be lazy-loaded.
      */
-    void set_dynamic_opaque_triangles(vectorp<std::pair<MaterialID, Triangle3DTextured>>&& p_triangles, bool p_update_immediate = false);
+    void set_dynamic_opaque_triangles(vectorp<std::pair<MaterialID, Triangle3DTextured>>&& p_triangles);
+
+    /**
+     * @brief Set the dynamic opaque triangle data of a specific material.
+     *
+     * @param p_material_id The material of the triangles to set.
+     * @param p_triangles The triangles to be set to.
+     */
+    void set_dynamic_opaque_triangles(MaterialID p_material_id, vectorp<Triangle3DTextured>&& p_triangles);
 
     /**
      * @brief Get all of the dynamic opaque triangles in the database.
@@ -92,7 +108,7 @@ public:
      */
     const vectorp<Triangle3DTextured>& get_dynamic_opaque_triangles() const {
         if (is_dynamic_opaque_triangles_dirty) {
-            update_dynamic_opaque_triangles();
+            update_cached_dynamic_opaque_triangles();
         }
         return dynamic_opaque_triangles;
     }
@@ -109,6 +125,16 @@ public:
         }
         return dynamic_opaque_triangle_map.at(p_mat_id);
     }
+
+    /**
+     * @brief Add triangles to the dynamic opaque triangles database.
+     *
+     * @param p_mat_id The material of the triangles.
+     * @param p_triangles The triangles.
+     * @param p_num The number of trianges to be added.
+     */
+    void add_dynamic_opaque_triangles(MaterialID p_mat_id, Triangle3DTextured* p_triangles, size_t p_num);
+
 private:
     HeapAllocatorAlignedPool* allocator;
 
@@ -119,7 +145,7 @@ private:
     mutable vectorp<Triangle3DTextured> dynamic_opaque_triangles;
     mutable bool is_dynamic_opaque_triangles_dirty = false;
 
-    void update_dynamic_opaque_triangles() const;
+    std::unordered_map<TextureID, VkImage> texture_map;
 };
 
 }
