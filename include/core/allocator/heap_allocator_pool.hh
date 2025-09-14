@@ -25,9 +25,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorPool> {
+struct AllocatorTrait<class HeapAllocatorPool> final : public AllocatorTrait<HeapAllocator> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorPool>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = true;

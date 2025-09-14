@@ -26,12 +26,10 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAlignedPool> {
+struct AllocatorTrait<class HeapAllocatorAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAlignedPool>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
-    static constexpr bool IS_ALIGNABLE = true;
     static constexpr bool IS_LIMITED_SIZE = true;
     static constexpr bool IS_ALLOC_FIXED_SIZE = false;
     static constexpr bool IS_ATOMIC = false;

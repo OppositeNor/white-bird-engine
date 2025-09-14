@@ -29,9 +29,8 @@
 namespace WhiteBirdEngine {
 
 template <size_t SIZE, template <size_t> class HeapAllocatorFixedSizePool>
-struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> {
+struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> final : public AllocatorTrait<HeapAllocator> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
-    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = true;
     static constexpr bool IS_ALIGNABLE = false;

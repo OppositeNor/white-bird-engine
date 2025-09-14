@@ -20,6 +20,11 @@
 
 namespace WhiteBirdEngine {
 
+template <>
+struct AllocatorTrait<class HeapAllocator> {
+    static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
+};
+
 /**
  * @class HeapAllocator
  * @brief Heap allocator.
