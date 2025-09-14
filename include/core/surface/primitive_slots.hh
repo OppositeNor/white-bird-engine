@@ -36,10 +36,6 @@ struct SlotTextured {
      * @brief The uv value.
      */
     glm::vec2 uv;
-    /**
-     * @brief Is the texture opaque.
-     */
-    bool is_opaque;
 };
 
 /**
@@ -52,10 +48,6 @@ struct SlotColor {
      * @brief The color value.
      */
     glm::vec4 color;
-    /**
-     * @brief Is the color opaque.
-     */
-    bool is_opaque;
 };
 
 struct SlotUVBone {

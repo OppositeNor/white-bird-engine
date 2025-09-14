@@ -15,13 +15,15 @@
 #ifndef __WBE_RENDER_PASS_HH__
 #define __WBE_RENDER_PASS_HH__
 
-#include <cstddef>
+#include "core/memory/reference_strong.hh"
 #include <string>
 namespace WhiteBirdEngine {
 
+using RenderData = void;
+
 /**
- * @class RenderPipeline
- * @brief Render pipeline interface.
+ * @class RenderPass
+ * @brief Render pass interface.
  *
  */
 class RenderPass {
@@ -30,28 +32,25 @@ public:
     virtual ~RenderPass() {}
 
     /**
-     * @brief Get the name of the pipeline.
+     * @brief Get the name of the pass.
      */
-    virtual const std::string& get_pipeline_name() = 0;
+    virtual const std::string& get_pass_name() = 0;
 
     /**
-     * @brief Setup the render pipline. Will be called once after the render tasks are added.
-     */
-    virtual void setup() = 0;
-
-    /**
-     * @brief Perform the render pipeline. Will be called every render tick.
+     * @brief Setup the render pass.
      *
-     * @param p_delta The time lasted since the last call to this function.
+     * @param p_input The input to the setup process.
+     * @return The output of the setup process.
      */
-    virtual void perform(double p_delta) = 0;
+    virtual Ref<RenderData> setup(Ref<RenderData> p_input) = 0;
 
     /**
-     * @brief Preserve a number of render tasks to be added.
+     * @brief Involke the render pass.
      *
-     * @param p_num The number of tasks to be preserved.
+     * @param p_input The input to the render pass.
+     * @return The output of the render pass.
      */
-    virtual void preserve(size_t p_num) = 0;
+    virtual Ref<RenderData> involke(Ref<RenderData> p_input) = 0;
 };
 
 }

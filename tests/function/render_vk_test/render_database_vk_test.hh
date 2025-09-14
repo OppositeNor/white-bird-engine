@@ -53,7 +53,6 @@ protected:
         triangle.vert1.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
         triangle.vert1.bitangent = glm::vec3(0.0f, 1.0f, 0.0f);
         triangle.vert1.slot.uv = glm::vec2(0.0f, 0.0f);
-        triangle.vert1.slot.is_opaque = true;
         
         // Vertex 2
         triangle.vert2.position = glm::vec3(1.0f + x_offset, 0.0f, 0.0f);
@@ -61,7 +60,6 @@ protected:
         triangle.vert2.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
         triangle.vert2.bitangent = glm::vec3(0.0f, 1.0f, 0.0f);
         triangle.vert2.slot.uv = glm::vec2(1.0f, 0.0f);
-        triangle.vert2.slot.is_opaque = true;
         
         // Vertex 3
         triangle.vert3.position = glm::vec3(0.5f + x_offset, 1.0f, 0.0f);
@@ -69,7 +67,6 @@ protected:
         triangle.vert3.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
         triangle.vert3.bitangent = glm::vec3(0.0f, 1.0f, 0.0f);
         triangle.vert3.slot.uv = glm::vec2(0.5f, 1.0f);
-        triangle.vert3.slot.is_opaque = true;
         
         return triangle;
     }
@@ -295,21 +292,18 @@ TEST_F(RenderDatabaseVKTest, TriangleDataIntegrity) {
     triangle.vert1.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
     triangle.vert1.bitangent = glm::vec3(0.0f, 1.0f, 0.0f);
     triangle.vert1.slot.uv = glm::vec2(0.25f, 0.75f);
-    triangle.vert1.slot.is_opaque = false;
     
     triangle.vert2.position = glm::vec3(-1.0f, -2.0f, -3.0f);
     triangle.vert2.normal = glm::vec3(0.0f, 1.0f, 0.0f);
     triangle.vert2.tangent = glm::vec3(0.0f, 0.0f, 1.0f);
     triangle.vert2.bitangent = glm::vec3(1.0f, 0.0f, 0.0f);
     triangle.vert2.slot.uv = glm::vec2(0.8f, 0.2f);
-    triangle.vert2.slot.is_opaque = true;
     
     triangle.vert3.position = glm::vec3(0.0f, 0.0f, 0.0f);
     triangle.vert3.normal = glm::vec3(0.0f, 0.0f, -1.0f);
     triangle.vert3.tangent = glm::vec3(-1.0f, 0.0f, 0.0f);
     triangle.vert3.bitangent = glm::vec3(0.0f, -1.0f, 0.0f);
     triangle.vert3.slot.uv = glm::vec2(0.5f, 0.5f);
-    triangle.vert3.slot.is_opaque = true;
     
     WBE::vectorp<WBE::Triangle3DTextured> triangles(allocator.get());
     triangles.push_back(triangle);
@@ -329,7 +323,6 @@ TEST_F(RenderDatabaseVKTest, TriangleDataIntegrity) {
     EXPECT_FLOAT_EQ(t.vert1.normal.z, 0.0f);
     EXPECT_FLOAT_EQ(t.vert1.slot.uv.x, 0.25f);
     EXPECT_FLOAT_EQ(t.vert1.slot.uv.y, 0.75f);
-    EXPECT_FALSE(t.vert1.slot.is_opaque);
     
     // Verify vertex 2
     EXPECT_FLOAT_EQ(t.vert2.position.x, -1.0f);
@@ -337,7 +330,6 @@ TEST_F(RenderDatabaseVKTest, TriangleDataIntegrity) {
     EXPECT_FLOAT_EQ(t.vert2.position.z, -3.0f);
     EXPECT_FLOAT_EQ(t.vert2.slot.uv.x, 0.8f);
     EXPECT_FLOAT_EQ(t.vert2.slot.uv.y, 0.2f);
-    EXPECT_TRUE(t.vert2.slot.is_opaque);
     
     // Verify vertex 3
     EXPECT_FLOAT_EQ(t.vert3.position.x, 0.0f);
@@ -346,7 +338,6 @@ TEST_F(RenderDatabaseVKTest, TriangleDataIntegrity) {
     EXPECT_FLOAT_EQ(t.vert3.normal.z, -1.0f);
     EXPECT_FLOAT_EQ(t.vert3.slot.uv.x, 0.5f);
     EXPECT_FLOAT_EQ(t.vert3.slot.uv.y, 0.5f);
-    EXPECT_TRUE(t.vert3.slot.is_opaque);
 }
 
 // Test material ID sorting for static triangles
@@ -438,7 +429,6 @@ TEST_F(RenderDatabaseVKTest, ZeroSizedTriangles) {
     triangle.vert1.tangent = triangle.vert2.tangent = triangle.vert3.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
     triangle.vert1.bitangent = triangle.vert2.bitangent = triangle.vert3.bitangent = glm::vec3(0.0f, 1.0f, 0.0f);
     triangle.vert1.slot.uv = triangle.vert2.slot.uv = triangle.vert3.slot.uv = glm::vec2(0.0f, 0.0f);
-    triangle.vert1.slot.is_opaque = triangle.vert2.slot.is_opaque = triangle.vert3.slot.is_opaque = true;
     
     WBE::vectorp<WBE::Triangle3DTextured> triangles(allocator.get());
     triangles.push_back(triangle);
@@ -475,7 +465,6 @@ TEST_F(RenderDatabaseVKTest, ExtremeCoordinateValues) {
     triangle.vert1.slot.uv = glm::vec2(0.0f, 1.0f);
     triangle.vert2.slot.uv = glm::vec2(1.0f, 0.0f);
     triangle.vert3.slot.uv = glm::vec2(0.5f, 0.5f);
-    triangle.vert1.slot.is_opaque = triangle.vert2.slot.is_opaque = triangle.vert3.slot.is_opaque = true;
     
     WBE::vectorp<WBE::Triangle3DTextured> triangles(allocator.get());
     triangles.push_back(triangle);
