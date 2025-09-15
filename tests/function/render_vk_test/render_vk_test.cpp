@@ -12,9 +12,4 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "render_database_vk_test.hh"
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+#include "render_vk_database_test.hh"
