@@ -16,6 +16,7 @@
 #define __WBE_RENDER_DATABASE_VK_HH__
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "core/surface/primitive_slots.hh"
 #include "function/render/material.hh"
@@ -66,7 +67,7 @@ private:
     vectorp<Vertex3DTextured> static_opaque_triangle_vertices;
     vectorp<uint32_t> static_opaque_triangle_indices;
 
-    std::map<MaterialID, vectorp<SubMesh<SlotTextured>>> dynamic_opaque_sub_meshes;
+    std::map<MaterialID, vectorp<RefWeak<SubMesh<SlotTextured>>*>> dynamic_opaque_sub_meshes;
 
     std::unordered_map<TextureID, VkImage> texture_map;
 

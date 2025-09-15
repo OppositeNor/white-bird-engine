@@ -154,6 +154,39 @@ public:
     }
 
     /**
+     * @brief Resize the array list.
+     *
+     * @param p_size The size to resize to.
+     */
+    void resize(size_t p_size) const {
+        std::unique_lock lock(mutex);
+        unguard_resize(p_size);
+    }
+
+    /**
+     * @brief Reserve the array list to a certain size.
+     *
+     * @param p_size The size to reserve.
+     */
+    void reserve(size_t p_size) const {
+        std::unique_lock lock(mutex);
+        unguard_reserve(p_size);
+    }
+
+    /**
+     * @brief Get the mutex lock of the array list.
+     *
+     * @warning Manually locking the mutex and using atomic operations
+     * may cause dead lock. So make sure when you lock it manually, use
+     * the unguard methods instead of the regular methods.
+     *
+     * @return 
+     */
+    std::shared_mutex& get_mutex() const {
+        return mutex;
+    }
+
+    /**
      * @brief Set a value at a specific index. This function is not
      * atomic. If you want atomic set, use the set method instead.
      *
@@ -198,13 +231,34 @@ public:
     }
 
     /**
-     * @brief Get the size of the array list.
+     * @brief Get the size of the array list. This funciton is not
+     * atomic. If you want atomic get, use the size method instead.
      *
      * @return The size of the array list.
      */
     size_t unguard_size() const {
         return data.size();
     }
+
+    /**
+     * @brief Resize the array list. This funciton is not
+     * atomic. If you want atomic get, use the resize method instead.
+     *
+     * @param p_size The size to resize to.
+     */
+    void unguard_resize(size_t p_size) {
+        data.resize(p_size);
+    }
+
+    /**
+     * @brief Reserve the array list to a certain size.
+     *
+     * @param p_size The size to reserve.
+     */
+    void unguard_reserve(size_t p_size) const {
+        data.reserve(p_size);
+    }
+
 private:
     mutable std::shared_mutex mutex;
     vectorp<T> data;
