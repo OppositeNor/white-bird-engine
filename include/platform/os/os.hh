@@ -41,7 +41,7 @@ public:
     /**
      * @brief Memory mapping protocols control bits.
      */
-    enum MMapProtBit {
+    enum class MMapProtBit {
         // Page may be read.
         READ = 0,
         // Page may be written.
@@ -52,23 +52,33 @@ public:
         TOTAL_PROT
     };
 
-    using MMapProt = std::bitset<MMapProtBit::TOTAL_PROT>;
+    using MMapProt = std::bitset<(int)MMapProtBit::TOTAL_PROT>;
 
     /**
      * @brief Mapping types.
      */
-    enum MMapFlagBit {
+    enum class MMapFlagBit {
         // Shared.
-        SHARED,
+        SHARED = 0,
         // Private.
         PRIVATE,
         // Map to an anonymous file.
         ANON,
         // Used for tracking total types.
-        TOTAL_FLAGS
+        TOTAL_MMAP_FLAGS
     };
 
-    using MMapFlags = std::bitset<MMapFlagBit::TOTAL_FLAGS>;
+    enum class FileOpenFlagBit {
+        // Read
+        READ = 0,
+        // Write
+        WRITE,
+        // Used for tracking total flags.
+        TOTAL_FILE_OPEN_FLAGS
+    };
+
+    using MMapFlags = std::bitset<(int)MMapFlagBit::TOTAL_MMAP_FLAGS>;
+    using FileOpenFlags = std::bitset<(int)FileOpenFlagBit::TOTAL_FILE_OPEN_FLAGS>;
 
     /**
      * @brief Execute a program on a separate process. The execution can be a separate
@@ -132,6 +142,22 @@ public:
      * @param p_offset The offset of the file that this memory is going to mapt to.
      */
     static void* memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags p_flags, FileDescrip p_fd, off_t p_offset);
+
+    /**
+     * @brief Open file and get a file description.
+     *
+     * @param p_path The path to the file.
+     * @param p_open_flags The flags of the file to be opened.
+     * @return The file desciption.
+     */
+    static FileDescrip open_file(const char* p_path, FileOpenFlags p_open_flags);
+
+    /**
+     * @brief Close a file.
+     *
+     * @param p_fd The file descripter of the file to be closed.
+     */
+    static void close_file(FileDescrip p_fd);
 
     /**
      * @brief Unmap an memory.

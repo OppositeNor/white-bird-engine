@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <sched.h>
 #include <stdexcept>
 #include <string>
@@ -30,13 +31,13 @@ namespace WhiteBirdEngine {
 
 int get_mmap_prot(OS::MMapProt p_prot) {
     int result = 0;
-    if (p_prot.test(OS::MMapProtBit::READ)) {
+    if (p_prot.test((int)OS::MMapProtBit::READ)) {
         result |= PROT_EXEC;
     }
-    if (p_prot.test(OS::MMapProtBit::WRITE)) {
+    if (p_prot.test((int)OS::MMapProtBit::WRITE)) {
         result |= PROT_WRITE;
     }
-    if (p_prot.test(OS::MMapProtBit::EXEC)) {
+    if (p_prot.test((int)OS::MMapProtBit::EXEC)) {
         result |= PROT_EXEC;
     }
     return result;
@@ -44,16 +45,29 @@ int get_mmap_prot(OS::MMapProt p_prot) {
 
 int get_mmap_flags(OS::MMapFlags p_prot) {
     int result = 0;
-    if (p_prot.test(OS::MMapFlagBit::SHARED)) {
+    if (p_prot.test((int)OS::MMapFlagBit::SHARED)) {
         result |= MAP_SHARED_VALIDATE;
     }
-    if (p_prot.test(OS::MMapFlagBit::PRIVATE)) {
+    if (p_prot.test((int)OS::MMapFlagBit::PRIVATE)) {
         result |= MAP_PRIVATE;
     }
-    if (p_prot.test(OS::MMapFlagBit::ANON)) {
+    if (p_prot.test((int)OS::MMapFlagBit::ANON)) {
         result |= MAP_ANON;
     }
     return result;
+}
+
+int get_file_open_flags(OS::FileOpenFlags p_prot) {
+    if (p_prot.test((int)OS::FileOpenFlagBit::READ) && p_prot.test((int)OS::FileOpenFlagBit::WRITE)) {
+        return O_RDWR;
+    }
+    if (p_prot.test((int)OS::FileOpenFlagBit::READ)) {
+        return O_RDONLY;
+    }
+    if (p_prot.test((int)OS::FileOpenFlagBit::WRITE)) {
+        return O_WRONLY;
+    }
+    throw std::runtime_error("Failed to retrieve file open flags: File open flag not valid.");
 }
 
 PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[], const char* p_envp[]) {
@@ -126,6 +140,20 @@ void* OS::memory_map(void* p_start, size_t p_length, MMapProt p_prot, MMapFlags 
         throw std::runtime_error("Failed to map memory: " + std::string(strerror(errno)));
     }
     return mapped;
+}
+
+FileDescrip OS::open_file(const char* p_path, FileOpenFlags p_open_flags) {
+    FileDescrip f = open("./test_file.txt", O_RDWR);
+    if (f < 0) {
+        throw std::runtime_error("Failed to open file at path " + std::string(p_path) + ": " + std::string(strerror(errno)));
+    }
+    return f;
+}
+
+void OS::close_file(FileDescrip p_fd) {
+    if (close(p_fd) < 0) {
+        throw std::runtime_error("Failed to close file: " + std::string(strerror(errno)));
+    }
 }
 
 void OS::memory_unmap(void* p_start, size_t p_length) {

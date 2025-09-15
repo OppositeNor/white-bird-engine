@@ -20,8 +20,8 @@ def reflect(p_metaparser_clang_args, p_metadata_path, p_metadata_cache, p_source
     Args:
         p_metaparser_clang_args (): The arguments for clang for the metaparser.
         p_metadata_path (): The path to output metadata.
-        p_sources_indices (): The pathes of the source files.
         p_metadata_cache (): The path to the metadata cache.
+        p_sources_indices (): The pathes of the source files.
     """
     reflector = WBEReflector(p_metadata_path)
     metaparser = WBEMetaparser(reflector, p_metaparser_clang_args, p_metadata_cache, p_sources_indices)
