@@ -24,6 +24,7 @@ namespace WhiteBirdEngine {
  * @brief Allocator for Vulkan.
  *
  */
+template <typename AllocType = HeapAllocatorAligned>
 class AllocatorVK {
 public:
 
@@ -61,7 +62,7 @@ private:
     static void free(AllocatorVK* p_this, void* p_memory);
 
     VkAllocationCallbacks allocator_callbacks{};
-    HeapAllocatorAligned* allocator;
+    AllocType* allocator;
 };
 
 }

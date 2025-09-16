@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(HeapAllocatorAlignedPool* p_allocator)
     : allocator(p_allocator),
-    allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)),
+    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)),
     render_database(make_ref<RenderDatabaseVK>(p_allocator, p_allocator)) {
     init();
 }

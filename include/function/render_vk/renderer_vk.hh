@@ -58,11 +58,13 @@ protected:
     virtual void add_render_pass(Ref<RenderPass> p_render_pipeline) override;
 private:
 
+    using AllocType = HeapAllocatorAlignedPool;
+
     template <typename T>
-    using STLAlloc = STLAllocatorPool<T>;
+    using STLAlloc = STLAllocator<T, AllocType>;
 
     HeapAllocatorAlignedPool* allocator;
-    Ref<AllocatorVK> allocator_vk;
+    Ref<AllocatorVK<AllocType>> allocator_vk;
 
     Ref<RenderDatabaseVK> render_database;
 
