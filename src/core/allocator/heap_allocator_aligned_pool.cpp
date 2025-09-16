@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -50,9 +51,12 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 }
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
+  if (p_alignment % WBE_DEFAULT_ALIGNMENT != 0) {
+      throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WBE_DEFAULT_ALIGNMENT) + ".");
+  }
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
-    // Clamp the padding size to the default alignment
-    size_t aligned_size = get_align_size(p_size, std::min<size_t>(p_alignment, WBE_DEFAULT_ALIGNMENT)) + HEADER_SIZE;
+    // Clamp the padding size to the default alignment.
+    size_t aligned_size = get_align_size(p_size, WBE_DEFAULT_ALIGNMENT) + HEADER_SIZE;
     while (*valid_idle_node != nullptr) {
         // Find the aligned starting point.
         uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>((*valid_idle_node)->mem_start) + HEADER_SIZE;

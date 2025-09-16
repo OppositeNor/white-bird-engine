@@ -84,6 +84,7 @@ public:
     }
 
     virtual void clear() override {
+        idle_list_head = std::make_unique<IdleListNode>();
         idle_list_head->size = size;
         idle_list_head->mem_start = mem_chunk;
         idle_list_head->next = nullptr;
