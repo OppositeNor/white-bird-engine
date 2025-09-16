@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/logging/log.hh"
+#include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "global/global.hh"
 #include <cstdlib>
@@ -24,16 +25,21 @@ int main(int p_argc, char* p_argv[]) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
     {
         WhiteBirdEngine::ApplicationGame game_application;
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
-        size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-        size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
+        {
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL);
+            WBE::wbe_console_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
+            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
+            size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
+            WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
+        }
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator layout: {}",
             static_cast<std::string>(*WBE::global_allocator())));
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator layout: {}",
             static_cast<std::string>(*game_application.get_renderer_allocator())));
     }
+    WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)
+        ->message("Time: " + std::to_string(global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL)[0].delta));
     return EXIT_SUCCESS;
 }
 
