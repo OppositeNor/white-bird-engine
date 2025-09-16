@@ -35,7 +35,6 @@ RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)),
     render_database(make_ref<RenderDatabaseVK<AllocType>>(p_allocator, p_allocator)) {
-    queue_family_indices.allocator = allocator;
     init();
 }
 
@@ -454,6 +453,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
 
 RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) {
     QueueFamilyIndices indices{};
+    indices.allocator = allocator;
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
     vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);

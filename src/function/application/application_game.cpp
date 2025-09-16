@@ -11,7 +11,7 @@ ApplicationGame::ApplicationGame() {
 }
 
 void ApplicationGame::init() {
-    renderer_allocator = make_ref<HeapAllocatorAlignedPoolImplicitList>(global_allocator(), WBE_KiB(500));
+    renderer_allocator = make_ref<HeapAllocatorAlignedPool>(global_allocator(), WBE_KiB(500));
     // TODO: Create renderer from config file.
     renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
     // TODO
