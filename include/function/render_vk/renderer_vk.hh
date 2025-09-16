@@ -16,13 +16,12 @@
 #define __WBE_RENDERER_VK_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_pass.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/render_database_vk.hh"
-#include "global/global.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
@@ -42,7 +41,7 @@ namespace WhiteBirdEngine {
 class RendererVK : public Renderer {
 public:
 
-    using AllocType = HeapAllocatorAlignedPool;
+    using AllocType = HeapAllocatorAlignedPoolImplicitList;
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
     RendererVK(RendererVK&&) = delete;
@@ -63,10 +62,16 @@ private:
     template <typename T>
     using STLAlloc = STLAllocator<T, AllocType>;
 
-    HeapAllocatorAlignedPool* allocator;
+    template <typename T>
+    using vector = ::WhiteBirdEngine::vector<T, AllocType>;
+    template <typename T>
+    using set = ::WhiteBirdEngine::set<T, AllocType>;
+    using string = ::WhiteBirdEngine::string<AllocType>;
+
+    AllocType* allocator;
     Ref<AllocatorVK<AllocType>> allocator_vk;
 
-    Ref<RenderDatabaseVK> render_database;
+    Ref<RenderDatabaseVK<AllocType>> render_database;
 
     // Vulkan properties
     SDL_Window* window;
@@ -108,6 +113,7 @@ private:
 #endif
 
     struct QueueFamilyIndices {
+        AllocType* allocator;
         std::optional<uint32_t> graphics;   // For basic pipeline rendering
         std::optional<uint32_t> compute;    // For compute shader
         std::optional<uint32_t> present;    // For presenting contents in window
@@ -116,8 +122,8 @@ private:
                 && compute.has_value()
                 && present.has_value();
         }
-        setp<int> get_unique_indices() const {
-            setp<int> result(global_allocator());
+        set<int> get_unique_indices() const {
+            set<int> result(allocator);
             result.insert(graphics.value());
             result.insert(compute.value());
             result.insert(present.value());
@@ -127,8 +133,8 @@ private:
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
-        vectorp<VkSurfaceFormatKHR> formats;
-        vectorp<VkPresentModeKHR> present_modes;
+        vector<VkSurfaceFormatKHR> formats;
+        vector<VkPresentModeKHR> present_modes;
         bool is_adequate() {
             return !formats.empty() && !present_modes.empty();
         }
@@ -154,7 +160,7 @@ private:
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();
-    void pick_physical_device(const vectorp<VkPhysicalDevice>& p_physical_devices);
+    void pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
 
@@ -162,8 +168,8 @@ private:
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
     SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
-    VkSurfaceFormatKHR choose_swap_surface_format(const vectorp<VkSurfaceFormatKHR>& p_available_formats);
-    VkPresentModeKHR choose_swap_present_mode(const vectorp<VkPresentModeKHR>& p_available_present_modes);
+    VkSurfaceFormatKHR choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
     VkAllocationCallbacks* get_allocation_callbacks() {

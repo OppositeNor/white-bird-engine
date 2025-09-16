@@ -24,42 +24,6 @@
 
 namespace WhiteBirdEngine {
 
-RenderDatabaseVK::RenderDatabaseVK(HeapAllocatorAlignedPool* p_allocator)
-    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator) {
-    if (p_allocator == nullptr) {
-        throw std::runtime_error("Failed to create renderer database: allocator is null.");
-    }
-    allocator = p_allocator;
-}
-
-void RenderDatabaseVK::set_static_opaque_triangles(vectorp<Vertex3DTextured>&& p_vertices,
-                                                   vectorp<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
-    static_opaque_triangle_map.clear();
-    static_opaque_triangle_vertices = std::move(p_vertices);
-    static_opaque_triangle_vertices.swap(static_opaque_triangle_vertices);  // Make the vector memory space compact
-    static_opaque_triangle_indices = vectorp<uint32_t>(allocator);
-
-    using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
-    std::sort(p_indices.begin(), p_indices.end(), [](
-        const TriType& p_tri1, const TriType& p_tri2) -> bool {
-              return p_tri1.first < p_tri2.first;
-              });
-    MaterialID current_id = MATERIAL_INVALID;
-    for (auto& tri : p_indices) {
-        if (tri.first != current_id) {
-            // Asign the next material ID's indices.
-            static_opaque_triangle_map[tri.first].first = 0;
-            static_opaque_triangle_map[tri.first].second = static_opaque_triangle_indices.size();
-            current_id = tri.first;
-        }
-        // Asign indices.
-        static_opaque_triangle_indices.insert(static_opaque_triangle_indices.end(),
-                                              tri.second.vertex_indices, tri.second.vertex_indices + 3);
-        static_opaque_triangle_map[tri.first].first += 3;
-    }
-    p_indices.clear();
-    p_indices.swap(p_indices); // Clear resources allocated by indices.
-}
 
 
 

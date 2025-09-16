@@ -21,7 +21,6 @@
 #include "function/engine_function.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_database_vk.hh"
-#include "global/stl_allocator.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
@@ -35,7 +34,8 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)),
-    render_database(make_ref<RenderDatabaseVK>(p_allocator, p_allocator)) {
+    render_database(make_ref<RenderDatabaseVK<AllocType>>(p_allocator, p_allocator)) {
+    queue_family_indices.allocator = allocator;
     init();
 }
 
@@ -300,14 +300,14 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    vectorp<VkPhysicalDevice> physical_devices(physical_device_count, allocator);
+    vector<VkPhysicalDevice> physical_devices(physical_device_count, allocator);
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
 
     // Pick one that's the most suitable.
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    string<> device_name(device_properties.deviceName, allocator);
+    string device_name(device_properties.deviceName, allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
 }
@@ -315,7 +315,7 @@ void RendererVK::create_physical_device() {
 void RendererVK::create_logical_device() {
     // Setup queues create info.
     float queue_priority = 1.0;
-    setp<int> indices = queue_family_indices.get_unique_indices();
+    set<int> indices = queue_family_indices.get_unique_indices();
     vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
     queues_create_info.reserve(indices.size());
     for (int elem : indices) {
@@ -394,7 +394,7 @@ bool RendererVK::check_validation_layer_support() {
     return true;
 }
 
-void RendererVK::pick_physical_device(const vectorp<VkPhysicalDevice>& p_physical_devices) {
+void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
@@ -407,7 +407,7 @@ void RendererVK::pick_physical_device(const vectorp<VkPhysicalDevice>& p_physica
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<> device_name(device_properties.deviceName, allocator);
+            string device_name(device_properties.deviceName, allocator);
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
                 " White Bird Engine is picking an alternative device.", device_name));
@@ -415,7 +415,7 @@ void RendererVK::pick_physical_device(const vectorp<VkPhysicalDevice>& p_physica
         else {
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string<> device_name(device_properties.deviceName, allocator);
+            string device_name(device_properties.deviceName, allocator);
             physical_device = p_physical_devices[pick_device_index];
             wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
@@ -480,8 +480,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 }
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
-    SwapChainSupportDetails details{.formats = vectorp<VkSurfaceFormatKHR>(allocator),
-        .present_modes = vectorp<VkPresentModeKHR>(allocator)};
+    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(allocator),
+        .present_modes = vector<VkPresentModeKHR>(allocator)};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -494,7 +494,7 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
     return details;
 }
 
-VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vectorp<VkSurfaceFormatKHR>& p_available_formats) {
+VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats) {
     for (const auto& available_format : p_available_formats) {
         if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB
             && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -504,7 +504,7 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vectorp<VkSurfac
     return p_available_formats[0];
 }
 
-VkPresentModeKHR RendererVK::choose_swap_present_mode(const vectorp<VkPresentModeKHR>& p_available_present_modes) {
+VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes) {
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
             return VK_PRESENT_MODE_IMMEDIATE_KHR;

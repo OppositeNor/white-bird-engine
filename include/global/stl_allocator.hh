@@ -104,7 +104,7 @@ struct STLAllocator {
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType>
 using vector = std::vector<T, STLAllocator<T, AllocType>>;
 
 /**
@@ -122,7 +122,7 @@ using vectorp = vector<T, HeapAllocatorAlignedPool>;
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType>>;
 
 /**
@@ -139,7 +139,7 @@ using setp = set<T, HeapAllocatorAlignedPool>;
  *
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename AllocType = HeapAllocatorAligned>
+template <typename AllocType>
 using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType>>;
 
 /**
@@ -147,8 +147,7 @@ using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char
  *
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
-template <typename T>
-using stringp = std::basic_string<T, HeapAllocatorAlignedPool>;
+using stringp = string<HeapAllocatorAlignedPool>;
 
 /**
  * @brief Short name for stl allocator that uses HeapAllocatorAlignedPool.

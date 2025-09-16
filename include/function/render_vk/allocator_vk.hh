@@ -16,6 +16,7 @@
 #define __WBE_ALLOCATOR_VK_HH__
 
 #include "core/allocator/heap_allocator_aligned.hh"
+#include <cstring>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -39,7 +40,7 @@ public:
      *
      * @param p_allocator The allocator.
      */
-    AllocatorVK(HeapAllocatorAligned* p_allocator) {
+    AllocatorVK(AllocType* p_allocator) {
         allocator = p_allocator;
         allocator_callbacks.pUserData = this;
         allocator_callbacks.pfnAllocation = (PFN_vkAllocationFunction)(AllocatorVK::allocation);
@@ -64,6 +65,36 @@ private:
     VkAllocationCallbacks allocator_callbacks{};
     AllocType* allocator;
 };
+
+template <typename AllocType>
+void* AllocatorVK<AllocType>::allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
+    if (p_size == 0) {
+        return nullptr;
+    }
+    void* result = std::bit_cast<void*>(p_this->allocator->allocate(p_size, p_alignment));
+    return result;
+}
+
+template <typename AllocType>
+void* AllocatorVK<AllocType>::reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
+    if (p_size == 0) {
+        free(p_this, p_original);
+        return nullptr;
+    }
+    size_t original_size = p_this->allocator->get_allocated_data_size(std::bit_cast<MemID>(p_original));
+    void* dest = std::bit_cast<void*>(p_this->allocator->allocate(p_size, p_alignment));
+    memcpy(dest, p_original, std::min(original_size, p_size));
+    p_this->allocator->deallocate(std::bit_cast<MemID>(p_original));
+    return dest;
+}
+
+template <typename AllocType>
+void AllocatorVK<AllocType>::free(AllocatorVK* p_this, void* p_memory) {
+    if (p_memory == nullptr) {
+        return;
+    }
+    p_this->allocator->deallocate(std::bit_cast<MemID>(p_memory));
+}
 
 }
 
