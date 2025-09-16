@@ -41,13 +41,15 @@ namespace WhiteBirdEngine {
  */
 class RendererVK : public Renderer {
 public:
+
+    using AllocType = HeapAllocatorAlignedPool;
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
     RendererVK(RendererVK&&) = delete;
     RendererVK& operator=(const RendererVK&) = delete;
     RendererVK& operator=(RendererVK&&) = delete;
 
-    RendererVK(HeapAllocatorAlignedPool* p_allocator);
+    RendererVK(AllocType* p_allocator);
 
     virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) override;
     virtual Ref<RenderPass> get_render_pass(const std::string& p_pipeline_id) override {
@@ -57,8 +59,6 @@ public:
 protected:
     virtual void add_render_pass(Ref<RenderPass> p_render_pipeline) override;
 private:
-
-    using AllocType = HeapAllocatorAlignedPool;
 
     template <typename T>
     using STLAlloc = STLAllocator<T, AllocType>;

@@ -15,7 +15,6 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "SDL_vulkan.h"
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -33,7 +32,7 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(HeapAllocatorAlignedPool* p_allocator)
+RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)),
     render_database(make_ref<RenderDatabaseVK>(p_allocator, p_allocator)) {
