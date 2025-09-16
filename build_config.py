@@ -30,7 +30,7 @@ target_info = {
         "c-compiler" : "clang",
         "cpp-compiler" : "clang++",
         "export-directory" : "deploy",
-        "cmake-build-type" : "Release",
+        "cmake-build-type" : "Deploy",
         "generate-tests" : False,
     },
     "debug-gcc" : {
@@ -51,7 +51,7 @@ target_info = {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
         "export-directory" : "deploy",
-        "cmake-build-type" : "Release",
+        "cmake-build-type" : "Deploy",
         "generate-tests" : False,
     },
 }

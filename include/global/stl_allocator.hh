@@ -85,7 +85,7 @@ struct STLAllocator {
      * @return The allocated memory.
      */
     T* allocate(size_t p_num) {
-        return std::bit_cast<T*>(allocator->allocate(p_num * sizeof(T), alignof(T)));
+        return std::bit_cast<T*>(allocator->allocate(p_num * sizeof(T)));
     }
     /**
      * @brief Deallocate memory
