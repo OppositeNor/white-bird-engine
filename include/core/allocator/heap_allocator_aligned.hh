@@ -116,7 +116,7 @@ public:
  */
 template <typename T, typename... Args>
 inline MemID create_obj_align(HeapAllocatorAligned& p_allocator, Args&&... p_args) {
-    MemID id = p_allocator.allocate(sizeof(T), alignof(T));
+    MemID id = p_allocator.allocate(sizeof(T));
     new(p_allocator.get(id)) T(std::forward<Args>(p_args)...);
     return id;
 }
