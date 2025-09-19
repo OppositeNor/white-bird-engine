@@ -45,10 +45,12 @@ root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
 test_dir = os.path.join(root_dir, build_config.test_dir)
+test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
 build_dir = os.path.join(root_dir, build_target["export-directory"])
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(build_dir, "res")
+test_env_resource_dir = os.path.join(test_env_dir, "res")
 config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
 shaders_dir = os.path.join(resource_dir, "shaders")
@@ -98,5 +100,10 @@ on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sourc
 print("WBEBuilder: Running cmake...")
 subprocess.run(_get_cmake_command_from_info(build_target))
 subprocess.run(["cmake", "--build", build_target["export-directory"]])
+
+# Set up test environment
+if build_target["generate-tests"]:
+    print("WBEBuilder: Setting up test environemnt...")
+    shutil.copy(os.path.join(resource_output_dir, "metadata.json"), os.path.join(test_env_resource_dir, "metadata.json"))
 
 print("WBEBuilder: Finished!")

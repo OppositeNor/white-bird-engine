@@ -62,5 +62,6 @@ source_extensions = set([".cpp", ".hh"])
 include_dir = "include"
 source_dir = "src"
 test_dir = "tests"
+test_env_dir = "test_env"
 resource_dir = "res"
 

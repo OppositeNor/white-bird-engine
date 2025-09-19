@@ -51,6 +51,8 @@ else()
     set(SDL_SHARED OFF)
     add_subdirectory(dependencies/SDL2)
 endif()
+add_subdirectory(dependencies/boost)
+find_package(Vulkan REQUIRED)
 
 set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
@@ -83,6 +85,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
     ${PROJECT_SOURCE_DIR}/dependencies/stb
+    ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/thread/include
 )
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories
@@ -99,6 +102,13 @@ add_subdirectory(src/function)
 add_subdirectory(src/resource)
 add_subdirectory(src/core)
 add_subdirectory(src/platform)
+
+set(libs ${libs}
+    Vulkan::Vulkan
+    SDL2::SDL2-static
+    yaml-cpp::yaml-cpp
+    Boost::thread
+)
 
 # Create executable
 if (WBE_BUILD_PLATFORM STREQUAL "Android")

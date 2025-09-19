@@ -22,15 +22,6 @@ add_library(WBE_LIB_FUNCTION STATIC
     ${wbe_function_src}
 )
 
-# TODO: also link other libraries
-find_package(Vulkan REQUIRED)
-
-target_link_libraries(WBE_LIB_FUNCTION PUBLIC
-    Vulkan::Vulkan
-    SDL2::SDL2-static
-    yaml-cpp::yaml-cpp
-)
-
 set(libs ${libs}
     WBE_LIB_FUNCTION
     PARENT_SCOPE
