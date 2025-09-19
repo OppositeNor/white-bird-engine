@@ -25,3 +25,6 @@
 [submodule "dependencies/libjpeg"]
 	path = dependencies/libjpeg
 	url = https://github.com/winlibs/libjpeg.git
+[submodule "dependencies/boost"]
+	path = dependencies/boost
+	url = https://github.com/boostorg/boost.git
