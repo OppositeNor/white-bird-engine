@@ -60,7 +60,7 @@ protected:
 private:
 
     template <typename T>
-    using STLAlloc = STLAllocator<T, AllocType>;
+    using STLAlloc = STLAllocator<T, AllocType, false>;
 
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;

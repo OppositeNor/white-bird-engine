@@ -15,12 +15,10 @@
 #ifndef __WBE_STL_ALLOCATOR_HH__
 #define __WBE_STL_ALLOCATOR_HH__
 
-#include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
-#include <cstddef>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 namespace WhiteBirdEngine {
 
@@ -29,15 +27,17 @@ namespace WhiteBirdEngine {
  * @brief Adapter allocator for C++ standard library.
  *
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType, bool PROPAGATE_ON_COPY>
 struct STLAllocator {
     using value_type = T;
     AllocType* allocator = nullptr;
 
     template <typename U>
     struct rebind {
-        using other = STLAllocator<U, AllocType>;
+        using other = STLAllocator<U, AllocType, PROPAGATE_ON_COPY>;
     };
+
+    using propagate_on_container_copy_construction = std::conditional<PROPAGATE_ON_COPY, std::true_type, std::false_type>;
 
     /**
      * @brief Constructor.
@@ -74,7 +74,7 @@ struct STLAllocator {
      * @param p_other The allocator to be copied.
      */
     template <typename T1>
-    STLAllocator(const STLAllocator<T1, AllocType>& p_other) noexcept
+    STLAllocator(const STLAllocator<T1, AllocType, PROPAGATE_ON_COPY>& p_other) noexcept
         : allocator(p_other.allocator) {}
 
     
@@ -105,7 +105,7 @@ struct STLAllocator {
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename T, typename AllocType>
-using vector = std::vector<T, STLAllocator<T, AllocType>>;
+using vector = std::vector<T, STLAllocator<T, AllocType, false>>;
 
 /**
  * @brief STL vector that uses a pool allocator.
@@ -123,7 +123,7 @@ using vectorp = vector<T, HeapAllocatorAlignedPool>;
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename T, typename AllocType>
-using set = std::set<T, std::less<T>, STLAllocator<T, AllocType>>;
+using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false>>;
 
 /**
  * @brief STL set that uses a pool allocator.
@@ -140,7 +140,7 @@ using setp = set<T, HeapAllocatorAlignedPool>;
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename AllocType>
-using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType>>;
+using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false>>;
 
 /**
  * @brief STL string that uses a pool allocator.
@@ -155,7 +155,7 @@ using stringp = string<HeapAllocatorAlignedPool>;
  * @tparam T 
  */
 template <typename T>
-using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool>;
+using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool, false>;
 
 }
 

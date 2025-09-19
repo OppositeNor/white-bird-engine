@@ -26,7 +26,7 @@ namespace WBE = WhiteBirdEngine;
 
 TEST(WBEStlAllocatorTest, Basic) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::STLAllocator<int, WBE::HeapAllocatorAlignedPool> allocator(WBE::global_allocator());
+    WBE::STLAllocator<int, WBE::HeapAllocatorAlignedPool, false> allocator(WBE::global_allocator());
     std::string expected = "{\"type\":\"HeapAllocatorAlignedPool\",\"total_size\":131072,\"free_chunk_layout\":[{\"begin\":0,\"size\":131072}]}";
     ASSERT_EQ(static_cast<std::string>(*(WBE::global_allocator())), expected);
     int* p = allocator.allocate(10);

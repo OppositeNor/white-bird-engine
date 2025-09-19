@@ -15,16 +15,14 @@
 #ifndef __WBE_RENDER_DATABASE_VK_HH__
 #define __WBE_RENDER_DATABASE_VK_HH__
 
-#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
-#include "core/surface/primitive_slots.hh"
 #include "function/render/material.hh"
-#include "function/render/texture.hh"
 #include "global/stl_allocator.hh"
 #include <cstddef>
 #include <cstdint>
 #include <map>
 #include <vulkan/vulkan_core.h>
+
 namespace WhiteBirdEngine {
 
 /**
@@ -63,8 +61,24 @@ public:
      * with this render database.
      * @param p_indices The indices of the triangles, with respect to its material.
      */
-    void set_static_opaque_triangles(vector<Vertex3DTextured>&& p_vertices,
-                                     vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
+    template <typename VertType, typename IndxType>
+    void set_static_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
+        set_opaque_triangles(static_opaque_triangle_map, static_opaque_triangle_vertices, static_opaque_triangle_indices,
+                             std::forward<VertType>(p_vertices), std::forward<IndxType>(p_indices));
+    }
+
+    /**
+     * @brief Set the dynamic opaque triangles.
+     *
+     * @param p_vertices The vertices of the triangles. Note that this vector have to be at the same memory pool
+     * with this render database.
+     * @param p_indices The indices of the triangles, with respect to its material.
+     */
+    template <typename VertType, typename IndxType>
+    void set_dynamic_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
+        set_opaque_triangles(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
+                             std::move(p_vertices), std::move(p_indices));
+    }
 
 private:
 
@@ -73,15 +87,30 @@ private:
     vector<Vertex3DTextured> static_opaque_triangle_vertices;
     vector<uint32_t> static_opaque_triangle_indices;
 
-    std::map<MaterialID, vector<RefWeak<SubMesh<SlotTextured>>*>> dynamic_opaque_sub_meshes;
+    std::map<MaterialID, std::pair<size_t, size_t>> dynamic_opaque_triangle_map;
+    vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
+    vector<uint32_t> dynamic_opaque_triangle_indices;
 
-    std::unordered_map<TextureID, VkImage> texture_map;
+    void set_opaque_triangles(
+        std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
+        vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+        vector<uint32_t>& p_opaque_triangle_indices,
+        vector<Vertex3DTextured>&& p_vertices,
+        vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
+
+    void set_opaque_triangles(
+        std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
+        vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+        vector<uint32_t>& p_opaque_triangle_indices,
+        const vector<Vertex3DTextured>& p_vertices,
+        const vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices);
 
 };
 
 template <typename AllocType>
 RenderDatabaseVK<AllocType>::RenderDatabaseVK(AllocType* p_allocator)
-    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator) {
+    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator),
+    dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
@@ -89,12 +118,17 @@ RenderDatabaseVK<AllocType>::RenderDatabaseVK(AllocType* p_allocator)
 }
 
 template <typename AllocType>
-void RenderDatabaseVK<AllocType>::set_static_opaque_triangles(vector<Vertex3DTextured>&& p_vertices,
-                                                              vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
-    static_opaque_triangle_map.clear();
-    static_opaque_triangle_vertices = std::move(p_vertices);
-    static_opaque_triangle_vertices.swap(static_opaque_triangle_vertices);  // Make the vector memory space compact
-    static_opaque_triangle_indices = vector<uint32_t>(allocator);
+void RenderDatabaseVK<AllocType>::set_opaque_triangles(
+    std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
+    vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+    vector<uint32_t>& p_opaque_triangle_indices,
+    vector<Vertex3DTextured>&& p_vertices,
+    vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
+
+    p_opaque_triangle_map.clear();
+    p_opaque_triangle_vertices = std::move(p_vertices);
+    p_opaque_triangle_vertices.swap(p_opaque_triangle_vertices);  // Make the vector memory space compact
+    p_opaque_triangle_indices = vector<uint32_t>(allocator);
 
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
@@ -105,18 +139,52 @@ void RenderDatabaseVK<AllocType>::set_static_opaque_triangles(vector<Vertex3DTex
     for (auto& tri : p_indices) {
         if (tri.first != current_id) {
             // Asign the next material ID's indices.
-            static_opaque_triangle_map[tri.first].first = 0;
-            static_opaque_triangle_map[tri.first].second = static_opaque_triangle_indices.size();
+            p_opaque_triangle_map[tri.first].first = 0;
+            p_opaque_triangle_map[tri.first].second = p_opaque_triangle_indices.size();
             current_id = tri.first;
         }
         // Asign indices.
-        static_opaque_triangle_indices.insert(static_opaque_triangle_indices.end(),
-                                              tri.second.vertex_indices, tri.second.vertex_indices + 3);
-        static_opaque_triangle_map[tri.first].first += 3;
+        p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
+                                         tri.second.vertex_indices, tri.second.vertex_indices + 3);
+        p_opaque_triangle_map[tri.first].first += 3;
     }
     p_indices.clear();
     p_indices.swap(p_indices); // Clear resources allocated by indices.
 }
+
+template <typename AllocType>
+void RenderDatabaseVK<AllocType>::set_opaque_triangles(
+    std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
+    vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+    vector<uint32_t>& p_opaque_triangle_indices,
+    const vector<Vertex3DTextured>& p_vertices,
+    const vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices) {
+
+    p_opaque_triangle_map.clear();
+    p_opaque_triangle_vertices = p_vertices;
+    p_opaque_triangle_indices = vector<uint32_t>(allocator);
+
+    using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
+    vector<TriType> indices(p_indices);
+    std::sort(indices.begin(), indices.end(), [](
+        const TriType& p_tri1, const TriType& p_tri2) -> bool {
+              return p_tri1.first < p_tri2.first;
+              });
+    MaterialID current_id = MATERIAL_INVALID;
+    for (auto& tri : indices) {
+        if (tri.first != current_id) {
+            // Asign the next material ID's indices.
+            p_opaque_triangle_map[tri.first].first = 0;
+            p_opaque_triangle_map[tri.first].second = p_opaque_triangle_indices.size();
+            current_id = tri.first;
+        }
+        // Asign indices.
+        p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
+                                         tri.second.vertex_indices, tri.second.vertex_indices + 3);
+        p_opaque_triangle_map[tri.first].first += 3;
+    }
+}
+
 
 }
 
