@@ -20,7 +20,7 @@ Or:
 ```sh
 git clone https://github.com/OppositeNor/white-bird-engine.git
 cd white-bird-engine
-git submodule init --update
+git submodule init --update --recursive
 ```
 
 It is suggested to use Anaconda for setting up the build environment.
