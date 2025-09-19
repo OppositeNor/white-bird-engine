@@ -17,6 +17,7 @@
 
 #include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
 #include "global/global.hh"
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <thread>
 #include <vector>
@@ -62,6 +63,45 @@ TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
+TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    const size_t pool_size = WBE_MiB(1);
+    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    const int num_threads = 8;
+    const int allocs_per_thread = 128;
+    std::vector<std::thread> threads;
+    std::vector<WBE::MemID> mem_ids(num_threads * allocs_per_thread);
+    std::vector<int> values(num_threads * allocs_per_thread, 0);
+    std::atomic<int> success_count{0};
+
+    auto alloc_and_write_func = [&](int thread_idx) {
+        for (int i = 0; i < allocs_per_thread; ++i) {
+            int idx = thread_idx * allocs_per_thread + i;
+            WBE::MemID mem = allocator.allocate(sizeof(int));
+            ASSERT_NE(mem, WBE::MEM_NULL);
+            mem_ids[idx] = mem;
+            int* ptr = static_cast<int*>(allocator.get(mem));
+            ASSERT_NE(ptr, nullptr);
+            *ptr = idx * 10;
+            values[idx] = *ptr;
+            if (*ptr == idx * 10) ++success_count;
+        }
+    };
+    for (int t = 0; t < num_threads; ++t) {
+        threads.emplace_back(alloc_and_write_func, t);
+    }
+    for (auto& th : threads) th.join();
+    ASSERT_EQ(success_count, num_threads * allocs_per_thread);
+    // Verify values after all threads finished
+    for (int idx = 0; idx < num_threads * allocs_per_thread; ++idx) {
+        int* ptr = static_cast<int*>(allocator.get(mem_ids[idx]));
+        ASSERT_NE(ptr, nullptr);
+        ASSERT_EQ(*ptr, idx * 10);
+        allocator.deallocate(mem_ids[idx]);
+    }
+    ASSERT_EQ(allocator.get_remain_size(), pool_size);
+}
+
 TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     const size_t pool_size = WBE_MiB(1);
@@ -101,6 +141,48 @@ TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
     ASSERT_GE(alloc_count, num_threads * ops_per_thread / 2); // At least half ops are allocs
     ASSERT_EQ(dealloc_count, alloc_count);
+}
+
+TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    const size_t pool_size = WBE_MiB(1);
+    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    const int num_threads = 8;
+    const int ops_per_thread = 2048;
+    std::vector<std::thread> threads;
+    std::vector<std::vector<std::pair<WBE::MemID, int>>> thread_mem_ids(num_threads);
+    auto mix_func = [&](int thread_idx) {
+        std::vector<std::pair<WBE::MemID, int>>& mems = thread_mem_ids[thread_idx];
+        for (int i = 0; i < ops_per_thread; ++i) {
+            int op = std::rand() % 3;
+            if (op == 0) {
+                WBE::MemID mem = allocator.allocate(8, 8);
+                ASSERT_TRUE(mem != WBE::MEM_NULL);
+                int val = std::rand();
+                void* ptr = allocator.get(mem);
+                ASSERT_NE(ptr, nullptr);
+                *static_cast<int*>(ptr) = val;
+                mems.push_back(std::pair(mem, val));
+            } else if (op == 1 && !mems.empty()) {
+                allocator.deallocate(mems.back().first);
+                mems.pop_back();
+            } else if (op == 2 && !mems.empty()) {
+                void* ptr = allocator.get(mems.back().first);
+                ASSERT_NE(ptr, nullptr);
+                ASSERT_EQ(*static_cast<int*>(ptr), mems.back().second);
+            }
+        }
+        // Deallocate any remaining allocations
+        for (auto mem : mems) {
+            allocator.deallocate(mem.first);
+        }
+        mems.clear();
+    };
+    for (int t = 0; t < num_threads; ++t) {
+        threads.emplace_back(mix_func, t);
+    }
+    for (auto& th : threads) th.join();
+    ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
 TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
