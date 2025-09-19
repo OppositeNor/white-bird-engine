@@ -100,10 +100,10 @@ try:
     # Build project with CMake
     print("WBEBuilder: Running cmake...")
     result = subprocess.run(_get_cmake_command_from_info(build_target))
-    if not result:
+    if result.returncode != 0:
         raise RuntimeError("Failed to setup cmake build.")
     result = subprocess.run(["cmake", "--build", build_target["export-directory"]])
-    if not result:
+    if result.returncode != 0:
         raise RuntimeError("Failed to build with CMake.")
 
     # Set up test environment
