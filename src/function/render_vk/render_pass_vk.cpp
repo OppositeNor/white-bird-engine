@@ -62,7 +62,7 @@ void RenderPassVK::create_renderable_image_view_2d(RenderDataVK* p_input, VkImag
     create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    // Specify the mipmap level. Should be 0 since it is only rendered to the 
+    // Specify the mipmap level.
     create_info.subresourceRange.baseMipLevel = 0;
     create_info.subresourceRange.levelCount = 1;
     create_info.subresourceRange.baseArrayLayer = 0;

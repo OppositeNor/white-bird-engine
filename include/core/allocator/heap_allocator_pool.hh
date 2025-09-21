@@ -35,7 +35,7 @@ struct AllocatorTrait<class HeapAllocatorPool> final : public AllocatorTrait<Hea
     static constexpr bool WILL_ADDR_MOVE = false;
     static constexpr bool IS_ALIGNABLE = false;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
 /**

@@ -39,7 +39,7 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> final : public All
     static constexpr bool IS_ATOMIC = false;
     static constexpr bool WILL_ADDR_MOVE = true;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
 template <size_t SIZE>

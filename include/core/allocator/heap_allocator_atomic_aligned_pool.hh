@@ -34,7 +34,7 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public Alloc
     static constexpr bool IS_ATOMIC = true;
     static constexpr bool WILL_ADDR_MOVE = false;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
 

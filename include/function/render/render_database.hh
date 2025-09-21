@@ -21,8 +21,22 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <string>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @brief Types for the render database.
+ *
+ * @tparam T
+ */
+template <typename T>
+concept RenderDatabaseTypeConcept = requires {
+    // The type of the allocator
+    typename T::AllocType;
+    // The type of images
+    typename T::ImageTypeGPU;
+};
 
 /**
  * @class RenderDatabase
@@ -30,9 +44,12 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-template <typename AllocType>
+template <RenderDatabaseTypeConcept Types>
 class RenderDatabase {
 private:
+    using AllocType = Types::AllocType;
+    using ImageTypeGPU = Types::ImageTypeGPU;
+
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
     template <typename T>
@@ -79,6 +96,37 @@ public:
                              std::move(p_vertices), std::move(p_indices));
     }
 
+    /**
+     * @brief Register an image referencing to the GPU resource to the database.
+     *
+     * @param p_key The key of the image to register.
+     * @param p_image The image to be registered.
+     */
+    void register_image_gpu(const std::string& p_key, ImageTypeGPU p_image) {
+        images[p_key] = p_image;
+    }
+
+    /**
+     * @brief Get an image referencing to the GPU resource from the database.
+     *
+     * @param p_key The key of the image.
+     * @return The image instance.
+     */
+    ImageTypeGPU get_image_gpu(const std::string& p_key) const {
+        return images.at(p_key);
+    }
+
+    /**
+     * @brief Remove an image referencing to the GPU resource from the database.
+     * This will NOT free the allocated GPU resource. The resource should be freed
+     * mannually.
+     *
+     * @param p_key The key of the image.
+     */
+    void remove_image_gpu(const std::string& p_key) const {
+        std::erase(images.find(p_key));
+    }
+
 private:
 
     AllocType* allocator;
@@ -89,6 +137,8 @@ private:
     std::map<MaterialID, std::pair<size_t, size_t>> dynamic_opaque_triangle_map;
     vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
     vector<uint32_t> dynamic_opaque_triangle_indices;
+
+    std::map<std::string, ImageTypeGPU> images;
 
     void set_opaque_triangles(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
@@ -106,8 +156,8 @@ private:
 
 };
 
-template <typename AllocType>
-RenderDatabase<AllocType>::RenderDatabase(AllocType* p_allocator)
+template <RenderDatabaseTypeConcept Types>
+RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
     : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator),
     dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator) {
     if (p_allocator == nullptr) {
@@ -116,8 +166,8 @@ RenderDatabase<AllocType>::RenderDatabase(AllocType* p_allocator)
     allocator = p_allocator;
 }
 
-template <typename AllocType>
-void RenderDatabase<AllocType>::set_opaque_triangles(
+template <RenderDatabaseTypeConcept Types>
+void RenderDatabase<Types>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
@@ -151,8 +201,8 @@ void RenderDatabase<AllocType>::set_opaque_triangles(
     p_indices.swap(p_indices); // Clear resources allocated by indices.
 }
 
-template <typename AllocType>
-void RenderDatabase<AllocType>::set_opaque_triangles(
+template <RenderDatabaseTypeConcept Types>
+void RenderDatabase<Types>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,

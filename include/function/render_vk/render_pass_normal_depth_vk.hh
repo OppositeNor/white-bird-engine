@@ -7,6 +7,11 @@
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
+/**
+ * @class RenderPassNormalDepthVK
+ * @brief Render pass for depth and normal.
+ *
+ */
 class RenderPassNormalDepthVK final : public RenderPassVK {
 public:
     WBE_RENDER_PASS(RenderPassNormalDepthVK, normal_depth, VULKAN);

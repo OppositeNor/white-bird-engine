@@ -33,7 +33,7 @@ struct AllocatorTrait<class HeapAllocatorRAM> final : public AllocatorTrait<Heap
     static constexpr bool IS_ATOMIC = false;
     static constexpr bool WILL_ADDR_MOVE = false;
 
-    WBE_TRAIT_REQURIES(AllocatorTraitConcept);
+    WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
 class HeapAllocatorRAM final : public HeapAllocator {

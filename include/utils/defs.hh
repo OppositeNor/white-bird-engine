@@ -45,11 +45,14 @@
 
 #endif
 
+// Requires the struct to satisfy a specific concept.
+#define WBE_REQUIRES_CONCEPT(requires_concept, StructType) static_assert(requires_concept<StructType>)
+
 // Used inside a trait structure.
 #define WBE_TRAIT(trait_name) using TraitType = trait_name
 
 // Used inside a trait structure. Requires the trait to satisfy a specific concept.
-#define WBE_TRAIT_REQURIES(requires_concept) static_assert(requires_concept<TraitType>)
+#define WBE_TRAIT_REQUIRES(requires_concept) WBE_REQUIRES_CONCEPT(requires_concept, TraitType)
 
 // Used for macro expansion.
 #define WBE_EXPAND_STR(x) #x

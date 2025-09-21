@@ -14,6 +14,8 @@
 */
 #include "function/render_vk/render_pass_normal_depth_vk.hh"
 #include "core/allocator/allocator.hh"
+#include "function/render/render_database.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -23,6 +25,9 @@ Ref<RenderPass::RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_inp
     RenderDataVK* input = std::bit_cast<RenderDataVK*>(p_input.get());
     setup_render_pass(input);
     setup_framebuffer(input);
+    // Register the two maps to the GPU.
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("normal_map", normal_map);
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("depth_map", depth_map);
     return p_input;
 }
 
@@ -31,6 +36,7 @@ Ref<RenderPass::RenderData> RenderPassNormalDepthVK::involke(Ref<RenderData> p_i
 }
 
 void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
+    auto* base_render_data = p_input->base_render_data;
     // Setup color attachment
     VkAttachmentDescription normal_attachment = create_normal_attachment();
     VkAttachmentDescription depth_attachment = create_depth_attachment();
@@ -69,14 +75,15 @@ void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(p_input->base_render_data->logic_device, &render_pass_info,
-                           p_input->base_render_data->allocation_callbacks, &render_pass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(base_render_data->logic_device, &render_pass_info,
+                           base_render_data->allocation_callbacks, &render_pass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass.");
     }
 }
 
 
 void RenderPassNormalDepthVK::setup_framebuffer(RenderDataVK* p_input) {
+    auto* base_render_data = p_input->base_render_data;
     create_renderable_image_2d(p_input, VK_FORMAT_R8G8B8_UNORM, &normal_map);
     create_renderable_image_2d(p_input, VK_FORMAT_R32_SFLOAT, &depth_map);
     create_renderable_image_view_2d(p_input, normal_map, VK_FORMAT_R8G8B8_UNORM, &normal_view);
@@ -88,12 +95,12 @@ void RenderPassNormalDepthVK::setup_framebuffer(RenderDataVK* p_input) {
     create_info.attachmentCount = 2;
     VkImageView attachments[] = { normal_view, depth_view };
     create_info.pAttachments = attachments;
-    create_info.width = p_input->base_render_data->swap_chain_extent.width;
-    create_info.height = p_input->base_render_data->swap_chain_extent.height;
+    create_info.width = base_render_data->swap_chain_extent.width;
+    create_info.height = base_render_data->swap_chain_extent.height;
     create_info.layers = 1;
 
-    if (vkCreateFramebuffer(p_input->base_render_data->logic_device, &create_info,
-                            p_input->base_render_data->allocation_callbacks, &framebuffer) != VK_SUCCESS) {
+    if (vkCreateFramebuffer(base_render_data->logic_device, &create_info,
+                            base_render_data->allocation_callbacks, &framebuffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }
 }
