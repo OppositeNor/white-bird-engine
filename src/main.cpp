@@ -40,7 +40,7 @@ int main(int p_argc, char* p_argv[]) {
     }
     auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (auto& profile : profiles) {
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}, delta: {}", profile.message, profile.delta));
+        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: delta: {}", profile.message, profile.delta));
     }
     return EXIT_SUCCESS;
 }

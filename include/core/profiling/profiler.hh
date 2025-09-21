@@ -35,7 +35,7 @@ public:
     }
 
     ~Profiler() {
-        profile_data.delta = EngineCore::get_singleton()->global_clock->get_duration();
+        profile_data.delta = EngineCore::get_singleton()->global_clock->get_duration() - profile_data.start_time;
         EngineCore::get_singleton()->profiling_manager->push_profiling_data(std::move(profile_data));
     }
 

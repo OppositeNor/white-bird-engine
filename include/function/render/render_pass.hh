@@ -18,8 +18,6 @@
 #include "core/memory/reference_strong.hh"
 namespace WhiteBirdEngine {
 
-struct RenderData {};
-
 /**
  * @class RenderPass
  * @brief Render pass interface.
@@ -27,6 +25,14 @@ struct RenderData {};
  */
 class RenderPass {
 public:
+
+    /**
+     * @class RenderData
+     * @brief Data passed in and out from setup and involke methods.
+     *
+     */
+    struct RenderData {};
+
     RenderPass() = default;
     virtual ~RenderPass() {}
 

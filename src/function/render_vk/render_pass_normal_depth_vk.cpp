@@ -14,12 +14,23 @@
 */
 #include "function/render_vk/render_pass_normal_depth_vk.hh"
 #include "core/allocator/allocator.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-Ref<RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_input) {
-    RenderPassNormalDepthVKInput* input = std::bit_cast<RenderPassNormalDepthVKInput*>(p_input.get());
+Ref<RenderPass::RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_input) {
+    RenderDataVK* input = std::bit_cast<RenderDataVK*>(p_input.get());
+    setup_render_pass(input);
+    setup_framebuffer(input);
+    return p_input;
+}
+
+Ref<RenderPass::RenderData> RenderPassNormalDepthVK::involke(Ref<RenderData> p_input) {
+    return MEM_NULL; // TODO
+}
+
+void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
     // Setup color attachment
     VkAttachmentDescription color_attachment = create_result_color_attachment();
 
@@ -52,14 +63,27 @@ Ref<RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_input) {
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(input->logic_device, &render_pass_info, input->allocation_callbacks, &render_pass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(p_input->logic_device, &render_pass_info, p_input->allocation_callbacks, &render_pass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass.");
     }
-    return p_input;
 }
 
-Ref<RenderData> RenderPassNormalDepthVK::involke(Ref<RenderData> p_input) {
-    return MEM_NULL; // TODO
+
+void RenderPassNormalDepthVK::setup_framebuffer(RenderDataVK* p_input) {
+    setup_render_image(p_input);
+    VkFramebufferCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    create_info.renderPass = render_pass;
+    create_info.attachmentCount = 1;
+    VkImageView attachments[] = { render_image_view };
+    create_info.pAttachments = attachments;
+    create_info.width = p_input->swap_chain_extent.width;
+    create_info.height = p_input->swap_chain_extent.height;
+    create_info.layers = 1;
+
+    if (vkCreateFramebuffer(p_input->logic_device, &create_info, p_input->allocation_callbacks, &framebuffer)) {
+        throw std::runtime_error("Failed to create framebuffer.");
+    }
 }
 
 VkAttachmentDescription RenderPassNormalDepthVK::create_result_color_attachment() {
@@ -82,5 +106,30 @@ VkAttachmentDescription RenderPassNormalDepthVK::create_result_color_attachment(
     return color_attachment;
 
 }
+
+void RenderPassNormalDepthVK::setup_render_image(RenderDataVK* p_input) {
+    VkImageCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    // 2D image
+    create_info.imageType = VK_IMAGE_TYPE_2D;
+    // 8 bits rgba
+    create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+    // Set size to the size of the swap chain's images.
+    create_info.extent.width = p_input->swap_chain_extent.width;
+    create_info.extent.height = p_input->swap_chain_extent.height;
+    // No mipmap
+    create_info.mipLevels = 0;
+    // 1 layer image
+    create_info.arrayLayers = 1;
+    // 1 sample per pixel
+    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    // Optimal memory layout
+    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    // Could be rendered into.
+    create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    // TODO
+}
+
 
 }
