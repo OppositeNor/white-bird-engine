@@ -16,12 +16,10 @@
 #define __WBE_RENDERER_VK_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_pass.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
-#include "function/render_vk/render_database_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
@@ -41,7 +39,7 @@ namespace WhiteBirdEngine {
 class RendererVK : public Renderer {
 public:
 
-    using AllocType = HeapAllocatorAlignedPool;
+    using AllocType = RenderAllocator;
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
     RendererVK(RendererVK&&) = delete;
@@ -71,8 +69,6 @@ private:
     AllocType* allocator;
     Ref<AllocatorVK<AllocType>> allocator_vk;
 
-    Ref<RenderDatabaseVK<AllocType>> render_database;
-
     // Vulkan properties
     SDL_Window* window;
     VkInstance vk_instance;
@@ -96,7 +92,7 @@ private:
     VkViewport viewport{};
     VkRect2D scissor{};
 
-    VkRenderPass render_pass;
+    VkRenderPass result_render_pass;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"

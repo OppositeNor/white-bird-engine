@@ -1,7 +1,6 @@
 #ifndef __WBE_APPLICATION_GAME_HH__
 #define __WBE_APPLICATION_GAME_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/application/application.hh"
 #include "function/render/renderer.hh"
@@ -24,12 +23,12 @@ public:
      *
      * @return The allocator for the renderer.
      */
-    Ref<const HeapAllocatorAlignedPool> get_renderer_allocator() const {
+    Ref<const RenderAllocator> get_renderer_allocator() const {
         return renderer_allocator;
     }
 
 private:
-    Ref<HeapAllocatorAlignedPool> renderer_allocator;
+    Ref<RenderAllocator> renderer_allocator;
     void init();
 protected:
     Ref<Renderer> renderer;

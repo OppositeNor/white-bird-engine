@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-add_subdirectory(render_vk_test)
 
 set(WBE_TEST_EXE ${WBE_TEST_EXE}
     PARENT_SCOPE

@@ -16,10 +16,9 @@
 #define __WBE_RENDER_PASS_HH__
 
 #include "core/memory/reference_strong.hh"
-#include <string>
 namespace WhiteBirdEngine {
 
-using RenderData = void;
+struct RenderData {};
 
 /**
  * @class RenderPass
@@ -34,7 +33,7 @@ public:
     /**
      * @brief Get the name of the pass.
      */
-    virtual const std::string& get_pass_name() = 0;
+    virtual const char* get_pass_name() = 0;
 
     /**
      * @brief Setup the render pass.

@@ -17,23 +17,23 @@
 
 #ifdef WBE_REFLECTION_PARSER
 
-__attribute__((annotate("WBE_DEFINE_RENDER_TASK")))
-void define_wbe_render_task(const char* task_name, const char* render_task_vk) {}
+__attribute__((annotate("WBE_DEFINE_RENDER_PASS")))
+void define_wbe_render_pass(const char* pass_class_name, const char* pass_name, const char* pass_type) {}
 
-__attribute__((annotate("WBE_DEFINE_RENDER_PIPELINE")))
-void define_wbe_render_pipeline(const char* pipeline_name, ...)
-
-// Define a render task.
-#define WBE_RENDER_TASK(task_name, RenderTaskVK) define_wbe_render_task(#task_name, #RenderTaskVK)
-// Define a render pipeline.
-#define WBE_RENDER_PIPELINE(pipeline_name, ...) define_wbe_render_pipeline(#pipeline_name, __VA_ARGS__)
+// Define a render pass.
+#define WBE_RENDER_PASS(PassClassName, pass_name, RENDER_API)\
+        define_wbe_render_pass(#PassClassName, #pass_name, #RENDER_API);\
+        virtual const char* get_pass_name() override {\
+            return #pass_name;\
+        }
 
 #else
 
-// Define a render task.
-#define WBE_RENDER_TASK(task_name, RenderTaskVK)
-// Define a render pipeline.
-#define WBE_RENDER_PIPELINE(...)
+// Define a render pass.
+#define WBE_RENDER_PASS(PassClassName, pass_name, RENDER_API)\
+virtual const char* get_pass_name() override {\
+    return #pass_name;\
+}
 
 #endif
 

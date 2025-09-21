@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDER_DATABASE_VK_HH__
-#define __WBE_RENDER_DATABASE_VK_HH__
+#ifndef __WBE_RENDER_DATABASE_HH__
+#define __WBE_RENDER_DATABASE_HH__
 
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
@@ -21,18 +21,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
-#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class RenderDatabaseVK
- * @brief Vulkan renderer render database.
+ * @class RenderDatabase
+ * @brief Renderer render database.
  *
  * @todo Test
  */
 template <typename AllocType>
-class RenderDatabaseVK {
+class RenderDatabase {
 private:
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
@@ -40,18 +39,18 @@ private:
     using set = ::WhiteBirdEngine::set<T, AllocType>;
 public:
 
-    ~RenderDatabaseVK() {}
-    RenderDatabaseVK(const RenderDatabaseVK&) = delete;
-    RenderDatabaseVK(RenderDatabaseVK&&) = delete;
-    RenderDatabaseVK& operator=(const RenderDatabaseVK&) = delete;
-    RenderDatabaseVK& operator=(RenderDatabaseVK&&) = delete;
+    ~RenderDatabase() {}
+    RenderDatabase(const RenderDatabase&) = delete;
+    RenderDatabase(RenderDatabase&&) = delete;
+    RenderDatabase& operator=(const RenderDatabase&) = delete;
+    RenderDatabase& operator=(RenderDatabase&&) = delete;
 
     /**
      * @brief Constructor.
      *
      * @param p_allocator The allocator for resource allocations.
      */
-    RenderDatabaseVK(AllocType* p_allocator);
+    RenderDatabase(AllocType* p_allocator);
 
 
     /**
@@ -108,7 +107,7 @@ private:
 };
 
 template <typename AllocType>
-RenderDatabaseVK<AllocType>::RenderDatabaseVK(AllocType* p_allocator)
+RenderDatabase<AllocType>::RenderDatabase(AllocType* p_allocator)
     : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator),
     dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator) {
     if (p_allocator == nullptr) {
@@ -118,7 +117,7 @@ RenderDatabaseVK<AllocType>::RenderDatabaseVK(AllocType* p_allocator)
 }
 
 template <typename AllocType>
-void RenderDatabaseVK<AllocType>::set_opaque_triangles(
+void RenderDatabase<AllocType>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
@@ -153,7 +152,7 @@ void RenderDatabaseVK<AllocType>::set_opaque_triangles(
 }
 
 template <typename AllocType>
-void RenderDatabaseVK<AllocType>::set_opaque_triangles(
+void RenderDatabase<AllocType>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,

@@ -161,8 +161,10 @@ struct RUMesh3D : public ResourceUnit {
     using VertType = Vertex3D<VertSlot>;
     // The vertices data.
     MemID vertices_data;
-    // The indices data.
-    MemID indices_data;
+    // The indices data for the submeshes. It is ordered in chunks, with each chunk
+    // starting with a 4 byte integer indicating the size of the submesh, followed
+    // with a NUL terminated string, representing the submesh's material ID.
+    MemID submeshes_indices_data;
     // The number of vertices of the mesh.
     uint32_t vertices_count;
 };

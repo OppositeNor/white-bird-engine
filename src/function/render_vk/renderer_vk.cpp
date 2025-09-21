@@ -13,14 +13,12 @@
    limitations under the License.
 */
 #include "function/render_vk/renderer_vk.hh"
-#include "SDL_vulkan.h"
 #include "core/allocator/allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/engine_function.hh"
 #include "function/render_vk/allocator_vk.hh"
-#include "function/render_vk/render_database_vk.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
@@ -33,8 +31,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator),
-    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)),
-    render_database(make_ref<RenderDatabaseVK<AllocType>>(p_allocator, p_allocator)) {
+    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)) {
     init();
 }
 
@@ -58,7 +55,7 @@ void RendererVK::add_render_pass(Ref<RenderPass> p_render_pass) {
 }
 
 void RendererVK::terminate() {
-    vkDestroyRenderPass(logical_device, render_pass, get_allocation_callbacks());
+    vkDestroyRenderPass(logical_device, result_render_pass, get_allocation_callbacks());
     for (auto image_view : swap_chain_image_views) {
         vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
     }
@@ -287,7 +284,7 @@ void RendererVK::create_render_pass() {
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(logical_device, &render_pass_info, get_allocation_callbacks(), &render_pass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(logical_device, &render_pass_info, get_allocation_callbacks(), &result_render_pass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass.");
     }
 }
@@ -400,7 +397,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
     if (pick_device_index >= 0) {
         if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
-                "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). White Bird Engine is picking"
+                "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). Picking"
                 " an alternative device.", pick_device_index, p_physical_devices.size()));
         }
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
@@ -409,7 +406,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
             string device_name(device_properties.deviceName, allocator);
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
-                " White Bird Engine is picking an alternative device.", device_name));
+                " Picking an alternative device.", device_name));
         }
         else {
             VkPhysicalDeviceProperties device_properties;
