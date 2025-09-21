@@ -32,7 +32,8 @@ Ref<RenderPass::RenderData> RenderPassNormalDepthVK::involke(Ref<RenderData> p_i
 
 void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
     // Setup color attachment
-    VkAttachmentDescription color_attachment = create_result_color_attachment();
+    VkAttachmentDescription normal_attachment = create_normal_attachment();
+    VkAttachmentDescription depth_attachment = create_depth_attachment();
 
     // Color attachment.
     VkAttachmentReference color_attachment_reference{};
@@ -40,6 +41,7 @@ void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
     // Image going to be rendered using a graphics pipeline.
     color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // Setup subpass
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
@@ -47,11 +49,15 @@ void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
 
     VkRenderPassCreateInfo render_pass_info{};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 1;
-    render_pass_info.pAttachments = &color_attachment;
+    // 2 attachments: normal and depth
+    render_pass_info.attachmentCount = 2;
+    VkAttachmentDescription attachments[] {
+        normal_attachment, depth_attachment
+    };
+    render_pass_info.pAttachments = attachments;
     render_pass_info.subpassCount = 1;
     render_pass_info.pSubpasses = &subpass;
-    
+
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -63,33 +69,39 @@ void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(p_input->logic_device, &render_pass_info, p_input->allocation_callbacks, &render_pass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(p_input->base_render_data->logic_device, &render_pass_info,
+                           p_input->base_render_data->allocation_callbacks, &render_pass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass.");
     }
 }
 
 
 void RenderPassNormalDepthVK::setup_framebuffer(RenderDataVK* p_input) {
-    setup_render_image(p_input);
+    create_renderable_image_2d(p_input, VK_FORMAT_R8G8B8_UNORM, &normal_map);
+    create_renderable_image_2d(p_input, VK_FORMAT_R32_SFLOAT, &depth_map);
+    create_renderable_image_view_2d(p_input, normal_map, VK_FORMAT_R8G8B8_UNORM, &normal_view);
+    create_renderable_image_view_2d(p_input, depth_map, VK_FORMAT_R32_SFLOAT, &depth_view);
+
     VkFramebufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     create_info.renderPass = render_pass;
-    create_info.attachmentCount = 1;
-    VkImageView attachments[] = { render_image_view };
+    create_info.attachmentCount = 2;
+    VkImageView attachments[] = { normal_view, depth_view };
     create_info.pAttachments = attachments;
-    create_info.width = p_input->swap_chain_extent.width;
-    create_info.height = p_input->swap_chain_extent.height;
+    create_info.width = p_input->base_render_data->swap_chain_extent.width;
+    create_info.height = p_input->base_render_data->swap_chain_extent.height;
     create_info.layers = 1;
 
-    if (vkCreateFramebuffer(p_input->logic_device, &create_info, p_input->allocation_callbacks, &framebuffer)) {
+    if (vkCreateFramebuffer(p_input->base_render_data->logic_device, &create_info,
+                            p_input->base_render_data->allocation_callbacks, &framebuffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }
 }
 
-VkAttachmentDescription RenderPassNormalDepthVK::create_result_color_attachment() {
+VkAttachmentDescription RenderPassNormalDepthVK::create_normal_attachment() {
     // Setup color attachment
     VkAttachmentDescription color_attachment{};
-    color_attachment.format = VK_FORMAT_B8G8R8A8_UNORM;
+    color_attachment.format = VK_FORMAT_R8G8B8_UNORM;
     // Disable multisample.
     color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     // Clear the color before every render pass.
@@ -107,29 +119,24 @@ VkAttachmentDescription RenderPassNormalDepthVK::create_result_color_attachment(
 
 }
 
-void RenderPassNormalDepthVK::setup_render_image(RenderDataVK* p_input) {
-    VkImageCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    // 2D image
-    create_info.imageType = VK_IMAGE_TYPE_2D;
-    // 8 bits rgba
-    create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    // Set size to the size of the swap chain's images.
-    create_info.extent.width = p_input->swap_chain_extent.width;
-    create_info.extent.height = p_input->swap_chain_extent.height;
-    // No mipmap
-    create_info.mipLevels = 0;
-    // 1 layer image
-    create_info.arrayLayers = 1;
-    // 1 sample per pixel
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    // Optimal memory layout
-    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    // Could be rendered into.
-    create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    // TODO
+VkAttachmentDescription create_depth_attachment() {
+    // Setup color attachment
+    VkAttachmentDescription color_attachment{};
+    color_attachment.format = VK_FORMAT_R32_SFLOAT;
+    // Disable multisample.
+    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    // Clear the color before every render pass.
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    // Store the color after every render pass.
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    // Don't care about the stencil images.
+    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    // The attachment's initial layout is not known.
+    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // The attachment's final layout should be able to present on screen.
+    color_attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    return color_attachment;
 }
-
 
 }

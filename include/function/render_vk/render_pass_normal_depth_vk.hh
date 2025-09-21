@@ -26,14 +26,16 @@ private:
     bool initialized = false;
     VkRenderPass render_pass;
     VkFramebuffer framebuffer;
-    VkImage render_image;
-    VkImageView render_image_view;
+    VkImage normal_map;
+    VkImageView normal_view;
+    VkImage depth_map;
+    VkImageView depth_view;
 
     void setup_render_pass(RenderDataVK* p_input);
     void setup_framebuffer(RenderDataVK* p_input);
 
-    VkAttachmentDescription create_result_color_attachment();
-    void setup_render_image(RenderDataVK* p_input);
+    VkAttachmentDescription create_normal_attachment();
+    VkAttachmentDescription create_depth_attachment();
 };
 
 }
