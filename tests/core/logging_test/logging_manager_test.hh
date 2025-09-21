@@ -15,11 +15,11 @@
 #ifndef __WBE_LOGGING_MANAGER_TEST_HH__
 #define __WBE_LOGGING_MANAGER_TEST_HH__
 
-#include "core/core_utils.hh"
 #include "core/logging/log.hh"
 #include "core/logging/logging_manager.hh"
 #include "global/global.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <gtest/gtest.h>
 #include <ostream>
 
@@ -33,14 +33,17 @@ WBE_DEFINE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
 
 class LogTestMock : public WBE::Log {
 public:
+    const std::string& get_channel_name(WBE::HashCode p_label) {
+        return WBE::EngineCore::get_singleton()->game_metadata->get_channel_metadata()[p_label];
+    }
 
     LogTestMock(WBE::ChannelID p_channel_id, std::ostream& p_ostream)
         : channel_id(p_channel_id), ostream(&p_ostream) {
-        *ostream << "Construct " << WBE::get_label_name(channel_id) << std::endl;
+        *ostream << "Construct " << get_channel_name(channel_id) << std::endl;
     }
 
     virtual ~LogTestMock() override {
-        *ostream << "Destruct " << WBE::get_label_name(channel_id) << std::endl;
+        *ostream << "Destruct " << get_channel_name(channel_id) << std::endl;
     }
 
     WBE::ChannelID channel_id;
@@ -51,16 +54,16 @@ public:
     }
 
     virtual void message(const std::string& p_str) override {
-        *ostream << "Message " << WBE::get_label_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Message " << get_channel_name(channel_id) << " " << p_str << std::endl;
     }
 
 
     virtual void warning(const std::string& p_str) override {
-        *ostream << "Warning " << WBE::get_label_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Warning " << get_channel_name(channel_id) << " " << p_str << std::endl;
     }
 
     virtual void error(const std::string& p_str) override {
-        *ostream << "Error " << WBE::get_label_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Error " << get_channel_name(channel_id) << " " << p_str << std::endl;
     }
 };
 

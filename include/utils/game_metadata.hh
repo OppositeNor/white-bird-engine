@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
 /**
  * @class GameMetadata
  * @brief Metadata of the game.
- * Including channel ids, type ids, etc.
+ * Including label ids, type ids, etc.
  * @todo Test
  */
 class GameMetadata : public Singleton<GameMetadata> {

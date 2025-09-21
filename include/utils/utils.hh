@@ -345,6 +345,8 @@ enum class ColorSpace {
     // SRGB space
     SRGB
 };
+
+using ChannelID = HashCode;
 }
 #endif
 

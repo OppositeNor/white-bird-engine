@@ -33,7 +33,7 @@ TEST(WBEProfilerTest, Profiling) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     uint32_t line_num = 0;
     {
-        WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL); line_num = __LINE__;
+        WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL, "Test profile"); line_num = __LINE__;
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     const auto& profile_data = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
@@ -43,7 +43,7 @@ TEST(WBEProfilerTest, Profiling) {
     ASSERT_EQ(profile_data[0].line, line_num);
     uint32_t line_num_1 = 0;
     {
-        WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL); line_num_1 = __LINE__;
+        WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL, "Test profile"); line_num_1 = __LINE__;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     ASSERT_EQ(profile_data.size(), 2);

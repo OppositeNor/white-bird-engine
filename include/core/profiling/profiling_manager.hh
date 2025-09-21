@@ -15,9 +15,12 @@
 #ifndef __WBE_PROFILLING_MANAGER_HH__
 #define __WBE_PROFILLING_MANAGER_HH__
 
-#include "core/logging/log.hh"
+#include "core/engine_core.hh"
 #include "utils/interface/singleton.hh"
+#include "utils/utils.hh"
 #include <shared_mutex>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -39,10 +42,24 @@ public:
      *
      */
     struct ProfileData {
+        ChannelID channel;
+        std::string message;
         double start_time;
         double delta;
         std::string file;
         uint32_t line;
+
+        operator std::string() const {
+            std::stringstream ss;
+            ss << R"({"channel":")" << get_label_name(channel) << '\"'
+               << R"(,"message":")" << message << '\"'
+               << R"(,"start_time":)" << start_time
+               << R"(,"delta":)" << delta
+               << R"(,"file":")" << file << '\"'
+               << R"(,"line":)" << line
+               << R"(})";
+            return ss.str();
+        }
     };
 
     /**
@@ -53,7 +70,17 @@ public:
      * @param p_file The source file that the proflier is created.
      * @param p_line The line number where the profiler is created.
      */
-    void push_profiling_data(ChannelID p_channel, double p_start_time, double p_delta, const std::string& p_file, uint32_t p_line);
+    void push_profiling_data(const ProfileData& p_profile_data);
+
+    /**
+     * @brief Push a profiling data to the profile stash.
+     *
+     * @param p_channel The channel to push the data to.
+     * @param p_delta The delta time that's been pushed into the profiler in seconds.
+     * @param p_file The source file that the proflier is created.
+     * @param p_line The line number where the profiler is created.
+     */
+    void push_profiling_data(ProfileData&& p_profile_data);
 
     /**
      * @brief Get data for profiliing.
@@ -68,6 +95,10 @@ public:
 private:
     mutable std::shared_mutex profile_stash_mutex;
     mutable std::unordered_map<ChannelID, std::vector<ProfileData>> profile_stash;
+
+    static const std::string& get_label_name(HashCode p_label) {
+        return EngineCore::get_singleton()->game_metadata->get_channel_metadata()[p_label];
+    }
 
 };
 

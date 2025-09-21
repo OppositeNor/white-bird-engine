@@ -21,7 +21,6 @@
 #include "utils/game_metadata.hh"
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
-#include "core/profiling/profiling_manager.hh"
 #include "platform/file_system/file_system.hh"
 #include "utils/interface/singleton.hh"
 
@@ -90,7 +89,7 @@ public:
     /**
      * @brief Manager for profiling.
      */
-    ProfilingManager* profiling_manager;
+    class ProfilingManager* profiling_manager;
 
     /**
      * @brief Metadata of the game.

@@ -26,7 +26,7 @@ int main(int p_argc, char* p_argv[]) {
     {
         WhiteBirdEngine::ApplicationGame game_application;
         {
-            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL);
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
             WBE::wbe_console_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
@@ -38,8 +38,10 @@ int main(int p_argc, char* p_argv[]) {
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator layout: {}",
             static_cast<std::string>(*game_application.get_renderer_allocator())));
     }
-    WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)
-        ->message("Time: " + std::to_string(global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL)[0].delta));
+    auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    for (auto& profile : profiles) {
+        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}, delta: {}", profile.message, profile.delta));
+    }
     return EXIT_SUCCESS;
 }
 

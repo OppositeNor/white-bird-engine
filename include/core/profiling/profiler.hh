@@ -16,11 +16,10 @@
 #define __WBE_PROFILLER_HH__
 
 #include "core/engine_core.hh"
-#include "core/logging/log.hh"
 #include "core/profiling/profiling_manager.hh"
 namespace WhiteBirdEngine {
 
-#define WBE_START_PROFILE(CHANNEL) auto profiler_##__LINE__ = WhiteBirdEngine::Profiler(CHANNEL, std::string(__FILE__), __LINE__)
+#define WBE_START_PROFILE(CHANNEL, p_message) auto profiler_##__LINE__ = WhiteBirdEngine::Profiler(CHANNEL, p_message, std::string(__FILE__), __LINE__)
 
 /**
  * @brief The profiler class.
@@ -29,15 +28,15 @@ namespace WhiteBirdEngine {
  */
 class Profiler {
 public:
-
-    Profiler(ChannelID p_channel, const std::string& p_file, uint32_t p_line)
-        : channel(p_channel), file(p_file), line(p_line) {
-        start_time = EngineCore::get_singleton()->global_clock->get_duration();
+    using ProfileData = ProfilingManager::ProfileData;
+    Profiler(ChannelID p_channel, const std::string& p_message, const std::string& p_file, uint32_t p_line) {
+        profile_data = { .channel = p_channel, .message = p_message, .file = p_file, .line = p_line };
+        profile_data.start_time = EngineCore::get_singleton()->global_clock->get_duration();
     }
 
     ~Profiler() {
-        double delta = EngineCore::get_singleton()->global_clock->get_duration();
-        EngineCore::get_singleton()->profiling_manager->push_profiling_data(channel, start_time, delta, file, line);
+        profile_data.delta = EngineCore::get_singleton()->global_clock->get_duration();
+        EngineCore::get_singleton()->profiling_manager->push_profiling_data(std::move(profile_data));
     }
 
     Profiler(const Profiler&) = delete;
@@ -46,10 +45,7 @@ public:
     Profiler& operator=(Profiler&&) = delete;
 
 private:
-    ChannelID channel;
-    std::string file;
-    uint32_t line;
-    double start_time;
+    ProfileData profile_data;
 };
 
 }

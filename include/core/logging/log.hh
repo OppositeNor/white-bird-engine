@@ -20,8 +20,6 @@
 #include <string>
 namespace WhiteBirdEngine {
 
-using ChannelID = HashCode;
-
 // default labels
 WBE_DEFINE_LABEL(WBE_CHANNEL_UNKNOWN, WBE_CHANNEL)
 WBE_DEFINE_LABEL(WBE_CHANNEL_GLOBAL, WBE_CHANNEL)
