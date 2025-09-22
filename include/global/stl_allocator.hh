@@ -26,18 +26,26 @@ namespace WhiteBirdEngine {
  * @class STLAllocator
  * @brief Adapter allocator for C++ standard library.
  *
+ * @tparam T The type of the data.
+ * @tparam AllocType The type of the allocator.
+ * @tparam POCCA Propagate on container copy assignment.
+ * @tparam POCMA Propagate on container move assignment.
+ * @tparam POCS Propagate on container swap.
+ * @return 
  */
-template <typename T, typename AllocType, bool PROPAGATE_ON_COPY>
+template <typename T, typename AllocType, bool POCCA, bool POCMA, bool POCS>
 struct STLAllocator {
     using value_type = T;
     AllocType* allocator = nullptr;
 
     template <typename U>
     struct rebind {
-        using other = STLAllocator<U, AllocType, PROPAGATE_ON_COPY>;
+        using other = STLAllocator<U, AllocType, POCCA, POCMA, POCS>;
     };
 
-    using propagate_on_container_copy_construction = std::conditional<PROPAGATE_ON_COPY, std::true_type, std::false_type>;
+    using propagate_on_container_copy_assignment = std::conditional<POCCA, std::true_type, std::false_type>;
+    using propagate_on_container_move_assignment = std::conditional<POCMA, std::true_type, std::false_type>;
+    using propagate_on_container_swap = std::conditional<POCS, std::true_type, std::false_type>;
 
     /**
      * @brief Constructor.
@@ -74,7 +82,7 @@ struct STLAllocator {
      * @param p_other The allocator to be copied.
      */
     template <typename T1>
-    STLAllocator(const STLAllocator<T1, AllocType, PROPAGATE_ON_COPY>& p_other) noexcept
+    STLAllocator(const STLAllocator<T1, AllocType, POCCA, POCMA, POCS>& p_other) noexcept
         : allocator(p_other.allocator) {}
 
     
@@ -105,7 +113,7 @@ struct STLAllocator {
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename T, typename AllocType>
-using vector = std::vector<T, STLAllocator<T, AllocType, false>>;
+using vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
  * @brief STL vector that uses a pool allocator.
@@ -123,7 +131,7 @@ using vectorp = vector<T, HeapAllocatorAlignedPool>;
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename T, typename AllocType>
-using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false>>;
+using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
  * @brief STL set that uses a pool allocator.
@@ -140,7 +148,7 @@ using setp = set<T, HeapAllocatorAlignedPool>;
  * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
  */
 template <typename AllocType>
-using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false>>;
+using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false, true, false>>;
 
 /**
  * @brief STL string that uses a pool allocator.
@@ -155,7 +163,7 @@ using stringp = string<HeapAllocatorAlignedPool>;
  * @tparam T 
  */
 template <typename T>
-using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool, false>;
+using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool, false, true, false>;
 
 }
 

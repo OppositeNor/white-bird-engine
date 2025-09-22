@@ -18,7 +18,6 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_pass.hh"
-#include "function/render/shader.hh"
 #include "utils/interface/singleton.hh"
 #include <string>
 namespace WhiteBirdEngine {
@@ -35,13 +34,6 @@ class Renderer : public Singleton<Renderer> {
 public:
     Renderer() = default;
     virtual ~Renderer() {}
-
-    /**
-     * @brief Create a shader instance.
-     *
-     * @param p_shader_res The resource ID referencing the source of the shader.
-     */
-    virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) = 0;
 
     /**
      * @brief Get the render passs from the name of the pass.

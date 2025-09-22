@@ -80,7 +80,7 @@ public:
     template <typename VertType, typename IndxType>
     void set_static_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
         set_opaque_triangles(static_opaque_triangle_map, static_opaque_triangle_vertices, static_opaque_triangle_indices,
-                             std::forward<VertType>(p_vertices), std::forward<IndxType>(p_indices));
+                             dynamic_opaque_triangle_obj_id, std::forward<VertType>(p_vertices), std::forward<IndxType>(p_indices));
     }
 
     /**
@@ -93,7 +93,7 @@ public:
     template <typename VertType, typename IndxType>
     void set_dynamic_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
         set_opaque_triangles(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
-                             std::move(p_vertices), std::move(p_indices));
+                             dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
     }
 
     /**
@@ -133,10 +133,12 @@ private:
     std::map<MaterialID, std::pair<size_t, size_t>> static_opaque_triangle_map;
     vector<Vertex3DTextured> static_opaque_triangle_vertices;
     vector<uint32_t> static_opaque_triangle_indices;
+    vector<uint32_t> static_opaque_triangle_obj_id;
 
     std::map<MaterialID, std::pair<size_t, size_t>> dynamic_opaque_triangle_map;
     vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
     vector<uint32_t> dynamic_opaque_triangle_indices;
+    vector<uint32_t> dynamic_opaque_triangle_obj_id;
 
     std::map<std::string, ImageTypeGPU> images;
 
@@ -144,6 +146,7 @@ private:
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
         vector<Vertex3DTextured>& p_opaque_triangle_vertices,
         vector<uint32_t>& p_opaque_triangle_indices,
+        vector<uint32_t>& p_opaque_triangle_obj_id,
         vector<Vertex3DTextured>&& p_vertices,
         vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
 
@@ -151,6 +154,7 @@ private:
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
         vector<Vertex3DTextured>& p_opaque_triangle_vertices,
         vector<uint32_t>& p_opaque_triangle_indices,
+        vector<uint32_t>& p_opaque_triangle_obj_id,
         const vector<Vertex3DTextured>& p_vertices,
         const vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices);
 
@@ -158,8 +162,8 @@ private:
 
 template <RenderDatabaseTypeConcept Types>
 RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
-    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator),
-    dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator) {
+    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator), static_opaque_triangle_obj_id(p_allocator),
+    dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator), dynamic_opaque_triangle_obj_id(p_allocator) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
@@ -171,13 +175,14 @@ void RenderDatabase<Types>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
+    vector<uint32_t>& p_opaque_triangle_obj_id,
     vector<Vertex3DTextured>&& p_vertices,
     vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
 
     p_opaque_triangle_map.clear();
-    p_opaque_triangle_vertices = std::move(p_vertices);
-    p_opaque_triangle_vertices.swap(p_opaque_triangle_vertices);  // Make the vector memory space compact
+    vector(allocator, std::move(p_vertices)).swap(p_opaque_triangle_vertices);
     p_opaque_triangle_indices = vector<uint32_t>(allocator);
+    p_opaque_triangle_obj_id = vector<uint32_t>(allocator);
 
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
@@ -196,9 +201,10 @@ void RenderDatabase<Types>::set_opaque_triangles(
         p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
                                          tri.second.vertex_indices, tri.second.vertex_indices + 3);
         p_opaque_triangle_map[tri.first].first += 3;
+        p_opaque_triangle_obj_id.push_back(tri.second.obj_id);
     }
     p_indices.clear();
-    p_indices.swap(p_indices); // Clear resources allocated by indices.
+    std::vector<uint32_t>().swap(p_indices);
 }
 
 template <RenderDatabaseTypeConcept Types>
@@ -206,21 +212,22 @@ void RenderDatabase<Types>::set_opaque_triangles(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
+    vector<uint32_t>& p_opaque_triangle_obj_id,
     const vector<Vertex3DTextured>& p_vertices,
     const vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices) {
 
     p_opaque_triangle_map.clear();
     p_opaque_triangle_vertices = p_vertices;
     p_opaque_triangle_indices = vector<uint32_t>(allocator);
+    p_opaque_triangle_obj_id = vector<uint32_t>(allocator);
 
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
-    vector<TriType> indices(p_indices);
-    std::sort(indices.begin(), indices.end(), [](
+    std::sort(p_indices.begin(), p_indices.end(), [](
         const TriType& p_tri1, const TriType& p_tri2) -> bool {
               return p_tri1.first < p_tri2.first;
               });
     MaterialID current_id = MATERIAL_INVALID;
-    for (auto& tri : indices) {
+    for (auto& tri : p_indices) {
         if (tri.first != current_id) {
             // Asign the next material ID's indices.
             p_opaque_triangle_map[tri.first].first = 0;
@@ -231,6 +238,7 @@ void RenderDatabase<Types>::set_opaque_triangles(
         p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
                                          tri.second.vertex_indices, tri.second.vertex_indices + 3);
         p_opaque_triangle_map[tri.first].first += 3;
+        p_opaque_triangle_obj_id.push_back(tri.second.obj_id);
     }
 }
 

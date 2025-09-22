@@ -49,10 +49,6 @@ void RendererVK::init() {
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
 }
 
-Ref<Shader> RendererVK::create_shader_instance(const std::string& p_shader_res) {
-    return MEM_NULL; // TODO
-}
-
 void RendererVK::add_render_pass(Ref<RenderPass> p_render_pass) {
     // TODO
 }

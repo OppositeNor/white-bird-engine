@@ -54,8 +54,6 @@ public:
     RendererVK& operator=(RendererVK&&) = delete;
 
     RendererVK(AllocType* p_allocator);
-
-    virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) override;
     virtual Ref<RenderPass> get_render_pass(const std::string& p_pipeline_id) override {
         return MEM_NULL; // TODO
     }
@@ -80,7 +78,7 @@ private:
     inline static RendererVK* singleton = nullptr;
 
     template <typename T>
-    using STLAlloc = STLAllocator<T, AllocType, false>;
+    using STLAlloc = STLAllocator<T, AllocType, false, true, false>;
 
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;

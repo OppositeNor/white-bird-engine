@@ -22,6 +22,12 @@
 #include <cstdint>
 #include <limits>
 
+#define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
+#define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))
+#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*p_header = ((Header)p_head_type) << 60 | p_size)
+#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), p_type, p_size)
+
+
 namespace WhiteBirdEngine {
 
 template <>
@@ -95,11 +101,11 @@ public:
     }
 
     virtual void clear() override {
-        set_chunk_header(mem_chunk, HeaderType::IDLE, size);
+        WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return get_header_size(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
+        return WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
     }
 
     size_t get_total_size() const {
@@ -130,31 +136,6 @@ private:
         IDLE = 1,
     };
 
-    HeaderType get_header_type(Header p_header) const {
-        return (HeaderType)((p_header & HEADER_TYPE_MASK) >> 60);
-    }
-
-    size_t get_header_size(Header p_header) const {
-        size_t chunk_size = p_header & TOTAL_SIZE_MASK;
-        return chunk_size;
-    }
-
-    void set_header(Header* p_header, HeaderType p_head_type, size_t p_size) {
-        *p_header = ((Header)p_head_type) << 60 | p_size;
-    }
-
-    HeaderType get_chunk_type(char* p_header) const {
-        return get_header_type(*reinterpret_cast<Header*>(p_header));
-    }
-
-    size_t get_chunk_size(char* p_mem_chunk) const {
-        return get_header_size(*reinterpret_cast<Header*>(p_mem_chunk));
-    }
-
-    void set_chunk_header(char* p_chunk, HeaderType p_type, size_t p_size) {
-        set_header(reinterpret_cast<Header*>(p_chunk), p_type, p_size);
-    }
-
     template <bool COALESCE_ENABLED>
     MemID find_valid_chunk(size_t p_aligned_size, size_t p_alignment);
     template <bool CHECK_FIRST, bool COALESCE_ENABLED>
@@ -168,5 +149,11 @@ private:
 };
 
 }
+
+#undef WBE_HAAPIL_GET_HEADER_SIZE
+#undef WBE_HAAPIL_GET_CHUNK_SIZE
+#undef WBE_HAAPIL_SET_HEADER
+#undef WBE_HAAPIL_SET_CHUNK_HEADER
+
 
 #endif

@@ -108,6 +108,10 @@ struct Triangle3DIndx {
         uint32_t vertex_indices[3];
     };
     /**
+     * @brief The object ID of this triangle.
+     */
+    uint32_t obj_id;
+    /**
      * @brief The slot used for extension.
      */
     TSlot slot;
