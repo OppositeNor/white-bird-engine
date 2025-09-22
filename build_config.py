@@ -24,6 +24,7 @@ target_info = {
         "cpp-compiler" : "clang++",
         "export-directory" : "release",
         "cmake-build-type" : "Release",
+        "generator" : "Ninja",
         "generate-tests" : True,
     },
     "deploy" : {
@@ -31,6 +32,7 @@ target_info = {
         "cpp-compiler" : "clang++",
         "export-directory" : "deploy",
         "cmake-build-type" : "Deploy",
+        "generator" : "Ninja",
         "generate-tests" : False,
     },
     "debug-gcc" : {
@@ -45,6 +47,7 @@ target_info = {
         "cpp-compiler" : "g++",
         "export-directory" : "release",
         "cmake-build-type" : "Release",
+        "generator" : "Ninja",
         "generate-tests" : True,
     },
     "deploy-gcc" : {
@@ -52,6 +55,7 @@ target_info = {
         "cpp-compiler" : "g++",
         "export-directory" : "deploy",
         "cmake-build-type" : "Deploy",
+        "generator" : "Ninja",
         "generate-tests" : False,
     },
 }

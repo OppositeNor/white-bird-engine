@@ -70,6 +70,9 @@ def _get_cmake_command_from_info(p_build_info):
     result = ["cmake"]
     result.append("-B")
     result.append(p_build_info["export-directory"])
+    if p_build_info.get("generator") is not None:
+        result.append("-G")
+        result.append(p_build_info["generator"])
     result.append(f"-DCMAKE_BUILD_TYPE={p_build_info["cmake-build-type"]}")
     if p_build_info.get("cpp-compiler") is not None:
         result.append(f"-DCMAKE_CXX_COMPILER={p_build_info["cpp-compiler"]}")

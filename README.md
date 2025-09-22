@@ -23,6 +23,12 @@ cd white-bird-engine
 git submodule init --update --recursive
 ```
 
+Install build dependencies:
+
+```sh
+sudo pacman -S cmake clang ninja
+```
+
 It is suggested to use Anaconda for setting up the build environment.
 
 You can install Anaconda from [here](https://github.com/conda-forge/miniforge).
