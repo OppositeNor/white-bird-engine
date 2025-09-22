@@ -18,12 +18,9 @@ add_subdirectory(render)
 add_subdirectory(render_vk)
 add_subdirectory(scene)
 
-add_library(WBE_LIB_FUNCTION STATIC
+set(WBE_SOURCES
+    ${WBE_SOURCES}
     ${wbe_function_src}
-)
-
-set(libs ${libs}
-    WBE_LIB_FUNCTION
     PARENT_SCOPE
 )
 

@@ -15,10 +15,11 @@ set(TEST_NAME wbe_profiler_test)
 
 # ---
 
-file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 file(GLOB ${TEST_NAME}_headers ${CMAKE_CURRENT_SOURCE_DIR}/*.hh)
+file(GLOB ${TEST_NAME}_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${TEST_NAME}
+    ${WBE_SOURCES}
     ${${TEST_NAME}_src}
 )
 

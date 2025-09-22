@@ -17,12 +17,9 @@ add_subdirectory(resource_manager)
 add_subdirectory(resource_chunk)
 add_subdirectory(resource_unit_loader)
 
-add_library(WBE_LIB_RESOURCE STATIC
+set(WBE_SOURCES
+    ${WBE_SOURCES}
     ${wbe_resource_src}
-)
-
-set(libs ${libs}
-    WBE_LIB_RESOURCE
     PARENT_SCOPE
 )
 

@@ -25,12 +25,9 @@ endif()
 
 add_subdirectory(file_system)
 
-add_library(WBE_LIB_PLATFORM STATIC
+set(WBE_SOURCES
+    ${WBE_SOURCES}
     ${wbe_platform_src}
-)
-
-set(libs ${libs}
-    WBE_LIB_PLATFORM
     PARENT_SCOPE
 )
 

@@ -126,7 +126,7 @@ VkAttachmentDescription RenderPassNormalDepthVK::create_normal_attachment() {
 
 }
 
-VkAttachmentDescription create_depth_attachment() {
+VkAttachmentDescription RenderPassNormalDepthVK::create_depth_attachment() {
     // Setup color attachment
     VkAttachmentDescription color_attachment{};
     color_attachment.format = VK_FORMAT_R32_SFLOAT;

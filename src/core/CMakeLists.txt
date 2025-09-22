@@ -20,12 +20,9 @@ add_subdirectory(logging)
 add_subdirectory(profiling)
 add_subdirectory(engine_config)
 
-add_library(WBE_LIB_CORE STATIC
+set(WBE_SOURCES
+    ${WBE_SOURCES}
     ${wbe_core_src}
-)
-
-set(libs ${libs}
-    WBE_LIB_CORE
     PARENT_SCOPE
 )
 

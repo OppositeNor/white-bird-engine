@@ -97,11 +97,12 @@ include_directories(
 )
 
 # Add engine source
-add_subdirectory(src/global)
-add_subdirectory(src/function)
-add_subdirectory(src/resource)
-add_subdirectory(src/core)
+set(WBE_SOURCES "")
 add_subdirectory(src/platform)
+add_subdirectory(src/core)
+add_subdirectory(src/resource)
+add_subdirectory(src/function)
+add_subdirectory(src/global)
 
 set(libs ${libs}
     Vulkan::Vulkan
@@ -115,6 +116,7 @@ if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android build
 else()
     add_executable(${PROJECT_NAME}
+        ${WBE_SOURCES}
         ${PROJECT_SOURCE_DIR}/src/main.cpp
     )
     target_link_libraries(${PROJECT_NAME} PUBLIC
