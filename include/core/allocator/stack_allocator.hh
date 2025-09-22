@@ -50,7 +50,7 @@ class StackAllocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
     ~StackAllocator() {
-        if (marker != 0) {
+        if (stack_pointer != 0) {
             wbe_console_log()->warning("StackAllocator not empty during destruction.");
         }
     }
@@ -65,7 +65,7 @@ public:
      * @param p_size The size of the allocated buffer in bytes.
      */
     StackAllocator(size_t p_size)
-        : total_size(p_size), marker(0),
+        : total_size(p_size), stack_pointer(0),
         mem_chunk(std::make_unique<char[]>(total_size)) {
     }
 
@@ -76,8 +76,8 @@ public:
      * @return 
      */
     MemID allocate(size_t p_size) {
-        void* result = mem_chunk.get() + marker;
-        marker += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+        void* result = mem_chunk.get() + stack_pointer;
+        stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
         return std::bit_cast<MemID>(result);
     }
 
@@ -87,7 +87,7 @@ public:
      * @param p_id The ID of the memory to get.
      */
     void* get(MemID p_id) {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return std::bit_cast<void*>(p_id);
     }
 
@@ -97,7 +97,7 @@ public:
      * @param p_id The ID of the memory to get.
      */
     void* get(MemID p_id) const {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return std::bit_cast<void*>(p_id);
     }
 
@@ -110,7 +110,7 @@ public:
      */
     template <typename T>
     T* get_obj(MemID p_id) const {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + marker));
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return std::bit_cast<T*>(p_id);
     }
 
@@ -120,15 +120,15 @@ public:
      * @return The pointer to the deallocated object.
      */
     void* pop_stack(size_t p_size) {
-        marker -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
-        return mem_chunk.get() + marker;
+        stack_pointer -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+        return mem_chunk.get() + stack_pointer;
     }
 
     /**
      * @brief Clear the allocator.
      */
     void clear() {
-        marker = 0;
+        stack_pointer = 0;
     }
 
     /**
@@ -137,7 +137,7 @@ public:
      * @return The size of the buffer.
      */
     size_t get_alloc_size() const {
-        return marker;
+        return stack_pointer;
     }
 
     /**
@@ -152,14 +152,14 @@ public:
     operator std::string() const {
         std::stringstream ss;
         ss << "{\"type\":\"StackAllocator\",\"total_size\":" << total_size
-           << ",\"marker\":" << marker
-           << ",\"available\":" << (total_size - marker) << "}";
+           << ",\"stack_pointer\":" << stack_pointer
+           << ",\"available\":" << (total_size - stack_pointer) << "}";
         return ss.str();
     }
 
 private:
     size_t total_size;
-    size_t marker;
+    size_t stack_pointer;
     std::unique_ptr<char[]> mem_chunk;
 };
 
