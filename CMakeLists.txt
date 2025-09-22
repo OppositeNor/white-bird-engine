@@ -51,6 +51,7 @@ else()
     set(SDL_SHARED OFF)
     add_subdirectory(dependencies/SDL2)
 endif()
+set(BUILD_TESTING OFF)
 add_subdirectory(dependencies/boost)
 find_package(Vulkan REQUIRED)
 
@@ -65,10 +66,10 @@ if (NOT MSVC)
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Deploy")
     ## for optimization
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -flto -DNDEBUG")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization and testing
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -flto -g -DNDEBUG")
 else()
     ## for gdb or valgrind
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG")
@@ -96,6 +97,13 @@ include_directories(
     ${include_dirs}
 )
 
+set(libs ${libs}
+    Vulkan::Vulkan
+    SDL2::SDL2-static
+    yaml-cpp::yaml-cpp
+    Boost::thread
+)
+
 # Add engine source
 set(WBE_SOURCES "")
 add_subdirectory(src/platform)
@@ -104,11 +112,16 @@ add_subdirectory(src/resource)
 add_subdirectory(src/function)
 add_subdirectory(src/global)
 
+add_library(WBE_LIB
+    ${WBE_SOURCES}
+)
+
+target_link_libraries(WBE_LIB INTERFACE
+    ${libs}
+)
+
 set(libs ${libs}
-    Vulkan::Vulkan
-    SDL2::SDL2-static
-    yaml-cpp::yaml-cpp
-    Boost::thread
+    WBE_LIB
 )
 
 # Create executable
@@ -116,7 +129,6 @@ if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android build
 else()
     add_executable(${PROJECT_NAME}
-        ${WBE_SOURCES}
         ${PROJECT_SOURCE_DIR}/src/main.cpp
     )
     target_link_libraries(${PROJECT_NAME} PUBLIC

@@ -24,8 +24,8 @@
 
 #define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
 #define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))
-#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*p_header = ((Header)p_head_type) << 60 | p_size)
-#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), p_type, p_size)
+#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*p_header = (((Header)(p_head_type) << 60) | (p_size)))
+#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
 
 
 namespace WhiteBirdEngine {

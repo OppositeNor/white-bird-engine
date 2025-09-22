@@ -86,6 +86,7 @@ def _get_cmake_command_from_info(p_build_info):
 # ENTRY
 # Gather sources for reflection
 try:
+    print(f"WBEBuilder: Building target: {args.target}.")
     print("WBEBuilder: Gathering sources...")
     sources = []
     sources.extend(utils.gather_files(include_dir, build_config.source_extensions))

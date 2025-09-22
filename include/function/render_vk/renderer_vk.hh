@@ -42,7 +42,7 @@ public:
     using AllocType = RenderAllocator;
 
     struct RenderDatabaseTypes {
-        using AllocType = AllocType;
+        using AllocType = RendererVK::AllocType;
         using ImageTypeGPU = VkImage;
         WBE_REQUIRES_CONCEPT(RenderDatabaseTypeConcept, RenderDatabaseTypes);
     };

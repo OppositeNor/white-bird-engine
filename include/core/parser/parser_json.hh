@@ -48,24 +48,34 @@ public:
     JSONData(json&& p_data)
         : data(std::move(p_data)) {}
 
-    template <typename T> requires (!std::same_as<T, JSONData>)
+    template <typename T>
     T get_value(const std::string& p_key) const {
-        return data.at(p_key).get<T>();
+        if constexpr (std::same_as<T, std::vector<JSONData>>) {
+            std::vector<JSONData> result;
+            for (const auto& elem : data.at(p_key)) {
+                result.emplace_back(elem);
+            }
+            return result;
+        } else if constexpr (!std::same_as<T, JSONData>) {
+            return data.at(p_key).get<T>();
+        } else {
+            return JSONData(data.at(p_key).get<json>());
+        }
     }
 
-    template <typename T> requires (!std::same_as<T, JSONData>)
+    template <typename T>
     T get_value() const {
-        return data.get<T>();
-    }
-
-    template <std::same_as<JSONData> T>
-    JSONData get_value(const std::string& p_key) const {
-        return JSONData(data.at(p_key).get<json>());
-    }
-
-    template <std::same_as<JSONData> T>
-    JSONData get_value() const {
-        return JSONData(data.get<json>());
+        if constexpr (std::same_as<T, std::vector<JSONData>>) {
+            std::vector<JSONData> result;
+            for (const auto& elem : data) {
+                result.emplace_back(elem);
+            }
+            return result;
+        } else if constexpr (!std::same_as<T, JSONData>) {
+            return data.get<T>();
+        } else {
+            return JSONData(data.get<json>());
+        }
     }
 
     std::vector<std::string> get_all_keys() const {
@@ -123,24 +133,14 @@ public:
         data.data = json::parse(p_buffer);
     }
 
-    template <typename T> requires (!ParserDataConcept<T>)
+    template <typename T>
     T get_value(const std::string& p_key) const {
-        return data.data.at(p_key).get<T>();
+        return data.get_value<T>(p_key);
     }
 
-    template <typename T> requires (!std::same_as<T, JSONData>)
+    template <typename T>
     T get_value() const {
-        return data.data.get<T>();
-    }
-
-    template <ParserDataConcept T>
-    JSONData get_value(const std::string& p_key) const {
-        return JSONData(data.data.at(p_key).get<json>());
-    }
-
-    template <ParserDataConcept T>
-    JSONData get_value() const {
-        return JSONData(data.data.get<json>());
+        return data.get_value<T>();
     }
 
     std::vector<std::string> get_all_keys() const {
