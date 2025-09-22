@@ -58,7 +58,7 @@ jobs:
 
     - name: Install dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y valgrind
+      run: sudo apt-get update && sudo apt-get install -y valgrind ninja
   
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v2
