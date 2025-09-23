@@ -15,6 +15,7 @@ from argparse import ArgumentParser
 import os
 import sys
 import subprocess
+import traceback
 from build_script import on_build
 from build_script import utils
 import shutil
@@ -119,5 +120,6 @@ try:
 
 except Exception as e:
     print("Build failed! Message:", e)
+    traceback.print_exc()
     exit(-1)
 
