@@ -52,13 +52,14 @@ else()
     add_subdirectory(dependencies/SDL2)
 endif()
 set(BUILD_TESTING OFF)
-add_subdirectory(dependencies/boost)
 find_package(Vulkan REQUIRED)
 
 set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
+
+find_package(Boost 1.88.0 REQUIRED CONFIG PATHS dependencies/boost/tools/boost_install)
 
 # Set C++ build flags
 if (NOT MSVC)
@@ -79,36 +80,6 @@ if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWBE_BUILD_TEST=OFF")
 endif()
 
-set(WBE_BOOST_INCLUDES
-    ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/*/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/assert/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/atomic/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/bind/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/chrono/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/concept_check/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/config/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/container/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/container_hash/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/core/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/date_time/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/exception/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/function/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/io/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/move/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/optional/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/predef/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/preprocessor/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/smart_ptr/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/static_assert/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/system/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/thread/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/throw_exception/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/tuple/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/type_traits/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/utility/include
-    # ${PROJECT_SOURCE_DIR}/dependencies/boost/libs/winapi/include
-)
-
 # Set include directories
 set(include_dirs 
     ${PROJECT_SOURCE_DIR}/include
@@ -116,7 +87,6 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
     ${PROJECT_SOURCE_DIR}/dependencies/stb
-    ${WBE_BOOST_INCLUDES}
 )
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories
@@ -131,7 +101,7 @@ set(libs ${libs}
     Vulkan::Vulkan
     SDL2::SDL2-static
     yaml-cpp::yaml-cpp
-    Boost::thread
+    boost_thread
 )
 
 # Add engine source
