@@ -52,15 +52,15 @@ TEST(StackAllocator, General) {
 
 TEST(StackAllocator, ToString) {
     WBE::StackAllocator allocator(1024);
-    std::string exp_1 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":0,\"available\":1024}";
+    std::string exp_1 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"stack_pointer\":0,\"available\":1024}";
     ASSERT_EQ(static_cast<std::string>(allocator), exp_1);
 
     WBE::create_stack_obj<int>(allocator, 42);
-    std::string exp_2 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":8,\"available\":1016}";
+    std::string exp_2 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"stack_pointer\":8,\"available\":1016}";
     ASSERT_EQ(static_cast<std::string>(allocator), exp_2);
 
     WBE::create_stack_obj<double>(allocator, 3.14);
-    std::string exp_3 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"marker\":16,\"available\":1008}";
+    std::string exp_3 = "{\"type\":\"StackAllocator\",\"total_size\":1024,\"stack_pointer\":16,\"available\":1008}";
     ASSERT_EQ(static_cast<std::string>(allocator), exp_3);
 
     WBE::pop_stack_obj<double>(allocator);
