@@ -166,6 +166,7 @@ private:
 template <RenderDatabaseTypeConcept Types>
 RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
     : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator), static_opaque_triangle_obj_id(p_allocator),
+    static_opaque_transform_mats(p_allocator),
     dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator), dynamic_opaque_triangle_obj_id(p_allocator) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
