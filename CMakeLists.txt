@@ -58,8 +58,8 @@ set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
-
-find_package(Boost REQUIRED CONFIG PATHS dependencies/boost/tools/boost_install)
+set(BUILD_TESTING OFF)
+add_subdirectory(dependencies/boost)
 
 # Set C++ build flags
 if (NOT MSVC)
@@ -87,6 +87,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
     ${PROJECT_SOURCE_DIR}/dependencies/stb
+    ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
 )
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories
