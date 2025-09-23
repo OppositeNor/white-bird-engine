@@ -17,6 +17,7 @@
 
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
+#include "glm/fwd.hpp"
 #include "global/stl_allocator.hh"
 #include <cstddef>
 #include <cstdint>
@@ -79,8 +80,8 @@ public:
      */
     template <typename VertType, typename IndxType>
     void set_static_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
-        set_opaque_triangles(static_opaque_triangle_map, static_opaque_triangle_vertices, static_opaque_triangle_indices,
-                             dynamic_opaque_triangle_obj_id, std::forward<VertType>(p_vertices), std::forward<IndxType>(p_indices));
+        set_opaque_triangles_linear(static_opaque_triangle_map, static_opaque_triangle_vertices, static_opaque_triangle_indices,
+                                    dynamic_opaque_triangle_obj_id, std::forward<VertType>(p_vertices), std::forward<IndxType>(p_indices));
     }
 
     /**
@@ -92,8 +93,8 @@ public:
      */
     template <typename VertType, typename IndxType>
     void set_dynamic_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
-        set_opaque_triangles(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
-                             dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
+        set_opaque_triangles_linear(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
+                                    dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
     }
 
     /**
@@ -134,7 +135,9 @@ private:
     vector<Vertex3DTextured> static_opaque_triangle_vertices;
     vector<uint32_t> static_opaque_triangle_indices;
     vector<uint32_t> static_opaque_triangle_obj_id;
+    vector<glm::mat4> static_opaque_transform_mats;
 
+    // TODO: change dynamic opaque triangles implementation
     std::map<MaterialID, std::pair<size_t, size_t>> dynamic_opaque_triangle_map;
     vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
     vector<uint32_t> dynamic_opaque_triangle_indices;
@@ -142,7 +145,7 @@ private:
 
     std::map<std::string, ImageTypeGPU> images;
 
-    void set_opaque_triangles(
+    void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
         vector<Vertex3DTextured>& p_opaque_triangle_vertices,
         vector<uint32_t>& p_opaque_triangle_indices,
@@ -150,7 +153,7 @@ private:
         vector<Vertex3DTextured>&& p_vertices,
         vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
 
-    void set_opaque_triangles(
+    void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
         vector<Vertex3DTextured>& p_opaque_triangle_vertices,
         vector<uint32_t>& p_opaque_triangle_indices,
@@ -171,7 +174,7 @@ RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
 }
 
 template <RenderDatabaseTypeConcept Types>
-void RenderDatabase<Types>::set_opaque_triangles(
+void RenderDatabase<Types>::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
@@ -187,9 +190,13 @@ void RenderDatabase<Types>::set_opaque_triangles(
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
         const TriType& p_tri1, const TriType& p_tri2) -> bool {
-              return p_tri1.first < p_tri2.first;
+              // Sort according to the material first, then sort according to the object ID.
+              // This makes sure that all the triangles with the same materials will be stored together,
+              // and for each material the triangles within the same object will be stored together.
+              return p_tri1.first == p_tri2.first ? p_tri1.second.obj_id < p_tri2.second.obj_id : p_tri1.first < p_tri2.first;
               });
     MaterialID current_id = MATERIAL_INVALID;
+    p_opaque_triangle_obj_id.reserve(p_indices);
     for (auto& tri : p_indices) {
         if (tri.first != current_id) {
             // Asign the next material ID's indices.
@@ -208,7 +215,7 @@ void RenderDatabase<Types>::set_opaque_triangles(
 }
 
 template <RenderDatabaseTypeConcept Types>
-void RenderDatabase<Types>::set_opaque_triangles(
+void RenderDatabase<Types>::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
@@ -224,9 +231,13 @@ void RenderDatabase<Types>::set_opaque_triangles(
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
         const TriType& p_tri1, const TriType& p_tri2) -> bool {
-              return p_tri1.first < p_tri2.first;
+              // Sort according to the material first, then sort according to the object ID.
+              // This makes sure that all the triangles with the same materials will be stored together,
+              // and for each material the triangles within the same object will be stored together.
+              return p_tri1.first == p_tri2.first ? p_tri1.second.obj_id < p_tri2.second.obj_id : p_tri1.first < p_tri2.first;
               });
     MaterialID current_id = MATERIAL_INVALID;
+    p_opaque_triangle_obj_id.reserve(p_indices);
     for (auto& tri : p_indices) {
         if (tri.first != current_id) {
             // Asign the next material ID's indices.

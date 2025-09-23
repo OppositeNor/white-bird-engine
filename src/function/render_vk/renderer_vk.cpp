@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/renderer_vk.hh"
-#include "core/allocator/allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
