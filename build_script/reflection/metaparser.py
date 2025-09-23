@@ -16,7 +16,10 @@ from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFileMetadata, WBELabelMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEComponentMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata
+
+WBE_REFLECT = "WBE_REFLECT"
+WBE_COMPONENT = "WBE_COMPONENT"
 
 class WBEMetaparser:
     """Metaparser
@@ -105,21 +108,37 @@ class WBEMetaparser:
 
     def _visit_attributes(self, p_metadata, p_cursor):
         if p_cursor.kind == clang.cindex.CursorKind.VAR_DECL:
-            for attr in p_cursor.get_children():
-                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                    if not self._any_all(p_metadata, lambda p_metadata:
-                            any(p_cursor.spelling == label.label_name for label in p_metadata.labels)):
-                        yield "labels", WBELabelMetadata(label_name=p_cursor.spelling, attribute=attr.spelling)
+            yield from self._handle_visit_var_decl(p_metadata, p_cursor)
         elif p_cursor.kind == clang.cindex.CursorKind.CLASS_DECL:
-            for attr in p_cursor.get_children():
-                if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                    if not self._any_all(p_metadata, lambda p_metadata:
-                            any(p_cursor.spelling == metad_class.class_name for metad_class in p_metadata.classes)):
-                        yield "classes", self._get_class_metadata(p_cursor, attr.displayname)
+            yield from self._handle_visit_class_decl(p_metadata, p_cursor)
+        elif p_cursor.kind == clang.cindex.CursorKind.STRUCT_DECL:
+            yield from self._handle_visit_struct_decl(p_metadata, p_cursor)
 
         for child in p_cursor.get_children():
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
                 yield from self._visit_attributes(p_metadata, child)
+
+    def _handle_visit_var_decl(self, p_metadata, p_cursor):
+        for attr in p_cursor.get_children():
+            if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                if not self._any_all(p_metadata, lambda p_metadata:
+                        any(p_cursor.spelling == label.label_name for label in p_metadata.labels)):
+                    yield "labels", WBELabelMetadata(label_name=p_cursor.spelling, attribute=attr.spelling)
+
+    def _handle_visit_class_decl(self, p_metadata, p_cursor):
+        for attr in p_cursor.get_children():
+            if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                if not self._any_all(p_metadata, lambda p_metadata:
+                        any(p_cursor.spelling == metad_class.class_name for metad_class in p_metadata.classes)):
+                    yield "classes", self._get_class_metadata(p_cursor, attr.spelling)
+
+    def _handle_visit_struct_decl(self, p_metadata, p_cursor):
+        for attr in p_cursor.get_children():
+            if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                if attr.spelling == WBE_COMPONENT:
+                    if not self._any_all(p_metadata, lambda p_metadata:
+                            any(p_cursor.spelling == metad_struct.struct_name for metad_struct in p_metadata.components)):
+                        yield "components", self._get_component_metadata(p_cursor)
 
     def _read_from_cache(self, p_cpp_file_path, p_cache_path):
         with open(p_cache_path) as f:
@@ -152,4 +171,18 @@ class WBEMetaparser:
         result.attribute = p_attribute
         # TODO
         return WBEClassMetadata(class_name=p_cursor.spelling)
+
+    def _get_component_metadata(self, p_cursor):
+        result = WBEComponentMetadata()
+        result.struct_name = p_cursor.spelling
+        for field in p_cursor.get_children():
+            if field.kind != clang.cindex.CursorKind.FIELD_DECL:
+                continue
+            for attr in field.get_children():
+                if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR or attr.spelling != WBE_REFLECT:
+                    continue
+                result.fields.append(WBEFieldMetadata(attribute=attr.spelling, field_name=field.spelling, field_type=field.type.spelling))
+        return result
+
+
 

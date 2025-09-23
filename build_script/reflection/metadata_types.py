@@ -49,7 +49,7 @@ class WBEClassMetadata(BaseModel):
     """
     attribute : str = ""
     class_name : str = ""
-    fields : list[WBEMethodMetadata] = Field(default_factory=list)
+    fields : list[WBEFieldMetadata] = Field(default_factory=list)
     methods : list[WBEMethodMetadata] = Field(default_factory=list)
 
 class WBELabelMetadata(BaseModel):
@@ -61,6 +61,17 @@ class WBELabelMetadata(BaseModel):
     """
     attribute : str = ""
     label_name : str = ""
+
+class WBEComponentMetadata(BaseModel):
+    """Component metadata.
+
+    Attributes: 
+        struct_name: The name of the struct.
+        fields: The name of the fields.
+        types: The types of the fields
+    """
+    struct_name : str = ""
+    fields : list[WBEFieldMetadata] = Field(default_factory=list)
 
 class WBEFileMetadata(BaseModel):
     """Metadata in a single C++ file.
@@ -77,3 +88,4 @@ class WBEFileMetadata(BaseModel):
     deps : list[str] = Field(default_factory=list)
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
+    components : list[WBEComponentMetadata] = Field(default_factory=list)
