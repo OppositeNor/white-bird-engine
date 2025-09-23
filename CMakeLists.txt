@@ -59,7 +59,7 @@ set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
 
-find_package(Boost 1.88.0 REQUIRED CONFIG PATHS dependencies/boost/tools/boost_install)
+find_package(Boost REQUIRED CONFIG PATHS dependencies/boost/tools/boost_install)
 
 # Set C++ build flags
 if (NOT MSVC)
