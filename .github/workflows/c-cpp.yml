@@ -37,6 +37,11 @@ jobs:
             build_target: release-gcc
 
     steps:
+
+    - name: Install dependencies (ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y valgrind ninja-build llvm
+      
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
@@ -55,10 +60,6 @@ jobs:
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/release" >> "$GITHUB_OUTPUT"
-
-    - name: Install dependencies (ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y valgrind ninja-build libllvm
   
     # - name: Install LLVM and Clang
     #   uses: KyleMayes/install-llvm-action@v2
