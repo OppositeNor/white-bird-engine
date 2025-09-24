@@ -82,6 +82,7 @@ endif()
 
 # Set include directories
 set(include_dirs 
+    ${Vulkan_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/dependencies/glm
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
