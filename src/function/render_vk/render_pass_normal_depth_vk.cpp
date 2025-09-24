@@ -26,8 +26,8 @@ Ref<RenderPass::RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_inp
     setup_render_pass(input);
     setup_framebuffer(input);
     // Register the two maps to the GPU.
-    RendererVK::get_singleton()->get_render_database()->register_image_gpu("normal_map", normal_map);
-    RendererVK::get_singleton()->get_render_database()->register_image_gpu("depth_map", depth_map);
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("normal_map", RendererVK::ImageGPU{.image = normal_map, .is_null = false});
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("depth_map", RendererVK::ImageGPU{.image = normal_map, .is_null = false});
     return p_input;
 }
 

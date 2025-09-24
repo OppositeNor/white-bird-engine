@@ -1,12 +1,13 @@
 #include "function/render_vk/render_pass_vk.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-void RenderPassVK::create_renderable_image_2d(RenderDataVK* p_input, VkFormat p_format, VkImage* p_image) {
+void RenderPassVK::create_renderable_image_2d(const RenderDataVK* p_input, VkFormat p_format, VkImage* p_image) {
     VkImageCreateInfo create_info{};
-    BaseRenderDataVK* base_render_data = p_input->base_render_data;
+    auto* base_render_data = p_input->base_render_data;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     // 2D image
     create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -47,9 +48,9 @@ void RenderPassVK::create_renderable_image_2d(RenderDataVK* p_input, VkFormat p_
     }
 }
 
-void RenderPassVK::create_renderable_image_view_2d(RenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view) {
+void RenderPassVK::create_renderable_image_view_2d(const RenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view) {
     VkImageViewCreateInfo create_info;
-    BaseRenderDataVK* base_render_data = p_input->base_render_data;
+    auto* base_render_data = p_input->base_render_data;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     // Set the image of the image view.
     create_info.image = p_image;

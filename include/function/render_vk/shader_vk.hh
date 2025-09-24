@@ -15,8 +15,9 @@
 #ifndef __WBE_SHADER_VK_HH__
 #define __WBE_SHADER_VK_HH__
 
-#include "function/render/shader.hh"
+#include "platform/file_system/path.hh"
 #include <string>
+#include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
@@ -24,10 +25,10 @@ namespace WhiteBirdEngine {
  * @brief Shader class for Vulkan.
  *
  */
-class ShaderVK : public Shader {
+class ShaderVK {
 public:
     ShaderVK() = delete;
-    virtual ~ShaderVK() override;
+    ~ShaderVK();
     ShaderVK(const ShaderVK&) = delete;
     ShaderVK(ShaderVK&&) = delete;
     ShaderVK& operator=(const ShaderVK&) = delete;
@@ -39,6 +40,24 @@ public:
      * @param p_shader_res_id The resource ID referencing to the source of the shader.
      */
     ShaderVK(const std::string& p_shader_res_id);
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_shader_file_path The path to the source of the shader.
+     */
+    ShaderVK(const Path& p_shader_file_path);
+
+    /**
+     * @brief Construct from a chunk of data..
+     *
+     * @tparam AllocType The type of the allocator for the vector.
+     * @param p_shader_data The data of the shader.
+     */
+    ShaderVK(const char* p_data);
+
+private:
+    VkShaderModule create_shader_module();
 };
 
 }

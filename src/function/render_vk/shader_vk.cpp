@@ -21,6 +21,14 @@ ShaderVK::ShaderVK(const std::string& p_shader_res_id) {
     // TODO
 }
 
+ShaderVK::ShaderVK(const Path& p_shader_file_path) {
+    // TODO
+}
+
+ShaderVK::ShaderVK(const char* p_data) {
+    // TODO
+}
+
 ShaderVK::~ShaderVK() {
     // TODO
 }

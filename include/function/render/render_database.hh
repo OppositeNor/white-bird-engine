@@ -118,6 +118,20 @@ public:
     }
 
     /**
+     * @brief Get the keys of the registered images.
+     *
+     * @return The keys of the registered images.
+     */
+    std::vector<std::string> get_images_keys() const {
+        std::vector<std::string> keys;
+        keys.reserve(images.size());
+        for (auto& image : images) {
+            keys.push_back(image.first);
+        }
+        return keys;
+    }
+
+    /**
      * @brief Remove an image referencing to the GPU resource from the database.
      * This will NOT free the allocated GPU resource. The resource should be freed
      * mannually.

@@ -41,11 +41,32 @@ class RendererVK : public Renderer {
 public:
     using AllocType = RenderAllocator;
 
+    struct ImageGPU {
+        VkImage image;
+        bool is_null = true;
+    };
+
     struct RenderDatabaseTypes {
         using AllocType = RendererVK::AllocType;
-        using ImageTypeGPU = VkImage;
+        using ImageTypeGPU = ImageGPU;
         WBE_REQUIRES_CONCEPT(RenderDatabaseTypeConcept, RenderDatabaseTypes);
     };
+
+    struct BaseRenderDataVK {
+        // The logic device.
+        VkDevice logic_device;
+        // The image format of the swap chain.
+        VkFormat swap_chain_format;
+        // The size of the swap chain.
+        VkExtent2D swap_chain_extent;
+        // Callback for allocator.
+        VkAllocationCallbacks* allocation_callbacks;
+        // Graphics queue family index.
+        uint32_t queue_family_index_graphics;
+        // Compute queue family index.
+        uint32_t queue_family_index_compute;
+    };
+
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
@@ -69,6 +90,10 @@ public:
 
     Ref<RenderDatabase<RenderDatabaseTypes>> get_render_database() {
         return render_database;
+    }
+
+    const BaseRenderDataVK* get_base_render_data() const {
+        return &base_render_data;
     }
 
 protected:
@@ -162,11 +187,14 @@ private:
         VK_DYNAMIC_STATE_SCISSOR
     };
 
+    BaseRenderDataVK base_render_data;
+
     void init();
     void terminate();
 
     void init_window();
     void init_vulkan();
+    void setup_base_render_data();
 
     void create_instance();
     void create_window_surface();

@@ -45,6 +45,7 @@ void RendererVK::init() {
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing RenderVK.");
     init_window();
     init_vulkan();
+    setup_base_render_data();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
 }
 
@@ -82,6 +83,16 @@ void RendererVK::init_vulkan() {
     create_swap_chain_image_views();
     create_render_pass();
 }
+
+void RendererVK::setup_base_render_data() {
+    base_render_data.logic_device = logical_device;
+    base_render_data.swap_chain_format = swap_chain_image_format;
+    base_render_data.swap_chain_extent = swap_chain_extent;
+    base_render_data.allocation_callbacks = get_allocation_callbacks();
+    base_render_data.queue_family_index_graphics = queue_family_indices.graphics.value();
+    base_render_data.queue_family_index_compute = queue_family_indices.compute.value();
+}
+
 
 void RendererVK::create_instance() {
     // Get configuration informations.

@@ -26,7 +26,7 @@ git submodule init --update --recursive
 Install build dependencies:
 
 ```sh
-sudo pacman -S cmake clang ninja
+sudo pacman -S cmake clang ninja llvm-libs
 ```
 
 It is suggested to use Anaconda for setting up the build environment.
