@@ -52,6 +52,7 @@ public:
 
     template <ResourceUnitConcept T>
     MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
+        push_res_unit_ptr(p_res_key, p_res, sizeof(T));
     }
 
     virtual MemID push_data(size_t p_res_size, void* p_res) override {
