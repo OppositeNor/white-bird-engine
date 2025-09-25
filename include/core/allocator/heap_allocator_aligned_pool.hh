@@ -94,11 +94,29 @@ public:
         return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
     }
 
+    /**
+     * @brief Get the total size of the pool.
+     *
+     * @return The total size of the pool.
+     */
     size_t get_total_size() const {
         return size;
     }
 
+    /**
+     * @brief Get the total size of the free chunkes.
+     *
+     * @return The total size of the free chunks.
+     */
     size_t get_remain_size() const;
+
+    /**
+     * @brief Check if a memory id belongs in this pool.
+     *
+     * @param p_mem_id The memory ID to check.
+     * @return True if it belongs to this pool, false otherwise.
+     */
+    bool is_in_pool(MemID p_mem_id) const;
 
     virtual operator std::string() const override;
 

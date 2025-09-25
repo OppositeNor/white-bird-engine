@@ -21,8 +21,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
+
+#define WBE_GET_CHUNK_SIZE(p_chunk) ((*reinterpret_cast<Header*>(p_chunk)) & MAX_TOTAL_SIZE)
+#define WBE_GET_ALLOCATED_DATA_SIZE(p_mem_id) ((*reinterpret_cast<Header*>(p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE)
 
 namespace WhiteBirdEngine {
 
@@ -51,9 +55,12 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
 }
 
 MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
-  if (p_alignment % WBE_DEFAULT_ALIGNMENT != 0) {
-      throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WBE_DEFAULT_ALIGNMENT) + ".");
-  }
+    if (p_alignment % WBE_DEFAULT_ALIGNMENT != 0) {
+        throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WBE_DEFAULT_ALIGNMENT) + ".");
+    }
+    if (p_size == 0) {
+        return MEM_NULL;
+    }
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
     // Clamp the padding size to the default alignment.
     size_t aligned_size = get_align_size(p_size, WBE_DEFAULT_ALIGNMENT) + HEADER_SIZE;
@@ -81,9 +88,10 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
 }
 
 void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
+    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
     // The first 64 bits are used to store the header.
     char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
-    size_t data_size = get_allocated_data_size(p_mem);
+    size_t data_size = WBE_GET_ALLOCATED_DATA_SIZE(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         insert_free_memory(nullptr, data_loc, data_size);
         return;
@@ -93,6 +101,7 @@ void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
 }
 
 void* HeapAllocatorAlignedPool::get(MemID p_id) const {
+    WBE_DEBUG_ASSERT(is_in_pool(p_id));
     if (p_id == MEM_NULL) {
         return nullptr;
     }
@@ -195,6 +204,29 @@ size_t HeapAllocatorAlignedPool::get_remain_size() const {
         node = node->next.get();
     }
     return total;
+}
+
+bool HeapAllocatorAlignedPool::is_in_pool(MemID p_mem_id) const {
+    const IdleListNode* curr = idle_list_head.get();
+    char* tracker = mem_chunk;
+    while (tracker < mem_chunk + size) {
+        if (reinterpret_cast<MemID>(tracker) > p_mem_id) {
+            return false;
+        }
+        if (curr != nullptr && curr->mem_start == tracker) {
+            tracker += curr->size;
+            curr = curr->next.get();
+        }
+        else if (p_mem_id == reinterpret_cast<MemID>(tracker) + HEADER_SIZE) {
+            return true;
+        }
+        else {
+            size_t chunk_size = WBE_GET_CHUNK_SIZE(tracker);
+            WBE_DEBUG_ASSERT(chunk_size != 0);
+            tracker += chunk_size;
+        }
+    }
+    return false;
 }
 
 HeapAllocatorAlignedPool::operator std::string() const {

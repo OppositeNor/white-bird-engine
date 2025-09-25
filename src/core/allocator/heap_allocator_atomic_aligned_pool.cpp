@@ -25,6 +25,9 @@
 #include <stdexcept>
 #include <string>
 
+#define WBE_GET_CHUNK_SIZE(p_chunk) ((*reinterpret_cast<Header*>(p_chunk)) & MAX_TOTAL_SIZE)
+#define WBE_GET_ALLOCATED_DATA_SIZE(p_mem_id) ((*reinterpret_cast<Header*>(p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE)
+
 namespace WhiteBirdEngine {
 
 HeapAllocatorAtomicAlignedPool::HeapAllocatorAtomicAlignedPool(size_t p_size)
@@ -54,6 +57,9 @@ HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
 MemID HeapAllocatorAtomicAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     if (p_alignment % WBE_DEFAULT_ALIGNMENT != 0) {
         throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WBE_DEFAULT_ALIGNMENT) + ".");
+    }
+    if (p_size == 0) {
+        return MEM_NULL;
     }
     // Share lock this when finding valid space for allocation, then unique lock when found.
     boost::upgrade_lock lock(mutex);
@@ -88,9 +94,10 @@ MemID HeapAllocatorAtomicAlignedPool::allocate(size_t p_size, size_t p_alignment
 void HeapAllocatorAtomicAlignedPool::deallocate(MemID p_mem) {
     // Share lock this when finding valid space for allocation, then unique lock when found.
     boost::upgrade_lock lock(mutex);
+    WBE_DEBUG_ASSERT(unguard_is_in_pool(p_mem));
     // The first 64 bits are used to store the header.
     char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
-    size_t data_size = get_allocated_data_size(p_mem);
+    size_t data_size = WBE_GET_ALLOCATED_DATA_SIZE(p_mem);
     if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
         // Unique lock when insert free memory.
         boost::upgrade_to_unique_lock unique_lock(lock);
@@ -106,6 +113,7 @@ void* HeapAllocatorAtomicAlignedPool::get(MemID p_id) const {
         return nullptr;
     }
     boost::shared_lock lock(mutex);
+    WBE_DEBUG_ASSERT(unguard_is_in_pool(p_id));
     return reinterpret_cast<void*>(p_id);
 }
 
@@ -206,6 +214,29 @@ size_t HeapAllocatorAtomicAlignedPool::get_remain_size() const {
         node = node->next.get();
     }
     return total;
+}
+
+bool HeapAllocatorAtomicAlignedPool::unguard_is_in_pool(MemID p_mem_id) const {
+    const IdleListNode* curr = idle_list_head.get();
+    char* tracker = mem_chunk;
+    while (tracker < mem_chunk + size) {
+        if (reinterpret_cast<MemID>(tracker) > p_mem_id) {
+            return false;
+        }
+        if (curr != nullptr && curr->mem_start == tracker) {
+            tracker += curr->size;
+            curr = curr->next.get();
+        }
+        else if (p_mem_id == reinterpret_cast<MemID>(tracker) + HEADER_SIZE) {
+            return true;
+        }
+        else {
+            size_t chunk_size = WBE_GET_CHUNK_SIZE(tracker);
+            WBE_DEBUG_ASSERT(chunk_size != 0);
+            tracker += chunk_size;
+        }
+    }
+    return false;
 }
 
 HeapAllocatorAtomicAlignedPool::operator std::string() const {

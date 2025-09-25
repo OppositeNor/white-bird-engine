@@ -28,6 +28,9 @@ HeapAllocatorRAM::~HeapAllocatorRAM() {
 }
 
 MemID HeapAllocatorRAM::allocate(size_t p_size) {
+    if (p_size == 0) {
+        return MEM_NULL;
+    }
     MemID result = std::bit_cast<MemID>(malloc(p_size));
     allocated.insert(result);
     return result;

@@ -104,6 +104,19 @@ public:
 
     size_t get_remain_size() const;
 
+
+    /**
+     * @brief Is the memory ID in this pool
+     *
+     * @param p_mem_id The memory ID to check.
+     * @return True if the memory ID belongs to this pool, false otherwise.
+     */
+    bool is_in_pool(MemID p_mem_id) const {
+        boost::shared_lock lock(mutex);
+        bool result = unguard_is_in_pool(p_mem_id);
+        return result;
+    }
+
     virtual operator std::string() const override;
 
     size_t get_internal_fragmentation_tracker() const {
@@ -118,6 +131,8 @@ private:
         char* mem_start;
         std::unique_ptr<IdleListNode> next = nullptr;
     };
+
+    bool unguard_is_in_pool(MemID p_mem_id) const;
 
     void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);

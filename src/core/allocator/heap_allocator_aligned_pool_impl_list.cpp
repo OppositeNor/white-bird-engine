@@ -60,6 +60,9 @@ MemID HeapAllocatorAlignedPoolImplicitList::allocate(size_t p_size, size_t p_ali
     if (p_alignment % WORD_SIZE != 0) {
         throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WORD_SIZE) + ".");
     }
+    if (p_size == 0) {
+        return MEM_NULL;
+    }
     // Clamp the padding size to the default alignment.
     size_t aligned_size = get_align_size(p_size, WORD_SIZE) + WORD_SIZE;
     MemID result = find_valid_chunk<false>(aligned_size, p_alignment);

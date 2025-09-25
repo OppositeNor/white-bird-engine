@@ -50,6 +50,9 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
 }
 
 MemID HeapAllocatorPool::allocate(size_t p_size) {
+    if (p_size == 0) {
+        return MEM_NULL;
+    }
     std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
     p_size += HEADER_SIZE;
     while (*valid_idle_node != nullptr) {
