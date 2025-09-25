@@ -53,6 +53,8 @@ public:
     };
 
     struct BaseRenderDataVK {
+        // The render allocator.
+        AllocType* allocator;
         // The logic device.
         VkDevice logic_device;
         // The image format of the swap chain.

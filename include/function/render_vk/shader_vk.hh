@@ -29,6 +29,14 @@ namespace WhiteBirdEngine {
  */
 class ShaderVK {
 public:
+
+    struct ShaderConfigurations {
+        // Shader stages bits.
+        VkShaderStageFlagBits stages;
+        // The entry function name of the shader.
+        std::string entry_function;
+    };
+
     ShaderVK() = delete;
     ~ShaderVK();
     ShaderVK(const ShaderVK&) = delete;
@@ -56,10 +64,15 @@ public:
      * @tparam AllocType The type of the allocator for the vector.
      * @param p_shader_data The data of the shader.
      */
-    ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const char* p_data);
+    ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const char* p_code_data, size_t p_data_size);
 
 private:
-    VkShaderModule create_shader_module();
+
+    VkShaderModule shader_module;
+
+    void initialize_shader(const char* p_code_data, size_t p_code_size);
+
+    void setup_shader_module(const char* p_code_data, size_t p_code_size);
     const RendererVK::BaseRenderDataVK* base_render_data;
 };
 

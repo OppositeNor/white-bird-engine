@@ -85,6 +85,7 @@ void RendererVK::init_vulkan() {
 }
 
 void RendererVK::setup_base_render_data() {
+    base_render_data.allocator = allocator;
     base_render_data.logic_device = logical_device;
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;

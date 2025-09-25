@@ -69,6 +69,14 @@ public:
         return total_size;
     }
 
+    virtual void* get_data(MemID p_mem_id) override {
+        return allocator->get(p_mem_id);
+    }
+
+    virtual const void* get_data(MemID p_mem_id) const override {
+        return allocator->get(p_mem_id);
+    }
+
 protected:
 
     virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {

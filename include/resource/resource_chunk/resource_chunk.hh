@@ -75,6 +75,46 @@ public:
      */
     virtual MemID push_data(size_t p_res_size, void* p_res) = 0;
 
+    /**
+     * @brief Get the data at ID.
+     *
+     * @tparam T the type of the data to get.
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    template <typename T>
+    T* get_data(MemID p_mem_id) {
+        return static_cast<T*>(get_data(p_mem_id));
+    }
+
+    /**
+     * @brief Get the data at ID.
+     *
+     * @tparam T the type of the data to get.
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    template <typename T>
+    const T* get_data(MemID p_mem_id) const {
+        return static_cast<const T*>(get_data(p_mem_id));
+    }
+
+    /**
+     * @brief Get the data at ID.
+     *
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    virtual void* get_data(MemID p_mem_id) = 0;
+
+    /**
+     * @brief Get the data at ID.
+     *
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    virtual const void* get_data(MemID p_mem_id) const = 0;
+
 protected:
     virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size);
 };

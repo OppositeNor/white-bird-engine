@@ -19,10 +19,11 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
+#include <stdexcept>
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
@@ -49,7 +50,7 @@ public:
      * resources.
      * @param p_resource_chunk The resource chunk to register.
      */
-    ResourceChunkID register_chunk(Ref<ResourceChunkLoadFile> p_resource_chunk) {
+    ResourceChunkID register_chunk(Ref<ResourceChunk> p_resource_chunk) {
         ResourceChunkID chunk_id = resource_chunks.size();
         resource_chunks.push_back(p_resource_chunk);
         return chunk_id;
@@ -73,6 +74,20 @@ public:
         return stack_allocator.get_obj<T>(get_resource_chunk(p_chunk_id)->get_resource(p_key));
     }
 
+    Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
+        if (p_chunk_id >= resource_chunks.size()) {
+            throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
+        }
+        return resource_chunks[p_chunk_id];
+    }
+
+    Ref<const ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
+        if (p_chunk_id >= resource_chunks.size()) {
+            throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
+        }
+        return resource_chunks[p_chunk_id];
+    }
+
     /**
      * @brief Get a resource by its memory ID.
      *
@@ -93,11 +108,7 @@ public:
     }
 
 private:
-    Ref<ResourceChunkLoadFile> get_resource_chunk(ResourceChunkID p_chunk_id) {
-        return resource_chunks[p_chunk_id];
-    }
-
-    std::vector<Ref<ResourceChunkLoadFile>> resource_chunks;
+    std::vector<Ref<ResourceChunk>> resource_chunks;
     StackAllocator stack_allocator;
 
     inline static ResourceManager* singleton = nullptr;
