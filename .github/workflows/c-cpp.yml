@@ -40,7 +40,11 @@ jobs:
 
     - name: Install dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y valgrind ninja-build libclang-18
+      run: sudo apt-get update && sudo apt-get install -y valgrind ninja-build
+
+    - name: Setup clang
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get install -y clang-format clang-tidy clang-tools clang clangd libc++-dev libc++1 libc++abi-dev libc++abi1 libclang-dev libclang1 liblldb-dev libllvm-ocaml-dev libomp-dev libomp5 lld lldb llvm-dev llvm-runtime llvm python3-clang 
       
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
