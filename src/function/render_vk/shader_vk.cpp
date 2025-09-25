@@ -14,19 +14,21 @@
 */
 
 #include "function/render_vk/shader_vk.hh"
+#include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 
 namespace WhiteBirdEngine {
 
-ShaderVK::ShaderVK(const std::string& p_shader_res_id) {
-    // TODO
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, ResourceChunkID p_resource_chunk, const std::string& p_shader_res_id) {
+    ResourceManager::get_singleton()->get_resource<RUBinary>(p_resource_chunk, p_shader_res_id);
 }
 
-ShaderVK::ShaderVK(const Path& p_shader_file_path) {
-    // TODO
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const Path& p_shader_file_path) {
+
 }
 
-ShaderVK::ShaderVK(const char* p_data) {
-    // TODO
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const char* p_data) {
+
 }
 
 ShaderVK::~ShaderVK() {

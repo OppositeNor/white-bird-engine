@@ -34,8 +34,8 @@ public:
     RULoaderJPEG& operator=(const RULoaderJPEG&)= delete;
     RULoaderJPEG& operator=(RULoaderJPEG&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         std::string key = p_parser_data.template get_value<std::string>("key");
         ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
@@ -53,7 +53,7 @@ public:
         if (desired_channels != 0) {
             ru_image.channel_count = desired_channels;
         }
-        ru_image.image_data = p_chunk.push_data(ru_image.width * ru_image.height * ru_image.channel_count, data.get(), p_allocator);
+        ru_image.image_data = p_chunk.push_data(ru_image.width * ru_image.height * ru_image.channel_count, data.get());
         return p_chunk.template push_res_unit<RUImage>(key, ru_image);
     }
 

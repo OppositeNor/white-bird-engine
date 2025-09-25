@@ -17,8 +17,8 @@
 
 #include "core/allocator/allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -31,7 +31,6 @@ using ResourceChunkID = HashCode;
  * @brief Chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
  * @todo Test
  */
-template <typename ChildT>
 class ResourceChunk {
 public:
     ResourceChunk() {}
@@ -43,19 +42,14 @@ public:
      * @param p_key The key to get resource from.
      * @return The MemID of the resource.
      */
-    template <typename T>
-    MemID get_resource(const std::string& p_key) const {
-        return static_cast<ChildT*>(this)->get_resource(p_key);
-    }
+    virtual MemID get_resource(const std::string& p_key) const = 0;
 
     /**
      * @brief Get the total size of the chunk.
      *
      * @return The total size of the chunk.
      */
-    size_t get_size() const {
-        return static_cast<ChildT*>(this)->get_size();
-    }
+    virtual size_t get_size() const = 0;
 
     /**
      * @brief Push a resource unit to the chunk.
@@ -68,7 +62,7 @@ public:
      */
     template <ResourceUnitConcept T>
     MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
-        return static_cast<ChildT*>(this)->push_res_unit(p_res_key, p_res);
+        return push_res_unit_ptr(p_res_key, &p_res, sizeof(T));
     }
 
     /**
@@ -79,13 +73,11 @@ public:
      * @param p_allocator The allocator to allocate memory.
      * @return The result memory id.
      */
-    MemID push_data(size_t p_res_size, void* p_res) {
-        return static_cast<ChildT*>(this)->push_data(p_res_size, p_res);
-    }
+    virtual MemID push_data(size_t p_res_size, void* p_res) = 0;
 
+protected:
+    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size);
 };
-
-WBE_DECL_CRTP_CONCEPT(ResourceChunk);
 
 }
 

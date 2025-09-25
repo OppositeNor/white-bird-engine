@@ -38,20 +38,20 @@ public:
     RULoaderImage& operator=(const RULoaderImage&)= delete;
     RULoaderImage& operator=(RULoaderImage&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         std::string ext = FileSystem::get_ext(get_resource_path(p_parser_data.template get_value<std::string>("path")));
         if (ext == "png") {
-            return RULoaderPNG().load(p_chunk, p_parser_data, p_allocator);
+            return RULoaderPNG().load(p_chunk, p_parser_data);
         }
         if (ext == "jpg" || ext == "jpeg") {
-            return RULoaderJPEG().load(p_chunk, p_parser_data, p_allocator);
+            return RULoaderJPEG().load(p_chunk, p_parser_data);
         }
         if (ext == "ppm") {
-            return RULoaderPPM().load(p_chunk, p_parser_data, p_allocator);
+            return RULoaderPPM().load(p_chunk, p_parser_data);
         }
         if (ext == "hdr") {
-            return RULoaderHDR().load(p_chunk, p_parser_data, p_allocator);
+            return RULoaderHDR().load(p_chunk, p_parser_data);
         }
         throw std::runtime_error("Failed to load image. Image with extension: " + ext + " not supported.");
     }

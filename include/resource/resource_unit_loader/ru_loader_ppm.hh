@@ -36,13 +36,13 @@ public:
     RULoaderPPM& operator=(const RULoaderPPM&)= delete;
     RULoaderPPM& operator=(RULoaderPPM&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
         auto header = get_ppm_header(path);
         if (header == "P3") {
-            return loader_ppm3.load(p_chunk, p_parser_data, p_allocator);
+            return loader_ppm3.load(p_chunk, p_parser_data);
         }
         throw std::runtime_error("Failed to load PPM: header: " + header + " not supported by White Bird Enigne.");
     }

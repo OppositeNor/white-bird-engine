@@ -17,8 +17,8 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/parser/parser.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "utils/utils.hh"
 #include <cstring>
+#include <string>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
  * @todo Test
  */
-class ResourceChunkLoadFile : public ResourceChunk<ResourceChunkLoadFile> {
+class ResourceChunkLoadFile final : public ResourceChunk {
 public:
     ~ResourceChunkLoadFile() {
         allocator->pop_stack(total_size);
@@ -46,25 +46,15 @@ public:
     template <ParserConcept ParserType>
     ResourceChunkLoadFile(const Parser<ParserType>& p_parser, StackAllocator& p_allocator);
 
-    MemID get_resource(const std::string& p_key) const {
-        return resource_map.at(dynam_hash(p_key.c_str()));
-    }
-
-    size_t get_size() const {
-        return total_size;
+    virtual MemID get_resource(const std::string& p_key) const override {
+        return resource_map.at(p_key.c_str());
     }
 
     template <ResourceUnitConcept T>
     MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
-        using PureT = std::remove_cvref<T>;
-        total_size += sizeof(PureT);
-        MemID result = allocator->allocate(sizeof(PureT));
-        *(allocator->get_obj<PureT>(result)) = p_res;
-        resource_map[dynam_hash(p_res_key.c_str())] = result;
-        return result;
     }
 
-    MemID push_data(size_t p_res_size, void* p_res) {
+    virtual MemID push_data(size_t p_res_size, void* p_res) override {
         total_size += p_res_size;
         MemID result = allocator->allocate(p_res_size);
         memcpy(allocator->get(result), p_res, p_res_size);
@@ -72,12 +62,26 @@ public:
     }
 
     bool is_already_registered(const std::string& p_res_key) {
-        return resource_map.contains(dynam_hash(p_res_key.c_str()));
+        return resource_map.contains(p_res_key.c_str());
+    }
+
+    virtual size_t get_size() const override {
+        return total_size;
+    }
+
+protected:
+
+    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
+        total_size += p_size;
+        MemID result = allocator->allocate(p_size);
+        memcpy(allocator->get(result), p_res, p_size);
+        resource_map[p_res_key.c_str()] = result;
+        return result;
     }
 
 private:
     size_t total_size;
-    std::unordered_map<HashCode, MemID> resource_map;
+    std::unordered_map<std::string, MemID> resource_map;
     StackAllocator* allocator;
 
     enum class RUType {

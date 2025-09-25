@@ -33,10 +33,14 @@ namespace WhiteBirdEngine {
  */
 class ResourceManager : public Singleton<ResourceManager> {
 public:
-    virtual ~ResourceManager() override {}
+    virtual ~ResourceManager() override {
+        singleton = nullptr;
+    }
 
     ResourceManager(size_t p_alloc_size)
-        : stack_allocator(p_alloc_size) {}
+        : stack_allocator(p_alloc_size) {
+        singleton = this;
+    }
 
     /**
      * @brief Register a resource chunk.
@@ -45,8 +49,10 @@ public:
      * resources.
      * @param p_resource_chunk The resource chunk to register.
      */
-    void register_chunk(ResourceChunkID p_chunk_id, Ref<ResourceChunkLoadFile> p_resource_chunk) {
-        resource_chunks.push_back(std::make_pair(p_chunk_id, p_resource_chunk));
+    ResourceChunkID register_chunk(Ref<ResourceChunkLoadFile> p_resource_chunk) {
+        ResourceChunkID chunk_id = resource_chunks.size();
+        resource_chunks.push_back(p_resource_chunk);
+        return chunk_id;
     }
 
     /**
@@ -77,11 +83,24 @@ public:
         return stack_allocator.get_obj<T>(p_memid);
     }
 
-private:
-    Ref<ResourceChunkLoadFile> get_resource_chunk(ResourceChunkID p_chunk_id);
+    /**
+     * @brief Get the singleton instance.
+     *
+     * @return The singleton instance. Null if not initialized.
+     */
+    static ResourceManager* get_singleton() {
+        return singleton;
+    }
 
-    std::vector<std::pair<ResourceChunkID, Ref<ResourceChunkLoadFile>>> resource_chunks;
+private:
+    Ref<ResourceChunkLoadFile> get_resource_chunk(ResourceChunkID p_chunk_id) {
+        return resource_chunks[p_chunk_id];
+    }
+
+    std::vector<Ref<ResourceChunkLoadFile>> resource_chunks;
     StackAllocator stack_allocator;
+
+    inline static ResourceManager* singleton = nullptr;
 };
 
 }

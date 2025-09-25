@@ -37,8 +37,8 @@ public:
     RULoaderText& operator=(const RULoaderText&)= delete;
     RULoaderText& operator=(RULoaderText&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         std::string key = p_parser_data.template get_value<std::string>("key");
         ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
@@ -47,9 +47,9 @@ public:
         ru_text.encode_type = get_encode_type_from_str(p_parser_data.template get_value<std::string>("encode_type"));
         std::string str = load_text_file(static_cast<std::string>(path).c_str(), ru_text.encode_type);
         ru_text.size = str.size();
-        MemID data_id = p_chunk.push_data(ru_text.size, str.c_str(), p_allocator);
+        MemID data_id = p_chunk.push_data(ru_text.size, (void*)str.c_str());
         ru_text.data = data_id;
-        return p_chunk.push_res_unit(key, p_allocator, ru_text);
+        return p_chunk.push_res_unit(key, ru_text);
     }
 };
 }

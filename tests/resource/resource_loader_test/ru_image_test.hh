@@ -18,8 +18,6 @@
 #include <gtest/gtest.h>
 
 #include "global/global.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit_loader/ru_loader_png.hh"
 
 namespace WBE = WhiteBirdEngine;
@@ -29,7 +27,6 @@ namespace WBE = WhiteBirdEngine;
 
 TEST(RUImageLoaderTest, PNGLoaderTest) {
     WBE::Global global(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::ResourceChunk<WBE::ResourceChunkLoadFile> res_chunk;
     WBE::RULoaderPNG png_loader;
 }
 

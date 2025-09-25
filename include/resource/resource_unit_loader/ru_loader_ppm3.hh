@@ -34,8 +34,8 @@ public:
     RULoaderPPM3& operator=(const RULoaderPPM3&)= delete;
     RULoaderPPM3& operator=(RULoaderPPM3&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         std::string key = p_parser_data.template get_value<std::string>("key");
         ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
@@ -48,7 +48,7 @@ public:
         bool flip_v = properties.contains("flip_v") && properties.template get_value<bool>("flip_v");
         auto data = load_ppm3_content(path, flip_h, flip_v, ru_image.width, ru_image.height);
         ru_image.channel_count = 3;
-        ru_image.image_data = p_chunk.push_data(ru_image.width * ru_image.height * ru_image.channel_count, data.get(), p_allocator);
+        ru_image.image_data = p_chunk.push_data(ru_image.width * ru_image.height * ru_image.channel_count, data.get());
         return p_chunk.template push_res_unit<RUImage>(key, ru_image);
     }
 private:

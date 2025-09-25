@@ -29,8 +29,8 @@ public:
     RULoaderBinary& operator=(const RULoaderBinary&)= delete;
     RULoaderBinary& operator=(RULoaderBinary&&) = delete;
 
-    template <ResourceChunkConcept ResChunkType, ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk<ResChunkType>& p_chunk, const ParserData<ParserDataType>& p_parser_data, StackAllocator& p_allocator) {
+    template <ParserDataConcept ParserDataType>
+    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         std::string key = p_parser_data.template get_value<std::string>("key");
         ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
@@ -38,9 +38,9 @@ public:
         RUBinary ru_binary{};
         std::vector<char> str = load_binary_file(static_cast<std::string>(path).c_str());
         ru_binary.size = str.size();
-        MemID data_id = p_chunk.push_data(ru_binary.size, str.data(), p_allocator);
+        MemID data_id = p_chunk.push_data(ru_binary.size, str.data());
         ru_binary.data = data_id;
-        return p_chunk.push_res_unit(key, p_allocator, ru_binary);
+        return p_chunk.push_res_unit(key, ru_binary);
     }
 };
 
