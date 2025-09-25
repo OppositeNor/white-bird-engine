@@ -25,15 +25,12 @@ jobs:
       matrix:
         # os: [ubuntu-latest, windows-latest]
         os: [ubuntu-latest]
-        build_type: [Release]
-        c_compiler: [release, release-gcc]
+        target: [release, release-gcc]
         include:
           - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
+            target: release
           - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+            target: release-gcc
           # - os: windows-latest
           #   c_compiler: cl
           #   cpp_compiler: cl
@@ -86,7 +83,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      run: python build.py -t ${{ matrix.build_type }}
+      run: python build.py -t ${{ matrix.target }}
 
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
