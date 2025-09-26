@@ -67,6 +67,10 @@ public:
         uint32_t queue_family_index_graphics;
         // Compute queue family index.
         uint32_t queue_family_index_compute;
+        // The viewport for the final presentation.
+        VkViewport viewport;
+        // The scissor for the final presentation.
+        VkRect2D scissor;
     };
 
 

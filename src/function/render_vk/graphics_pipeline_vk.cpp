@@ -13,11 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/graphics_pipeline_vk.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-GraphicsPipelineVK::GraphicsPipelineVK(const PipelineConfigurations& p_pipeline_configurations) {
+GraphicsPipelineVK::GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const PipelineConfigurations& p_pipeline_configurations)
+    : render_data(p_render_data) {
     initialize(p_pipeline_configurations);
 }
 
@@ -34,7 +36,44 @@ void GraphicsPipelineVK::initialize(const PipelineConfigurations& p_pipeline_con
     setup_input_assembly_state_create_info(p_pipeline_configurations, state_create_info);
     setup_tessellation_state_create_info(p_pipeline_configurations, state_create_info);
     setup_rasterization_state_create_info(p_pipeline_configurations, state_create_info);
+    setup_mulitsample_state_create_info(p_pipeline_configurations, state_create_info);
     setup_depth_stencil_state_create_info(p_pipeline_configurations, state_create_info);
+    setup_color_blend_state_create_info(p_pipeline_configurations, state_create_info);
+    setup_dynamic_state_create_info(p_pipeline_configurations, state_create_info);
+    // TODO: Pipeline layout
+
+    VkGraphicsPipelineCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    create_info.stageCount = shader_stages.size();
+    create_info.pStages = shader_stages.data();
+    create_info.pVertexInputState = &(state_create_info.vertex_input_state);
+    create_info.pInputAssemblyState = &(state_create_info.input_assembly_state);
+    if (state_create_info.tessellation_state.has_value()) {
+        create_info.pTessellationState = &(state_create_info.tessellation_state.value());
+    }
+    create_info.pRasterizationState = &(state_create_info.rasterization_state);
+    create_info.pMultisampleState = &(state_create_info.multisample_state);
+    create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
+    create_info.pColorBlendState = &(state_create_info.color_blend_state);
+    create_info.pDynamicState = &(state_create_info.dynamic_state);
+
+    if (vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create graphics pipeline.");
+    }
+}
+
+void GraphicsPipelineVK::setup_viewport_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                          PipelineStateCreateInfo& p_pipeline_create_infos) {
+    auto& viewport_config = p_pipeline_configurations.viewport;
+    VkPipelineViewportStateCreateInfo create_info;
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    // Setup viewports.
+    create_info.viewportCount = viewport_config.viewports.size();
+    create_info.pViewports = viewport_config.viewports.data();
+    // Setup scissors.
+    create_info.scissorCount = viewport_config.scissors.size();
+    create_info.pScissors = viewport_config.scissors.data();
+    p_pipeline_create_infos.viewport_state = create_info;
 }
 
 void GraphicsPipelineVK::setup_vertex_input_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
@@ -83,7 +122,12 @@ void GraphicsPipelineVK::setup_rasterization_state_create_info(const PipelineCon
 
 void GraphicsPipelineVK::setup_mulitsample_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
-    // TODO
+    // TODO: Get from configuration.
+    VkPipelineMultisampleStateCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    create_info.sampleShadingEnable = VK_FALSE;
+    create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    p_pipeline_create_infos.multisample_state = create_info;
 }
 
 void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
@@ -96,6 +140,27 @@ void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const PipelineCon
     create_info.depthCompareOp = depth_stencil_config.depth_compare_op;
     create_info.stencilTestEnable = VK_FALSE;
     p_pipeline_create_infos.depth_stencil_state = create_info;
+}
+
+void GraphicsPipelineVK::setup_color_blend_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                             PipelineStateCreateInfo& p_pipeline_create_infos)  {
+    auto& color_blend_config = p_pipeline_configurations.color_blend;
+    VkPipelineColorBlendStateCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    create_info.logicOpEnable = color_blend_config.logic_op_enable;
+    create_info.logicOp = color_blend_config.logic_op;
+    create_info.attachmentCount = color_blend_config.attachments.size();
+    create_info.pAttachments = color_blend_config.attachments.data();
+    p_pipeline_create_infos.color_blend_state = create_info;
+}
+
+void GraphicsPipelineVK::setup_dynamic_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                         PipelineStateCreateInfo& p_pipeline_create_infos) {
+    auto& dynamic_state_config = p_pipeline_configurations.dynamic_state;
+    VkPipelineDynamicStateCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    create_info.dynamicStateCount = dynamic_state_config.dynamic_states.size();
+    create_info.pDynamicStates = dynamic_state_config.dynamic_states.data();
 }
 
 }

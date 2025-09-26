@@ -92,6 +92,8 @@ void RendererVK::setup_base_render_data() {
     base_render_data.allocation_callbacks = get_allocation_callbacks();
     base_render_data.queue_family_index_graphics = queue_family_indices.graphics.value();
     base_render_data.queue_family_index_compute = queue_family_indices.compute.value();
+    base_render_data.viewport = viewport;
+    base_render_data.scissor = scissor;
 }
 
 

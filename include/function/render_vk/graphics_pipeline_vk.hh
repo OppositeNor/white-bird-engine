@@ -31,12 +31,20 @@ public:
      *
      */
     struct PipelineConfigurations {
+        // Viewport configuration.
+        struct ViewportStateConfig {
+            // Viewports. Manual setup needed!
+            std::vector<VkViewport> viewports;
+            // Scissors. Manual setup needed!
+            // A scissor clamps a rectangle region that the fragments will only be generated inside this region.
+            std::vector<VkRect2D> scissors;
+        };
         // Vertex input configurations.
         struct VertexInputConfig {
-            // The vertex bindings.
-            vector<VkVertexInputBindingDescription> bindings;
-            // The vertex attributes.
-            vector<VkVertexInputAttributeDescription> attributes;
+            // The vertex bindings. Manual setup needed!
+            std::vector<VkVertexInputBindingDescription> bindings;
+            // The vertex attributes. Manual setup needed!
+            std::vector<VkVertexInputAttributeDescription> attributes;
         };
         // Input assembly configurations.
         struct InputAssemblyConfig {
@@ -75,25 +83,48 @@ public:
         };
         // Color blend configurations.
         struct ColorBlendConfig {
-            // TODO
+            // Enable logic operations for the attachments.
+            VkBool32 logic_op_enable = VK_FALSE;
+            // Logic operation. Ignored if logic_op_enable is VK_FALSE.
+            VkLogicOp logic_op;
+            // Color blend attachments.
+            std::vector<VkPipelineColorBlendAttachmentState> attachments {
+                {
+                    .blendEnable = VK_FALSE,
+                    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                    | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+                }
+            };
+        };
+        // Dynamic state configurations.
+        struct DynamicStateConfig {
+            // Dynamic states.
+            std::vector<VkDynamicState> dynamic_states {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR
+            };
         };
 
-        // The input shaders.
-        vector<ShaderVK> shaders;
+        // The input shaders. Manual setup needed!
+        std::vector<ShaderVK> shaders;
+        // Viewport state configuration.
+        ViewportStateConfig viewport{};
         // Vertex input stage configurations.
-        VertexInputConfig vertex_input;
+        VertexInputConfig vertex_input{};
         // Input assembly stage configurations.
-        InputAssemblyConfig input_assembly;
+        InputAssemblyConfig input_assembly{};
         // Teselation stage configurations.
         std::optional<TesselationConfig> tesselation;
         // Rasterization stage configurations.
-        RasterizationConfig rasterization;
+        RasterizationConfig rasterization{};
         // Multisample state configurations.
-        MultisampleConfig multisample;
+        MultisampleConfig multisample{};
         // Depth test configuration.
-        DepthTestConfig depth_test;
+        DepthTestConfig depth_test{};
         // Color blend configuration.
-        ColorBlendConfig color_blend;
+        ColorBlendConfig color_blend{};
+        // Dynamic state configuration.
+        DynamicStateConfig dynamic_state{};
     };
 
     ~GraphicsPipelineVK();
@@ -107,19 +138,43 @@ public:
      *
      * @param p_shaders The list of shaders used in the pipeline.
      */
-    GraphicsPipelineVK(const PipelineConfigurations& p_pipeline_configurations);
+    GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const PipelineConfigurations& p_pipeline_configurations);
+
+    /**
+     * @brief Get the default configuration of the pipeline for rendering opaque objects.
+     * Note that you still need to set the shaders, vertex input bindings and attributes yourself.
+     *
+     * @return The default configuration of the pipeline for rendering opaque objects.
+     */
+    PipelineConfigurations get_default_render_opaque_configuration() {
+        auto result = PipelineConfigurations();
+        result.viewport.viewports = { render_data->viewport };
+        result.viewport.scissors = { render_data->scissor };
+        return result;
+    }
 
 private:
 
+    const RendererVK::BaseRenderDataVK* render_data;
+
+    VkPipelineLayout pipeline_layout;
+    VkPipeline graphics_pipeline;
+
     struct PipelineStateCreateInfo {
+        VkPipelineViewportStateCreateInfo viewport_state;
         VkPipelineVertexInputStateCreateInfo vertex_input_state;
         VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
         std::optional<VkPipelineTessellationStateCreateInfo> tessellation_state;
         VkPipelineRasterizationStateCreateInfo rasterization_state;
+        VkPipelineMultisampleStateCreateInfo multisample_state;
         VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
+        VkPipelineColorBlendStateCreateInfo color_blend_state;
+        VkPipelineDynamicStateCreateInfo dynamic_state;
     };
 
     void initialize(const PipelineConfigurations& p_pipeline_configurations);
+    void setup_viewport_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                          PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_vertex_input_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_input_assembly_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
@@ -134,6 +189,8 @@ private:
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_color_blend_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_dynamic_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                         PipelineStateCreateInfo& p_pipeline_create_infos);
 };
 
 }
