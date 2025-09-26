@@ -16,7 +16,7 @@
 #define __WBE_GRAPHICS_PIPELINE_VK_HH__
 
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/shader_pipeline_vk.hh"
+#include "function/render_vk/shader_vk.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -51,7 +51,7 @@ public:
         };
         // Rasterization configuraion.
         struct RasterizationConfig {
-            // Enables depth clamping.
+            // If set to true, the fragments of depth over 1.0 or smaller than 0.0 won't be discarded but will be clamped.
             VkBool32 depth_clamp_enabled = VK_TRUE;
             // Polygon mode.
             VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
@@ -60,8 +60,26 @@ public:
             // Which direction is considered front, default to counter-clockwise.
             VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         };
+        // Multisample configurations.
+        struct MultisampleConfig {
+            // TODO
+        };
+        // Depth test configurations.
+        struct DepthTestConfig {
+            // Depth test enabled.
+            VkBool32 depth_test_enable = VK_TRUE;
+            // Enable depth writing.
+            VkBool32 depth_write_enable = VK_FALSE;
+            // Compare operation.
+            VkCompareOp depth_compare_op = VK_COMPARE_OP_LESS;
+        };
+        // Color blend configurations.
+        struct ColorBlendConfig {
+            // TODO
+        };
+
         // The input shaders.
-        vector<ShaderPipelineVK> shaders;
+        vector<ShaderVK> shaders;
         // Vertex input stage configurations.
         VertexInputConfig vertex_input;
         // Input assembly stage configurations.
@@ -70,6 +88,12 @@ public:
         std::optional<TesselationConfig> tesselation;
         // Rasterization stage configurations.
         RasterizationConfig rasterization;
+        // Multisample state configurations.
+        MultisampleConfig multisample;
+        // Depth test configuration.
+        DepthTestConfig depth_test;
+        // Color blend configuration.
+        ColorBlendConfig color_blend;
     };
 
     ~GraphicsPipelineVK();
@@ -92,6 +116,7 @@ private:
         VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
         std::optional<VkPipelineTessellationStateCreateInfo> tessellation_state;
         VkPipelineRasterizationStateCreateInfo rasterization_state;
+        VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
     };
 
     void initialize(const PipelineConfigurations& p_pipeline_configurations);
@@ -103,6 +128,12 @@ private:
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_rasterization_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_mulitsample_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                             PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_depth_stencil_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                               PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_color_blend_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                               PipelineStateCreateInfo& p_pipeline_create_infos);
 };
 
 }

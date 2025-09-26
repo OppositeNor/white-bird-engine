@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-#include "function/render_vk/shader_pipeline_vk.hh"
+#include "function/render_vk/shader_vk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
@@ -21,7 +21,7 @@
 
 namespace WhiteBirdEngine {
 
-ShaderPipelineVK::ShaderPipelineVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
                                    ResourceChunkID p_resource_chunk, const std::string& p_shader_res_id)
     : base_render_data(p_base_render_data), configurations(p_configurations) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
@@ -30,20 +30,20 @@ ShaderPipelineVK::ShaderPipelineVK(const RendererVK::BaseRenderDataVK* p_base_re
     initialize_shader(code_data, resource->size);
 }
 
-ShaderPipelineVK::ShaderPipelineVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
                                    const Path& p_shader_file_path)
     : base_render_data(p_base_render_data), configurations(p_configurations) {
     auto binary_data = load_binary_file(static_cast<std::string>(p_shader_file_path).c_str());
     initialize_shader(binary_data.data(), binary_data.size());
 }
 
-ShaderPipelineVK::ShaderPipelineVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
+ShaderVK::ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
                                    const char* p_code_data, size_t p_data_size)
     : base_render_data(p_base_render_data), configurations(p_configurations) {
     initialize_shader(p_code_data, p_data_size);
 }
 
-VkPipelineShaderStageCreateInfo ShaderPipelineVK::get_shader_stage_create_info() const {
+VkPipelineShaderStageCreateInfo ShaderVK::get_shader_stage_create_info() const {
     VkPipelineShaderStageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     create_info.stage = configurations->stages;
@@ -52,12 +52,24 @@ VkPipelineShaderStageCreateInfo ShaderPipelineVK::get_shader_stage_create_info()
     return create_info;
 }
 
-ShaderPipelineVK::~ShaderPipelineVK() {
+ShaderVK::~ShaderVK() {
     vkDestroyShaderModule(base_render_data->logic_device, shader_module, base_render_data->allocation_callbacks);
 }
 
-void ShaderPipelineVK::initialize_shader(const char* p_code_data, size_t p_code_size) {
+void ShaderVK::initialize_shader(const char* p_code_data, size_t p_code_size) {
     shader_module = create_shader_module(base_render_data, p_code_data, p_code_size);
+}
+
+VkShaderModule ShaderVK::create_shader_module(const RendererVK::BaseRenderDataVK* p_base_render_data, const char* p_code_data, size_t p_code_size) {
+    VkShaderModuleCreateInfo create_info{};
+    VkShaderModule result;
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = p_code_size;
+    create_info.pCode = reinterpret_cast<const uint32_t*>(p_code_data);
+    if (vkCreateShaderModule(p_base_render_data->logic_device, &create_info, p_base_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create shader module.");
+    }
+    return result;
 }
 
 }

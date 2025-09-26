@@ -33,11 +33,12 @@ void GraphicsPipelineVK::initialize(const PipelineConfigurations& p_pipeline_con
     setup_vertex_input_state_create_info(p_pipeline_configurations, state_create_info);
     setup_input_assembly_state_create_info(p_pipeline_configurations, state_create_info);
     setup_tessellation_state_create_info(p_pipeline_configurations, state_create_info);
+    setup_rasterization_state_create_info(p_pipeline_configurations, state_create_info);
+    setup_depth_stencil_state_create_info(p_pipeline_configurations, state_create_info);
 }
 
-void GraphicsPipelineVK::setup_vertex_input_state_create_info(
-    const PipelineConfigurations& p_pipeline_configurations,
-    PipelineStateCreateInfo& p_pipeline_create_infos) {
+void GraphicsPipelineVK::setup_vertex_input_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                              PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& vertex_input_config = p_pipeline_configurations.vertex_input;
     VkPipelineVertexInputStateCreateInfo create_info;
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -50,8 +51,8 @@ void GraphicsPipelineVK::setup_vertex_input_state_create_info(
     p_pipeline_create_infos.vertex_input_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_input_assembly_state_create_info(
-    const PipelineConfigurations& p_pipeline_configurations, PipelineStateCreateInfo& p_pipeline_create_infos) {
+void GraphicsPipelineVK::setup_input_assembly_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& input_assembly_config = p_pipeline_configurations.input_assembly;
     VkPipelineInputAssemblyStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -67,7 +68,34 @@ void GraphicsPipelineVK::setup_tessellation_state_create_info(const PipelineConf
 
 void GraphicsPipelineVK::setup_rasterization_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
+    auto& rasterization_config = p_pipeline_configurations.rasterization;
+    VkPipelineRasterizationStateCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    create_info.depthClampEnable = rasterization_config.depth_clamp_enabled;
+    create_info.rasterizerDiscardEnable = VK_FALSE;
+    create_info.polygonMode = rasterization_config.polygon_mode;
+    create_info.cullMode = rasterization_config.cull_mode;
+    create_info.frontFace = rasterization_config.front_face;
+    create_info.depthBiasEnable = VK_FALSE;
+    create_info.lineWidth = 1.0f;
+    p_pipeline_create_infos.rasterization_state = create_info;
+}
+
+void GraphicsPipelineVK::setup_mulitsample_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                              PipelineStateCreateInfo& p_pipeline_create_infos) {
     // TODO
+}
+
+void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
+    auto& depth_stencil_config = p_pipeline_configurations.depth_test;
+    VkPipelineDepthStencilStateCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    create_info.depthTestEnable = depth_stencil_config.depth_test_enable;
+    create_info.depthWriteEnable = depth_stencil_config.depth_write_enable;
+    create_info.depthCompareOp = depth_stencil_config.depth_compare_op;
+    create_info.stencilTestEnable = VK_FALSE;
+    p_pipeline_create_infos.depth_stencil_state = create_info;
 }
 
 }
