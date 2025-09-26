@@ -15,8 +15,10 @@
 #ifndef __WBE_RENDER_PASS_NORMAL_DEPTH_VK_HH__
 #define __WBE_RENDER_PASS_NORMAL_DEPTH_VK_HH__
 
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_pass.hh"
+#include "function/render_vk/graphics_pipeline_vk.hh"
 #include "function/render_vk/render_pass_vk.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -49,6 +51,8 @@ private:
     VkImageView normal_view;
     VkImage depth_map;
     VkImageView depth_view;
+
+    Unique<GraphicsPipelineVK> graphics_pipeline;
 
     void setup_render_pass(RenderDataVK* p_input);
     void setup_framebuffer(RenderDataVK* p_input);
