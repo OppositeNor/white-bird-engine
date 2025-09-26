@@ -13,6 +13,7 @@
 # limitations under the License.
 from argparse import ArgumentParser
 import os
+from pathlib import Path
 import sys
 import subprocess
 import traceback
@@ -48,6 +49,7 @@ source_dir = os.path.join(root_dir, build_config.source_dir)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
 build_dir = os.path.join(root_dir, build_target["export-directory"])
+dependencies_dir = os.path.join(root_dir, "dependencies")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(build_dir, "res")
@@ -58,11 +60,13 @@ shaders_dir = os.path.join(resource_dir, "shaders")
 shaders_output_dir = os.path.join(resource_output_dir, "shaders")
 metadata_path = os.path.join(resource_output_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
+licenses_output_dir = os.path.join(resource_output_dir, "licenses")
 
 # Create directories
 os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(shaders_output_dir, exist_ok=True)
+os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 
 # HELPER FUNCTIONS
@@ -87,10 +91,45 @@ def _get_cmake_command_from_info(p_build_info):
         result.append(p_build_info["additional-cmake-args"])
     return result
 
+def _gather_license():
+    # Get white bird engine license
+    shutil.copyfile(os.path.join(root_dir, "LICENSE"), os.path.join(licenses_output_dir, "white-bird-engine_LICENSE"))
+    shutil.copyfile(os.path.join(root_dir, "NOTICE"), os.path.join(licenses_output_dir, "white-bird-engine_NOTICE"))
+    # Get licenses from dependencies
+    deps_dir = Path(dependencies_dir).resolve()
+    output_dir = Path(licenses_output_dir).resolve()
+
+    for subdir in deps_dir.iterdir():
+        if subdir.is_dir():
+            license_files = [p for p in subdir.iterdir() 
+                             if p.is_file() and ("license" in p.name.lower() or
+                                                 "copying" in p.name.lower() or
+                                                 "authors" in p.name.lower() or
+                                                 "patents" in p.name.lower())]
+            if not license_files:
+                print(f"Warning: No LICENSE found in {subdir}")
+                continue
+            for lf in license_files:
+                target_name = f"{subdir.name}_{lf.name}"
+                target_path = output_dir / target_name
+                shutil.copy2(lf, target_path)
+
+            # Apache license requires to also include a NOTICE file if exists:
+            notice_files = [p for p in subdir.iterdir()
+                if p.is_file() and "notice" in p.name.lower()]
+            if notice_files:
+                for nf in notice_files:
+                    target_name = f"{subdir.name}_{nf.name}"
+                    target_path = output_dir / target_name
+                    print(f"Copying NOTICE {nf} -> {target_path}")
+                    shutil.copy2(nf, target_path)
+
 # ENTRY
 # Gather sources for reflection
 try:
     print(f"WBEBuilder: Building target: {args.target}.")
+    print("Gathering licenses...")
+    _gather_license()
     print("WBEBuilder: Gathering sources...")
     sources = []
     sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
@@ -122,4 +161,3 @@ except Exception as e:
     print("Build failed! Message:", e)
     traceback.print_exc()
     exit(-1)
-
