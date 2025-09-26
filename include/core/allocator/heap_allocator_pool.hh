@@ -15,6 +15,7 @@
 #ifndef __WBE_HEAP_ALLOCATOR_POOL_HH__
 #define __WBE_HEAP_ALLOCATOR_POOL_HH__
 
+#include "core/allocator/allocator.hh"
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
@@ -76,7 +77,7 @@ public:
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) override {
-        if (p_id == 0) {
+        if (p_id == MEM_NULL) {
             return nullptr;
         }
         return reinterpret_cast<void*>(p_id);

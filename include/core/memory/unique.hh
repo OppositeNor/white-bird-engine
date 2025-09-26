@@ -23,6 +23,12 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class Unique.
+ * @brief Ensures an instance to only exists once, to make it memory safe.
+ *
+ * @tparam T The type of the instance.
+ */
 template <typename T>
 class Unique {
     template <typename T1>
@@ -33,9 +39,7 @@ public:
     Unique()
         : mem_id(MEM_NULL), allocator(nullptr) {}
     ~Unique() {
-        if (allocator != nullptr && mem_id != MEM_NULL) {
-            destroy_obj<T>(allocator, mem_id);
-        }
+        reset();
     }
     // Unique is not copyable.
     Unique(const Unique&) = delete;
@@ -47,38 +51,55 @@ public:
     Unique& operator=(const Unique&) = delete;
     template <typename T1> requires std::convertible_to<T1, T>
     Unique& operator=(Unique<T1>&& p_other) {
-        if (mem_id != MEM_NULL) {
-            destroy_obj<T>(allocator, mem_id);
-        }
+        reset();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
+        return *this;
     }
     
     Unique(AllocType* p_allocator, MemID p_mem_id)
-        : allocator(p_allocator), mem_id(p_mem_id) {}
+        : mem_id(p_mem_id), allocator(p_allocator) {}
 
+    /**
+     * @brief Create a unique instance.
+     *
+     * @tparam Args The arguments of the constructor.
+     * @param p_allocator The allocator that this instance is going to be allocated.
+     * @param p_args The arguments.
+     * @return The unique instnace.
+     */
     template <typename... Args>
     static Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
         return Unique(p_allocator, create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
+    /**
+     * @brief Get the instance of the object.
+     *
+     * @return The instance of the object.
+     */
     T* get() {
         return allocator->get_obj<T>(mem_id);
     }
 
+    /**
+     * @brief Get the instance of the object.
+     *
+     * @return The instance of the object.
+     */
     const T* get() const {
         return allocator->get_obj<T>(mem_id);
     }
 
+    /**
+     * @brief Release the instance.
+     */
     void reset() {
-        destroy_obj<T>(allocator, mem_id);
-        mem_id = MEM_NULL;
-    }
-
-    template <typename T1>
-    bool operator==(const Unique<T1>& p_other) {
-        return allocator == p_other.allocator && mem_id == p_other.mem_id;
+        if (allocator != nullptr && mem_id != MEM_NULL) {
+            destroy_obj<T>(*allocator, mem_id);
+            mem_id = MEM_NULL;
+        }
     }
 
     bool operator==(MemID p_mem_id) {

@@ -101,10 +101,10 @@ void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
 }
 
 void* HeapAllocatorAlignedPool::get(MemID p_id) const {
-    WBE_DEBUG_ASSERT(is_in_pool(p_id));
     if (p_id == MEM_NULL) {
         return nullptr;
     }
+    WBE_DEBUG_ASSERT(is_in_pool(p_id));
     return reinterpret_cast<void*>(p_id);
 }
 
