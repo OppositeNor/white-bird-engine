@@ -47,9 +47,9 @@ private:
     bool initialized = false;
     VkRenderPass render_pass;
     VkFramebuffer framebuffer;
-    VkImage normal_map;
+    Ref<VkImage> normal_map;
     VkImageView normal_view;
-    VkImage depth_map;
+    Ref<VkImage> depth_map;
     VkImageView depth_view;
 
     Unique<GraphicsPipelineVK> graphics_pipeline;

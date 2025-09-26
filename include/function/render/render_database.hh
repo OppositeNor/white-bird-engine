@@ -15,6 +15,9 @@
 #ifndef __WBE_RENDER_DATABASE_HH__
 #define __WBE_RENDER_DATABASE_HH__
 
+#include "core/allocator/allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
 #include "glm/fwd.hpp"
@@ -103,7 +106,7 @@ public:
      * @param p_key The key of the image to register.
      * @param p_image The image to be registered.
      */
-    void register_image_gpu(const std::string& p_key, ImageTypeGPU p_image) {
+    void register_image_gpu(const std::string& p_key, Ref<ImageTypeGPU> p_image) {
         images[p_key] = p_image;
     }
 
@@ -113,8 +116,12 @@ public:
      * @param p_key The key of the image.
      * @return The image instance.
      */
-    ImageTypeGPU get_image_gpu(const std::string& p_key) const {
-        return images.at(p_key);
+    Ref<ImageTypeGPU> get_image_gpu(const std::string& p_key) const {
+        RefWeak<ImageTypeGPU> result = images.at(p_key);
+        if (result.is_valid()) {
+            return result.lock();
+        }
+        return MEM_NULL;
     }
 
     /**
@@ -157,7 +164,7 @@ private:
     vector<uint32_t> dynamic_opaque_triangle_indices;
     vector<uint32_t> dynamic_opaque_triangle_obj_id;
 
-    std::map<std::string, ImageTypeGPU> images;
+    std::map<std::string, RefWeak<ImageTypeGPU>> images;
 
     void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,

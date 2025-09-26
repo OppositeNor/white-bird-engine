@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/render_pass_normal_depth_vk.hh"
 #include "core/allocator/allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <stdexcept>
@@ -26,8 +27,8 @@ Ref<RenderPass::RenderData> RenderPassNormalDepthVK::setup(Ref<RenderData> p_inp
     setup_render_pass(input);
     setup_framebuffer(input);
     // Register the two maps to the GPU.
-    RendererVK::get_singleton()->get_render_database()->register_image_gpu("normal_map", RendererVK::ImageGPU{.image = normal_map, .is_null = false});
-    RendererVK::get_singleton()->get_render_database()->register_image_gpu("depth_map", RendererVK::ImageGPU{.image = normal_map, .is_null = false});
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("normal_map", normal_map);
+    RendererVK::get_singleton()->get_render_database()->register_image_gpu("depth_map", depth_map);
     // TODO: Setup graphics pipeline
     return p_input;
 }
@@ -85,10 +86,12 @@ void RenderPassNormalDepthVK::setup_render_pass(RenderDataVK* p_input) {
 
 void RenderPassNormalDepthVK::setup_framebuffer(RenderDataVK* p_input) {
     auto* base_render_data = p_input->base_render_data;
-    create_renderable_image_2d(p_input, VK_FORMAT_R8G8B8_UNORM, &normal_map);
-    create_renderable_image_2d(p_input, VK_FORMAT_R32_SFLOAT, &depth_map);
-    create_renderable_image_view_2d(p_input, normal_map, VK_FORMAT_R8G8B8_UNORM, &normal_view);
-    create_renderable_image_view_2d(p_input, depth_map, VK_FORMAT_R32_SFLOAT, &depth_view);
+    normal_map = make_ref<VkImage>(base_render_data->allocator);
+    depth_map = make_ref<VkImage>(base_render_data->allocator);
+    create_renderable_image_2d(p_input, VK_FORMAT_R8G8B8_UNORM, normal_map.get());
+    create_renderable_image_2d(p_input, VK_FORMAT_R32_SFLOAT, depth_map.get());
+    create_renderable_image_view_2d(p_input, *normal_map, VK_FORMAT_R8G8B8_UNORM, &normal_view);
+    create_renderable_image_view_2d(p_input, *depth_map, VK_FORMAT_R32_SFLOAT, &depth_view);
 
     VkFramebufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

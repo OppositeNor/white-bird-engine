@@ -41,14 +41,9 @@ class RendererVK : public Renderer {
 public:
     using AllocType = RenderAllocator;
 
-    struct ImageGPU {
-        VkImage image;
-        bool is_null = true;
-    };
-
     struct RenderDatabaseTypes {
         using AllocType = RendererVK::AllocType;
-        using ImageTypeGPU = ImageGPU;
+        using ImageTypeGPU = VkImage;
         WBE_REQUIRES_CONCEPT(RenderDatabaseTypeConcept, RenderDatabaseTypes);
     };
 
