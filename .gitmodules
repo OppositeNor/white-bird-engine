@@ -30,4 +30,4 @@
 	url = https://github.com/boostorg/boost.git
 [submodule "dependencies/freetype"]
 	path = dependencies/freetype
-	url = https://github.com/freetype/freetype.git
+	url = https://gitlab.freedesktop.org/freetype/freetype.git
