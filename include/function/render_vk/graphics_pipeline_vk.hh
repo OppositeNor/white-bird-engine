@@ -15,6 +15,8 @@
 #ifndef __WBE_GRAPHICS_PIPELINE_VK_HH__
 #define __WBE_GRAPHICS_PIPELINE_VK_HH__
 
+#include "core/memory/reference_strong.hh"
+#include "function/render_vk/pipeline_layout_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/shader_vk.hh"
 #include <vulkan/vulkan_core.h>
@@ -30,7 +32,7 @@ public:
      * @brief Pipeline configurations.
      *
      */
-    struct PipelineConfigurations {
+    struct Config {
         // Viewport configuration.
         struct ViewportStateConfig {
             // Viewports. Manual setup needed!
@@ -106,7 +108,7 @@ public:
         };
 
         // The input shaders. Manual setup needed!
-        std::vector<ShaderVK> shaders;
+        std::vector<Ref<ShaderVK>> shaders;
         // Viewport state configuration.
         ViewportStateConfig viewport{};
         // Vertex input stage configurations.
@@ -125,6 +127,8 @@ public:
         ColorBlendConfig color_blend{};
         // Dynamic state configuration.
         DynamicStateConfig dynamic_state{};
+        // Pipeline layout. Manual setup needed!
+        Ref<PipelineLayoutVK> pipeline_layout;
     };
 
     ~GraphicsPipelineVK();
@@ -138,7 +142,7 @@ public:
      *
      * @param p_shaders The list of shaders used in the pipeline.
      */
-    GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const PipelineConfigurations& p_pipeline_configurations);
+    GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations);
 
     /**
      * @brief Get the default configuration of the pipeline for rendering opaque objects.
@@ -146,8 +150,8 @@ public:
      *
      * @return The default configuration of the pipeline for rendering opaque objects.
      */
-    PipelineConfigurations get_default_render_opaque_configuration() {
-        auto result = PipelineConfigurations();
+    Config get_default_render_opaque_configuration() {
+        auto result = Config();
         result.viewport.viewports = { render_data->viewport };
         result.viewport.scissors = { render_data->scissor };
         return result;
@@ -172,24 +176,25 @@ private:
         VkPipelineDynamicStateCreateInfo dynamic_state;
     };
 
-    void initialize(const PipelineConfigurations& p_pipeline_configurations);
-    void setup_viewport_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void initialize(const Config& p_pipeline_configurations);
+
+    void setup_viewport_state_create_info(const Config& p_pipeline_configurations,
                                           PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_vertex_input_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_vertex_input_state_create_info(const Config& p_pipeline_configurations,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_input_assembly_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_input_assembly_state_create_info(const Config& p_pipeline_configurations,
                                                 PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_tessellation_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_tessellation_state_create_info(const Config& p_pipeline_configurations,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_rasterization_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_rasterization_state_create_info(const Config& p_pipeline_configurations,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_mulitsample_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_mulitsample_state_create_info(const Config& p_pipeline_configurations,
                                              PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_depth_stencil_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_depth_stencil_state_create_info(const Config& p_pipeline_configurations,
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_color_blend_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_color_blend_state_create_info(const Config& p_pipeline_configurations,
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_dynamic_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+    void setup_dynamic_state_create_info(const Config& p_pipeline_configurations,
                                          PipelineStateCreateInfo& p_pipeline_create_infos);
 };
 

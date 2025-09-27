@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

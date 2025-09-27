@@ -18,17 +18,17 @@
 
 namespace WhiteBirdEngine {
 
-GraphicsPipelineVK::GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const PipelineConfigurations& p_pipeline_configurations)
+GraphicsPipelineVK::GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations)
     : render_data(p_render_data) {
     initialize(p_pipeline_configurations);
 }
 
-void GraphicsPipelineVK::initialize(const PipelineConfigurations& p_pipeline_configurations) {
+void GraphicsPipelineVK::initialize(const Config& p_pipeline_configurations) {
     // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(p_pipeline_configurations.shaders.size());
     for (auto& shader : p_pipeline_configurations.shaders) {
-        shader_stages.push_back(shader.get_shader_stage_create_info());
+        shader_stages.push_back(shader->get_shader_stage_create_info());
     }
     // Setup create information for states.
     PipelineStateCreateInfo state_create_info;
@@ -56,13 +56,15 @@ void GraphicsPipelineVK::initialize(const PipelineConfigurations& p_pipeline_con
     create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
     create_info.pColorBlendState = &(state_create_info.color_blend_state);
     create_info.pDynamicState = &(state_create_info.dynamic_state);
+    create_info.layout = p_pipeline_configurations.pipeline_layout->get_pipeline_layout();
+    // TODO: Setup render pass.
 
     if (vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline.");
     }
 }
 
-void GraphicsPipelineVK::setup_viewport_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_pipeline_configurations,
                                                           PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& viewport_config = p_pipeline_configurations.viewport;
     VkPipelineViewportStateCreateInfo create_info;
@@ -76,7 +78,7 @@ void GraphicsPipelineVK::setup_viewport_state_create_info(const PipelineConfigur
     p_pipeline_create_infos.viewport_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_vertex_input_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_vertex_input_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& vertex_input_config = p_pipeline_configurations.vertex_input;
     VkPipelineVertexInputStateCreateInfo create_info;
@@ -90,7 +92,7 @@ void GraphicsPipelineVK::setup_vertex_input_state_create_info(const PipelineConf
     p_pipeline_create_infos.vertex_input_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_input_assembly_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_input_assembly_state_create_info(const Config& p_pipeline_configurations,
                                                                 PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& input_assembly_config = p_pipeline_configurations.input_assembly;
     VkPipelineInputAssemblyStateCreateInfo create_info{};
@@ -100,12 +102,12 @@ void GraphicsPipelineVK::setup_input_assembly_state_create_info(const PipelineCo
     p_pipeline_create_infos.input_assembly_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_tessellation_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_tessellation_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     // TODO
 }
 
-void GraphicsPipelineVK::setup_rasterization_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p_pipeline_configurations,
                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& rasterization_config = p_pipeline_configurations.rasterization;
     VkPipelineRasterizationStateCreateInfo create_info{};
@@ -120,7 +122,7 @@ void GraphicsPipelineVK::setup_rasterization_state_create_info(const PipelineCon
     p_pipeline_create_infos.rasterization_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_mulitsample_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_mulitsample_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     // TODO: Get from configuration.
     VkPipelineMultisampleStateCreateInfo create_info{};
@@ -130,7 +132,7 @@ void GraphicsPipelineVK::setup_mulitsample_state_create_info(const PipelineConfi
     p_pipeline_create_infos.multisample_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const Config& p_pipeline_configurations,
                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& depth_stencil_config = p_pipeline_configurations.depth_test;
     VkPipelineDepthStencilStateCreateInfo create_info{};
@@ -142,7 +144,7 @@ void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const PipelineCon
     p_pipeline_create_infos.depth_stencil_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_color_blend_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_color_blend_state_create_info(const Config& p_pipeline_configurations,
                                                              PipelineStateCreateInfo& p_pipeline_create_infos)  {
     auto& color_blend_config = p_pipeline_configurations.color_blend;
     VkPipelineColorBlendStateCreateInfo create_info{};
@@ -154,7 +156,7 @@ void GraphicsPipelineVK::setup_color_blend_state_create_info(const PipelineConfi
     p_pipeline_create_infos.color_blend_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_dynamic_state_create_info(const PipelineConfigurations& p_pipeline_configurations,
+void GraphicsPipelineVK::setup_dynamic_state_create_info(const Config& p_pipeline_configurations,
                                                          PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& dynamic_state_config = p_pipeline_configurations.dynamic_state;
     VkPipelineDynamicStateCreateInfo create_info{};
