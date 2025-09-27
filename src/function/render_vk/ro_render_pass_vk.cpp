@@ -12,24 +12,38 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/render_pass_vk.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-void RenderPassVK::create_renderable_image_2d(const RenderDataVK* p_input, VkFormat p_format, VkImage* p_image) {
+RORenderPassVK::RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+    : render_data(p_render_data) {
+    init(p_render_data, p_config);
+}
+
+RORenderPassVK::~RORenderPassVK() {
+    vkDestroyRenderPass(render_data->logic_device, render_pass, render_data->allocation_callbacks);
+}
+
+void RORenderPassVK::init(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config) {
+    VkRenderPassCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    // TODO
+}
+
+void RORenderPassVK::create_renderable_image_2d(const RendererVK::BaseRenderDataVK* p_input, VkFormat p_format, VkImage* p_image) {
     VkImageCreateInfo create_info{};
-    auto* base_render_data = p_input->base_render_data;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     // 2D image
     create_info.imageType = VK_IMAGE_TYPE_2D;
     // 8 bits rgba
     create_info.format = p_format;
     // Set size to the size of the swap chain's images.
-    create_info.extent.width = base_render_data->swap_chain_extent.width;
-    create_info.extent.height = base_render_data->swap_chain_extent.height;
+    create_info.extent.width = p_input->swap_chain_extent.width;
+    create_info.extent.height = p_input->swap_chain_extent.height;
     // No mipmap
     create_info.mipLevels = 1;
     // 1 layer image
@@ -40,13 +54,13 @@ void RenderPassVK::create_renderable_image_2d(const RenderDataVK* p_input, VkFor
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     // Could be rendered into.
     create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if (base_render_data->queue_family_index_graphics != base_render_data->queue_family_index_compute) {
+    if (p_input->queue_family_index_graphics != p_input->queue_family_index_compute) {
         // Shared with the graphics queue and the compute queue.
         create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = 2;
         uint32_t shared_queue_families[] = {
-            base_render_data->queue_family_index_graphics,
-            base_render_data->queue_family_index_compute
+            p_input->queue_family_index_graphics,
+            p_input->queue_family_index_compute
         };
         create_info.pQueueFamilyIndices = shared_queue_families;
     }
@@ -57,14 +71,13 @@ void RenderPassVK::create_renderable_image_2d(const RenderDataVK* p_input, VkFor
     // Image is going to be rendered by a graphics pipeline.
     create_info.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     
-    if (vkCreateImage(base_render_data->logic_device, &create_info, base_render_data->allocation_callbacks, p_image) != VK_SUCCESS) {
+    if (vkCreateImage(p_input->logic_device, &create_info, p_input->allocation_callbacks, p_image) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create image.");
     }
 }
 
-void RenderPassVK::create_renderable_image_view_2d(const RenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view) {
+void RORenderPassVK::create_renderable_image_view_2d(const RendererVK::BaseRenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view) {
     VkImageViewCreateInfo create_info;
-    auto* base_render_data = p_input->base_render_data;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     // Set the image of the image view.
     create_info.image = p_image;
@@ -82,7 +95,7 @@ void RenderPassVK::create_renderable_image_view_2d(const RenderDataVK* p_input, 
     create_info.subresourceRange.levelCount = 1;
     create_info.subresourceRange.baseArrayLayer = 0;
     create_info.subresourceRange.layerCount = 1;
-    if (vkCreateImageView(base_render_data->logic_device, &create_info, base_render_data->allocation_callbacks, p_image_view) != VK_SUCCESS) {
+    if (vkCreateImageView(p_input->logic_device, &create_info, p_input->allocation_callbacks, p_image_view) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create image view.");
     }
 }

@@ -15,6 +15,7 @@
 #ifndef __WBE_SHADER_VK_HH__
 #define __WBE_SHADER_VK_HH__
 
+#include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
@@ -27,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Shader class for Vulkan.
  *
  */
-class ShaderVK {
+class ShaderVK final : public RenderObject {
 public:
 
     struct ShaderConfigurations {
@@ -68,6 +69,10 @@ public:
      */
     ShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const ShaderConfigurations* p_configurations,
                      const char* p_code_data, size_t p_data_size);
+
+    virtual std::string get_ro_type() const {
+        return "shader_vk";
+    }
 
     /**
      * @brief Get the shader stage create info.

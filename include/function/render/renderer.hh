@@ -16,10 +16,7 @@
 #define __WBE_RENDERER_HH__
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render/render_pass.hh"
 #include "utils/interface/singleton.hh"
-#include <string>
 namespace WhiteBirdEngine {
 
 using RenderAllocator = HeapAllocatorAlignedPool;
@@ -34,16 +31,8 @@ class Renderer : public Singleton<Renderer> {
 public:
     Renderer() = default;
     virtual ~Renderer() {}
-
-    /**
-     * @brief Get the render passs from the name of the pass.
-     *
-     * @param p_pass_id The ID of the render pass to get.
-     */
-    virtual Ref<RenderPass> get_render_pass(const std::string& p_pass_name) = 0;
-
+    // TODO
 protected:
-    virtual void add_render_pass(Ref<RenderPass> p_render_pass) = 0;
 
 private:
     void initialize_render_pass();

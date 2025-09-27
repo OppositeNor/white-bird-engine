@@ -15,9 +15,6 @@
 #ifndef __WBE_RENDER_DATABASE_HH__
 #define __WBE_RENDER_DATABASE_HH__
 
-#include "core/allocator/allocator.hh"
-#include "core/memory/reference_strong.hh"
-#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
 #include "glm/fwd.hpp"
@@ -25,22 +22,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
-#include <string>
 
 namespace WhiteBirdEngine {
-
-/**
- * @brief Types for the render database.
- *
- * @tparam T
- */
-template <typename T>
-concept RenderDatabaseTypeConcept = requires {
-    // The type of the allocator
-    typename T::AllocType;
-    // The type of images
-    typename T::ImageTypeGPU;
-};
 
 /**
  * @class RenderDatabase
@@ -48,12 +31,9 @@ concept RenderDatabaseTypeConcept = requires {
  *
  * @todo Test
  */
-template <RenderDatabaseTypeConcept Types>
+template <typename AllocType>
 class RenderDatabase {
 private:
-    using AllocType = Types::AllocType;
-    using ImageTypeGPU = Types::ImageTypeGPU;
-
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
     template <typename T>
@@ -100,54 +80,7 @@ public:
                                     dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
     }
 
-    /**
-     * @brief Register an image referencing to the GPU resource to the database.
-     *
-     * @param p_key The key of the image to register.
-     * @param p_image The image to be registered.
-     */
-    void register_image_gpu(const std::string& p_key, Ref<ImageTypeGPU> p_image) {
-        images[p_key] = p_image;
-    }
-
-    /**
-     * @brief Get an image referencing to the GPU resource from the database.
-     *
-     * @param p_key The key of the image.
-     * @return The image instance.
-     */
-    Ref<ImageTypeGPU> get_image_gpu(const std::string& p_key) const {
-        RefWeak<ImageTypeGPU> result = images.at(p_key);
-        if (result.is_valid()) {
-            return result.lock();
-        }
-        return MEM_NULL;
-    }
-
-    /**
-     * @brief Get the keys of the registered images.
-     *
-     * @return The keys of the registered images.
-     */
-    std::vector<std::string> get_images_keys() const {
-        std::vector<std::string> keys;
-        keys.reserve(images.size());
-        for (auto& image : images) {
-            keys.push_back(image.first);
-        }
-        return keys;
-    }
-
-    /**
-     * @brief Remove an image referencing to the GPU resource from the database.
-     * This will NOT free the allocated GPU resource. The resource should be freed
-     * mannually.
-     *
-     * @param p_key The key of the image.
-     */
-    void remove_image_gpu(const std::string& p_key) const {
-        std::erase(images.find(p_key));
-    }
+    
 
 private:
 
@@ -163,8 +96,6 @@ private:
     vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
     vector<uint32_t> dynamic_opaque_triangle_indices;
     vector<uint32_t> dynamic_opaque_triangle_obj_id;
-
-    std::map<std::string, RefWeak<ImageTypeGPU>> images;
 
     void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
@@ -184,8 +115,8 @@ private:
 
 };
 
-template <RenderDatabaseTypeConcept Types>
-RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
+template <typename AllocType>
+RenderDatabase<AllocType>::RenderDatabase(AllocType* p_allocator)
     : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator), static_opaque_triangle_obj_id(p_allocator),
     static_opaque_transform_mats(p_allocator),
     dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator), dynamic_opaque_triangle_obj_id(p_allocator) {
@@ -195,8 +126,8 @@ RenderDatabase<Types>::RenderDatabase(AllocType* p_allocator)
     allocator = p_allocator;
 }
 
-template <RenderDatabaseTypeConcept Types>
-void RenderDatabase<Types>::set_opaque_triangles_linear(
+template <typename AllocType>
+void RenderDatabase<AllocType>::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,
@@ -236,8 +167,8 @@ void RenderDatabase<Types>::set_opaque_triangles_linear(
     std::vector<uint32_t>().swap(p_indices);
 }
 
-template <RenderDatabaseTypeConcept Types>
-void RenderDatabase<Types>::set_opaque_triangles_linear(
+template <typename AllocType>
+void RenderDatabase<AllocType>::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
     vector<Vertex3DTextured>& p_opaque_triangle_vertices,
     vector<uint32_t>& p_opaque_triangle_indices,

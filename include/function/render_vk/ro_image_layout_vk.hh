@@ -12,31 +12,35 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDER_PASS_VK_HH__
-#define __WBE_RENDER_PASS_VK_HH__
+#ifndef __WBE_RO_IMAGE_LAYOUT_VK_HH__
+#define __WBE_RO_IMAGE_LAYOUT_VK_HH__
 
-#include "core/reflection/reflection_defs.hh"
-#include "function/render/render_pass.hh"
+#include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-class RenderPassVK : public RenderPass {
+class ROImageLayoutVK final : public RenderObject {
 public:
-
-    /**
-     * @class RenderDataVK
-     * @brief Common used render data in vulkan.
-     *
-     */
-    WBE_STRUCT(RenderDataVK, RENDER_DATA_VK) : public RenderData {
-        // Used for all render passes.
-        const RendererVK::BaseRenderDataVK* base_render_data;
+    struct Config {
+        // TODO
     };
+    ROImageLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    virtual ~ROImageLayoutVK() override;
 
-protected:
-    void create_renderable_image_2d(const RenderDataVK* p_input, VkFormat p_format, VkImage* p_image);
-    void create_renderable_image_view_2d(const RenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view);
+    virtual std::string get_ro_type() const override {
+        return "image_layout_vk";
+    }
+
+    VkImageLayout get_image_layout() const {
+        return image_layout;
+    }
+
+private:
+    const RendererVK::BaseRenderDataVK* render_data;
+    VkImageLayout image_layout;
+
+    void init(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
 };
 
 }

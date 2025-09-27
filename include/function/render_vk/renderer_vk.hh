@@ -15,10 +15,8 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
-#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_pass.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render/renderer.hh"
 #include "global/stl_allocator.hh"
@@ -40,12 +38,6 @@ namespace WhiteBirdEngine {
 class RendererVK : public Renderer {
 public:
     using AllocType = RenderAllocator;
-
-    struct RenderDatabaseTypes {
-        using AllocType = RendererVK::AllocType;
-        using ImageTypeGPU = VkImage;
-        WBE_REQUIRES_CONCEPT(RenderDatabaseTypeConcept, RenderDatabaseTypes);
-    };
 
     struct BaseRenderDataVK {
         // The render allocator.
@@ -76,10 +68,6 @@ public:
     RendererVK& operator=(RendererVK&&) = delete;
 
     RendererVK(AllocType* p_allocator);
-    virtual Ref<RenderPass> get_render_pass(const std::string& p_pipeline_id) override {
-        return MEM_NULL; // TODO
-    }
-
     /**
      * @brief Get the singleton instance.
      *
@@ -89,7 +77,7 @@ public:
         return singleton;
     }
 
-    Ref<RenderDatabase<RenderDatabaseTypes>> get_render_database() {
+    Ref<RenderDatabase<RenderAllocator>> get_render_database() {
         return render_database;
     }
 
@@ -97,8 +85,6 @@ public:
         return &base_render_data;
     }
 
-protected:
-    virtual void add_render_pass(Ref<RenderPass> p_render_pipeline) override;
 private:
 
     inline static RendererVK* singleton = nullptr;
@@ -113,7 +99,7 @@ private:
     using string = ::WhiteBirdEngine::string<AllocType>;
 
     AllocType* allocator;
-    Ref<RenderDatabase<RenderDatabaseTypes>> render_database;
+    Ref<RenderDatabase<RenderAllocator>> render_database;
     Ref<AllocatorVK<AllocType>> allocator_vk;
 
     // Vulkan properties

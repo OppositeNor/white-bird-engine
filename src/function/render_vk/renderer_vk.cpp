@@ -18,6 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/engine_function.hh"
 #include "function/render/render_database.hh"
+#include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 
 #include <SDL_vulkan.h>
@@ -30,7 +31,7 @@
 namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator)
-    : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderDatabaseTypes>>(p_allocator, p_allocator)),
+    : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)) {
     singleton = this;
     init();
@@ -47,10 +48,6 @@ void RendererVK::init() {
     init_vulkan();
     setup_base_render_data();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
-}
-
-void RendererVK::add_render_pass(Ref<RenderPass> p_render_pass) {
-    // TODO
 }
 
 void RendererVK::terminate() {

@@ -12,30 +12,35 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_PIPELINE_LAYOUT_VK_HH__
-#define __WBE_PIPELINE_LAYOUT_VK_HH__
+#ifndef __WBE_RO_PIPELINE_LAYOUT_VK_HH__
+#define __WBE_RO_PIPELINE_LAYOUT_VK_HH__
 
+#include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
- * @class PipelineLayoutVK
+ * @class ROPipelineLayoutVK
  * @brief Pipeline layout.
  *
  */
-class PipelineLayoutVK {
+class ROPipelineLayoutVK final : public RenderObject {
 public:
 
     // Pipeline layout configurations.
-    struct PipelineLayoutConfiguration {
+    struct ROPipelineLayoutConfiguration {
         // Descriptor sets.
         std::vector<VkDescriptorSetLayout> descriptor_sets;
     };
 
-    PipelineLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data);
-    ~PipelineLayoutVK();
+    ROPipelineLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data);
+    virtual ~ROPipelineLayoutVK() override;
+
+    virtual std::string get_ro_type() const override {
+        return "pipeline_layout_vk";
+    }
 
     /**
      * @brief Get the vulkan pipeline layout instance.

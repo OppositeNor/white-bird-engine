@@ -12,18 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-GraphicsPipelineVK::GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations)
+ROGraphicsPipelineVK::ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations)
     : render_data(p_render_data) {
     initialize(p_pipeline_configurations);
 }
 
-void GraphicsPipelineVK::initialize(const Config& p_pipeline_configurations) {
+void ROGraphicsPipelineVK::initialize(const Config& p_pipeline_configurations) {
     // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(p_pipeline_configurations.shaders.size());
@@ -64,7 +64,7 @@ void GraphicsPipelineVK::initialize(const Config& p_pipeline_configurations) {
     }
 }
 
-void GraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_pipeline_configurations,
                                                           PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& viewport_config = p_pipeline_configurations.viewport;
     VkPipelineViewportStateCreateInfo create_info;
@@ -78,7 +78,7 @@ void GraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_pipeli
     p_pipeline_create_infos.viewport_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_vertex_input_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_vertex_input_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& vertex_input_config = p_pipeline_configurations.vertex_input;
     VkPipelineVertexInputStateCreateInfo create_info;
@@ -92,7 +92,7 @@ void GraphicsPipelineVK::setup_vertex_input_state_create_info(const Config& p_pi
     p_pipeline_create_infos.vertex_input_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_input_assembly_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_input_assembly_state_create_info(const Config& p_pipeline_configurations,
                                                                 PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& input_assembly_config = p_pipeline_configurations.input_assembly;
     VkPipelineInputAssemblyStateCreateInfo create_info{};
@@ -102,12 +102,12 @@ void GraphicsPipelineVK::setup_input_assembly_state_create_info(const Config& p_
     p_pipeline_create_infos.input_assembly_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_tessellation_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_tessellation_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     // TODO
 }
 
-void GraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p_pipeline_configurations,
                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& rasterization_config = p_pipeline_configurations.rasterization;
     VkPipelineRasterizationStateCreateInfo create_info{};
@@ -122,7 +122,7 @@ void GraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p_p
     p_pipeline_create_infos.rasterization_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_mulitsample_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_mulitsample_state_create_info(const Config& p_pipeline_configurations,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     // TODO: Get from configuration.
     VkPipelineMultisampleStateCreateInfo create_info{};
@@ -132,7 +132,7 @@ void GraphicsPipelineVK::setup_mulitsample_state_create_info(const Config& p_pip
     p_pipeline_create_infos.multisample_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_depth_stencil_state_create_info(const Config& p_pipeline_configurations,
                                                                PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& depth_stencil_config = p_pipeline_configurations.depth_test;
     VkPipelineDepthStencilStateCreateInfo create_info{};
@@ -144,7 +144,7 @@ void GraphicsPipelineVK::setup_depth_stencil_state_create_info(const Config& p_p
     p_pipeline_create_infos.depth_stencil_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_color_blend_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_color_blend_state_create_info(const Config& p_pipeline_configurations,
                                                              PipelineStateCreateInfo& p_pipeline_create_infos)  {
     auto& color_blend_config = p_pipeline_configurations.color_blend;
     VkPipelineColorBlendStateCreateInfo create_info{};
@@ -156,7 +156,7 @@ void GraphicsPipelineVK::setup_color_blend_state_create_info(const Config& p_pip
     p_pipeline_create_infos.color_blend_state = create_info;
 }
 
-void GraphicsPipelineVK::setup_dynamic_state_create_info(const Config& p_pipeline_configurations,
+void ROGraphicsPipelineVK::setup_dynamic_state_create_info(const Config& p_pipeline_configurations,
                                                          PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& dynamic_state_config = p_pipeline_configurations.dynamic_state;
     VkPipelineDynamicStateCreateInfo create_info{};

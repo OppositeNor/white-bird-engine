@@ -12,21 +12,25 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_GRAPHICS_PIPELINE_VK_HH__
-#define __WBE_GRAPHICS_PIPELINE_VK_HH__
+#ifndef __WBE_RO_GRAPHICS_PIPELINE_VK_HH__
+#define __WBE_RO_GRAPHICS_PIPELINE_VK_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/pipeline_layout_vk.hh"
+#include "function/render/render_object.hh"
+#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/shader_vk.hh"
 #include <vulkan/vulkan_core.h>
+
 namespace WhiteBirdEngine {
 
-class GraphicsPipelineVK {
+/**
+ * @class ROGraphicsPipelineVK
+ * @brief The graphics pipeline.
+ *
+ */
+class ROGraphicsPipelineVK final : public RenderObject {
 public:
-    template <typename T>
-    using vector = RendererVK::vector<T>;
-
     /**
      * @class PipelineConfigurations
      * @brief Pipeline configurations.
@@ -106,7 +110,6 @@ public:
                 VK_DYNAMIC_STATE_SCISSOR
             };
         };
-
         // The input shaders. Manual setup needed!
         std::vector<Ref<ShaderVK>> shaders;
         // Viewport state configuration.
@@ -128,21 +131,28 @@ public:
         // Dynamic state configuration.
         DynamicStateConfig dynamic_state{};
         // Pipeline layout. Manual setup needed!
-        Ref<PipelineLayoutVK> pipeline_layout;
+        Ref<ROPipelineLayoutVK> pipeline_layout;
     };
 
-    ~GraphicsPipelineVK();
-    GraphicsPipelineVK(const GraphicsPipelineVK&) = delete;
-    GraphicsPipelineVK(GraphicsPipelineVK&&) = delete;
-    GraphicsPipelineVK& operator=(const GraphicsPipelineVK&) = delete;
-    GraphicsPipelineVK& operator=(GraphicsPipelineVK&&) = delete;
+    ~ROGraphicsPipelineVK();
+    ROGraphicsPipelineVK(const ROGraphicsPipelineVK&) = delete;
+    ROGraphicsPipelineVK(ROGraphicsPipelineVK&&) = delete;
+    ROGraphicsPipelineVK& operator=(const ROGraphicsPipelineVK&) = delete;
+    ROGraphicsPipelineVK& operator=(ROGraphicsPipelineVK&&) = delete;
 
     /**
      * @brief Constructor.
      *
      * @param p_shaders The list of shaders used in the pipeline.
      */
-    GraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations);
+    ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations);
+
+    /**
+     * @brief Get the type of the render object.
+     */
+    virtual std::string get_ro_type() const override {
+        return "graphics_pipeline_vk";
+    }
 
     /**
      * @brief Get the default configuration of the pipeline for rendering opaque objects.
