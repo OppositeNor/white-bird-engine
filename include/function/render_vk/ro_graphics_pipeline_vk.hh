@@ -19,7 +19,8 @@
 #include "function/render/render_object.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/shader_vk.hh"
+#include "function/render_vk/ro_shader_vk.hh"
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -37,6 +38,20 @@ public:
      *
      */
     struct Config {
+        // Shader configuration. Manual setup needed!
+        struct ShaderConfig {
+            // Shader stage configurations.
+            struct ShaderStage {
+                // Shader stages bits.
+                VkShaderStageFlagBits stage;
+                // The entry function name of the shader.
+                std::string entry_function = "main";
+                // Shader instance.
+                Ref<ROShaderVK> shader;
+            };
+            // Shader stages.
+            std::vector<ShaderStage> shader_stages;
+        };
         // Viewport configuration.
         struct ViewportStateConfig {
             // Viewports. Manual setup needed!
@@ -111,7 +126,7 @@ public:
             };
         };
         // The input shaders. Manual setup needed!
-        std::vector<Ref<ShaderVK>> shaders;
+        ShaderConfig shader{};
         // Viewport state configuration.
         ViewportStateConfig viewport{};
         // Vertex input stage configurations.
@@ -145,7 +160,7 @@ public:
      *
      * @param p_shaders The list of shaders used in the pipeline.
      */
-    ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_pipeline_configurations);
+    ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
 
     /**
      * @brief Get the type of the render object.
@@ -186,25 +201,25 @@ private:
         VkPipelineDynamicStateCreateInfo dynamic_state;
     };
 
-    void initialize(const Config& p_pipeline_configurations);
+    void init(const Config& p_config);
 
-    void setup_viewport_state_create_info(const Config& p_pipeline_configurations,
+    void setup_viewport_state_create_info(const Config& p_config,
                                           PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_vertex_input_state_create_info(const Config& p_pipeline_configurations,
+    void setup_vertex_input_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_input_assembly_state_create_info(const Config& p_pipeline_configurations,
+    void setup_input_assembly_state_create_info(const Config& p_config,
                                                 PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_tessellation_state_create_info(const Config& p_pipeline_configurations,
+    void setup_tessellation_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_rasterization_state_create_info(const Config& p_pipeline_configurations,
+    void setup_rasterization_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_mulitsample_state_create_info(const Config& p_pipeline_configurations,
+    void setup_mulitsample_state_create_info(const Config& p_config,
                                              PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_depth_stencil_state_create_info(const Config& p_pipeline_configurations,
+    void setup_depth_stencil_state_create_info(const Config& p_config,
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_color_blend_state_create_info(const Config& p_pipeline_configurations,
+    void setup_color_blend_state_create_info(const Config& p_config,
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
-    void setup_dynamic_state_create_info(const Config& p_pipeline_configurations,
+    void setup_dynamic_state_create_info(const Config& p_config,
                                          PipelineStateCreateInfo& p_pipeline_create_infos);
 };
 
