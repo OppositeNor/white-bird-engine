@@ -32,6 +32,11 @@ public:
         return "image_layout_vk";
     }
 
+    /**
+     * @brief Get the image layout instance.
+     *
+     * @return The image layout instance.
+     */
     VkImageLayout get_image_layout() const {
         return image_layout;
     }

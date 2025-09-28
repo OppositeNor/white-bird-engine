@@ -182,11 +182,19 @@ public:
         return result;
     }
 
+    /**
+     * @brief Get the graphics pipeline instance.
+     *
+     * @return The graphics pipeline instance.
+     */
+    VkPipeline get_graphics_pipeline() const {
+        return graphics_pipeline;
+    }
+
 private:
 
     const RendererVK::BaseRenderDataVK* render_data;
 
-    VkPipelineLayout pipeline_layout;
     VkPipeline graphics_pipeline;
 
     struct PipelineStateCreateInfo {

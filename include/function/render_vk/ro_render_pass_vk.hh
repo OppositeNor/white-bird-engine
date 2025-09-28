@@ -38,6 +38,14 @@ public:
     RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
     virtual ~RORenderPassVK() override;
 
+    /**
+     * @brief Get the render pass instance.
+     *
+     * @return The render pass instance.
+     */
+    VkRenderPass get_render_pass() const {
+        return render_pass;
+    }
 
 protected:
     void create_renderable_image_2d(const RendererVK::BaseRenderDataVK* p_input, VkFormat p_format, VkImage* p_image);

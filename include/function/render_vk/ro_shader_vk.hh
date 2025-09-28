@@ -59,9 +59,9 @@ public:
     }
 
     /**
-     * @brief Get the shader stage create info.
+     * @brief Get the shader module.
      *
-     * @return The shader stage create info.
+     * @return The shader module.
      */
     VkShaderModule get_shader_module() const;
 

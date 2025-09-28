@@ -13,16 +13,22 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 
-ROImageVK::ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config) {
-
+ROImageVK::ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+    : render_data(p_render_data) {
+    init(p_config);
 }
 
 ROImageVK::~ROImageVK() {
+    vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+}
 
+void ROImageVK::init(const Config& p_config) {
+    // TODO
 }
 
 }

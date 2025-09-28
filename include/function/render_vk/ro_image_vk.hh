@@ -17,6 +17,7 @@
 
 #include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
@@ -36,6 +37,21 @@ public:
     virtual std::string get_ro_type() const override {
         return "image_vk";
     }
+
+    /**
+     * @brief Get image instance.
+     *
+     * @return The image instance.
+     */
+    VkImage get_image() const {
+        return image;
+    }
+
+private:
+    VkImage image;
+    const RendererVK::BaseRenderDataVK* render_data;
+
+    void init(const Config& p_config);
 };
 
 }
