@@ -13,21 +13,65 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROImageViewVK::ROImageViewVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(VkImage p_image) {
+    image = p_image;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_view_type(VkImageViewType p_view_type) {
+    view_type = p_view_type;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_format(VkFormat p_format) {
+    format = p_format;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(const VkComponentMapping& p_components) {
+    components = p_components;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkImageSubresourceRange& p_subresource_range) {
+    subresource_range = p_subresource_range;
+    return *this;
+}
+
+VkImageView ROImageViewVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+    VkImageViewCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    create_info.image = WBE_REQUIRED(image);
+    create_info.viewType = WBE_REQUIRED(view_type);
+    create_info.format = WBE_REQUIRED(format);
+    create_info.components = components;
+    create_info.subresourceRange = WBE_REQUIRED(subresource_range);
+    
+    VkImageView result;
+    if (vkCreateImageView(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create image view.");
+    }
+    return result;
+}
+
+ROImageViewVK::ROImageViewVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
-    init(p_config);
+    init(p_builder);
 }
 
 ROImageViewVK::~ROImageViewVK() {
     vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
 }
 
-void ROImageViewVK::init(const Config& p_config) {
-    // TODO
+void ROImageViewVK::init(const Builder& p_builder) {
+    image_view = p_builder.build(render_data);
 }
 
 }

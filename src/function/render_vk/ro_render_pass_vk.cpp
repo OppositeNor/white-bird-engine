@@ -19,19 +19,64 @@
 
 namespace WhiteBirdEngine {
 
-RORenderPassVK::RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_attachments(const std::vector<VkAttachmentDescription>& p_attachments) {
+    attachments = p_attachments;
+    return *this;
+}
+
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_attachment(const VkAttachmentDescription& p_attachment) {
+    attachments.push_back(p_attachment);
+    return *this;
+}
+
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_subpasses(const std::vector<VkSubpassDescription>& p_subpasses) {
+    subpasses = p_subpasses;
+    return *this;
+}
+
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_subpass(const VkSubpassDescription& p_subpass) {
+    subpasses.push_back(p_subpass);
+    return *this;
+}
+
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_dependencies(const std::vector<VkSubpassDependency>& p_dependencies) {
+    dependencies = p_dependencies;
+    return *this;
+}
+
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_dependency(const VkSubpassDependency& p_dependency) {
+    dependencies.push_back(p_dependency);
+    return *this;
+}
+
+VkRenderPass RORenderPassVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+    VkRenderPassCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    create_info.attachmentCount = attachments.size();
+    create_info.pAttachments = attachments.data();
+    create_info.subpassCount = subpasses.size();
+    create_info.pSubpasses = subpasses.data();
+    create_info.dependencyCount = dependencies.size();
+    create_info.pDependencies = dependencies.data();
+    
+    VkRenderPass result;
+    if (vkCreateRenderPass(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create render pass.");
+    }
+    return result;
+}
+
+RORenderPassVK::RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
-    init(p_render_data, p_config);
+    init(p_builder);
 }
 
 RORenderPassVK::~RORenderPassVK() {
     vkDestroyRenderPass(render_data->logic_device, render_pass, render_data->allocation_callbacks);
 }
 
-void RORenderPassVK::init(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config) {
-    VkRenderPassCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    // TODO
+void RORenderPassVK::init(const Builder& p_builder) {
+    render_pass = p_builder.build(render_data);
 }
 
 void RORenderPassVK::create_renderable_image_2d(const RendererVK::BaseRenderDataVK* p_input, VkFormat p_format, VkImage* p_image) {

@@ -28,15 +28,19 @@ namespace WhiteBirdEngine {
  */
 class ROShaderVK final : public RenderObject {
 public:
-
-    /**
-     * @class Config
-     * @brief Shader configuration.
-     *
-     */
-    struct Config {
+    // Builder for ROShaderVK
+    struct Builder {
+        friend ROShaderVK;
         // The source code of the shader.
-        std::vector<char> code;
+        std::optional<std::vector<char>> code;
+
+        // Set the shader source code.
+        Builder& set_code(const std::vector<char>& p_code);
+        // Set the shader source code from a file.
+        Builder& set_code_from_file(const std::string& p_file_path);
+
+    private:
+        VkShaderModule build(const RendererVK::BaseRenderDataVK* p_render_data) const;
     };
 
     ROShaderVK() = delete;
@@ -47,12 +51,12 @@ public:
     ROShaderVK& operator=(ROShaderVK&&) = delete;
 
     /**
-     * @brief Construct from a chunk of data..
+     * @brief Constructor.
      *
-     * @tparam AllocType The type of the allocator for the vector.
-     * @param p_shader_data The data of the shader.
+     * @param p_base_render_data The base render data.
+     * @param p_builder Configuration builder.
      */
-    ROShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const Config& p_config);
+    ROShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
 
     virtual std::string get_ro_type() const {
         return "shader_vk";
@@ -69,8 +73,7 @@ private:
     VkShaderModule shader_module;
     const RendererVK::BaseRenderDataVK* render_data;
 
-    void init(const Config& p_config);
-    VkShaderModule create_shader_module(const Config& p_config);
+    void init(const Builder& p_builder);
 };
 
 }

@@ -19,23 +19,40 @@
 
 namespace WhiteBirdEngine {
 
-RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::set_bindings(const std::vector<VkDescriptorSetLayoutBinding>& p_bindings) {
+    bindings = p_bindings;
+    return *this;
+}
+
+RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_binding(const VkDescriptorSetLayoutBinding& p_binding) {
+    bindings.push_back(p_binding);
+    return *this;
+}
+
+VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+    VkDescriptorSetLayoutCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    create_info.bindingCount = bindings.size();
+    create_info.pBindings = bindings.data();
+    
+    VkDescriptorSetLayout result;
+    if (vkCreateDescriptorSetLayout(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor set layout.");
+    }
+    return result;
+}
+
+RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
-    init(p_config);
+    init(p_builder);
 }
 
 RODescriptorSetLayoutVK::~RODescriptorSetLayoutVK() {
     vkDestroyDescriptorSetLayout(render_data->logic_device, descriptor_set_layout, render_data->allocation_callbacks);
 }
 
-void RODescriptorSetLayoutVK::init(const Config& p_config) {
-    VkDescriptorSetLayoutCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    create_info.bindingCount = p_config.bindings.size();
-    create_info.pBindings = p_config.bindings.data();
-    if (vkCreateDescriptorSetLayout(render_data->logic_device, &create_info, render_data->allocation_callbacks, &descriptor_set_layout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout.");
-    }
+void RODescriptorSetLayoutVK::init(const Builder& p_builder) {
+    descriptor_set_layout = p_builder.build(render_data);
 }
 
 }

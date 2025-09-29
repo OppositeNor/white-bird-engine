@@ -28,14 +28,34 @@ namespace WhiteBirdEngine {
  */
 class ROPipelineLayoutVK final : public RenderObject {
 public:
+    // Builder for ROPipelineLayoutVK
+    struct Builder {
+        friend ROPipelineLayoutVK;
+        // Descriptor set layouts.
+        std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
+        // Push constant ranges.
+        std::vector<VkPushConstantRange> push_constant_ranges;
 
-    // Pipeline layout configurations.
-    struct ROPipelineLayoutConfiguration {
-        // Descriptor sets.
-        std::vector<VkDescriptorSetLayout> descriptor_sets;
+        // Set descriptor set layouts.
+        Builder& set_descriptor_set_layouts(const std::vector<VkDescriptorSetLayout>& p_descriptor_set_layouts);
+        // Add a single descriptor set layout.
+        Builder& add_descriptor_set_layout(VkDescriptorSetLayout p_descriptor_set_layout);
+        // Set push constant ranges.
+        Builder& set_push_constant_ranges(const std::vector<VkPushConstantRange>& p_push_constant_ranges);
+        // Add a single push constant range.
+        Builder& add_push_constant_range(const VkPushConstantRange& p_push_constant_range);
+
+    private:
+        VkPipelineLayout build(const RendererVK::BaseRenderDataVK* p_render_data) const;
     };
 
-    ROPipelineLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data);
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     * @param p_builder Configuration builder.
+     */
+    ROPipelineLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROPipelineLayoutVK() override;
 
     virtual std::string get_ro_type() const override {
@@ -53,6 +73,8 @@ public:
 private:
     const RendererVK::BaseRenderDataVK* render_data;
     VkPipelineLayout pipeline_layout;
+
+    void init(const Builder& p_builder);
 };
 
 }

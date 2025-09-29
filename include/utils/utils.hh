@@ -350,11 +350,11 @@ enum class ColorSpace {
 using ChannelID = HashCode;
 
 template <typename T>
-inline T& required(const std::string& p_value_name, std::optional<T> p_optional_value) {
+inline T required(const std::string& p_value_name, std::optional<T> p_optional_value) {
     if (!p_optional_value.has_value()) {
         throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
-    return *p_optional_value;
+    return p_optional_value.value();
 }
 
 }

@@ -27,15 +27,21 @@ namespace WhiteBirdEngine {
  */
 class RODescriptorSetLayoutVK : public RenderObject {
 public:
-    /**
-     * @class Config
-     * @brief Descriptor set configuration.
-     *
-     */
-    struct Config {
+    // Builder for RODescriptorSetLayoutVK
+    struct Builder {
+        friend RODescriptorSetLayoutVK;
         // The descriptor set bindings.
         std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+        // Set the descriptor set bindings.
+        Builder& set_bindings(const std::vector<VkDescriptorSetLayoutBinding>& p_bindings);
+        // Add a single binding.
+        Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding);
+
+    private:
+        VkDescriptorSetLayout build(const RendererVK::BaseRenderDataVK* p_render_data) const;
     };
+
     ~RODescriptorSetLayoutVK();
     RODescriptorSetLayoutVK(const RODescriptorSetLayoutVK&) = delete;
     RODescriptorSetLayoutVK(RODescriptorSetLayoutVK&&) = delete;
@@ -46,9 +52,18 @@ public:
      * @brief Constructor.
      *
      * @param p_render_data The base render data.
-     * @param p_config The descriptor set layout configuration.
+     * @param p_builder Configuration builder.
      */
-    RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    /**
+     * @brief Get the vulkan descriptor set layout instance.
+     *
+     * @return The vulkan descriptor set layout instance.
+     */
+    virtual std::string get_ro_type() const override {
+        return "descriptor_set_layout_vk";
+    }
 
     /**
      * @brief Get the vulkan descriptor set layout instance.
@@ -60,9 +75,10 @@ public:
     }
 
 private:
-    void init(const Config& p_config);
     VkDescriptorSetLayout descriptor_set_layout;
     const RendererVK::BaseRenderDataVK* render_data;
+
+    void init(const Builder& p_builder);
 };
 
 }

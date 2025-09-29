@@ -27,16 +27,45 @@ namespace WhiteBirdEngine {
  */
 class RORenderPassVK : public RenderObject {
 public:
-    // Render pass configurations.
-    struct Config {
+    // Builder for RORenderPassVK
+    struct Builder {
+        friend RORenderPassVK;
         // Attachment descriptions.
         std::vector<VkAttachmentDescription> attachments;
         // Subpass descriptions.
         std::vector<VkSubpassDescription> subpasses;
+        // Subpass dependencies.
+        std::vector<VkSubpassDependency> dependencies;
+
+        // Set attachment descriptions.
+        Builder& set_attachments(const std::vector<VkAttachmentDescription>& p_attachments);
+        // Add a single attachment description.
+        Builder& add_attachment(const VkAttachmentDescription& p_attachment);
+        // Set subpass descriptions.
+        Builder& set_subpasses(const std::vector<VkSubpassDescription>& p_subpasses);
+        // Add a single subpass description.
+        Builder& add_subpass(const VkSubpassDescription& p_subpass);
+        // Set subpass dependencies.
+        Builder& set_dependencies(const std::vector<VkSubpassDependency>& p_dependencies);
+        // Add a single subpass dependency.
+        Builder& add_dependency(const VkSubpassDependency& p_dependency);
+
+    private:
+        VkRenderPass build(const RendererVK::BaseRenderDataVK* p_render_data) const;
     };
 
-    RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     * @param p_builder Configuration builder.
+     */
+    RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~RORenderPassVK() override;
+
+    virtual std::string get_ro_type() const override {
+        return "render_pass_vk";
+    }
 
     /**
      * @brief Get the render pass instance.
@@ -55,7 +84,7 @@ private:
     const RendererVK::BaseRenderDataVK* render_data;
     VkRenderPass render_pass;
 
-    void init(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    void init(const Builder& p_builder);
 };
 
 }
