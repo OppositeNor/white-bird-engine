@@ -13,8 +13,10 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include "core/core_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -45,10 +47,10 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkIm
     return *this;
 }
 
-VkImageView ROImageViewVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    create_info.image = WBE_REQUIRED(image);
+    create_info.image = WBE_REQUIRED(image).get_image();
     create_info.viewType = WBE_REQUIRED(view_type);
     create_info.format = WBE_REQUIRED(format);
     create_info.components = components;
@@ -61,7 +63,7 @@ VkImageView ROImageViewVK::Builder::build(const RendererVK::BaseRenderDataVK* p_
     return result;
 }
 
-ROImageViewVK::ROImageViewVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
     init(p_builder);
 }

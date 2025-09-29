@@ -15,9 +15,12 @@
 #ifndef __WBE_RO_IMAGE_VIEW_VK_HH__
 #define __WBE_RO_IMAGE_VIEW_VK_HH__
 
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_object.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/ro_image_vk.hh"
 #include <vulkan/vulkan_core.h>
+
 namespace WhiteBirdEngine {
 
 class ROImageViewVK final : public RenderObject {
@@ -26,7 +29,7 @@ public:
     struct Builder {
         friend ROImageViewVK;
         // Source image.
-        std::optional<VkImage> image;
+        Ref<ROImageVK> image;
         // Image view type.
         std::optional<VkImageViewType> view_type;
         // Image format.
@@ -53,7 +56,7 @@ public:
         Builder& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
 
     private:
-        VkImageView build(const RendererVK::BaseRenderDataVK* p_render_data) const;
+        VkImageView build(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -62,7 +65,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    ROImageViewVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROImageViewVK() override;
 
     virtual std::string get_ro_type() const override {
@@ -80,7 +83,7 @@ public:
 
 private:    
     VkImageView image_view;
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

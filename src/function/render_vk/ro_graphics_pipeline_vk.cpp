@@ -13,12 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROGraphicsPipelineVK::ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config)
     : render_data(p_render_data) {
     init(p_config);
 }

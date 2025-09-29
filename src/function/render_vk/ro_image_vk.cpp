@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -58,7 +58,49 @@ ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32
     return *this;
 }
 
-VkImage ROImageVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+ROImageVK::Builder& ROImageVK::Builder::image_2d(glm::uvec2 p_size) {
+    image_type = VK_IMAGE_TYPE_2D;
+    extent = VkExtent3D{ .width = p_size.x, .height = p_size.y };
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::image_3d(glm::uvec3 p_size) {
+    image_type = VK_IMAGE_TYPE_3D;
+    extent = VkExtent3D{ .width = p_size.x, .height = p_size.y, .depth = p_size.z };
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::rgb() {
+    format = VK_FORMAT_R8G8B8_UNORM;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::srgb() {
+    format = VK_FORMAT_R8G8B8_SRGB;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::rgba() {
+    format = VK_FORMAT_R8G8B8A8_UNORM;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::srgba() {
+    format = VK_FORMAT_R8G8B8A8_SRGB;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::rgb_hdr() {
+    format = VK_FORMAT_R32G32B32_SFLOAT;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::rgba_hdr() {
+    format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    return *this;
+}
+
+VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     create_info.imageType = WBE_REQUIRED(image_type);
@@ -86,7 +128,7 @@ VkImage ROImageVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_d
     return result;
 }
 
-ROImageVK::ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
     init(p_builder);
 }

@@ -16,7 +16,8 @@
 #define __WBE_RO_RENDER_PASS_VK_HH__
 
 #include "function/render/render_object.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -51,7 +52,7 @@ public:
         Builder& add_dependency(const VkSubpassDependency& p_dependency);
 
     private:
-        VkRenderPass build(const RendererVK::BaseRenderDataVK* p_render_data) const;
+        VkRenderPass build(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -60,7 +61,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    RORenderPassVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RORenderPassVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~RORenderPassVK() override;
 
     virtual std::string get_ro_type() const override {
@@ -76,12 +77,8 @@ public:
         return render_pass;
     }
 
-protected:
-    void create_renderable_image_2d(const RendererVK::BaseRenderDataVK* p_input, VkFormat p_format, VkImage* p_image);
-    void create_renderable_image_view_2d(const RendererVK::BaseRenderDataVK* p_input, VkImage p_image, VkFormat p_format, VkImageView* p_image_view);
-
 private:
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
     VkRenderPass render_pass;
 
     void init(const Builder& p_builder);

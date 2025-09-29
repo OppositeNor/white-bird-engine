@@ -16,8 +16,10 @@
 #define __WBE_RO_SHADER_VK_HH__
 
 #include "function/render/render_object.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
+#include <optional>
 #include <string>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -40,7 +42,7 @@ public:
         Builder& set_code_from_file(const std::string& p_file_path);
 
     private:
-        VkShaderModule build(const RendererVK::BaseRenderDataVK* p_render_data) const;
+        VkShaderModule build(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROShaderVK() = delete;
@@ -56,7 +58,7 @@ public:
      * @param p_base_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    ROShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
 
     virtual std::string get_ro_type() const {
         return "shader_vk";
@@ -71,7 +73,7 @@ public:
 
 private:
     VkShaderModule shader_module;
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

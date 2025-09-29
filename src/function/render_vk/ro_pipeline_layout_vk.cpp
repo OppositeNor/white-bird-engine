@@ -13,18 +13,18 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::set_descriptor_set_layouts(const std::vector<VkDescriptorSetLayout>& p_descriptor_set_layouts) {
+ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::set_descriptor_set_layouts(const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts) {
     descriptor_set_layouts = p_descriptor_set_layouts;
     return *this;
 }
 
-ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::add_descriptor_set_layout(VkDescriptorSetLayout p_descriptor_set_layout) {
+ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::add_descriptor_set_layout(Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout) {
     descriptor_set_layouts.push_back(p_descriptor_set_layout);
     return *this;
 }
@@ -39,11 +39,15 @@ ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::add_push_constant_rang
     return *this;
 }
 
-VkPipelineLayout ROPipelineLayoutVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+VkPipelineLayout ROPipelineLayoutVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkPipelineLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create_info.setLayoutCount = descriptor_set_layouts.size();
-    create_info.pSetLayouts = descriptor_set_layouts.data();
+    std::vector<VkDescriptorSetLayout> descriptor_set_layouts_vk;
+    for (auto& descriptor_set_layout : descriptor_set_layouts) {
+        descriptor_set_layouts_vk.push_back(descriptor_set_layout->get_descriptor_set_layout());
+    }
+    create_info.setLayoutCount = descriptor_set_layouts_vk.size();
+    create_info.pSetLayouts = descriptor_set_layouts_vk.data();
     create_info.pushConstantRangeCount = push_constant_ranges.size();
     create_info.pPushConstantRanges = push_constant_ranges.data();
     
@@ -54,7 +58,7 @@ VkPipelineLayout ROPipelineLayoutVK::Builder::build(const RendererVK::BaseRender
     return result;
 }
 
-ROPipelineLayoutVK::ROPipelineLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROPipelineLayoutVK::ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
     init(p_builder);
 }

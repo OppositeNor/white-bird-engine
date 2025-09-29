@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_object.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -160,7 +160,7 @@ public:
      *
      * @param p_shaders The list of shaders used in the pipeline.
      */
-    ROGraphicsPipelineVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config);
 
     /**
      * @brief Get the type of the render object.
@@ -193,7 +193,7 @@ public:
 
 private:
 
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
 
     VkPipeline graphics_pipeline;
 

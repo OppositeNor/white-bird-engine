@@ -14,6 +14,7 @@
 */
 
 #include "function/render_vk/ro_shader_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
@@ -26,7 +27,7 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::vector<char>& p_co
     return *this;
 }
 
-VkShaderModule ROShaderVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     const auto& shader_code = WBE_REQUIRED(code);
@@ -40,7 +41,7 @@ VkShaderModule ROShaderVK::Builder::build(const RendererVK::BaseRenderDataVK* p_
     return result;
 }
 
-ROShaderVK::ROShaderVK(const RendererVK::BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
     : render_data(p_base_render_data) {
     init(p_builder);
 }

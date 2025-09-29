@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -29,7 +29,7 @@ RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_binding(
     return *this;
 }
 
-VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkDescriptorSetLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     create_info.bindingCount = bindings.size();
@@ -42,7 +42,7 @@ VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const RendererVK::
     return result;
 }
 
-RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
+RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
     init(p_builder);
 }

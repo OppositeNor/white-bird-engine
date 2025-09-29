@@ -15,8 +15,19 @@
 #ifndef __CORE_UTILS_HH__
 #define __CORE_UTILS_HH__
 
+#include "core/allocator/allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include <stdexcept>
+#include <string>
 namespace WhiteBirdEngine {
 
+template <typename T>
+T& required(const std::string& p_name, Ref<T> p_ref) {
+    if (p_ref == MEM_NULL) {
+        throw std::runtime_error("Reference: \"" + p_name + "\" is required.");
+    }
+    return *p_ref;
+}
 
 }
 

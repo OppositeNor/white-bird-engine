@@ -16,7 +16,8 @@
 #define __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
 
 #include "function/render/render_object.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -39,7 +40,7 @@ public:
         Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding);
 
     private:
-        VkDescriptorSetLayout build(const RendererVK::BaseRenderDataVK* p_render_data) const;
+        VkDescriptorSetLayout build(const BaseRenderDataVK* p_render_data) const;
     };
 
     ~RODescriptorSetLayoutVK();
@@ -54,7 +55,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RODescriptorSetLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the vulkan descriptor set layout instance.
@@ -76,7 +77,7 @@ public:
 
 private:
     VkDescriptorSetLayout descriptor_set_layout;
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

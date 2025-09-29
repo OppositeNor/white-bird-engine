@@ -18,6 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
@@ -38,28 +39,6 @@ namespace WhiteBirdEngine {
 class RendererVK : public Renderer {
 public:
     using AllocType = RenderAllocator;
-
-    struct BaseRenderDataVK {
-        // The render allocator.
-        AllocType* allocator;
-        // The logic device.
-        VkDevice logic_device;
-        // The image format of the swap chain.
-        VkFormat swap_chain_format;
-        // The size of the swap chain.
-        VkExtent2D swap_chain_extent;
-        // Callback for allocator.
-        VkAllocationCallbacks* allocation_callbacks;
-        // Graphics queue family index.
-        uint32_t queue_family_index_graphics;
-        // Compute queue family index.
-        uint32_t queue_family_index_compute;
-        // The viewport for the final presentation.
-        VkViewport viewport;
-        // The scissor for the final presentation.
-        VkRect2D scissor;
-    };
-
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;

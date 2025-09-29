@@ -16,8 +16,9 @@
 #define __WBE_RO_IMAGE_VK_HH__
 
 #include "function/render/render_object.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <optional>
 #include <set>
 #include <vulkan/vulkan_core.h>
@@ -62,18 +63,34 @@ public:
         Builder& set_usage(VkImageUsageFlags p_usage);
         // Set the queue family indices.
         Builder& set_queue_families(const std::set<uint32_t>& p_queue_family_indices);
+        // Make a 2D image.
+        Builder& image_2d(glm::uvec2 p_size);
+        // Make a 3D image.
+        Builder& image_3d(glm::uvec3 p_size);
+        // Make an RGB image with each element 8 bit wide.
+        Builder& rgb();
+        // Make an SRGB image with each element 8 bit wide.
+        Builder& srgb();
+        // Make an RGBA image with each element 8 bit wide.
+        Builder& rgba();
+        // Make an SRGBA image with each element 8 bit wide.
+        Builder& srgba();
+        // Make an RGB HDR image with each element 32 bit wide.
+        Builder& rgb_hdr();
+        // Make an RGBA HDR image with each element 32 bit wide.
+        Builder& rgba_hdr();
 
     private:
-        VkImage build(const RendererVK::BaseRenderDataVK* p_render_data) const;
+        VkImage build(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
      * @brief Constructor.
      *
      * @param p_render_data The base render data.
-     * @param p_config Configuration.
+     * @param p_builder Configuration builder.
      */
-    ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROImageVK() override;
 
     virtual std::string get_ro_type() const override {
@@ -91,7 +108,7 @@ public:
 
 private:
     VkImage image;
-    const RendererVK::BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_config);
 };
