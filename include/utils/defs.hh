@@ -123,4 +123,7 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 // Default alignment
 #define WBE_DEFAULT_ALIGNMENT 8 // TODO: set value according to the platform
 
+// Get a required optional value.
+#define WBE_REQUIRED(optional_value) WhiteBirdEngine::required(#optional_value, (optional_value))
+
 #endif

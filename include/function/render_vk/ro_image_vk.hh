@@ -18,6 +18,8 @@
 #include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <cstdint>
+#include <optional>
+#include <set>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -28,18 +30,41 @@ namespace WhiteBirdEngine {
  */
 class ROImageVK final : public RenderObject {
 public:
-    // Image configurations.
-    struct Config {
+    // Builder for ROImageVK
+    struct Builder {
+        friend ROImageVK;
         // Image type.
-        VkImageType image_type;
+        std::optional<VkImageType> image_type;
         // Image format.
-        VkFormat format;
+        std::optional<VkFormat> format;
         // Image extent.
-        VkExtent3D extent;
+        std::optional<VkExtent3D> extent;
         // Mipmap level.
         uint32_t mipmap_level = 1;
         // Number of layers.
         uint32_t layers_count = 1;
+        // Image usages.
+        std::optional<VkImageUsageFlags> usage;
+        // Queue family indices.
+        std::set<uint32_t> queue_family_indices;
+
+        // Set the image type.
+        Builder& set_image_type(VkImageType p_image_type);
+        // Set the format.
+        Builder& set_format(VkFormat p_format);
+        // Set the image extent.
+        Builder& set_extent(VkExtent3D p_extent);
+        // Set the mipmap level.
+        Builder& set_mipmap_level(uint32_t p_mipmap_level);
+        // Set the number of layers of the image.
+        Builder& set_layers(uint32_t p_layers_count);
+        // Set the image usage.
+        Builder& set_usage(VkImageUsageFlags p_usage);
+        // Set the queue family indices.
+        Builder& set_queue_families(const std::set<uint32_t>& p_queue_family_indices);
+
+    private:
+        VkImage build(const RendererVK::BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -48,7 +73,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_config Configuration.
      */
-    ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROImageVK() override;
 
     virtual std::string get_ro_type() const override {
@@ -68,7 +93,7 @@ private:
     VkImage image;
     const RendererVK::BaseRenderDataVK* render_data;
 
-    void init(const Config& p_config);
+    void init(const Builder& p_config);
 };
 
 }

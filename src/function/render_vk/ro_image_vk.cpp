@@ -13,29 +13,90 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/renderer_vk.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
+#include <cstdint>
+#include <stdexcept>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
+ROImageVK::Builder& ROImageVK::Builder::set_image_type(VkImageType p_image_type) {
+    image_type = p_image_type;
+    return *this;
+}
 
-ROImageVK::ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+ROImageVK::Builder& ROImageVK::Builder::set_format(VkFormat p_format) {
+    format = p_format;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_extent(VkExtent3D p_extent) {
+    extent = p_extent;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_mipmap_level(uint32_t p_mipmap_level) {
+    mipmap_level = p_mipmap_level;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_layers(uint32_t p_layers_count) {
+    layers_count = p_layers_count;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_usage(VkImageUsageFlags p_usage) {
+    usage = p_usage;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_family_indices) {
+    queue_family_indices = p_queue_family_indices;
+    return *this;
+}
+
+VkImage ROImageVK::Builder::build(const RendererVK::BaseRenderDataVK* p_render_data) const {
+    VkImageCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info.imageType = WBE_REQUIRED(image_type);
+    create_info.format = WBE_REQUIRED(format);
+    create_info.extent = WBE_REQUIRED(extent);
+    create_info.mipLevels = mipmap_level;
+    create_info.arrayLayers = layers_count;
+    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    create_info.usage = WBE_REQUIRED(usage);
+    WBE_DEBUG_ASSERT(queue_family_indices.size() >= 1);
+    if (queue_family_indices.size() == 1) {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+    else {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    }
+    create_info.queueFamilyIndexCount = queue_family_indices.size();
+    std::vector<uint32_t> queue_family_indices_array(queue_family_indices.begin(), queue_family_indices.end());
+    create_info.pQueueFamilyIndices = queue_family_indices_array.data();
+    VkImage result;
+    if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create vulkan image.");
+    }
+    return result;
+}
+
+ROImageVK::ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
-    init(p_config);
+    init(p_builder);
 }
 
 ROImageVK::~ROImageVK() {
     vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
 }
 
-void ROImageVK::init(const Config& p_config) {
-    VkImageCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.imageType = p_config.image_type;
-    create_info.format = p_config.format;
-    create_info.extent = p_config.extent;
-    create_info.mipLevels = p_config.mipmap_level;
-    create_info.arrayLayers = p_config.layers_count;
-
+void ROImageVK::init(const Builder& p_builder) {
+    image = p_builder.build(render_data);
 }
 
 }
