@@ -12,19 +12,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_DESCRIPTOR_SET_LAYOUT_VK_HH__
-#define __WBE_DESCRIPTOR_SET_LAYOUT_VK_HH__
+#ifndef __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
+#define __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
 
+#include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
- * @class DescriptorSetLayoutVK
+ * @class RODescriptorSetLayoutVK
  * @brief Descriptor set layout.
  *
  */
-class DescriptorSetLayoutVK {
+class RODescriptorSetLayoutVK : public RenderObject {
 public:
     /**
      * @class Config
@@ -35,11 +36,11 @@ public:
         // The descriptor set bindings.
         std::vector<VkDescriptorSetLayoutBinding> bindings;
     };
-    ~DescriptorSetLayoutVK();
-    DescriptorSetLayoutVK(const DescriptorSetLayoutVK&) = delete;
-    DescriptorSetLayoutVK(DescriptorSetLayoutVK&&) = delete;
-    DescriptorSetLayoutVK& operator=(const DescriptorSetLayoutVK&) = delete;
-    DescriptorSetLayoutVK& operator=(DescriptorSetLayoutVK&&) = delete;
+    ~RODescriptorSetLayoutVK();
+    RODescriptorSetLayoutVK(const RODescriptorSetLayoutVK&) = delete;
+    RODescriptorSetLayoutVK(RODescriptorSetLayoutVK&&) = delete;
+    RODescriptorSetLayoutVK& operator=(const RODescriptorSetLayoutVK&) = delete;
+    RODescriptorSetLayoutVK& operator=(RODescriptorSetLayoutVK&&) = delete;
 
     /**
      * @brief Constructor.
@@ -47,7 +48,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_config The descriptor set layout configuration.
      */
-    DescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
+    RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
 
     /**
      * @brief Get the vulkan descriptor set layout instance.

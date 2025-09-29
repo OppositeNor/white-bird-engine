@@ -12,23 +12,23 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/descriptor_set_layout_vk.hh"
+#include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-DescriptorSetLayoutVK::DescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
+RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config)
     : render_data(p_render_data) {
     init(p_config);
 }
 
-DescriptorSetLayoutVK::~DescriptorSetLayoutVK() {
+RODescriptorSetLayoutVK::~RODescriptorSetLayoutVK() {
     vkDestroyDescriptorSetLayout(render_data->logic_device, descriptor_set_layout, render_data->allocation_callbacks);
 }
 
-void DescriptorSetLayoutVK::init(const Config& p_config) {
+void RODescriptorSetLayoutVK::init(const Config& p_config) {
     VkDescriptorSetLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     create_info.bindingCount = p_config.bindings.size();

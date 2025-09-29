@@ -28,7 +28,14 @@ ROImageVK::~ROImageVK() {
 }
 
 void ROImageVK::init(const Config& p_config) {
-    // TODO
+    VkImageCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info.imageType = p_config.image_type;
+    create_info.format = p_config.format;
+    create_info.extent = p_config.extent;
+    create_info.mipLevels = p_config.mipmap_level;
+    create_info.arrayLayers = p_config.layers_count;
+
 }
 
 }

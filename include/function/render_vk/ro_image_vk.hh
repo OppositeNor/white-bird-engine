@@ -17,6 +17,7 @@
 
 #include "function/render/render_object.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include <cstdint>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -27,10 +28,26 @@ namespace WhiteBirdEngine {
  */
 class ROImageVK final : public RenderObject {
 public:
+    // Image configurations.
     struct Config {
-        // TODO;
+        // Image type.
+        VkImageType image_type;
+        // Image format.
+        VkFormat format;
+        // Image extent.
+        VkExtent3D extent;
+        // Mipmap level.
+        uint32_t mipmap_level = 1;
+        // Number of layers.
+        uint32_t layers_count = 1;
     };
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     * @param p_config Configuration.
+     */
     ROImageVK(const RendererVK::BaseRenderDataVK* p_render_data, const Config& p_config);
     virtual ~ROImageVK() override;
 
