@@ -124,10 +124,44 @@ def _gather_license():
                     print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
+def _compile_shaders():
+    shaders_dir_path = Path(shaders_dir)
+    for hlsl_file in shaders_dir_path.rglob("*.hlsl"):
+        with open(hlsl_file, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        if first_line.startswith("//"):
+            profile = first_line[2:].strip()
+            if profile not in ["vs_6_0", "ps_6_0", "cs_6_0", "gs_6_0", "hs_6_0", "ds_6_0"]:
+                print(f"Unsupported profile for {hlsl_file} : {profile}, skipped.")
+                continue
+        else:
+            # Files without a profile header are considered to be header files, skipped.
+            continue
+
+        output_file = os.path.join(shaders_output_dir, (hlsl_file.stem + ".spv"))
+        cmd = [
+            "dxc",
+            "-T", profile,
+            "-E", "main",
+            "-spirv",
+            "-Fo", str(output_file),
+            str(hlsl_file)
+        ]
+        print("Compiling:", hlsl_file)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print("Failed to compile", hlsl_file)
+            print(result.stderr)
+            raise RuntimeError("Failed to compile shader.")
+        else:
+            print(" Success:", output_file)
+
 # ENTRY
 # Gather sources for reflection
 try:
     print(f"WBEBuilder: Building target: {args.target}.")
+    print("WBEBuilder: Compiling shaders...")
+    _compile_shaders()
     print("Gathering licenses...")
     _gather_license()
     print("WBEBuilder: Gathering sources...")

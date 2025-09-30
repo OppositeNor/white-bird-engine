@@ -21,6 +21,7 @@
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -150,6 +151,8 @@ public:
         Ref<ROPipelineLayoutVK> pipeline_layout;
         // Render pass. Manual setup needed!
         Ref<RORenderPassVK> render_pass;
+        // Indicate which subpass this graphics pipeline uses.
+        uint32_t subpass_index = 0;
     };
 
     ~ROGraphicsPipelineVK();
@@ -173,15 +176,26 @@ public:
     }
 
     /**
-     * @brief Get the default configuration of the pipeline for rendering opaque objects.
-     * Note that you still need to set the shaders, vertex input bindings and attributes yourself.
+     * @brief Get the default configurations.
      *
-     * @return The default configuration of the pipeline for rendering opaque objects.
+     * @param p_shader_config The shader configurations.
+     * @param p_vertex_input_config The vertex input configurations.
+     * @param p_pipeline_layout The pipeline layout.
+     * @param p_render_pass The render pass.
+     * @return The default configurations according to the input parameters.
      */
-    Config get_default_render_opaque_configuration() {
+    Config get_default_render_opaque_configuration(
+        const Config::ShaderConfig& p_shader_config,
+        const Config::VertexInputConfig& p_vertex_input_config,
+        Ref<ROPipelineLayoutVK> p_pipeline_layout,
+        Ref<RORenderPassVK> p_render_pass) {
         auto result = Config();
+        result.shader = p_shader_config;
+        result.vertex_input = p_vertex_input_config;
         result.viewport.viewports = { render_data->viewport };
         result.viewport.scissors = { render_data->scissor };
+        result.pipeline_layout = p_pipeline_layout;
+        result.render_pass = p_render_pass;
         return result;
     }
 

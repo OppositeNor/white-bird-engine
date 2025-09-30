@@ -69,6 +69,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.pDynamicState = &(state_create_info.dynamic_state);
     create_info.layout = p_config.pipeline_layout->get_pipeline_layout();
     create_info.renderPass = WBE_REQUIRED(p_config.render_pass).get_render_pass();
+    create_info.subpass = p_config.subpass_index;
 
     if (vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline.");

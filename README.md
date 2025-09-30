@@ -20,13 +20,13 @@ Or:
 ```sh
 git clone https://github.com/OppositeNor/white-bird-engine.git
 cd white-bird-engine
-git submodule init --update --recursive
+git submodule update --init --recursive
 ```
 
 Install build dependencies:
 
 ```sh
-sudo pacman -S cmake clang ninja llvm-libs
+sudo pacman -S cmake clang ninja directx-shader-compiler
 ```
 
 It is suggested to use Anaconda for setting up the build environment.

@@ -30,8 +30,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
 set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
 
-set(WBE_SHADER_DIR ${WBE_RESOURCE_DIR}/shaders)
-set(WBE_SHADER_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/shaders)
 set(WBE_METADATA_OUTPUT_PATH ${WBE_RESOURCE_OUTPUT_DIR}/metadata.json)
 
 set(WBE_CONFIG_DIR ${WBE_RESOURCE_DIR}/config)
@@ -150,26 +148,6 @@ if (WBE_MAKE_TEST)
     add_subdirectory(tests)
 endif()
 
-# Compile shaders
-file(GLOB shader_sources ${WBE_SHADER_DIR}/*.vert ${WBE_SHADER_DIR}/*.frag ${WBE_SHADER_DIR}/*.comp)
-set(shaders_outputs "")
-foreach(shader_source ${shader_sources})
-    message("Compiling: ${shader_source}")
-    get_filename_component(shader_name ${shader_source} NAME)
-    set(output_file "${WBE_SHADER_OUTPUT_DIR}/${shader_name}.spv")
-
-    add_custom_command(
-        OUTPUT ${output_file}
-        COMMAND glslc ${shader_source} -o ${output_file}
-        DEPENDS ${shader_source}
-        VERBATIM
-    )
-
-    list(APPEND shaders_outputs ${output_file})
-endforeach()
-
-add_custom_target(compile_shaders DEPENDS ${shaders_outputs})
-
 # Run all tests
 if (WBE_MAKE_TEST)
     add_custom_target(wbe_run_tests
@@ -185,8 +163,6 @@ if (WBE_MAKE_TEST)
     )
 
 endif()
-
-add_dependencies(${PROJECT_NAME} compile_shaders)
 
 if (WBE_MAKE_TEST)
     add_dependencies(wbe_run_tests wbe_setup_test_env)
