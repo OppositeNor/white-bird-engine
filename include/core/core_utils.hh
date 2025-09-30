@@ -29,6 +29,14 @@ T& required(const std::string& p_name, Ref<T> p_ref) {
     return *p_ref;
 }
 
+template <typename T>
+Ref<T> requires_valid(const std::string& p_name, Ref<T> p_ref) {
+    if (p_ref == MEM_NULL) {
+        throw std::runtime_error("Reference: \"" + p_name + "\" is required.");
+    }
+    return p_ref;
+}
+
 }
 
 #endif

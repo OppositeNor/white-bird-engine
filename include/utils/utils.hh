@@ -21,6 +21,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -355,6 +356,46 @@ inline T required(const std::string& p_value_name, std::optional<T> p_optional_v
         throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value.value();
+}
+
+template <typename T>
+inline std::optional<T>& requires_valid(const std::string& p_value_name, std::optional<T>& p_optional_value) {
+    if (!p_optional_value.has_value()) {
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+    }
+    return p_optional_value;
+}
+
+template <typename T>
+inline std::optional<T> requires_valid(const std::string& p_value_name, std::optional<T>&& p_optional_value) {
+    if (!p_optional_value.has_value()) {
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+    }
+    return p_optional_value;
+}
+
+template <typename T>
+inline T* requires_valid(const std::string& p_value_name, T* p_optional_value) {
+    if (p_optional_value == nullptr) {
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+    }
+    return p_optional_value;
+}
+
+template <typename T>
+inline std::shared_ptr<T> requires_valid(const std::string& p_value_name, std::shared_ptr<T> p_optional_value) {
+    if (p_optional_value == nullptr) {
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+    }
+    return p_optional_value;
+}
+
+template <typename T>
+inline std::unique_ptr<T> requires_valid(const std::string& p_value_name, std::unique_ptr<T> p_optional_value) {
+    if (p_optional_value == nullptr) {
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+    }
+    return p_optional_value;
 }
 
 }

@@ -19,6 +19,7 @@
 #include "function/render/render_object.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -147,6 +148,8 @@ public:
         DynamicStateConfig dynamic_state{};
         // Pipeline layout. Manual setup needed!
         Ref<ROPipelineLayoutVK> pipeline_layout;
+        // Render pass. Manual setup needed!
+        Ref<RORenderPassVK> render_pass;
     };
 
     ~ROGraphicsPipelineVK();

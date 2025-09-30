@@ -20,6 +20,7 @@
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
@@ -105,6 +106,8 @@ private:
     VkRect2D scissor{};
 
     VkRenderPass result_render_pass;
+
+    Ref<ROGraphicsPipelineVK> graphics_pipeline;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"

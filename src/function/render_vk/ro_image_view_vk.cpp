@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -22,8 +23,8 @@
 
 namespace WhiteBirdEngine {
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(VkImage p_image) {
-    image = p_image;
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
+    image = WBE_REQUIRES_VALID(p_image);
     return *this;
 }
 
@@ -47,6 +48,24 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkIm
     return *this;
 }
 
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROImageVK::Builder& p_image_config) {
+    switch (WBE_REQUIRED(p_image_config.image_type)) {
+        case VK_IMAGE_TYPE_1D:
+            view_type = VK_IMAGE_VIEW_TYPE_1D;
+            break;
+        case VK_IMAGE_TYPE_2D:
+            view_type = VK_IMAGE_VIEW_TYPE_2D;
+            break;
+        case VK_IMAGE_TYPE_3D:
+            view_type = VK_IMAGE_VIEW_TYPE_3D;
+            break;
+        default:
+            break;
+    };
+    format = WBE_REQUIRED(p_image_config.format);
+    return *this;
+}
+
 VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -54,7 +73,7 @@ VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data)
     create_info.viewType = WBE_REQUIRED(view_type);
     create_info.format = WBE_REQUIRED(format);
     create_info.components = components;
-    create_info.subresourceRange = WBE_REQUIRED(subresource_range);
+    create_info.subresourceRange = subresource_range;
     
     VkImageView result;
     if (vkCreateImageView(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {

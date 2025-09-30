@@ -126,4 +126,7 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 // Get a required optional value.
 #define WBE_REQUIRED(optional_value) WhiteBirdEngine::required(#optional_value, (optional_value))
 
+// Requires a pointer or reference to be non-null.
+#define WBE_REQUIRES_VALID(optional_value) WhiteBirdEngine::requires_valid(#optional_value, (optional_value))
+
 #endif

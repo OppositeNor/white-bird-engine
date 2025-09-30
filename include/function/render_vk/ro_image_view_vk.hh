@@ -15,6 +15,7 @@
 #ifndef __WBE_RO_IMAGE_VIEW_VK_HH__
 #define __WBE_RO_IMAGE_VIEW_VK_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_object.hh"
 #include "function/render_vk/render_vk_utils.hh"
@@ -23,13 +24,18 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class ROImageViewVK
+ * @brief Vulkan image view object.
+ *
+ */
 class ROImageViewVK final : public RenderObject {
 public:
     // Builder for ROImageViewVK
     struct Builder {
         friend ROImageViewVK;
         // Source image.
-        Ref<ROImageVK> image;
+        Ref<ROImageVK> image = MEM_NULL;
         // Image view type.
         std::optional<VkImageViewType> view_type;
         // Image format.
@@ -42,10 +48,15 @@ public:
             .a = VK_COMPONENT_SWIZZLE_IDENTITY
         };
         // Subresource range.
-        std::optional<VkImageSubresourceRange> subresource_range;
+        VkImageSubresourceRange subresource_range {
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        };
 
         // Set the source image.
-        Builder& set_image(VkImage p_image);
+        Builder& set_image(Ref<ROImageVK> p_image);
         // Set the image view type.
         Builder& set_view_type(VkImageViewType p_view_type);
         // Set the image format.
@@ -54,6 +65,8 @@ public:
         Builder& set_components(const VkComponentMapping& p_components);
         // Set subresource range.
         Builder& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
+        // Set from image configurations. All features are default to match to the image config.
+        Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);
 
     private:
         VkImageView build(const BaseRenderDataVK* p_render_data) const;

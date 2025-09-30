@@ -6,6 +6,11 @@
 #include "function/render/renderer.hh"
 namespace WhiteBirdEngine {
 
+/**
+ * @class ApplicationGame
+ * @brief Application class to run the game.
+ *
+ */
 class ApplicationGame : public Application {
 public:
     ApplicationGame();

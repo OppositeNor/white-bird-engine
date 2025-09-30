@@ -47,6 +47,7 @@ void RendererVK::init() {
     init_window();
     init_vulkan();
     setup_base_render_data();
+    // TODO: Initialize graphics pipeline.
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
 }
 

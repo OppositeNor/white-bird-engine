@@ -14,10 +14,15 @@
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "core/core_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
+    vkDestroyPipeline(render_data->logic_device, graphics_pipeline, render_data->allocation_callbacks);
+}
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config)
     : render_data(p_render_data) {
@@ -63,7 +68,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.pColorBlendState = &(state_create_info.color_blend_state);
     create_info.pDynamicState = &(state_create_info.dynamic_state);
     create_info.layout = p_config.pipeline_layout->get_pipeline_layout();
-    // TODO: Setup render pass.
+    create_info.renderPass = WBE_REQUIRED(p_config.render_pass).get_render_pass();
 
     if (vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline.");
