@@ -153,8 +153,6 @@ def _compile_shaders():
             print("Failed to compile", hlsl_file)
             print(result.stderr)
             raise RuntimeError("Failed to compile shader.")
-        else:
-            print(" Success:", output_file)
 
 # ENTRY
 # Gather sources for reflection
