@@ -175,6 +175,7 @@ void ROGraphicsPipelineVK::setup_dynamic_state_create_info(const Config& p_confi
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     create_info.dynamicStateCount = dynamic_state_config.dynamic_states.size();
     create_info.pDynamicStates = dynamic_state_config.dynamic_states.data();
+    p_pipeline_create_infos.dynamic_state = create_info;
 }
 
 }

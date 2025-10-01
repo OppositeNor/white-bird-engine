@@ -15,13 +15,19 @@
 #ifndef __WBE_RENDER_DATABASE_HH__
 #define __WBE_RENDER_DATABASE_HH__
 
+#include "core/memory/reference_strong.hh"
+#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
-#include "glm/fwd.hpp"
+#include "function/render/render_object.hh"
 #include "global/stl_allocator.hh"
+#include "core/core_utils.hh"
+#include <glm/glm.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <stdexcept>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -80,7 +86,28 @@ public:
                                     dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
     }
 
-    
+    /**
+     * @brief Register a resource.
+     *
+     * @param p_res_name The name of the resource.
+     * @param p_resource The reference to the resource.
+     */
+    void register_resource(const std::string& p_res_name, Ref<RenderObject> p_resource) {
+        resources[p_res_name] = WBE_REQUIRES_VALID(p_resource);
+    }
+
+    Ref<RenderObject> get_resource(const std::string& p_res_name, const std::string& p_res_type) {
+        auto result_iter = resources.find(p_res_name);
+        if (result_iter == resources.end() || !result_iter->second.is_valid()) {
+            throw std::runtime_error("Resource " + p_res_name + " not found.");
+        }
+        auto result = result_iter->second.lock();
+        if (result->get_ro_type() != p_res_type) {
+            throw std::runtime_error("Resource " + p_res_name + " with type " + result->get_ro_type()
+                                     + " does not match the type expected: " + p_res_type + ".");
+        }
+        return result;
+    }
 
 private:
 
@@ -96,6 +123,8 @@ private:
     vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
     vector<uint32_t> dynamic_opaque_triangle_indices;
     vector<uint32_t> dynamic_opaque_triangle_obj_id;
+
+    std::map<std::string, RefWeak<RenderObject>> resources;
 
     void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
