@@ -160,7 +160,7 @@ try:
     print(f"WBEBuilder: Building target: {args.target}.")
     print("WBEBuilder: Compiling shaders...")
     _compile_shaders()
-    print("Gathering licenses...")
+    print("WBEBuilder: Gathering licenses...")
     _gather_license()
     print("WBEBuilder: Gathering sources...")
     sources = []

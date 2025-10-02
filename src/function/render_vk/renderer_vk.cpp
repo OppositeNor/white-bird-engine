@@ -20,6 +20,9 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_shader_vk.hh"
+#include "utils/utils.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
@@ -47,7 +50,7 @@ void RendererVK::init() {
     init_window();
     init_vulkan();
     setup_base_render_data();
-    // TODO: Initialize graphics pipeline.
+    init_graphics_pipeline();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
 }
 
@@ -94,6 +97,11 @@ void RendererVK::setup_base_render_data() {
     base_render_data.scissor = scissor;
 }
 
+void RendererVK::init_graphics_pipeline() {
+    ROShaderVK::Builder shader_builder;
+    // TODO: Initialize main shader and main graphics pipeline.
+
+}
 
 void RendererVK::create_instance() {
     // Get configuration informations.

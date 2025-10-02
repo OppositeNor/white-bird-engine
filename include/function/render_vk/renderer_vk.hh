@@ -164,6 +164,7 @@ private:
     void init_window();
     void init_vulkan();
     void setup_base_render_data();
+    void init_graphics_pipeline();
 
     void create_instance();
     void create_window_surface();

@@ -51,7 +51,6 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     setup_depth_stencil_state_create_info(p_config, state_create_info);
     setup_color_blend_state_create_info(p_config, state_create_info);
     setup_dynamic_state_create_info(p_config, state_create_info);
-    // TODO: Pipeline layout
 
     VkGraphicsPipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;

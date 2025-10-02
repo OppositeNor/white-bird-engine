@@ -38,8 +38,6 @@ public:
 
         // Set the shader source code.
         Builder& set_code(const std::vector<char>& p_code);
-        // Set the shader source code from a file.
-        Builder& set_code_from_file(const std::string& p_file_path);
 
     private:
         VkShaderModule build(const BaseRenderDataVK* p_render_data) const;
