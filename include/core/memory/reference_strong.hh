@@ -284,6 +284,15 @@ private:
     mutable ControlBlock* control_block;
 };
 
+/**
+ * @brief Make a reference with given constructor arguments.
+ *
+ * @tparam T The type that is created.
+ * @tparam Args The argument types of the constructor.
+ * @param p_allocator The allocator to allocate the object.
+ * @param p_args The arguments of the constructor.
+ * @return The created reference.
+ */
 template <typename T,  typename... Args>
 Ref<T> make_ref(HeapAllocatorAligned* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);

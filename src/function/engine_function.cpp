@@ -13,17 +13,17 @@
    limitations under the License.
 */
 #include "function/engine_function.hh"
+#include "core/engine_core.hh"
 #include "function/game_config/game_config.hh"
 
 namespace WhiteBirdEngine {
 
 EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
     singleton = this;
-    game_config = new GameConfig(p_game_config_file_path);
+    game_config = make_unique<GameConfig>(EngineCore::get_singleton()->pool_allocator, p_game_config_file_path);
 }
 
 EngineFunction::~EngineFunction() {
-    delete game_config;
     singleton = nullptr;
 }
 }

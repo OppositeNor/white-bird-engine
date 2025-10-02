@@ -15,6 +15,8 @@
 #ifndef __WBE_ENGINE_FUNCTION_HH__
 #define __WBE_ENGINE_FUNCTION_HH__
 
+#include "core/allocator/allocator.hh"
+#include "core/memory/unique.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
@@ -31,7 +33,7 @@ public:
         return singleton;
     }
 
-    GameConfig* game_config = nullptr;
+    Unique<GameConfig> game_config = MEM_NULL;
 private:
 
     inline static EngineFunction* singleton;

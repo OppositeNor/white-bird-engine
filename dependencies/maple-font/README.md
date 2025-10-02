@@ -1,1 +1,1 @@
-This directory is used to track the license of maple font.
+This directory is used for the automated license gatherer to track the license file for maple-font
