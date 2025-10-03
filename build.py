@@ -158,41 +158,42 @@ def _compile_shaders():
             raise RuntimeError("Failed to compile shader.")
 
 # ENTRY
-# Gather sources for reflection
-try:
-    print(f"WBEBuilder: Building target: {args.target}.")
-    print("WBEBuilder: Compiling shaders...")
-    _compile_shaders()
-    print("WBEBuilder: Gathering licenses...")
-    _gather_license()
-    print("WBEBuilder: Gathering sources...")
-    sources = []
-    sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
-    sources.extend(utils.gather_files(source_dir, build_config.source_extensions))
-    if build_target["generate-tests"]:
-        sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
+if __name__ == "__main__":
+    # Gather sources for reflection
+    try:
+        print(f"WBEBuilder: Building target: {args.target}.")
+        print("WBEBuilder: Compiling shaders...")
+        _compile_shaders()
+        print("WBEBuilder: Gathering licenses...")
+        _gather_license()
+        print("WBEBuilder: Gathering sources...")
+        sources = []
+        sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
+        sources.extend(utils.gather_files(source_dir, build_config.source_extensions))
+        if build_target["generate-tests"]:
+            sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
 
-    # Run reflection script
-    print("WBEBuilder: Running reflections...")
-    on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sources)
+        # Run reflection script
+        print("WBEBuilder: Running reflections...")
+        on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sources)
 
-    # Build project with CMake
-    print("WBEBuilder: Running cmake...")
-    result = subprocess.run(_get_cmake_command_from_info(build_target))
-    if result.returncode != 0:
-        raise RuntimeError("Failed to setup cmake build.")
-    result = subprocess.run(["cmake", "--build", build_target["export-directory"]])
-    if result.returncode != 0:
-        raise RuntimeError("Failed to build with CMake.")
+        # Build project with CMake
+        print("WBEBuilder: Running cmake...")
+        result = subprocess.run(_get_cmake_command_from_info(build_target))
+        if result.returncode != 0:
+            raise RuntimeError("Failed to setup cmake build.")
+        result = subprocess.run(["cmake", "--build", build_target["export-directory"]])
+        if result.returncode != 0:
+            raise RuntimeError("Failed to build with CMake.")
 
-    # Set up test environment
-    if build_target["generate-tests"]:
-        print("WBEBuilder: Setting up test environemnt...")
-        shutil.copy(os.path.join(resource_output_dir, "metadata.json"), os.path.join(test_env_resource_dir, "metadata.json"))
+        # Set up test environment
+        if build_target["generate-tests"]:
+            print("WBEBuilder: Setting up test environemnt...")
+            shutil.copy(os.path.join(resource_output_dir, "metadata.json"), os.path.join(test_env_resource_dir, "metadata.json"))
 
-    print("WBEBuilder: Finished!")
+        print("WBEBuilder: Finished!")
 
-except Exception as e:
-    print("Build failed! Message:", e)
-    traceback.print_exc()
-    exit(-1)
+    except Exception as e:
+        print("Build failed! Message:", e)
+        traceback.print_exc()
+        exit(-1)

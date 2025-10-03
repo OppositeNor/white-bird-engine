@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
-#include <stdexcept>
 
 namespace WhiteBirdEngine {
 }
