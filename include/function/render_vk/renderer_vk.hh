@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
  * @brief Vulkan renderer.
  *
  */
-class RendererVK : public Renderer {
+class RendererVK final : public Renderer {
 public:
     using AllocType = RenderAllocator;
 
@@ -57,10 +57,20 @@ public:
         return singleton;
     }
 
+    /**
+     * @brief Get the render database.
+     *
+     * @return 
+     */
     Ref<RenderDatabase<RenderAllocator>> get_render_database() {
         return render_database;
     }
 
+    /**
+     * @brief Get the base render data of this renderer.
+     *
+     * @return The base render data of this renderer.
+     */
     const BaseRenderDataVK* get_base_render_data() const {
         return &base_render_data;
     }

@@ -14,11 +14,7 @@
 */
 #ifndef __WBE_RENDERER_DUMMY_H__
 #define __WBE_RENDERER_DUMMY_H__
-#include "core/memory/reference_strong.hh"
-#include "function/render_dummy/render_pipeline_dummy.hh"
 #include "function/render/renderer.hh"
-#include "function/render_dummy/shader_dummy.hh"
-#include "global/global.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -26,24 +22,12 @@ namespace WhiteBirdEngine {
  * @brief A dummy renderer that omits all operations.
  *
  */
-class RendererDummy : public Renderer {
+class RendererDummy final : public Renderer {
 public:
-    RendererDummy()
-        : dummy_render_pipeline(make_ref<RenderPipelineDummy>(global_allocator())),
-          dummy_shader(make_ref<ShaderDummy>(global_allocator())) {}
+    RendererDummy() {}
     
     virtual ~RendererDummy() override {}
-    virtual Ref<Shader> create_shader_instance(const std::string& p_shader_res) override {
-        return dummy_shader;
-    }
-    virtual Ref<RenderPipeline> get_render_pipeline(const std::string& p_pipeline_name) override {
-        return dummy_render_pipeline;
-    }
-    virtual void add_render_pipeline(Ref<RenderPipeline> p_render_pipeline) override {}
-
 private:
-    Ref<RenderPipelineDummy> dummy_render_pipeline;
-    Ref<ShaderDummy> dummy_shader;
 };
 
 }

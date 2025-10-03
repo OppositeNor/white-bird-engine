@@ -20,7 +20,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 
