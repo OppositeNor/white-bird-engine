@@ -1,9 +1,0 @@
-{
-    "text" : {
-        "key" : "test_text_res_utf8",
-        "properties" : {
-            "encode_type" : "utf8"
-        },
-        "path" : "test_text_files/test_file_utf8.txt"
-    }
-}
