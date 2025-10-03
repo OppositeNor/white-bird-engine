@@ -33,7 +33,7 @@ using ResourceChunkID = HashCode;
  */
 class ResourceChunk {
 public:
-    ResourceChunk() {}
+    ResourceChunk() = default;
     virtual ~ResourceChunk() {}
 
     /**
@@ -116,7 +116,7 @@ public:
     virtual const void* get_data(MemID p_mem_id) const = 0;
 
 protected:
-    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size);
+    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
 }

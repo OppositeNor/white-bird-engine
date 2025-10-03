@@ -23,4 +23,8 @@ EngineResource::EngineResource() {
     resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, WBE_MiB(0.5), "res_chunks/global_resources.json");
 }
 
+EngineResource::~EngineResource() {
+    resource_manager.reset();
+}
+
 }

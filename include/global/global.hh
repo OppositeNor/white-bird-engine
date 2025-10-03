@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
 #include "platform/file_system/directory.hh"
+#include "resource/engine_resource.hh"
 #include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
@@ -62,6 +63,11 @@ public:
      * @brief The core singleton.
      */
     EngineCore* engine_core;
+
+    /**
+     * @brief The resource singleton.
+     */
+    Unique<EngineResource> engine_resource;
 
     /**
      * @brief The function singleton.
