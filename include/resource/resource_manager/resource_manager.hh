@@ -18,7 +18,10 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/parser/parser_json.hh"
+#include "global/global.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
@@ -38,9 +41,11 @@ public:
         singleton = nullptr;
     }
 
-    ResourceManager(size_t p_alloc_size)
+    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
         : stack_allocator(p_alloc_size) {
         singleton = this;
+        register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
+            global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
     }
 
     /**

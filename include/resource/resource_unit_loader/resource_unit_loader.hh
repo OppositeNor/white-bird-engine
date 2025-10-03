@@ -19,6 +19,7 @@
 #include "core/parser/parser.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "utils/defs.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -40,7 +41,7 @@ public:
      * @param p_parser_data The parser data.
      */
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
+    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         return static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data);
     }
 };

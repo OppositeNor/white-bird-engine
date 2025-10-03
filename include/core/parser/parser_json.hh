@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @brief Data class for json.
  *
  */
-class JSONData : public ParserData<JSONData> {
+class JSONData final : public ParserData<JSONData> {
     using json = nlohmann::json;
     friend class ParserJSON;
 public:
@@ -100,7 +100,7 @@ private:
  * @brief Parser for JSON files.
  * @todo Test
  */
-class ParserJSON : public Parser<ParserJSON> {
+class ParserJSON final : public Parser<ParserJSON> {
     using json = nlohmann::json;
 public:
     using DataType = JSONData;

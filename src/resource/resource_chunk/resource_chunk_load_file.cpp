@@ -16,25 +16,4 @@
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
-ResourceChunkLoadFile::RUType ResourceChunkLoadFile::get_res_type(const std::string& p_type) {
-    if (p_type.starts_with("audio.")) {
-        return RUType::AUDIO;
-    }
-    if (p_type.starts_with("binary.")) {
-        return RUType::BINARY;
-    }
-    if (p_type.starts_with("font.")) {
-        return RUType::FONT;
-    }
-    if (p_type.starts_with("image.")) {
-        return RUType::IMAGE;
-    }
-    if (p_type.starts_with("text.")) {
-        return RUType::TEXT;
-    }
-    if (p_type.starts_with("video.")) {
-        return RUType::VIDEO;
-    }
-    throw std::runtime_error("Failed to get resource type. Type: " + p_type + " not recognized.");
-}
 }

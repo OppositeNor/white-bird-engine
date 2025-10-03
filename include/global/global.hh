@@ -17,6 +17,7 @@
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
+#include "core/memory/unique.hh"
 #include "function/engine_function.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/interface/singleton.hh"
@@ -65,7 +66,7 @@ public:
     /**
      * @brief The function singleton.
      */
-    EngineFunction* engine_function;
+    Unique<EngineFunction> engine_function;
 
 private:
     inline static Global* singleton;

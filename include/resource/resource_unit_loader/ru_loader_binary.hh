@@ -17,6 +17,7 @@
 
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include "resource/resource_utils.hh"
 
 namespace WhiteBirdEngine {
 
@@ -30,17 +31,15 @@ public:
     RULoaderBinary& operator=(RULoaderBinary&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const ParserData<ParserDataType>& p_parser_data) {
+    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
-        std::string key = p_parser_data.template get_value<std::string>("key");
-        ParserData<ParserDataType>& properties = p_parser_data.template get_value<ParserDataType>("properties");
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
         RUBinary ru_binary{};
-        std::vector<char> str = load_binary_file(static_cast<std::string>(path).c_str());
-        ru_binary.size = str.size();
-        MemID data_id = p_chunk.push_data(ru_binary.size, str.data());
+        std::vector<char> data = load_binary_file(static_cast<std::string>(path).c_str());
+        ru_binary.size = data.size();
+        MemID data_id = p_chunk.push_data(ru_binary.size, data.data());
         ru_binary.data = data_id;
-        return p_chunk.push_res_unit(key, ru_binary);
+        return p_chunk.push_res_unit(p_key, ru_binary);
     }
 };
 

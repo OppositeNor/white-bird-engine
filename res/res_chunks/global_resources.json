@@ -1,0 +1,10 @@
+{
+    "main_shader_vert": {
+        "type": "binary",
+        "path": "shaders/main_pipeline_vert.spirv",
+    },
+    "main_shader_vert": {
+        "type": "binary",
+        "path": "shaders/main_pipeline_pixl.spirv",
+    },
+}

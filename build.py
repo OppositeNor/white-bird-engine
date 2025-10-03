@@ -58,6 +58,8 @@ config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
 shaders_dir = os.path.join(resource_dir, "shaders")
 shaders_output_dir = os.path.join(resource_output_dir, "shaders")
+res_chunks_dir = os.path.join(resource_dir, "res_chunks")
+res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 metadata_path = os.path.join(resource_output_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
@@ -68,6 +70,7 @@ os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(shaders_output_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
+shutil.copytree(res_chunks_dir, res_chunks_output_dir, dirs_exist_ok=True)
 
 # HELPER FUNCTIONS
 def _get_cmake_command_from_info(p_build_info):
