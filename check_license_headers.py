@@ -47,11 +47,11 @@ def has_apache_license_header(file_pathes, max_lines=30):
             failed_checks.append(file_path)
 
     if len(failed_checks) != 0:
-        print("Files that does not have a license header:")
+        print(f"{len(file_pathes)} files checked. Files missing a license header:")
         for path in failed_checks:
             print(path)
     else:
-        print("All files contains a license header.")
+        print(f"{len(file_pathes)} files checked. All files contains a license header.")
 
 if __name__ == "__main__":
     sources = []
