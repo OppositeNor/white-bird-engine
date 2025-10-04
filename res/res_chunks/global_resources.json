@@ -3,7 +3,7 @@
         "type": "binary",
         "path": "shaders/main_pipeline_vert.spv"
     },
-    "main_shader_vert": {
+    "main_shader_pixl": {
         "type": "binary",
         "path": "shaders/main_pipeline_pixl.spv"
     }

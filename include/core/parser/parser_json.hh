@@ -78,6 +78,12 @@ public:
         }
     }
 
+    /**
+     * @brief Get all keys.
+     * @todo Test
+     *
+     * @return All the keys.
+     */
     std::vector<std::string> get_all_keys() const {
         std::vector<std::string> result;
         result.reserve(data.size());
@@ -143,6 +149,12 @@ public:
         return data.get_value<T>();
     }
 
+    /**
+     * @brief Get all keys.
+     * @todo Test
+     *
+     * @return All the keys.
+     */
     std::vector<std::string> get_all_keys() const {
         return data.get_all_keys();
     }

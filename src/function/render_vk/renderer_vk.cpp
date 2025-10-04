@@ -16,11 +16,18 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/engine_function.hh"
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 
 #include <SDL_vulkan.h>
@@ -45,16 +52,18 @@ RendererVK::~RendererVK() {
 }
 
 void RendererVK::init() {
+    render_objects = make_unique<RenderObjects>(allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing RenderVK.");
     init_window();
     init_vulkan();
     setup_base_render_data();
+    init_render_pass();
     init_graphics_pipeline();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
 }
 
 void RendererVK::terminate() {
-    vkDestroyRenderPass(logical_device, result_render_pass, get_allocation_callbacks());
+    render_objects.reset();
     for (auto image_view : swap_chain_image_views) {
         vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
     }
@@ -81,7 +90,6 @@ void RendererVK::init_vulkan() {
     create_device();
     create_swap_chain();
     create_swap_chain_image_views();
-    create_render_pass();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -97,9 +105,31 @@ void RendererVK::setup_base_render_data() {
 }
 
 void RendererVK::init_graphics_pipeline() {
-    ROShaderVK::Builder shader_builder;
-    // TODO: Initialize main shader and main graphics pipeline.
+    ResourceChunkID global_res_chunk_id = ResourceManager::get_singleton()->global_res_chunk();
 
+    ROShaderVK::Builder shader_builder;
+    RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_vert");
+    shader_builder.set_code(shader_code->data.get(), shader_code->size);
+    Ref<ROShaderVK> vertex_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
+    shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_pixl");
+    shader_builder.set_code(shader_code->data.get(), shader_code->size);
+    Ref<ROShaderVK> pixel_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
+
+    ROGraphicsPipelineVK::Config::ShaderConfig shader_config{};
+    shader_config.push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader);
+    shader_config.push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, pixel_shader);
+
+
+    ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config{};
+    // TODO: vertex input config
+
+    ROPipelineLayoutVK::Builder pipeline_layout_builder;
+    render_objects->graphics_pipeline_layout = make_ref<ROPipelineLayoutVK>(allocator, &base_render_data, pipeline_layout_builder);
+
+    auto graphics_pipeline_config = ROGraphicsPipelineVK::get_default_render_opaque_configuration(
+        &base_render_data, shader_config, vertex_input_config, render_objects->graphics_pipeline_layout, render_objects->result_render_pass
+    );
+    render_objects->graphics_pipeline = make_ref<ROGraphicsPipelineVK>(allocator, &base_render_data, graphics_pipeline_config);
 }
 
 void RendererVK::create_instance() {
@@ -254,7 +284,7 @@ void RendererVK::create_swap_chain_image_views() {
     }
 }
 
-void RendererVK::create_render_pass() {
+void RendererVK::init_render_pass() {
     // Setup color attachment
     VkAttachmentDescription color_attachment{};
     color_attachment.format = swap_chain_image_format;
@@ -283,13 +313,6 @@ void RendererVK::create_render_pass() {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &color_attachment_reference;
 
-    VkRenderPassCreateInfo render_pass_info{};
-    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 1;
-    render_pass_info.pAttachments = &color_attachment;
-    render_pass_info.subpassCount = 1;
-    render_pass_info.pSubpasses = &subpass;
-    
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -298,12 +321,9 @@ void RendererVK::create_render_pass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    render_pass_info.dependencyCount = 1;
-    render_pass_info.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(logical_device, &render_pass_info, get_allocation_callbacks(), &result_render_pass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass.");
-    }
+    RORenderPassVK::Builder render_pass_builder;
+    render_pass_builder.add_attachment(color_attachment).add_subpass(subpass).add_dependency(dependency);
+    render_objects->result_render_pass = make_ref<RORenderPassVK>(allocator, &base_render_data, render_pass_builder);
 }
 
 void RendererVK::create_physical_device() {

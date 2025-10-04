@@ -16,11 +16,14 @@
 #define __WBE_RENDERER_VK_HH__
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
@@ -115,9 +118,13 @@ private:
     VkViewport viewport{};
     VkRect2D scissor{};
 
-    VkRenderPass result_render_pass;
+    struct RenderObjects {
+        Ref<RORenderPassVK> result_render_pass;
+        Ref<ROGraphicsPipelineVK> graphics_pipeline;
+        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+    };
 
-    Ref<ROGraphicsPipelineVK> graphics_pipeline;
+    Unique<RenderObjects> render_objects;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
@@ -174,6 +181,7 @@ private:
     void init_window();
     void init_vulkan();
     void setup_base_render_data();
+    void init_render_pass();
     void init_graphics_pipeline();
 
     void create_instance();
@@ -181,7 +189,6 @@ private:
     void create_device();
     void create_swap_chain();
     void create_swap_chain_image_views();
-    void create_render_pass();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();

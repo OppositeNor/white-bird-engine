@@ -22,6 +22,7 @@
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <cstdint>
+#include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -51,6 +52,27 @@ public:
                 // Shader instance.
                 Ref<ROShaderVK> shader;
             };
+            /**
+             * @brief Push a shader stage.
+             *
+             * @param p_stage The shader stage.
+             * @param p_entry_function The entry function of the shader.
+             * @param p_shader The shader instance.
+             */
+            void push_shader_stage(VkShaderStageFlagBits p_stage, const std::string& p_entry_function, Ref<ROShaderVK> p_shader) {
+                shader_stages.push_back({.stage = p_stage, .entry_function = p_entry_function, .shader = p_shader});
+            }
+
+            /**
+             * @brief Push a shader stage.
+             *
+             * @param p_stage The shader stage.
+             * @param p_entry_function The entry function of the shader.
+             * @param p_shader The shader instance.
+             */
+            void push_shader_stage(VkShaderStageFlagBits p_stage, Ref<ROShaderVK> p_shader) {
+                shader_stages.push_back({.stage = p_stage, .shader = p_shader});
+            }
             // Shader stages.
             std::vector<ShaderStage> shader_stages;
         };
@@ -61,6 +83,32 @@ public:
             // Scissors. Manual setup needed!
             // A scissor clamps a rectangle region that the fragments will only be generated inside this region.
             std::vector<VkRect2D> scissors;
+
+            /**
+             * @brief Add a viewport.
+             *
+             * @param p_viewport The viewport to add.
+             * @param p_scissor The scissor of this viewport.
+             */
+            void add_viewport(VkViewport p_viewport, VkRect2D p_scissor) {
+                viewports.push_back(p_viewport);
+                scissors.push_back(p_scissor);
+            }
+
+            /**
+             * @brief Add a viewport.
+             *
+             * @param p_viewport The viewport to add.
+             */
+            void add_viewport(VkViewport p_viewport) {
+                VkRect2D scissor{};
+                scissor.offset.x = 0;
+                scissor.offset.y = 0;
+                scissor.extent.width = p_viewport.width;
+                scissor.extent.height = p_viewport.height;
+                viewports.push_back(p_viewport);
+                scissors.push_back(scissor);
+            }
         };
         // Vertex input configurations.
         struct VertexInputConfig {
@@ -184,7 +232,8 @@ public:
      * @param p_render_pass The render pass.
      * @return The default configurations according to the input parameters.
      */
-    Config get_default_render_opaque_configuration(
+    static Config get_default_render_opaque_configuration(
+        const BaseRenderDataVK* p_render_data,
         const Config::ShaderConfig& p_shader_config,
         const Config::VertexInputConfig& p_vertex_input_config,
         Ref<ROPipelineLayoutVK> p_pipeline_layout,
@@ -192,8 +241,8 @@ public:
         auto result = Config();
         result.shader = p_shader_config;
         result.vertex_input = p_vertex_input_config;
-        result.viewport.viewports = { render_data->viewport };
-        result.viewport.scissors = { render_data->scissor };
+        result.viewport.viewports = { p_render_data->viewport };
+        result.viewport.scissors = { p_render_data->scissor };
         result.pipeline_layout = p_pipeline_layout;
         result.render_pass = p_render_pass;
         return result;

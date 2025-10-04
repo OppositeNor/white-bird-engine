@@ -76,7 +76,7 @@ public:
      */
     template <ResourceUnitConcept T>
     T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_key) {
-        return stack_allocator.get_obj<T>(get_resource_chunk(p_chunk_id)->get_resource(p_key));
+        return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_key).get());
     }
 
     Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
