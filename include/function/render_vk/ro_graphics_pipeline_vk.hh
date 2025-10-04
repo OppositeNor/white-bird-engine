@@ -112,9 +112,9 @@ public:
         };
         // Vertex input configurations.
         struct VertexInputConfig {
-            // The vertex bindings. Manual setup needed!
+            // The vertex bindings.
             std::vector<VkVertexInputBindingDescription> bindings;
-            // The vertex attributes. Manual setup needed!
+            // The vertex attributes.
             std::vector<VkVertexInputAttributeDescription> attributes;
         };
         // Input assembly configurations.

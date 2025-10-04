@@ -43,6 +43,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     }
     // Setup create information for states.
     PipelineStateCreateInfo state_create_info;
+    setup_viewport_state_create_info(p_config, state_create_info);
     setup_vertex_input_state_create_info(p_config, state_create_info);
     setup_input_assembly_state_create_info(p_config, state_create_info);
     setup_tessellation_state_create_info(p_config, state_create_info);
@@ -93,7 +94,7 @@ void ROGraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_conf
 void ROGraphicsPipelineVK::setup_vertex_input_state_create_info(const Config& p_config,
                                                               PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& vertex_input_config = p_config.vertex_input;
-    VkPipelineVertexInputStateCreateInfo create_info;
+    VkPipelineVertexInputStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     // Setup bindings.
     create_info.vertexBindingDescriptionCount = vertex_input_config.bindings.size();

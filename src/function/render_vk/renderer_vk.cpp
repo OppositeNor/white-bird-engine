@@ -381,6 +381,7 @@ void RendererVK::create_logical_device() {
     create_info.ppEnabledExtensionNames = enabled_device_extensions.data();
     // Setup physical device features.
     VkPhysicalDeviceFeatures device_features{};
+    device_features.depthClamp = VK_TRUE;
     create_info.pEnabledFeatures = &device_features;
 
     // Create logical device.
