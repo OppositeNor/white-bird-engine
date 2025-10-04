@@ -53,13 +53,13 @@ RendererVK::~RendererVK() {
 
 void RendererVK::init() {
     render_objects = make_unique<RenderObjects>(allocator);
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing RenderVK.");
+    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     init_window();
     init_vulkan();
     setup_base_render_data();
     init_render_pass();
     init_graphics_pipeline();
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message("RenderVK initialized.");
+    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
 void RendererVK::terminate() {
