@@ -53,6 +53,7 @@ public:
     }
     RefRaw& operator=(RefRaw&& p_other) {
         mem_id = p_other.mem_id;
+        num = p_other.num;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
         return *this;

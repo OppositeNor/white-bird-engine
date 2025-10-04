@@ -12,6 +12,7 @@
 #ifndef __WBE_MOCK_HEAP_ALLOCATOR_ALIGNED_HH__
 #define __WBE_MOCK_HEAP_ALLOCATOR_ALIGNED_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include <sstream>
