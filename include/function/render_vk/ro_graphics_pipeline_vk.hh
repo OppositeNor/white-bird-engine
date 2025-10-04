@@ -76,6 +76,24 @@ public:
             // Shader stages.
             std::vector<ShaderStage> shader_stages;
         };
+        // Vertex input configurations.
+        struct VertexInputConfig {
+            // The vertex bindings.
+            std::vector<VkVertexInputBindingDescription> bindings;
+            // The vertex attributes.
+            std::vector<VkVertexInputAttributeDescription> attributes;
+        };
+        // Input assembly configurations.
+        struct InputAssemblyConfig {
+            // The topology used in the input assembly stage.
+            VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            // Enable restart for strip and fan primitive topology.
+            VkBool32 primitive_restart_enabled = VK_FALSE;
+        };
+        // Teselation configurations.
+        struct TesselationConfig {
+            // TODO
+        };
         // Viewport configuration.
         struct ViewportStateConfig {
             // Viewports. Manual setup needed!
@@ -109,24 +127,6 @@ public:
                 viewports.push_back(p_viewport);
                 scissors.push_back(scissor);
             }
-        };
-        // Vertex input configurations.
-        struct VertexInputConfig {
-            // The vertex bindings.
-            std::vector<VkVertexInputBindingDescription> bindings;
-            // The vertex attributes.
-            std::vector<VkVertexInputAttributeDescription> attributes;
-        };
-        // Input assembly configurations.
-        struct InputAssemblyConfig {
-            // The topology used in the input assembly stage.
-            VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-            // Enable restart for strip and fan primitive topology.
-            VkBool32 primitive_restart_enabled = VK_FALSE;
-        };
-        // Teselation configurations.
-        struct TesselationConfig {
-            // TODO
         };
         // Rasterization configuraion.
         struct RasterizationConfig {
@@ -177,14 +177,14 @@ public:
         };
         // The input shaders. Manual setup needed!
         ShaderConfig shader{};
-        // Viewport state configuration.
-        ViewportStateConfig viewport{};
         // Vertex input stage configurations.
         VertexInputConfig vertex_input{};
         // Input assembly stage configurations.
         InputAssemblyConfig input_assembly{};
         // Teselation stage configurations.
         std::optional<TesselationConfig> tesselation;
+        // Viewport state configuration.
+        ViewportStateConfig viewport{};
         // Rasterization stage configurations.
         RasterizationConfig rasterization{};
         // Multisample state configurations.
@@ -277,14 +277,14 @@ private:
 
     void init(const Config& p_config);
 
-    void setup_viewport_state_create_info(const Config& p_config,
-                                          PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_vertex_input_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_input_assembly_state_create_info(const Config& p_config,
                                                 PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_tessellation_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_viewport_state_create_info(const Config& p_config,
+                                          PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_rasterization_state_create_info(const Config& p_config,
                                               PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_mulitsample_state_create_info(const Config& p_config,

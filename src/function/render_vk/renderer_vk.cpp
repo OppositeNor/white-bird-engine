@@ -107,6 +107,7 @@ void RendererVK::setup_base_render_data() {
 void RendererVK::init_graphics_pipeline() {
     ResourceChunkID global_res_chunk_id = ResourceManager::get_singleton()->global_res_chunk();
 
+    // Initialize shaders.
     ROShaderVK::Builder shader_builder;
     RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_vert");
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
@@ -115,17 +116,20 @@ void RendererVK::init_graphics_pipeline() {
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
     Ref<ROShaderVK> pixel_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
 
+    // Initialize shader configurations.
     ROGraphicsPipelineVK::Config::ShaderConfig shader_config{};
     shader_config.push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader);
     shader_config.push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, pixel_shader);
 
-
+    // Initialize vertex inputs.
     ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config{};
     // TODO: vertex input config
 
+    // Initialize graphics pipeline layout.
     ROPipelineLayoutVK::Builder pipeline_layout_builder;
     render_objects->graphics_pipeline_layout = make_ref<ROPipelineLayoutVK>(allocator, &base_render_data, pipeline_layout_builder);
 
+    // Initialize graphics pipeline.
     auto graphics_pipeline_config = ROGraphicsPipelineVK::get_default_render_opaque_configuration(
         &base_render_data, shader_config, vertex_input_config, render_objects->graphics_pipeline_layout, render_objects->result_render_pass
     );

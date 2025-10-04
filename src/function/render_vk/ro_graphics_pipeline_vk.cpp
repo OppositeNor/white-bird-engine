@@ -43,10 +43,10 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     }
     // Setup create information for states.
     PipelineStateCreateInfo state_create_info;
-    setup_viewport_state_create_info(p_config, state_create_info);
     setup_vertex_input_state_create_info(p_config, state_create_info);
     setup_input_assembly_state_create_info(p_config, state_create_info);
     setup_tessellation_state_create_info(p_config, state_create_info);
+    setup_viewport_state_create_info(p_config, state_create_info);
     setup_rasterization_state_create_info(p_config, state_create_info);
     setup_mulitsample_state_create_info(p_config, state_create_info);
     setup_depth_stencil_state_create_info(p_config, state_create_info);
@@ -62,6 +62,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     if (state_create_info.tessellation_state.has_value()) {
         create_info.pTessellationState = &(state_create_info.tessellation_state.value());
     }
+    create_info.pViewportState = &(state_create_info.viewport_state);
     create_info.pRasterizationState = &(state_create_info.rasterization_state);
     create_info.pMultisampleState = &(state_create_info.multisample_state);
     create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
@@ -80,7 +81,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
 void ROGraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_config,
                                                           PipelineStateCreateInfo& p_pipeline_create_infos) {
     auto& viewport_config = p_config.viewport;
-    VkPipelineViewportStateCreateInfo create_info;
+    VkPipelineViewportStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     // Setup viewports.
     create_info.viewportCount = viewport_config.viewports.size();
