@@ -39,6 +39,7 @@ class ResourceManager : public Singleton<ResourceManager> {
 public:
     virtual ~ResourceManager() override {
         singleton = nullptr;
+        resource_chunks.clear();
     }
 
     ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
