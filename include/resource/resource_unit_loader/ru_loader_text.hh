@@ -15,7 +15,6 @@
 #ifndef __WBE_RU_LOADER_TEXT_HH__
 #define __WBE_RU_LOADER_TEXT_HH__
 
-#include "core/allocator/allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
@@ -38,15 +37,15 @@ public:
     RULoaderText& operator=(RULoaderText&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
         RUText ru_text{};
         ru_text.encode_type = get_encode_type_from_str(p_parser_data.template get_value<std::string>("encode_type"));
         std::string str = load_text_file(static_cast<std::string>(path).c_str(), ru_text.encode_type);
         ru_text.size = str.size();
-        MemID data_id = p_chunk.push_data(ru_text.size, (void*)str.c_str());
-        ru_text.data = data_id;
+        RefRes<char> data_id = p_chunk.push_data(ru_text.size, (void*)str.c_str());
+        ru_text.text_data = data_id;
         return p_chunk.push_res_unit(p_key, ru_text);
     }
 };

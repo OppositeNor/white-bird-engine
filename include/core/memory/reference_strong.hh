@@ -88,18 +88,18 @@ public:
         throw std::runtime_error("Cannot directly asign an memory id to a reference unless it's MEM_NULL.");
     }
 
-    template <typename T1>
-    Ref(const Ref<T1>& p_other) {
+    template <typename T1, typename AllocType1>
+    Ref(const Ref<T1, AllocType1>& p_other) {
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
     }
-    template <typename T1>
-    Ref(Ref<T1>&& p_other) {
+    template <typename T1, typename AllocType1>
+    Ref(Ref<T1, AllocType1>&& p_other) {
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
-    template <typename T1>
-    Ref& operator=(const Ref<T1>& p_other) {
+    template <typename T1, typename AllocType1>
+    Ref& operator=(const Ref<T1, AllocType1>& p_other) {
         if (*this == p_other) {
             return *this;
         }
@@ -108,8 +108,8 @@ public:
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         return *this;
     }
-    template <typename T1>
-    Ref& operator=(Ref<T1>&& p_other) {
+    template <typename T1, typename AllocType1>
+    Ref& operator=(Ref<T1, AllocType1>&& p_other) {
         if (*this == p_other) {
             return *this;
         }
@@ -162,7 +162,7 @@ public:
      * @return The created reference.
      */
     template <typename... Args>
-    static Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
+    static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
         return Ref(p_allocator, create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
@@ -216,8 +216,8 @@ public:
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
 
-    template <typename T1>
-    bool operator==(const Ref<T1>& p_other) const {
+    template <typename T1, typename AllocType1>
+    bool operator==(const Ref<T1, AllocType1>& p_other) const {
         return control_block == reinterpret_cast<decltype(control_block)>(p_other.control_block);
     }
 
@@ -297,7 +297,7 @@ private:
  * @return The created reference.
  */
 template <typename T, typename AllocType = HeapAllocatorAligned, typename... Args>
-Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
+Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }

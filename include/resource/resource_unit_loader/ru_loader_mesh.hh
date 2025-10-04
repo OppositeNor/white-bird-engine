@@ -34,8 +34,8 @@ public:
     RULoaderMesh& operator=(RULoaderMesh&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
-        return MEM_NULL; // TODO
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+        return RefRes<char>(); // TODO
     }
 
 };

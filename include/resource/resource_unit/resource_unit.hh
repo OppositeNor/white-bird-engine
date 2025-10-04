@@ -16,7 +16,7 @@
 #define __WBE_RESOURCE_UNIT_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/surface/3d_primitive.hh"
 #include "utils/utils.hh"
@@ -34,7 +34,7 @@ template <typename T>
 concept ResourceUnitConcept = is_resource_unit<T>;
 
 template <typename T>
-using RefRes = RefRaw<T, HeapAllocatorPool>;
+using RefRes = RefRaw<T, StackAllocator>;
 
 /**
  * @class RUAudio
@@ -67,7 +67,7 @@ struct RUAudio : public ResourceUnit {
     // Configurations of the audio.
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The data of the audio.
-    MemID audio_data;
+    RefRes<char> audio_data;
 };
 
 /**
@@ -85,7 +85,7 @@ struct RUBinary : public ResourceUnit {
     // The size of the binary data size (in bytes).
     size_t size;
     // The binary data.
-    MemID data;
+    RefRes<char> data;
 };
 
 struct RUFont : public ResourceUnit {
@@ -123,7 +123,7 @@ struct RUImage : public ResourceUnit {
     // Image configurations.
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The memory ID of the image data.
-    MemID image_data;
+    RefRes<char> image_data;
 };
 
 /**
@@ -143,7 +143,7 @@ struct RUText : public ResourceUnit {
     // The size of the string (in bytes)
     size_t size;
     // The memid of the text data.
-    MemID data;
+    RefRes<char> text_data;
 };
 
 struct RUVideo : public ResourceUnit {
@@ -169,7 +169,7 @@ struct RUMesh3D : public ResourceUnit {
     // The indices data for the submeshes. It is ordered in chunks, with each chunk
     // starting with a 4 byte integer indicating the size of the submesh, followed
     // with a NUL terminated string, representing the submesh's material ID.
-    MemID submeshes_indices_data;
+    RefRes<char> submeshes_indices_data;
     // The number of vertices of the mesh.
     uint32_t vertices_count;
 };

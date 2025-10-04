@@ -15,7 +15,6 @@
 #ifndef __WBE_RESOURCE_UNIT_LOADER_HH__
 #define __WBE_RESOURCE_UNIT_LOADER_HH__
 
-#include "core/allocator/allocator.hh"
 #include "core/parser/parser.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "utils/defs.hh"
@@ -41,7 +40,7 @@ public:
      * @param p_parser_data The parser data.
      */
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         return static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data);
     }
 };

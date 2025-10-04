@@ -37,7 +37,7 @@ public:
     RULoaderPPM& operator=(RULoaderPPM&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
         auto header = get_ppm_header(path);

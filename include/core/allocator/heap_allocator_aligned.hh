@@ -122,6 +122,26 @@ inline MemID create_obj_align(HeapAllocatorAligned& p_allocator, Args&&... p_arg
 }
 
 /**
+ * @brief Create an array of objects.
+ *
+ * @tparam T The type of the objects.
+ * @tparam Args The types of the constructor arguments to construct the object.
+ * @param p_allocator The allocator to allocate memory from.
+ * @param p_num The number of instance in the array.
+ * @param p_args The arguments of the constructor.
+ * @return The memory ID of the created object.
+ */
+template <typename T, typename... Args>
+inline MemID create_obj_array_align(HeapAllocatorAligned& p_allocator, size_t p_num, Args&&... p_args) {
+    MemID id = p_allocator.allocate(sizeof(T) * p_num);
+    T* begin = static_cast<T*>(p_allocator.get(id));
+    for (; p_num > 0; --p_num) {
+        new(begin + p_num - 1) T(std::forward<Args>(p_args)...);
+    }
+    return id;
+}
+
+/**
  * @brief Destroy an object.
  *
  * @tparam T The type of the object.
@@ -134,6 +154,44 @@ inline void destroy_obj(HeapAllocatorAligned& p_allocator, MemID p_id) {
         return;
     }
     static_cast<T*>(p_allocator.get(p_id))->~T();
+    p_allocator.deallocate(p_id);
+}
+
+/**
+ * @brief Destroy an array of objects.
+ *
+ * @tparam T The type of the objects.
+ * @param p_allocator The allocator that this object's memory is allocated from.
+ * @param p_id The memory ID of the object.
+ * @param p_num The number of instances in the array.
+ */
+template<typename T, typename AllocatorType>
+void destroy_obj_array_align(AllocatorType& p_allocator, MemID p_id, size_t p_num) {
+    T* array_ptr = static_cast<T*>(p_allocator.get(p_id));
+    
+    for (; p_num > 0; --p_num) {
+        array_ptr[p_num - 1].~T();
+    }
+    
+    p_allocator.deallocate(p_id);
+}
+
+/**
+ * @brief Destroy an object.
+ *
+ * @tparam T The type of the object.
+ * @param p_allocator The allocator that this object's memory is allocated from.
+ * @param p_id The memory ID of the object.
+ */
+template <typename T>
+inline void destroy_array(HeapAllocatorAligned& p_allocator, MemID p_id, size_t p_num) {
+    if (p_id == MEM_NULL) {
+        return;
+    }
+    T* begin = static_cast<T*>(p_allocator.get(p_id));
+    for (size_t i = 0; i < p_num; ++i) {
+        (begin + i)->~T();
+    }
     p_allocator.deallocate(p_id);
 }
 

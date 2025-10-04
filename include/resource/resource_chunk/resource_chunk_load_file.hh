@@ -18,6 +18,7 @@
 #include "core/parser/parser.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/ru_loader_binary.hh"
 #include "resource/resource_unit_loader/ru_loader_image.hh"
 #include "resource/resource_unit_loader/ru_loader_text.hh"
@@ -50,14 +51,15 @@ public:
      */
     ResourceChunkLoadFile(const Path& p_path, StackAllocator& p_allocator);
 
-    virtual MemID get_resource(const std::string& p_key) const override {
+    virtual RefRes<char> get_resource(const std::string& p_key) const override {
         return resource_map.at(p_key.c_str());
     }
 
-    virtual MemID push_data(size_t p_res_size, void* p_res) override {
+    virtual RefRes<char> push_data(size_t p_res_size, void* p_res) override {
         total_size += p_res_size;
-        MemID result = allocator->allocate(p_res_size);
-        memcpy(allocator->get(result), p_res, p_res_size);
+        MemID result_mem_id = allocator->allocate(p_res_size);
+        memcpy(allocator->get(result_mem_id), p_res, p_res_size);
+        RefRes<char> result(result_mem_id, allocator);
         return result;
     }
 
@@ -79,17 +81,18 @@ public:
 
 protected:
 
-    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
+    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
         total_size += p_size;
-        MemID result = allocator->allocate(p_size);
-        memcpy(allocator->get(result), p_res, p_size);
+        MemID result_mem_id = allocator->allocate(p_size);
+        memcpy(allocator->get(result_mem_id), p_res, p_size);
+        RefRes<char> result(result_mem_id, allocator);
         resource_map[p_res_key.c_str()] = result;
         return result;
     }
 
 private:
     size_t total_size;
-    std::unordered_map<std::string, MemID> resource_map;
+    std::unordered_map<std::string, RefRes<char>> resource_map;
     StackAllocator* allocator;
 
     enum class RUType {

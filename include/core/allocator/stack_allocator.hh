@@ -175,6 +175,15 @@ void pop_stack_obj(StackAllocator& p_allocator) {
     static_cast<T*>(p_allocator.pop_stack(sizeof(T)))->~T();
 }
 
+template <typename T>
+void pop_stack_obj_array(StackAllocator& p_allocator, size_t p_num) {
+    T* head = static_cast<T*>(p_allocator.get(p_num));
+    for (; p_num > 0; --p_num) {
+        head->~T();
+    }
+    p_allocator.pop_stack(p_num * sizeof(T));
+}
+
 }
 
 #endif

@@ -37,12 +37,12 @@ public:
     virtual ~ResourceChunk() {}
 
     /**
-     * @brief Get the resource of a specific key.
+     * @brief Get the resource from a key.
      *
      * @param p_key The key to get resource from.
-     * @return The MemID of the resource.
+     * @return The resource reference of the resource.
      */
-    virtual MemID get_resource(const std::string& p_key) const = 0;
+    virtual RefRes<char> get_resource(const std::string& p_key) const = 0;
 
     /**
      * @brief Get the total size of the chunk.
@@ -61,7 +61,7 @@ public:
      * @return The memory id of the pushed resource unit.
      */
     template <ResourceUnitConcept T>
-    MemID push_res_unit(const std::string& p_res_key, const T& p_res) {
+    RefRes<char> push_res_unit(const std::string& p_res_key, const T& p_res) {
         return push_res_unit_ptr(p_res_key, &p_res, sizeof(T));
     }
 
@@ -73,7 +73,7 @@ public:
      * @param p_allocator The allocator to allocate memory.
      * @return The result memory id.
      */
-    virtual MemID push_data(size_t p_res_size, void* p_res) = 0;
+    virtual RefRes<char> push_data(size_t p_res_size, void* p_res) = 0;
 
     /**
      * @brief Get the data at ID.
@@ -116,7 +116,7 @@ public:
     virtual const void* get_data(MemID p_mem_id) const = 0;
 
 protected:
-    virtual MemID push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
+    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
 }

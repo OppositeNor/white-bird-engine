@@ -39,7 +39,7 @@ public:
     RULoaderImage& operator=(RULoaderImage&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         std::string ext = FileSystem::get_ext(get_resource_path(p_parser_data.template get_value<std::string>("path")));
         if (ext == "png") {
             return RULoaderPNG().load(p_chunk, p_key, p_parser_data);

@@ -31,13 +31,13 @@ public:
     RULoaderBinary& operator=(RULoaderBinary&&) = delete;
 
     template <ParserDataConcept ParserDataType>
-    MemID load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
         // TODO: Test
         Path path = get_resource_path(p_parser_data.template get_value<std::string>("path"));
         RUBinary ru_binary{};
         std::vector<char> data = load_binary_file(static_cast<std::string>(path).c_str());
         ru_binary.size = data.size();
-        MemID data_id = p_chunk.push_data(ru_binary.size, data.data());
+        RefRes<char> data_id = p_chunk.push_data(ru_binary.size, data.data());
         ru_binary.data = data_id;
         return p_chunk.push_res_unit(p_key, ru_binary);
     }
