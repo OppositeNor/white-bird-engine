@@ -33,9 +33,9 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T>
+template <typename T, typename AllocType = HeapAllocatorAligned>
 class Ref {
-    template <typename T1>
+    template <typename T1, typename AllocType1>
     friend class Ref;
 
     template <typename T1>
@@ -45,7 +45,6 @@ class Ref {
 public:
 
     using ObjType = T;
-    using AllocType = HeapAllocatorAligned;
 
     Ref() {
         control_block = nullptr;
@@ -227,12 +226,16 @@ public:
     }
 
     bool operator==(void* p_ptr) const {
-        WBE_DEBUG_ASSERT(p_ptr == nullptr);
+        if (p_ptr != nullptr) {
+            throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
+        }
         return control_block == nullptr || control_block->mem_id == MEM_NULL;
     }
 
     bool operator==(MemID p_mem_id) const {
-        WBE_DEBUG_ASSERT(p_mem_id == MEM_NULL);
+        if (p_mem_id != MEM_NULL) {
+            throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
+        }
         return control_block == nullptr || control_block->mem_id == MEM_NULL;
     }
 
@@ -293,9 +296,11 @@ private:
  * @param p_args The arguments of the constructor.
  * @return The created reference.
  */
-template <typename T,  typename... Args>
-Ref<T> make_ref(HeapAllocatorAligned* p_allocator, Args&&... p_args) {
-    WBE_DEBUG_ASSERT(p_allocator != nullptr);
+template <typename T, typename AllocType = HeapAllocatorAligned, typename... Args>
+Ref<T> make_ref(AllocType* p_allocator, Args&&... p_args) {
+    if (p_allocator == nullptr) {
+        throw std::runtime_error("Allocator cannot be nullptr.");
+    }
     MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Ref<T>(p_allocator, id);
 }

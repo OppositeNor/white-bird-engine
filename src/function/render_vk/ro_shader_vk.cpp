@@ -22,17 +22,17 @@
 
 namespace WhiteBirdEngine {
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::vector<char>& p_code) {
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_code_size) {
     code = p_code;
+    code_size = p_code_size;
     return *this;
 }
 
 VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    const auto& shader_code = WBE_REQUIRED(code);
-    create_info.codeSize = shader_code.size();
-    create_info.pCode = reinterpret_cast<const uint32_t*>(shader_code.data());
+    create_info.pCode = reinterpret_cast<const uint32_t*>(WBE_REQUIRED(code));
+    create_info.codeSize = code_size;
     
     VkShaderModule result;
     if (vkCreateShaderModule(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {

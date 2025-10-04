@@ -44,7 +44,7 @@ public:
     ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
         : stack_allocator(p_alloc_size) {
         singleton = this;
-        register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
+        global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
             global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
     }
 
@@ -112,7 +112,12 @@ public:
         return singleton;
     }
 
+    ResourceChunkID global_res_chunk() const {
+        return global_res_chunk_id;
+    }
+
 private:
+    ResourceChunkID global_res_chunk_id;
     std::vector<Ref<ResourceChunk>> resource_chunks;
     StackAllocator stack_allocator;
 

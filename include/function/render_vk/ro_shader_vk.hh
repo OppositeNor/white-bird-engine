@@ -19,7 +19,6 @@
 #include "function/render_vk/render_vk_utils.hh"
 #include <optional>
 #include <string>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -34,10 +33,12 @@ public:
     struct Builder {
         friend ROShaderVK;
         // The source code of the shader.
-        std::optional<std::vector<char>> code;
+        std::optional<const char*> code;
+        // Size of the code.
+        size_t code_size;
 
         // Set the shader source code.
-        Builder& set_code(const std::vector<char>& p_code);
+        Builder& set_code(const char* p_code, size_t p_code_size);
 
     private:
         VkShaderModule build(const BaseRenderDataVK* p_render_data) const;

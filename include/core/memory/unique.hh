@@ -29,12 +29,11 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the instance.
  */
-template <typename T>
+template <typename T, typename AllocType = HeapAllocatorAligned>
 class Unique {
-    template <typename T1>
+    template <typename T1, typename AllocType1>
     friend class Unique;
 
-    using AllocType = HeapAllocatorAligned;
 public:
     Unique()
         : mem_id(MEM_NULL), allocator(nullptr) {}
@@ -102,7 +101,7 @@ public:
         if (allocator == nullptr) {
             return nullptr;
         }
-        return allocator->get_obj<T>(mem_id);
+        return allocator->template get_obj<T>(mem_id);
     }
 
     /**
@@ -114,7 +113,7 @@ public:
         if (allocator == nullptr) {
             return nullptr;
         }
-        return allocator->get_obj<T>(mem_id);
+        return allocator->template get_obj<T>(mem_id);
     }
 
     /**
@@ -175,8 +174,8 @@ private:
  * @param p_args The arguments.
  * @return The unique instnace.
  */
-template <typename T,  typename... Args>
-Unique<T> make_unique(HeapAllocatorAligned* p_allocator, Args&&... p_args) {
+template <typename T, typename AllocType = HeapAllocatorAligned,  typename... Args>
+Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Unique<T>(p_allocator, id);
