@@ -32,8 +32,6 @@ template <typename T, typename AllocType = HeapAllocatorAligned>
 class RefRaw {
     template <typename T1, typename AllocType1>
     friend class RefRaw;
-    template <typename T1, typename AllocType1>
-    friend void delete_ref(RefRaw<T, AllocType>&&);
 public:
     using ObjType = T;
     RefRaw() = default;
@@ -57,23 +55,27 @@ public:
     }
 
     RefRaw(MemID p_mem_id, AllocType* p_allocator)
-        : mem_id(p_mem_id), allocator(p_allocator) {}
+    : mem_id(p_mem_id), allocator(p_allocator) {}
 
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1, T> && std::convertible_to<AllocType1, AllocType>
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
     RefRaw(const RefRaw<T1, AllocType1>& p_other)
-        : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1, T> && std::convertible_to<AllocType1, AllocType>
+    : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
     RefRaw(RefRaw<T1, AllocType1>&& p_other)
-        : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1, T> && std::convertible_to<AllocType1, AllocType>
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
     RefRaw& operator=(const RefRaw<T1, AllocType1>& p_other) {
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         return *this;
     }
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1, T> && std::convertible_to<AllocType1, AllocType>
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
     RefRaw& operator=(RefRaw<T1, AllocType1>&& p_other) {
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
@@ -92,7 +94,7 @@ public:
     }
 
     static void delete_ref(RefRaw<T, AllocType>&& p_ref) {
-        destroy_obj<T>(p_ref.allocator, p_ref.mem_id);
+        destroy_obj<T>(*(p_ref.allocator), p_ref.mem_id);
         p_ref.mem_id = MEM_NULL;
     }
 
@@ -126,7 +128,7 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(allocator != nullptr);
-        return static_cast<T*>(allocator->get(allocator->mem_id));
+        return static_cast<T*>(allocator->get(mem_id));
     }
 
     /**
@@ -139,11 +141,11 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(allocator != nullptr);
-        return static_cast<T*>(allocator->get(allocator->mem_id));
+        return static_cast<T*>(allocator->get(mem_id));
     }
 
-    template <typename T1>
-    bool operator==(const RefRaw<T1>& p_other) const {
+    template <typename T1, typename AllocType1>
+    bool operator==(const RefRaw<T1, AllocType1>& p_other) const {
         return allocator == p_other.allocator && mem_id == p_other.mem_id;
     }
 
@@ -182,13 +184,11 @@ RefRaw<T, AllocType> new_ref(AllocType* p_allocator, Args&&... p_args) {
     }
     MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
     return RefRaw<T, AllocType>(id, p_allocator);
-
 }
 
 template <typename T, typename AllocType = HeapAllocatorAligned>
 void delete_ref(RefRaw<T, AllocType>&& p_ref) {
-    destroy_obj<T>(p_ref.allocator, p_ref.mem_id);
-    p_ref.mem_id = MEM_NULL;
+    RefRaw<T, AllocType>::delete_ref(std::move(p_ref));
 }
 
 }

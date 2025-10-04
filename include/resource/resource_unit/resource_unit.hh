@@ -16,6 +16,8 @@
 #define __WBE_RESOURCE_UNIT_HH__
 
 #include "core/allocator/allocator.hh"
+#include "core/allocator/heap_allocator_pool.hh"
+#include "core/memory/reference_raw.hh"
 #include "core/surface/3d_primitive.hh"
 #include "utils/utils.hh"
 #include <bitset>
@@ -30,6 +32,9 @@ constexpr bool is_resource_unit = std::is_base_of_v<ResourceUnit, std::remove_cv
 
 template <typename T>
 concept ResourceUnitConcept = is_resource_unit<T>;
+
+template <typename T>
+using RefRes = RefRaw<T, HeapAllocatorPool>;
 
 /**
  * @class RUAudio
