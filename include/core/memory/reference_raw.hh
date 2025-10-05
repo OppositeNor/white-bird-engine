@@ -234,7 +234,7 @@ public:
     }
 
     bool operator==(std::nullptr_t) const {
-        return allocator == nullptr || mem_id == MEM_NULL;
+        return mem_id == MEM_NULL || allocator == nullptr;
     }
 
     bool operator==(void* p_ptr) const {

@@ -16,9 +16,9 @@
 #define __WBE_COMPONENTS_HH__
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/memory/reference_raw.hh"
 #include "function/ecs/entity.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "glm/fwd.hpp"
 #include "global/stl_allocator.hh"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -53,10 +53,19 @@ WBE_STRUCT(ComponentTransform, WBE_COMPONENT) {
     // The scale value in quaternion, ordered x, y, z
     WBE_META(WBE_REFLECT)
     glm::vec3 scale;
-    // The transform matrix.
-    glm::mat4 transform;
-    // The inverse transform matrix.
-    glm::mat4 inverse;
+
+    // The local transform matrix.
+    glm::mat4 local_transform;
+    // The local inverse transform matrix.
+    glm::mat4 local_inverse;
+    // The global transform matrix.
+    glm::mat4 global_transform;
+    // The global inverse transform matrix.
+    glm::mat4 global_inverse;
+    // Parent.
+    RefRaw<ComponentTransform> parent;
+    // Tick tock checker for checking if the component is updated or not.
+    bool tick_tock = false;
 };
 
 }

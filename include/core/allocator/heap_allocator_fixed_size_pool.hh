@@ -49,6 +49,11 @@ class HeapAllocatorFixedSizePool final : public HeapAllocator {
     using InternalID = uint16_t;
 public:
 
+    /**
+     * @brief The maximum number of objects the pool can hold.
+     */
+    static constexpr uint32_t MAX_OBJ = std::numeric_limits<InternalID>::max() - 1;
+
     HeapAllocatorFixedSizePool()
         : HeapAllocatorFixedSizePool(64) {}
     virtual ~HeapAllocatorFixedSizePool() override;
@@ -56,11 +61,6 @@ public:
     HeapAllocatorFixedSizePool(HeapAllocatorFixedSizePool&&) = delete;
     HeapAllocatorFixedSizePool& operator=(const HeapAllocatorFixedSizePool&) = delete;
     HeapAllocatorFixedSizePool& operator=(HeapAllocatorFixedSizePool&&) = delete;
-
-    /**
-     * @brief The maximum number of objects the pool can hold.
-     */
-    static constexpr uint32_t MAX_OBJ = std::numeric_limits<InternalID>::max() - 1;
 
     /**
      * @brief Constructor.
@@ -102,6 +102,11 @@ public:
         return get_mem_loc_at_id(p_id);
     }
 
+    /**
+     * @brief Get number of allocated objects.
+     *
+     * @return The number of allocated objects.
+     */
     uint32_t obj_count() const {
         return alloc_obj_count;
     }
