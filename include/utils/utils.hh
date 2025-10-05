@@ -93,8 +93,6 @@ struct TypeIDRevTrait;
 template <HashCode CODE>
 struct LabelTrait;
 
-constexpr uint64_t MAX_COMPONENT_COUNT = 64;
-
 /**
  * @brief Split the string with respect to a token.
  *

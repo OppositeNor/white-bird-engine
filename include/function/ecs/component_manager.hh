@@ -31,7 +31,7 @@ template <typename T, size_t MAX_COMPONENTS>
 class ComponentManager {
 public:
     ComponentManager()
-        : allocator(MAX_COMPONENTS) {}
+        : allocator(sizeof(T), MAX_COMPONENTS) {}
 
     /**
      * @brief Apply a system to the components.
@@ -50,7 +50,7 @@ public:
     void flush();
 
 private:
-    WhiteBirdEngine::HeapAllocatorFixedSizePool<sizeof(T)> allocator;
+    HeapAllocatorFixedSizePool allocator;
     std::bitset<MAX_COMPONENTS> enabled_components;
 
 };

@@ -16,7 +16,6 @@
 #define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/logging/log.hh"
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
@@ -28,9 +27,9 @@
 
 namespace WhiteBirdEngine {
 
-template <size_t SIZE, template <size_t> class HeapAllocatorFixedSizePool>
-struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> final : public AllocatorTrait<HeapAllocator> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool<SIZE>>);
+template <>
+struct AllocatorTrait<class HeapAllocatorFixedSizePool> final : public AllocatorTrait<HeapAllocator> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = true;
     static constexpr bool IS_ALIGNABLE = false;
@@ -42,7 +41,6 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool<SIZE>> final : public All
     WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
-template <size_t SIZE>
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
     // TODO: make this type generically adaptive to all integer types.
     using DataIndex = uint16_t;
@@ -54,8 +52,6 @@ public:
      */
     static constexpr uint32_t MAX_OBJ = std::numeric_limits<InternalID>::max() - 1;
 
-    HeapAllocatorFixedSizePool()
-        : HeapAllocatorFixedSizePool(64) {}
     virtual ~HeapAllocatorFixedSizePool() override;
     HeapAllocatorFixedSizePool(const HeapAllocatorFixedSizePool&) = delete;
     HeapAllocatorFixedSizePool(HeapAllocatorFixedSizePool&&) = delete;
@@ -67,8 +63,8 @@ public:
      *
      * @param p_max_obj The maximum objects this allocator could hold. Up to MAX_OBJ maximum.
      */
-    HeapAllocatorFixedSizePool(uint32_t p_max_obj)
-        : max_obj(p_max_obj), alloc_obj_count(0) {
+    HeapAllocatorFixedSizePool(size_t p_element_size, uint32_t p_max_obj)
+        : max_obj(p_max_obj), alloc_obj_count(0), element_size(p_element_size) {
         if (p_max_obj > MAX_OBJ) {
             throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }
@@ -80,11 +76,11 @@ public:
         // data space stores the data.
         // Notice that when DataIndex or InternalID is 0 it maps to MEM_NULL,
         // so for offseting, the true offset for the reverse data is internal id - 1.
-        mem_chunk = (char*)malloc(SIZE * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj);
+        mem_chunk = (char*)malloc(element_size * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj);
         clear_indices();
     }
 
-    virtual MemID allocate(size_t p_size = SIZE) override;
+    virtual MemID allocate(size_t p_size = 0) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -130,7 +126,7 @@ public:
     }
 
     size_t get_allocated_data_size(MemID p_mem_id) const {
-        return SIZE;
+        return element_size;
     }
 
     // TODO: Test
@@ -139,10 +135,15 @@ public:
         alloc_obj_count = 0;
     }
 
+    size_t get_element_size() const {
+        return element_size;
+    }
+
 private:
     DataIndex max_obj;
     char* mem_chunk;
     DataIndex alloc_obj_count;
+    const size_t element_size;
 
     DataIndex get_data_index(InternalID p_id) const {
         if (p_id > max_obj) {
@@ -162,7 +163,7 @@ private:
         if (p_id > max_obj) {
             return nullptr;
         }
-        uintptr_t offset = (get_data_index(p_id) - 1) * SIZE;
+        uintptr_t offset = (get_data_index(p_id) - 1) * element_size;
         return data_chunk_start() + offset;
     }
 
@@ -170,7 +171,7 @@ private:
         if (p_id > max_obj) {
             return nullptr;
         }
-        uintptr_t offset = (get_data_index(p_id) - 1) * SIZE;
+        uintptr_t offset = (get_data_index(p_id) - 1) * element_size;
         return data_chunk_start() + offset;
     }
 
@@ -202,11 +203,11 @@ private:
     }
 
     DataIndex* index_chunk_start() {
-        return (DataIndex*)(mem_chunk + SIZE * max_obj);
+        return (DataIndex*)(mem_chunk + element_size * max_obj);
     }
 
     InternalID* index_chunk_rev_start() {
-        return (InternalID*)(mem_chunk + SIZE * max_obj + max_obj * sizeof(DataIndex));
+        return (InternalID*)(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
     }
 
     char* data_chunk_start() {
@@ -214,11 +215,11 @@ private:
     }
 
     const DataIndex* index_chunk_start() const {
-        return (DataIndex*)(mem_chunk + SIZE * max_obj);
+        return (DataIndex*)(mem_chunk + element_size * max_obj);
     }
 
     const InternalID* index_chunk_rev_start() const {
-        return (InternalID*)(mem_chunk + SIZE * max_obj + max_obj * sizeof(DataIndex));
+        return (InternalID*)(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
     }
 
     const char* data_chunk_start() const {
@@ -227,62 +228,6 @@ private:
 
 };
 
-template <size_t SIZE>
-HeapAllocatorFixedSizePool<SIZE>::~HeapAllocatorFixedSizePool() {
-    if (obj_count() != 0) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
-    }
-    free(mem_chunk);
-}
-
-template <size_t SIZE>
-inline MemID HeapAllocatorFixedSizePool<SIZE>::allocate(size_t p_size) {
-    WBE_DEBUG_ASSERT(p_size == SIZE);
-    if (alloc_obj_count >= max_obj) {
-        throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.");
-    }
-    InternalID curr_id = retrieve_valid_index();
-    write_info(curr_id, ++alloc_obj_count);
-    return curr_id;
-}
-
-template <size_t SIZE>
-inline void HeapAllocatorFixedSizePool<SIZE>::deallocate(MemID p_mem) {
-    DataIndex data_index = get_data_index(p_mem);
-    if (data_index == MEM_NULL || p_mem > max_obj) {
-        throw std::runtime_error("Failed to deallocate memory: memory not allocated in this memory pool.");
-    }
-    if (alloc_obj_count > 1 && data_index != alloc_obj_count) {
-        void* data_loc = get_mem_loc_at_id(p_mem);
-        InternalID copy_from_id = get_internal_id(alloc_obj_count);
-        void* copy_from = get_mem_loc_at_id(copy_from_id);
-        memcpy(data_loc, copy_from, SIZE);
-        write_info(copy_from_id, data_index);
-    }
-    write_data_index(alloc_obj_count, MEM_NULL);
-    --alloc_obj_count;
-}
-
-template <size_t SIZE>
-inline HeapAllocatorFixedSizePool<SIZE>::operator std::string() const {
-    std::stringstream ss;
-    ss << "{";
-    ss << "\"type\":\"HeapAllocatorFixedSizePool\",";
-    ss << "\"size\":" << SIZE << ",";
-    ss << "\"obj_count\":" << obj_count() << ",";
-    ss << "\"max_obj\":" << static_cast<uint32_t>(max_obj) << ",";
-    ss << "\"allocated\":[";
-    std::set<MemID> alloc_mems = get_allocated();
-    bool first = true;
-    for (auto alloc_mem : alloc_mems) {
-        if (!first) ss << ",";
-        first = false;
-        ss << alloc_mem;
-    }
-    ss << "]";
-    ss << "}";
-    return ss.str();
-}
 
 }
 

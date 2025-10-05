@@ -16,6 +16,7 @@
 #define __WBE_COMPONENTS_HH__
 
 #include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"
 #include "function/ecs/entity.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -25,6 +26,9 @@
 namespace WhiteBirdEngine {
 
 using String = ::WhiteBirdEngine::string<HeapAllocatorAlignedPool>;
+
+template <typename T>
+using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
 /**
  * @class ComponentLabel
@@ -63,7 +67,7 @@ WBE_STRUCT(ComponentTransform, WBE_COMPONENT) {
     // The global inverse transform matrix.
     glm::mat4 global_inverse;
     // Parent.
-    RefRaw<ComponentTransform> parent;
+    RefComp<ComponentTransform> parent;
     // Tick tock checker for checking if the component is updated or not.
     bool tick_tock = false;
 };
