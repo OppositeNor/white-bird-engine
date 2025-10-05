@@ -28,6 +28,7 @@ class WBEReflector:
         self.metadata_path = p_metadata_path
         self.channels = {}
         self.classes = []
+        self.components = []
 
     def load_script_config(self, p_load_path : str) -> None:
         """Load config scripts.
@@ -61,9 +62,17 @@ class WBEReflector:
         """Register a class.
 
         Args:
-            p_channel_path (): The channel to register.
+            p_class (): The class to register.
         """
-        self.classes.append(p_class.__dict__)
+        self.classes.append(p_class.model_dump())
+
+    def register_component(self, p_component) -> None:
+        """Register a component.
+
+        Args:
+            p_components (): The component to register.
+        """
+        self.components.append(p_component.model_dump())
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
@@ -71,7 +80,8 @@ class WBEReflector:
         metadata : dict = {}
         metadata["channels"] = self.channels
         metadata["classes"] = self.classes
-        self._write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True, indent=4))
+        metadata["components"] = self.components
+        self._write_to_file(self.metadata_path, json.dumps(metadata, indent=4))
 
     def checks(self) -> None:
         """Do checkings."""

@@ -86,6 +86,8 @@ class WBEMetaparser:
                     self.reflector.register_channel(label.label_name)
             for cxx_class in metadata.classes:
                 self.reflector.register_class(cxx_class)
+            for component in metadata.components:
+                self.reflector.register_component(component)
 
 
     def _register_from_clang(self, p_cpp_file_path, p_cache_path):
