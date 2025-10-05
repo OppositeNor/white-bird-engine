@@ -81,8 +81,12 @@ class WBEMetaparser:
     def _export_metadata(self):
         for _, metadata in self._metadata.items():
             for label in metadata.labels:
-                if "WBE_CHANNEL" in label.attribute.split(", "):
+                split_attribute = label.attribute.split(", ")
+                if "WBE_CHANNEL" in split_attribute:
                     self.reflector.register_channel(label.label_name)
+            for cxx_class in metadata.classes:
+                self.reflector.register_class(cxx_class)
+
 
     def _register_from_clang(self, p_cpp_file_path, p_cache_path):
         print(f"WBEMetaparser: parsing {p_cpp_file_path}")

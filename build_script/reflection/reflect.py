@@ -14,7 +14,7 @@
 import json
 import os
 import importlib.util
-from build_script.reflection.channel_registrator import WBEChannelRegistrator
+from build_script.utils import hash_str
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
@@ -26,7 +26,8 @@ class WBEReflector:
 
     def __init__(self, p_metadata_path : str) -> None:
         self.metadata_path = p_metadata_path
-        self.channel_registrator = WBEChannelRegistrator()
+        self.channels = {}
+        self.classes = []
 
     def load_script_config(self, p_load_path : str) -> None:
         """Load config scripts.
@@ -54,19 +55,28 @@ class WBEReflector:
         Args:
             p_channel_path (): The channel to register.
         """
-        self.channel_registrator.register_channel(p_channel_name)
+        self.channels[p_channel_name] = hash_str(p_channel_name)
+
+    def register_class(self, p_class) -> None:
+        """Register a class.
+
+        Args:
+            p_channel_path (): The channel to register.
+        """
+        self.classes.append(p_class.__dict__)
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
         print("WBEReflect: Exporting metadata...")
         metadata : dict = {}
-        metadata["channels"] = self.channel_registrator.channels
-        self._write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True))
+        metadata["channels"] = self.channels
+        metadata["classes"] = self.classes
+        self._write_to_file(self.metadata_path, json.dumps(metadata, sort_keys=True, indent=4))
 
     def checks(self) -> None:
         """Do checkings."""
         print("WBEReflect: Checking...")
-        self._check_hashing_collision("channels", self.channel_registrator.channels)
+        self._check_hashing_collision("channels", self.channels)
 
     def _write_to_file(self, p_path : str, p_str : str) -> None:
         with open(p_path, "w+") as channel_file:
