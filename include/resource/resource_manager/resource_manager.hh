@@ -40,6 +40,7 @@ public:
     virtual ~ResourceManager() override {
         singleton = nullptr;
         resource_chunks.clear();
+        stack_allocator.clear();
     }
 
     ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)

@@ -1,9 +1,9 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/logging/log.hh"
-#include "utils/defs.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <set>
 #include <stdexcept>
 
@@ -16,7 +16,12 @@ HeapAllocatorFixedSizePool::~HeapAllocatorFixedSizePool() {
 }
 
 inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {
-    WBE_DEBUG_ASSERT(p_size == element_size);
+    if (p_size == 0) {
+        p_size = element_size;
+    }
+    if (p_size != element_size) {
+        throw std::runtime_error(std::format("Failed to allocate memory: size must be: ", element_size));
+    }
     if (alloc_obj_count >= max_obj) {
         throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.");
     }
