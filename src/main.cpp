@@ -36,7 +36,7 @@ int main(int p_argc, char* p_argv[]) {
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator layout: {}",
             static_cast<std::string>(*WBE::global_allocator())));
         WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator layout: {}",
-            static_cast<std::string>(*game_application.get_renderer_allocator())));
+            static_cast<std::string>(*(game_application.get_renderer_allocator()))));
     }
     auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (auto& profile : profiles) {

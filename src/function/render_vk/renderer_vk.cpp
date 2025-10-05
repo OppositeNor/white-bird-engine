@@ -67,6 +67,8 @@ void RendererVK::terminate() {
     for (auto image_view : swap_chain_image_views) {
         vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
     }
+    vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
+    vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
     vkDestroySurfaceKHR(vk_instance, surface, nullptr);
     vkDestroyDevice(logical_device, get_allocation_callbacks());
@@ -90,6 +92,7 @@ void RendererVK::init_vulkan() {
     create_device();
     create_swap_chain();
     create_swap_chain_image_views();
+    create_command_pools();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -285,6 +288,23 @@ void RendererVK::create_swap_chain_image_views() {
         if (vkCreateImageView(logical_device, &create_info, get_allocation_callbacks(), &swap_chain_image_views[i]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image view.");
         }
+    }
+}
+
+void RendererVK::create_command_pools() {
+    VkCommandPoolCreateInfo graphics_pool_create_info{};
+    graphics_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    graphics_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    graphics_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
+    if (vkCreateCommandPool(logical_device, &graphics_pool_create_info, get_allocation_callbacks(), &graphics_command_pool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create graphics command pool.");
+    }
+    VkCommandPoolCreateInfo compute_pool_create_info{};
+    compute_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    compute_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    compute_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
+    if (vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create compute command pool.");
     }
 }
 

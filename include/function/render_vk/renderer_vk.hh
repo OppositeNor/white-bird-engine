@@ -95,6 +95,17 @@ private:
     Ref<RenderDatabase<RenderAllocator>> render_database;
     Ref<AllocatorVK<AllocType>> allocator_vk;
 
+    // Render objects for the renderer.
+    struct RenderObjects {
+        // Render pass.
+        Ref<RORenderPassVK> result_render_pass;
+        // Graphics pipeline.
+        Ref<ROGraphicsPipelineVK> graphics_pipeline;
+        // Graphics pipeline layout.
+        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+    };
+    Unique<RenderObjects> render_objects;
+
     // Vulkan properties
     SDL_Window* window;
     VkInstance vk_instance;
@@ -118,13 +129,8 @@ private:
     VkViewport viewport{};
     VkRect2D scissor{};
 
-    struct RenderObjects {
-        Ref<RORenderPassVK> result_render_pass;
-        Ref<ROGraphicsPipelineVK> graphics_pipeline;
-        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
-    };
-
-    Unique<RenderObjects> render_objects;
+    VkCommandPool graphics_command_pool;
+    VkCommandPool compute_command_pool;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
@@ -189,6 +195,7 @@ private:
     void create_device();
     void create_swap_chain();
     void create_swap_chain_image_views();
+    void create_command_pools();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();
