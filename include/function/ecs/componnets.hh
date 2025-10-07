@@ -15,17 +15,15 @@
 #ifndef __WBE_COMPONENTS_HH__
 #define __WBE_COMPONENTS_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"
 #include "function/ecs/entity.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "global/stl_allocator.hh"
+#include <cstddef>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <string_view>
 namespace WhiteBirdEngine {
-
-using String = ::WhiteBirdEngine::string<HeapAllocatorAlignedPool>;
 
 template <typename T>
 using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
@@ -35,9 +33,12 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
  * @brief Label of the entity.
  */
 WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
+    static constexpr size_t MAX_NAME_SIZE = 15;
+    // The buffer for the name.
+    char name_buffer[MAX_NAME_SIZE + 1] = "";
     // The name of the component.
     WBE_META(WBE_REFLECT)
-    String name;
+    std::string_view name = std::string_view(name_buffer);
     // The parent of the entity.
     WBE_META(WBE_REFLECT)
     EntityID parent;
