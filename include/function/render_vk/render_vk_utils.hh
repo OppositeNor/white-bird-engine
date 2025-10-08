@@ -39,6 +39,11 @@ struct BaseRenderDataVK {
     VkViewport viewport;
     // The scissor for the final presentation.
     VkRect2D scissor;
+
+    // Graphics command pool.
+    VkCommandPool graphics_command_pool;
+    // Compute command pool.
+    VkCommandPool compute_command_pool;
 };
 
 

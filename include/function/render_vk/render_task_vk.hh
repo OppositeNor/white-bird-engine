@@ -17,7 +17,6 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
-#include <set>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -39,7 +38,8 @@ public:
      * @param p_task 
      */
     void add_dependency(Ref<RenderTaskVK> p_task) {
-        dependencies.insert(p_task);
+        dependent_semaphores.push_back(p_task->get_semaphore());
+        dependencies.push_back(p_task);
     }
 
     /**
@@ -53,7 +53,8 @@ public:
 
 protected:
     VkSemaphore semaphore;
-    std::set<Ref<RenderTaskVK>> dependencies;
+    std::vector<VkSemaphore> dependent_semaphores;
+    std::vector<Ref<RenderTaskVK>> dependencies;
 };
 
 }

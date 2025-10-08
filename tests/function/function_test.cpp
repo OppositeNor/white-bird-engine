@@ -13,5 +13,4 @@
    limitations under the License.
 */
 #include <gtest/gtest.h>
-#include "ecs/systems_test.hh"
 

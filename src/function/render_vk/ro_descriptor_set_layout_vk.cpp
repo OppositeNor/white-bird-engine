@@ -30,6 +30,9 @@ RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_binding(
 }
 
 VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+    if (p_render_data == nullptr) {
+        throw std::runtime_error("Render data is nullptr.");
+    }
     VkDescriptorSetLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     create_info.bindingCount = bindings.size();

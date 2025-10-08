@@ -41,8 +41,11 @@ VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data)
     return result;
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
-    : render_data(p_base_render_data) {
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+    : render_data(p_render_data) {
+    if (p_render_data == nullptr) {
+        throw std::runtime_error("Render data is nullptr.");
+    }
     init(p_builder);
 }
 

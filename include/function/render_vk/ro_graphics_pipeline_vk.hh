@@ -257,7 +257,17 @@ public:
         return graphics_pipeline;
     }
 
+    /**
+     * @brief Get the configurations of the graphics pipeline.
+     *
+     * @return The configurations of the graphics pipeline.
+     */
+    const Config& get_config() const {
+        return config;
+    }
+
 private:
+    Config config;
 
     const BaseRenderDataVK* render_data;
 

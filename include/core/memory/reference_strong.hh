@@ -88,17 +88,17 @@ public:
         throw std::runtime_error("Cannot directly asign an memory id to a reference unless it's MEM_NULL.");
     }
 
-    template <typename T1, typename AllocType1>
+    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
     Ref(const Ref<T1, AllocType1>& p_other) {
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
     }
-    template <typename T1, typename AllocType1>
+    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
     Ref(Ref<T1, AllocType1>&& p_other) {
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
-    template <typename T1, typename AllocType1>
+    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
     Ref& operator=(const Ref<T1, AllocType1>& p_other) {
         if (*this == p_other) {
             return *this;
@@ -108,7 +108,7 @@ public:
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         return *this;
     }
-    template <typename T1, typename AllocType1>
+    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
     Ref& operator=(Ref<T1, AllocType1>&& p_other) {
         if (*this == p_other) {
             return *this;

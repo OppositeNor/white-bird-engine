@@ -30,19 +30,18 @@ public:
     virtual ~RenderTask() {}
 
     /**
+     * @brief Involke the render task.
+     *
+     * @param p_delta The difference of time in seconds from the last frame.
+     */
+    virtual void involke(double p_delta) = 0;
+
+    /**
      * @brief Get the dependencies of resources.
      *
      * @return The ids of the resources.
      */
     virtual std::vector<std::string> get_resource_dependencies() const = 0;
-
-    /**
-     * @brief Has the task started running.
-     *
-     * @param p_tick_flag Changes every tick, for checking if a new tick has started.
-     * @return True if the task started, false otherwise.
-     */
-    virtual bool has_started(bool p_tick_flag) const = 0;
 };
 
 }

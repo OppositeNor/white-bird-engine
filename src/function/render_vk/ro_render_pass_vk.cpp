@@ -68,6 +68,9 @@ VkRenderPass RORenderPassVK::Builder::build(const BaseRenderDataVK* p_render_dat
 
 RORenderPassVK::RORenderPassVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data) {
+    if (p_render_data == nullptr) {
+        throw std::runtime_error("Render data is nullptr.");
+    }
     init(p_builder);
 }
 

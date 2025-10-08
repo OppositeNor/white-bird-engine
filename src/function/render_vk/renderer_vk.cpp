@@ -21,6 +21,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -59,10 +60,12 @@ void RendererVK::init() {
     setup_base_render_data();
     init_render_pass();
     init_graphics_pipeline();
+    setup_present_render_task();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
 void RendererVK::terminate() {
+    present_render_task.reset();
     render_objects.reset();
     for (auto image_view : swap_chain_image_views) {
         vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
@@ -105,6 +108,8 @@ void RendererVK::setup_base_render_data() {
     base_render_data.queue_family_index_compute = queue_family_indices.compute.value();
     base_render_data.viewport = viewport;
     base_render_data.scissor = scissor;
+    base_render_data.graphics_command_pool = graphics_command_pool;
+    base_render_data.compute_command_pool = compute_command_pool;
 }
 
 void RendererVK::init_graphics_pipeline() {
@@ -137,6 +142,12 @@ void RendererVK::init_graphics_pipeline() {
         &base_render_data, shader_config, vertex_input_config, render_objects->graphics_pipeline_layout, render_objects->result_render_pass
     );
     render_objects->graphics_pipeline = make_ref<ROGraphicsPipelineVK>(allocator, &base_render_data, graphics_pipeline_config);
+}
+
+void RendererVK::setup_present_render_task() {
+    // TEST
+    // TOOD
+    present_render_task = make_unique<RenderTaskVKPerformGraphicsPipeline>(allocator, &base_render_data, render_objects->graphics_pipeline);
 }
 
 void RendererVK::create_instance() {

@@ -26,6 +26,9 @@ ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config)
     : render_data(p_render_data) {
+    if (p_render_data == nullptr) {
+        throw std::runtime_error("Render data is nullptr.");
+    }
     init(p_config);
 }
 
@@ -76,6 +79,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
         render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline.");
     }
+    config = p_config;
 }
 
 void ROGraphicsPipelineVK::setup_viewport_state_create_info(const Config& p_config,

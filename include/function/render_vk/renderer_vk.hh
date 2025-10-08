@@ -19,6 +19,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -78,6 +79,19 @@ public:
         return &base_render_data;
     }
 
+    /**
+     * @brief Get the present render task.
+     *
+     * @return The present render task.
+     */
+    const Unique<RenderTaskVK>& get_present_render_task() const {
+        return present_render_task;
+    }
+
+    void add_preset_render_task_dependency(Ref<RenderTaskVK> p_render_task) {
+        present_render_task->add_dependency(p_render_task);
+    }
+
 private:
 
     inline static RendererVK* singleton = nullptr;
@@ -105,6 +119,9 @@ private:
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
     };
     Unique<RenderObjects> render_objects;
+    
+    // The final render task that presents the result onto the screen.
+    Unique<RenderTaskVK> present_render_task;
 
     // Vulkan properties
     SDL_Window* window;
@@ -189,6 +206,7 @@ private:
     void setup_base_render_data();
     void init_render_pass();
     void init_graphics_pipeline();
+    void setup_present_render_task();
 
     void create_instance();
     void create_window_surface();
