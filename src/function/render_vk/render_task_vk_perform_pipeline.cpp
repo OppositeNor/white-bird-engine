@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -20,10 +21,8 @@ namespace WhiteBirdEngine {
 
 RenderTaskVKPerformGraphicsPipeline::RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
                                                                          Ref<ROGraphicsPipelineVK> p_graphics_pipeline)
-    : graphics_pipeline(p_graphics_pipeline), render_data(p_render_data) {
-    if (p_render_data == nullptr) {
-        throw std::runtime_error("Render data is nullptr.");
-    }
+    : RenderTaskVK(p_render_data), graphics_pipeline(p_graphics_pipeline)  {
+    init();
 }
 
 RenderTaskVKPerformGraphicsPipeline::~RenderTaskVKPerformGraphicsPipeline() {
@@ -34,15 +33,15 @@ void RenderTaskVKPerformGraphicsPipeline::involke(double p_delta) {
     // TODO
 }
 
-void RenderTaskVKPerformGraphicsPipeline::init(const BaseRenderDataVK* p_render_data) {
+void RenderTaskVKPerformGraphicsPipeline::init() {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     // Allocate on the graphics command pool.
-    alloc_info.commandPool = p_render_data->graphics_command_pool;
+    alloc_info.commandPool = render_data->graphics_command_pool;
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     alloc_info.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(p_render_data->logic_device, &alloc_info, &command_buffer) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(render_data->logic_device, &alloc_info, &command_buffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers.");
     }
 }

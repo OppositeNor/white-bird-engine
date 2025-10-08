@@ -61,10 +61,9 @@ public:
     }
 
 private:
-    void init(const BaseRenderDataVK* p_render_data);
+    void init();
     Ref<ROGraphicsPipelineVK> graphics_pipeline;
     VkCommandBuffer command_buffer;
-    const BaseRenderDataVK* render_data;
 };
 
 }
