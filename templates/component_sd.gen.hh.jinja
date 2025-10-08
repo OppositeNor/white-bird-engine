@@ -23,7 +23,7 @@ namespace WhiteBirdEngine {
 {% for component in components %}
 /**
  * @class ComponentSD<{{ component.struct_name }}>
- * @brief Component serializer-deserializer for {{ component.struct_name }}
+ * @brief Component serializer-deserializer for {{ component.struct_name }}.
  *
  * @tparam Serializer The type of the serializer.
  */
@@ -42,7 +42,7 @@ public:
      *
      * @param p_serializer The serializer.
      */
-    ComponentSD(SerializerJSON& p_serializer)
+    ComponentSD(Serializer& p_serializer)
         : serializer(&p_serializer) {}
 
     using ComponentType = {{ component.struct_name }};
@@ -61,16 +61,25 @@ public:
     }
 
     /**
+     * @brief Deserialize a component.
+     *
+     * @param p_component The component to deserialize.
+     */
+    void deserialize(ComponentType& p_component) {
+        // TODO
+    }
+
+    /**
      * @brief Get the serializer.
      *
      * @return The serializer.
      */
-    const SerializerJSON& get_serializer() const {
+    const Serializer& get_serializer() const {
         return *serializer;
     }
 
 private:
-    SerializerJSON* serializer;
+    Serializer* serializer;
 };
 {% endfor %}
 
