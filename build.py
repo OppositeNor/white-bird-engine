@@ -48,8 +48,10 @@ include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
-build_dir = os.path.join(root_dir, build_target["export-directory"])
+build_dir = os.path.join(include_dir, build_target["export-directory"])
 dependencies_dir = os.path.join(root_dir, "dependencies")
+template_dir = os.path.join(root_dir, "templates")
+generate_output_dir = os.path.join(include_dir, "generated")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(build_dir, "res")
@@ -69,29 +71,30 @@ os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(shaders_output_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
+os.makedirs(generate_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 shutil.copytree(res_chunks_dir, res_chunks_output_dir, dirs_exist_ok=True)
 
 # HELPER FUNCTIONS
-def _get_cmake_command_from_info(p_build_info):
+def _get_cmake_command_from_info(build_info):
     """Helper function which converts the build info to cmake command"""
     result = ["cmake"]
     result.append("-B")
-    result.append(p_build_info["export-directory"])
-    if p_build_info.get("generator") is not None:
+    result.append(build_info["export-directory"])
+    if build_info.get("generator") is not None:
         result.append("-G")
-        result.append(p_build_info["generator"])
-    result.append(f"-DCMAKE_BUILD_TYPE={p_build_info["cmake-build-type"]}")
-    if p_build_info.get("cpp-compiler") is not None:
-        result.append(f"-DCMAKE_CXX_COMPILER={p_build_info["cpp-compiler"]}")
-    if p_build_info.get("c-compiler") is not None:
-        result.append(f"-DCMAKE_C_COMPILER={p_build_info["c-compiler"]}")
-    if p_build_info["generate-tests"]:
+        result.append(build_info["generator"])
+    result.append(f"-DCMAKE_BUILD_TYPE={build_info["cmake-build-type"]}")
+    if build_info.get("cpp-compiler") is not None:
+        result.append(f"-DCMAKE_CXX_COMPILER={build_info["cpp-compiler"]}")
+    if build_info.get("c-compiler") is not None:
+        result.append(f"-DCMAKE_C_COMPILER={build_info["c-compiler"]}")
+    if build_info["generate-tests"]:
         result.append("-DWBE_MAKE_TEST=ON")
     else:
         result.append("-DWBE_MAKE_TEST=OFF")
-    if p_build_info.get("additional-cmake-args") is not None:
-        result.append(p_build_info["additional-cmake-args"])
+    if build_info.get("additional-cmake-args") is not None:
+        result.append(build_info["additional-cmake-args"])
     return result
 
 def _gather_license():

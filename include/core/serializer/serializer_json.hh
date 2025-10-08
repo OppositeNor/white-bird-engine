@@ -23,6 +23,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @brief Concept for types that could be serialized by nlohmann::json.
+ *
+ * @tparam T The type to check.
+ */
 template <typename T>
 concept SerializableJSON = requires (std::remove_cvref_t<T> p_t_inst, nlohmann::json p_json) {
     p_json["key"] = p_t_inst;
@@ -81,6 +86,14 @@ public:
 
     uint32_t get_context_depth() const {
         return context_stack.size() - 1;
+    }
+
+    /**
+     * @brief Clear the serializer.
+     */
+    void clear() {
+        context_stack.clear();
+        context_stack.push_back(std::make_pair("base", json()));
     }
 private:
     std::vector<std::pair<std::string, json>> context_stack;

@@ -89,3 +89,8 @@ class WBEFileMetadata(BaseModel):
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
     components : list[WBEComponentMetadata] = Field(default_factory=list)
+
+class WBEMetadata(BaseModel):
+    channels : dict = Field(default_factory=dict)
+    classes : list[WBEClassMetadata] = Field(default_factory=list)
+    components : list[WBEComponentMetadata] = Field(default_factory=list)

@@ -25,6 +25,15 @@
 #include <string_view>
 namespace WhiteBirdEngine {
 
+/**
+ * @class ComponentSD
+ * @brief Component serialize deserialize class.
+ *
+ * @tparam T Component type.
+ */
+template <typename T, typename SerializerType>
+class ComponentSD {};
+
 template <typename T>
 using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
@@ -35,13 +44,15 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
+    WBE_META(WBE_REFLECT)
     char name_buffer[MAX_NAME_SIZE + 1] = "";
     // The name of the component.
-    WBE_META(WBE_REFLECT)
-    std::string_view name = std::string_view(name_buffer);
+    const std::string_view name;
     // The parent of the entity.
     WBE_META(WBE_REFLECT)
     EntityID parent;
+
+    ComponentLabel() : name(name_buffer) {}
 };
 
 /**

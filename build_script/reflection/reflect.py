@@ -14,93 +14,92 @@
 import json
 import os
 import importlib.util
+from build_script.reflection.code_gen import WBECodeGenerator
 from build_script.utils import hash_str
+from build_script.reflection.metadata_types import WBEMetadata
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
 
     Attributes: 
         metadata_path: The path to the metadata output file.
-        channel_registrator: The channel registrator.
+        metadata: The metadata of the engine.
     """
 
-    def __init__(self, p_metadata_path : str) -> None:
-        self.metadata_path = p_metadata_path
-        self.channels = {}
-        self.classes = []
-        self.components = []
+    def __init__(self, metadata_path : str) -> None:
+        self.metadata_path = metadata_path
+        self.metadata = WBEMetadata()
 
-    def load_script_config(self, p_load_path : str) -> None:
+    def load_script_config(self, load_path : str) -> None:
         """Load config scripts.
 
         Args:
-            p_load_path: The path to load the config script.
+            load_path: The path to load the config script.
 
         Raises:
             RuntimeError: If the config script is not runnable.
         """
-        print("WBEReflect: Loading configuration script: " + p_load_path)
-        if not os.path.exists(p_load_path):
-            raise FileNotFoundError(f"File not found: {p_load_path}")
-        spec = importlib.util.spec_from_file_location("config", p_load_path)
+        print("WBEReflect: Loading configuration script: " + load_path)
+        if not os.path.exists(load_path):
+            raise FileNotFoundError(f"File not found: {load_path}")
+        spec = importlib.util.spec_from_file_location("config", load_path)
         if spec is None:
-            raise RuntimeError(f"Failed to load spec from path: {p_load_path}")
+            raise RuntimeError(f"Failed to load spec from path: {load_path}")
         module_config = importlib.util.module_from_spec(spec)
         if spec.loader is not None:
             spec.loader.exec_module(module_config)
             module_config.register(self)
 
-    def register_channel(self, p_channel_name) -> None:
+    def register_channel(self, channel_name) -> None:
         """Register a channel.
 
         Args:
-            p_channel_path (): The channel to register.
+            channel_path (): The channel to register.
         """
-        self.channels[p_channel_name] = hash_str(p_channel_name)
+        self.metadata.channels[channel_name] = hash_str(channel_name)
 
-    def register_class(self, p_class) -> None:
+    def register_class(self, class_obj) -> None:
         """Register a class.
 
         Args:
-            p_class (): The class to register.
+            class_obj (): The class to register.
         """
-        self.classes.append(p_class.model_dump())
+        self.metadata.classes.append(class_obj.model_dump())
 
-    def register_component(self, p_component) -> None:
+    def register_component(self, component) -> None:
         """Register a component.
 
         Args:
-            p_components (): The component to register.
+            component (): The component to register.
         """
-        self.components.append(p_component.model_dump())
+        self.metadata.components.append(component.model_dump())
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
         print("WBEReflect: Exporting metadata...")
-        metadata : dict = {}
-        metadata["channels"] = self.channels
-        metadata["classes"] = self.classes
-        metadata["components"] = self.components
-        self._write_to_file(self.metadata_path, json.dumps(metadata, indent=4))
+        self._write_to_file(self.metadata_path, json.dumps(self.metadata.__dict__, indent=4))
+        # Generate code
+        generator = WBECodeGenerator(self.metadata)
+        generator.generate()
 
     def checks(self) -> None:
         """Do checkings."""
         print("WBEReflect: Checking...")
-        self._check_hashing_collision("channels", self.channels)
+        self._check_hashing_collision("channels", self.metadata.channels)
 
-    def _write_to_file(self, p_path : str, p_str : str) -> None:
-        with open(p_path, "w+") as channel_file:
-            channel_file.write(p_str)
+    def _write_to_file(self, path : str, str_content : str) -> None:
+        with open(path, "w+") as channel_file:
+            channel_file.write(str_content)
 
-    def _check_hashing_collision(self, p_dict_name : str, p_dictionary : dict) -> None:
+    def _check_hashing_collision(self, dict_name : str, dictionary : dict) -> None:
         hash_val_set = set()
         dict_rev = dict()
-        for channel in p_dictionary.keys():
-            if p_dictionary[channel] in hash_val_set:
-                raise RuntimeError(f"Hasing collision of \"{p_dict_name}\" detected! Hash values of: \"{channel}\" "
-                    f"and \"{dict_rev[p_dictionary[channel]]}\" are identical: {p_dictionary[channel]}")
-            dict_rev[p_dictionary[channel]] = channel
-            hash_val_set.add(p_dictionary[channel])
+        for channel in dictionary.keys():
+            if dictionary[channel] in hash_val_set:
+                raise RuntimeError(f"Hasing collision of \"{dict_name}\" detected! Hash values of: \"{channel}\" "
+                    f"and \"{dict_rev[dictionary[channel]]}\" are identical: {dictionary[channel]}")
+            dict_rev[dictionary[channel]] = channel
+            hash_val_set.add(dictionary[channel])
 
 
 

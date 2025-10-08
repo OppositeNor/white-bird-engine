@@ -25,62 +25,62 @@ def to_uint32(x):
     """
     return x & 0xFFFFFFFF
 
-def hash_str(p_str : str) -> int:
+def hash_str(str_input : str) -> int:
     """Hash a string.
 
     Args:
-        p_str: The string to hash.
+        str_input: The string to hash.
 
     Returns:
         The hash value of the string.
     """
-    if (len(p_str) != 0):
-        return to_uint32(ord(p_str[0]) + to_uint32(33 * hash_str(p_str[1:])))
+    if (len(str_input) != 0):
+        return to_uint32(ord(str_input[0]) + to_uint32(33 * hash_str(str_input[1:])))
     else:
         return 5381
 
-def hash_file(p_path : str):
+def hash_file(path : str):
     """Hash a file.
 
     Args:
-        p_path: The path to the file to get the hashcode.
+        path: The path to the file to get the hashcode.
 
     Returns: The hashcode of the file's content.
         
     """
     hasher = hashlib.sha256()
-    with open(p_path, "rb") as f:
+    with open(path, "rb") as f:
         hasher.update(f.read())
     return hasher.hexdigest()
 
-def hash_str_sha256(p_str : str) -> str:
+def hash_str_sha256(str_input : str) -> str:
     """Hash a string with sha256, has smaller collision posibility compared to hash_str method.
 
     Args:
-        p_str: The string to be hashed.
+        str_input: The string to be hashed.
 
     Returns:
         The hashed result.
     """
     hasher = hashlib.sha256()
-    hasher.update(p_str.encode("utf-8"))
+    hasher.update(str_input.encode("utf-8"))
     return hasher.hexdigest()
 
-def gather_files(p_dir, p_file_ext : set[str]) -> list[str]:
+def gather_files(directory, file_ext : set[str]) -> list[str]:
     """Gather files that has the specific file extensions in a directory recursively
 
     Args:
-        p_dir (): The directory to gather file from.
-        p_file_ext: The list of extensions to get.
+        directory (): The directory to gather file from.
+        file_ext: The list of extensions to get.
 
     Returns:
-        The list of file paths that matches the extensions in p_dir.
+        The list of file paths that matches the extensions in directory.
     """
     sources = []
-    dir_path = Path(p_dir)
+    dir_path = Path(directory)
     # Gather include files
     for dir_file in dir_path.rglob("*"):
-        if dir_file.suffix in p_file_ext:
+        if dir_file.suffix in file_ext:
             sources.append(str(dir_file))
     return sources
 
