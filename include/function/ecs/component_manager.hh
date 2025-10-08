@@ -15,10 +15,14 @@
 #ifndef __WBE_COMPONENT_MANAGER_HH__
 #define __WBE_COMPONENT_MANAGER_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include <bitset>
+#include <cstdint>
+#include <mutex>
+#include <shared_mutex>
 
-namespace WhiteBirdEnigne {
+namespace WhiteBirdEngine {
 
 /**
  * @brief Component manager.
@@ -31,7 +35,17 @@ template <typename T, size_t MAX_COMPONENTS>
 class ComponentManager {
 public:
     ComponentManager()
-        : allocator(sizeof(T), MAX_COMPONENTS) {}
+        : allocator(sizeof(T), MAX_COMPONENTS), num_wait_for_free(0) {}
+
+    /**
+     * @brief The number of components waiting for freeing that will trigger a flush.
+     */
+    static constexpr uint32_t FLUSH_AFTER_FREE = 16;
+
+    /**
+     * @brief Called every certain period of time.
+     */
+    void update();
 
     /**
      * @brief Apply a system to the components.
@@ -41,23 +55,42 @@ public:
      */
     template <typename SysType>
     void apply(SysType& p_system) {
-        p_system(allocator.get_mem_start(), allocator.obj_count(), enabled_components);
+        std::shared_lock lock(mutex);
+        p_system(allocator.get_mem_start(), allocator.obj_count(), wait_for_free);
     }
 
     /**
-     * @brief Remove the disabled components.
+     * @brief Remove the components that are waiting for free.
      */
     void flush();
 
 private:
     HeapAllocatorFixedSizePool allocator;
-    std::bitset<MAX_COMPONENTS> enabled_components;
-
+    std::bitset<HeapAllocatorFixedSizePool::MAX_OBJ> wait_for_free;
+    std::bitset<HeapAllocatorFixedSizePool::MAX_OBJ> disabled;
+    uint32_t num_wait_for_free;
+    mutable std::shared_mutex mutex;
 };
 
 template <typename T, size_t MAX_COMPONENTS>
+inline void ComponentManager<T, MAX_COMPONENTS>::update() {
+    // flushing
+    if (num_wait_for_free > FLUSH_AFTER_FREE) {
+        flush();
+    }
+}
+
+template <typename T, size_t MAX_COMPONENTS>
 void ComponentManager<T, MAX_COMPONENTS>::flush() {
-    // TODO
+    std::unique_lock lock(mutex);
+    std::vector<MemID> objs = allocator.get_allocated();
+    for (auto& obj : objs) {
+        if (wait_for_free.test(obj)) {
+            allocator.deallocate(obj);
+        }
+    }
+    wait_for_free.reset();
+    num_wait_for_free = 0;
 }
 
 }

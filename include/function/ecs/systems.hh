@@ -32,9 +32,9 @@ namespace WhiteBirdEngine {
  * @param p_enabled_components The enabled components.
  */
 template <size_t MAX_COMPONENTS>
-inline void update_local_transform(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_enabled_components) {
+inline void update_local_transform(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_disabled_components) {
     for (size_t i = 0; i < p_num; ++i) {
-        if (p_enabled_components.test(i)) {
+        if (!p_disabled_components.test(i)) {
             auto& transform = p_transforms[i];
             transform.local_transform =
                 glm::translate(glm::scale(glm::mat4(), transform.position)
@@ -49,7 +49,7 @@ inline void update_local_transform(ComponentTransform* p_transforms, size_t p_nu
  * @todo Test.
  * @param p_transforms The tnrasform components.
  * @param p_num The upper bound of transfrom components.
- * @param p_enabled_components The enabled components.
+ * @param p_disabled_components The disabled components.
  */
 template <size_t MAX_COMPONENTS>
 struct UpdateGlobalTransform {
@@ -57,9 +57,9 @@ struct UpdateGlobalTransform {
      * @brief Used for keeping track if a component has been updated or not altered every time when called.
      */
     bool tick_tock = true;
-    void operator()(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_enabled_components) {
+    void operator()(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_disabled_components) {
         for (size_t i = 0; i < p_num; ++i) {
-            if (p_enabled_components.test(i)) {
+            if (!p_disabled_components.test(i)) {
                 auto& transform = p_transforms[i];
                 if (transform.tick_tock == tick_tock) {
                     continue;
@@ -92,7 +92,7 @@ struct UpdateGlobalTransform {
  * @todo Test.
  * @param p_transforms The tnrasform components.
  * @param p_num The upper bound of transfrom components.
- * @param p_enabled_components The enabled components.
+ * @param p_disabled_components The disabled components.
  */
 template <size_t MAX_COMPONENTS>
 inline UpdateGlobalTransform<MAX_COMPONENTS> update_global_transform;

@@ -18,7 +18,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
-#include <set>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
@@ -68,7 +67,7 @@ inline HeapAllocatorFixedSizePool::operator std::string() const {
     ss << "\"obj_count\":" << obj_count() << ",";
     ss << "\"max_obj\":" << static_cast<uint32_t>(max_obj) << ",";
     ss << "\"allocated\":[";
-    std::set<MemID> alloc_mems = get_allocated();
+    auto alloc_mems = get_allocated();
     bool first = true;
     for (auto alloc_mem : alloc_mems) {
         if (!first) ss << ",";

@@ -22,8 +22,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
-#include <set>
 #include <stdexcept>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -42,10 +42,9 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool> final : public Allocator
 };
 
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
-    // TODO: make this type generically adaptive to all integer types.
+public:
     using DataIndex = uint16_t;
     using InternalID = uint16_t;
-public:
 
     /**
      * @brief The maximum number of objects the pool can hold.
@@ -99,6 +98,15 @@ public:
     }
 
     /**
+     * @brief Get memory ID by its index in the pool.
+     *
+     * @param p_index The index of the element.
+     */
+    MemID get_id_by_index(DataIndex p_index) {
+        return static_cast<MemID>(get_internal_id(p_index));
+    }
+
+    /**
      * @brief Get number of allocated objects.
      *
      * @return The number of allocated objects.
@@ -107,10 +115,11 @@ public:
         return alloc_obj_count;
     }
 
-    std::set<MemID> get_allocated() const {
-        std::set<MemID> result;
+    std::vector<MemID> get_allocated() const {
+        std::vector<MemID> result;
+        result.reserve(alloc_obj_count);
         for (uint32_t i = 0; i < alloc_obj_count; ++i) {
-            result.insert(*(index_chunk_rev_start() + i));
+            result.push_back(*(index_chunk_rev_start() + i));
         }
         return result;
     }
