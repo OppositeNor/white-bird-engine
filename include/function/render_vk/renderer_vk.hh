@@ -22,6 +22,7 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -117,6 +118,8 @@ private:
         Ref<ROGraphicsPipelineVK> graphics_pipeline;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+        // Framebuffers in the swap chain.
+        std::vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
     };
     Unique<RenderObjects> render_objects;
     
@@ -206,6 +209,7 @@ private:
     void setup_base_render_data();
     void init_render_pass();
     void init_graphics_pipeline();
+    void init_swap_chain_framebuffers();
     void setup_present_render_task();
 
     void create_instance();

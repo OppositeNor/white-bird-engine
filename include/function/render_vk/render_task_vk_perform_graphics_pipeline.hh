@@ -17,6 +17,7 @@
 
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "render_task_vk.hh"
 #include <string>
 #include <vulkan/vulkan_core.h>
@@ -42,7 +43,8 @@ public:
      *
      * @param p_graphics_pipeline The graphics pipeline to perform.
      */
-    RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data, Ref<ROGraphicsPipelineVK> p_graphics_pipeline);
+    RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
+                                        Ref<RORenderPassVK> p_render_pass, Ref<ROGraphicsPipelineVK> p_graphics_pipeline);
 
     /**
      * @brief Involke the render task.
@@ -62,6 +64,8 @@ public:
 
 private:
     void init();
+    void record_command_buffer();
+    Ref<RORenderPassVK> render_pass;
     Ref<ROGraphicsPipelineVK> graphics_pipeline;
     VkCommandBuffer command_buffer;
 };

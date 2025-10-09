@@ -22,6 +22,7 @@
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -60,6 +61,7 @@ void RendererVK::init() {
     setup_base_render_data();
     init_render_pass();
     init_graphics_pipeline();
+    init_swap_chain_framebuffers();
     setup_present_render_task();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
@@ -144,10 +146,25 @@ void RendererVK::init_graphics_pipeline() {
     render_objects->graphics_pipeline = make_ref<ROGraphicsPipelineVK>(allocator, &base_render_data, graphics_pipeline_config);
 }
 
+void RendererVK::init_swap_chain_framebuffers() {
+    render_objects->swap_chain_framebuffers.resize(swap_chain_image_views.size());
+    // Setup the framebuffer for each swap chain image view.
+    for (size_t i = 0; i < swap_chain_image_views.size(); ++i) {
+        ROFramebufferVK::Builder builder;
+        builder.add_attachment(swap_chain_image_views[i])
+            .set_render_pass(render_objects->result_render_pass)
+            .set_extent(swap_chain_extent)
+            .set_layers(1);
+        render_objects->swap_chain_framebuffers[i] = make_ref<ROFramebufferVK>(allocator, &base_render_data, builder);
+    }
+}
+
 void RendererVK::setup_present_render_task() {
     // TEST
-    // TOOD
-    present_render_task = make_unique<RenderTaskVKPerformGraphicsPipeline>(allocator, &base_render_data, render_objects->graphics_pipeline);
+    // TODO
+    present_render_task = make_unique<RenderTaskVKPerformGraphicsPipeline>(allocator, &base_render_data,
+                                                                           render_objects->result_render_pass,
+                                                                           render_objects->graphics_pipeline);
 }
 
 void RendererVK::create_instance() {

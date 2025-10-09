@@ -20,8 +20,9 @@
 namespace WhiteBirdEngine {
 
 RenderTaskVKPerformGraphicsPipeline::RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
+                                                                         Ref<RORenderPassVK> p_render_pass,
                                                                          Ref<ROGraphicsPipelineVK> p_graphics_pipeline)
-    : RenderTaskVK(p_render_data), graphics_pipeline(p_graphics_pipeline)  {
+    : RenderTaskVK(p_render_data), render_pass(p_render_pass), graphics_pipeline(p_graphics_pipeline)  {
     init();
 }
 
@@ -30,7 +31,19 @@ RenderTaskVKPerformGraphicsPipeline::~RenderTaskVKPerformGraphicsPipeline() {
 }
 
 void RenderTaskVKPerformGraphicsPipeline::involke(double p_delta) {
-    // TODO
+    record_command_buffer();
+}
+
+void RenderTaskVKPerformGraphicsPipeline::record_command_buffer() {
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = 0;
+    begin_info.pInheritanceInfo = nullptr;
+    if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer.");
+    }
+    VkRenderPassBeginInfo render_pass_info{};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 }
 
 void RenderTaskVKPerformGraphicsPipeline::init() {
