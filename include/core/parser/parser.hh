@@ -72,6 +72,12 @@ public:
 
 WBE_DECL_CRTP_CONCEPT(ParserData);
 
+template <ParserDataConcept ParserDataType>
+inline std::ostream& operator<<(std::ostream& p_ostream, const ParserData<ParserDataType>& p_parser) {
+    return operator<<(p_ostream, p_parser);
+}
+
+
 /**
  * @class Parser
  * @brief Parser interface.

@@ -17,8 +17,8 @@
 
 #include <bitset>
 #include <cstddef>
-#include <sys/types.h>
 #ifdef __unix__
+#include <sys/types.h>
 #include <sched.h>
 #endif
 

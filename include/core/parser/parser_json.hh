@@ -18,6 +18,7 @@
 #include "parser.hh"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <ostream>
 
 namespace WhiteBirdEngine {
 
@@ -29,6 +30,7 @@ namespace WhiteBirdEngine {
 class JSONData final : public ParserData<JSONData> {
     using json = nlohmann::json;
     friend class ParserJSON;
+    friend std::ostream& operator<<(std::ostream& p_ostrem, const JSONData& p_parser);
 public:
     JSONData() {}
     ~JSONData() {}
@@ -100,6 +102,10 @@ public:
 private:
     json data;
 };
+
+inline std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parser) {
+    return p_ostream << p_parser.data;
+}
 
 /**
  * @class ParserJSON

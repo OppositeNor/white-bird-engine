@@ -17,6 +17,7 @@
 
 #include "serializer.hh"
 
+#include <concepts>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -47,6 +48,10 @@ public:
     SerializerYAML& operator=(const SerializerYAML&) = delete;
     SerializerYAML& operator=(SerializerYAML&&) = delete;
 
+    void push_list(const std::string& p_key, const SerializerYAML& p_serializer) {
+        context_stack.back().second[p_key].push_back(p_serializer.context_stack[0].second);
+    }
+
     void push_context(const std::string& p_context_name) {
         context_stack.push_back(std::pair<std::string, yaml>(p_context_name, yaml()));
     }
@@ -60,9 +65,14 @@ public:
         context_stack.back().second[std::move(back.first)] = std::move(back.second);
     }
 
-    template <SerializableYAML T>
+    template <SerializableYAML T> requires (!std::same_as<T, char*>)
     void register_serialize(const std::string& p_key, T&& p_value) {
         context_stack.back().second[p_key] = std::forward<T>(p_value);
+    }
+
+    void register_serialize(const std::string& p_key, const char* p_value) {
+        std::string str(p_value);
+        context_stack.back().second[p_key] = str;
     }
 
     std::string dump() const {

@@ -28,6 +28,7 @@ namespace WhiteBirdEngine {
 class YAMLData : public ParserData<YAMLData> {
     using yaml = YAML::Node;
     friend class ParserYAML;
+    friend std::ostream& operator<<(std::ostream& p_ostrem, const YAMLData& p_parser);
 public:
     YAMLData() {}
     ~YAMLData() {}
@@ -84,6 +85,10 @@ public:
 private:
     yaml node;
 };
+
+inline std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parser) {
+    return p_ostream << p_parser.node;
+}
 
 /**
  * @class ParserYAML

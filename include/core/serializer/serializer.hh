@@ -28,6 +28,19 @@ public:
     Serializer() = default;
     ~Serializer() {}
 
+
+    /**
+     * @brief Push the content of a serializer into a list.
+     *
+     * @tparam SerializerType The type of the serializer.
+     * @param p_key The key of the list.
+     * @param p_serializer The serializer to get data to push.
+     */
+    template <typename SerializerType>
+    void push_list(const std::string& p_key, const SerializerType& p_serializer) {
+        static_cast<ChildT*>(this)->push_context(p_serializer);
+    }
+
     /**
      * @brief Push a new context for the serializer context stack.
      *

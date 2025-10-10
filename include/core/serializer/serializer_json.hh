@@ -16,6 +16,7 @@
 #define __WBE_SERILIAZER_JSON_HH__
 
 #include "serializer.hh"
+#include <concepts>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
@@ -51,6 +52,10 @@ public:
     SerializerJSON& operator=(const SerializerJSON&) = delete;
     SerializerJSON& operator=(SerializerJSON&&) = delete;
 
+    void push_list(const std::string& p_key, const SerializerJSON& p_serializer) {
+        context_stack.back().second[p_key].push_back(p_serializer.context_stack[0].second);
+    }
+
     void push_context(const std::string& p_context_name) {
         context_stack.push_back(std::pair<std::string, json>(p_context_name, json()));
     }
@@ -64,9 +69,14 @@ public:
         context_stack.back().second[std::move(back.first)] = std::move(back.second);
     }
 
-    template <SerializableJSON T>
+    template <SerializableJSON T> requires (!std::same_as<T, char*>)
     void register_serialize(const std::string& p_key, T&& p_value) {
         context_stack.back().second[p_key] = std::forward<T>(p_value);
+    }
+
+    void register_serialize(const std::string& p_key, const char* p_value) {
+        std::string str(p_value);
+        context_stack.back().second[p_key] = str;
     }
 
     std::string dump() const {
