@@ -58,11 +58,7 @@ public:
             glm::vec2 this_to_next = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1)->position
                 - get_vert(p_vertex_list, p_vertex_count, ear_check_index)->position;
             float cross_prev_next = cross_vec2(prev_to_this, this_to_next);
-            if (std::abs(cross_prev_next - 0.0) < WBE_FLOAT_TOLARENCE) {
-                remove_vertex(p_vertex_list, p_vertex_count, ear_check_index);
-                --p_vertex_count;
-            }
-            else if (is_vertex_ear(p_vertex_list, p_vertex_count, ear_check_index)) {
+            if (std::abs(cross_prev_next - 0.0) < WBE_FLOAT_TOLARENCE || is_vertex_ear(p_vertex_list, p_vertex_count, ear_check_index)) {
                 p_triangle_list[triangle_index].vert1 = get_vert(p_vertex_list, p_vertex_count, ear_check_index - 1);
                 p_triangle_list[triangle_index].vert2 = get_vert(p_vertex_list, p_vertex_count, ear_check_index);
                 p_triangle_list[triangle_index].vert3 = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1);

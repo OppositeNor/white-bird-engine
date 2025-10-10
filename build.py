@@ -19,7 +19,7 @@ from build_script import on_build
 from build_script import utils
 import shutil
 import build_config
-from build_setup import *
+import build_setup
 
 metaparser_clang_args = [
     "-std=c++20",
@@ -51,11 +51,11 @@ def _get_cmake_command_from_info(build_info):
 
 def _gather_license():
     # Get white bird engine license
-    shutil.copyfile(os.path.join(root_dir, "LICENSE"), os.path.join(licenses_output_dir, "white-bird-engine_LICENSE"))
-    shutil.copyfile(os.path.join(root_dir, "NOTICE"), os.path.join(licenses_output_dir, "white-bird-engine_NOTICE"))
+    shutil.copyfile(os.path.join(build_setup.root_dir, "LICENSE"), os.path.join(build_setup.licenses_output_dir, "white-bird-engine_LICENSE"))
+    shutil.copyfile(os.path.join(build_setup.root_dir, "NOTICE"), os.path.join(build_setup.licenses_output_dir, "white-bird-engine_NOTICE"))
     # Get licenses from dependencies
-    deps_dir = Path(dependencies_dir).resolve()
-    output_dir = Path(licenses_output_dir).resolve()
+    deps_dir = Path(build_setup.dependencies_dir).resolve()
+    output_dir = Path(build_setup.licenses_output_dir).resolve()
 
     for subdir in deps_dir.iterdir():
         if subdir.is_dir():
@@ -83,7 +83,7 @@ def _gather_license():
                     shutil.copy2(nf, target_path)
 
 def _compile_shaders():
-    shaders_dir_path = Path(shaders_dir)
+    shaders_dir_path = Path(build_setup.shaders_dir)
     for hlsl_file in shaders_dir_path.rglob("*.hlsl"):
         with open(hlsl_file, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
@@ -96,7 +96,7 @@ def _compile_shaders():
             # Files without a profile header are considered to be header files, skipped.
             continue
 
-        output_file = os.path.join(shaders_output_dir, (hlsl_file.stem + ".spv"))
+        output_file = os.path.join(build_setup.shaders_output_dir, (hlsl_file.stem + ".spv"))
         cmd = [
             "dxc",
             "-T", profile,
@@ -116,35 +116,35 @@ def _compile_shaders():
 if __name__ == "__main__":
     # Gather sources for reflection
     try:
-        print(f"WBEBuilder: Building target: {args.target}.")
+        print(f"WBEBuilder: Building target: {build_setup.args.target}.")
         print("WBEBuilder: Compiling shaders...")
         _compile_shaders()
         print("WBEBuilder: Gathering licenses...")
         _gather_license()
         print("WBEBuilder: Gathering sources...")
         sources = []
-        sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
-        sources.extend(utils.gather_files(source_dir, build_config.source_extensions))
-        if build_target["generate-tests"]:
-            sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
+        sources.extend(utils.gather_files(build_setup.include_dir, build_config.source_extensions))
+        sources.extend(utils.gather_files(build_setup.source_dir, build_config.source_extensions))
+        if build_setup.build_target["generate-tests"]:
+            sources.extend(utils.gather_files(build_setup.test_dir, build_config.source_extensions))
 
         # Run reflection script
         print("WBEBuilder: Running reflections...")
-        on_build.reflect(metaparser_clang_args, metadata_path, metadata_cache_dir, sources)
+        on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, sources)
 
         # Build project with CMake
         print("WBEBuilder: Running cmake...")
-        result = subprocess.run(_get_cmake_command_from_info(build_target))
+        result = subprocess.run(_get_cmake_command_from_info(build_setup.build_target))
         if result.returncode != 0:
             raise RuntimeError("Failed to setup cmake build.")
-        result = subprocess.run(["cmake", "--build", build_target["export-directory"]])
+        result = subprocess.run(["cmake", "--build", build_setup.build_target["export-directory"]])
         if result.returncode != 0:
             raise RuntimeError("Failed to build with CMake.")
 
         # Set up test environment
-        if build_target["generate-tests"]:
+        if build_setup.build_target["generate-tests"]:
             print("WBEBuilder: Setting up test environemnt...")
-            shutil.copy(os.path.join(resource_output_dir, "metadata.json"), os.path.join(test_env_resource_dir, "metadata.json"))
+            shutil.copy(os.path.join(build_setup.resource_output_dir, "metadata.json"), os.path.join(build_setup.test_env_resource_dir, "metadata.json"))
 
         print("WBEBuilder: Finished!")
 

@@ -41,7 +41,9 @@ public:
     EngineConfig(const Path& p_config_file_path, int p_argc, char* p_argv[])
         : config_file_parser(config_options, ParserYAML()) {
         parse_config_file(p_config_file_path);
-        parse_cla(p_argc, p_argv);
+        if (p_argc > 0) {
+            parse_cla(p_argc, p_argv);
+        }
     }
     virtual ~EngineConfig() {}
     EngineConfig(const EngineConfig&) = delete;
