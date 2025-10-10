@@ -3,7 +3,7 @@
 #include "generated/component_sd.gen.hh"
 #include <gtest/gtest.h>
 
-// TODO
+
 
 #endif
 

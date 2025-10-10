@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+#include <cstring>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -140,6 +141,103 @@ TEST(SerializerYAMLTest, ConstCharPointerInContext) {
     // Verify inner message
     ASSERT_TRUE(inner_data.contains("msg"));
     ASSERT_EQ(inner_data.get_value<std::string>("msg"), "Inner message");
+}
+
+TEST(SerializerYAMLTest, BufferBoundsChecking) {
+    WBE::SerializerYAML serializer;
+    
+    // Test Buffer with different sizes
+    WBE::Buffer<16> small_buffer;
+    WBE::Buffer<64> medium_buffer;
+    WBE::Buffer<256> large_buffer;
+    
+    // Test small string that fits in all buffers
+    const char* small_str = "Hello";
+    strcpy(small_buffer.buffer, small_str);
+    strcpy(medium_buffer.buffer, small_str);
+    strcpy(large_buffer.buffer, small_str);
+    
+    serializer.register_serialize("small_buf", small_buffer);
+    serializer.register_serialize("medium_buf", medium_buffer);
+    serializer.register_serialize("large_buf", large_buffer);
+    
+    std::string result = serializer.dump();
+    
+    // Parse and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("small_buf"), "Hello");
+    ASSERT_EQ(parser.get_value<std::string>("medium_buf"), "Hello");
+    ASSERT_EQ(parser.get_value<std::string>("large_buf"), "Hello");
+}
+
+TEST(SerializerYAMLTest, BufferMaxCapacity) {
+    WBE::SerializerYAML serializer;
+    
+    // Test buffer at maximum capacity (15 chars + null terminator for size 16)
+    WBE::Buffer<16> buffer;
+    const char* max_str = "123456789012345"; // 15 characters
+    strcpy(buffer.buffer, max_str);
+    
+    serializer.register_serialize("max_capacity", buffer);
+    std::string result = serializer.dump();
+    
+    // Parse and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("max_capacity"), "123456789012345");
+}
+
+TEST(SerializerYAMLTest, BufferWithSpecialCharacters) {
+    WBE::SerializerYAML serializer;
+    
+    WBE::Buffer<64> buffer;
+    const char* special_str = "Line1\nLine2\tTab\"Quote'";
+    strcpy(buffer.buffer, special_str);
+    
+    serializer.register_serialize("special_chars", buffer);
+    std::string result = serializer.dump();
+    
+    // Parse and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("special_chars"), "Line1\nLine2\tTab\"Quote'");
+}
+
+TEST(SerializerYAMLTest, BufferEmptyString) {
+    WBE::SerializerYAML serializer;
+    
+    WBE::Buffer<32> buffer;
+    buffer.buffer[0] = '\0'; // Empty string
+    
+    serializer.register_serialize("empty_buffer", buffer);
+    std::string result = serializer.dump();
+    
+    // Parse and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("empty_buffer"), "");
+}
+
+TEST(SerializerYAMLTest, BufferMultilineHandling) {
+    WBE::SerializerYAML serializer;
+    
+    WBE::Buffer<128> buffer;
+    const char* multiline_str = "Line 1\nLine 2\nLine 3\nWith various content";
+    strcpy(buffer.buffer, multiline_str);
+    
+    serializer.register_serialize("multiline_buffer", buffer);
+    std::string result = serializer.dump();
+    
+    // Parse and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("multiline_buffer"), "Line 1\nLine 2\nLine 3\nWith various content");
 }
 
 TEST(SerializerYAMLTest, PushList) {

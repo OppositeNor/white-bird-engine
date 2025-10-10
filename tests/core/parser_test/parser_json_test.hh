@@ -17,7 +17,9 @@
 
 #include <gtest/gtest.h>
 #include "core/parser/parser_json.hh"
+#include "core/serializer/serializer_json.hh"
 #include "parser_test_general.hh"
+#include <cstring>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -215,6 +217,123 @@ TEST(ParserJSONTest, ParseEmptyAndMixedLists) {
     
     ASSERT_EQ(mixed_content[2].get_value<std::string>("type"), "boolean");
     ASSERT_EQ(mixed_content[2].get_value<bool>("value"), true);
+}
+
+TEST(ParserJSONTest, BufferRetrieval) {
+    WBE::ParserJSON parser;
+    
+    const std::string json_data = R"({
+        "short_text": "Hello",
+        "medium_text": "This is a medium length text",
+        "long_text": "This is a very long text that should test buffer capacity limits and bounds checking functionality",
+        "empty_text": "",
+        "special_chars": "Line1\nLine2\tTab\"Quote'"
+    })";
+    
+    parser.parse_from_buffer(json_data);
+    
+    // Test retrieving into different buffer sizes
+    WBE::Buffer<16> small_buffer;
+    WBE::Buffer<64> medium_buffer;
+    WBE::Buffer<128> large_buffer;
+    
+    // Test short text fits in all buffers
+    std::string key = "short_text";
+    parser.get_data().get_value(key, small_buffer);
+    ASSERT_STREQ(small_buffer.buffer, "Hello");
+    
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "Hello");
+    
+    parser.get_data().get_value(key, large_buffer);
+    ASSERT_STREQ(large_buffer.buffer, "Hello");
+    
+    // Test medium text fits in medium and large buffers
+    key = "medium_text";
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "This is a medium length text");
+    
+    parser.get_data().get_value(key, large_buffer);
+    ASSERT_STREQ(large_buffer.buffer, "This is a medium length text");
+    
+    // Test empty text
+    key = "empty_text";
+    parser.get_data().get_value(key, small_buffer);
+    ASSERT_STREQ(small_buffer.buffer, "");
+    
+    // Test special characters
+    key = "special_chars";
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "Line1\nLine2\tTab\"Quote'");
+}
+
+TEST(ParserJSONTest, BufferBoundsChecking) {
+    WBE::ParserJSON parser;
+    
+    const std::string json_data = R"({
+        "long_text": "This is a very long text that exceeds small buffer capacity"
+    })";
+    
+    parser.parse_from_buffer(json_data);
+    
+    // Test that attempting to retrieve long text into small buffer throws exception
+    WBE::Buffer<16> small_buffer;
+    std::string key = "long_text";
+    ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
+    
+    // Test that it works with appropriately sized buffer
+    WBE::Buffer<128> large_buffer;
+    ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
+    ASSERT_STREQ(large_buffer.buffer, "This is a very long text that exceeds small buffer capacity");
+}
+
+TEST(ParserJSONTest, BufferMaxCapacityRetrieval) {
+    WBE::ParserJSON parser;
+    
+    // Test string that exactly fits buffer capacity (15 chars + null terminator for size 16)
+    const std::string json_data = R"({
+        "max_text": "123456789012345"
+    })";
+    
+    parser.parse_from_buffer(json_data);
+    
+    WBE::Buffer<16> buffer;
+    std::string key = "max_text";
+    parser.get_data().get_value(key, buffer);
+    ASSERT_STREQ(buffer.buffer, "123456789012345");
+    
+    // Test string that's one character too long
+    const std::string json_data_too_long = R"({
+        "too_long": "1234567890123456"
+    })";
+    
+    parser.parse_from_buffer(json_data_too_long);
+    key = "too_long";
+    ASSERT_THROW(parser.get_data().get_value(key, buffer), std::runtime_error);
+}
+
+TEST(ParserJSONTest, BufferRoundTripSerialization) {
+    // Test round-trip: Buffer -> Serializer -> Parser -> Buffer
+    WBE::Buffer<64> original_buffer;
+    const char* test_str = "Round trip test with special chars: \n\t\"'";
+    strcpy(original_buffer.buffer, test_str);
+    
+    // Serialize
+    WBE::SerializerJSON serializer;
+    serializer.register_serialize("test_data", original_buffer);
+    std::string serialized = serializer.dump();
+    
+    // Parse
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(serialized);
+    
+    // Retrieve into new buffer
+    WBE::Buffer<64> retrieved_buffer;
+    std::string key = "test_data";
+    parser.get_data().get_value(key, retrieved_buffer);
+    
+    // Verify round-trip integrity
+    ASSERT_STREQ(original_buffer.buffer, retrieved_buffer.buffer);
 }
 
 TEST(ParserJSONTest, ComplexNestedStructures) {

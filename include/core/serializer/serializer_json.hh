@@ -16,7 +16,7 @@
 #define __WBE_SERILIAZER_JSON_HH__
 
 #include "serializer.hh"
-#include <concepts>
+#include "utils/utils.hh"
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
@@ -69,13 +69,17 @@ public:
         context_stack.back().second[std::move(back.first)] = std::move(back.second);
     }
 
-    template <SerializableJSON T> requires (!std::same_as<T, char*>)
+    template <SerializableJSON T> requires (!BufferBaseConcept<T>)
     void register_serialize(const std::string& p_key, T&& p_value) {
         context_stack.back().second[p_key] = std::forward<T>(p_value);
     }
 
-    void register_serialize(const std::string& p_key, const char* p_value) {
-        std::string str(p_value);
+    template <BufferBaseConcept T>
+    void register_serialize(const std::string& p_key, T&& p_value) {
+        using BufferT = std::remove_cvref_t<T>;
+        // Make sure the buffer don't overflow.
+        p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
+        std::string str(p_value.buffer);
         context_stack.back().second[p_key] = str;
     }
 

@@ -153,6 +153,18 @@ public:
     bool contains(const std::string& p_key) const {
         return static_cast<const ChildType*>(this)->contains();
     }
+
+    /**
+     * @brief Get the value and set.
+     *
+     * @tparam T The type of the value to get.
+     * @param p_key The key of the value.
+     * @param p_value The value reference to be set.
+     */
+    template <typename T>
+    void get_value(std::string& p_key, T&& p_value) const {
+        return static_cast<const ChildType*>(this)->get_value(p_key, std::forward<T>(p_value));
+    }
 };
 
 WBE_DECL_CRTP_CONCEPT(Parser);

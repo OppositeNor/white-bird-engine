@@ -27,8 +27,8 @@ namespace WhiteBirdEngine {
  *
  * @tparam Serializer The type of the serializer.
  */
-template <typename Serializer>
-class ComponentSD<{{ component.struct_name }}, Serializer> {
+template <>
+class ComponentSD<{{ component.struct_name }}> {
 public:
 
     ~ComponentSD() {}
@@ -37,14 +37,6 @@ public:
     ComponentSD& operator=(const ComponentSD&) = delete;
     ComponentSD& operator=(ComponentSD&&) = delete;
 
-    /**
-     * @brief Constructor.
-     *
-     * @param p_serializer The serializer.
-     */
-    ComponentSD(Serializer& p_serializer)
-        : serializer(&p_serializer) {}
-
     using ComponentType = {{ component.struct_name }};
 
     /**
@@ -52,11 +44,12 @@ public:
      *
      * @param p_component The component to serialize.
      */
-    void serialize(const ComponentType& p_component) {
-        serializer->push_context("{{ component.struct_name }}");
-        {% for field in component.fields %}serializer->register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
+    template <typename Serializer>
+    void serialize(Serializer& p_serializer, const ComponentType& p_component) {
+        p_serializer.push_context("{{ component.struct_name }}");
+        {% for field in component.fields %}p_serializer.register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
         {% endfor %}
-        serializer->pop_context();
+        p_serializer.pop_context();
     }
 
     /**
@@ -64,21 +57,11 @@ public:
      *
      * @param p_component The component to deserialize.
      */
-    void deserialize(ComponentType& p_component) {
-        // TODO
+    template <typename ParserData>
+    void deserialize(const ParserData& p_data, ComponentType& p_component) {
+        {% for field in component.fields %}p_data.get_data("{{ field.field_name }}", p_component.{{ field.field_name }});
+        {% endfor %}
     }
-
-    /**
-     * @brief Get the serializer.
-     *
-     * @return The serializer.
-     */
-    const Serializer& get_serializer() const {
-        return *serializer;
-    }
-
-private:
-    Serializer* serializer;
 };
 {% endfor %}
 

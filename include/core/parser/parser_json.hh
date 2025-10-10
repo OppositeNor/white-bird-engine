@@ -16,9 +16,16 @@
 #define __WBE_PARSER_JSON_HH__
 
 #include "parser.hh"
+#include "utils/utils.hh"
+#include <concepts>
+#include <cstring>
+#include <format>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <ostream>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 
 namespace WhiteBirdEngine {
 
@@ -77,6 +84,23 @@ public:
             return data.get<T>();
         } else {
             return JSONData(data.get<json>());
+        }
+    }
+
+    template <typename T>
+    void get_value(std::string& p_key, T& p_value) {
+        if constexpr (BufferBaseConcept<T>) {
+            using BufferT = std::remove_cvref_t<T>;
+            std::string result = get_value<std::string>(p_key);
+            if (result.size() > BufferT::BUFFER_SIZE - 1) {
+                throw std::runtime_error(std::format(
+                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
+                    result, BufferT::BUFFER_SIZE, result.size()));
+            }
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+        }
+        else {
+            p_value = get_value<T>(p_key);
         }
     }
 
@@ -153,6 +177,11 @@ public:
     template <typename T>
     T get_value() const {
         return data.get_value<T>();
+    }
+
+    template <typename T>
+    void get_value(std::string& p_key, T&& p_value) {
+        return data.get_value<T>(std::forward<T>(p_value));
     }
 
     /**

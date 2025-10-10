@@ -19,6 +19,7 @@
 #include "core/memory/reference_raw.hh"
 #include "function/ecs/entity.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -31,7 +32,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T Component type.
  */
-template <typename T, typename SerializerType>
+template <typename T>
 class ComponentSD {};
 
 template <typename T>
@@ -45,14 +46,15 @@ WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
     WBE_META(WBE_REFLECT)
-    char name_buffer[MAX_NAME_SIZE + 1] = "";
+    Buffer<MAX_NAME_SIZE + 1> name_buffer;
     // The name of the component.
     const std::string_view name;
     // The parent of the entity.
     WBE_META(WBE_REFLECT)
     EntityID parent;
 
-    ComponentLabel() : name(name_buffer) {}
+    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
+    }
 };
 
 /**

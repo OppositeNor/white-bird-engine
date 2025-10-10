@@ -396,6 +396,30 @@ inline std::unique_ptr<T> requires_valid(const std::string& p_value_name, std::u
     return p_optional_value;
 }
 
+/**
+ * @class BufferBase
+ * @brief Base class for buffers. Used to identify buffers.
+ *
+ */
+template <typename Child>
+struct BufferBase {
+    // The size of the buffer (in bytes).
+    static constexpr size_t BUFFER_SIZE = Child::BUFFER_SIZE;
+};
+
+/**
+ * @brief A buffer type.
+ */
+template <size_t SIZE>
+struct Buffer : public BufferBase<Buffer<SIZE>> {
+    // The size of the buffer (in bytes).
+    static constexpr size_t BUFFER_SIZE = SIZE;
+    // The buffer.
+    char buffer[SIZE];
+};
+
+WBE_DECL_CRTP_CONCEPT(BufferBase);
+
 }
 #endif
 

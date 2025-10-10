@@ -16,8 +16,10 @@
 #define __WBE_PARSER_YAML_TEST_HH__
 
 #include "core/parser/parser_yaml.hh"
+#include "core/serializer/serializer_yaml.hh"
 #include "parser_test_general.hh"
 #include <gtest/gtest.h>
+#include <cstring>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -212,6 +214,152 @@ simple_array: [1, 2, 3, 4, 5]
     ASSERT_EQ(simple_array.size(), 5);
     ASSERT_EQ(simple_array[0], 1);
     ASSERT_EQ(simple_array[4], 5);
+}
+
+TEST(ParserYAMLTest, BufferRetrieval) {
+    WBE::ParserYAML parser;
+    
+    const std::string yaml_data = R"(
+short_text: "Hello"
+medium_text: "This is a medium length text"
+long_text: "This is a very long text that should test buffer capacity limits and bounds checking functionality"
+empty_text: ""
+special_chars: "Line1\nLine2\tTab\"Quote'"
+)";
+    
+    parser.parse_from_buffer(yaml_data);
+    
+    // Test retrieving into different buffer sizes
+    WBE::Buffer<16> small_buffer;
+    WBE::Buffer<64> medium_buffer;
+    WBE::Buffer<128> large_buffer;
+    
+    // Test short text fits in all buffers
+    std::string key = "short_text";
+    parser.get_data().get_value(key, small_buffer);
+    ASSERT_STREQ(small_buffer.buffer, "Hello");
+    
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "Hello");
+    
+    parser.get_data().get_value(key, large_buffer);
+    ASSERT_STREQ(large_buffer.buffer, "Hello");
+    
+    // Test medium text fits in medium and large buffers
+    key = "medium_text";
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "This is a medium length text");
+    
+    parser.get_data().get_value(key, large_buffer);
+    ASSERT_STREQ(large_buffer.buffer, "This is a medium length text");
+    
+    // Test empty text
+    key = "empty_text";
+    parser.get_data().get_value(key, small_buffer);
+    ASSERT_STREQ(small_buffer.buffer, "");
+    
+    // Test special characters
+    key = "special_chars";
+    parser.get_data().get_value(key, medium_buffer);
+    ASSERT_STREQ(medium_buffer.buffer, "Line1\nLine2\tTab\"Quote'");
+}
+
+TEST(ParserYAMLTest, BufferBoundsChecking) {
+    WBE::ParserYAML parser;
+    
+    const std::string yaml_data = R"(
+long_text: "This is a very long text that exceeds small buffer capacity"
+)";
+    
+    parser.parse_from_buffer(yaml_data);
+    
+    // Test that attempting to retrieve long text into small buffer throws exception
+    WBE::Buffer<16> small_buffer;
+    std::string key = "long_text";
+    ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
+    
+    // Test that it works with appropriately sized buffer
+    WBE::Buffer<128> large_buffer;
+    ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
+    ASSERT_STREQ(large_buffer.buffer, "This is a very long text that exceeds small buffer capacity");
+}
+
+TEST(ParserYAMLTest, BufferMaxCapacityRetrieval) {
+    WBE::ParserYAML parser;
+    
+    // Test string that exactly fits buffer capacity (15 chars + null terminator for size 16)
+    const std::string yaml_data = R"(
+max_text: "123456789012345"
+)";
+    
+    parser.parse_from_buffer(yaml_data);
+    
+    WBE::Buffer<16> buffer;
+    std::string key = "max_text";
+    parser.get_data().get_value(key, buffer);
+    ASSERT_STREQ(buffer.buffer, "123456789012345");
+    
+    // Test string that's one character too long
+    const std::string yaml_data_too_long = R"(
+too_long: "1234567890123456"
+)";
+    
+    parser.parse_from_buffer(yaml_data_too_long);
+    key = "too_long";
+    ASSERT_THROW(parser.get_data().get_value(key, buffer), std::runtime_error);
+}
+
+TEST(ParserYAMLTest, BufferRoundTripSerialization) {
+    // Test round-trip: Buffer -> Serializer -> Parser -> Buffer
+    WBE::Buffer<64> original_buffer;
+    const char* test_str = "Round trip test with special chars: \n\t\"'";
+    strcpy(original_buffer.buffer, test_str);
+    
+    // Serialize
+    WBE::SerializerYAML serializer;
+    serializer.register_serialize("test_data", original_buffer);
+    std::string serialized = serializer.dump();
+    
+    // Parse
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(serialized);
+    
+    // Retrieve into new buffer
+    WBE::Buffer<64> retrieved_buffer;
+    std::string key = "test_data";
+    parser.get_data().get_value(key, retrieved_buffer);
+    
+    // Verify round-trip integrity
+    ASSERT_STREQ(original_buffer.buffer, retrieved_buffer.buffer);
+}
+
+TEST(ParserYAMLTest, BufferWithYAMLSpecificFeatures) {
+    WBE::ParserYAML parser;
+    
+    const std::string yaml_data = R"(
+multiline_literal: |
+  This is a literal
+  multiline string
+  with preserved newlines
+  
+multiline_folded: >
+  This is a folded
+  multiline string
+  that becomes a single line
+)";
+    
+    parser.parse_from_buffer(yaml_data);
+    
+    // Test multiline literal retrieval
+    WBE::Buffer<128> buffer;
+    std::string key = "multiline_literal";
+    parser.get_data().get_value(key, buffer);
+    ASSERT_TRUE(strstr(buffer.buffer, "This is a literal\nmultiline string") != nullptr);
+    
+    // Test multiline folded retrieval
+    key = "multiline_folded";
+    parser.get_data().get_value(key, buffer);
+    ASSERT_TRUE(strstr(buffer.buffer, "This is a folded multiline string") != nullptr);
 }
 
 TEST(ParserYAMLTest, ComplexNestedStructures) {
