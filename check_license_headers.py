@@ -13,7 +13,7 @@
 # limitations under the License.
 from build_script import utils
 import build_config
-from build import source_dir, include_dir, test_dir
+from build_setup import source_dir, include_dir, test_dir
 
 
 LICENSE_KEYWORDS = [
