@@ -15,8 +15,9 @@
 #ifndef __WBE_2D_SURFACE_UTILS_HH__
 #define __WBE_2D_SURFACE_UTILS_HH__
 
-#include "glm/fwd.hpp"
-#include "glm/geometric.hpp"
+#include "utils/defs.hh"
+
+#include <glm/glm.hpp>
 #include <cstdint>
 #include <stdexcept>
 
@@ -57,23 +58,25 @@ public:
             glm::vec2 this_to_next = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1)->position
                 - get_vert(p_vertex_list, p_vertex_count, ear_check_index)->position;
             float cross_prev_next = cross_vec2(prev_to_this, this_to_next);
-            if (cross_prev_next == 0.0) {
+            if (std::abs(cross_prev_next - 0.0) < WBE_FLOAT_TOLARENCE) {
                 remove_vertex(p_vertex_list, p_vertex_count, ear_check_index);
                 --p_vertex_count;
             }
             else if (is_vertex_ear(p_vertex_list, p_vertex_count, ear_check_index)) {
-                TriaType triangle{};
-                triangle.vert1 = get_vert(p_vertex_list, p_vertex_count, ear_check_index - 1);
-                triangle.vert2 = get_vert(p_vertex_list, p_vertex_count, ear_check_index);
-                triangle.vert3 = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1);
-                p_triangle_list[triangle_index] = triangle;
+                p_triangle_list[triangle_index].vert1 = get_vert(p_vertex_list, p_vertex_count, ear_check_index - 1);
+                p_triangle_list[triangle_index].vert2 = get_vert(p_vertex_list, p_vertex_count, ear_check_index);
+                p_triangle_list[triangle_index].vert3 = get_vert(p_vertex_list, p_vertex_count, ear_check_index + 1);
                 remove_vertex(p_vertex_list, p_vertex_count, ear_check_index);
+                ++triangle_index;
                 --p_vertex_count;
             }
             else {
                 ear_check_index = (ear_check_index + 1) % p_vertex_count;
             }
         }
+        p_triangle_list[triangle_index].vert1 = get_vert(p_vertex_list, p_vertex_count, 0);
+        p_triangle_list[triangle_index].vert2 = get_vert(p_vertex_list, p_vertex_count, 1);
+        p_triangle_list[triangle_index].vert3 = get_vert(p_vertex_list, p_vertex_count, 2);
     }
 
 private:
@@ -90,21 +93,21 @@ private:
     }
 
     template <typename VertType>
-    static constexpr VertType* get_vert(const VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
-        return p_vertex_list[p_index % p_vertex_list];
+    static VertType* get_vert(VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
+        return &(p_vertex_list[p_index % p_vert_count]);
     }
 
     template <typename VertType>
     static bool is_vertex_ear(const VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
-        for (uint32_t i = p_index + 2; i != p_index - 2; ++i) {
+        for (uint32_t i = p_index + 2; i != (p_index + p_vert_count - 2) % p_vert_count; i = (i + 1) % p_vert_count) {
             glm::vec2 prev_to_this = get_vert(p_vertex_list, p_vert_count, i)->position
                 - get_vert(p_vertex_list, p_vert_count, i - 1)->position;
             glm::vec2 this_to_next = get_vert(p_vertex_list, p_vert_count, i + 1)->position
                 - get_vert(p_vertex_list, p_vert_count, i)->position;
-            glm::vec2 i_pos = get_vert(p_vertex_list, p_vert_count, i).position;
-            glm::vec2 vert_next_pos = get_vert(p_vertex_list, p_vert_count, p_index + 1).position;
-            glm::vec2 vert_prev_pos = get_vert(p_vertex_list, p_vert_count, p_index - 1).position;
-            glm::vec2 vert_pos = get_vert(p_vertex_list, p_vert_count, p_index).position;
+            glm::vec2 i_pos = get_vert(p_vertex_list, p_vert_count, i)->position;
+            glm::vec2 vert_next_pos = get_vert(p_vertex_list, p_vert_count, p_index + 1)->position;
+            glm::vec2 vert_prev_pos = get_vert(p_vertex_list, p_vert_count, p_index - 1)->position;
+            glm::vec2 vert_pos = get_vert(p_vertex_list, p_vert_count, p_index)->position;
             if (cross_vec2(i_pos - vert_prev_pos, vert_next_pos - vert_pos) < 0.0f
                 && cross_vec2(i_pos - vert_next_pos, vert_pos - i_pos) < 0.0f
                 && cross_vec2(i_pos - vert_pos, vert_prev_pos - i_pos) < 0.0f)

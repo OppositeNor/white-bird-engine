@@ -129,4 +129,6 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 // Requires a pointer or reference to be non-null.
 #define WBE_REQUIRES_VALID(optional_value) WhiteBirdEngine::requires_valid(#optional_value, (optional_value))
 
+#define WBE_FLOAT_TOLARENCE 0.0000001
+
 #endif
