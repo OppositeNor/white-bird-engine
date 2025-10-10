@@ -102,6 +102,15 @@ private:
     inline static EngineCore* singleton;
 };
 
+/**
+ * @brief Shortcut function to get the global allocator.
+ *
+ * @return The global allocator;
+ */
+inline HeapAllocatorAlignedPool* global_allocator() {
+    return EngineCore::get_singleton()->pool_allocator;
+}
+
 }
 
 #endif

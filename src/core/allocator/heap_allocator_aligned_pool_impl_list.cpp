@@ -137,8 +137,8 @@ char* HeapAllocatorAlignedPoolImplicitList::get_next_free_memory(char* p_from) {
 }
 
 void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size) {
-    WBE_DEBUG_ASSERT(p_mem_start + p_mem_size <= p_idle_chunk + WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk));
-    WBE_DEBUG_ASSERT(WBE_HAAPIL_GET_CHUNK_TYPE(p_mem_start) == HeaderType::IDLE);
+    WBE_DEBUG_ASSERT(p_mem_start >= mem_chunk && p_mem_start + p_mem_size <= p_idle_chunk + WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk));
+    WBE_DEBUG_ASSERT(WBE_HAAPIL_GET_CHUNK_TYPE(p_idle_chunk) == HeaderType::IDLE);
     size_t idle_chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk);
     size_t idle_before_size = p_mem_start - p_idle_chunk;
     // Insert the idle memory after the acquired memory chunk.
@@ -182,6 +182,18 @@ size_t HeapAllocatorAlignedPoolImplicitList::get_remain_size() const {
         curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
     }
     return total;
+}
+
+bool HeapAllocatorAlignedPoolImplicitList::is_in_pool(MemID p_mem_id) const {
+    char* curr = mem_chunk;
+    char* mem_ptr = reinterpret_cast<char*>(p_mem_id);
+    while (curr <= mem_ptr && curr < mem_chunk + size - WORD_SIZE) {
+        if (curr + WORD_SIZE == mem_ptr && WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
+            return true;
+        }
+        curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
+    }
+    return false;
 }
 
 void HeapAllocatorAlignedPoolImplicitList::coalesce_all() const {

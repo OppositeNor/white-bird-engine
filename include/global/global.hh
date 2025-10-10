@@ -15,7 +15,6 @@
 #ifndef __WBE_GLOBAL_HH__
 #define __WBE_GLOBAL_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/engine_core.hh"
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
@@ -77,15 +76,6 @@ public:
 private:
     inline static Global* singleton;
 };
-
-/**
- * @brief Shortcut function to get the global allocator.
- *
- * @return The global allocator;
- */
-inline HeapAllocatorAlignedPool* global_allocator() {
-    return Global::get_singleton()->engine_core->pool_allocator;
-}
 
 }
 

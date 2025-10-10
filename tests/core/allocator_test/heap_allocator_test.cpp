@@ -14,6 +14,7 @@
 */
 #include "heap_allocator_pool_test.hh"
 #include "heap_allocator_align_pool_test.hh"
+#include "heap_allocator_aligned_pool_impl_list_test.hh"
 #include "heap_allocator_fixed_size_pool_test.hh"
 #include "heap_allocator_atomic_aligned_pool_test.hh"
 #include "stack_allocator_test.hh"

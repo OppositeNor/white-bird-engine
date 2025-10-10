@@ -26,7 +26,20 @@
 namespace WBE = WhiteBirdEngine;
 constexpr size_t AAAPT_HEADER_SIZE = WBE::HeapAllocatorAtomicAlignedPool::HEADER_SIZE;
 
-TEST(WBEAllocAtomicAlignedPoolTest, TraitTest) {
+class WBEAllocAtomicAlignedPoolTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    }
+
+    void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+};
+
+TEST_F(WBEAllocAtomicAlignedPoolTest, TraitTest) {
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_POOL);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_LIMITED_SIZE);
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_GURANTEED_CONTINUOUS);
@@ -34,8 +47,7 @@ TEST(WBEAllocAtomicAlignedPoolTest, TraitTest) {
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_ATOMIC);
 }
 
-TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
     const size_t pool_size = WBE_MiB(1);
     WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
     const int num_threads = 8;
@@ -63,8 +75,7 @@ TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
     const size_t pool_size = WBE_MiB(1);
     WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
     const int num_threads = 8;
@@ -102,8 +113,7 @@ TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
     const size_t pool_size = WBE_MiB(1);
     WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
     const int num_threads = 8;
@@ -143,8 +153,7 @@ TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
     ASSERT_EQ(dealloc_count, alloc_count);
 }
 
-TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
     const size_t pool_size = WBE_MiB(1);
     WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
     const int num_threads = 8;
@@ -185,8 +194,7 @@ TEST(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
     const size_t pool_size = WBE_MiB(1);
     WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
     const int num_threads = 8;

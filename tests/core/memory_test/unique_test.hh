@@ -28,7 +28,20 @@ struct Dummy {
     ~Dummy() { x = -1; }
 };
 
-TEST(WBEUniqueTest, BasicConstructionAndAccess) {
+class WBEUniqueTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    }
+
+    void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+};
+
+TEST_F(WBEUniqueTest, BasicConstructionAndAccess) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     allocator.clear_call_log();
     
@@ -44,7 +57,7 @@ TEST(WBEUniqueTest, BasicConstructionAndAccess) {
     ASSERT_NE(log.find("get"), std::string::npos);
 }
 
-TEST(WBEUniqueTest, MoveSemantics) {
+TEST_F(WBEUniqueTest, MoveSemantics) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::MemID id1 = WBE::create_obj_align<Dummy>(allocator, 7);
@@ -57,7 +70,7 @@ TEST(WBEUniqueTest, MoveSemantics) {
     ASSERT_EQ(u2.get()->x, 7);
 }
 
-TEST(WBEUniqueTest, ResetBehavior) {
+TEST_F(WBEUniqueTest, ResetBehavior) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     allocator.clear_call_log();
     
@@ -74,7 +87,7 @@ TEST(WBEUniqueTest, ResetBehavior) {
     ASSERT_EQ(u.get(), nullptr);
 }
 
-TEST(WBEUniqueTest, ComparisonOperators) {
+TEST_F(WBEUniqueTest, ComparisonOperators) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 1);
@@ -93,7 +106,7 @@ TEST(WBEUniqueTest, ComparisonOperators) {
     ASSERT_THROW(_ = u1 == WBE::MemID(42), std::runtime_error);
 }
 
-TEST(WBEUniqueTest, CallLoggingWithMakeUnique) {
+TEST_F(WBEUniqueTest, CallLoggingWithMakeUnique) {
     WBE::MockHeapAllocatorAligned allocator(4096);
     allocator.clear_call_log();
     
@@ -108,7 +121,7 @@ TEST(WBEUniqueTest, CallLoggingWithMakeUnique) {
     ASSERT_NE(log.find("get"), std::string::npos);
 }
 
-TEST(WBEUniqueTest, ArrowOperator) {
+TEST_F(WBEUniqueTest, ArrowOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 42);
@@ -124,7 +137,7 @@ TEST(WBEUniqueTest, ArrowOperator) {
     ASSERT_EQ(const_u->x, 84);
 }
 
-TEST(WBEUniqueTest, DereferenceOperator) {
+TEST_F(WBEUniqueTest, DereferenceOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 123);
@@ -140,7 +153,7 @@ TEST(WBEUniqueTest, DereferenceOperator) {
     ASSERT_EQ((*const_u).x, 456);
 }
 
-TEST(WBEUniqueTest, GlobalMakeUniqueFunction) {
+TEST_F(WBEUniqueTest, GlobalMakeUniqueFunction) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     allocator.clear_call_log();
     
@@ -154,7 +167,7 @@ TEST(WBEUniqueTest, GlobalMakeUniqueFunction) {
     ASSERT_NE(log.find("allocate"), std::string::npos);
 }
 
-TEST(WBEUniqueTest, MemIDComparisonOperator) {
+TEST_F(WBEUniqueTest, MemIDComparisonOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::Unique<Dummy> empty_unique;
@@ -184,7 +197,7 @@ TEST(WBEUniqueTest, MemIDComparisonOperator) {
     ASSERT_TRUE(threw_exception);
 }
 
-TEST(WBEUniqueTest, VoidPointerComparisonOperator) {
+TEST_F(WBEUniqueTest, VoidPointerComparisonOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::Unique<Dummy> empty_unique;
@@ -206,7 +219,7 @@ TEST(WBEUniqueTest, VoidPointerComparisonOperator) {
     ASSERT_TRUE(threw_exception);
 }
 
-TEST(WBEUniqueTest, MemIDConstructorValidation) {
+TEST_F(WBEUniqueTest, MemIDConstructorValidation) {
     // Test constructor with MEM_NULL - should not throw and create empty unique
     WBE::Unique<Dummy> u1(WBE::MEM_NULL);
     ASSERT_EQ(u1.get(), nullptr);
@@ -234,7 +247,7 @@ struct Derived : public Base {
     Derived(int v, int e) : Base(v), extra(e) {}
 };
 
-TEST(WBEUniqueTest, TemplateConversionConstructor) {
+TEST_F(WBEUniqueTest, TemplateConversionConstructor) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create a Unique<Derived>
@@ -255,7 +268,7 @@ TEST(WBEUniqueTest, TemplateConversionConstructor) {
     ASSERT_EQ(base_unique->value, 42);
 }
 
-TEST(WBEUniqueTest, TemplateConversionAssignmentOperator) {
+TEST_F(WBEUniqueTest, TemplateConversionAssignmentOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create a Unique<Derived>
@@ -275,7 +288,7 @@ TEST(WBEUniqueTest, TemplateConversionAssignmentOperator) {
     ASSERT_EQ(base_unique->value, 10);
 }
 
-TEST(WBEUniqueTest, MoveAssignmentWithExistingObject) {
+TEST_F(WBEUniqueTest, MoveAssignmentWithExistingObject) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create two Unique objects
@@ -302,7 +315,7 @@ TEST(WBEUniqueTest, MoveAssignmentWithExistingObject) {
     ASSERT_EQ(u2.get(), nullptr);
 }
 
-TEST(WBEUniqueTest, ArrowOperatorNullAccess) {
+TEST_F(WBEUniqueTest, ArrowOperatorNullAccess) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Test arrow operator on empty unique - should handle null gracefully or crash predictably
@@ -313,7 +326,7 @@ TEST(WBEUniqueTest, ArrowOperatorNullAccess) {
     // In production code, users should check get() != nullptr before using ->
 }
 
-TEST(WBEUniqueTest, DereferenceOperatorNullAccess) {
+TEST_F(WBEUniqueTest, DereferenceOperatorNullAccess) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Test dereference operator on empty unique
@@ -324,7 +337,7 @@ TEST(WBEUniqueTest, DereferenceOperatorNullAccess) {
     // In production code, users should check get() != nullptr before using *
 }
 
-TEST(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
+TEST_F(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Test both static and global make_unique functions work identically
@@ -341,7 +354,7 @@ TEST(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
     ASSERT_FALSE(u2 == nullptr);
 }
 
-TEST(WBEUniqueTest, MultipleResetCalls) {
+TEST_F(WBEUniqueTest, MultipleResetCalls) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 999);

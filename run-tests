@@ -1,0 +1,3 @@
+#!/bin/sh
+cmake --build $1 --target wbe_run_tests
+

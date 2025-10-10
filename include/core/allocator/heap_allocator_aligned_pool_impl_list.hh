@@ -108,17 +108,40 @@ public:
         return WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
     }
 
+    /**
+     * @brief Get the total size of the allocator.
+     *
+     * @return The total size of the allocator.
+     */
     size_t get_total_size() const {
         return size;
     }
 
+    /**
+     * @brief Get the remaining size of the allocator.
+     *
+     * @return The remaining size of the allocator.
+     */
     size_t get_remain_size() const;
 
     virtual operator std::string() const override;
 
+    /**
+     * @brief Get the internal fragmentation tracker.
+     *
+     * @return The internal fragmentation tracker.
+     */
     size_t get_internal_fragmentation_tracker() const {
         return internal_fragmentation_tracker;
     }
+
+    /**
+     * @brief Check if a memory id belongs in this pool.
+     *
+     * @param p_mem_id The memory ID to check.
+     * @return True if it belongs to this pool, false otherwise.
+     */
+    bool is_in_pool(MemID p_mem_id) const;
 
 private:
 
