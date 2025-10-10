@@ -16,7 +16,8 @@
 #define __WBE_COMPONENT_SD_GEN_HH__
 
 #include "core/serializer/serializer_json.hh"
-#include "function/ecs/components.hh"
+{% for component in components %}#include "{{ component.in_file }}"
+{% endfor %}
 
 namespace WhiteBirdEngine {
 
@@ -59,7 +60,7 @@ public:
      */
     template <typename ParserData>
     void deserialize(const ParserData& p_data, ComponentType& p_component) {
-        {% for field in component.fields %}p_data.get_data("{{ field.field_name }}", p_component.{{ field.field_name }});
+        {% for field in component.fields %}p_data.get_value("{{ field.field_name }}", p_component.{{ field.field_name }});
         {% endfor %}
     }
 };

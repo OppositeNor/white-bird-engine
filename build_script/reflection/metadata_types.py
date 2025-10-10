@@ -70,6 +70,7 @@ class WBEComponentMetadata(BaseModel):
         fields: The name of the fields.
         types: The types of the fields
     """
+    in_file : str = ""
     struct_name : str = ""
     fields : list[WBEFieldMetadata] = Field(default_factory=list)
 

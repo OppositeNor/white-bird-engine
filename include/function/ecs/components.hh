@@ -17,7 +17,6 @@
 
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"
-#include "function/ecs/entity.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -49,9 +48,6 @@ WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
     Buffer<MAX_NAME_SIZE + 1> name_buffer;
     // The name of the component.
     const std::string_view name;
-    // The parent of the entity.
-    WBE_META(WBE_REFLECT)
-    EntityID parent;
 
     ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
     }
