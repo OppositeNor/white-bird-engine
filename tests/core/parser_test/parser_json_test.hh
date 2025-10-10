@@ -217,4 +217,236 @@ TEST(ParserJSONTest, ParseEmptyAndMixedLists) {
     ASSERT_EQ(mixed_content[2].get_value<bool>("value"), true);
 }
 
+TEST(ParserJSONTest, ComplexNestedStructures) {
+    WBE::ParserJSON parser;
+    
+    // Test deeply nested structures with mixed types
+    const std::string complex_json = R"({
+        "application": {
+            "name": "Test App",
+            "version": "1.2.3",
+            "features": {
+                "authentication": {
+                    "enabled": true,
+                    "methods": ["oauth", "basic", "token"],
+                    "config": {
+                        "timeout": 3600,
+                        "max_attempts": 3,
+                        "providers": {
+                            "google": {
+                                "client_id": "google_client_123",
+                                "enabled": true
+                            },
+                            "facebook": {
+                                "app_id": "fb_app_456",
+                                "enabled": false
+                            }
+                        }
+                    }
+                },
+                "logging": {
+                    "level": "info",
+                    "destinations": ["console", "file", "remote"],
+                    "rotation": {
+                        "max_size": "10MB",
+                        "max_files": 5,
+                        "compress": true
+                    }
+                }
+            },
+            "dependencies": [
+                {
+                    "name": "nlohmann-json",
+                    "version": "3.11.2",
+                    "required": true
+                },
+                {
+                    "name": "yaml-cpp",
+                    "version": "0.7.0",
+                    "required": true
+                },
+                {
+                    "name": "optional-lib",
+                    "version": "1.0.0",
+                    "required": false
+                }
+            ]
+        }
+    })";
+    
+    parser.parse_from_buffer(complex_json);
+    
+    // Test top-level access
+    auto app = parser.get_value<WBE::JSONData>("application");
+    ASSERT_EQ(app.get_value<std::string>("name"), "Test App");
+    ASSERT_EQ(app.get_value<std::string>("version"), "1.2.3");
+    
+    // Test nested features
+    auto features = app.get_value<WBE::JSONData>("features");
+    auto auth = features.get_value<WBE::JSONData>("authentication");
+    ASSERT_EQ(auth.get_value<bool>("enabled"), true);
+    
+    // Test array within nested structure
+    auto methods = auth.get_value<std::vector<std::string>>("methods");
+    ASSERT_EQ(methods.size(), 3);
+    ASSERT_EQ(methods[0], "oauth");
+    ASSERT_EQ(methods[1], "basic");
+    ASSERT_EQ(methods[2], "token");
+    
+    // Test deeply nested config
+    auto config = auth.get_value<WBE::JSONData>("config");
+    ASSERT_EQ(config.get_value<int>("timeout"), 3600);
+    ASSERT_EQ(config.get_value<int>("max_attempts"), 3);
+    
+    // Test providers object
+    auto providers = config.get_value<WBE::JSONData>("providers");
+    auto google = providers.get_value<WBE::JSONData>("google");
+    ASSERT_EQ(google.get_value<std::string>("client_id"), "google_client_123");
+    ASSERT_EQ(google.get_value<bool>("enabled"), true);
+    
+    auto facebook = providers.get_value<WBE::JSONData>("facebook");
+    ASSERT_EQ(facebook.get_value<std::string>("app_id"), "fb_app_456");
+    ASSERT_EQ(facebook.get_value<bool>("enabled"), false);
+    
+    // Test other nested sections
+    auto logging = features.get_value<WBE::JSONData>("logging");
+    ASSERT_EQ(logging.get_value<std::string>("level"), "info");
+    
+    auto destinations = logging.get_value<std::vector<std::string>>("destinations");
+    ASSERT_EQ(destinations.size(), 3);
+    
+    // Test dependencies array
+    auto dependencies = app.get_value<std::vector<WBE::JSONData>>("dependencies");
+    ASSERT_EQ(dependencies.size(), 3);
+    ASSERT_EQ(dependencies[0].get_value<std::string>("name"), "nlohmann-json");
+    ASSERT_EQ(dependencies[0].get_value<bool>("required"), true);
+    ASSERT_EQ(dependencies[2].get_value<bool>("required"), false);
+}
+
+TEST(ParserJSONTest, ArrayVariations) {
+    WBE::ParserJSON parser;
+    
+    // Test various array types and structures
+    const std::string array_json = R"({
+        "empty_array": [],
+        "string_array": ["one", "two", "three"],
+        "number_array": [1, 2, 3, 4, 5],
+        "mixed_primitive_array": [1, "two", true, null, 3.14],
+        "boolean_array": [true, false, true, true, false],
+        "nested_arrays": [
+            [1, 2, 3],
+            ["a", "b", "c"],
+            [true, false]
+        ],
+        "array_of_objects": [
+            {"id": 1, "data": [10, 20]},
+            {"id": 2, "data": [30, 40]},
+            {"id": 3, "data": [50, 60]}
+        ]
+    })";
+    
+    parser.parse_from_buffer(array_json);
+    
+    // Test empty array
+    auto empty_array = parser.get_value<std::vector<WBE::JSONData>>("empty_array");
+    ASSERT_EQ(empty_array.size(), 0);
+    
+    // Test string array
+    auto string_array = parser.get_value<std::vector<std::string>>("string_array");
+    ASSERT_EQ(string_array.size(), 3);
+    ASSERT_EQ(string_array[1], "two");
+    
+    // Test number array
+    auto number_array = parser.get_value<std::vector<int>>("number_array");
+    ASSERT_EQ(number_array.size(), 5);
+    ASSERT_EQ(number_array[3], 4);
+    
+    // Test boolean array
+    auto boolean_array = parser.get_value<std::vector<bool>>("boolean_array");
+    ASSERT_EQ(boolean_array.size(), 5);
+    ASSERT_EQ(boolean_array[0], true);
+    ASSERT_EQ(boolean_array[1], false);
+    
+    // Test array of objects
+    auto object_array = parser.get_value<std::vector<WBE::JSONData>>("array_of_objects");
+    ASSERT_EQ(object_array.size(), 3);
+    ASSERT_EQ(object_array[1].get_value<int>("id"), 2);
+    
+    auto data_array = object_array[1].get_value<std::vector<int>>("data");
+    ASSERT_EQ(data_array.size(), 2);
+    ASSERT_EQ(data_array[0], 30);
+    ASSERT_EQ(data_array[1], 40);
+}
+
+TEST(ParserJSONTest, ErrorHandlingAndValidation) {
+    WBE::ParserJSON parser;
+    
+    // Test malformed JSON handling
+    ASSERT_THROW(parser.parse_from_buffer("{invalid json}"), std::exception);
+    ASSERT_THROW(parser.parse_from_buffer("{\"unclosed\": \"string"), std::exception);
+    ASSERT_THROW(parser.parse_from_buffer("{\"trailing\": \"comma\",}"), std::exception);
+    
+    // Test valid JSON with various edge cases
+    parser.parse_from_buffer(R"({"null_value": null, "empty_string": "", "zero": 0})");
+    
+    // Test accessing non-existent keys
+    ASSERT_FALSE(parser.contains("non_existent_key"));
+    ASSERT_THROW(parser.get_value<std::string>("non_existent_key"), std::exception);
+    
+    // Test type mismatches and valid access
+    ASSERT_TRUE(parser.contains("zero"));
+    ASSERT_EQ(parser.get_value<int>("zero"), 0);
+    
+    // Test accessing valid keys
+    ASSERT_TRUE(parser.contains("null_value"));
+    ASSERT_TRUE(parser.contains("empty_string"));
+    ASSERT_EQ(parser.get_value<std::string>("empty_string"), "");
+}
+
+TEST(ParserJSONTest, KeyManagementAndUtilities) {
+    WBE::ParserJSON parser;
+    
+    const std::string test_json = R"({
+        "key1": "value1",
+        "key2": 123,
+        "key3": true,
+        "nested": {
+            "subkey1": "subvalue1",
+            "subkey2": 456
+        },
+        "array": [1, 2, 3]
+    })";
+    
+    parser.parse_from_buffer(test_json);
+    
+    // Test get_all_keys functionality
+    auto keys = parser.get_all_keys();
+    ASSERT_EQ(keys.size(), 5);
+    
+    // Keys should include all top-level keys
+    std::sort(keys.begin(), keys.end());
+    std::vector<std::string> expected_keys = {"array", "key1", "key2", "key3", "nested"};
+    std::sort(expected_keys.begin(), expected_keys.end());
+    ASSERT_EQ(keys, expected_keys);
+    
+    // Test nested key access
+    auto nested = parser.get_value<WBE::JSONData>("nested");
+    auto nested_keys = nested.get_all_keys();
+    ASSERT_EQ(nested_keys.size(), 2);
+    
+    std::sort(nested_keys.begin(), nested_keys.end());
+    std::vector<std::string> expected_nested = {"subkey1", "subkey2"};
+    std::sort(expected_nested.begin(), expected_nested.end());
+    ASSERT_EQ(nested_keys, expected_nested);
+    
+    // Test contains functionality at different levels
+    ASSERT_TRUE(parser.contains("key1"));
+    ASSERT_TRUE(parser.contains("nested"));
+    ASSERT_FALSE(parser.contains("subkey1")); // Not at top level
+    
+    ASSERT_TRUE(nested.contains("subkey1"));
+    ASSERT_TRUE(nested.contains("subkey2"));
+    ASSERT_FALSE(nested.contains("key1")); // Not in nested level
+}
+
 #endif

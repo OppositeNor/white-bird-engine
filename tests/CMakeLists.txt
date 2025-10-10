@@ -17,6 +17,7 @@ add_subdirectory(utils_test)
 add_subdirectory(resource)
 add_subdirectory(global)
 add_subdirectory(function)
+add_subdirectory(reflection)
 
 set(WBE_TEST_EXE ${WBE_TEST_EXE}
     PARENT_SCOPE

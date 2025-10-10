@@ -54,7 +54,7 @@ public:
      */
     void serialize(const ComponentType& p_component) {
         serializer->push_context("{{ component.struct_name }}");
-        {% for field in component.fields %}register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
+        {% for field in component.fields %}serializer->register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
         {% endfor %}
         serializer->pop_context();
     }

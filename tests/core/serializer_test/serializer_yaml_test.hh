@@ -263,4 +263,200 @@ TEST(SerializerYAMLTest, Edge) {
     ASSERT_EQ(serializer.dump(), "test_context1: ~");
 }
 
+TEST(SerializerYAMLTest, RoundTripSerialization) {
+    WBE::SerializerYAML serializer;
+    
+    // Create complex data structure
+    serializer.register_serialize("string_val", "Hello, YAML World!");
+    serializer.register_serialize("int_val", 42);
+    serializer.register_serialize("double_val", 3.14159);
+    serializer.register_serialize("bool_val", true);
+    serializer.register_serialize("negative_int", -123);
+    serializer.register_serialize("zero_val", 0);
+    
+    // Add nested context
+    serializer.push_context("nested_data");
+    serializer.register_serialize("nested_string", "nested yaml value");
+    serializer.register_serialize("nested_number", 99);
+    
+    // Add deeper nesting
+    serializer.push_context("deep_nested");
+    serializer.register_serialize("deep_val", "very deep yaml");
+    const char* deep_cstr = "deep yaml const char";
+    serializer.register_serialize("deep_cstr", deep_cstr);
+    serializer.pop_context();
+    serializer.pop_context();
+    
+    // Serialize to YAML
+    std::string yaml_result = serializer.dump();
+    
+    // Parse back the YAML
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(yaml_result);
+    
+    // Verify all values are preserved
+    ASSERT_EQ(parser.get_value<std::string>("string_val"), "Hello, YAML World!");
+    ASSERT_EQ(parser.get_value<int>("int_val"), 42);
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("double_val"), 3.14159);
+    ASSERT_EQ(parser.get_value<bool>("bool_val"), true);
+    ASSERT_EQ(parser.get_value<int>("negative_int"), -123);
+    ASSERT_EQ(parser.get_value<int>("zero_val"), 0);
+    
+    // Verify nested data
+    auto nested = parser.get_value<WBE::YAMLData>("nested_data");
+    ASSERT_EQ(nested.get_value<std::string>("nested_string"), "nested yaml value");
+    ASSERT_EQ(nested.get_value<int>("nested_number"), 99);
+    
+    // Verify deep nested data
+    auto deep_nested = nested.get_value<WBE::YAMLData>("deep_nested");
+    ASSERT_EQ(deep_nested.get_value<std::string>("deep_val"), "very deep yaml");
+    ASSERT_EQ(deep_nested.get_value<std::string>("deep_cstr"), "deep yaml const char");
+}
+
+TEST(SerializerYAMLTest, SpecialCharactersAndEdgeCases) {
+    WBE::SerializerYAML serializer;
+    
+    // Test various special characters and edge cases for YAML
+    const char* unicode_str = "Unicode: αβγ δεζ 中文 🚀";
+    const char* yaml_special = "YAML special: 'single quotes' and \"double quotes\"";
+    const char* whitespace_str = "Whitespace:\n\t\r  test";
+    const char* empty_str = "";
+    const char* single_char = "a";
+    const char* colon_str = "Key: value inside string";
+    const char* dash_str = "- not a list item";
+    
+    serializer.register_serialize("unicode", unicode_str);
+    serializer.register_serialize("yaml_special", yaml_special);
+    serializer.register_serialize("whitespace", whitespace_str);
+    serializer.register_serialize("empty", empty_str);
+    serializer.register_serialize("single_char", single_char);
+    serializer.register_serialize("colon_test", colon_str);
+    serializer.register_serialize("dash_test", dash_str);
+    
+    // Test numeric edge cases
+    serializer.register_serialize("max_int", std::numeric_limits<int>::max());
+    serializer.register_serialize("min_int", std::numeric_limits<int>::min());
+    serializer.register_serialize("large_double", 1234567890.123456789);
+    serializer.register_serialize("small_double", 0.000000123456789);
+    
+    std::string result = serializer.dump();
+    
+    // Parse back and verify
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("unicode"), unicode_str);
+    ASSERT_EQ(parser.get_value<std::string>("yaml_special"), yaml_special);
+    ASSERT_EQ(parser.get_value<std::string>("whitespace"), whitespace_str);
+    ASSERT_EQ(parser.get_value<std::string>("empty"), "");
+    ASSERT_EQ(parser.get_value<std::string>("single_char"), "a");
+    ASSERT_EQ(parser.get_value<std::string>("colon_test"), colon_str);
+    ASSERT_EQ(parser.get_value<std::string>("dash_test"), dash_str);
+    
+    ASSERT_EQ(parser.get_value<int>("max_int"), std::numeric_limits<int>::max());
+    ASSERT_EQ(parser.get_value<int>("min_int"), std::numeric_limits<int>::min());
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("large_double"), 1234567890.123456789);
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("small_double"), 0.000000123456789);
+}
+
+TEST(SerializerYAMLTest, MultilineStringsAndFormatting) {
+    WBE::SerializerYAML serializer;
+    
+    // Test multiline strings and formatting
+    const char* multiline_str = "Line 1\nLine 2\nLine 3\nWith multiple lines";
+    const char* formatted_str = "  Indented text  \n\tTabbed content\n  More indentation  ";
+    const char* code_block = "def function():\n    return 'Python code'\n    # with comments";
+    
+    serializer.register_serialize("multiline", multiline_str);
+    serializer.register_serialize("formatted", formatted_str);
+    serializer.register_serialize("code_block", code_block);
+    
+    // Add some regular values for comparison
+    serializer.register_serialize("simple_string", "Simple value");
+    serializer.register_serialize("number", 123);
+    
+    std::string result = serializer.dump();
+    
+    // Parse back and verify formatting is preserved
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("multiline"), multiline_str);
+    ASSERT_EQ(parser.get_value<std::string>("formatted"), formatted_str);
+    ASSERT_EQ(parser.get_value<std::string>("code_block"), code_block);
+    ASSERT_EQ(parser.get_value<std::string>("simple_string"), "Simple value");
+    ASSERT_EQ(parser.get_value<int>("number"), 123);
+}
+
+TEST(SerializerYAMLTest, ErrorHandling) {
+    WBE::SerializerYAML serializer;
+    
+    // Test context stack underflow
+    ASSERT_THROW(serializer.pop_context(), std::runtime_error);
+    
+    // Test dumping with unbalanced contexts
+    serializer.push_context("test1");
+    serializer.push_context("test2");
+    ASSERT_THROW(serializer.dump(), std::runtime_error);
+    
+    // Clean up contexts
+    serializer.pop_context();
+    serializer.pop_context();
+    
+    // Test that serializer produces valid YAML after errors
+    serializer.register_serialize("after_error", "test_value");
+    std::string result = serializer.dump();
+    ASSERT_FALSE(result.empty());
+    ASSERT_NE(result.find("after_error"), std::string::npos);
+}
+
+TEST(SerializerYAMLTest, ContextManagement) {
+    WBE::SerializerYAML serializer;
+    
+    // Test multiple context levels
+    ASSERT_EQ(serializer.get_context_depth(), 0);
+    ASSERT_EQ(serializer.get_current_context(), "base");
+    
+    serializer.push_context("level1");
+    ASSERT_EQ(serializer.get_context_depth(), 1);
+    ASSERT_EQ(serializer.get_current_context(), "level1");
+    
+    serializer.push_context("level2");
+    ASSERT_EQ(serializer.get_context_depth(), 2);
+    ASSERT_EQ(serializer.get_current_context(), "level2");
+    
+    serializer.push_context("level3");
+    ASSERT_EQ(serializer.get_context_depth(), 3);
+    ASSERT_EQ(serializer.get_current_context(), "level3");
+    
+    // Add data at different levels
+    serializer.register_serialize("deep_data", "level3_yaml_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("mid_data", "level2_yaml_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("shallow_data", "level1_yaml_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("root_data", "root_yaml_value");
+    
+    std::string result = serializer.dump();
+    
+    // Parse and verify nested structure
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("root_data"), "root_yaml_value");
+    
+    auto level1 = parser.get_value<WBE::YAMLData>("level1");
+    ASSERT_EQ(level1.get_value<std::string>("shallow_data"), "level1_yaml_value");
+    
+    auto level2 = level1.get_value<WBE::YAMLData>("level2");
+    ASSERT_EQ(level2.get_value<std::string>("mid_data"), "level2_yaml_value");
+    
+    auto level3 = level2.get_value<WBE::YAMLData>("level3");
+    ASSERT_EQ(level3.get_value<std::string>("deep_data"), "level3_yaml_value");
+}
+
 #endif

@@ -49,24 +49,34 @@ public:
     YAMLData(YAML::Node&& p_node)
         : node(std::move(p_node)) {}
 
-    template <typename T> requires (!std::same_as<T, YAMLData>)
+    template <typename T>
     T get_value(const std::string& p_key) const {
-        return node[p_key].as<T>();
+        if constexpr (std::same_as<T, std::vector<YAMLData>>) {
+            std::vector<YAMLData> result;
+            for (const auto& elem : node[p_key]) {
+                result.emplace_back(elem);
+            }
+            return result;
+        } else if constexpr (!std::same_as<T, YAMLData>) {
+            return node[p_key].as<T>();
+        } else {
+            return YAMLData(node[p_key].as<yaml>());
+        }
     }
 
-    template <typename T> requires (!std::same_as<T, YAMLData>)
+    template <typename T>
     T get_value() const {
-        return node.as<T>();
-    }
-
-    template <std::same_as<YAMLData> T>
-    YAMLData get_value(const std::string& p_key) const {
-        return YAMLData(node[p_key]);
-    }
-
-    template <std::same_as<YAMLData> T>
-    YAMLData get_value() const {
-        return YAMLData(node);
+        if constexpr (std::same_as<T, std::vector<YAMLData>>) {
+            std::vector<YAMLData> result;
+            for (const auto& elem : node) {
+                result.emplace_back(elem);
+            }
+            return result;
+        } else if constexpr (!std::same_as<T, YAMLData>) {
+            return node.as<T>();
+        } else {
+            return YAMLData(node.as<yaml>());
+        }
     }
 
     std::vector<std::string> get_all_keys() const {
@@ -124,26 +134,15 @@ public:
         data.node = YAML::Load(p_buffer);
     }
 
-    template <typename T> requires (!ParserDataConcept<T>)
+    template <typename T>
     T get_value(const std::string& p_key) const {
         return data.get_value<T>(p_key);
     }
 
-    template <typename T> requires (!ParserDataConcept<T>)
-    T get_value() const requires (!std::same_as<T, YAMLData>) {
+    template <typename T>
+    T get_value() const {
         return data.get_value<T>();
     }
-
-    template <ParserDataConcept T>
-    YAMLData get_value(const std::string& p_key) const {
-        return YAMLData(data.get_value<yaml>(p_key));
-    }
-
-    template <ParserDataConcept T>
-    YAMLData get_value() const {
-        return YAMLData(data.get_value<yaml>());
-    }
-
     std::vector<std::string> get_all_keys() const {
         return data.get_all_keys();
     }

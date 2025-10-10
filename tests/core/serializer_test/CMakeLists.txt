@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set(TEST_NAME wbe_serializer_json_test)
+set(TEST_NAME wbe_serializer_test)
 
 # ---
 

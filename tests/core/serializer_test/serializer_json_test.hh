@@ -289,4 +289,214 @@ TEST(SerializerJSONTest, Edge) {
     ASSERT_THROW(serializer.pop_context(), std::runtime_error);
 }
 
+TEST(SerializerJSONTest, RoundTripSerialization) {
+    WBE::SerializerJSON serializer;
+    
+    // Create complex data structure
+    serializer.register_serialize("string_val", "Hello, World!");
+    serializer.register_serialize("int_val", 42);
+    serializer.register_serialize("double_val", 3.14159);
+    serializer.register_serialize("bool_val", true);
+    serializer.register_serialize("negative_int", -123);
+    serializer.register_serialize("zero_val", 0);
+    
+    // Add nested context
+    serializer.push_context("nested_data");
+    serializer.register_serialize("nested_string", "nested value");
+    serializer.register_serialize("nested_number", 99);
+    
+    // Add deeper nesting
+    serializer.push_context("deep_nested");
+    serializer.register_serialize("deep_val", "very deep");
+    const char* deep_cstr = "deep const char";
+    serializer.register_serialize("deep_cstr", deep_cstr);
+    serializer.pop_context();
+    serializer.pop_context();
+    
+    // Serialize to JSON
+    std::string json_result = serializer.dump();
+    
+    // Parse back the JSON
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_result);
+    
+    // Verify all values are preserved
+    ASSERT_EQ(parser.get_value<std::string>("string_val"), "Hello, World!");
+    ASSERT_EQ(parser.get_value<int>("int_val"), 42);
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("double_val"), 3.14159);
+    ASSERT_EQ(parser.get_value<bool>("bool_val"), true);
+    ASSERT_EQ(parser.get_value<int>("negative_int"), -123);
+    ASSERT_EQ(parser.get_value<int>("zero_val"), 0);
+    
+    // Verify nested data
+    auto nested = parser.get_value<WBE::JSONData>("nested_data");
+    ASSERT_EQ(nested.get_value<std::string>("nested_string"), "nested value");
+    ASSERT_EQ(nested.get_value<int>("nested_number"), 99);
+    
+    // Verify deep nested data
+    auto deep_nested = nested.get_value<WBE::JSONData>("deep_nested");
+    ASSERT_EQ(deep_nested.get_value<std::string>("deep_val"), "very deep");
+    ASSERT_EQ(deep_nested.get_value<std::string>("deep_cstr"), "deep const char");
+}
+
+TEST(SerializerJSONTest, SpecialCharactersAndEdgeCases) {
+    WBE::SerializerJSON serializer;
+    
+    // Test various special characters and edge cases
+    const char* unicode_str = "Unicode: αβγ δεζ 中文 🚀";
+    const char* json_special = "JSON special: \"quotes\" and \\backslashes\\ and /slashes/";
+    const char* whitespace_str = "Whitespace:\n\t\r  test";
+    const char* empty_str = "";
+    const char* single_char = "a";
+    
+    serializer.register_serialize("unicode", unicode_str);
+    serializer.register_serialize("json_special", json_special);
+    serializer.register_serialize("whitespace", whitespace_str);
+    serializer.register_serialize("empty", empty_str);
+    serializer.register_serialize("single_char", single_char);
+    
+    // Test numeric edge cases
+    serializer.register_serialize("max_int", std::numeric_limits<int>::max());
+    serializer.register_serialize("min_int", std::numeric_limits<int>::min());
+    serializer.register_serialize("max_double", std::numeric_limits<double>::max());
+    serializer.register_serialize("min_double", std::numeric_limits<double>::lowest());
+    serializer.register_serialize("infinity", std::numeric_limits<double>::infinity());
+    
+    std::string result = serializer.dump();
+    
+    // Parse back and verify
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("unicode"), unicode_str);
+    ASSERT_EQ(parser.get_value<std::string>("json_special"), json_special);
+    ASSERT_EQ(parser.get_value<std::string>("whitespace"), whitespace_str);
+    ASSERT_EQ(parser.get_value<std::string>("empty"), "");
+    ASSERT_EQ(parser.get_value<std::string>("single_char"), "a");
+    
+    ASSERT_EQ(parser.get_value<int>("max_int"), std::numeric_limits<int>::max());
+    ASSERT_EQ(parser.get_value<int>("min_int"), std::numeric_limits<int>::min());
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("max_double"), std::numeric_limits<double>::max());
+    ASSERT_DOUBLE_EQ(parser.get_value<double>("min_double"), std::numeric_limits<double>::lowest());
+}
+
+TEST(SerializerJSONTest, LargeDataSets) {
+    WBE::SerializerJSON main_serializer;
+    
+    // Test with many items
+    const int num_items = 1000;
+    
+    for (int i = 0; i < num_items; ++i) {
+        WBE::SerializerJSON item;
+        item.register_serialize("id", i);
+        item.register_serialize("name", std::string("Item_") + std::to_string(i));
+        item.register_serialize("active", i % 2 == 0);
+        item.register_serialize("value", static_cast<double>(i) * 3.14);
+        
+        main_serializer.push_list("items", item);
+    }
+    
+    main_serializer.register_serialize("total_count", num_items);
+    main_serializer.register_serialize("test_name", "Large Dataset Test");
+    
+    std::string result = main_serializer.dump();
+    ASSERT_FALSE(result.empty());
+    
+    // Parse back and verify structure
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<int>("total_count"), num_items);
+    ASSERT_EQ(parser.get_value<std::string>("test_name"), "Large Dataset Test");
+    
+    auto items = parser.get_value<std::vector<WBE::JSONData>>("items");
+    ASSERT_EQ(items.size(), num_items);
+    
+    // Spot check a few items
+    ASSERT_EQ(items[0].get_value<int>("id"), 0);
+    ASSERT_EQ(items[0].get_value<std::string>("name"), "Item_0");
+    ASSERT_EQ(items[0].get_value<bool>("active"), true);
+    
+    ASSERT_EQ(items[num_items-1].get_value<int>("id"), num_items-1);
+    ASSERT_EQ(items[num_items-1].get_value<bool>("active"), (num_items-1) % 2 == 0);
+}
+
+TEST(SerializerJSONTest, ErrorHandling) {
+    WBE::SerializerJSON serializer;
+    
+    // Test context stack underflow
+    ASSERT_THROW(serializer.pop_context(), std::runtime_error);
+    
+    // Test dumping with unbalanced contexts
+    serializer.push_context("test1");
+    serializer.push_context("test2");
+    ASSERT_THROW(serializer.dump(), std::runtime_error);
+    
+    // Clean up contexts
+    serializer.pop_context();
+    serializer.pop_context();
+    
+    // Test clear functionality
+    serializer.register_serialize("before_clear", "value");
+    serializer.clear();
+    
+    std::string after_clear = serializer.dump();
+    ASSERT_EQ(after_clear, "null");
+    
+    // Verify serializer is usable after clear
+    serializer.register_serialize("after_clear", "new_value");
+    std::string after_use = serializer.dump();
+    ASSERT_NE(after_use.find("after_clear"), std::string::npos);
+    ASSERT_NE(after_use.find("new_value"), std::string::npos);
+}
+
+TEST(SerializerJSONTest, ContextManagement) {
+    WBE::SerializerJSON serializer;
+    
+    // Test multiple context levels
+    ASSERT_EQ(serializer.get_context_depth(), 0);
+    ASSERT_EQ(serializer.get_current_context(), "base");
+    
+    serializer.push_context("level1");
+    ASSERT_EQ(serializer.get_context_depth(), 1);
+    ASSERT_EQ(serializer.get_current_context(), "level1");
+    
+    serializer.push_context("level2");
+    ASSERT_EQ(serializer.get_context_depth(), 2);
+    ASSERT_EQ(serializer.get_current_context(), "level2");
+    
+    serializer.push_context("level3");
+    ASSERT_EQ(serializer.get_context_depth(), 3);
+    ASSERT_EQ(serializer.get_current_context(), "level3");
+    
+    // Add data at different levels
+    serializer.register_serialize("deep_data", "level3_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("mid_data", "level2_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("shallow_data", "level1_value");
+    serializer.pop_context();
+    
+    serializer.register_serialize("root_data", "root_value");
+    
+    std::string result = serializer.dump();
+    
+    // Parse and verify nested structure
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(result);
+    
+    ASSERT_EQ(parser.get_value<std::string>("root_data"), "root_value");
+    
+    auto level1 = parser.get_value<WBE::JSONData>("level1");
+    ASSERT_EQ(level1.get_value<std::string>("shallow_data"), "level1_value");
+    
+    auto level2 = level1.get_value<WBE::JSONData>("level2");
+    ASSERT_EQ(level2.get_value<std::string>("mid_data"), "level2_value");
+    
+    auto level3 = level2.get_value<WBE::JSONData>("level3");
+    ASSERT_EQ(level3.get_value<std::string>("deep_data"), "level3_value");
+}
+
 #endif
