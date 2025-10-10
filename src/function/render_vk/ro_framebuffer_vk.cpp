@@ -24,8 +24,13 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
     VkFramebufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     create_info.renderPass = render_pass->get_render_pass();
-    create_info.attachmentCount = attachments.size();
-    create_info.pAttachments = attachments.data();
+    std::vector<VkImageView> attachments_data;
+    attachments_data.reserve(attachments.size());
+    for (auto& attachment : attachments) {
+        attachments_data.push_back(attachment->get_image_view());
+    }
+    create_info.attachmentCount = attachments_data.size();
+    create_info.pAttachments = attachments_data.data();
     create_info.width = WBE_REQUIRED(width);
     create_info.height = WBE_REQUIRED(height);
     create_info.layers = layers;

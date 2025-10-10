@@ -24,7 +24,12 @@
 namespace WhiteBirdEngine {
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
-    image = WBE_REQUIRES_VALID(p_image);
+    image = WBE_REQUIRES_VALID(p_image)->get_image();
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(VkImage p_image) {
+    image = p_image;
     return *this;
 }
 
@@ -40,6 +45,11 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_format(VkFormat p_format) {
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(const VkComponentMapping& p_components) {
     components = p_components;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a) {
+    components = {.r = p_r, .g = p_g, .b = p_b, .a = p_a};
     return *this;
 }
 
@@ -69,7 +79,7 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROIm
 VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    create_info.image = WBE_REQUIRED(image).get_image();
+    create_info.image = WBE_REQUIRED(image);
     create_info.viewType = WBE_REQUIRED(view_type);
     create_info.format = WBE_REQUIRED(format);
     create_info.components = components;

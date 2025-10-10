@@ -24,8 +24,13 @@ constexpr MemID MEM_NULL = 0;
 template <typename T>
 struct AllocatorTrait;
 
+/**
+ * @brief Types of allocators.
+ */
 enum class AllocatorType {
+    // Stack allocator.
     STACK_ALLOCATOR,
+    // Heap allocator.
     HEAP_ALLOCATOR
 };
 

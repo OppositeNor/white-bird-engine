@@ -43,7 +43,8 @@ public:
     struct Builder {
         friend ROFramebufferVK;
         // The attachment image views.
-        std::vector<VkImageView> attachments;
+        // std::vector<VkImageView> attachments;
+        std::vector<Ref<ROImageViewVK>> attachments;
         // The render pass this framebuffer will be compatable with.
         Ref<RORenderPassVK> render_pass;
         // The width of the framebuffer.
@@ -54,11 +55,6 @@ public:
         uint32_t layers = 1;
 
         // Set the attachment image views.
-        Builder& set_attachments(const std::vector<VkImageView>& p_attachments) {
-            attachments = p_attachments;
-            return *this;
-        }
-        // Set the attachment image views.
         Builder& set_attachments(const std::vector<Ref<ROImageViewVK>>& p_attachments) {
             for (auto& attachment : p_attachments) {
                 add_attachment(attachment);
@@ -66,13 +62,8 @@ public:
             return *this;
         }
         // Add an attachment image view.
-        Builder& add_attachment(VkImageView p_image_view) {
-            attachments.push_back(p_image_view);
-            return *this;
-        }
-        // Add an attachment image view.
         Builder& add_attachment(Ref<ROImageViewVK> p_image_view) {
-            attachments.push_back(p_image_view->get_image_view());
+            attachments.push_back(p_image_view);
             return *this;
         }
         // Set the extent of the framebuffer.

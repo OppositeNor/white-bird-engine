@@ -24,6 +24,7 @@
 #include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
@@ -59,6 +60,7 @@ void RendererVK::init() {
     init_window();
     init_vulkan();
     setup_base_render_data();
+    init_swap_chain_image_views();
     init_render_pass();
     init_graphics_pipeline();
     init_swap_chain_framebuffers();
@@ -69,9 +71,6 @@ void RendererVK::init() {
 void RendererVK::terminate() {
     present_render_task.reset();
     render_objects.reset();
-    for (auto image_view : swap_chain_image_views) {
-        vkDestroyImageView(logical_device, image_view, get_allocation_callbacks());
-    }
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -96,7 +95,6 @@ void RendererVK::init_vulkan() {
     create_window_surface();
     create_device();
     create_swap_chain();
-    create_swap_chain_image_views();
     create_command_pools();
 }
 
@@ -147,11 +145,11 @@ void RendererVK::init_graphics_pipeline() {
 }
 
 void RendererVK::init_swap_chain_framebuffers() {
-    render_objects->swap_chain_framebuffers.resize(swap_chain_image_views.size());
+    render_objects->swap_chain_framebuffers.resize(render_objects->swap_chain_image_views.size());
     // Setup the framebuffer for each swap chain image view.
-    for (size_t i = 0; i < swap_chain_image_views.size(); ++i) {
+    for (size_t i = 0; i < render_objects->swap_chain_image_views.size(); ++i) {
         ROFramebufferVK::Builder builder;
-        builder.add_attachment(swap_chain_image_views[i])
+        builder.add_attachment(render_objects->swap_chain_image_views[i])
             .set_render_pass(render_objects->result_render_pass)
             .set_extent(swap_chain_extent)
             .set_layers(1);
@@ -293,29 +291,32 @@ void RendererVK::create_swap_chain() {
     scissor.extent = extent;
 }
 
-void RendererVK::create_swap_chain_image_views() {
-    swap_chain_image_views.resize(swap_chain_images.size());
+void RendererVK::init_swap_chain_image_views() {
+    render_objects->swap_chain_image_views.reserve(swap_chain_images.size());
     for (size_t i = 0; i < swap_chain_images.size(); ++i) {
-        VkImageViewCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        create_info.image = swap_chain_images[i];
-        create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create_info.format = swap_chain_image_format;
-        // Map the color channels.
-        create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        VkImageSubresourceRange subresource_range;
         // Only use the color information of the image.
-        create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         // Map to a mipmap level, map to the original image, which is 0.
-        create_info.subresourceRange.baseMipLevel = 0;
-        create_info.subresourceRange.levelCount = 1;
-        create_info.subresourceRange.baseArrayLayer = 0;
-        create_info.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(logical_device, &create_info, get_allocation_callbacks(), &swap_chain_image_views[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create image view.");
-        }
+        subresource_range.baseMipLevel = 0;
+        subresource_range.levelCount = 1;
+        subresource_range.baseArrayLayer = 0;
+        subresource_range.layerCount = 1;
+
+        ROImageViewVK::Builder builder;
+        builder.set_image(swap_chain_images[i])
+            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+            .set_format(swap_chain_image_format)
+            .set_components(
+                VK_COMPONENT_SWIZZLE_IDENTITY,
+                VK_COMPONENT_SWIZZLE_IDENTITY,
+                VK_COMPONENT_SWIZZLE_IDENTITY,
+                VK_COMPONENT_SWIZZLE_IDENTITY)
+        .set_subresource_range(subresource_range);
+
+        render_objects->swap_chain_image_views.push_back(
+            make_ref<ROImageViewVK>(allocator, &base_render_data, builder)
+        );
     }
 }
 

@@ -44,7 +44,9 @@ public:
      * @param p_graphics_pipeline The graphics pipeline to perform.
      */
     RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
-                                        Ref<RORenderPassVK> p_render_pass, Ref<ROGraphicsPipelineVK> p_graphics_pipeline);
+                                        Ref<RORenderPassVK> p_render_pass,
+                                        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+                                        bool p_fenced = true);
 
     /**
      * @brief Involke the render task.
@@ -63,11 +65,14 @@ public:
     }
 
 private:
-    void init();
-    void record_command_buffer();
     Ref<RORenderPassVK> render_pass;
     Ref<ROGraphicsPipelineVK> graphics_pipeline;
     VkCommandBuffer command_buffer;
+    VkFence fence;
+    bool is_fenced;
+
+    void init();
+    void record_command_buffer();
 };
 
 }

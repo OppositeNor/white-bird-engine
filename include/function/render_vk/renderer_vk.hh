@@ -24,6 +24,7 @@
 #include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "global/stl_allocator.hh"
@@ -118,6 +119,8 @@ private:
         Ref<ROGraphicsPipelineVK> graphics_pipeline;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+        // Swap chain image views.
+        std::vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // Framebuffers in the swap chain.
         std::vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
     };
@@ -143,8 +146,6 @@ private:
     std::vector<VkImage> swap_chain_images;
     VkFormat swap_chain_image_format;
     VkExtent2D swap_chain_extent;
-
-    std::vector<VkImageView> swap_chain_image_views;
 
     VkViewport viewport{};
     VkRect2D scissor{};
@@ -207,6 +208,8 @@ private:
     void init_window();
     void init_vulkan();
     void setup_base_render_data();
+    void init_swap_chain_images();
+    void init_swap_chain_image_views();
     void init_render_pass();
     void init_graphics_pipeline();
     void init_swap_chain_framebuffers();
@@ -216,7 +219,6 @@ private:
     void create_window_surface();
     void create_device();
     void create_swap_chain();
-    void create_swap_chain_image_views();
     void create_command_pools();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
