@@ -15,9 +15,8 @@
 #ifndef __WBE_REF_STRONG_TEST_HH__
 #define __WBE_REF_STRONG_TEST_HH__
 
-#include "core/allocator/heap_allocator_aligned_ram.hh"
-#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
+#include "mock_heap_allocator_aligned.hh"
 #include "global/global.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -27,7 +26,7 @@ namespace WBE = WhiteBirdEngine;
 
 TEST(WBERefStrongTest, Allocation) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::HeapAllocatorAlignedRAM allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 0);
         ASSERT_FALSE(allocator.is_empty());
@@ -44,7 +43,7 @@ TEST(WBERefStrongTest, Allocation) {
 
 TEST(WBERefStrongTest, CopyMove) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::HeapAllocatorAlignedRAM allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     {
         WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 3);
         ASSERT_FALSE(allocator.is_empty());
@@ -67,7 +66,7 @@ TEST(WBERefStrongTest, CopyMove) {
 
 TEST(WBERefStrongTest, ConstructDestruct) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::HeapAllocatorAlignedRAM allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     int test_val = 0;
     class TestClass {
     public:
@@ -117,7 +116,7 @@ TEST(WBERefStrongTest, DynamicDispatch) {
             num = 2;
         }
     };
-    WBE::HeapAllocatorAlignedPool allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     {
         WBE::Ref<A> ref = WBE::Ref<A>::make_ref(&allocator);
         ASSERT_EQ(ref->num, 0);
@@ -133,7 +132,7 @@ TEST(WBERefStrongTest, DynamicDispatch) {
 
 TEST(WBERefStrongTest, NullReference) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WBE::HeapAllocatorAlignedPool allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
     ASSERT_EQ(ref, nullptr);
     ASSERT_EQ(ref, (void*)nullptr);
@@ -164,7 +163,7 @@ inline int test_val2 = 0;
 
 inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass> p_ref2, uint32_t p_iteration_count) {
     std::vector<WBE::Ref<TestClass>> refs;
-    WBE::HeapAllocatorAlignedPool allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     refs.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
@@ -205,7 +204,7 @@ TEST(WBERefStrongTest, Multithread) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     ASSERT_EQ(test_val1, 0);
     ASSERT_EQ(test_val2, 0);
-    WBE::HeapAllocatorAlignedPool allocator;
+    WBE::MockHeapAllocatorAligned allocator(1024);
     {
         WBE::Ref<TestClass> ref1 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val1);
         WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val2);
