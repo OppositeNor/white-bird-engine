@@ -129,7 +129,7 @@ VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
 }
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : render_data(p_render_data) {
+    : RenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }

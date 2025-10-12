@@ -16,7 +16,7 @@
 #define __WBE_RO_PIPELINE_LAYOUT_VK_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include <vector>
@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Pipeline layout.
  *
  */
-class ROPipelineLayoutVK final : public RenderObject {
+class ROPipelineLayoutVK final : public RenderObjectVK {
 public:
     // Builder for ROPipelineLayoutVK
     struct Builder {
@@ -73,7 +73,6 @@ public:
         return pipeline_layout;
     }
 private:
-    const BaseRenderDataVK* render_data;
     VkPipelineLayout pipeline_layout;
 
     void init(const Builder& p_builder);

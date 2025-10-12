@@ -90,10 +90,6 @@ public:
         return present_render_task;
     }
 
-    void add_preset_render_task_dependency(Ref<RenderTaskVK> p_render_task) {
-        present_render_task->add_dependency(p_render_task);
-    }
-
 private:
 
     inline static RendererVK* singleton = nullptr;

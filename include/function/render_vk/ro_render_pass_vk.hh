@@ -15,7 +15,7 @@
 #ifndef __WBE_RO_RENDER_PASS_VK_HH__
 #define __WBE_RO_RENDER_PASS_VK_HH__
 
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @brief Render pass.
  *
  */
-class RORenderPassVK : public RenderObject {
+class RORenderPassVK : public RenderObjectVK {
 public:
     // Builder for RORenderPassVK
     struct Builder {
@@ -78,7 +78,6 @@ public:
     }
 
 private:
-    const BaseRenderDataVK* render_data;
     VkRenderPass render_pass;
 
     void init(const Builder& p_builder);

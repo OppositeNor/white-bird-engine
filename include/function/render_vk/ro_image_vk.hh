@@ -15,7 +15,7 @@
 #ifndef __WBE_RO_IMAGE_VK_HH__
 #define __WBE_RO_IMAGE_VK_HH__
 
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief Image.
  *
  */
-class ROImageVK final : public RenderObject {
+class ROImageVK final : public RenderObjectVK {
 public:
     // Builder for ROImageVK
     struct Builder {
@@ -108,7 +108,6 @@ public:
 
 private:
     VkImage image;
-    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_config);
 };

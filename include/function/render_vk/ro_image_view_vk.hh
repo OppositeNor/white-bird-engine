@@ -16,7 +16,7 @@
 #define __WBE_RO_IMAGE_VIEW_VK_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include <vulkan/vulkan_core.h>
@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Vulkan image view object.
  *
  */
-class ROImageViewVK final : public RenderObject {
+class ROImageViewVK final : public RenderObjectVK {
 public:
     // Builder for ROImageViewVK
     struct Builder {
@@ -99,7 +99,6 @@ public:
 
 private:    
     VkImageView image_view;
-    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

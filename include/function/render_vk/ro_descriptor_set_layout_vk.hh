@@ -15,7 +15,7 @@
 #ifndef __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
 #define __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
 
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @brief Descriptor set layout.
  *
  */
-class RODescriptorSetLayoutVK : public RenderObject {
+class RODescriptorSetLayoutVK : public RenderObjectVK {
 public:
     // Builder for RODescriptorSetLayoutVK
     struct Builder {
@@ -77,7 +77,6 @@ public:
 
 private:
     VkDescriptorSetLayout descriptor_set_layout;
-    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

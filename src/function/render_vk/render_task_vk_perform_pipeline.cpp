@@ -48,7 +48,7 @@ void RenderTaskVKPerformGraphicsPipeline::involke(double p_delta) {
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
     submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &semaphore;
+    // submit_info.pWaitSemaphores = &semaphore; TODO
     submit_info.pWaitDstStageMask = wait_stages;
 }
 

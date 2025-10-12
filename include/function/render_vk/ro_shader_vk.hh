@@ -15,7 +15,7 @@
 #ifndef __WBE_RO_SHADER_VK_HH__
 #define __WBE_RO_SHADER_VK_HH__
 
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <optional>
 #include <string>
@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @brief Shader class for Vulkan.
  *
  */
-class ROShaderVK final : public RenderObject {
+class ROShaderVK final : public RenderObjectVK {
 public:
     // Builder for ROShaderVK
     struct Builder {
@@ -72,7 +72,6 @@ public:
 
 private:
     VkShaderModule shader_module;
-    const BaseRenderDataVK* render_data;
 
     void init(const Builder& p_builder);
 };

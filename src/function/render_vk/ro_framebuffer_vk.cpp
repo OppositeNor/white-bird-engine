@@ -42,7 +42,7 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
 }
 
 ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : render_data(p_render_data) {
+    : RenderObjectVK(p_render_data) {
     framebuffer = p_builder.build(p_render_data);
 }
 

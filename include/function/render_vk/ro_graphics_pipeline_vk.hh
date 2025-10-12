@@ -16,7 +16,7 @@
 #define __WBE_RO_GRAPHICS_PIPELINE_VK_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  * @brief The graphics pipeline.
  *
  */
-class ROGraphicsPipelineVK final : public RenderObject {
+class ROGraphicsPipelineVK final : public RenderObjectVK {
 public:
     /**
      * @class PipelineConfigurations
@@ -268,8 +268,6 @@ public:
 
 private:
     Config config;
-
-    const BaseRenderDataVK* render_data;
 
     VkPipeline graphics_pipeline;
 

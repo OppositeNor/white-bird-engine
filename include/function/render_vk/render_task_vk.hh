@@ -15,7 +15,6 @@
 #ifndef __WBE_RENDER_TASK_VK_HH__
 #define __WBE_RENDER_TASK_VK_HH__
 
-#include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <vulkan/vulkan_core.h>
@@ -29,7 +28,7 @@ namespace WhiteBirdEngine {
  */
 class RenderTaskVK : public RenderTask {
 public:
-    virtual ~RenderTaskVK();
+    virtual ~RenderTaskVK() {}
 
     /**
      * @brief Constructor.
@@ -38,33 +37,8 @@ public:
      */
     RenderTaskVK(const BaseRenderDataVK* p_render_data);
 
-    /**
-     * @brief Add a render task as dependency. The task only runs after all dependencies
-     * finishes running.
-     *
-     * @param p_task 
-     */
-    void add_dependency(Ref<RenderTaskVK> p_task) {
-        dependent_semaphores.push_back(p_task->get_semaphore());
-        dependencies.push_back(p_task);
-    }
-
-    /**
-     * @brief Get the semaphore for this task to finish.
-     *
-     * @return The semaphore for the task to finish.
-     */
-    VkSemaphore get_semaphore() const {
-        return semaphore;
-    }
-
 protected:
     const BaseRenderDataVK* render_data;
-    VkSemaphore semaphore;
-    std::vector<VkSemaphore> dependent_semaphores;
-    std::vector<Ref<RenderTaskVK>> dependencies;
-private:
-    void init();
 };
 
 }

@@ -16,7 +16,7 @@
 #define __WBE_COMPONENT_SD_GEN_HH__
 
 #include "core/serializer/serializer_json.hh"
-{% for component in components %}#include "{{ component.in_file }}"
+{% for components_header in components_headers %}#include "{{ components_header }}"
 {% endfor %}
 
 namespace WhiteBirdEngine {

@@ -74,6 +74,9 @@ class WBEReflector:
         """
         self.metadata.components.append(component.model_dump())
 
+    def register_components_headers(self, components_headers) -> None:
+        self.metadata.components_headers = list(components_headers)
+
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
         print("WBEReflect: Exporting metadata...")

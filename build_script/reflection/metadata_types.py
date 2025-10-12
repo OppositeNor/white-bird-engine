@@ -70,7 +70,6 @@ class WBEComponentMetadata(BaseModel):
         fields: The name of the fields.
         types: The types of the fields
     """
-    in_file : str = ""
     struct_name : str = ""
     fields : list[WBEFieldMetadata] = Field(default_factory=list)
 
@@ -92,6 +91,15 @@ class WBEFileMetadata(BaseModel):
     components : list[WBEComponentMetadata] = Field(default_factory=list)
 
 class WBEMetadata(BaseModel):
+    """Metadata.
+
+    Attributes:
+        components_headers: The header files that the components are defined in.
+        channels: The registrated channels.
+        classes: The registrated classes.
+        components: The registrated components.
+    """
+    components_headers : list[str] = Field(default_factory=list[str])
     channels : dict = Field(default_factory=dict)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
     components : list[WBEComponentMetadata] = Field(default_factory=list)

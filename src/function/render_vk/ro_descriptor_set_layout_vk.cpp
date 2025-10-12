@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -46,7 +47,7 @@ VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const BaseRenderDa
 }
 
 RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : render_data(p_render_data) {
+    : RenderObjectVK(p_render_data) {
     init(p_builder);
 }
 

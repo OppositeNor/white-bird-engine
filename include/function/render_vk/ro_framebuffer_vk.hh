@@ -16,7 +16,7 @@
 #define __WBE_RO_FRAMEBUFFER_VK_HH__
 
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_object.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  * @brief Framebuffer render object.
  *
  */
-class ROFramebufferVK final : public RenderObject {
+class ROFramebufferVK final : public RenderObjectVK {
 public:
 
     /**
@@ -133,7 +133,6 @@ public:
     }
 
 private:
-    const BaseRenderDataVK* render_data;
     VkFramebuffer framebuffer;
 };
 

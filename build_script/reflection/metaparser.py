@@ -42,6 +42,7 @@ class WBEMetaparser:
         self.cache_dir = cache_dir
         self.sources = sources
         self._metadata = {}
+        self._components_headers = set()
 
     def parse(self, cpp_file_path : str):
         """Parse the C++ file.
@@ -59,11 +60,14 @@ class WBEMetaparser:
     def _get_metadata(self, cpp_file_path, cache_path):
         preloaded = self._metadata.get(cpp_file_path)
         if preloaded is not None:
-            return preloaded
+            result = preloaded
         if os.path.exists(cache_path):
-            return self._register_from_cache(cpp_file_path, cache_path)
+            result = self._register_from_cache(cpp_file_path, cache_path)
         else:
-            return self._register_from_clang(cpp_file_path, cache_path)
+            result = self._register_from_clang(cpp_file_path, cache_path)
+        if len(result.components) > 0:
+            self._components_headers.add(cpp_file_path)
+        return result
 
     def _register_from_cache(self, cpp_file_path, cache_path):
         try:
@@ -88,6 +92,7 @@ class WBEMetaparser:
                 self.reflector.register_class(cxx_class)
             for component in metadata.components:
                 self.reflector.register_component(component)
+        self.reflector.register_components_headers(self._components_headers)
 
 
     def _register_from_clang(self, cpp_file_path, cache_path):
@@ -101,28 +106,28 @@ class WBEMetaparser:
         metadata = WBEFileMetadata()
         metadata.deps = self._get_include_deps(tu)
         metadata.file_path = cpp_file_path
-        self._register_labels(tu, metadata, cpp_file_path)
+        self._register_labels(tu, metadata)
         metadata.hashcode = hash_file(cpp_file_path)
         self._metadata[cpp_file_path] = metadata
         with open(cache_path, "w") as f:
             json.dump(metadata.model_dump(), f, indent=4)
         return metadata
 
-    def _register_labels(self, tu, metadata : WBEFileMetadata, in_file):
-        for attribute, data in self._visit_attributes(metadata, tu.cursor, in_file):
+    def _register_labels(self, tu, metadata : WBEFileMetadata):
+        for attribute, data in self._visit_attributes(metadata, tu.cursor):
             getattr(metadata, attribute).append(data)
 
-    def _visit_attributes(self, metadata, cursor, in_file):
+    def _visit_attributes(self, metadata, cursor):
         if cursor.kind == clang.cindex.CursorKind.VAR_DECL:
             yield from self._handle_visit_var_decl(metadata, cursor)
         elif cursor.kind == clang.cindex.CursorKind.CLASS_DECL:
             yield from self._handle_visit_class_decl(metadata, cursor)
         elif cursor.kind == clang.cindex.CursorKind.STRUCT_DECL:
-            yield from self._handle_visit_struct_decl(metadata, cursor, in_file)
+            yield from self._handle_visit_struct_decl(metadata, cursor)
 
         for child in cursor.get_children():
             if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
-                yield from self._visit_attributes(metadata, child, in_file)
+                yield from self._visit_attributes(metadata, child)
 
     def _handle_visit_var_decl(self, metadata, cursor):
         for attr in cursor.get_children():
@@ -138,13 +143,13 @@ class WBEMetaparser:
                         any(cursor.spelling == metad_class.class_name for metad_class in metadata.classes)):
                     yield "classes", self._get_class_metadata(cursor, attr.spelling)
 
-    def _handle_visit_struct_decl(self, metadata, cursor, in_file):
+    def _handle_visit_struct_decl(self, metadata, cursor):
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if attr.spelling == WBE_COMPONENT:
                     if not self._any_all(metadata, lambda metadata:
                             any(cursor.spelling == metad_struct.struct_name for metad_struct in metadata.components)):
-                        yield "components", self._get_component_metadata(cursor, in_file)
+                        yield "components", self._get_component_metadata(cursor)
 
     def _read_from_cache(self, cpp_file_path, cache_path):
         with open(cache_path) as f:
@@ -178,9 +183,8 @@ class WBEMetaparser:
         # TODO
         return WBEClassMetadata(class_name=cursor.spelling)
 
-    def _get_component_metadata(self, cursor, in_file):
+    def _get_component_metadata(self, cursor):
         result = WBEComponentMetadata()
-        result.in_file = in_file
         result.struct_name = cursor.spelling
         for field in cursor.get_children():
             if field.kind != clang.cindex.CursorKind.FIELD_DECL:
