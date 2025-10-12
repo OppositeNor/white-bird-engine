@@ -87,7 +87,7 @@ public:
     }
 
     /**
-     * @brief Register a resource.
+     * @brief Register a resource. If the resource name already exists, it will be overwritten.
      *
      * @param p_res_name The name of the resource.
      * @param p_resource The reference to the resource.

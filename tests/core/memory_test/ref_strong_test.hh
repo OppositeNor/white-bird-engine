@@ -232,4 +232,128 @@ TEST_F(WBERefStrongTest, Multithread) {
     ASSERT_EQ(test_val2, -1);
 }
 
+TEST_F(WBERefStrongTest, DynamicCastRef) {
+    WBE::MockHeapAllocatorAligned allocator(1024);
+    
+    // Test classes for polymorphic casting
+    class BaseClass {
+    public:
+        virtual ~BaseClass() = default;
+        int base_value = 42;
+        virtual int get_type() const { return 1; }
+    };
+    
+    class DerivedClass : public BaseClass {
+    public:
+        int derived_value = 123;
+        int get_type() const override { return 2; }
+    };
+    
+    class AnotherClass : public BaseClass {
+    public:
+        int another_value = 456;
+        int get_type() const override { return 3; }
+    };
+    
+    class UnrelatedClass {
+    public:
+        virtual ~UnrelatedClass() = default;
+        int unrelated_value = 789;
+    };
+
+    // Test successful downcast (Base -> Derived)
+    {
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        static_cast<DerivedClass*>(base_ref.get())->derived_value = 999;
+        
+        WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
+        ASSERT_NE(derived_ref, nullptr);
+        ASSERT_EQ(derived_ref->base_value, 42);
+        ASSERT_EQ(derived_ref->derived_value, 999);
+        ASSERT_EQ(derived_ref->get_type(), 2);
+        
+        // Verify they point to the same object
+        ASSERT_EQ(base_ref.get(), derived_ref.get());
+    }
+
+    // Test successful upcast (Derived -> Base)
+    {
+        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        derived_ref->derived_value = 777;
+        
+        WBE::Ref<BaseClass> base_ref = derived_ref.dynamic_cast_ref<BaseClass>();
+        ASSERT_NE(base_ref, nullptr);
+        ASSERT_EQ(base_ref->base_value, 42);
+        ASSERT_EQ(base_ref->get_type(), 2);
+        
+        // Verify they point to the same object
+        ASSERT_EQ(derived_ref.get(), base_ref.get());
+    }
+
+    // Test failed downcast (Base -> wrong Derived)
+    {
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        
+        WBE::Ref<AnotherClass> another_ref = base_ref.dynamic_cast_ref<AnotherClass>();
+        ASSERT_EQ(another_ref, nullptr);
+        ASSERT_EQ(another_ref, WBE::MEM_NULL);
+    }
+
+    // Test cast with null reference
+    {
+        WBE::Ref<BaseClass> null_ref;
+        ASSERT_EQ(null_ref, nullptr);
+        
+        WBE::Ref<DerivedClass> derived_ref = null_ref.dynamic_cast_ref<DerivedClass>();
+        ASSERT_EQ(derived_ref, nullptr);
+        ASSERT_EQ(derived_ref, WBE::MEM_NULL);
+    }
+
+    // Test cast between unrelated types (should fail)
+    {
+        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        
+        WBE::Ref<UnrelatedClass> unrelated_ref = derived_ref.dynamic_cast_ref<UnrelatedClass>();
+        ASSERT_EQ(unrelated_ref, nullptr);
+        ASSERT_EQ(unrelated_ref, WBE::MEM_NULL);
+    }
+
+    // Test side cast (Derived1 -> Derived2 through common base)
+    {
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<AnotherClass>::make_ref(&allocator);
+        static_cast<AnotherClass*>(base_ref.get())->another_value = 555;
+        
+        // This should fail since AnotherClass is not DerivedClass
+        WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
+        ASSERT_EQ(derived_ref, nullptr);
+        
+        // But casting to AnotherClass should succeed
+        WBE::Ref<AnotherClass> another_ref = base_ref.dynamic_cast_ref<AnotherClass>();
+        ASSERT_NE(another_ref, nullptr);
+        ASSERT_EQ(another_ref->another_value, 555);
+        ASSERT_EQ(another_ref->get_type(), 3);
+    }
+
+    // Test reference counting is preserved after casting
+    {
+        WBE::Ref<BaseClass> base_ref1 = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<BaseClass> base_ref2 = base_ref1; // Create another reference
+        
+        WBE::Ref<DerivedClass> derived_ref = base_ref1.dynamic_cast_ref<DerivedClass>();
+        ASSERT_NE(derived_ref, nullptr);
+        
+        // All three references should point to the same object
+        ASSERT_EQ(base_ref1.get(), base_ref2.get());
+        ASSERT_EQ(base_ref1.get(), derived_ref.get());
+        
+        // Object should still be alive after releasing one reference
+        base_ref1 = nullptr;
+        ASSERT_NE(base_ref2, nullptr);
+        ASSERT_NE(derived_ref, nullptr);
+        ASSERT_EQ(base_ref2.get(), derived_ref.get());
+    }
+    
+    ASSERT_TRUE(allocator.is_empty());
+}
+
 #endif

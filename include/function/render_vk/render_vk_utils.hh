@@ -15,6 +15,7 @@
 #ifndef __WBE_RENDER_VK_UTILS_HH__
 #define __WBE_RENDER_VK_UTILS_HH__
 
+#include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include <vulkan/vulkan_core.h>
 
@@ -23,6 +24,9 @@ namespace WhiteBirdEngine {
 struct BaseRenderDataVK {
     // The render allocator.
     RenderAllocator* allocator;
+    // The render database.
+    RenderDatabase<RenderAllocator>* render_database;
+
     // The logic device.
     VkDevice logic_device;
     // The image format of the swap chain.

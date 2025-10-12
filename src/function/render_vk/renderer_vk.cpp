@@ -100,6 +100,7 @@ void RendererVK::init_vulkan() {
 
 void RendererVK::setup_base_render_data() {
     base_render_data.allocator = allocator;
+    base_render_data.render_database = render_database.get();
     base_render_data.logic_device = logical_device;
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;
@@ -162,7 +163,8 @@ void RendererVK::setup_present_render_task() {
     // TODO
     present_render_task = make_unique<RenderTaskVKPerformGraphicsPipeline>(allocator, &base_render_data,
                                                                            render_objects->result_render_pass,
-                                                                           render_objects->graphics_pipeline);
+                                                                           render_objects->graphics_pipeline,
+                                                                           "swap_chain_present");
 }
 
 void RendererVK::create_instance() {

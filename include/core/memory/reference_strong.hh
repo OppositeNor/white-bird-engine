@@ -119,6 +119,8 @@ public:
         return *this;
     }
 
+
+
     Ref& operator=(std::nullptr_t) {
         deref();
         control_block = nullptr;
@@ -215,6 +217,27 @@ public:
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
     }
+
+    /**
+     * @brief Dynamic cast to a different type of reference.
+     *
+     * @todo Test
+     * @tparam T1 The type to cast to.
+     * @return The casted reference. MEM_NULL if the cast fails.
+     */
+    template <typename T1>
+    Ref<T1, AllocType> dynamic_cast_ref() const {
+        if (control_block == nullptr) {
+            return Ref<T1, AllocType>(nullptr);
+        }
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        T1* casted_ptr = dynamic_cast<T1*>(static_cast<T*>(control_block->allocator->get(control_block->mem_id)));
+        if (casted_ptr == nullptr) {
+            return MEM_NULL;
+        }
+        return Ref<T1, AllocType>(reinterpret_cast<typename Ref<T1, AllocType>::ControlBlock*>(control_block));
+    }
+
 
     template <typename T1, typename AllocType1>
     bool operator==(const Ref<T1, AllocType1>& p_other) const {

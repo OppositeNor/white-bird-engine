@@ -46,6 +46,7 @@ public:
     RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
                                         Ref<RORenderPassVK> p_render_pass,
                                         Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+                                        const std::string& p_result_framebuffer_id,
                                         bool p_fenced = true);
 
     /**
@@ -70,6 +71,7 @@ private:
     VkCommandBuffer command_buffer;
     VkFence fence;
     bool is_fenced;
+    std::string result_framebuffer_id;
 
     void init();
     void record_command_buffer();

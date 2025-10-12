@@ -12,8 +12,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/allocator.hh"
+#include "function/render/render_database.hh"
+#include "function/render/renderer.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
+#include <format>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -22,8 +27,10 @@ namespace WhiteBirdEngine {
 RenderTaskVKPerformGraphicsPipeline::RenderTaskVKPerformGraphicsPipeline(const BaseRenderDataVK* p_render_data,
                                                                          Ref<RORenderPassVK> p_render_pass,
                                                                          Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+                                                                         const std::string& p_result_framebuffer_id,
                                                                          bool p_fenced)
-    : RenderTaskVK(p_render_data), render_pass(p_render_pass), graphics_pipeline(p_graphics_pipeline), is_fenced(p_fenced) {
+    : RenderTaskVK(p_render_data), render_pass(p_render_pass), graphics_pipeline(p_graphics_pipeline), is_fenced(p_fenced),
+      result_framebuffer_id(p_result_framebuffer_id) {
     init();
 }
 
@@ -39,17 +46,29 @@ void RenderTaskVKPerformGraphicsPipeline::involke(double p_delta) {
         vkWaitForFences(render_data->logic_device, 1, &fence, VK_TRUE, UINT64_MAX);
         vkResetFences(render_data->logic_device, 1, &fence);
     }
+
+    auto framebuffer = render_data->render_database->get_resource(result_framebuffer_id, "framebuffer_vk").dynamic_cast_ref<ROFramebufferVK>();
+    if (framebuffer == MEM_NULL) {
+        throw std::runtime_error(std::format("Failed to get framebuffer with id: {}", result_framebuffer_id));
+    }
+
     vkResetCommandBuffer(command_buffer, 0);
     record_command_buffer();
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    
     // For graphics pipeline, wait till the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage.
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore semaphore[] = {framebuffer->get_available_semaphore()};
 
     submit_info.waitSemaphoreCount = 1;
-    // submit_info.pWaitSemaphores = &semaphore; TODO
+    submit_info.pWaitSemaphores = semaphore;
     submit_info.pWaitDstStageMask = wait_stages;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+    // TODO
 }
 
 void RenderTaskVKPerformGraphicsPipeline::record_command_buffer() {
