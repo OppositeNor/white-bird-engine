@@ -13,9 +13,9 @@
    limitations under the License.
 */
 #include "function/application/application_game.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "global/global.hh"
 
 namespace WhiteBirdEngine {
 

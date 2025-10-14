@@ -14,7 +14,7 @@
 from build_script.reflection.metaparser import WBEMetaparser
 from build_script.reflection.reflect import WBEReflector
 
-def reflect(metaparser_clang_args, metadata_path, metadata_cache, sources_indices):
+def reflect(metaparser_clang_args, metadata_path, metadata_cache, sources_indices, generate_infos):
     """Run reflection.
 
     Args:
@@ -23,7 +23,7 @@ def reflect(metaparser_clang_args, metadata_path, metadata_cache, sources_indice
         metadata_cache (): The path to the metadata cache.
         sources_indices (): The pathes of the source files.
     """
-    reflector = WBEReflector(metadata_path)
+    reflector = WBEReflector(metadata_path, generate_infos)
     metaparser = WBEMetaparser(reflector, metaparser_clang_args, metadata_cache, sources_indices)
     for index_file in sources_indices:
         metaparser.parse(index_file)

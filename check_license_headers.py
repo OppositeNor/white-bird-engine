@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from build_script import utils
+from pathlib import Path
 import build_config
-from build_setup import source_dir, include_dir, test_dir
+from build_setup import project_files
 
 
 LICENSE_KEYWORDS = [
@@ -54,8 +54,5 @@ def has_apache_license_header(file_pathes, max_lines=30):
         print(f"{len(file_pathes)} files checked. All files contains a license header.")
 
 if __name__ == "__main__":
-    sources = []
-    sources.extend(utils.gather_files(include_dir, build_config.source_extensions))
-    sources.extend(utils.gather_files(source_dir, build_config.source_extensions))
-    sources.extend(utils.gather_files(test_dir, build_config.source_extensions))
+    sources = [source for source in project_files if Path(source).suffix in build_config.source_extensions]
     has_apache_license_header(sources)

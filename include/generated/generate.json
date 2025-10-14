@@ -1,0 +1,9 @@
+[
+    {
+        "output_name" : "component_sd.gen.hh",
+        "template" : "component_sd.gen.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata"
+        }
+    }
+]

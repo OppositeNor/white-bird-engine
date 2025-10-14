@@ -1,0 +1,9 @@
+[
+    {
+        "output_name" : "CMakeLists.txt",
+        "template" : "unit_test.jinja",
+        "data" : {
+            "name" : "wbe_cla_test"
+        }
+    }
+]

@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
 from pathlib import Path
 import subprocess
 import traceback
 from build_script import on_build
-from build_script import utils
 import shutil
 import build_config
+from build_script.reflection.code_gen import WBEGenFileInfo
 import build_setup
 
 metaparser_clang_args = [
@@ -112,6 +113,20 @@ def _compile_shaders():
             print(result.stderr)
             raise RuntimeError("Failed to compile shader.")
 
+def _gather_gen_infos():
+    gen_info_files = [gen_info for gen_info in build_setup.project_files if os.path.basename(gen_info) == "generate.json"]
+    gen_infos = []
+    for gen_info_file in gen_info_files:
+        with open(gen_info_file) as f:
+            print(gen_info_file)
+            data = json.load(f)
+        file_infos = [WBEGenFileInfo(**info) for info in data]
+        for file_info in file_infos:
+            file_info.out_dir = os.path.dirname(gen_info_file)
+        gen_infos.extend(file_infos)
+    print(f"gen_infos: {gen_infos}")
+    return gen_infos
+
 # ENTRY
 if __name__ == "__main__":
     # Gather sources for reflection
@@ -122,15 +137,16 @@ if __name__ == "__main__":
         print("WBEBuilder: Gathering licenses...")
         _gather_license()
         print("WBEBuilder: Gathering sources...")
-        sources = []
-        sources.extend(utils.gather_files(build_setup.include_dir, build_config.source_extensions))
-        sources.extend(utils.gather_files(build_setup.source_dir, build_config.source_extensions))
         if build_setup.build_target["generate-tests"]:
-            sources.extend(utils.gather_files(build_setup.test_dir, build_config.source_extensions))
+            sources = [source for source in build_setup.project_files_exclude_tests if Path(source).suffix in build_config.source_extensions]
+        else:
+            sources = [source for source in build_setup.project_files if Path(source).suffix in build_config.source_extensions]
+        print("WBEBuilder: Gathering generate.json...")
+        gen_infos = _gather_gen_infos()
 
         # Run reflection script
         print("WBEBuilder: Running reflections...")
-        on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, sources)
+        on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, sources, gen_infos)
 
         # Build project with CMake
         print("WBEBuilder: Running cmake...")

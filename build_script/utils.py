@@ -66,21 +66,21 @@ def hash_str_sha256(str_input : str) -> str:
     hasher.update(str_input.encode("utf-8"))
     return hasher.hexdigest()
 
-def gather_files(directory, file_ext : set[str]) -> list[str]:
-    """Gather files that has the specific file extensions in a directory recursively
+def list_files(dir, ignore_dirs=None):
+    """List all the file in a directory (recursivly).
 
     Args:
-        directory (): The directory to gather file from.
-        file_ext: The list of extensions to get.
-
-    Returns:
-        The list of file paths that matches the extensions in directory.
+        dir (): The directory to list.
+        ignore_dirs (): The directories to ignore.
     """
-    sources = []
-    dir_path = Path(directory)
-    # Gather include files
-    for dir_file in dir_path.rglob("*"):
-        if dir_file.suffix in file_ext:
-            sources.append(str(dir_file))
-    return sources
-
+    root = Path(dir)
+    ignore_dirs = set(ignore_dirs or [])
+    result = []
+    for path in root.rglob('*'):
+        # Skip directories.
+        # If any of the parent directories are ignored, ignore.
+        if any(ignored in path.parts for ignored in ignore_dirs):
+            continue
+        if not path.is_dir():
+            result.append(str(path))
+    return result

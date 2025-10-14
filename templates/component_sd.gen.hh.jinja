@@ -1,3 +1,4 @@
+// {{ _prefix }}
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +17,12 @@
 #define __WBE_COMPONENT_SD_GEN_HH__
 
 #include "core/serializer/serializer_json.hh"
-{% for components_header in components_headers %}#include "{{ components_header }}"
+{% for components_header in metadata.components_headers %}#include "{{ components_header }}"
 {% endfor %}
 
 namespace WhiteBirdEngine {
 
-{% for component in components %}
+{% for component in metadata.components %}
 /**
  * @class ComponentSD<{{ component.struct_name }}>
  * @brief Component serializer-deserializer for {{ component.struct_name }}.

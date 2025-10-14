@@ -17,6 +17,7 @@ import os
 import sys
 import shutil
 import build_config
+from build_script.utils import list_files
 
 # SETUP
 print("WBEBuilder: Setting up...")
@@ -40,7 +41,6 @@ test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
 build_dir = os.path.join(root_dir, build_target["export-directory"])
 dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
-template_output_dir = os.path.join(include_dir, "generated")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(build_dir, "res")
@@ -55,12 +55,18 @@ metadata_path = os.path.join(resource_output_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
 
+project_files = list_files(root_dir, ignore_dirs=["dependencies",
+                                                  ".cache", ".git", ".github", "__pycache__",
+                                                  "build", "release", "deploy"])
+project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies",
+                                                                ".cache", ".git", ".github", "__pycache__",
+                                                                "build", "release", "deploy"])
+
 # Create directories
 os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(shaders_output_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
-os.makedirs(template_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 shutil.copytree(res_chunks_dir, res_chunks_output_dir, dirs_exist_ok=True)
 

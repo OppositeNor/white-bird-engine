@@ -16,7 +16,7 @@
 #define __WBE_SERIALIZER_JSON_TEST_HH__
 
 #include "core/serializer/serializer_json.hh"
-#include "core/parser/parser_json.hh"
+#include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
@@ -77,25 +77,23 @@ TEST(SerializerJSONTest, ConstCharPointer) {
     
     std::string result = serializer.dump();
     
-    // Use parser to verify the content structure
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    // Use nlohmann json to verify the content structure
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
     // Verify all keys are present
-    ASSERT_TRUE(parser.contains("message"));
-    ASSERT_TRUE(parser.contains("empty"));
-    ASSERT_TRUE(parser.contains("special"));
-    ASSERT_TRUE(parser.contains("null_term"));
+    ASSERT_TRUE(json_obj.contains("message"));
+    ASSERT_TRUE(json_obj.contains("empty"));
+    ASSERT_TRUE(json_obj.contains("special"));
+    ASSERT_TRUE(json_obj.contains("null_term"));
     
     // Verify values are correct
-    ASSERT_EQ(parser.get_value<std::string>("message"), "Hello, World!");
-    ASSERT_EQ(parser.get_value<std::string>("empty"), "");
-    ASSERT_EQ(parser.get_value<std::string>("special"), "Line 1\nLine 2\tTabbed \"Quoted\"");
-    ASSERT_EQ(parser.get_value<std::string>("null_term"), "Test");
+    ASSERT_EQ(json_obj["message"].get<std::string>(), "Hello, World!");
+    ASSERT_EQ(json_obj["empty"].get<std::string>(), "");
+    ASSERT_EQ(json_obj["special"].get<std::string>(), "Line 1\nLine 2\tTabbed \"Quoted\"");
+    ASSERT_EQ(json_obj["null_term"].get<std::string>(), "Test");
     
     // Verify key count
-    auto keys = parser.get_all_keys();
-    ASSERT_EQ(keys.size(), 4);
+    ASSERT_EQ(json_obj.size(), 4);
 }
 
 TEST(SerializerJSONTest, ConstCharPointerInContext) {
@@ -115,25 +113,24 @@ TEST(SerializerJSONTest, ConstCharPointerInContext) {
     
     std::string result = serializer.dump();
     
-    // Use parser to verify nested structure
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    // Use nlohmann json to verify nested structure
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
     // Verify outer context exists
-    ASSERT_TRUE(parser.contains("outer"));
-    auto outer_data = parser.get_value<WBE::JSONData>("outer");
+    ASSERT_TRUE(json_obj.contains("outer"));
+    auto outer_data = json_obj["outer"];
     
     // Verify outer message
     ASSERT_TRUE(outer_data.contains("msg"));
-    ASSERT_EQ(outer_data.get_value<std::string>("msg"), "Outer message");
+    ASSERT_EQ(outer_data["msg"].get<std::string>(), "Outer message");
     
     // Verify inner context exists
     ASSERT_TRUE(outer_data.contains("inner"));
-    auto inner_data = outer_data.get_value<WBE::JSONData>("inner");
+    auto inner_data = outer_data["inner"];
     
     // Verify inner message
     ASSERT_TRUE(inner_data.contains("msg"));
-    ASSERT_EQ(inner_data.get_value<std::string>("msg"), "Inner message");
+    ASSERT_EQ(inner_data["msg"].get<std::string>(), "Inner message");
 }
 
 TEST(SerializerJSONTest, BufferBoundsChecking) {
@@ -157,12 +154,11 @@ TEST(SerializerJSONTest, BufferBoundsChecking) {
     std::string result = serializer.dump();
     
     // Parse and verify
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("small_buf"), "Hello");
-    ASSERT_EQ(parser.get_value<std::string>("medium_buf"), "Hello");
-    ASSERT_EQ(parser.get_value<std::string>("large_buf"), "Hello");
+    ASSERT_EQ(json_obj["small_buf"].get<std::string>(), "Hello");
+    ASSERT_EQ(json_obj["medium_buf"].get<std::string>(), "Hello");
+    ASSERT_EQ(json_obj["large_buf"].get<std::string>(), "Hello");
 }
 
 TEST(SerializerJSONTest, BufferMaxCapacity) {
@@ -177,10 +173,9 @@ TEST(SerializerJSONTest, BufferMaxCapacity) {
     std::string result = serializer.dump();
     
     // Parse and verify
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("max_capacity"), "123456789012345");
+    ASSERT_EQ(json_obj["max_capacity"].get<std::string>(), "123456789012345");
 }
 
 TEST(SerializerJSONTest, BufferWithSpecialCharacters) {
@@ -194,10 +189,9 @@ TEST(SerializerJSONTest, BufferWithSpecialCharacters) {
     std::string result = serializer.dump();
     
     // Parse and verify
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("special_chars"), "Line1\nLine2\tTab\"Quote'");
+    ASSERT_EQ(json_obj["special_chars"].get<std::string>(), "Line1\nLine2\tTab\"Quote'");
 }
 
 TEST(SerializerJSONTest, BufferEmptyString) {
@@ -210,10 +204,9 @@ TEST(SerializerJSONTest, BufferEmptyString) {
     std::string result = serializer.dump();
     
     // Parse and verify
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("empty_buffer"), "");
+    ASSERT_EQ(json_obj["empty_buffer"].get<std::string>(), "");
 }
 
 TEST(SerializerJSONTest, PushList) {
@@ -250,42 +243,42 @@ TEST(SerializerJSONTest, PushList) {
     
     std::string result = main_serializer.dump();
     
-    // Use parser to deeply verify the structure
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    // Use nlohmann json to deeply verify the structure
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
     // Verify top-level keys
-    ASSERT_TRUE(parser.contains("items"));
-    ASSERT_TRUE(parser.contains("total_count"));
-    ASSERT_TRUE(parser.contains("list_name"));
+    ASSERT_TRUE(json_obj.contains("items"));
+    ASSERT_TRUE(json_obj.contains("total_count"));
+    ASSERT_TRUE(json_obj.contains("list_name"));
     
     // Verify top-level values
-    ASSERT_EQ(parser.get_value<int>("total_count"), 3);
-    ASSERT_EQ(parser.get_value<std::string>("list_name"), "Test Items");
+    ASSERT_EQ(json_obj["total_count"].get<int>(), 3);
+    ASSERT_EQ(json_obj["list_name"].get<std::string>(), "Test Items");
     
     // Verify items array structure
-    auto items = parser.get_value<std::vector<WBE::JSONData>>("items");
+    auto items = json_obj["items"];
+    ASSERT_TRUE(items.is_array());
     ASSERT_EQ(items.size(), 3);
 
     // Verify first item
     ASSERT_TRUE(items[0].contains("id"));
     ASSERT_TRUE(items[0].contains("name"));
     ASSERT_TRUE(items[0].contains("active"));
-    ASSERT_EQ(items[0].get_value<int>("id"), 1);
-    ASSERT_EQ(items[0].get_value<std::string>("name"), "First Item");
-    ASSERT_EQ(items[0].get_value<bool>("active"), true);
+    ASSERT_EQ(items[0]["id"].get<int>(), 1);
+    ASSERT_EQ(items[0]["name"].get<std::string>(), "First Item");
+    ASSERT_EQ(items[0]["active"].get<bool>(), true);
     
     // Verify second item
-    ASSERT_EQ(items[1].get_value<int>("id"), 2);
-    ASSERT_EQ(items[1].get_value<std::string>("name"), "Second Item");
-    ASSERT_EQ(items[1].get_value<bool>("active"), false);
+    ASSERT_EQ(items[1]["id"].get<int>(), 2);
+    ASSERT_EQ(items[1]["name"].get<std::string>(), "Second Item");
+    ASSERT_EQ(items[1]["active"].get<bool>(), false);
     
     // Verify third item with nested context
-    ASSERT_EQ(items[2].get_value<int>("id"), 3);
+    ASSERT_EQ(items[2]["id"].get<int>(), 3);
     ASSERT_TRUE(items[2].contains("details"));
-    auto details = items[2].get_value<WBE::JSONData>("details");
-    ASSERT_EQ(details.get_value<std::string>("description"), "Third item with details");
-    ASSERT_EQ(details.get_value<std::string>("priority"), "high");
+    auto details = items[2]["details"];
+    ASSERT_EQ(details["description"].get<std::string>(), "Third item with details");
+    ASSERT_EQ(details["priority"].get<std::string>(), "high");
 }
 
 TEST(SerializerJSONTest, PushListWithConstChar) {
@@ -310,23 +303,23 @@ TEST(SerializerJSONTest, PushListWithConstChar) {
     
     std::string result = main_serializer.dump();
     
-    // Use parser to verify const char* handling in lists
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    // Use nlohmann json to verify const char* handling in lists
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_TRUE(parser.contains("string_items"));
-    auto items = parser.get_value<std::vector<WBE::JSONData>>("string_items");
+    ASSERT_TRUE(json_obj.contains("string_items"));
+    auto items = json_obj["string_items"];
+    ASSERT_TRUE(items.is_array());
     ASSERT_EQ(items.size(), 2);
     
     // Verify first item
     ASSERT_TRUE(items[0].contains("name"));
     ASSERT_TRUE(items[0].contains("description"));
-    ASSERT_EQ(items[0].get_value<std::string>("name"), "Item One");
-    ASSERT_EQ(items[0].get_value<std::string>("description"), "Description for item one");
+    ASSERT_EQ(items[0]["name"].get<std::string>(), "Item One");
+    ASSERT_EQ(items[0]["description"].get<std::string>(), "Description for item one");
     
     // Verify second item with empty string
-    ASSERT_EQ(items[1].get_value<std::string>("name"), "Item Two");
-    ASSERT_EQ(items[1].get_value<std::string>("description"), "");
+    ASSERT_EQ(items[1]["name"].get<std::string>(), "Item Two");
+    ASSERT_EQ(items[1]["description"].get<std::string>(), "");
 }
 
 TEST(SerializerJSONTest, PushListEmpty) {
@@ -340,16 +333,16 @@ TEST(SerializerJSONTest, PushListEmpty) {
     
     std::string result = main_serializer.dump();
     
-    // Use parser to verify empty list handling
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    // Use nlohmann json to verify empty list handling
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_TRUE(parser.contains("empty_list"));
-    ASSERT_TRUE(parser.contains("has_items"));
-    ASSERT_EQ(parser.get_value<bool>("has_items"), false);
+    ASSERT_TRUE(json_obj.contains("empty_list"));
+    ASSERT_TRUE(json_obj.contains("has_items"));
+    ASSERT_EQ(json_obj["has_items"].get<bool>(), false);
     
     // Verify empty list structure
-    auto empty_list = parser.get_value<std::vector<WBE::JSONData>>("empty_list");
+    auto empty_list = json_obj["empty_list"];
+    ASSERT_TRUE(empty_list.is_array());
     ASSERT_EQ(empty_list.size(), 1);  // Should contain one empty item
 }
 
@@ -398,26 +391,25 @@ TEST(SerializerJSONTest, RoundTripSerialization) {
     std::string json_result = serializer.dump();
     
     // Parse back the JSON
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(json_result);
+    nlohmann::json json_obj = nlohmann::json::parse(json_result);
     
     // Verify all values are preserved
-    ASSERT_EQ(parser.get_value<std::string>("string_val"), "Hello, World!");
-    ASSERT_EQ(parser.get_value<int>("int_val"), 42);
-    ASSERT_DOUBLE_EQ(parser.get_value<double>("double_val"), 3.14159);
-    ASSERT_EQ(parser.get_value<bool>("bool_val"), true);
-    ASSERT_EQ(parser.get_value<int>("negative_int"), -123);
-    ASSERT_EQ(parser.get_value<int>("zero_val"), 0);
+    ASSERT_EQ(json_obj["string_val"].get<std::string>(), "Hello, World!");
+    ASSERT_EQ(json_obj["int_val"].get<int>(), 42);
+    ASSERT_DOUBLE_EQ(json_obj["double_val"].get<double>(), 3.14159);
+    ASSERT_EQ(json_obj["bool_val"].get<bool>(), true);
+    ASSERT_EQ(json_obj["negative_int"].get<int>(), -123);
+    ASSERT_EQ(json_obj["zero_val"].get<int>(), 0);
     
     // Verify nested data
-    auto nested = parser.get_value<WBE::JSONData>("nested_data");
-    ASSERT_EQ(nested.get_value<std::string>("nested_string"), "nested value");
-    ASSERT_EQ(nested.get_value<int>("nested_number"), 99);
+    auto nested = json_obj["nested_data"];
+    ASSERT_EQ(nested["nested_string"].get<std::string>(), "nested value");
+    ASSERT_EQ(nested["nested_number"].get<int>(), 99);
     
     // Verify deep nested data
-    auto deep_nested = nested.get_value<WBE::JSONData>("deep_nested");
-    ASSERT_EQ(deep_nested.get_value<std::string>("deep_val"), "very deep");
-    ASSERT_EQ(deep_nested.get_value<std::string>("deep_cstr"), "deep const char");
+    auto deep_nested = nested["deep_nested"];
+    ASSERT_EQ(deep_nested["deep_val"].get<std::string>(), "very deep");
+    ASSERT_EQ(deep_nested["deep_cstr"].get<std::string>(), "deep const char");
 }
 
 TEST(SerializerJSONTest, SpecialCharactersAndEdgeCases) {
@@ -446,19 +438,18 @@ TEST(SerializerJSONTest, SpecialCharactersAndEdgeCases) {
     std::string result = serializer.dump();
     
     // Parse back and verify
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("unicode"), unicode_str);
-    ASSERT_EQ(parser.get_value<std::string>("json_special"), json_special);
-    ASSERT_EQ(parser.get_value<std::string>("whitespace"), whitespace_str);
-    ASSERT_EQ(parser.get_value<std::string>("empty"), "");
-    ASSERT_EQ(parser.get_value<std::string>("single_char"), "a");
+    ASSERT_EQ(json_obj["unicode"].get<std::string>(), unicode_str);
+    ASSERT_EQ(json_obj["json_special"].get<std::string>(), json_special);
+    ASSERT_EQ(json_obj["whitespace"].get<std::string>(), whitespace_str);
+    ASSERT_EQ(json_obj["empty"].get<std::string>(), "");
+    ASSERT_EQ(json_obj["single_char"].get<std::string>(), "a");
     
-    ASSERT_EQ(parser.get_value<int>("max_int"), std::numeric_limits<int>::max());
-    ASSERT_EQ(parser.get_value<int>("min_int"), std::numeric_limits<int>::min());
-    ASSERT_DOUBLE_EQ(parser.get_value<double>("max_double"), std::numeric_limits<double>::max());
-    ASSERT_DOUBLE_EQ(parser.get_value<double>("min_double"), std::numeric_limits<double>::lowest());
+    ASSERT_EQ(json_obj["max_int"].get<int>(), std::numeric_limits<int>::max());
+    ASSERT_EQ(json_obj["min_int"].get<int>(), std::numeric_limits<int>::min());
+    ASSERT_DOUBLE_EQ(json_obj["max_double"].get<double>(), std::numeric_limits<double>::max());
+    ASSERT_DOUBLE_EQ(json_obj["min_double"].get<double>(), std::numeric_limits<double>::lowest());
 }
 
 TEST(SerializerJSONTest, LargeDataSets) {
@@ -484,22 +475,22 @@ TEST(SerializerJSONTest, LargeDataSets) {
     ASSERT_FALSE(result.empty());
     
     // Parse back and verify structure
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<int>("total_count"), num_items);
-    ASSERT_EQ(parser.get_value<std::string>("test_name"), "Large Dataset Test");
+    ASSERT_EQ(json_obj["total_count"].get<int>(), num_items);
+    ASSERT_EQ(json_obj["test_name"].get<std::string>(), "Large Dataset Test");
     
-    auto items = parser.get_value<std::vector<WBE::JSONData>>("items");
+    auto items = json_obj["items"];
+    ASSERT_TRUE(items.is_array());
     ASSERT_EQ(items.size(), num_items);
     
     // Spot check a few items
-    ASSERT_EQ(items[0].get_value<int>("id"), 0);
-    ASSERT_EQ(items[0].get_value<std::string>("name"), "Item_0");
-    ASSERT_EQ(items[0].get_value<bool>("active"), true);
+    ASSERT_EQ(items[0]["id"].get<int>(), 0);
+    ASSERT_EQ(items[0]["name"].get<std::string>(), "Item_0");
+    ASSERT_EQ(items[0]["active"].get<bool>(), true);
     
-    ASSERT_EQ(items[num_items-1].get_value<int>("id"), num_items-1);
-    ASSERT_EQ(items[num_items-1].get_value<bool>("active"), (num_items-1) % 2 == 0);
+    ASSERT_EQ(items[num_items-1]["id"].get<int>(), num_items-1);
+    ASSERT_EQ(items[num_items-1]["active"].get<bool>(), (num_items-1) % 2 == 0);
 }
 
 TEST(SerializerJSONTest, ErrorHandling) {
@@ -565,19 +556,18 @@ TEST(SerializerJSONTest, ContextManagement) {
     std::string result = serializer.dump();
     
     // Parse and verify nested structure
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(result);
+    nlohmann::json json_obj = nlohmann::json::parse(result);
     
-    ASSERT_EQ(parser.get_value<std::string>("root_data"), "root_value");
+    ASSERT_EQ(json_obj["root_data"].get<std::string>(), "root_value");
     
-    auto level1 = parser.get_value<WBE::JSONData>("level1");
-    ASSERT_EQ(level1.get_value<std::string>("shallow_data"), "level1_value");
+    auto level1 = json_obj["level1"];
+    ASSERT_EQ(level1["shallow_data"].get<std::string>(), "level1_value");
     
-    auto level2 = level1.get_value<WBE::JSONData>("level2");
-    ASSERT_EQ(level2.get_value<std::string>("mid_data"), "level2_value");
+    auto level2 = level1["level2"];
+    ASSERT_EQ(level2["mid_data"].get<std::string>(), "level2_value");
     
-    auto level3 = level2.get_value<WBE::JSONData>("level3");
-    ASSERT_EQ(level3.get_value<std::string>("deep_data"), "level3_value");
+    auto level3 = level2["level3"];
+    ASSERT_EQ(level3["deep_data"].get<std::string>(), "level3_value");
 }
 
 #endif

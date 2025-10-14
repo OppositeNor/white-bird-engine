@@ -31,3 +31,6 @@
 [submodule "dependencies/freetype"]
 	path = dependencies/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git
+[submodule "dependencies/google-benchmark"]
+	path = dependencies/google-benchmark
+	url = https://github.com/google/benchmark.git

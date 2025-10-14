@@ -65,13 +65,14 @@ if (NOT MSVC)
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Deploy")
     ## for optimization
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -flto -DNDEBUG")
+    add_compile_options(-O2 -flto -DNDEBUG)
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization and testing
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -flto -g -DNDEBUG")
+    add_compile_options(-O2 -g -flto -DNDEBUG)
 else()
     ## for gdb or valgrind
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG")
+    add_compile_options(--coverage -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
+    add_link_options(--coverage)
 endif()
 
 if (WBE_MAKE_TEST)

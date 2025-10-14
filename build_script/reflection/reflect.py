@@ -14,7 +14,7 @@
 import json
 import os
 import importlib.util
-from build_script.reflection.code_gen import WBECodeGenerator
+from build_script.reflection.code_gen import WBECodeGenerator, WBEGenFileInfo
 from build_script.utils import hash_str
 from build_script.reflection.metadata_types import WBEMetadata
 
@@ -26,9 +26,16 @@ class WBEReflector:
         metadata: The metadata of the engine.
     """
 
-    def __init__(self, metadata_path : str) -> None:
+    def __init__(self, metadata_path : str, gen_file_infos : list[WBEGenFileInfo]) -> None:
+        """Constructor.
+
+        Args:
+            metadata_path: The path to the metadata output file.
+            gen_file_infos: The list of code generation information.
+        """
         self.metadata_path = metadata_path
         self.metadata = WBEMetadata()
+        self._gen_file_infos = gen_file_infos
 
     def load_script_config(self, load_path : str) -> None:
         """Load config scripts.
@@ -82,7 +89,9 @@ class WBEReflector:
         print("WBEReflect: Exporting metadata...")
         self._write_to_file(self.metadata_path, json.dumps(self.metadata.__dict__, indent=4))
         # Generate code
-        generator = WBECodeGenerator(self.metadata)
+        generator = WBECodeGenerator({
+            "metadata" : self.metadata
+        }, self._gen_file_infos)
         generator.generate()
 
     def checks(self) -> None:
