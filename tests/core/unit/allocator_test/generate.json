@@ -1,6 +1,6 @@
 [
     {
-        "output_name" : "CMakeLists.txt",
+        "output_name" : "unit_test.gen.cmake",
         "template" : "unit_test.jinja",
         "data" : {
             "name" : "wbe_allocator_test"
