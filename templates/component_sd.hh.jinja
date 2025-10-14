@@ -1,4 +1,3 @@
-// {{ _prefix }}
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// {{ _prefix }}
 #ifndef __WBE_COMPONENT_SD_GEN_HH__
 #define __WBE_COMPONENT_SD_GEN_HH__
 
@@ -26,13 +26,11 @@ namespace WhiteBirdEngine {
 /**
  * @class ComponentSD<{{ component.struct_name }}>
  * @brief Component serializer-deserializer for {{ component.struct_name }}.
- *
- * @tparam Serializer The type of the serializer.
  */
 template <>
 class ComponentSD<{{ component.struct_name }}> {
 public:
-
+    ComponentSD() = default;
     ~ComponentSD() {}
     ComponentSD(const ComponentSD&) = delete;
     ComponentSD(ComponentSD&&) = delete;

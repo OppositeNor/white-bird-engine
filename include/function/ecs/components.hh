@@ -34,6 +34,15 @@ namespace WhiteBirdEngine {
 template <typename T>
 class ComponentSD {};
 
+/**
+ * @class ComponentAccess
+ * @brief The accessor of the component.
+ *
+ * @tparam T Component type.
+ */
+template <typename T>
+class ComponentAccess {};
+
 template <typename T>
 using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 

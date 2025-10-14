@@ -1,7 +1,14 @@
 [
     {
         "output_name" : "component_sd.gen.hh",
-        "template" : "component_sd.gen.hh.jinja",
+        "template" : "component_sd.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata"
+        }
+    },
+    {
+        "output_name" : "component_access.gen.hh",
+        "template" : "component_access.hh.jinja",
         "data" : {
             "metadata" : ".metadata"
         }
