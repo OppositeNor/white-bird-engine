@@ -69,7 +69,6 @@ class WBECodeGenerator:
                     f"Data: {key} starts with an underscore, which is preserved by the generator.")
 
         template = generate_info.template
-        print(template)
         template = self._env.get_template(template)
         data = generate_info.data
         data["_prefix"] = GENERATE_PREFIX

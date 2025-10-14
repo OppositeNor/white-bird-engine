@@ -118,13 +118,11 @@ def _gather_gen_infos():
     gen_infos = []
     for gen_info_file in gen_info_files:
         with open(gen_info_file) as f:
-            print(gen_info_file)
             data = json.load(f)
         file_infos = [WBEGenFileInfo(**info) for info in data]
         for file_info in file_infos:
             file_info.out_dir = os.path.dirname(gen_info_file)
         gen_infos.extend(file_infos)
-    print(f"gen_infos: {gen_infos}")
     return gen_infos
 
 # ENTRY
