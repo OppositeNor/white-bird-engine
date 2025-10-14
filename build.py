@@ -136,9 +136,9 @@ if __name__ == "__main__":
         _gather_license()
         print("WBEBuilder: Gathering sources...")
         if build_setup.build_target["generate-tests"]:
-            sources = [source for source in build_setup.project_files_exclude_tests if Path(source).suffix in build_config.source_extensions]
-        else:
             sources = [source for source in build_setup.project_files if Path(source).suffix in build_config.source_extensions]
+        else:
+            sources = [source for source in build_setup.project_files_exclude_tests if Path(source).suffix in build_config.source_extensions]
         print("WBEBuilder: Gathering generate.json...")
         gen_infos = _gather_gen_infos()
 
