@@ -16,8 +16,8 @@
 #define __WBE_STACK_ALLOCATOR_HH__
 
 #include "allocator.hh"
-#include "core/logging/log.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <bit>
 #include <cstddef>
 #include <memory>
@@ -49,11 +49,7 @@ struct AllocatorTrait<class StackAllocator> {
 class StackAllocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
-    ~StackAllocator() {
-        if (stack_pointer != 0) {
-            wbe_console_log()->warning("StackAllocator not empty during destruction.");
-        }
-    }
+    ~StackAllocator() {}
     StackAllocator(const StackAllocator&) = delete;
     StackAllocator(StackAllocator&&) = delete;
     StackAllocator& operator=(const StackAllocator&) = delete;
@@ -87,7 +83,11 @@ public:
      * @param p_id The ID of the memory to get.
      */
     void* get(MemID p_id) {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) >= mem_chunk.get());
+        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) <= (mem_chunk.get() + stack_pointer));
         return std::bit_cast<void*>(p_id);
     }
 

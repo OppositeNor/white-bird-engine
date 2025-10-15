@@ -240,7 +240,7 @@ bool HeapAllocatorAtomicAlignedPool::unguard_is_in_pool(MemID p_mem_id) const {
 }
 
 HeapAllocatorAtomicAlignedPool::operator std::string() const {
-        boost::shared_lock lock(mutex);
+    boost::shared_lock lock(mutex);
     std::stringstream ss;
     ss << "{";
     ss << "\"type\":\"HeapAllocatorAtomicAlignedPool\",";

@@ -16,7 +16,6 @@
 #define __WBE_LOG_STREAM_HH__
 
 #include "log.hh"
-#include "utils/defs.hh"
 #include <ostream>
 
 namespace WhiteBirdEngine {
@@ -29,8 +28,19 @@ namespace WhiteBirdEngine {
 class LogStream : public Log {
 public:
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_channel_id The channel id.
+     * @param p_ostream The output stream.
+     */
     LogStream(ChannelID p_channel_id, std::ostream& p_ostream)
         : Log(), ostream(&p_ostream), channel_id(p_channel_id) {}
+    /**
+     * @brief Constructor. The channel ID will be WBE_CHANNEL_UNKNOWN.
+     *
+     * @param p_ostream The output stream.
+     */
     LogStream(std::ostream& p_ostream)
         : Log(), ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
     virtual ~LogStream() override {}
@@ -38,11 +48,6 @@ public:
     LogStream(LogStream &&) = delete;
     LogStream &operator=(const LogStream &) = delete;
     LogStream &operator=(LogStream &&) = delete;
-
-    LogStream(std::ostream* p_ostream)
-        : Log() {
-        WBE_DEBUG_ASSERT(p_ostream != nullptr);
-    }
 
     virtual ChannelID get_channel() const override {
         return channel_id;
