@@ -90,8 +90,10 @@ public:
      * @brief Manager for profiling.
      */
     class ProfilingManager* profiling_manager;
-
-
+    /**
+     * @brief Manager for the labels.
+     */
+    LabelManager* label_manager;
 
 private:
     void parse_metadata(const Path& p_metadata_config_path);

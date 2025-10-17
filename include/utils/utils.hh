@@ -81,6 +81,16 @@ constexpr HashCode dynam_hash(const char* p_str) {
     return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
 }
 
+/**
+ * @brief Hash a string.
+ *
+ * @param p_str The string to hash.
+ * @return The hash code of the string.
+ */
+constexpr HashCode dynam_hash(const std::string& p_str) {
+    return dynam_hash(p_str.c_str());
+}
+
 using TypeID = HashCode;
 using ConstID = HashCode;
 

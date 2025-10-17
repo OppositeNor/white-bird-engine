@@ -200,7 +200,7 @@ TEST(WBEAllocAlignedPoolTest, ConstructDestructCall) {
 
 TEST(WBEAllocAlignedPoolTest, AlignmentTest) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(2048);
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(WBE_MiB(0.5));
     WBE::MemID mem1 = allocator.allocate(1, 8);
     ASSERT_EQ(mem1 % 8, 0);
     WBE::MemID mem2 = allocator.allocate(1, 16);
@@ -233,7 +233,7 @@ TEST(WBEAllocAlignedPoolTest, AlignmentTest) {
     allocator.deallocate(mem9);
     allocator.deallocate(mem10);
 
-    ASSERT_EQ(allocator.get_remain_size(), 2048);
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
 }
 
 TEST(WBEAllocAlignedPoolTest, ManySmallAllocations) {

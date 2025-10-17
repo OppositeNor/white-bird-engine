@@ -19,6 +19,7 @@
 #include "utils/utils.hh"
 
 #include <map>
+#include <string>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -46,7 +47,7 @@ public:
     LabelManager() {
         {% for label in metadata.labels %}
         dynamic_labels.push_back("{{ label.label_name }}");
-        hash_to_name.insert(static_hash("{{ label.label_name }}"), "{{ label.label_name }}");
+        hash_to_name.insert(std::pair(static_hash("{{ label.label_name }}"), std::string("{{ label.label_name }}")));
         {% endfor %}
     }
     ~LabelManager() {}
@@ -68,11 +69,11 @@ public:
      */
     void register_label(const std::string& p_name) {
         dynamic_labels.push_back(p_name);
-        hash_to_name.insert(dynam_hash(p_name), p_name);
+        hash_to_name.insert(std::pair(dynam_hash(p_name), p_name));
     }
 
 private:
-    std::string dynamic_labels;
+    std::vector<std::string> dynamic_labels;
     std::map<HashCode, std::string> hash_to_name;
 };
 

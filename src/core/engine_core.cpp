@@ -18,11 +18,13 @@
 #include "core/engine_config/engine_config.hh"
 #include "core/profiling/profiling_manager.hh"
 #include "core/parser/parser_json.hh"
+#include "generated/label_manager.gen.hh"
 #include <iostream>
 
 namespace WhiteBirdEngine {
 
 EngineCore::~EngineCore() {
+    delete label_manager;
     delete profiling_manager;
     delete file_system;
     delete pool_allocator;
@@ -49,8 +51,6 @@ EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
 void EngineCore::parse_metadata(const Path& p_metadata_config_path) {
     ParserJSON parser;
     parser.parse(p_metadata_config_path);
-    auto channels_data = parser.get_value<JSONData>("channels");
-    auto channel_keys = channels_data.get_all_keys();
 }
 
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
@@ -59,6 +59,7 @@ void EngineCore::initialize(int p_argc, char* p_argv[]) {
     parse_metadata(Path(file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
+    label_manager = new LabelManager();
     singleton = this;
 }
 

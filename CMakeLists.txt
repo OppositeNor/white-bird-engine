@@ -71,7 +71,7 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-O2 -g -flto -DNDEBUG)
 else()
     ## for gdb or valgrind
-    add_compile_options(--coverage -O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
+    add_compile_options(-O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
     add_link_options(--coverage)
 endif()
 
