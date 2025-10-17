@@ -15,8 +15,9 @@ import json
 import os
 import importlib.util
 from build_script.reflection.code_gen import WBECodeGenerator, WBEGenFileInfo
-from build_script.utils import hash_str
 from build_script.reflection.metadata_types import WBEMetadata
+from build_config import static_labels, dynamic_labels
+from build_script.utils import hash_str
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
@@ -57,61 +58,42 @@ class WBEReflector:
             spec.loader.exec_module(module_config)
             module_config.register(self)
 
-    def register_channel(self, channel_name) -> None:
-        """Register a channel.
-
-        Args:
-            channel_path (): The channel to register.
-        """
-        self.metadata.channels[channel_name] = hash_str(channel_name)
-
-    def register_class(self, class_obj) -> None:
-        """Register a class.
-
-        Args:
-            class_obj (): The class to register.
-        """
-        self.metadata.classes.append(class_obj.model_dump())
-
-    def register_component(self, component) -> None:
-        """Register a component.
-
-        Args:
-            component (): The component to register.
-        """
-        self.metadata.components.append(component.model_dump())
-
+    def register_metadata(self, metadata) -> None:
+        self.metadata = metadata
     def register_components_headers(self, components_headers) -> None:
         self.metadata.components_headers = list(components_headers)
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
         print("WBEReflect: Exporting metadata...")
-        self._write_to_file(self.metadata_path, json.dumps(self.metadata.__dict__, indent=4))
+        self._write_to_file(self.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
         # Generate code
         generator = WBECodeGenerator({
-            "metadata" : self.metadata
+            "metadata" : self.metadata,
+            "static_labels" : static_labels,
+            "dynamic_labels" : dynamic_labels
         }, self._gen_file_infos)
         generator.generate()
 
     def checks(self) -> None:
         """Do checkings."""
         print("WBEReflect: Checking...")
-        self._check_hashing_collision("channels", self.metadata.channels)
+        self._check_hashing_collision("channels", self.metadata.labels, lambda label: hash_str(label.label_name))
 
     def _write_to_file(self, path : str, str_content : str) -> None:
         with open(path, "w+") as channel_file:
             channel_file.write(str_content)
 
-    def _check_hashing_collision(self, dict_name : str, dictionary : dict) -> None:
+    def _check_hashing_collision(self, dict_name : str, strs : list, hash_function) -> None:
         hash_val_set = set()
         dict_rev = dict()
-        for channel in dictionary.keys():
-            if dictionary[channel] in hash_val_set:
-                raise RuntimeError(f"Hasing collision of \"{dict_name}\" detected! Hash values of: \"{channel}\" "
-                    f"and \"{dict_rev[dictionary[channel]]}\" are identical: {dictionary[channel]}")
-            dict_rev[dictionary[channel]] = channel
-            hash_val_set.add(dictionary[channel])
+        for check in strs:
+            hash_code = hash_function(check)
+            if hash_code in hash_val_set:
+                raise RuntimeError(f"Hasing collision of \"{dict_name}\" detected! Hash values of: \"{check}\" "
+                    f"and \"{dict_rev[hash_code]}\" are identical: {hash_code}")
+            dict_rev[hash_code] = check
+            hash_val_set.add(hash_code)
 
 
 

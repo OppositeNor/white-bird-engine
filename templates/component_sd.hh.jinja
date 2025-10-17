@@ -1,4 +1,4 @@
-/* Copyright 2025 OppositeNor
+{# Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -11,18 +11,19 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
+#}
 // {{ _prefix }}
 #ifndef __WBE_COMPONENT_SD_GEN_HH__
 #define __WBE_COMPONENT_SD_GEN_HH__
 
 #include "core/serializer/serializer_json.hh"
-{% for components_header in metadata.components_headers %}#include "{{ components_header }}"
+{% for components_header in metadata.components_headers +%}
+#include "{{ components_header }}"
 {% endfor %}
 
 namespace WhiteBirdEngine {
 
-{% for component in metadata.components %}
+{% for component in metadata.components +%}
 /**
  * @class ComponentSD<{{ component.struct_name }}>
  * @brief Component serializer-deserializer for {{ component.struct_name }}.
@@ -47,7 +48,8 @@ public:
     template <typename Serializer>
     void serialize(Serializer& p_serializer, const ComponentType& p_component) {
         p_serializer.push_context("{{ component.struct_name }}");
-        {% for field in component.fields %}p_serializer.register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
+        {%+ for field in component.fields %}
+        p_serializer.register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
         {% endfor %}
         p_serializer.pop_context();
     }
@@ -59,7 +61,8 @@ public:
      */
     template <typename ParserData>
     void deserialize(const ParserData& p_data, ComponentType& p_component) {
-        {% for field in component.fields %}p_data.get_value("{{ field.field_name }}", p_component.{{ field.field_name }});
+        {% for field in component.fields %}
+        p_data.get_value("{{ field.field_name }}", p_component.{{ field.field_name }});
         {% endfor %}
     }
 };

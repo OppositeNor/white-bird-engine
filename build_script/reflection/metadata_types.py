@@ -20,7 +20,7 @@ class WBEFieldMetadata(BaseModel):
         field_name: The name of the field.
         field_type: The type of the field.
     """
-    attribute : str = ""
+    attribute : list[str] = Field(default_factory=list)
     field_name : str = ""
     field_type : str = ""
 
@@ -33,7 +33,7 @@ class WBEMethodMetadata(BaseModel):
         args_type: The types of the arguments.
         ret_type: The return type.
     """
-    attribute : str = ""
+    attribute : list[str] = Field(default_factory=list)
     method_name : str = ""
     args_name : list[str] = Field(default_factory=list)
     args_type : list[str] = Field(default_factory=list)
@@ -47,7 +47,7 @@ class WBEClassMetadata(BaseModel):
         fields: The fields of the class.
         methods: The methods of the class.
     """
-    attribute : str = ""
+    attribute : list[str] = Field(default_factory=list)
     class_name : str = ""
     fields : list[WBEFieldMetadata] = Field(default_factory=list)
     methods : list[WBEMethodMetadata] = Field(default_factory=list)
@@ -59,7 +59,7 @@ class WBELabelMetadata(BaseModel):
         attribute: The attribute of the label.
         label_name: The name of the label.
     """
-    attribute : str = ""
+    attribute : list[str] = Field(default_factory=list)
     label_name : str = ""
 
 class WBEComponentMetadata(BaseModel):
@@ -100,6 +100,6 @@ class WBEMetadata(BaseModel):
         components: The registrated components.
     """
     components_headers : list[str] = Field(default_factory=list[str])
-    channels : dict = Field(default_factory=dict)
+    labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
     components : list[WBEComponentMetadata] = Field(default_factory=list)

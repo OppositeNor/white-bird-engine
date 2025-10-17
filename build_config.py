@@ -69,3 +69,10 @@ test_dir = "tests"
 test_env_dir = "test_env"
 resource_dir = "res"
 
+static_labels = [
+    "WBE_CHANNEL"
+]
+
+dynamic_labels = [
+    "WBE_CHANNEL"
+]

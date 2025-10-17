@@ -12,5 +12,14 @@
         "data" : {
             "metadata" : ".metadata"
         }
+    },
+    {
+        "output_name" : "label_manager.gen.hh",
+        "template" : "label_manager.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "static_labels" : ".static_labels",
+            "dynamic_labels" : ".dynamic_labels"
+        }
     }
 ]

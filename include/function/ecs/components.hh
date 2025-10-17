@@ -92,5 +92,4 @@ WBE_STRUCT(ComponentTransform, WBE_COMPONENT) {
 };
 
 }
-
 #endif

@@ -18,7 +18,6 @@
 #include "global/global.hh"
 #include "core/logging/log_stream.hh"
 #include "platform/file_system/directory.hh"
-#include "utils/defs.hh"
 
 #include <gtest/gtest.h>
 #include <sstream>
@@ -41,7 +40,7 @@ TEST(WBELogStreamTest, General) {
 }
 
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(WBE_TEST_CHANNEL, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_CHANNEL, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabel) {
@@ -62,7 +61,7 @@ TEST(WBELogStreamTest, UserDefinedLabel) {
 #define TEST_LABEL_NAME_MACRO WBE_TEST_LABEL_MACRO
 
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
+WBE_LABEL(TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {

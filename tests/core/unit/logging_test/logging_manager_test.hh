@@ -18,7 +18,6 @@
 #include "core/logging/log.hh"
 #include "core/logging/logging_manager.hh"
 #include "global/global.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
 #include <ostream>
@@ -26,9 +25,9 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(WBE_TEST_LABEL_1, WBE_CHANNEL)
-WBE_DEFINE_LABEL(WBE_TEST_LABEL_2, WBE_CHANNEL)
-WBE_DEFINE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_LABEL_1, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_LABEL_2, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
 }
 
 class LogTestMock : public WBE::Log {

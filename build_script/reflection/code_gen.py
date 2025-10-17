@@ -50,7 +50,9 @@ class WBECodeGenerator:
         # Create a template environment in the root_dir
         self._env = Environment(
             loader=FileSystemLoader(build_setup.template_dir),
-            autoescape=select_autoescape()
+            autoescape=select_autoescape(),
+            trim_blocks=True,
+            lstrip_blocks=True
         )
         self._generate_infos = generate_infos
 

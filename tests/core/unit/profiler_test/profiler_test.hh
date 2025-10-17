@@ -26,7 +26,7 @@
 
 namespace WBE = WhiteBirdEngine;
 namespace WhiteBirdEngine {
-WBE_DEFINE_LABEL(WBE_TEST_PROFILING_CHANNEL, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_PROFILING_CHANNEL, WBE_CHANNEL)
 }
 
 TEST(WBEProfilerTest, Profiling) {

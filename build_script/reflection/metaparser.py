@@ -16,7 +16,7 @@ from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEComponentMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEComponentMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
@@ -83,15 +83,12 @@ class WBEMetaparser:
             return self._register_from_clang(cpp_file_path, cache_path)
 
     def _export_metadata(self):
+        result_metadata = WBEMetadata()
         for _, metadata in self._metadata.items():
-            for label in metadata.labels:
-                split_attribute = label.attribute.split(", ")
-                if "WBE_CHANNEL" in split_attribute:
-                    self.reflector.register_channel(label.label_name)
-            for cxx_class in metadata.classes:
-                self.reflector.register_class(cxx_class)
-            for component in metadata.components:
-                self.reflector.register_component(component)
+            result_metadata.labels.extend(metadata.labels)
+            result_metadata.classes.extend(metadata.classes)
+            result_metadata.components.extend(metadata.components)
+        self.reflector.register_metadata(result_metadata)
         self.reflector.register_components_headers(self._components_headers)
 
 
@@ -106,14 +103,14 @@ class WBEMetaparser:
         metadata = WBEFileMetadata()
         metadata.deps = self._get_include_deps(tu)
         metadata.file_path = cpp_file_path
-        self._register_labels(tu, metadata)
+        self._register_metadata(tu, metadata)
         metadata.hashcode = hash_file(cpp_file_path)
         self._metadata[cpp_file_path] = metadata
         with open(cache_path, "w") as f:
             json.dump(metadata.model_dump(), f, indent=4)
         return metadata
 
-    def _register_labels(self, tu, metadata : WBEFileMetadata):
+    def _register_metadata(self, tu, metadata : WBEFileMetadata):
         for attribute, data in self._visit_attributes(metadata, tu.cursor):
             getattr(metadata, attribute).append(data)
 
@@ -134,7 +131,7 @@ class WBEMetaparser:
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda metadata:
                         any(cursor.spelling == label.label_name for label in metadata.labels)):
-                    yield "labels", WBELabelMetadata(label_name=cursor.spelling, attribute=attr.spelling)
+                    yield "labels", WBELabelMetadata(label_name=cursor.spelling, attribute=self._get_attributes(attr.spelling))
 
     def _handle_visit_class_decl(self, metadata, cursor):
         for attr in cursor.get_children():
@@ -146,7 +143,7 @@ class WBEMetaparser:
     def _handle_visit_struct_decl(self, metadata, cursor):
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                if attr.spelling == WBE_COMPONENT:
+                if WBE_COMPONENT in self._get_attributes(attr.spelling):
                     if not self._any_all(metadata, lambda metadata:
                             any(cursor.spelling == metad_struct.struct_name for metad_struct in metadata.components)):
                         yield "components", self._get_component_metadata(cursor)
@@ -179,7 +176,7 @@ class WBEMetaparser:
     def _get_class_metadata(self, cursor, attribute):
         result = WBEClassMetadata()
         result.class_name = cursor.spelling
-        result.attribute = attribute
+        result.attribute = self._get_attributes(attribute)
         # TODO
         return WBEClassMetadata(class_name=cursor.spelling)
 
@@ -192,8 +189,11 @@ class WBEMetaparser:
             for attr in field.get_children():
                 if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR or attr.spelling != WBE_REFLECT:
                     continue
-                result.fields.append(WBEFieldMetadata(attribute=attr.spelling, field_name=field.spelling, field_type=field.type.spelling))
+                result.fields.append(WBEFieldMetadata(attribute=self._get_attributes(attr.spelling),
+                                                      field_name=field.spelling, field_type=field.type.spelling))
         return result
 
+    def _get_attributes(self, attr_spelling : str) -> list[str]:
+        return attr_spelling.split(", ")
 
 

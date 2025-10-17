@@ -1,4 +1,4 @@
-/* Copyright 2025 OppositeNor
+{# Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
+#}
 // {{ _prefix }}
 #ifndef __WBE_COMPONENT_ACCESS_GEN_HH__
 #define __WBE_COMPONENT_ACCESS_GEN_HH__
@@ -45,7 +45,8 @@ public:
      */
     std::vector<std::string> list_fields() const {
         return {
-            {% for field in component.fields %}"{{ field.field_name }}",
+            {% for field in component.fields %}
+            "{{ field.field_name }}",
             {% endfor %}
         };
     }

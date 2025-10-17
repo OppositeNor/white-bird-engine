@@ -1,0 +1,81 @@
+{# Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+#}
+// {{ _prefix }}
+#ifndef __WBE_LABEL_MANAGER_HH__
+#define __WBE_LABEL_MANAGER_HH__
+
+#include "utils/utils.hh"
+
+#include <map>
+#include <vector>
+
+namespace WhiteBirdEngine {
+
+template <HashCode T>
+struct LabelName {};
+
+{% for label in metadata.labels %}
+/**
+ * @class LabelName<static_hash("{{ label.label_name }}")>
+ * @brief Label name finder for {{ label.label_name }}.
+ */
+template <>
+struct LabelName<static_hash("{{ label.label_name }}")> {
+    static constexpr std::string_view LABEL_NAME = "{{ label.label_name }}";
+};
+{% endfor %}
+
+/**
+ * @class LabelManager
+ * @brief The manager for all the dynamic labels.
+ */
+class LabelManager {
+public:
+    LabelManager() {
+        {% for label in metadata.labels %}
+        dynamic_labels.push_back("{{ label.label_name }}");
+        hash_to_name.insert(static_hash("{{ label.label_name }}"), "{{ label.label_name }}");
+        {% endfor %}
+    }
+    ~LabelManager() {}
+
+    /**
+     * @brief Get the name of the label.
+     *
+     * @param p_label The label to get the name from.
+     * @return The name of the label
+     */
+    const std::string& get_label_name(HashCode p_label) const {
+        return hash_to_name.at(p_label);
+    }
+
+    /**
+     * @brief Register a label.
+     *
+     * @param p_name The name of the label to register.
+     */
+    void register_label(const std::string& p_name) {
+        dynamic_labels.push_back(p_name);
+        hash_to_name.insert(dynam_hash(p_name), p_name);
+    }
+
+private:
+    std::string dynamic_labels;
+    std::map<HashCode, std::string> hash_to_name;
+};
+
+}
+
+#endif
