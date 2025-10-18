@@ -61,7 +61,7 @@ class WBEReflector:
     def register_metadata(self, metadata) -> None:
         self.metadata = metadata
     def register_components_headers(self, components_headers) -> None:
-        self.metadata.components_headers = list(components_headers)
+        self.metadata.components_headers = sorted(list(components_headers))
 
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""

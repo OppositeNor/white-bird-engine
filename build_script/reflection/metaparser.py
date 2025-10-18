@@ -88,9 +88,9 @@ class WBEMetaparser:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
             result_metadata.components.extend(metadata.components)
+        result_metadata.sort()
         self.reflector.register_metadata(result_metadata)
         self.reflector.register_components_headers(self._components_headers)
-
 
     def _register_from_clang(self, cpp_file_path, cache_path):
         print(f"WBEMetaparser: parsing {cpp_file_path}")

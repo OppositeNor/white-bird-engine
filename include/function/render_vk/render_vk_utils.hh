@@ -21,6 +21,12 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class BaseRenderDataVK
+ * @brief The base render data that is commonly used throughout
+ * the render objects.
+ *
+ */
 struct BaseRenderDataVK {
     // The render allocator.
     RenderAllocator* allocator;
@@ -49,7 +55,6 @@ struct BaseRenderDataVK {
     // Compute command pool.
     VkCommandPool compute_command_pool;
 };
-
 
 }
 

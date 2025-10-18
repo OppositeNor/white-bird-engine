@@ -37,6 +37,11 @@ public:
      */
     RenderTaskVK(const BaseRenderDataVK* p_render_data);
 
+    
+    struct RenderDataHandle {
+
+    };
+
 protected:
     const BaseRenderDataVK* render_data;
 };

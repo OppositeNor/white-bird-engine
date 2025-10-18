@@ -60,10 +60,9 @@ void RenderTaskVKPerformGraphicsPipeline::involke(double p_delta) {
     
     // For graphics pipeline, wait till the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage.
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore semaphore[] = {framebuffer->get_available_semaphore()};
 
     submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = semaphore;
+    submit_info.pWaitSemaphores = VK_NULL_HANDLE; // TODO
     submit_info.pWaitDstStageMask = wait_stages;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;

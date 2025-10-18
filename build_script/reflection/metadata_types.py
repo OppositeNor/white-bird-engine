@@ -103,3 +103,13 @@ class WBEMetadata(BaseModel):
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
     components : list[WBEComponentMetadata] = Field(default_factory=list)
+
+    def sort(self):
+        """Sor the fields. This may gurantee the order it generates will always be the same,
+        which is usefull not triggering the CMake and metaparser's compilation for the generated
+        files.
+        """
+        self.components_headers.sort()
+        self.labels = sorted(self.labels, key=lambda label: label.label_name)
+        self.classes = sorted(self.classes, key=lambda cxx_class: cxx_class.class_name)
+        self.components = sorted(self.components, key=lambda component: component.struct_name)

@@ -15,6 +15,7 @@
 import os
 from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from build_script.utils import hash_file, hash_str_sha256
 import build_setup
 from pydantic import BaseModel, Field
 
@@ -75,7 +76,12 @@ class WBECodeGenerator:
         data = generate_info.data
         data["_prefix"] = GENERATE_PREFIX
         output = template.render(data)
-        with open(os.path.join(generate_info.out_dir, generate_info.output_name), "w") as f:
-            f.write(output)
+        
+        output_path = os.path.join(generate_info.out_dir, generate_info.output_name)
+        if hash_file(output_path) != hash_str_sha256(output):
+            # Only export when found different from what was generated to not trigger
+            # the CMake compilation.
+            with open(output_path, "w") as f:
+                f.write(output)
 
 

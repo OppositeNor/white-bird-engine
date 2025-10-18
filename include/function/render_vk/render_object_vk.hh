@@ -16,17 +16,7 @@ public:
     RenderObjectVK(const BaseRenderDataVK* p_render_data);
     virtual ~RenderObjectVK() override;
 
-    /**
-     * @brief Get the semaphore that indicates the object is available.
-     *
-     * @return The semaphore that indicates the object is available.
-     */
-    VkSemaphore get_available_semaphore() const {
-        return available_semaphore;
-    }
-
 protected:
-    VkSemaphore available_semaphore;
     const BaseRenderDataVK* render_data;
 private:
     void init();
