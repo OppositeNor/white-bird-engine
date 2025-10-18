@@ -19,7 +19,6 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
@@ -81,15 +80,6 @@ public:
         return &base_render_data;
     }
 
-    /**
-     * @brief Get the present render task.
-     *
-     * @return The present render task.
-     */
-    const Unique<RenderTaskVK>& get_present_render_task() const {
-        return present_render_task;
-    }
-
 private:
 
     inline static RendererVK* singleton = nullptr;
@@ -121,9 +111,6 @@ private:
         std::vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
     };
     Unique<RenderObjects> render_objects;
-    
-    // The final render task that presents the result onto the screen.
-    Unique<RenderTaskVK> present_render_task;
 
     // Vulkan properties
     SDL_Window* window;

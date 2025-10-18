@@ -35,6 +35,8 @@ def has_apache_license_header(file_pathes, max_lines=30):
     for file_path in file_pathes:
         print(f"Checking {file_path}...")
         found = set()
+        if ".gen" in file_path:
+            continue
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             for i, line in enumerate(f):
                 for k in LICENSE_KEYWORDS:

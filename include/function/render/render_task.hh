@@ -15,34 +15,53 @@
 #ifndef __WBE_RENDER_TASK_HH__
 #define __WBE_RENDER_TASK_HH__
 
-#include <string>
+#include "core/allocator/allocator.hh"
+#include "core/memory/reference_raw.hh"
+#include "utils/utils.hh"
 #include <vector>
+#include <vulkan/vulkan_core.h>
+
 namespace WhiteBirdEngine {
+
+using RendResID = HashCode;
+using RendResTID = HashCode;
+using RendTaskID = HashCode;
+
+struct RendResInfo {
+    RendResID res_id;
+    RendResTID type_id;
+};
 
 /**
  * @class RenderTask
- * @brief A render task.
+ * @brief The abstract struct for render task.
  *
  */
-class RenderTask {
-public:
-    RenderTask() = default;
-    virtual ~RenderTask() {}
-
+struct RenderTask {
     /**
-     * @brief Involke the render task.
-     *
-     * @param p_delta The difference of time in seconds from the last frame.
+     * @brief Perform the render task.
      */
-    virtual void involke(double p_delta) = 0;
-
-    /**
-     * @brief Get the dependencies of resources.
-     *
-     * @return The ids of the resources.
-     */
-    virtual std::vector<std::string> get_resource_dependencies() const = 0;
+    virtual void operator()() = 0;
 };
+
+struct RenderTaskInfo {
+    // The ID of this render task.
+    RendTaskID render_task_id;
+
+    // Previous render task.
+    std::vector<RendTaskID> prev;
+    // Next render tasks.
+    std::vector<RendTaskID> next;
+
+    // Required resources.
+    std::vector<RendResID> req_res;
+    // Produced resources.
+    std::vector<RendResInfo> prod_res;
+
+    // The render task instance.
+    RefRaw<RenderTask> render_task = MEM_NULL;
+};
+
 
 }
 

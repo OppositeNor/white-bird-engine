@@ -28,6 +28,7 @@ template <HashCode T>
 struct LabelName {};
 
 {% for label in metadata.labels %}
+{% if label.attribute | select("in", static_labels) | list | length > 0  %}
 /**
  * @class LabelName<static_hash("{{ label.label_name }}")>
  * @brief Label name finder for {{ label.label_name }}.
@@ -36,6 +37,7 @@ template <>
 struct LabelName<static_hash("{{ label.label_name }}")> {
     static constexpr std::string_view LABEL_NAME = "{{ label.label_name }}";
 };
+{% endif %}
 {% endfor %}
 
 /**
@@ -46,8 +48,10 @@ class LabelManager {
 public:
     LabelManager() {
         {% for label in metadata.labels %}
+        {% if label.attribute | select("in", dynamic_labels) | list | length > 0  %}
         dynamic_labels.push_back("{{ label.label_name }}");
         hash_to_name.insert(std::pair(static_hash("{{ label.label_name }}"), std::string("{{ label.label_name }}")));
+        {% endif %}
         {% endfor %}
     }
     ~LabelManager() {}

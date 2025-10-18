@@ -21,7 +21,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
-#include "function/render_vk/render_task_vk_perform_graphics_pipeline.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -69,7 +68,6 @@ void RendererVK::init() {
 }
 
 void RendererVK::terminate() {
-    present_render_task.reset();
     render_objects.reset();
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
@@ -159,12 +157,7 @@ void RendererVK::init_swap_chain_framebuffers() {
 }
 
 void RendererVK::setup_present_render_task() {
-    // TEST
     // TODO
-    present_render_task = make_unique<RenderTaskVKPerformGraphicsPipeline>(allocator, &base_render_data,
-                                                                           render_objects->result_render_pass,
-                                                                           render_objects->graphics_pipeline,
-                                                                           "swap_chain_present");
 }
 
 void RendererVK::create_instance() {
