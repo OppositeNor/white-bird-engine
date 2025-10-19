@@ -31,7 +31,13 @@ class Renderer : public Singleton<Renderer> {
 public:
     Renderer() = default;
     virtual ~Renderer() {}
-    // TODO
+
+    /**
+     * @brief Called every frame.
+     *
+     * @param p_delta The difference between the last two calls of this function.
+     */
+    virtual void tick(double p_delta) = 0;
 protected:
 
 private:

@@ -41,7 +41,7 @@ struct RenderTask {
     /**
      * @brief Perform the render task.
      */
-    virtual void operator()() = 0;
+    virtual void operator()(double p_delta) = 0;
 };
 
 struct RenderTaskInfo {

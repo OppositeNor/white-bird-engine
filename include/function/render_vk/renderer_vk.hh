@@ -15,12 +15,14 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -30,7 +32,11 @@
 #include "utils/defs.hh"
 
 #include <SDL.h>
+#include <format>
+#include <map>
 #include <optional>
+#include <stdexcept>
+#include <string>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -53,6 +59,9 @@ public:
     RendererVK& operator=(RendererVK&&) = delete;
 
     RendererVK(AllocType* p_allocator);
+
+    virtual void tick(double p_delta) override;
+
     /**
      * @brief Get the singleton instance.
      *
@@ -78,6 +87,32 @@ public:
      */
     const BaseRenderDataVK* get_base_render_data() const {
         return &base_render_data;
+    }
+
+    /**
+     * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
+     *
+     * @param p_pipeline_name The name of the pipeline to register.
+     * @param p_root_task The root render task of the pipeline.
+     */
+    void register_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task) {
+        if (p_root_task == MEM_NULL) {
+            throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
+        }
+        pipelines[p_pipeline_name] = p_root_task;
+        compile_pipeline(p_pipeline_name);
+    }
+
+    /**
+     * @brief Activate a pipeline.
+     *
+     * @param p_pipeline_name The name of the pipeline to activate.
+     */
+    void activate_pipeline(const std::string& p_pipeline_name) {
+        if (pipelines.find(p_pipeline_name) == pipelines.end()) {
+            throw std::runtime_error(std::format("Failed to activate pipeline: {}, pipeline not registered.", p_pipeline_name));
+        }
+        activated_pipeline = pipelines[p_pipeline_name];
     }
 
 private:
@@ -185,6 +220,9 @@ private:
 
     BaseRenderDataVK base_render_data;
 
+    std::map<std::string, Ref<RenderTaskInfo>> pipelines;
+    Ref<RenderTaskInfo> activated_pipeline;
+
     void init();
     void terminate();
 
@@ -221,6 +259,8 @@ private:
     VkAllocationCallbacks* get_allocation_callbacks() {
         return allocator_vk->get_allocation_callbacks();
     }
+
+    void compile_pipeline(const std::string& p_pipeline_name);
 };
 
 }

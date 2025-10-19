@@ -53,6 +53,10 @@ RendererVK::~RendererVK() {
     singleton = nullptr;
 }
 
+void RendererVK::tick(double p_delta) {
+    // TODO
+}
+
 void RendererVK::init() {
     render_objects = make_unique<RenderObjects>(allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
@@ -606,6 +610,10 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     result.width = extent_width;
     result.height = extent_height;
     return result;
+}
+
+void RendererVK::compile_pipeline(const std::string& p_pipeline_name) {
+    // TODO
 }
 
 }
