@@ -46,15 +46,6 @@ struct AllocatorTrait<class HeapAllocatorAlignedPoolImplicitList> final : public
 /**
  * @class HeapAllocatorAlignedPoolImplicitList
  * @brief Heap allocator pool with memory alignment support, with an implicit list.
- * I put this here because I spent a lot of time implement this and I think there might
- * be posibilities for further optimizations. But for now the efficiency of this
- * allocator is very bad and you should use the one without the implicit list version
- * if you want ot have an aligned pool allocator.
- * The only advantage of this allocator is that it keeps all the resource allocations
- * inside this pool, where the one without the implicit list does not since it needs
- * additional allocation for the idle list. However, this doesn't really overcome the
- * performance issue it has for now, and should be avoided using.
- * @todo Test
  */
 class HeapAllocatorAlignedPoolImplicitList final : public HeapAllocatorAligned {
 public:

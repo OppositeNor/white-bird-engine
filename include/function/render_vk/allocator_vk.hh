@@ -15,7 +15,7 @@
 #ifndef __WBE_ALLOCATOR_VK_HH__
 #define __WBE_ALLOCATOR_VK_HH__
 
-#include "core/allocator/heap_allocator_aligned.hh"
+#include "core/core_utils.hh"
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
  * @brief Allocator for Vulkan.
  *
  */
-template <typename AllocType = HeapAllocatorAligned>
+template <typename AllocType = HeapAllocatorDefault>
 class AllocatorVK {
 public:
 

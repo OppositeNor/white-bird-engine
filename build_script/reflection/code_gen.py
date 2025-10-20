@@ -78,7 +78,7 @@ class WBECodeGenerator:
         output = template.render(data)
         
         output_path = os.path.join(generate_info.out_dir, generate_info.output_name)
-        if hash_file(output_path) != hash_str_sha256(output):
+        if not os.path.exists(output_path) or hash_file(output_path) != hash_str_sha256(output):
             # Only export when found different from what was generated to not trigger
             # the CMake compilation.
             with open(output_path, "w") as f:

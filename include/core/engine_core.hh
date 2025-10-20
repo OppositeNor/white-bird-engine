@@ -14,7 +14,7 @@
 */
 #ifndef __WBE_ENGINE_CORE_HH__
 #define __WBE_ENGINE_CORE_HH__
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/engine_config/engine_config.hh"
 #include "core/clock/clock.hh"
@@ -81,7 +81,7 @@ public:
     /**
      * @brief Global pool allocator.
      */
-    HeapAllocatorAlignedPool* pool_allocator;
+    HeapAllocatorAlignedPoolImplicitList* pool_allocator;
     /**
      * @brief Manager for logs.
      */
@@ -106,7 +106,7 @@ private:
  *
  * @return The global allocator;
  */
-inline HeapAllocatorAlignedPool* global_allocator() {
+inline HeapAllocatorAlignedPoolImplicitList* global_allocator() {
     return EngineCore::get_singleton()->pool_allocator;
 }
 

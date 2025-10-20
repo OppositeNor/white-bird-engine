@@ -15,11 +15,11 @@
 #ifndef __WBE_RENDERER_HH__
 #define __WBE_RENDERER_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/core_utils.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
 
-using RenderAllocator = HeapAllocatorAlignedPool;
+using RenderAllocator = HeapAllocatorDefault;
 
 /**
  * @class Renderer

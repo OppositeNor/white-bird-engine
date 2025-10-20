@@ -58,6 +58,12 @@ set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
 add_subdirectory(dependencies/boost)
+if (WBE_MAKE_TEST)
+    add_subdirectory(dependencies/googletest)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
+    add_subdirectory(dependencies/google-benchmark)
+endif()
+
 
 # Set C++ build flags
 if (NOT MSVC)
@@ -65,10 +71,10 @@ if (NOT MSVC)
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Deploy")
     ## for optimization
-    add_compile_options(-O2 -flto -DNDEBUG)
+    add_compile_options(-O2 -DNDEBUG)
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     ## for optimization and testing
-    add_compile_options(-O2 -g -flto -DNDEBUG)
+    add_compile_options(-O2 -g -DNDEBUG)
 else()
     ## for gdb or valgrind
     add_compile_options(-O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
@@ -89,11 +95,20 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/stb
     ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
 )
+if (WBE_MAKE_TEST)
+    set(include_dirs
+        ${include_dirs}
+        ${PROJECT_SOURCE_DIR}/dependencies/googletest/googletest
+        ${PROJECT_SOURCE_DIR}/dependencies/google-benchmark/include
+    )
+endif()
+
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories
 else()
     set(include_dirs ${include_dirs} ${PROJECT_SOURCE_DIR}/dependencies/SDL2/include)
 endif()
+
 include_directories(
     ${include_dirs}
 )
@@ -141,11 +156,6 @@ endif()
 set(WBE_TEST_EXE "")
 if (WBE_MAKE_TEST)
     # Export tests
-    add_subdirectory(dependencies/googletest)
-    set(include_dirs
-        ${include_dirs}
-        ${PROJECT_SOURCE_DIR}/dependencies/googletest/googletest
-    )
     add_subdirectory(tests)
 endif()
 

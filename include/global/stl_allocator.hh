@@ -15,7 +15,7 @@
 #ifndef __WBE_STL_ALLOCATOR_HH__
 #define __WBE_STL_ALLOCATOR_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/core_utils.hh"
 #include <set>
 #include <string>
 #include <type_traits>
@@ -110,7 +110,7 @@ struct STLAllocator {
  * @brief STL vector that uses a custom allocator.
  *
  * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType>
 using vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
@@ -119,16 +119,16 @@ using vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
  * @brief STL vector that uses a pool allocator.
  *
  * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T>
-using vectorp = vector<T, HeapAllocatorAlignedPool>;
+using vectorp = vector<T, HeapAllocatorDefault>;
 
 /**
  * @brief STL set that uses a custom allocator.
  *
  * @tparam T The type of the values in the set.
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
@@ -137,15 +137,15 @@ using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  * @brief STL set that uses a pool allocator.
  *
  * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T>
-using setp = set<T, HeapAllocatorAlignedPool>;
+using setp = set<T, HeapAllocatorDefault>;
 
 /**
  * @brief STL string that uses a custom allocator.
  *
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename AllocType>
 using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false, true, false>>;
@@ -153,17 +153,17 @@ using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char
 /**
  * @brief STL string that uses a pool allocator.
  *
- * @tparam AllocType The type of the allocator. HeapAllocatorAlignedPool by default.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-using stringp = string<HeapAllocatorAlignedPool>;
+using stringp = string<HeapAllocatorDefault>;
 
 /**
- * @brief Short name for stl allocator that uses HeapAllocatorAlignedPool.
+ * @brief Short name for stl allocator that uses HeapAllocatorDefault.
  *
  * @tparam T 
  */
 template <typename T>
-using STLAllocatorPool = STLAllocator<T, HeapAllocatorAlignedPool, false, true, false>;
+using STLAllocatorPool = STLAllocator<T, HeapAllocatorDefault, false, true, false>;
 
 }
 

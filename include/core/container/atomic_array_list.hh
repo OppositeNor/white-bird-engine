@@ -15,7 +15,7 @@
 #ifndef __WBE_ARRAY_LIST_HH__
 #define __WBE_ARRAY_LIST_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/core_utils.hh"
 #include "global/stl_allocator.hh"
 #include <algorithm>
 #include <cstddef>
@@ -280,7 +280,7 @@ private:
 };
 
 template <typename T>
-using AtomicArrayListP = AtomicArrayList<T, HeapAllocatorAlignedPool>;
+using AtomicArrayListP = AtomicArrayList<T, HeapAllocatorDefault>;
 
 
 }

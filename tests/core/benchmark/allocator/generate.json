@@ -1,0 +1,10 @@
+[
+    {
+        "output_name" : "benchmark.gen.cmake",
+        "template" : "benchmark.cmake.jinja",
+        "data" : {
+            "name" : "wbe_allocator_benchmark"
+        }
+    }
+]
+
