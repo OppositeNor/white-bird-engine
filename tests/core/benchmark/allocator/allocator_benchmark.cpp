@@ -18,50 +18,96 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "global/global.hh"
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <vector>
 
-namespace WhiteBirdEngine {
+namespace WBE = WhiteBirdEngine;
+
+constexpr size_t ALLOC_NUM = 100;
+constexpr size_t POOL_SIZE = WBE_MiB(1);
+constexpr size_t FREE_BATCH = 1000;
 
 void malloc_free_benchmark(benchmark::State& p_state) {
+    std::vector<int*> allocated;
+    allocated.reserve(FREE_BATCH);
+    size_t counter = 0;
     for (auto _ : p_state) {
-        int* mem = static_cast<int*>(malloc(1000 * sizeof(int)));
-        for (int i = 0; i < 10; ++i) {
-            // trigger page fault to allocate memory.
-            mem[i] = i;
+        ++counter;
+        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int)));
+        for (int i = 0; i < ALLOC_NUM; ++i) {
+            result[i] = i;
         }
-        free(mem);
+        allocated.push_back(result);
+        if (counter % FREE_BATCH == 0) {
+            for (int i = 0; i < FREE_BATCH; ++i) {
+                free(allocated.back());
+                allocated.pop_back();
+            }
+        }
+    }
+    for (auto queued_free : allocated) {
+        free(queued_free);
     }
 }
 BENCHMARK(malloc_free_benchmark);
 
 void heap_allocated_aligned_pool_benchmark(benchmark::State& p_state) {
-    HeapAllocatorAlignedPool pool;
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WBE::HeapAllocatorAlignedPool pool(POOL_SIZE);
+    std::vector<WBE::MemID> allocated;
+    allocated.reserve(FREE_BATCH);
+    size_t counter = 0;
     for (auto _ : p_state) {
-        MemID mem_id = pool.allocate(1000 * sizeof(int));
-        int* mem = static_cast<int*>(pool.get(mem_id));
-        for (int i = 0; i < 10; ++i) {
-            mem[i] = i;
+        ++counter;
+        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        int* result_ptr = static_cast<int*>(pool.get(result));
+        for (int i = 0; i < ALLOC_NUM; ++i) {
+            result_ptr[i] = i;
         }
-        pool.deallocate(mem_id);
+        allocated.push_back(result);
+        if (counter % FREE_BATCH == 0) {
+            for (int i = 0; i < FREE_BATCH; ++i) {
+                pool.deallocate(allocated.back());
+                allocated.pop_back();
+            }
+        }
+    }
+    for (auto queued_free : allocated) {
+        pool.deallocate(queued_free);
     }
 }
 BENCHMARK(heap_allocated_aligned_pool_benchmark);
 
 void heap_allocated_aligned_pool_impl_list_benchmark(benchmark::State& p_state) {
-    HeapAllocatorAlignedPoolImplicitList pool;
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WBE::HeapAllocatorAlignedPoolImplicitList pool(POOL_SIZE);
+    std::vector<WBE::MemID> allocated;
+    allocated.reserve(FREE_BATCH);
+    size_t counter = 0;
     for (auto _ : p_state) {
-        MemID mem_id = pool.allocate(10 * sizeof(int));
-        int* mem = static_cast<int*>(pool.get(mem_id));
-        for (int i = 0; i < 10; ++i) {
-            mem[i] = i;
+        ++counter;
+        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        int* result_ptr = static_cast<int*>(pool.get(result));
+        for (int i = 0; i < ALLOC_NUM; ++i) {
+            result_ptr[i] = i;
         }
-        pool.deallocate(mem_id);
+        allocated.push_back(result);
+        if (counter % FREE_BATCH == 0) {
+            for (int i = 0; i < FREE_BATCH; ++i) {
+                pool.deallocate(allocated.back());
+                allocated.pop_back();
+            }
+        }
+    }
+    for (auto queued_free : allocated) {
+        pool.deallocate(queued_free);
     }
 }
 BENCHMARK(heap_allocated_aligned_pool_impl_list_benchmark);
 
 BENCHMARK_MAIN();
 
-}
 
 #endif

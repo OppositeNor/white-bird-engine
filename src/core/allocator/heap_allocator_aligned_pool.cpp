@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -39,6 +40,8 @@ HeapAllocatorAlignedPool::HeapAllocatorAlignedPool(size_t p_size)
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to create pool: malloc failed.");
     }
+    // Trigger page fault to mmap from MMU.
+    memset(mem_chunk, 0, p_size);
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
     idle_list_head->next = nullptr;

@@ -16,7 +16,7 @@
 #define __CORE_UTILS_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include <stdexcept>
@@ -47,7 +47,7 @@ RefWeak<T> requires_valid(const std::string& p_name, RefWeak<T> p_ref) {
     return p_ref;
 }
 
-using HeapAllocatorDefault = HeapAllocatorAlignedPoolImplicitList;
+using HeapAllocatorDefault = HeapAllocatorAlignedPool;
 
 }
 

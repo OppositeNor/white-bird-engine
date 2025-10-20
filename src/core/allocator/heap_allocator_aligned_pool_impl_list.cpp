@@ -44,6 +44,7 @@ HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to create pool: malloc failed.");
     }
+    memset(mem_chunk, 0, p_size);
     WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
     idle_chunks_count = 1;
 }
