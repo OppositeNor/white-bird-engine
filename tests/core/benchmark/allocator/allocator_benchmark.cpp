@@ -25,9 +25,9 @@
 
 namespace WBE = WhiteBirdEngine;
 
-constexpr size_t ALLOC_NUM = 100;
-constexpr size_t POOL_SIZE = WBE_MiB(1);
-constexpr size_t FREE_BATCH = 1000;
+constexpr size_t ALLOC_NUM = 1000;
+constexpr size_t POOL_SIZE = WBE_MiB(100);
+constexpr size_t FREE_BATCH = 10000;
 
 void malloc_free_benchmark(benchmark::State& p_state) {
     std::vector<int*> allocated;
