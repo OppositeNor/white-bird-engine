@@ -46,7 +46,7 @@ HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_
     }
     memset(mem_chunk, 0, p_size);
     WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
-    idle_chunks_count = 1;
+    possible_valid = mem_chunk;
 }
 
 HeapAllocatorAlignedPoolImplicitList::~HeapAllocatorAlignedPoolImplicitList() {
@@ -83,8 +83,39 @@ MemID HeapAllocatorAlignedPoolImplicitList::allocate(size_t p_size, size_t p_ali
     throw std::runtime_error(err_msg);
 }
 
+MemID HeapAllocatorAlignedPoolImplicitList::check_posible_free(size_t p_aligned_size, size_t p_alignment) {
+    if (possible_valid == nullptr) {
+        return MEM_NULL;
+    }
+    uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(possible_valid) + WORD_SIZE;
+    char* idle_mem_start = reinterpret_cast<char*>(
+        (proxy_mem_start_addr / p_alignment) * p_alignment == proxy_mem_start_addr ?
+            proxy_mem_start_addr : (proxy_mem_start_addr / p_alignment + 1) * p_alignment
+    ) - WORD_SIZE;
+    // If idle node valid, insert.
+    if (idle_mem_start + p_aligned_size <= possible_valid + WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
+        void* result_loc = acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
+        char* next_chunk = possible_valid + p_aligned_size;
+        if (WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+            possible_valid = next_chunk;
+        }
+        else {
+            possible_valid = nullptr;
+        }
+        MemID result_id = reinterpret_cast<MemID>(result_loc) + WORD_SIZE;
+        *static_cast<Header*>(result_loc) = p_aligned_size;
+        internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
+        return result_id;
+    }
+    return MEM_NULL;
+}
+
 template <bool COALESCE_ENABLED>
 MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_size, size_t p_alignment) {
+    MemID possible_result = check_posible_free(p_aligned_size, p_alignment);
+    if (possible_result != MEM_NULL) {
+        return possible_result;
+    }
     char* free_memory = get_next_free_memory<true, COALESCE_ENABLED>(mem_chunk);
     while (free_memory != nullptr) {
         // Find the aligned starting point.
@@ -96,6 +127,13 @@ MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_si
         // If idle node valid, insert.
         if (idle_mem_start + p_aligned_size <= free_memory + WBE_HAAPIL_GET_CHUNK_SIZE(free_memory)) {
             void* result_loc = acquire_memory(free_memory, idle_mem_start, p_aligned_size);
+            char* next_chunk = free_memory + p_aligned_size;
+            if (WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+                possible_valid = next_chunk;
+            }
+            else {
+                possible_valid = nullptr;
+            }
             MemID result_id = reinterpret_cast<MemID>(result_loc) + WORD_SIZE;
             *static_cast<Header*>(result_loc) = p_aligned_size;
             internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
@@ -111,6 +149,9 @@ void HeapAllocatorAlignedPoolImplicitList::deallocate(MemID p_mem) {
     char* data_loc = reinterpret_cast<char*>(p_mem - WORD_SIZE);
     size_t data_size = WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - WORD_SIZE)));
     insert_free_memory(data_loc, data_size);
+    if (possible_valid == nullptr || data_size > WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
+        possible_valid = data_loc;
+    }
 }
 
 template <bool CHECK_FIRST, bool COALESCE_ENABLED>
@@ -158,7 +199,7 @@ void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(char* p_idle_chunk, c
 
 void HeapAllocatorAlignedPoolImplicitList::insert_free_memory(char* p_insert_start, size_t p_insert_size) {
     WBE_HAAPIL_SET_CHUNK_HEADER(p_insert_start, HeaderType::IDLE, p_insert_size);
-    // coalesce_chunk(p_insert_start);
+    coalesce_chunk(p_insert_start);
 }
 
 char* HeapAllocatorAlignedPoolImplicitList::get_chunk_before(void* p_loc) {

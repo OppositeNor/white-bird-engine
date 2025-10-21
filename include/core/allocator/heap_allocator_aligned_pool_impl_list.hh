@@ -93,6 +93,7 @@ public:
 
     virtual void clear() override {
         WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
+        possible_valid = mem_chunk;
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
@@ -138,7 +139,7 @@ private:
 
     size_t size;
     char* mem_chunk;
-    uint32_t idle_chunks_count;
+    char* possible_valid;
 
     size_t internal_fragmentation_tracker = 0;
 
@@ -150,6 +151,7 @@ private:
         IDLE = 1,
     };
 
+    MemID check_posible_free(size_t p_aligned_size, size_t p_alignment);
     template <bool COALESCE_ENABLED>
     MemID find_valid_chunk(size_t p_aligned_size, size_t p_alignment);
     template <bool CHECK_FIRST, bool COALESCE_ENABLED>

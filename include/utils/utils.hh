@@ -81,6 +81,14 @@ constexpr HashCode dynam_hash(const char* p_str) {
     return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
 }
 
+constexpr HashCode dynam_hash(int32_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = (p_val >> 16) ^ p_val;
+    return p_val;
+}
+
 /**
  * @brief Hash a string.
  *

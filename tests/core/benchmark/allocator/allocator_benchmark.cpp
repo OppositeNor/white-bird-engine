@@ -19,9 +19,12 @@
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "global/global.hh"
+#include "utils/utils.hh"
 #include <benchmark/benchmark.h>
 #include <cstddef>
+#include <utility>
 #include <vector>
+#include <ranges>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -35,16 +38,30 @@ void malloc_free_benchmark(benchmark::State& p_state) {
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int)));
+        int* result = (int*)malloc(ALLOC_NUM*sizeof(int));
         for (int i = 0; i < ALLOC_NUM; ++i) {
             result[i] = i;
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
-            for (int i = 0; i < FREE_BATCH; ++i) {
-                free(allocated.back());
-                allocated.pop_back();
+            if (counter % (3 + FREE_BATCH)) {
+                size_t n = allocated.size();
+                for (int k = 0; k < n; ++k) {
+                    std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
+                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                }
             }
+            if (counter % (2 * FREE_BATCH)) {
+                for (auto queued_free : allocated) {
+                    free(queued_free);
+                }
+            }
+            else {
+                for (auto queued_free : allocated | std::views::reverse) {
+                    free(queued_free);
+                }
+            }
+            allocated.clear();
         }
     }
     for (auto queued_free : allocated) {
@@ -68,10 +85,24 @@ void heap_allocated_aligned_pool_benchmark(benchmark::State& p_state) {
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
-            for (int i = 0; i < FREE_BATCH; ++i) {
-                pool.deallocate(allocated.back());
-                allocated.pop_back();
+            if (counter % (3 + FREE_BATCH)) {
+                size_t n = allocated.size();
+                for (int k = 0; k < n; ++k) {
+                    std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
+                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                }
             }
+            if (counter % (2 * FREE_BATCH)) {
+                for (auto queued_free : allocated) {
+                    pool.deallocate(queued_free);
+                }
+            }
+            else {
+                for (auto queued_free : allocated | std::views::reverse) {
+                    pool.deallocate(queued_free);
+                }
+            }
+            allocated.clear();
         }
     }
     for (auto queued_free : allocated) {
@@ -95,10 +126,24 @@ void heap_allocated_aligned_pool_impl_list_benchmark(benchmark::State& p_state) 
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
-            for (int i = 0; i < FREE_BATCH; ++i) {
-                pool.deallocate(allocated.back());
-                allocated.pop_back();
+            if (counter % (3 + FREE_BATCH)) {
+                size_t n = allocated.size();
+                for (int k = 0; k < n; ++k) {
+                    std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
+                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                }
             }
+            if (counter % (2 * FREE_BATCH)) {
+                for (auto queued_free : allocated) {
+                    pool.deallocate(queued_free);
+                }
+            }
+            else {
+                for (auto queued_free : allocated | std::views::reverse) {
+                    pool.deallocate(queued_free);
+                }
+            }
+            allocated.clear();
         }
     }
     for (auto queued_free : allocated) {
