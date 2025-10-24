@@ -18,6 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_object.hh"
 #include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
@@ -224,8 +225,10 @@ private:
 
     BaseRenderDataVK base_render_data;
 
+    // TODO
     struct RendTaskRes {
         RendResID res_id;
+        Ref<RenderObject> res;
         VkSemaphore available_semaphore;
     };
 

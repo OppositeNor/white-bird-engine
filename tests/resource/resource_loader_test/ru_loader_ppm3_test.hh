@@ -21,6 +21,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/ru_loader_ppm3.hh"
 #include <cstring>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <memory>
 #include <sstream>
@@ -47,6 +48,20 @@ protected:
     R"("flip_v" : false)"
     R"(})";
     WBE::JSONData test_ppm3_json_data;
+    
+    void createSinglePixelImage() {
+        // Create a single pixel PPM3 image file for edge case testing
+        std::ofstream single_pixel_file("test_env/res/images/single_pixel.ppm");
+        single_pixel_file << "P3\n";
+        single_pixel_file << "1 1\n";
+        single_pixel_file << "255\n";
+        single_pixel_file << "128 64 192\n"; // Purple pixel
+        single_pixel_file.close();
+    }
+    
+    void removeSinglePixelImage() {
+        std::remove("test_env/res/images/single_pixel.ppm");
+    }
 };
 
 class MockResourceChunk : public WBE::ResourceChunk {
@@ -333,6 +348,99 @@ TEST_F(RULoaderPPM3Test, MultipleLoads) {
         << "Expected first load with key test_res_1, got: " << output;
     EXPECT_TRUE(output.find("push_res_unit_ptr(test_res_2, pushed_res,") != std::string::npos)
         << "Expected second load with key test_res_2, got: " << output;
+}
+
+TEST_F(RULoaderPPM3Test, SinglePixelImage) {
+    // Create the single pixel image file
+    createSinglePixelImage();
+    
+    WBE::RULoaderPPM3 loader;
+    MockResourceChunk res_chunk;
+    
+    // Create JSON data for single pixel image
+    std::string single_pixel_json = R"({
+        "path" : "images/single_pixel.ppm",
+        "color_space" : "rgb",
+        "flip_h" : false,
+        "flip_v" : false
+    })";
+    
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(single_pixel_json);
+    WBE::JSONData single_pixel_json_data = parser.get_data();
+    
+    // Load the single pixel image
+    auto result = loader.load<WBE::JSONData>(res_chunk, "single_pixel", single_pixel_json_data);
+    
+    // Verify that the resource chunk methods were called correctly
+    std::string output = res_chunk.ss.str();
+    EXPECT_TRUE(output.find("push_data(3, pushed_data)") != std::string::npos) 
+        << "Expected push_data call for 1x1x3=3 bytes, got: " << output;
+    EXPECT_TRUE(output.find("push_res_unit_ptr(single_pixel, pushed_res,") != std::string::npos)
+        << "Expected push_res_unit_ptr call, got: " << output;
+    
+    // Verify that the RUImage was created correctly
+    ASSERT_NE(res_chunk.pushed_res.size(), 0) << "RUImage should have been pushed to chunk";
+    const WBE::RUImage* image = reinterpret_cast<const WBE::RUImage*>(res_chunk.pushed_res[0].get());
+    
+    EXPECT_EQ(image->width, 1) << "Image width should be 1";
+    EXPECT_EQ(image->height, 1) << "Image height should be 1";
+    EXPECT_EQ(image->channel_count, 3) << "Image should have 3 channels (RGB)";
+    EXPECT_EQ(image->color_space, WBE::ColorSpace::RGB) << "Color space should be RGB";
+    EXPECT_FALSE(image->config.test(WBE::RUImage::IS_HDR)) << "Image should not be HDR";
+    
+    // Verify that image data was pushed
+    EXPECT_NE(res_chunk.pushed_data.size(), 0) << "Image data should have been pushed to chunk";
+    
+    // Verify the single pixel data (should be purple: 128, 64, 192)
+    const unsigned char* pixel_data = reinterpret_cast<const unsigned char*>(res_chunk.pushed_data[0].get());
+    EXPECT_EQ(pixel_data[0], 128) << "Single pixel red component should be 128";
+    EXPECT_EQ(pixel_data[1], 64) << "Single pixel green component should be 64";
+    EXPECT_EQ(pixel_data[2], 192) << "Single pixel blue component should be 192";
+    
+    // Clean up the test file
+    removeSinglePixelImage();
+}
+
+TEST_F(RULoaderPPM3Test, SinglePixelImageWithFlips) {
+    // Create the single pixel image file
+    createSinglePixelImage();
+    
+    WBE::RULoaderPPM3 loader;
+    MockResourceChunk res_chunk;
+    
+    // Create JSON data for single pixel image with both flips enabled
+    std::string single_pixel_flip_json = R"({
+        "path" : "images/single_pixel.ppm",
+        "color_space" : "rgb",
+        "flip_h" : true,
+        "flip_v" : true
+    })";
+    
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(single_pixel_flip_json);
+    WBE::JSONData single_pixel_flip_json_data = parser.get_data();
+    
+    // Load the single pixel image with flips (should be same result)
+    auto result = loader.load<WBE::JSONData>(res_chunk, "single_pixel_flip", single_pixel_flip_json_data);
+    
+    // Verify that the image was loaded correctly
+    ASSERT_NE(res_chunk.pushed_res.size(), 0) << "RUImage should have been pushed to chunk";
+    ASSERT_NE(res_chunk.pushed_data.size(), 0) << "Image data should have been pushed to chunk";
+    
+    const WBE::RUImage* image = reinterpret_cast<const WBE::RUImage*>(res_chunk.pushed_res[0].get());
+    const unsigned char* pixel_data = reinterpret_cast<const unsigned char*>(res_chunk.pushed_data[0].get());
+    
+    EXPECT_EQ(image->width, 1) << "Image width should be 1";
+    EXPECT_EQ(image->height, 1) << "Image height should be 1";
+    
+    // For a single pixel, flipping should have no effect - pixel data should be identical
+    EXPECT_EQ(pixel_data[0], 128) << "Single pixel red component should be 128 (same after flips)";
+    EXPECT_EQ(pixel_data[1], 64) << "Single pixel green component should be 64 (same after flips)";
+    EXPECT_EQ(pixel_data[2], 192) << "Single pixel blue component should be 192 (same after flips)";
+    
+    // Clean up the test file
+    removeSinglePixelImage();
 }
 
 #endif

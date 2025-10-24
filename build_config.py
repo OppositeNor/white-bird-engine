@@ -70,7 +70,8 @@ test_env_dir = "test_env"
 resource_dir = "res"
 
 static_labels = [
-    "WBE_CHANNEL"
+    "WBE_CHANNEL",
+    "WBE_RENDER_OBJECT_TYPE"
 ]
 
 dynamic_labels = [

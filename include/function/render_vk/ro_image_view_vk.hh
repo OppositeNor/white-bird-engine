@@ -15,13 +15,17 @@
 #ifndef __WBE_RO_IMAGE_VIEW_VK_HH__
 #define __WBE_RO_IMAGE_VIEW_VK_HH__
 
+#include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+WBE_LABEL(ROT_IMAGE_VIEW_VK, WBE_RENDER_OBJECT_TYPE);
 
 /**
  * @class ROImageViewVK
@@ -84,8 +88,8 @@ public:
     ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROImageViewVK() override;
 
-    virtual std::string get_ro_type() const override {
-        return "image_view_vk";
+    virtual RendResTID get_ro_type() const override {
+        return ROT_IMAGE_VIEW_VK;
     }
 
     /**

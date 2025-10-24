@@ -15,7 +15,7 @@
 #ifndef __WBE_RENDER_OBJECT_HH__
 #define __WBE_RENDER_OBJECT_HH__
 
-#include <string>
+#include "function/render/render_task.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -32,7 +32,7 @@ public:
     /**
      * @brief Get the type of the render object.
      */
-    virtual std::string get_ro_type() const = 0;
+    virtual RendResTID get_ro_type() const = 0;
 
 };
 

@@ -68,6 +68,7 @@ class WBEReflector:
         print("WBEReflect: Exporting metadata...")
         self._write_to_file(self.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
         # Generate code
+        print("metadata:", self.metadata)
         generator = WBECodeGenerator({
             "metadata" : self.metadata,
             "static_labels" : static_labels,
