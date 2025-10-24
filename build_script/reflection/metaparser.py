@@ -187,10 +187,12 @@ class WBEMetaparser:
             if field.kind != clang.cindex.CursorKind.FIELD_DECL:
                 continue
             for attr in field.get_children():
-                if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR or attr.spelling != WBE_REFLECT:
+                if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
                     continue
-                result.fields.append(WBEFieldMetadata(attribute=self._get_attributes(attr.spelling),
-                                                      field_name=field.spelling, field_type=field.type.spelling))
+                attributes = self._get_attributes(attr.spelling)
+                if WBE_REFLECT in attributes:
+                    result.fields.append(WBEFieldMetadata(attribute=self._get_attributes(attr.spelling),
+                                                          field_name=field.spelling, field_type=field.type.spelling))
         return result
 
     def _get_attributes(self, attr_spelling : str) -> list[str]:

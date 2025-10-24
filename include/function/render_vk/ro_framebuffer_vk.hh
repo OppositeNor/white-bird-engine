@@ -15,7 +15,9 @@
 #ifndef __WBE_RO_FRAMEBUFFER_VK_HH__
 #define __WBE_RO_FRAMEBUFFER_VK_HH__
 
+#include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -26,6 +28,8 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
+
+WBE_LABEL(ROT_FRAME_BUFFER_VK, WBE_RENDER_OBJECT_TYPE);
 
 /**
  * @class ROFramebufferVK
@@ -119,8 +123,8 @@ public:
     ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROFramebufferVK() override;
 
-    virtual std::string get_ro_type() const override {
-        return "frame_buffer";
+    virtual RendResTID get_ro_type() const override {
+        return ROT_FRAME_BUFFER_VK;
     }
 
     /**
