@@ -82,8 +82,10 @@ public:
 
     virtual void* get(MemID p_id) const override {
         if (p_id == MEM_NULL) {
+
             return nullptr;
         }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
         return reinterpret_cast<void*>(p_id);
     }
 

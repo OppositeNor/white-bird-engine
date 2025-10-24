@@ -146,6 +146,7 @@ MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_si
 }
 
 void HeapAllocatorAlignedPoolImplicitList::deallocate(MemID p_mem) {
+    WBE_DEBUG_ASSERT(is_in_pool(p_mem));
     char* data_loc = reinterpret_cast<char*>(p_mem - WORD_SIZE);
     size_t data_size = WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - WORD_SIZE)));
     insert_free_memory(data_loc, data_size);
