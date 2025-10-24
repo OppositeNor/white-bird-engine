@@ -18,10 +18,11 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -32,6 +33,7 @@
 #include "utils/defs.hh"
 
 #include <SDL.h>
+#include <cstdint>
 #include <format>
 #include <map>
 #include <optional>
@@ -99,8 +101,10 @@ public:
         if (p_root_task == MEM_NULL) {
             throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
         }
-        pipelines[p_pipeline_name] = p_root_task;
-        compile_pipeline(p_pipeline_name);
+        if (p_root_task->prev.size() != 0) {
+            throw std::runtime_error(std::format("Root task {} should not have previous tasks.", p_pipeline_name));
+        }
+        pipelines[p_pipeline_name] = compile_pipeline(p_pipeline_name, p_root_task);
     }
 
     /**
@@ -220,8 +224,23 @@ private:
 
     BaseRenderDataVK base_render_data;
 
-    std::map<std::string, Ref<RenderTaskInfo>> pipelines;
-    Ref<RenderTaskInfo> activated_pipeline;
+    struct RendTaskRes {
+        RendResID res_id;
+        VkSemaphore available_semaphore;
+    };
+
+    struct TaskInfo {
+        RendTaskID task_id;
+        Ref<RenderTaskVK> setup_command_buffer_task;
+    };
+
+    struct PipelineInfo {
+        string pipeline_name;
+        std::vector<TaskInfo> task_infos;
+    };
+
+    std::map<std::string, Ref<PipelineInfo>> pipelines;
+    Ref<PipelineInfo> activated_pipeline;
 
     void init();
     void terminate();
@@ -260,7 +279,7 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    void compile_pipeline(const std::string& p_pipeline_name);
+    Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task);
 };
 
 }

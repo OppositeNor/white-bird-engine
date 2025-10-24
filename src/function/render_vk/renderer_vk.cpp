@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/renderer_vk.hh"
+#include "core/allocator/allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -35,6 +36,7 @@
 #include <SDL_vulkan.h>
 #include <cstdint>
 #include <format>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vulkan/vulkan_core.h>
@@ -569,6 +571,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
     SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(allocator),
         .present_modes = vector<VkPresentModeKHR>(allocator)};
+    std::cout << static_cast<std::string>(*allocator) << std::endl;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -612,8 +615,8 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     return result;
 }
 
-void RendererVK::compile_pipeline(const std::string& p_pipeline_name) {
-    // TODO
+Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task) {
+    return MEM_NULL; // TODO
 }
 
 }

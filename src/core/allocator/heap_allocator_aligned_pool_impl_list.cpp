@@ -96,7 +96,7 @@ MemID HeapAllocatorAlignedPoolImplicitList::check_posible_free(size_t p_aligned_
     if (idle_mem_start + p_aligned_size <= possible_valid + WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
         void* result_loc = acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
         char* next_chunk = possible_valid + p_aligned_size;
-        if (WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+        if (next_chunk < mem_chunk + size && WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
             possible_valid = next_chunk;
         }
         else {
@@ -128,7 +128,7 @@ MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_si
         if (idle_mem_start + p_aligned_size <= free_memory + WBE_HAAPIL_GET_CHUNK_SIZE(free_memory)) {
             void* result_loc = acquire_memory(free_memory, idle_mem_start, p_aligned_size);
             char* next_chunk = free_memory + p_aligned_size;
-            if (WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+            if (next_chunk < mem_chunk + size && WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
                 possible_valid = next_chunk;
             }
             else {
@@ -149,9 +149,6 @@ void HeapAllocatorAlignedPoolImplicitList::deallocate(MemID p_mem) {
     char* data_loc = reinterpret_cast<char*>(p_mem - WORD_SIZE);
     size_t data_size = WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - WORD_SIZE)));
     insert_free_memory(data_loc, data_size);
-    if (possible_valid == nullptr || data_size > WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
-        possible_valid = data_loc;
-    }
 }
 
 template <bool CHECK_FIRST, bool COALESCE_ENABLED>
@@ -256,6 +253,7 @@ void HeapAllocatorAlignedPoolImplicitList::coalesce_chunk(char* p_chunk) const {
         WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, HeaderType::IDLE, chunk_size + WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk + chunk_size));
         chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk);
     }
+    possible_valid = p_chunk;
 }
 
 HeapAllocatorAlignedPoolImplicitList::operator std::string() const {

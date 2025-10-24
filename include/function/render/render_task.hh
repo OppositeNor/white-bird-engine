@@ -38,6 +38,8 @@ struct RendResInfo {
  *
  */
 struct RenderTask {
+    RenderTask() = default;
+    virtual ~RenderTask() {};
     /**
      * @brief Perform the render task.
      */

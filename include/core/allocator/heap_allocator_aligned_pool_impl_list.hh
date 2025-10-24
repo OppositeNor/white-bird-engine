@@ -139,7 +139,7 @@ private:
 
     size_t size;
     char* mem_chunk;
-    char* possible_valid;
+    mutable char* possible_valid;
 
     size_t internal_fragmentation_tracker = 0;
 

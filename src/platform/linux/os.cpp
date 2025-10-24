@@ -76,7 +76,7 @@ PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[]
     if (pid == 0) {
         int ret_val;
         if ((ret_val = execve(p_exec_path, (char* const*)p_argv, (char* const*)p_envp)) < 0) {
-            printf("Failed to run program: %s.\n", p_exec_path);
+            printf("Failed to run program %s: %s\n", p_exec_path, strerror(errno));
             exit(EXIT_FAILURE);
         }
     }
