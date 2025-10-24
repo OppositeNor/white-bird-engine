@@ -13,3 +13,4 @@
    limitations under the License.
 */
 #include "ru_image_test.hh"
+#include "ru_loader_ppm3_test.hh"
