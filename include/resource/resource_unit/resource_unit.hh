@@ -130,7 +130,7 @@ struct RUImage : public ResourceUnit {
  * @class RUText
  * @brief Text resource unit. contains encoding type, size (in bytes, excluding
  * the NUL terminater) and a MemID pointing to the data chunk that stores the data
- * of the string (ends with a NUL character).
+ * of the string (ends with a NUL terminater).
  *
  * The data should always be pushed before pushing this resource unit, and the
  * release process should always be backwards (first release the resource unit, and
