@@ -254,7 +254,9 @@ void HeapAllocatorAlignedPoolImplicitList::coalesce_chunk(char* p_chunk) const {
         WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, HeaderType::IDLE, chunk_size + WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk + chunk_size));
         chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk);
     }
-    possible_valid = p_chunk;
+    if (possible_valid == nullptr || p_chunk < possible_valid) {
+        possible_valid = p_chunk;
+    }
 }
 
 HeapAllocatorAlignedPoolImplicitList::operator std::string() const {
@@ -265,17 +267,23 @@ HeapAllocatorAlignedPoolImplicitList::operator std::string() const {
     ss << "\"chunk_layout\":[";
     char* curr = mem_chunk;
     bool first = true;
+    uint32_t fragments_count = 0;
     while (curr < mem_chunk + size) {
         if (!first) ss << ",";
         first = false;
+        bool occupied = WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED;
         ss << "{"
-            << "\"occupied\":" << std::to_string(WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) << ","
+            << "\"occupied\":" << std::to_string(occupied) << ","
             << "\"begin\":" << (curr - mem_chunk) << ","
             << "\"size\":" << WBE_HAAPIL_GET_CHUNK_SIZE(curr)
             << "}";
         curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
+        if (curr < mem_chunk + size && !occupied) {
+            ++fragments_count;
+        }
     }
-    ss << "]";
+    ss << "],";
+    ss << "\"fragments_count:\"" << fragments_count;
     ss << "}";
     return ss.str();
 }
