@@ -19,6 +19,7 @@
 #include <set>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <vector>
 namespace WhiteBirdEngine {
 
@@ -132,6 +133,33 @@ using vectorp = vector<T, HeapAllocatorDefault>;
  */
 template <typename T, typename AllocType>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
+
+/**
+ * @brief STL set that uses a pool allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
+ */
+template <typename T>
+using setp = set<T, HeapAllocatorDefault>;
+
+/**
+ * @brief STL set that uses a custom allocator.
+ *
+ * @tparam T The type of the values in the set.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
+ */
+template <typename T, typename AllocType>
+using unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
+
+/**
+ * @brief STL set that uses a custom allocator.
+ *
+ * @tparam T The type of the values in the set.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
+ */
+template <typename T, typename AllocType>
+using unordered_setp = unordered_set<T, HeapAllocatorDefault>;
 
 /**
  * @brief STL set that uses a pool allocator.

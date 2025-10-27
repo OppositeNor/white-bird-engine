@@ -21,6 +21,7 @@
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
+#include <functional>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
@@ -38,8 +39,10 @@ class Ref {
     template <typename T1, typename AllocType1>
     friend class Ref;
 
-    template <typename T1>
+    template <typename T1, typename AllocTYpe1>
     friend class RefWeak;
+
+    friend struct ::std::hash<Ref<T, AllocType>>;
 
     struct ControlBlock;
 public:
@@ -88,17 +91,20 @@ public:
         throw std::runtime_error("Cannot directly asign an memory id to a reference unless it's MEM_NULL.");
     }
 
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref(const Ref<T1, AllocType1>& p_other) {
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
     }
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref(Ref<T1, AllocType1>&& p_other) {
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(const Ref<T1, AllocType1>& p_other) {
         if (*this == p_other) {
             return *this;
@@ -108,7 +114,8 @@ public:
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         return *this;
     }
-    template <typename T1, typename AllocType1> requires std::convertible_to<T1*, T*>
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(Ref<T1, AllocType1>&& p_other) {
         if (*this == p_other) {
             return *this;
@@ -118,8 +125,6 @@ public:
         p_other.control_block = nullptr;
         return *this;
     }
-
-
 
     Ref& operator=(std::nullptr_t) {
         deref();
@@ -245,26 +250,35 @@ public:
     }
 
     bool operator==(std::nullptr_t) const {
-        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+        return is_null();
     }
 
     bool operator==(void* p_ptr) const {
         if (p_ptr != nullptr) {
             throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
         }
-        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+        return is_null();
     }
 
     bool operator==(MemID p_mem_id) const {
         if (p_mem_id != MEM_NULL) {
             throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
         }
-        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+        return is_null();
     }
 
     template <typename T1>
     bool operator!=(T1 p_obj) const {
         return !(*this == p_obj);
+    }
+
+    /**
+     * @brief Is the reference NULL.
+     *
+     * @return true if the reference is NULL, false otherwise.
+     */
+    bool is_null() const {
+        return control_block == nullptr || control_block->mem_id == MEM_NULL;
     }
 
 private:
@@ -325,9 +339,29 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }
     MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
-    return Ref<T>(p_allocator, id);
+    return Ref<T, AllocType>(p_allocator, id);
 }
 
+}
+
+namespace std {
+/**
+ * @brief Hash function for reference.
+ *
+ * @tparam T The type of the reference.
+ * @param p_ref The reference to hash.
+ * @return 
+ */
+template <typename T, typename AllocType>
+struct hash<::WhiteBirdEngine::Ref<T, AllocType>> {
+    size_t operator()(const ::WhiteBirdEngine::Ref<T, AllocType>& p_ref) {
+        if (p_ref.is_null()) {
+            return WhiteBirdEngine::MEM_NULL;
+        }
+        return std::hash(p_ref.control_block->allocator) ^ std::hash(p_ref.control_block->mem_id);
+    }
+
+};
 }
 
 #endif

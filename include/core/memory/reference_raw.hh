@@ -35,6 +35,8 @@ template <typename T, typename AllocType = HeapAllocatorAligned>
 class RefRaw {
     template <typename T1, typename AllocType1>
     friend class RefRaw;
+
+    friend struct ::std::hash<::WhiteBirdEngine::RefRaw<T, AllocType>>;
 public:
     using ObjType = T;
     RefRaw() = default;
@@ -234,21 +236,21 @@ public:
     }
 
     bool operator==(std::nullptr_t) const {
-        return mem_id == MEM_NULL || allocator == nullptr;
+        return is_null();
     }
 
     bool operator==(void* p_ptr) const {
         if (p_ptr != nullptr) {
             throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
         }
-        return allocator == nullptr || mem_id == MEM_NULL;
+        return is_null();
     }
 
     bool operator==(MemID p_mem_id) const {
         if (p_mem_id != MEM_NULL) {
             throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
         }
-        return allocator == nullptr || mem_id == MEM_NULL;
+        return is_null();
     }
 
     template <typename T1>
@@ -285,6 +287,15 @@ public:
         return num;
     }
 
+    /**
+     * @brief Is the reference NULL.
+     *
+     * @return true if the reference is NULL, false otherwise.
+     */
+    bool is_null() const {
+        return allocator == nullptr || mem_id == MEM_NULL;
+    }
+
 private:
     MemID mem_id = MEM_NULL;
     size_t num;
@@ -318,6 +329,26 @@ template <typename T>
 void delete_ref_stack(RefRaw<T, StackAllocator>&& p_ref) {
     RefRaw<T, StackAllocator>::delete_ref_stack(std::move(p_ref));
 }
+}
+
+namespace std {
+/**
+ * @brief Hash function for raw reference.
+ *
+ * @tparam T The type of the reference.
+ * @param p_ref The reference to hash.
+ * @return 
+ */
+template <typename T, typename AllocType>
+struct hash<::WhiteBirdEngine::RefRaw<T, AllocType>> {
+    size_t operator()(const ::WhiteBirdEngine::RefRaw<T, AllocType>& p_ref) {
+        if (p_ref.is_null()) {
+            return WhiteBirdEngine::MEM_NULL;
+        }
+        return std::hash(p_ref.allocator) ^ std::hash(p_ref.control_block->mem_id);
+    }
+
+};
 }
 
 #endif
