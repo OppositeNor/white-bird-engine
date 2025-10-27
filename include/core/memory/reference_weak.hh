@@ -16,29 +16,32 @@
 #define __WBE_REFERENCE_WEAK_HH__
 
 #include "reference_strong.hh"
+#include <atomic>
 #include <concepts>
 
 namespace WhiteBirdEngine {
 
-template <typename T>
+template <typename T, typename AllocType = HeapAllocatorAligned>
 class RefWeak {
 public:
+    using ObjType = T;
+
     RefWeak()
         : control_block(nullptr) {}
     ~RefWeak() {
         deref();
     }
-    RefWeak(const RefWeak<T>& p_other) {
+    RefWeak(const RefWeak<T, AllocType>& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         p_other.ref();
         control_block = p_other.control_block;
     }
-    RefWeak(RefWeak<T>&& p_other) {
+    RefWeak(RefWeak<T, AllocType>&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
     }
-    RefWeak& operator=(const RefWeak<T>& p_other) {
+    RefWeak& operator=(const RefWeak<T, AllocType>& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
@@ -48,7 +51,7 @@ public:
         control_block = p_other.control_block;
         return *this;
     }
-    RefWeak& operator=(RefWeak<T>&& p_other) {
+    RefWeak& operator=(RefWeak<T, AllocType>&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
@@ -58,12 +61,12 @@ public:
         p_other.control_block = nullptr;
         return *this;
     }
-    RefWeak(const Ref<T>& p_ref) {
+    RefWeak(const Ref<T, AllocType>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         control_block = p_ref.control_block;
         ref();
     }
-    RefWeak& operator=(const Ref<T>& p_ref) {
+    RefWeak& operator=(const Ref<T, AllocType>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         deref();
         control_block = p_ref.control_block;
@@ -71,29 +74,33 @@ public:
         return *this;
     }
 
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak(const RefWeak<T1>& p_other) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak(const RefWeak<T1, AllocType1>& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         p_other.ref();
         control_block = reinterpret_cast<decltype(control_block)>(p_other.control_block);
     }
 
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak(RefWeak<T1>&& p_other) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak(RefWeak<T1, AllocType1>&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = reinterpret_cast<decltype(control_block)>(p_other.control_block);
         p_other.control_block = nullptr;
     }
 
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak(const Ref<T1>& p_ref) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak(const Ref<T1, AllocType1>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         control_block = reinterpret_cast<decltype(control_block)>(p_ref.control_block);
         ref();
     }
 
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak& operator=(const RefWeak<T1>& p_other) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak& operator=(const RefWeak<T1, AllocType1>& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
@@ -103,8 +110,9 @@ public:
         control_block = reinterpret_cast<decltype(control_block)>(p_other.control_block);
         return *this;
     }
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak& operator=(RefWeak<T1>&& p_other) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak& operator=(RefWeak<T1, AllocType1>&& p_other) {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
@@ -115,8 +123,9 @@ public:
         return *this;
     }
 
-    template <typename T1> requires (std::convertible_to<T1*, T*>)
-    RefWeak& operator=(const Ref<T1>& p_ref) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    RefWeak& operator=(const Ref<T1, AllocType1>& p_ref) {
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
         deref();
         control_block = reinterpret_cast<decltype(control_block)>(p_ref.control_block);
@@ -135,6 +144,11 @@ public:
         return Ref<const T>(control_block);
     }
 
+    /**
+     * @brief Is the reference valid.
+     *
+     * @return True if the reference is valid, false otherwise.
+     */
     bool is_valid() const {
         return control_block != nullptr && control_block->strong_ref_counter.load(std::memory_order_acquire) != 0;
     }
@@ -142,6 +156,18 @@ public:
     template <typename T1>
     bool operator==(const RefWeak<T1>& p_other) const {
         return control_block == reinterpret_cast<decltype(control_block)>(p_other.control_block);
+    }
+
+    /**
+     * @brief Is the reference NULL. Invalid reference would be recognized as NULL.
+     *
+     * @return True if the reference is NULL, false otherwise.
+     */
+    bool is_null() const {
+        if (!is_valid()) {
+            return false;
+        }
+        return lock()->is_null();
     }
 
 private:
@@ -167,6 +193,26 @@ private:
     }
 };
 
+}
+
+namespace std {
+/**
+ * @brief Hash function for reference.
+ *
+ * @tparam T The type of the reference.
+ * @param p_ref The reference to hash.
+ * @return 
+ */
+template <typename T, typename AllocType>
+struct hash<::WhiteBirdEngine::RefWeak<T, AllocType>> {
+    size_t operator()(const ::WhiteBirdEngine::RefWeak<T, AllocType>& p_ref) {
+        if (p_ref.is_null()) {
+            return WhiteBirdEngine::MEM_NULL;
+        }
+        return std::hash(p_ref.control_block->allocator) ^ std::hash(p_ref.control_block->mem_id);
+    }
+
+};
 }
 
 #endif

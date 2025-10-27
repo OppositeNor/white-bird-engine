@@ -40,6 +40,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -131,6 +132,8 @@ private:
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
     template <typename T>
     using set = ::WhiteBirdEngine::set<T, AllocType>;
+    template <typename T>
+    using unordered_set = ::WhiteBirdEngine::unordered_set<T, AllocType>;
     using string = ::WhiteBirdEngine::string<AllocType>;
 
     AllocType* allocator;
@@ -239,10 +242,13 @@ private:
 
     struct PipelineInfo {
         string pipeline_name;
-        std::vector<TaskInfo> task_infos;
+        unordered_set<Ref<RendTaskRes>> rend_res;
+        vector<TaskInfo> task_infos;
     };
 
     std::map<std::string, Ref<PipelineInfo>> pipelines;
+    std::unordered_map<RendResID, RefWeak<RendTaskRes>> rend_res;
+
     Ref<PipelineInfo> activated_pipeline;
 
     void init();

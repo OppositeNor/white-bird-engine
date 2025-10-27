@@ -356,4 +356,45 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     ASSERT_TRUE(allocator.is_empty());
 }
 
+TEST_F(WBERefStrongTest, IsNullMethod_BasicBehavior) {
+    WBE::MockHeapAllocatorAligned allocator(1024);
+    {
+        // Default constructed reference should be null
+        WBE::Ref<int> default_ref;
+        ASSERT_TRUE(default_ref.is_null());
+
+        // Reference constructed with MEM_NULL via allocator should be null
+        WBE::Ref<int> null_ref(&allocator, WBE::MEM_NULL);
+        ASSERT_TRUE(null_ref.is_null());
+        ASSERT_EQ(null_ref.get(), nullptr);
+
+        // make_ref should produce a non-null reference
+        WBE::Ref<int> valid_ref = WBE::Ref<int>::make_ref(&allocator, 42);
+        ASSERT_FALSE(valid_ref.is_null());
+        ASSERT_NE(valid_ref.get(), nullptr);
+
+        // Assigning nullptr should make it null again
+        valid_ref = nullptr;
+        ASSERT_TRUE(valid_ref.is_null());
+    }
+    ASSERT_TRUE(allocator.is_empty());
+}
+
+TEST_F(WBERefStrongTest, IsNullMethod_MoveAndLifetime) {
+    WBE::MockHeapAllocatorAligned allocator(1024);
+    {
+        // Move semantics: moved-from reference becomes null
+        WBE::Ref<int> a = WBE::Ref<int>::make_ref(&allocator, 7);
+        WBE::Ref<int> b = std::move(a);
+        ASSERT_TRUE(a.is_null());
+        ASSERT_FALSE(b.is_null());
+
+        // After resetting the last strong reference, the reference should be null
+        b = nullptr;
+        ASSERT_TRUE(b.is_null());
+    }
+
+    ASSERT_TRUE(allocator.is_empty());
+}
+
 #endif

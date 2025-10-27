@@ -616,6 +616,7 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
 }
 
 Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task) {
+
     return MEM_NULL; // TODO
 }
 
