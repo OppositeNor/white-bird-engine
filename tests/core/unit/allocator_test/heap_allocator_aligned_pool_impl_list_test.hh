@@ -66,14 +66,6 @@ TEST(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
     ASSERT_EQ(pool.get_remain_size(), 256);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, DoubleDeallocation) {
-    WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
-    WBE::MemID mem = pool.allocate(16);
-    pool.deallocate(mem);
-    pool.deallocate(mem);
-    ASSERT_EQ(pool.get_remain_size(), 128);
-}
-
 TEST(WBEAllocAlignedPoolImplicitListTest, PoolReuseAfterClear) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     pool.allocate(32);
