@@ -162,6 +162,15 @@ public:
         return mem_id == MEM_NULL;
     }
 
+    /**
+     * @brief Check if the unique reference is NULL.
+     *
+     * @return True if is NULL, false otherwise.
+     */
+    bool is_null() const {
+        return allocator == nullptr || mem_id == MEM_NULL;
+    }
+
 private:
     MemID mem_id;
     AllocType* allocator;
@@ -182,6 +191,26 @@ Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
     MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Unique<T>(p_allocator, id);
 }
+
+}
+namespace std {
+/**
+ * @brief Hash function for unique instance.
+ *
+ * @tparam T The type of the instance.
+ * @param p_ref The reference to hash.
+ * @return 
+ */
+template <typename T, typename AllocType>
+struct hash<::WhiteBirdEngine::Unique<T, AllocType>> {
+    size_t operator()(const ::WhiteBirdEngine::Unique<T, AllocType>& p_unique) {
+        if (p_unique.is_null()) {
+            return WhiteBirdEngine::MEM_NULL;
+        }
+        return std::hash<AllocType*>{}(p_unique.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.control_block->mem_id);
+    }
+
+};
 
 }
 

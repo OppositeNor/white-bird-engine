@@ -56,6 +56,7 @@ struct BaseRenderDataVK {
     VkCommandPool compute_command_pool;
 };
 
+
 }
 
 #endif

@@ -15,7 +15,9 @@
 #ifndef __WBE_RENDER_TASK_VK_HH__
 #define __WBE_RENDER_TASK_VK_HH__
 
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/render_object_vk.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -27,15 +29,13 @@ struct RenderTaskVK : public RenderTask {
     RenderTaskVK() = default;
     virtual ~RenderTaskVK() {}
     /**
-     * @brief The semaphores of the required resources. This will be filled in the order
-     * of the req_res field.
+     * @brief The required resources. This will be filled in the order of the req_res field in RendTaskInfo.
      */
-    std::vector<VkSemaphore> req_res_semaphores;
+    std::vector<Ref<RendResVK>> req_rend_res;
     /**
-     * @brief The semaphores of the produced resources. This will be filled in the order
-     * of the prod_res field.
+     * @brief The produced resources. This will be filled in the order of the prod_res field in RendTaskInfo.
      */
-    std::vector<VkSemaphore> prod_res_semaphores;
+    std::vector<Ref<RendResVK>> prod_rend_res;
 };
 
 }

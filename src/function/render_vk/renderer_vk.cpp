@@ -22,19 +22,24 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "global/stl_allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 
 #include <SDL_vulkan.h>
 #include <cstdint>
+#include <deque>
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -613,9 +618,78 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     return result;
 }
 
-Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task) {
+Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
+    WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
+    auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
+    process_tasks(p_root_task, pipeline_info);
+    return pipeline_info;
+}
 
-    return MEM_NULL; // TODO
+void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
+    // Using bfs, as the order where the render task will be pushed to the queue.
+    unordered_set<Ref<RendTaskInfo>> visited(allocator);
+    deque<Ref<RendTaskInfo>> to_visit(allocator);
+    to_visit.push_back(p_root_task);
+    while (!to_visit.empty()) {
+        Ref<RendTaskInfo> curr = to_visit.front();
+        to_visit.pop_front();
+        if (visited.find(curr) == visited.end()) {
+            visited.insert(curr);
+
+            TaskInfo task_info;
+            task_info.render_task = curr->render_task.dynamic_cast_ref<RenderTaskVK>();
+
+            if (task_info.render_task == MEM_NULL) {
+                throw std::runtime_error(std::format(
+                    "Failed to convert RenderTask {} to RenderTaskVK. This task is probably not a Vulkan task.", curr->task_id));
+            }
+            task_info.task_id = curr->task_id;
+            register_render_resources(curr, task_info, p_pipeline_info);
+            p_pipeline_info->task_infos.push_back(task_info);
+
+            for (auto next : curr->next) {
+                to_visit.push_back(next);
+            }
+        }
+    }
+}
+
+void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline) {
+    WBE_DEBUG_ASSERT(p_task != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_task_info.render_task != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
+    for (auto& res : p_task->req_res) {
+        auto iter = render_resources.find(res);
+        Ref<RendResVK> rend_res;
+        if (iter == render_resources.end()) {
+            rend_res = make_ref<RendResVK>(allocator, &base_render_data);
+            rend_res->res_id = res;
+            // It is the users' responsibility to unitialize this field.
+            rend_res->res = MEM_NULL;
+            p_pipeline->rend_res.push_back(rend_res);
+            render_resources.insert({res, rend_res});
+        }
+        else {
+            rend_res = iter->second.lock();
+        }
+        p_task_info.render_task->req_rend_res.push_back(rend_res);
+    }
+    for (auto& res : p_task->prod_res) {
+        auto iter = render_resources.find(res);
+        Ref<RendResVK> rend_res;
+        if (iter == render_resources.end()) {
+            rend_res = make_ref<RendResVK>(allocator, &base_render_data);
+            rend_res->res_id = res;
+            // It is the users' responsibility to unitialize this field.
+            rend_res->res = MEM_NULL;
+            p_pipeline->rend_res.push_back(rend_res);
+            render_resources.insert({res, rend_res});
+        }
+        else {
+            rend_res = iter->second.lock();
+        }
+        p_task_info.render_task->prod_rend_res.push_back(rend_res);
+    }
 }
 
 }

@@ -17,6 +17,7 @@
 
 #include "function/render/render_object.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -36,6 +37,41 @@ private:
     void init();
 };
 
+
+/**
+ * @class SemaphoreVK
+ * @brief Vulkan semaphore container.
+ *
+ */
+struct SemaphoreVK {
+    VkSemaphore semaphore;
+    const BaseRenderDataVK* render_data;
+    SemaphoreVK(const BaseRenderDataVK* p_render_data)
+        : render_data(p_render_data) {
+        VkSemaphoreCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create semaphore.");
+        }
+    }
+    ~SemaphoreVK() {
+        vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
+    }
+};
+
+/**
+ * @class RendResVK
+ * @brief A vulkan resource instance.
+ *
+ */
+struct RendResVK {
+    RendResID res_id;
+    Ref<RenderObjectVK> res;
+    SemaphoreVK available_semaphore;
+    RendResVK(const BaseRenderDataVK* p_render_data)
+        : available_semaphore(p_render_data) {}
+    
+};
 }
 
 #endif

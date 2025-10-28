@@ -345,7 +345,7 @@ struct hash<::WhiteBirdEngine::RefRaw<T, AllocType>> {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }
-        return std::hash(p_ref.allocator) ^ std::hash(p_ref.control_block->mem_id);
+        return std::hash<AllocType*>{}(p_ref.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_ref.control_block->mem_id);
     }
 
 };

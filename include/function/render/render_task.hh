@@ -16,7 +16,7 @@
 #define __WBE_RENDER_TASK_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/memory/reference_raw.hh"
+#include "core/memory/reference_strong.hh"
 #include "utils/utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -27,8 +27,15 @@ using RendResID = HashCode;
 using RendResTID = HashCode;
 using RendTaskID = HashCode;
 
+/**
+ * @class RendResInfo
+ * @brief Render resource info.
+ *
+ */
 struct RendResInfo {
+    // The ID of this render resource. Each resource should have a unique res_id.
     RendResID res_id;
+    // The type of the render reesource. Each type should have a unique type_id.
     RendResTID type_id;
 };
 
@@ -46,22 +53,27 @@ struct RenderTask {
     virtual void operator()(double p_delta) = 0;
 };
 
-struct RenderTaskInfo {
-    // The ID of this render task.
-    RendTaskID render_task_id;
+/**
+ * @class RendTaskInfo
+ * @brief Render task info.
+ *
+ */
+struct RendTaskInfo {
+    // The ID of this render task. Each render task should have a unique task_id.
+    RendTaskID task_id;
 
     // Previous render task.
     std::vector<RendTaskID> prev;
     // Next render tasks.
-    std::vector<RendTaskID> next;
+    std::vector<Ref<RendTaskInfo>> next;
 
     // Required resources.
     std::vector<RendResID> req_res;
     // Produced resources.
-    std::vector<RendResInfo> prod_res;
+    std::vector<RendResID> prod_res;
 
     // The render task instance.
-    RefRaw<RenderTask> render_task = MEM_NULL;
+    Ref<RenderTask> render_task = MEM_NULL;
 };
 
 

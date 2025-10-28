@@ -16,6 +16,7 @@
 #define __WBE_STL_ALLOCATOR_HH__
 
 #include "core/core_utils.hh"
+#include <deque>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -138,7 +139,6 @@ using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  * @brief STL set that uses a pool allocator.
  *
  * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T>
 using setp = set<T, HeapAllocatorDefault>;
@@ -156,19 +156,9 @@ using unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLA
  * @brief STL set that uses a custom allocator.
  *
  * @tparam T The type of the values in the set.
- * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType>
 using unordered_setp = unordered_set<T, HeapAllocatorDefault>;
-
-/**
- * @brief STL set that uses a pool allocator.
- *
- * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
- */
-template <typename T>
-using setp = set<T, HeapAllocatorDefault>;
 
 /**
  * @brief STL string that uses a custom allocator.
@@ -180,10 +170,25 @@ using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char
 
 /**
  * @brief STL string that uses a pool allocator.
- *
- * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 using stringp = string<HeapAllocatorDefault>;
+
+/**
+ * @brief STL deque that uses a custom allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
+ */
+template <typename T, typename AllocType>
+using deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
+
+/**
+ * @brief STL string that uses a pool allocator.
+ *
+ * @tparam T The type of the values in the vector.
+ */
+template <typename T>
+using dequep = deque<T, HeapAllocatorDefault>;
 
 /**
  * @brief Short name for stl allocator that uses HeapAllocatorDefault.

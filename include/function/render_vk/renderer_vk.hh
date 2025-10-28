@@ -18,11 +18,11 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/render_object.hh"
 #include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
@@ -96,10 +96,11 @@ public:
     /**
      * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
      *
+     * @todo Test
      * @param p_pipeline_name The name of the pipeline to register.
      * @param p_root_task The root render task of the pipeline.
      */
-    void register_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task) {
+    void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
         if (p_root_task == MEM_NULL) {
             throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
         }
@@ -112,6 +113,7 @@ public:
     /**
      * @brief Activate a pipeline.
      *
+     * @todo Test
      * @param p_pipeline_name The name of the pipeline to activate.
      */
     void activate_pipeline(const std::string& p_pipeline_name) {
@@ -121,12 +123,8 @@ public:
         activated_pipeline = pipelines[p_pipeline_name];
     }
 
+    // TODO
 private:
-
-    inline static RendererVK* singleton = nullptr;
-
-    template <typename T>
-    using STLAlloc = STLAllocator<T, AllocType, false, true, false>;
 
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
@@ -134,7 +132,16 @@ private:
     using set = ::WhiteBirdEngine::set<T, AllocType>;
     template <typename T>
     using unordered_set = ::WhiteBirdEngine::unordered_set<T, AllocType>;
+    template <typename T>
+    using deque = ::WhiteBirdEngine::deque<T, AllocType>;
     using string = ::WhiteBirdEngine::string<AllocType>;
+
+
+    inline static RendererVK* singleton = nullptr;
+
+    template <typename T>
+    using STLAlloc = STLAllocator<T, AllocType, false, true, false>;
+
 
     AllocType* allocator;
     Ref<RenderDatabase<RenderAllocator>> render_database;
@@ -230,26 +237,23 @@ private:
 
     BaseRenderDataVK base_render_data;
 
-    // TODO
-    struct RendTaskRes {
-        RendResID res_id;
-        Ref<RenderObject> res;
-        VkSemaphore available_semaphore;
-    };
-
     struct TaskInfo {
         RendTaskID task_id;
-        Ref<RenderTaskVK> setup_command_buffer_task;
+        Ref<RenderTaskVK> render_task;
     };
 
     struct PipelineInfo {
         string pipeline_name;
-        unordered_set<Ref<RendTaskRes>> rend_res;
+        vector<Ref<RendResVK>> rend_res;
         vector<TaskInfo> task_infos;
+        PipelineInfo(AllocType* p_allocator)
+            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator) {}
     };
 
+
     std::map<std::string, Ref<PipelineInfo>> pipelines;
-    std::unordered_map<RendResID, RefWeak<RendTaskRes>> rend_res;
+    std::unordered_map<RendResID, RefWeak<RendResVK>> rend_res;
+    std::map<RendResID, RefWeak<RendResVK>> render_resources;
 
     Ref<PipelineInfo> activated_pipeline;
 
@@ -290,7 +294,10 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RenderTaskInfo> p_root_task);
+    Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
+    void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
+    void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
+
 };
 
 }

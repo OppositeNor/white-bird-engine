@@ -354,11 +354,12 @@ namespace std {
  */
 template <typename T, typename AllocType>
 struct hash<::WhiteBirdEngine::Ref<T, AllocType>> {
-    size_t operator()(const ::WhiteBirdEngine::Ref<T, AllocType>& p_ref) {
+    size_t operator()(const ::WhiteBirdEngine::Ref<T, AllocType>& p_ref) const {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }
-        return std::hash(p_ref.control_block->allocator) ^ std::hash(p_ref.control_block->mem_id);
+        WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
+        return std::hash<AllocType*>{}(p_ref.control_block->allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_ref.control_block->mem_id);
     }
 
 };
