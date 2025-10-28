@@ -142,6 +142,8 @@ private:
 
     // Render objects for the renderer.
     struct RenderObjects {
+        RenderObjects(AllocType* p_allocator)
+            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline.
@@ -149,9 +151,9 @@ private:
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain image views.
-        std::vector<Ref<ROImageViewVK>> swap_chain_image_views;
+        vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // Framebuffers in the swap chain.
-        std::vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
+        vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
     };
     Unique<RenderObjects> render_objects;
 
@@ -169,7 +171,7 @@ private:
     VkQueue compute_queue;
     VkQueue present_queue;
 
-    std::vector<VkImage> swap_chain_images;
+    vector<VkImage> swap_chain_images;
     VkFormat swap_chain_image_format;
     VkExtent2D swap_chain_extent;
 

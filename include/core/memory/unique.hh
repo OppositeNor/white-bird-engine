@@ -55,13 +55,15 @@ public:
         return *this;
     }
 
-    template <typename T1> requires std::convertible_to<T1*, T*>
-    Unique(Unique<T1>&& p_other)
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    Unique(Unique<T1, AllocType1>&& p_other)
         : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
-    template <typename T1> requires std::convertible_to<T1*, T*>
-    Unique& operator=(Unique<T1>&& p_other) {
+    template <typename T1, typename AllocType1>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    Unique& operator=(Unique<T1, AllocType1>&& p_other) {
         reset();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;

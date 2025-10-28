@@ -44,7 +44,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
-    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)) {
+    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)), swap_chain_images(p_allocator) {
     singleton = this;
     init();
 }
@@ -59,7 +59,7 @@ void RendererVK::tick(double p_delta) {
 }
 
 void RendererVK::init() {
-    render_objects = make_unique<RenderObjects>(allocator);
+    render_objects = make_unique<RenderObjects>(allocator, allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     init_window();
     init_vulkan();
