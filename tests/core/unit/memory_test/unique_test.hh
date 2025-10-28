@@ -376,4 +376,24 @@ TEST_F(WBEUniqueTest, MultipleResetCalls) {
     ASSERT_EQ(u.get(), nullptr);
 }
 
+TEST_F(WBEUniqueTest, IsNullMethod_Behavior) {
+    WBE::MockHeapAllocatorAligned allocator(1024);
+
+    // Default constructed should be null
+    WBE::Unique<Dummy> empty_unique;
+    ASSERT_TRUE(empty_unique.is_null());
+
+    // make_unique should produce non-null
+    auto u = WBE::Unique<Dummy>::make_unique(&allocator, 13);
+    ASSERT_FALSE(u.is_null());
+
+    // reset should make it null again
+    u.reset();
+    ASSERT_TRUE(u.is_null());
+
+    // const version
+    const auto& const_u = u;
+    ASSERT_TRUE(const_u.is_null());
+}
+
 #endif

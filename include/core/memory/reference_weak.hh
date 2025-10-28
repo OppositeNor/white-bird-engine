@@ -141,6 +141,9 @@ public:
     }
 
     Ref<const T> lock() const {
+        if (!is_valid()) {
+            return Ref<const T>(nullptr);
+        }
         return Ref<const T>(control_block);
     }
 
@@ -167,7 +170,7 @@ public:
         if (!is_valid()) {
             return false;
         }
-        return lock()->is_null();
+        return control_block->allocator == nullptr || control_block->mem_id == MEM_NULL;
     }
 
 private:

@@ -1015,4 +1015,25 @@ TEST(WBERefRawTest, ObjTypeAlias) {
     static_assert(std::is_same_v<WBE::RefRaw<int>::ObjType, int>);
 }
 
+TEST(WBERefRawTest, IsNullMethod_BasicBehavior) {
+    WBE::MockHeapAllocatorAligned allocator(1024);
+    // Default constructed should be null
+    WBE::RefRaw<TestObject> default_ref;
+    ASSERT_TRUE(default_ref.is_null());
+
+    // After creating with allocator, should not be null
+    auto r = WBE::new_ref<TestObject>(&allocator, 11);
+    ASSERT_FALSE(r.is_null());
+    ASSERT_NE(r.get(), nullptr);
+
+    // After delete_ref, should be null again
+    WBE::delete_ref(std::move(r));
+    ASSERT_TRUE(r.is_null());
+    ASSERT_EQ(r.get(), nullptr);
+
+    // const version
+    WBE::RefRaw<const TestObject> const_default_ref;
+    ASSERT_TRUE(const_default_ref.is_null());
+}
+
 #endif

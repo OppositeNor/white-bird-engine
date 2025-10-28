@@ -304,4 +304,26 @@ TEST(WBERefStrongWeak, Multithread) {
     ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nChild construct.\nChild destruct.\nDestruct.\n"));
 }
+
+TEST(WBERefWeakTest, IsNullMethod_Behavior) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WBE::MockHeapAllocatorAligned pool_allocator(1024);
+
+    // Default-constructed weak should not be considered NULL by implementation
+    WBE::RefWeak<int> weak_default;
+    ASSERT_FALSE(weak_default.is_null());
+
+    WBE::RefWeak<int> weak;
+    {
+        WBE::Ref<int> strong = WBE::Ref<int>::make_ref(&pool_allocator, 7);
+        weak = strong;
+        ASSERT_TRUE(weak.is_valid());
+        // While valid, is_null() delegates to lock()->is_null() which is false for a live Ref
+        ASSERT_FALSE(weak.is_null());
+    }
+
+    // After strong ref goes out of scope, weak becomes invalid; implementation returns false for invalid
+    ASSERT_FALSE(weak.is_valid());
+    ASSERT_FALSE(weak.is_null());
+}
 #endif
