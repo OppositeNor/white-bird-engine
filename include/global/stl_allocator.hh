@@ -15,6 +15,7 @@
 #ifndef __WBE_STL_ALLOCATOR_HH__
 #define __WBE_STL_ALLOCATOR_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/core_utils.hh"
 #include <deque>
 #include <set>
@@ -36,6 +37,7 @@ namespace WhiteBirdEngine {
  * @return 
  */
 template <typename T, typename AllocType, bool POCCA, bool POCMA, bool POCS>
+    requires (!(AllocatorTrait<AllocType>::WILL_ADDR_MOVE))
 struct STLAllocator {
     using value_type = T;
     AllocType* allocator = nullptr;

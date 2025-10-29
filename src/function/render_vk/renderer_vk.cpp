@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -621,6 +622,7 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
 Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
     WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
     auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
+    pipeline_info->pipeline_name = p_pipeline_name;
     process_tasks(p_root_task, pipeline_info);
     return pipeline_info;
 }
@@ -654,40 +656,31 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     }
 }
 
+Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res) {
+    auto iter = render_resources.find(p_res);
+    if (iter == render_resources.end() || !iter->second.is_valid()) {
+        auto rend_res = make_ref<RendResVK>(allocator, &base_render_data);
+        rend_res->res_id = p_res;
+        // It is the users' responsibility to initialize this field.
+        rend_res->res = MEM_NULL;
+        render_resources.insert({p_res, rend_res});
+        return rend_res;
+    }
+    return iter->second.lock();
+}
+
 void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline) {
     WBE_DEBUG_ASSERT(p_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_task_info.render_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
     for (auto& res : p_task->req_res) {
-        auto iter = render_resources.find(res);
-        Ref<RendResVK> rend_res;
-        if (iter == render_resources.end()) {
-            rend_res = make_ref<RendResVK>(allocator, &base_render_data);
-            rend_res->res_id = res;
-            // It is the users' responsibility to unitialize this field.
-            rend_res->res = MEM_NULL;
-            p_pipeline->rend_res.push_back(rend_res);
-            render_resources.insert({res, rend_res});
-        }
-        else {
-            rend_res = iter->second.lock();
-        }
+        Ref<RendResVK> rend_res = get_rend_res(res);
+        p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->req_rend_res.push_back(rend_res);
     }
     for (auto& res : p_task->prod_res) {
-        auto iter = render_resources.find(res);
-        Ref<RendResVK> rend_res;
-        if (iter == render_resources.end()) {
-            rend_res = make_ref<RendResVK>(allocator, &base_render_data);
-            rend_res->res_id = res;
-            // It is the users' responsibility to unitialize this field.
-            rend_res->res = MEM_NULL;
-            p_pipeline->rend_res.push_back(rend_res);
-            render_resources.insert({res, rend_res});
-        }
-        else {
-            rend_res = iter->second.lock();
-        }
+        Ref<RendResVK> rend_res = get_rend_res(res);
+        p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->prod_rend_res.push_back(rend_res);
     }
 }

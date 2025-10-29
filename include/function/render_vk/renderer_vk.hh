@@ -296,6 +296,7 @@ private:
 
     Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
     void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
+    Ref<RendResVK> get_rend_res(RendResID p_res);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 
 };
