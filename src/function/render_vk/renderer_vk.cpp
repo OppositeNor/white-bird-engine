@@ -70,15 +70,16 @@ void RendererVK::tick(double p_delta) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
     }
-    for (auto& task_info : run_pipeline->task_infos) {
-        // Setup swap chain image.
-        uint32_t image_index;
-        auto image_available_semaphore = render_objects->render_start_task.render_task->task_semaphore.semaphore;
-        if (vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to acquire swap chain image.");
-        }
-        render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
 
+    // Setup swap chain image.
+    uint32_t image_index;
+    auto image_available_semaphore = render_objects->render_start_task.render_task->task_semaphore.semaphore;
+    if (vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to acquire swap chain image.");
+    }
+    render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
+
+    for (auto& task_info : run_pipeline->task_infos) {
         if (task_info.render_task == MEM_NULL) {
             wbe_console_log(WBE_CHANNEL_RENDER)->warning(std::format("Render task {} is NULL. Skipped.", task_info.task_id));
             continue;
@@ -206,6 +207,7 @@ void RendererVK::setup_render_resource() {
     render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE;
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));
+    
 }
 
 void RendererVK::create_instance() {
@@ -325,7 +327,7 @@ void RendererVK::create_swap_chain() {
     viewport.x = 0;
     viewport.y = 0;
     viewport.width = extent.width;
-    viewport.width = extent.height;
+    viewport.height = extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 

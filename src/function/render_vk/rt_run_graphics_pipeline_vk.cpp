@@ -80,6 +80,14 @@ void RTRunGraphicsPipeline::record_command_buffer() {
     Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
     Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
 
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = 0;
+    begin_info.pInheritanceInfo = nullptr;
+    if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer.");
+    }
+
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_info.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
