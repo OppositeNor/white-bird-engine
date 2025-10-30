@@ -267,7 +267,7 @@ HeapAllocatorAlignedPoolImplicitList::operator std::string() const {
     ss << "\"chunk_layout\":[";
     char* curr = mem_chunk;
     bool first = true;
-    uint32_t fragments_count = 0;
+    uint32_t fragments_size = 0;
     while (curr < mem_chunk + size) {
         if (!first) ss << ",";
         first = false;
@@ -279,11 +279,11 @@ HeapAllocatorAlignedPoolImplicitList::operator std::string() const {
             << "}";
         curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
         if (curr < mem_chunk + size && !occupied) {
-            ++fragments_count;
+            fragments_size += size;
         }
     }
     ss << "],";
-    ss << "\"fragments_count:\"" << fragments_count;
+    ss << "\"fragments_size:\"" << fragments_size;
     ss << "}";
     return ss.str();
 }
