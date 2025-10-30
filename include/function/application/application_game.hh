@@ -42,8 +42,12 @@ public:
      *
      * @return The allocator for the renderer.
      */
-    Ref<const RenderAllocator> get_renderer_allocator() const {
+    Ref<RenderAllocator> get_renderer_allocator() const {
         return renderer_allocator;
+    }
+
+    Ref<Renderer> get_renderer() const {
+        return renderer;
     }
 
 private:

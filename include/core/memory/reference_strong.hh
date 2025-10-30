@@ -231,10 +231,9 @@ public:
      */
     template <typename T1>
     Ref<T1, AllocType> dynamic_cast_ref() const {
-        if (control_block == nullptr) {
+        if (control_block == nullptr || control_block->allocator == nullptr) {
             return Ref<T1, AllocType>(nullptr);
         }
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
         T1* casted_ptr = dynamic_cast<T1*>(static_cast<T*>(control_block->allocator->get(control_block->mem_id)));
         if (casted_ptr == nullptr) {
             return MEM_NULL;

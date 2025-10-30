@@ -32,6 +32,7 @@
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_prepare_swap_chain_image.hh"
+#include "generated/label_manager.gen.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -65,17 +66,19 @@ RendererVK::~RendererVK() {
 void RendererVK::tick(double p_delta) {
     Ref<PipelineInfo> run_pipeline = activated_pipeline;
 
-    // Setup swap chain image.
-    uint32_t image_index;
-    vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, render_start_task.render_task->task_semaphore.semaphore,
-                          VK_NULL_HANDLE, &image_index);
-    swap_chain_image_resource->res = swap_chain_images[image_index];
-
     if (run_pipeline == MEM_NULL) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
     }
     for (auto& task_info : run_pipeline->task_infos) {
+        // Setup swap chain image.
+        uint32_t image_index;
+        auto image_available_semaphore = render_objects->render_start_task.render_task->task_semaphore.semaphore;
+        if (vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to acquire swap chain image.");
+        }
+        render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
+
         if (task_info.render_task == MEM_NULL) {
             wbe_console_log(WBE_CHANNEL_RENDER)->warning(std::format("Render task {} is NULL. Skipped.", task_info.task_id));
             continue;
@@ -94,7 +97,7 @@ void RendererVK::init() {
     init_render_pass();
     init_graphics_pipeline();
     init_swap_chain_framebuffers();
-    setup_render_start_task();
+    setup_render_resource();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
@@ -187,15 +190,22 @@ void RendererVK::init_swap_chain_framebuffers() {
     }
 }
 
-void RendererVK::setup_render_start_task() {
+void RendererVK::setup_render_resource() {
     Ref<RTPrepareSwapChianImage> prepare_swap_chain_image_task = make_ref<RTPrepareSwapChianImage>(allocator, &base_render_data);
-    swap_chain_image_resource = make_ref<RendResVK>(allocator, &base_render_data);
-    uint32_t image_index;
-    vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, prepare_swap_chain_image_task->task_semaphore.semaphore,
-                          VK_NULL_HANDLE, &image_index);
-    swap_chain_image_resource->res = swap_chain_images[image_index];
-    render_start_task.task_id = RO_SWAP_CHAIN_IMAGE;
-    render_start_task.render_task = prepare_swap_chain_image_task;
+    render_objects->render_start_task.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE;
+    render_objects->render_start_task.render_task = prepare_swap_chain_image_task;
+
+    render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->swap_chain_framebuffer_resource->res_type_id = ROT_FRAME_BUFFER_VK;
+    render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER;
+    render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
+    render_resources.insert(std::pair(REND_RES_SWAP_CHAIN_FRAMEBUFFER, render_objects->swap_chain_framebuffer_resource));
+
+    render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->base_graphics_pipeline_resource->res_type_id = ROT_GRAPHICS_PIPELINE_VK;
+    render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE;
+    render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
+    render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));
 }
 
 void RendererVK::create_instance() {
@@ -647,7 +657,7 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
 }
 
 Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
-    if (p_root_task != MEM_NULL) {
+    if (p_root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
     if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PREPARE_SWAP_CHAIN_IMAGE) {
@@ -661,14 +671,15 @@ Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_
 
 void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
     // Using bfs, as the order where the render task will be pushed to the queue.
+    std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
+    // Push the render_start_task as the starting task.
+    p_pipeline_info->task_infos.push_back(render_objects->render_start_task);
+    std::vector<RendTaskID> dummy;
+    render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE, std::pair(render_objects->render_start_task.render_task, &dummy)));
+
     unordered_set<Ref<RendTaskInfo>> visited(allocator);
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
-    std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
-    // Push the render_start_task as the starting task.
-    p_pipeline_info->task_infos.push_back(render_start_task);
-    std::vector<RendTaskID> dummy;
-    render_task_map[RT_PREPARE_SWAP_CHAIN_IMAGE] = std::pair(render_start_task.render_task, &dummy);
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
@@ -680,7 +691,8 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
 
             if (task_info.render_task == MEM_NULL) {
                 throw std::runtime_error(std::format(
-                    "Failed to convert RenderTask {} to RenderTaskVK. This task is probably not a Vulkan task.", curr->task_id));
+                    "Failed to convert RenderTask {} to RenderTaskVK. This task is probably not a Vulkan task.",
+                    LabelManager::get_singleton()->get_label_name(curr->task_id)));
             }
             task_info.task_id = curr->task_id;
             register_render_resources(curr, task_info, p_pipeline_info);

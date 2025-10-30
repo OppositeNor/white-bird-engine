@@ -15,7 +15,6 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
-#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -48,8 +47,10 @@
 
 namespace WhiteBirdEngine {
 
-WBE_LABEL(RO_SWAP_CHAIN_IMAGE, WBE_RENDER_OBJECT_TYPE);
-WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE, WBE_RENDER_TASK_ID);
+WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+
+WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE, WBE_RENDER_TASK);
 
 /**
  * @class RendererVK
@@ -71,12 +72,6 @@ public:
     virtual void tick(double p_delta) override;
 
     virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {
-        if (p_root_task == MEM_NULL) {
-            throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
-        }
-        if (p_root_task->prev.size() != 0) {
-            throw std::runtime_error(std::format("Root task {} should not have previous tasks.", p_pipeline_name));
-        }
         pipelines[p_pipeline_name] = compile_pipeline(p_pipeline_name, p_root_task);
     }
 
@@ -137,23 +132,6 @@ private:
     AllocType* allocator;
     Ref<RenderDatabase<RenderAllocator>> render_database;
     Ref<AllocatorVK<AllocType>> allocator_vk;
-
-    // Render objects for the renderer.
-    struct RenderObjects {
-        RenderObjects(AllocType* p_allocator)
-            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
-        // Render pass.
-        Ref<RORenderPassVK> result_render_pass;
-        // Graphics pipeline.
-        Ref<ROGraphicsPipelineVK> graphics_pipeline;
-        // Graphics pipeline layout.
-        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
-        // Swap chain image views.
-        vector<Ref<ROImageViewVK>> swap_chain_image_views;
-        // Framebuffers in the swap chain.
-        vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
-    };
-    Unique<RenderObjects> render_objects;
 
     // Vulkan properties
     SDL_Window* window;
@@ -247,8 +225,29 @@ private:
     std::map<RendResID, RefWeak<RendResVK>> render_resources;
 
     Ref<PipelineInfo> activated_pipeline;
-    TaskInfo render_start_task;
-    Ref<RendResVK> swap_chain_image_resource;
+
+    // Render objects for the renderer.
+    struct RenderObjects {
+        RenderObjects(AllocType* p_allocator)
+            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
+        // Render pass.
+        Ref<RORenderPassVK> result_render_pass;
+        // Graphics pipeline.
+        Ref<ROGraphicsPipelineVK> graphics_pipeline;
+        // Graphics pipeline layout.
+        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+        // Swap chain image views.
+        vector<Ref<ROImageViewVK>> swap_chain_image_views;
+        // Framebuffers in the swap chain.
+        vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
+        // The swap chain image resource.
+        Ref<RendResVK> swap_chain_framebuffer_resource;
+        // The base graphics pipeline resource.
+        Ref<RendResVK> base_graphics_pipeline_resource;
+        // The start render task.
+        TaskInfo render_start_task;
+    };
+    Unique<RenderObjects> render_objects;
 
     void init();
     void terminate();
@@ -261,7 +260,7 @@ private:
     void init_render_pass();
     void init_graphics_pipeline();
     void init_swap_chain_framebuffers();
-    void setup_render_start_task();
+    void setup_render_resource();
 
     void create_instance();
     void create_window_surface();

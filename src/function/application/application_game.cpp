@@ -31,7 +31,7 @@ void ApplicationGame::init() {
 }
 
 void ApplicationGame::render_tick(double p_delta) {
-    // TODO
+    renderer->tick(p_delta);
 }
 
 void ApplicationGame::logic_tick(double p_delta) {

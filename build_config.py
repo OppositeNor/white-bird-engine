@@ -72,9 +72,11 @@ resource_dir = "res"
 static_labels = [
     "WBE_CHANNEL",
     "WBE_RENDER_OBJECT_TYPE",
+    "WBE_RENDER_TASK",
 ]
 
 dynamic_labels = [
     "WBE_CHANNEL",
     "WBE_RENDER_OBJECT_TYPE",
+    "WBE_RENDER_TASK",
 ]
