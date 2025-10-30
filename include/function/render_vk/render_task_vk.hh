@@ -62,10 +62,6 @@ struct RenderTaskVK : public RenderTask {
      */
     std::vector<Ref<RendResVK>> req_rend_res;
     /**
-     * @brief The produced resources. This will be filled in the order of the prod_res field in RendTaskInfo.
-     */
-    std::vector<Ref<RendResVK>> prod_rend_res;
-    /**
      * @brief The tasks this task depends on.
      */
     std::vector<Ref<RenderTaskVK>> depend_tasks;
@@ -84,20 +80,6 @@ protected:
                 throw std::runtime_error(std::format(
                     "Render task's required resource type mismatch: expected: {}, actual: NULL.",
                     LabelManager::get_singleton()->get_label_name(*(p_expected_req_res.begin() + i))));
-            }
-        }
-    }
-
-    void check_prod_res(std::initializer_list<RendResTID> p_expected_prod_res) {
-        if (prod_rend_res.size() != p_expected_prod_res.size()) {
-            throw std::runtime_error(std::format(
-                "Number of produced resources doesn't match: expected: {}, actual: {}.", p_expected_prod_res.size(), prod_rend_res.size()));
-        }
-        for (size_t i = 0; i < p_expected_prod_res.size(); ++i) {
-            if (prod_rend_res[i] == MEM_NULL) {
-                throw std::runtime_error(std::format(
-                    "Render task's produced resource type mismatch: expected: {}, actual: NULL.",
-                    LabelManager::get_singleton()->get_label_name(*(p_expected_prod_res.begin() + i))));
             }
         }
     }

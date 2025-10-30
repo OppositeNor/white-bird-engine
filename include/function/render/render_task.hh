@@ -69,8 +69,6 @@ struct RendTaskInfo {
 
     // Required resources.
     std::vector<RendResInfo> req_res;
-    // Produced resources.
-    std::vector<RendResInfo> prod_res;
 
     // The render task instance.
     Ref<RenderTask> render_task = MEM_NULL;

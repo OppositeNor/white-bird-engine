@@ -16,15 +16,19 @@
 #define __WBE_PREPARE_SWAP_CHAIN_IMAGE_HH__
 
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 namespace WhiteBirdEngine {
 
 /**
  * @class RTPrepareSwapChianImage
- * @brief Prepare swap chain image.
+ * @brief A dummy render task to hold the semaphore for swap chain image preparing.
  *
  */
-struct RTPrepareSwapChianImage : public RenderTaskVK {
+struct RTPrepareSwapChianImage final: public RenderTaskVK {
+    RTPrepareSwapChianImage(const BaseRenderDataVK* p_render_data)
+        : RenderTaskVK(p_render_data) {}
 
+    virtual void perform(double p_delta) override {}
 };
 
 }

@@ -31,6 +31,7 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "function/render_vk/rt_prepare_swap_chain_image.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -63,6 +64,13 @@ RendererVK::~RendererVK() {
 
 void RendererVK::tick(double p_delta) {
     Ref<PipelineInfo> run_pipeline = activated_pipeline;
+
+    // Setup swap chain image.
+    uint32_t image_index;
+    vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, render_start_task.render_task->task_semaphore.semaphore,
+                          VK_NULL_HANDLE, &image_index);
+    swap_chain_image_resource->res = swap_chain_images[image_index];
+
     if (run_pipeline == MEM_NULL) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
@@ -86,7 +94,7 @@ void RendererVK::init() {
     init_render_pass();
     init_graphics_pipeline();
     init_swap_chain_framebuffers();
-    setup_present_render_task();
+    setup_render_start_task();
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
@@ -179,8 +187,15 @@ void RendererVK::init_swap_chain_framebuffers() {
     }
 }
 
-void RendererVK::setup_present_render_task() {
-    // TODO
+void RendererVK::setup_render_start_task() {
+    Ref<RTPrepareSwapChianImage> prepare_swap_chain_image_task = make_ref<RTPrepareSwapChianImage>(allocator, &base_render_data);
+    swap_chain_image_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    uint32_t image_index;
+    vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, prepare_swap_chain_image_task->task_semaphore.semaphore,
+                          VK_NULL_HANDLE, &image_index);
+    swap_chain_image_resource->res = swap_chain_images[image_index];
+    render_start_task.task_id = RO_SWAP_CHAIN_IMAGE;
+    render_start_task.render_task = prepare_swap_chain_image_task;
 }
 
 void RendererVK::create_instance() {
@@ -632,7 +647,12 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
 }
 
 Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
-    WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
+    if (p_root_task != MEM_NULL) {
+        throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
+    }
+    if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PREPARE_SWAP_CHAIN_IMAGE) {
+        throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
+    }
     auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
     pipeline_info->pipeline_name = p_pipeline_name;
     process_tasks(p_root_task, pipeline_info);
@@ -645,6 +665,10 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
+    // Push the render_start_task as the starting task.
+    p_pipeline_info->task_infos.push_back(render_start_task);
+    std::vector<RendTaskID> dummy;
+    render_task_map[RT_PREPARE_SWAP_CHAIN_IMAGE] = std::pair(render_start_task.render_task, &dummy);
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
@@ -699,11 +723,6 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
         Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
         p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->req_rend_res.push_back(rend_res);
-    }
-    for (auto& res : p_task->prod_res) {
-        Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
-        p_pipeline->rend_res.push_back(rend_res);
-        p_task_info.render_task->prod_rend_res.push_back(rend_res);
     }
 }
 

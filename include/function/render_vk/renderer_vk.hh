@@ -18,6 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
@@ -46,6 +47,9 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+WBE_LABEL(RO_SWAP_CHAIN_IMAGE, WBE_RENDER_OBJECT_TYPE);
+WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE, WBE_RENDER_TASK_ID);
 
 /**
  * @class RendererVK
@@ -243,6 +247,8 @@ private:
     std::map<RendResID, RefWeak<RendResVK>> render_resources;
 
     Ref<PipelineInfo> activated_pipeline;
+    TaskInfo render_start_task;
+    Ref<RendResVK> swap_chain_image_resource;
 
     void init();
     void terminate();
@@ -255,7 +261,7 @@ private:
     void init_render_pass();
     void init_graphics_pipeline();
     void init_swap_chain_framebuffers();
-    void setup_present_render_task();
+    void setup_render_start_task();
 
     void create_instance();
     void create_window_surface();

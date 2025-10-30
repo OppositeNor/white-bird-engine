@@ -17,15 +17,15 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "utils/defs.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
-                                             Ref<ROFramebufferVK> p_framebuffer, VkFence p_wait_fence)
-    : RenderTaskVK(p_render_data), graphics_pipeline(p_graphics_pipeline), framebuffer(p_framebuffer), wait_fence(p_wait_fence) {
+RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, VkFence p_wait_fence)
+    : RenderTaskVK(p_render_data), wait_fence(p_wait_fence) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -41,15 +41,12 @@ RTRunGraphicsPipeline::~RTRunGraphicsPipeline() {
 }
 
 void RTRunGraphicsPipeline::perform(double p_delta) {
-    check_req_res({});
-    check_prod_res({ROT_IMAGE_VK});
+    check_req_res({ROT_FRAME_BUFFER_VK, ROT_GRAPHICS_PIPELINE_VK});
     if (req_rend_res[0]->res == MEM_NULL) {
-        ROImageVK::Builder builder;
-        builder.image_2d(render_data->swap_chain_extent)
-            .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-            .set_format(render_data->swap_chain_format);
-        Ref<ROImageVK> image = make_ref<ROImageVK>(render_data->allocator, render_data, builder);
-        req_rend_res[0]->res = image;
+        throw std::runtime_error("Failed to perform render task: framebuffer must be specified.");
+    }
+    if (req_rend_res[1]->res == MEM_NULL) {
+        throw std::runtime_error("Failed to perform render task: graphics pipeline must be specified.");
     }
     record_command_buffer();
 
@@ -80,7 +77,9 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
 }
 
 void RTRunGraphicsPipeline::record_command_buffer() {
-    auto result = prod_rend_res[0];
+    Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
+    Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_info.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
