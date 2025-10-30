@@ -24,8 +24,8 @@
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, VkFence p_wait_fence)
-    : RenderTaskVK(p_render_data), wait_fence(p_wait_fence) {
+RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
+    : RenderTaskVK(p_render_data) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -33,6 +33,12 @@ RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_da
     alloc_info.commandBufferCount = 1;
     if (vkAllocateCommandBuffers(render_data->logic_device, &alloc_info, &command_buffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffer.");
+    }
+    if (p_signal_in_flight) {
+        signal_fence = p_render_data->in_flight_fence;
+    }
+    else {
+        signal_fence = VK_NULL_HANDLE;
     }
 }
 
@@ -48,6 +54,7 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     if (req_rend_res[1]->res == MEM_NULL) {
         throw std::runtime_error("Failed to perform render task: graphics pipeline must be specified.");
     }
+    vkResetCommandBuffer(command_buffer, 0);
     record_command_buffer();
 
     VkSubmitInfo submit_info{};
@@ -70,7 +77,7 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, wait_fence) != VK_SUCCESS) {
+    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_fence) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 

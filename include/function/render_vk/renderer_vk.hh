@@ -109,7 +109,6 @@ public:
         return &base_render_data;
     }
 
-    // TODO
 private:
 
     template <typename T>
@@ -156,6 +155,8 @@ private:
 
     VkCommandPool graphics_command_pool;
     VkCommandPool compute_command_pool;
+
+    VkFence in_flight_fence;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
@@ -215,8 +216,9 @@ private:
         string pipeline_name;
         vector<Ref<RendResVK>> rend_res;
         vector<TaskInfo> task_infos;
+        vector<VkSemaphore> result_semaphores;
         PipelineInfo(AllocType* p_allocator)
-            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator) {}
+            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator), result_semaphores(p_allocator) {}
     };
 
 
@@ -267,6 +269,7 @@ private:
     void create_device();
     void create_swap_chain();
     void create_command_pools();
+    void create_async_objects();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();

@@ -34,8 +34,10 @@ public:
     ApplicationGame& operator=(const ApplicationGame&) = delete;
     ApplicationGame& operator=(ApplicationGame&&) = delete;
 
-    virtual void render_tick(double p_delta) override;
-    virtual void logic_tick(double p_delta) override;
+    virtual void run() override;
+
+    void render_tick(double p_delta);
+    void logic_tick(double p_delta);
 
     /**
      * @brief Get the allocator for the renderer.

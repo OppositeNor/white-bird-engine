@@ -23,6 +23,22 @@ ApplicationGame::ApplicationGame() {
     init();
 }
 
+void ApplicationGame::run() {
+    bool should_close = false;
+    SDL_Event event;
+    while (!should_close) {
+        while (SDL_PollEvent(&event)) {
+            // TODO: replace with event handler.
+            switch (event.type) {
+                case SDL_QUIT:
+                    should_close = true;
+                    break;
+            }
+        }
+        render_tick(0.01);
+    }
+}
+
 void ApplicationGame::init() {
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.5));
     // TODO: Create renderer based on config file.

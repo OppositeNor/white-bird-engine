@@ -71,6 +71,9 @@ void RendererVK::tick(double p_delta) {
         return;
     }
 
+    vkWaitForFences(logical_device, 1, &in_flight_fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(logical_device, 1, &in_flight_fence);
+
     // Setup swap chain image.
     uint32_t image_index;
     auto image_available_semaphore = render_objects->render_start_task.render_task->task_semaphore.semaphore;
@@ -86,6 +89,19 @@ void RendererVK::tick(double p_delta) {
         }
         task_info.render_task->perform(p_delta);
     }
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = run_pipeline->result_semaphores.size();
+    present_info.pWaitSemaphores = run_pipeline->result_semaphores.data();
+
+    VkSwapchainKHR swap_chains[] = {swap_chain};
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swap_chains;
+    present_info.pImageIndices = &image_index;
+
+    present_info.pResults = nullptr;
+    vkQueuePresentKHR(present_queue, &present_info);
 }
 
 void RendererVK::init() {
@@ -103,7 +119,10 @@ void RendererVK::init() {
 }
 
 void RendererVK::terminate() {
+    pipelines.clear();
+    activated_pipeline = MEM_NULL;
     render_objects.reset();
+    vkDestroyFence(logical_device, in_flight_fence, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -129,6 +148,7 @@ void RendererVK::init_vulkan() {
     create_device();
     create_swap_chain();
     create_command_pools();
+    create_async_objects();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -144,6 +164,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
+    base_render_data.in_flight_fence = in_flight_fence;
 }
 
 void RendererVK::init_graphics_pipeline() {
@@ -207,7 +228,7 @@ void RendererVK::setup_render_resource() {
     render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE;
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));
-    
+
 }
 
 void RendererVK::create_instance() {
@@ -379,6 +400,16 @@ void RendererVK::create_command_pools() {
     compute_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
     if (vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute command pool.");
+    }
+}
+
+void RendererVK::create_async_objects() {
+    VkFenceCreateInfo fence_create_info{};
+    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    // Set the initial state of the fence to "signaled", since we don't have a "previous frame" at the first frame.
+    fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &in_flight_fence) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create in flight fence");
     }
 }
 
@@ -701,6 +732,9 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
             p_pipeline_info->task_infos.push_back(task_info);
 
             render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+            if (curr->next.empty()) {
+                p_pipeline_info->result_semaphores.push_back(task_info.render_task->task_semaphore.semaphore);
+            }
 
             for (auto next : curr->next) {
                 to_visit.push_back(next);

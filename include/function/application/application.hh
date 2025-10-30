@@ -28,18 +28,9 @@ public:
     virtual ~Application() {}
 
     /**
-     * @brief Function that ticks the rendering frames.
-     *
-     * @param p_delta The difference of time of the last two calls for this function.
+     * @brief Run the application.
      */
-    virtual void render_tick(double p_delta) = 0;
-
-    /**
-     * @brief Function that ticks the logic frames.
-     *
-     * @param p_delta The difference of time of the last two calls for this function.
-     */
-    virtual void logic_tick(double p_delta) = 0;
+    virtual void run() = 0;
 
 };
 

@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  *
  */
 struct RTRunGraphicsPipeline final : public RenderTaskVK {
-    RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, VkFence p_wait_fence = VK_NULL_HANDLE);
+    RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false);
     virtual ~RTRunGraphicsPipeline() override;
 
     virtual void perform(double p_delta) override;
@@ -34,7 +34,7 @@ struct RTRunGraphicsPipeline final : public RenderTaskVK {
 
 private:
     VkCommandBuffer command_buffer;
-    VkFence wait_fence;
+    VkFence signal_fence;
     void record_command_buffer();
 };
 
