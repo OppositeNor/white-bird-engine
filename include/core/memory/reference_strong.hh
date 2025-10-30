@@ -17,7 +17,6 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator.hh"
-#include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
@@ -34,7 +33,7 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType = HeapAllocator>
 class Ref {
     template <typename T1, typename AllocType1>
     friend class Ref;
@@ -154,7 +153,7 @@ public:
      */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        MemID control_block_mem_id = create_obj_align<ControlBlock>(*(p_allocator), p_allocator, p_mem_id);
+        MemID control_block_mem_id = create_obj<ControlBlock>(*(p_allocator), p_allocator, p_mem_id);
         control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
         control_block->control_block_mem_id = control_block_mem_id;
         ref();
@@ -170,7 +169,7 @@ public:
      */
     template <typename... Args>
     static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
-        return Ref(p_allocator, create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...));
+        return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
     T* operator->() {
@@ -333,12 +332,12 @@ private:
  * @param p_args The arguments of the constructor.
  * @return The created reference.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned, typename... Args>
+template <typename T, typename AllocType = HeapAllocator, typename... Args>
 Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }
-    MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
+    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Ref<T, AllocType>(p_allocator, id);
 }
 

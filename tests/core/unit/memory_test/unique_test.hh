@@ -16,6 +16,7 @@
 #define __WBE_UNIQUE_TEST_HH__
 
 #include "core/memory/unique.hh"
+#include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -46,7 +47,7 @@ TEST_F(WBEUniqueTest, BasicConstructionAndAccess) {
     allocator.clear_call_log();
     
     // Create object using allocator directly
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 42);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 42);
     WBE::Unique<Dummy> u(&allocator, id);
     
     ASSERT_NE(u.get(), nullptr);
@@ -60,7 +61,7 @@ TEST_F(WBEUniqueTest, BasicConstructionAndAccess) {
 TEST_F(WBEUniqueTest, MoveSemantics) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
-    WBE::MemID id1 = WBE::create_obj_align<Dummy>(allocator, 7);
+    WBE::MemID id1 = WBE::create_obj<Dummy>(allocator, 7);
     WBE::Unique<Dummy> u1(&allocator, id1);
     WBE::Unique<Dummy> u2 = std::move(u1);
     
@@ -74,7 +75,7 @@ TEST_F(WBEUniqueTest, ResetBehavior) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     allocator.clear_call_log();
     
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 123);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 123);
     WBE::Unique<Dummy> u(&allocator, id);
     ASSERT_NE(u.get(), nullptr);
     
@@ -90,7 +91,7 @@ TEST_F(WBEUniqueTest, ResetBehavior) {
 TEST_F(WBEUniqueTest, ComparisonOperators) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 1);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
     WBE::Unique<Dummy> u1(&allocator, id);
     WBE::Unique<Dummy> u2; // Empty unique
     
@@ -124,7 +125,7 @@ TEST_F(WBEUniqueTest, CallLoggingWithMakeUnique) {
 TEST_F(WBEUniqueTest, ArrowOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 42);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 42);
     WBE::Unique<Dummy> u(&allocator, id);
     
     // Test non-const arrow operator - should work like get()->x
@@ -140,7 +141,7 @@ TEST_F(WBEUniqueTest, ArrowOperator) {
 TEST_F(WBEUniqueTest, DereferenceOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 123);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 123);
     WBE::Unique<Dummy> u(&allocator, id);
     
     // Test non-const dereference operator - should work like *get()
@@ -171,7 +172,7 @@ TEST_F(WBEUniqueTest, MemIDComparisonOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::Unique<Dummy> empty_unique;
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 1);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
     WBE::Unique<Dummy> valid_unique(&allocator, id);
     
     // Test MEM_NULL comparison - empty should equal MEM_NULL, valid should not
@@ -201,7 +202,7 @@ TEST_F(WBEUniqueTest, VoidPointerComparisonOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     WBE::Unique<Dummy> empty_unique;
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 1);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
     WBE::Unique<Dummy> valid_unique(&allocator, id);
     
     // Test void* comparison with nullptr - should work like nullptr comparison
@@ -251,7 +252,7 @@ TEST_F(WBEUniqueTest, TemplateConversionConstructor) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create a Unique<Derived>
-    WBE::MemID derived_id = WBE::create_obj_align<Derived>(allocator, 42, 84);
+    WBE::MemID derived_id = WBE::create_obj<Derived>(allocator, 42, 84);
     WBE::Unique<Derived> derived_unique(&allocator, derived_id);
     
     ASSERT_EQ(derived_unique->value, 42);
@@ -272,7 +273,7 @@ TEST_F(WBEUniqueTest, TemplateConversionAssignmentOperator) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create a Unique<Derived>
-    WBE::MemID derived_id = WBE::create_obj_align<Derived>(allocator, 10, 20);
+    WBE::MemID derived_id = WBE::create_obj<Derived>(allocator, 10, 20);
     WBE::Unique<Derived> derived_unique(&allocator, derived_id);
     
     // Create an empty Unique<Base>
@@ -292,8 +293,8 @@ TEST_F(WBEUniqueTest, MoveAssignmentWithExistingObject) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create two Unique objects
-    WBE::MemID id1 = WBE::create_obj_align<Dummy>(allocator, 100);
-    WBE::MemID id2 = WBE::create_obj_align<Dummy>(allocator, 200);
+    WBE::MemID id1 = WBE::create_obj<Dummy>(allocator, 100);
+    WBE::MemID id2 = WBE::create_obj<Dummy>(allocator, 200);
     
     WBE::Unique<Dummy> u1(&allocator, id1);
     WBE::Unique<Dummy> u2(&allocator, id2);
@@ -357,7 +358,7 @@ TEST_F(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
 TEST_F(WBEUniqueTest, MultipleResetCalls) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
-    WBE::MemID id = WBE::create_obj_align<Dummy>(allocator, 999);
+    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 999);
     WBE::Unique<Dummy> u(&allocator, id);
     
     ASSERT_NE(u.get(), nullptr);

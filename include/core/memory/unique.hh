@@ -16,7 +16,8 @@
 #define __WBE_UNIQUE_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/heap_allocator.hh"
+#include "utils/defs.hh"
 #include <concepts>
 #include <cstddef>
 #include <stdexcept>
@@ -29,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the instance.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType = HeapAllocator>
 class Unique {
     template <typename T1, typename AllocType1>
     friend class Unique;
@@ -91,7 +92,7 @@ public:
      */
     template <typename... Args>
     static Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
-        return Unique(p_allocator, create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...));
+        return Unique(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
     /**
@@ -185,10 +186,10 @@ private:
  * @param p_args The arguments.
  * @return The unique instnace.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned,  typename... Args>
+template <typename T, typename AllocType = HeapAllocator,  typename... Args>
 Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
-    MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
+    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
     return Unique<T>(p_allocator, id);
 }
 

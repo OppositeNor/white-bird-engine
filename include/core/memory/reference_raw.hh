@@ -16,7 +16,7 @@
 #define __WBE_REFERENCE_RAW_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/heap_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include <concepts>
 #include <cstddef>
@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType = HeapAllocator>
 class RefRaw {
     template <typename T1, typename AllocType1>
     friend class RefRaw;
@@ -146,7 +146,7 @@ public:
             if (p_allocator == nullptr) {
                 throw std::runtime_error("Allocator cannot be nullptr.");
             }
-            MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
+            MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
             return RefRaw<T, AllocType>(id, p_allocator);
         }
     }
@@ -302,16 +302,16 @@ private:
     AllocType* allocator = nullptr;
 };
 
-template <typename T, typename AllocType = HeapAllocatorAligned, typename... Args>
+template <typename T, typename AllocType = HeapAllocator, typename... Args>
 RefRaw<T, AllocType> new_ref(AllocType* p_allocator, Args&&... p_args) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }
-    MemID id = create_obj_align<T>(*p_allocator, std::forward<Args>(p_args)...);
+    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
     return RefRaw<T, AllocType>(id, p_allocator);
 }
 
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType = HeapAllocator>
 void delete_ref(RefRaw<T, AllocType>&& p_ref) {
     RefRaw<T, AllocType>::delete_ref(std::move(p_ref));
 }

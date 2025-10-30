@@ -83,14 +83,7 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual const void* get(MemID p_id) const override {
-        if (p_id == 0) {
-            return nullptr;
-        }
-        return get_mem_loc_at_id(p_id);
-    }
-
-    virtual void* get(MemID p_id) override {
+    virtual void* get(MemID p_id) const override {
         if (p_id == 0) {
             return nullptr;
         }
@@ -176,7 +169,7 @@ private:
         return data_chunk_start() + offset;
     }
 
-    const void* get_mem_loc_at_id(InternalID p_id) const {
+    void* get_mem_loc_at_id(InternalID p_id) const {
         if (p_id > max_obj) {
             return nullptr;
         }
@@ -211,27 +204,15 @@ private:
         throw std::runtime_error("Failed to retrieve valid index: memory chunk is full.");
     }
 
-    DataIndex* index_chunk_start() {
+    DataIndex* index_chunk_start() const {
         return (DataIndex*)(mem_chunk + element_size * max_obj);
     }
 
-    InternalID* index_chunk_rev_start() {
+    InternalID* index_chunk_rev_start() const {
         return (InternalID*)(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
     }
 
-    char* data_chunk_start() {
-        return mem_chunk;
-    }
-
-    const DataIndex* index_chunk_start() const {
-        return (DataIndex*)(mem_chunk + element_size * max_obj);
-    }
-
-    const InternalID* index_chunk_rev_start() const {
-        return (InternalID*)(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
-    }
-
-    const char* data_chunk_start() const {
+    char* data_chunk_start() const {
         return mem_chunk;
     }
 

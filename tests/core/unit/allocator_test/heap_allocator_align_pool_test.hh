@@ -192,7 +192,7 @@ TEST(WBEAllocAlignedPoolTest, ConstructDestructCall) {
         uint32_t* test_val_ptr;
     };
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool();
-    WBE::MemID test_obj = WhiteBirdEngine::create_obj_align<TestClass>(allocator, &test_val);
+    WBE::MemID test_obj = WhiteBirdEngine::create_obj<TestClass>(allocator, &test_val);
     ASSERT_EQ(test_val, 1);
     WBE::destroy_obj<TestClass>(allocator, test_obj);
     ASSERT_EQ(test_val, 2);

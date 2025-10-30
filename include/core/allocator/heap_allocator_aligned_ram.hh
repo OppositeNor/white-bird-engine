@@ -82,8 +82,14 @@ public:
         free(std::bit_cast<void*>(p_mem));
     }
 
-    virtual void* get(MemID p_id) const override {
-        return std::bit_cast<void*>(p_id);
+    virtual const void* get(MemID p_id) const override {
+        WBE_DEBUG_ASSERT(allocated.find(p_id) != allocated.end());
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual void* get(MemID p_id) override {
+        WBE_DEBUG_ASSERT(allocated.find(p_id) != allocated.end());
+        return reinterpret_cast<void*>(p_id);
     }
 
     uint32_t obj_count() const {

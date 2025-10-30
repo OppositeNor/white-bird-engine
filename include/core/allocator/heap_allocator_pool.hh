@@ -76,15 +76,8 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual void* get(MemID p_id) override {
+    virtual void* get(MemID p_id) const override {
         if (p_id == MEM_NULL) {
-            return nullptr;
-        }
-        return reinterpret_cast<void*>(p_id);
-    }
-
-    virtual const void* get(MemID p_id) const override {
-        if (p_id == 0) {
             return nullptr;
         }
         return reinterpret_cast<void*>(p_id);

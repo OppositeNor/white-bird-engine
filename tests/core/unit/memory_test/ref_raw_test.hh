@@ -437,7 +437,7 @@ TEST(WBERefRawTest, NumFieldCustomConstructor) {
     TestObject::instance_count = 0;
     
     // Create array of 5 objects
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 5, 100);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 5, 100);
     WBE::RefRaw<TestObject> array_ref(array_id, 5, &allocator);
     
     ASSERT_EQ(array_ref.get_num(), 5);
@@ -451,7 +451,7 @@ TEST(WBERefRawTest, NumFieldZeroThrowsException) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     TestObject::instance_count = 0;
     
-    WBE::MemID mem_id = WBE::create_obj_align<TestObject>(allocator, 42);
+    WBE::MemID mem_id = WBE::create_obj<TestObject>(allocator, 42);
     
     // Test that num = 0 throws exception
     ASSERT_THROW({
@@ -468,7 +468,7 @@ TEST(WBERefRawTest, NumFieldCopyPreservation) {
     TestObject::instance_count = 0;
     
     // Create array reference with num = 3
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 3, 200);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 3, 200);
     WBE::RefRaw<TestObject> original(array_id, 3, &allocator);
     ASSERT_EQ(original.get_num(), 3);
     
@@ -489,7 +489,7 @@ TEST(WBERefRawTest, NumFieldMovePreservation) {
     TestObject::instance_count = 0;
     
     // Create array reference with num = 4
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 4, 300);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 4, 300);
     WBE::RefRaw<TestObject> original(array_id, 4, &allocator);
     ASSERT_EQ(original.get_num(), 4);
     
@@ -499,7 +499,7 @@ TEST(WBERefRawTest, NumFieldMovePreservation) {
     ASSERT_EQ(original.get(), nullptr); // Original should be moved from
     
     // Create another reference for move assignment test
-    WBE::MemID array_id2 = WBE::create_obj_array_align<TestObject>(allocator, 6, 400);
+    WBE::MemID array_id2 = WBE::create_array<TestObject>(allocator, 6, 400);
     WBE::RefRaw<TestObject> move_source(array_id2, 6, &allocator);
     ASSERT_EQ(move_source.get_num(), 6);
     
@@ -517,7 +517,7 @@ TEST(WBERefRawTest, NumFieldTemplateConversions) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     
     // Create array of DerivedClass with num = 7
-    WBE::MemID array_id = WBE::create_obj_array_align<DerivedClass>(allocator, 7, 500, 600);
+    WBE::MemID array_id = WBE::create_array<DerivedClass>(allocator, 7, 500, 600);
     WBE::RefRaw<DerivedClass> derived_ref(array_id, 7, &allocator);
     ASSERT_EQ(derived_ref.get_num(), 7);
     
@@ -527,7 +527,7 @@ TEST(WBERefRawTest, NumFieldTemplateConversions) {
     ASSERT_EQ(derived_ref.get_num(), 7); // Original unchanged
     
     // Template move constructor should preserve num
-    WBE::MemID array_id2 = WBE::create_obj_array_align<DerivedClass>(allocator, 8, 700, 800);
+    WBE::MemID array_id2 = WBE::create_array<DerivedClass>(allocator, 8, 700, 800);
     WBE::RefRaw<DerivedClass> derived_move_source(array_id2, 8, &allocator);
     WBE::RefRaw<BaseClass> base_moved(std::move(derived_move_source));
     ASSERT_EQ(base_moved.get_num(), 8);
@@ -539,7 +539,7 @@ TEST(WBERefRawTest, NumFieldTemplateConversions) {
     ASSERT_EQ(base_copy_assigned.get_num(), 7);
     
     // Template move assignment should preserve num
-    WBE::MemID array_id3 = WBE::create_obj_array_align<DerivedClass>(allocator, 9, 900, 1000);
+    WBE::MemID array_id3 = WBE::create_array<DerivedClass>(allocator, 9, 900, 1000);
     WBE::RefRaw<DerivedClass> derived_move_assign_source(array_id3, 9, &allocator);
     WBE::RefRaw<BaseClass> base_move_assigned;
     base_move_assigned = std::move(derived_move_assign_source);
@@ -557,7 +557,7 @@ TEST(WBERefRawTest, NumFieldVariousSizes) {
     
     // Test various array sizes and verify num field
     for (size_t i = 1; i <= 10; ++i) {
-        WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, i, static_cast<int>(i * 10));
+        WBE::MemID array_id = WBE::create_array<TestObject>(allocator, i, static_cast<int>(i * 10));
         WBE::RefRaw<TestObject> ref(array_id, i, &allocator);
         
         ASSERT_EQ(ref.get_num(), i);
@@ -585,7 +585,7 @@ TEST(WBERefRawTest, GetNumMethodConst) {
     WBE::delete_ref(std::move(single_ref));
     
     // Test get_num() on array
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 12, 456);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 12, 456);
     WBE::RefRaw<TestObject> array_ref(array_id, 12, &allocator);
     ASSERT_EQ(array_ref.get_num(), 12);
     
@@ -602,7 +602,7 @@ TEST(WBERefRawTest, NumFieldDeleteArrayHandling) {
     TestObject::instance_count = 0;
     
     // Create array with multiple elements
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 5, 777);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 5, 777);
     WBE::RefRaw<TestObject> array_ref(array_id, 5, &allocator);
     
     ASSERT_EQ(array_ref.get_num(), 5);
@@ -618,7 +618,7 @@ TEST(WBERefRawTest, NumFieldComplexScenario) {
     TestObject::instance_count = 0;
     
     // Create original array reference
-    WBE::MemID array_id = WBE::create_obj_array_align<TestObject>(allocator, 4, 999);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 4, 999);
     WBE::RefRaw<TestObject> original(array_id, 4, &allocator);
     ASSERT_EQ(original.get_num(), 4);
     ASSERT_EQ(TestObject::instance_count, 4);
@@ -754,7 +754,7 @@ TEST(WBERefRawTest, GetMethodWithIndexArray) {
     TestObject::instance_count = 0;
     
     // Test get() with various indices on array
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 5, 0);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 5, 0);
     WBE::RefRaw<TestObject> array_ref(array_id, 5, &allocator);
     
     // Set different values for each array element
@@ -773,7 +773,7 @@ TEST(WBERefRawTest, GetMethodWithIndexArray) {
     ASSERT_THROW(array_ref.get(10), std::runtime_error);
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 5);
+    WBE::destroy_array<TestObject>(allocator, array_id, 5);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -782,7 +782,7 @@ TEST(WBERefRawTest, GetMethodWithIndexConst) {
     TestObject::instance_count = 0;
     
     // Create array and set values
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 4, 0);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 4, 0);
     WBE::RefRaw<TestObject> array_ref(array_id, 4, &allocator);
     
     for (size_t i = 0; i < 4; ++i) {
@@ -801,7 +801,7 @@ TEST(WBERefRawTest, GetMethodWithIndexConst) {
     ASSERT_THROW(const_array_ref.get(4), std::runtime_error);
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 4);
+    WBE::destroy_array<TestObject>(allocator, array_id, 4);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -810,7 +810,7 @@ TEST(WBERefRawTest, OperatorBracketArray) {
     TestObject::instance_count = 0;
     
     // Test operator[] on array
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 6, 0);
+    WBE::MemID array_id = WBE::create_array<TestObject>(allocator, 6, 0);
     WBE::RefRaw<TestObject> array_ref(array_id, 6, &allocator);
     
     // Set values using operator[]
@@ -828,7 +828,7 @@ TEST(WBERefRawTest, OperatorBracketArray) {
     ASSERT_THROW(array_ref[100], std::runtime_error);
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 6);
+    WBE::destroy_array<TestObject>(allocator, array_id, 6);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -837,7 +837,7 @@ TEST(WBERefRawTest, OperatorBracketConstArray) {
     TestObject::instance_count = 0;
     
     // Create array and set values
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 3, 0);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 3, 0);
     WBE::RefRaw<TestObject> array_ref(array_id, 3, &allocator);
     
     array_ref[0].value = 111;
@@ -854,7 +854,7 @@ TEST(WBERefRawTest, OperatorBracketConstArray) {
     ASSERT_THROW(const_array_ref[3], std::runtime_error);
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 3);
+    WBE::destroy_array<TestObject>(allocator, array_id, 3);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -863,7 +863,7 @@ TEST(WBERefRawTest, GetAndOperatorBracketEquivalenceArray) {
     TestObject::instance_count = 0;
     
     // Create array
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 4, 0);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 4, 0);
     WBE::RefRaw<TestObject> array_ref(array_id, 4, &allocator);
     
     // Set values and verify get() and operator[] return same references
@@ -883,7 +883,7 @@ TEST(WBERefRawTest, GetAndOperatorBracketEquivalenceArray) {
     }
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 4);
+    WBE::destroy_array<TestObject>(allocator, array_id, 4);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -916,7 +916,7 @@ TEST(WBERefRawTest, IndexedAccessErrorMessages) {
     WBE::delete_ref(std::move(single_ref));
     
     // Test with array (num = 3)
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 3, 456);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 3, 456);
     WBE::RefRaw<TestObject> array_ref(array_id, 3, &allocator);
     
     try {
@@ -938,7 +938,7 @@ TEST(WBERefRawTest, IndexedAccessErrorMessages) {
     }
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 3);
+    WBE::destroy_array<TestObject>(allocator, array_id, 3);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -947,7 +947,7 @@ TEST(WBERefRawTest, IndexedAccessWithTemplateConversions) {
     TestObject::instance_count = 0;
     
     // Create array of DerivedTestObject
-    WBE::MemID array_id = create_obj_array_align<DerivedTestObject>(allocator, 3, 100);
+    WBE::MemID array_id = create_array<DerivedTestObject>(allocator, 3, 100);
     WBE::RefRaw<DerivedTestObject> derived_ref(array_id, 3, &allocator);
     
     // Set different values for each element
@@ -973,7 +973,7 @@ TEST(WBERefRawTest, IndexedAccessWithTemplateConversions) {
     ASSERT_THROW(base_ref.get(3), std::runtime_error);
     
     // Manual cleanup
-    WBE::destroy_obj_array_align<DerivedTestObject>(allocator, array_id, 3);
+    WBE::destroy_array<DerivedTestObject>(allocator, array_id, 3);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
@@ -982,7 +982,7 @@ TEST(WBERefRawTest, IndexedAccessNumFieldConsistency) {
     TestObject::instance_count = 0;
     
     // Test that indexed access respects the num field correctly
-    WBE::MemID array_id = create_obj_array_align<TestObject>(allocator, 10, 777);
+    WBE::MemID array_id = create_array<TestObject>(allocator, 10, 777);
     
     // Create RefRaw with smaller num than actual array size
     WBE::RefRaw<TestObject> limited_ref(array_id, 5, &allocator);  // Only access first 5 elements
@@ -1005,7 +1005,7 @@ TEST(WBERefRawTest, IndexedAccessNumFieldConsistency) {
     ASSERT_EQ(limited_ref.get_num(), 5);
     
     // Manual cleanup of full array
-    WBE::destroy_obj_array_align<TestObject>(allocator, array_id, 10);
+    WBE::destroy_array<TestObject>(allocator, array_id, 10);
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 

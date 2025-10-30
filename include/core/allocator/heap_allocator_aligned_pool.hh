@@ -77,7 +77,13 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual void* get(MemID p_id) const override;
+    virtual void* get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        return reinterpret_cast<void*>(p_id);
+    }
 
     virtual bool is_empty() const override {
         return idle_list_head != nullptr && idle_list_head->size == size;

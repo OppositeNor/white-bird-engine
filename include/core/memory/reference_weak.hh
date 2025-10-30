@@ -15,13 +15,14 @@
 #ifndef __WBE_REFERENCE_WEAK_HH__
 #define __WBE_REFERENCE_WEAK_HH__
 
+#include "core/allocator/heap_allocator.hh"
 #include "reference_strong.hh"
 #include <atomic>
 #include <concepts>
 
 namespace WhiteBirdEngine {
 
-template <typename T, typename AllocType = HeapAllocatorAligned>
+template <typename T, typename AllocType = HeapAllocator>
 class RefWeak {
 public:
     using ObjType = T;

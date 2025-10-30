@@ -43,7 +43,7 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public Alloc
  * @brief Heap allocator aligned pool atomic version.
  *
  */
-class HeapAllocatorAtomicAlignedPool : public HeapAllocatorAligned {
+class HeapAllocatorAtomicAlignedPool final : public HeapAllocatorAligned {
 public:
 public:
     HeapAllocatorAtomicAlignedPool()
@@ -77,7 +77,14 @@ public:
 
     virtual void deallocate(MemID p_mem) override;
 
-    virtual void* get(MemID p_id) const override;
+    virtual void* get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        boost::shared_lock lock(mutex);
+        WBE_DEBUG_ASSERT(unguard_is_in_pool(p_id));
+        return reinterpret_cast<void*>(p_id);
+    }
 
     virtual bool is_empty() const override {
         boost::shared_lock lock(mutex);

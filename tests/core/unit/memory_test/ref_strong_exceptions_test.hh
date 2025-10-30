@@ -38,7 +38,7 @@ protected:
 TEST_F(WBERefStrongExceptionsTest, MemIDOnlyConstructorThrowsOnNonNull) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     // allocate an int to get a non-null MemID
-    WBE::MemID id = WBE::create_obj_align<int>(allocator, 5);
+    WBE::MemID id = WBE::create_obj<int>(allocator, 5);
     // constructing Ref<int> with a non-MEM_NULL MemID (without allocator) should throw
     ASSERT_THROW({ WBE::Ref<int> r(id); }, std::runtime_error);
     // cleanup

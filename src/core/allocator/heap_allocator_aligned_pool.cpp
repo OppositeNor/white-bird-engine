@@ -103,14 +103,6 @@ void HeapAllocatorAlignedPool::deallocate(MemID p_mem) {
     insert_free_memory(insert_pos, data_loc, data_size);
 }
 
-void* HeapAllocatorAlignedPool::get(MemID p_id) const {
-    if (p_id == MEM_NULL) {
-        return nullptr;
-    }
-    WBE_DEBUG_ASSERT(is_in_pool(p_id));
-    return reinterpret_cast<void*>(p_id);
-}
-
 void* HeapAllocatorAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {
     WBE_DEBUG_ASSERT(p_mem_start >= p_node->mem_start);
     WBE_DEBUG_ASSERT(p_mem_start + p_mem_size <= p_node->mem_start + p_node->size);

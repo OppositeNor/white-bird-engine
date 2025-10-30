@@ -59,15 +59,7 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    virtual void* get(MemID p_id) = 0;
-
-    /**
-     * @brief Get the pointer pointing to the resource.
-     *
-     * @param p_id The resource id to get the pointer from.
-     * @return The pointer of the resource.
-     */
-    virtual const void* get(MemID p_id) const = 0;
+    virtual void* get(MemID p_id) const = 0;
 
     /**
      * @brief Is the allocator empty.
@@ -141,6 +133,45 @@ inline void destroy_obj(AllocType& p_allocator, MemID p_id) {
         return;
     }
     static_cast<T*>(p_allocator.get(p_id))->~T();
+    p_allocator.deallocate(p_id);
+}
+
+/**
+ * @brief Create an array.
+ *
+ * @tparam T The type of the array element.
+ * @tparam AllocType The type of the allocator.
+ * @tparam Args The arguments types that will be passed to each element of the constructor.
+ * @param p_allocator The allocator to allocate the array.
+ * @param p_num The size of the array.
+ * @param p_args The arguments that will be passed to each element of the constructor.
+ * @return The array created.
+ */
+template <typename T, typename AllocType, typename... Args>
+inline MemID create_array(AllocType& p_allocator, size_t p_num, Args&&... p_args) {
+    T* begin = reinterpret_cast<T*>(p_allocator.allocate(sizeof(T) * p_num));
+    for (size_t i = 0; i < p_num; ++i) {
+        new(begin + i) T(std::forward<Args>(p_args)...);
+    }
+    return reinterpret_cast<MemID>(begin);
+}
+
+/**
+ * @brief Destroy an array
+ *
+ * @tparam T The type of the array elements.
+ * @param p_allocator The allocator that the array was allocated on.
+ * @param p_id The memory ID of the array.
+ */
+template <typename T, typename AllocType>
+inline void destroy_array(AllocType& p_allocator, MemID p_id, size_t p_num) {
+    if (p_id == MEM_NULL) {
+        return;
+    }
+    T* begin = static_cast<T*>(p_allocator.get(p_id));
+    for (size_t i = 0; i < p_num; ++i) {
+        (begin + i)->~T();
+    }
     p_allocator.deallocate(p_id);
 }
 

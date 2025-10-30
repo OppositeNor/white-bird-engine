@@ -73,7 +73,7 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, wait_fence) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 
