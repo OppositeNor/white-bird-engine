@@ -25,7 +25,7 @@ ApplicationGame::ApplicationGame() {
 
 void ApplicationGame::init() {
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.5));
-    // TODO: Create renderer from config file.
+    // TODO: Create renderer based on config file.
     renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
     // TODO
 }

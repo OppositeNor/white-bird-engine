@@ -136,8 +136,39 @@ public:
         return framebuffer;
     }
 
+    /**
+     * @class ExposedFields
+     * @brief Exposed fields of framebuffer.
+     *
+     */
+    struct ExposedFields {
+        // The render pass.
+        Ref<RORenderPassVK> render_pass;
+        // The width and height of the framebuffer.
+        glm::uvec2 extent;
+    };
+
+    /**
+     * @brief Get the exposed fields of framebuffer.
+     *
+     * @return The exposed fields of framebuffer.
+     */
+    ExposedFields& fields() {
+        return exposed_fields;
+    }
+
+    /**
+     * @brief Get the exposed fields of framebuffer.
+     *
+     * @return The exposed fields of framebuffer.
+     */
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
+
 private:
     VkFramebuffer framebuffer;
+    ExposedFields exposed_fields;
 };
 
 }

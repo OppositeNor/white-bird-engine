@@ -50,7 +50,7 @@ struct RenderTask {
     /**
      * @brief Perform the render task.
      */
-    virtual void operator()(double p_delta) = 0;
+    virtual void perform(double p_delta) = 0;
 };
 
 /**
@@ -68,9 +68,9 @@ struct RendTaskInfo {
     std::vector<Ref<RendTaskInfo>> next;
 
     // Required resources.
-    std::vector<RendResID> req_res;
+    std::vector<RendResInfo> req_res;
     // Produced resources.
-    std::vector<RendResID> prod_res;
+    std::vector<RendResInfo> prod_res;
 
     // The render task instance.
     Ref<RenderTask> render_task = MEM_NULL;

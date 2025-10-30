@@ -17,6 +17,7 @@
 #define __WBE_LABEL_MANAGER_HH__
 
 #include "utils/utils.hh"
+#include "utils/interface/singleton.hh"
 
 #include <map>
 #include <string>
@@ -44,9 +45,10 @@ struct LabelName<static_hash("{{ label.label_name }}")> {
  * @class LabelManager
  * @brief The manager for all the dynamic labels.
  */
-class LabelManager {
+class LabelManager : public Singleton<LabelManager> {
 public:
     LabelManager() {
+        singleton = this;
         {% for label in metadata.labels %}
         {% if label.attribute | select("in", dynamic_labels) | list | length > 0  %}
         dynamic_labels.push_back("{{ label.label_name }}");
@@ -54,7 +56,9 @@ public:
         {% endif %}
         {% endfor %}
     }
-    ~LabelManager() {}
+    ~LabelManager() {
+        singleton = nullptr;
+    }
 
     /**
      * @brief Get the name of the label.
@@ -76,7 +80,15 @@ public:
         hash_to_name.insert(std::pair(dynam_hash(p_name), p_name));
     }
 
+    /**
+     * @brief Get the singleton instance.
+     */
+    static LabelManager* get_singleton() {
+        return singleton;
+    }
+
 private:
+    inline static LabelManager* singleton = nullptr;
     std::vector<std::string> dynamic_labels;
     std::map<HashCode, std::string> hash_to_name;
 };

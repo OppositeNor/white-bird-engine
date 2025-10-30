@@ -64,9 +64,21 @@ ROImageVK::Builder& ROImageVK::Builder::image_2d(glm::uvec2 p_size) {
     return *this;
 }
 
+ROImageVK::Builder& ROImageVK::Builder::image_2d(VkExtent2D p_extent) {
+    image_type = VK_IMAGE_TYPE_2D;
+    extent = {p_extent.width, p_extent.height};
+    return *this;
+}
+
 ROImageVK::Builder& ROImageVK::Builder::image_3d(glm::uvec3 p_size) {
     image_type = VK_IMAGE_TYPE_3D;
     extent = VkExtent3D{ .width = p_size.x, .height = p_size.y, .depth = p_size.z };
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::image_3d(VkExtent3D p_extent) {
+    image_type = VK_IMAGE_TYPE_3D;
+    extent = p_extent;
     return *this;
 }
 

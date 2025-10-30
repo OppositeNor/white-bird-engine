@@ -69,8 +69,12 @@ public:
         Builder& set_queue_families(const std::set<uint32_t>& p_queue_family_indices);
         // Make a 2D image.
         Builder& image_2d(glm::uvec2 p_size);
+        // Make a 2D image.
+        Builder& image_2d(VkExtent2D p_size);
         // Make a 3D image.
         Builder& image_3d(glm::uvec3 p_size);
+        // Make a 3D image.
+        Builder& image_3d(VkExtent3D p_size);
         // Make an RGB image with each element 8 bit wide.
         Builder& rgb();
         // Make an SRGB image with each element 8 bit wide.

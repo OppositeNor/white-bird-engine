@@ -42,9 +42,9 @@ struct BaseRenderDataVK {
     // Callback for allocator.
     VkAllocationCallbacks* allocation_callbacks;
     // Graphics queue family index.
-    uint32_t queue_family_index_graphics;
+    VkQueue graphics_queue;
     // Compute queue family index.
-    uint32_t queue_family_index_compute;
+    VkQueue compute_queue;
     // The viewport for the final presentation.
     VkViewport viewport;
     // The scissor for the final presentation.

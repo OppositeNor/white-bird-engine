@@ -14,7 +14,6 @@
 */
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "utils/defs.hh"
-#include "utils/utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -38,12 +37,15 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
     if (vkCreateFramebuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }
+
     return result;
 }
 
 ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     framebuffer = p_builder.build(p_render_data);
+    exposed_fields.extent = {*(p_builder.width), *(p_builder.height)};
+    exposed_fields.render_pass = p_builder.render_pass;
 }
 
 ROFramebufferVK::~ROFramebufferVK() {

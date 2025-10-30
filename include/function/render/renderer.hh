@@ -16,8 +16,12 @@
 #define __WBE_RENDERER_HH__
 
 #include "core/core_utils.hh"
+#include "core/reflection/reflection_defs.hh"
+#include "function/render/render_task.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
+
+WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
 
 using RenderAllocator = HeapAllocatorDefault;
 
@@ -38,6 +42,23 @@ public:
      * @param p_delta The difference between the last two calls of this function.
      */
     virtual void tick(double p_delta) = 0;
+
+    /**
+     * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
+     *
+     * @todo Test
+     * @param p_pipeline_name The name of the pipeline to register.
+     * @param p_root_task The root render task of the pipeline.
+     */
+    virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) = 0;
+
+    /**
+     * @brief Activate a pipeline.
+     *
+     * @todo Test
+     * @param p_pipeline_name The name of the pipeline to activate.
+     */
+    virtual void activate_pipeline(const std::string& p_pipeline_name) = 0;
 protected:
 
 private:

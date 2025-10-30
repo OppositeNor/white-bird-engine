@@ -42,6 +42,7 @@
 #include <cstdint>
 #include <deque>
 #include <format>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vulkan/vulkan_core.h>
@@ -61,7 +62,18 @@ RendererVK::~RendererVK() {
 }
 
 void RendererVK::tick(double p_delta) {
-    // TODO
+    Ref<PipelineInfo> run_pipeline = activated_pipeline;
+    if (run_pipeline == MEM_NULL) {
+        wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
+        return;
+    }
+    for (auto& task_info : run_pipeline->task_infos) {
+        if (task_info.render_task == MEM_NULL) {
+            wbe_console_log(WBE_CHANNEL_RENDER)->warning(std::format("Render task {} is NULL. Skipped.", task_info.task_id));
+            continue;
+        }
+        task_info.render_task->perform(p_delta);
+    }
 }
 
 void RendererVK::init() {
@@ -114,8 +126,8 @@ void RendererVK::setup_base_render_data() {
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;
     base_render_data.allocation_callbacks = get_allocation_callbacks();
-    base_render_data.queue_family_index_graphics = queue_family_indices.graphics.value();
-    base_render_data.queue_family_index_compute = queue_family_indices.compute.value();
+    base_render_data.graphics_queue = graphics_queue;
+    base_render_data.compute_queue = compute_queue;
     base_render_data.viewport = viewport;
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
@@ -632,6 +644,7 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     unordered_set<Ref<RendTaskInfo>> visited(allocator);
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
+    std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
@@ -649,17 +662,26 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
             register_render_resources(curr, task_info, p_pipeline_info);
             p_pipeline_info->task_infos.push_back(task_info);
 
+            render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+
             for (auto next : curr->next) {
                 to_visit.push_back(next);
             }
         }
     }
+    for (auto rend_task : p_pipeline_info->task_infos) {
+        auto* dep_tasks = render_task_map[rend_task.task_id].second;
+        for (auto dep_task_id : *dep_tasks) {
+            rend_task.render_task->depend_tasks.push_back(render_task_map[dep_task_id].first);
+        }
+    }
 }
 
-Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res) {
+Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
     auto iter = render_resources.find(p_res);
     if (iter == render_resources.end() || !iter->second.is_valid()) {
         auto rend_res = make_ref<RendResVK>(allocator, &base_render_data);
+        rend_res->res_type_id = p_type_id;
         rend_res->res_id = p_res;
         // It is the users' responsibility to initialize this field.
         rend_res->res = MEM_NULL;
@@ -674,12 +696,12 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
     WBE_DEBUG_ASSERT(p_task_info.render_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
     for (auto& res : p_task->req_res) {
-        Ref<RendResVK> rend_res = get_rend_res(res);
+        Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
         p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->req_rend_res.push_back(rend_res);
     }
     for (auto& res : p_task->prod_res) {
-        Ref<RendResVK> rend_res = get_rend_res(res);
+        Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
         p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->prod_rend_res.push_back(rend_res);
     }

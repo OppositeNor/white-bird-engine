@@ -66,6 +66,23 @@ public:
 
     virtual void tick(double p_delta) override;
 
+    virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {
+        if (p_root_task == MEM_NULL) {
+            throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
+        }
+        if (p_root_task->prev.size() != 0) {
+            throw std::runtime_error(std::format("Root task {} should not have previous tasks.", p_pipeline_name));
+        }
+        pipelines[p_pipeline_name] = compile_pipeline(p_pipeline_name, p_root_task);
+    }
+
+    virtual void activate_pipeline(const std::string& p_pipeline_name) override {
+        if (pipelines.find(p_pipeline_name) == pipelines.end()) {
+            throw std::runtime_error(std::format("Failed to activate pipeline: {}, pipeline not registered.", p_pipeline_name));
+        }
+        activated_pipeline = pipelines[p_pipeline_name];
+    }
+
     /**
      * @brief Get the singleton instance.
      *
@@ -91,36 +108,6 @@ public:
      */
     const BaseRenderDataVK* get_base_render_data() const {
         return &base_render_data;
-    }
-
-    /**
-     * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
-     *
-     * @todo Test
-     * @param p_pipeline_name The name of the pipeline to register.
-     * @param p_root_task The root render task of the pipeline.
-     */
-    void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
-        if (p_root_task == MEM_NULL) {
-            throw std::runtime_error(std::format("Failed to register pipeline {}, root task is NULL.", p_pipeline_name));
-        }
-        if (p_root_task->prev.size() != 0) {
-            throw std::runtime_error(std::format("Root task {} should not have previous tasks.", p_pipeline_name));
-        }
-        pipelines[p_pipeline_name] = compile_pipeline(p_pipeline_name, p_root_task);
-    }
-
-    /**
-     * @brief Activate a pipeline.
-     *
-     * @todo Test
-     * @param p_pipeline_name The name of the pipeline to activate.
-     */
-    void activate_pipeline(const std::string& p_pipeline_name) {
-        if (pipelines.find(p_pipeline_name) == pipelines.end()) {
-            throw std::runtime_error(std::format("Failed to activate pipeline: {}, pipeline not registered.", p_pipeline_name));
-        }
-        activated_pipeline = pipelines[p_pipeline_name];
     }
 
     // TODO
@@ -296,7 +283,7 @@ private:
 
     Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
     void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
-    Ref<RendResVK> get_rend_res(RendResID p_res);
+    Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 
 };

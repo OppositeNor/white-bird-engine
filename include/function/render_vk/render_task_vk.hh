@@ -15,10 +15,38 @@
 #ifndef __WBE_RENDER_TASK_VK_HH__
 #define __WBE_RENDER_TASK_VK_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
+#include "generated/label_manager.gen.hh"
+#include <cstddef>
+#include <format>
+#include <initializer_list>
+#include <stdexcept>
 namespace WhiteBirdEngine {
+
+/**
+ * @class SemaphoreVK
+ * @brief Vulkan semaphore container.
+ *
+ */
+struct SemaphoreVK {
+    VkSemaphore semaphore;
+    const BaseRenderDataVK* render_data;
+    SemaphoreVK(const BaseRenderDataVK* p_render_data)
+        : render_data(p_render_data) {
+        VkSemaphoreCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create semaphore.");
+        }
+    }
+    ~SemaphoreVK() {
+        vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
+    }
+};
 
 /**
  * @class RenderTaskVK
@@ -26,7 +54,8 @@ namespace WhiteBirdEngine {
  *
  */
 struct RenderTaskVK : public RenderTask {
-    RenderTaskVK() = default;
+    RenderTaskVK(const BaseRenderDataVK* p_render_data)
+        : task_semaphore(p_render_data), render_data(p_render_data) {}
     virtual ~RenderTaskVK() {}
     /**
      * @brief The required resources. This will be filled in the order of the req_res field in RendTaskInfo.
@@ -36,6 +65,43 @@ struct RenderTaskVK : public RenderTask {
      * @brief The produced resources. This will be filled in the order of the prod_res field in RendTaskInfo.
      */
     std::vector<Ref<RendResVK>> prod_rend_res;
+    /**
+     * @brief The tasks this task depends on.
+     */
+    std::vector<Ref<RenderTaskVK>> depend_tasks;
+
+    SemaphoreVK task_semaphore;
+
+protected:
+    const BaseRenderDataVK* render_data;
+    void check_req_res(std::initializer_list<RendResTID> p_expected_req_res) {
+        if (req_rend_res.size() != p_expected_req_res.size()) {
+            throw std::runtime_error(std::format(
+                "Number of required resources doesn't match: expected: {}, actual: {}.", p_expected_req_res.size(), req_rend_res.size()));
+        }
+        for (size_t i = 0; i < p_expected_req_res.size(); ++i) {
+            if (req_rend_res[i] == MEM_NULL) {
+                throw std::runtime_error(std::format(
+                    "Render task's required resource type mismatch: expected: {}, actual: NULL.",
+                    LabelManager::get_singleton()->get_label_name(*(p_expected_req_res.begin() + i))));
+            }
+        }
+    }
+
+    void check_prod_res(std::initializer_list<RendResTID> p_expected_prod_res) {
+        if (prod_rend_res.size() != p_expected_prod_res.size()) {
+            throw std::runtime_error(std::format(
+                "Number of produced resources doesn't match: expected: {}, actual: {}.", p_expected_prod_res.size(), prod_rend_res.size()));
+        }
+        for (size_t i = 0; i < p_expected_prod_res.size(); ++i) {
+            if (prod_rend_res[i] == MEM_NULL) {
+                throw std::runtime_error(std::format(
+                    "Render task's produced resource type mismatch: expected: {}, actual: NULL.",
+                    LabelManager::get_singleton()->get_label_name(*(p_expected_prod_res.begin() + i))));
+            }
+        }
+    }
+
 };
 
 }
