@@ -85,6 +85,37 @@ TEST(WindowsFileSystemTest, ParseDirectory) {
     ASSERT_TRUE(parsed_dir_absolute_empty == expectd_absolute_empty);
 }
 
+TEST(WindowsFileSystemTest, ParseDirectoryEmptyEdgeCases) {
+    // Test specific edge case where splitting results in empty array
+    WBE::Directory expected_empty({}, false);
+    
+    // Empty string should return empty relative directory
+    WBE::Directory parsed_empty = WBE::FileSystem::parse_directory("");
+    ASSERT_TRUE(parsed_empty == expected_empty);
+    
+    // String with only separators and dots should result in appropriate directories
+    WBE::Directory parsed_dots_only = WBE::FileSystem::parse_directory(".\\.\\.\\.\\.");
+    ASSERT_TRUE(parsed_dots_only == expected_empty);
+    
+    // String with only double dots that cancel out
+    WBE::Directory parsed_cancelled = WBE::FileSystem::parse_directory("..\\dir\\..\\");
+    ASSERT_TRUE(parsed_cancelled == expected_empty);
+    
+    // Multiple backslashes should be treated as single separators
+    WBE::Directory parsed_multiple_slashes = WBE::FileSystem::parse_directory("C:\\\\\\");
+    WBE::Directory expected_absolute_empty({"C:"}, true);
+    ASSERT_TRUE(parsed_multiple_slashes == expected_absolute_empty);
+    
+    // Complex case that results in empty after processing
+    WBE::Directory parsed_complex_empty = WBE::FileSystem::parse_directory(".\\a\\..\\b\\..\\c\\..\\");
+    ASSERT_TRUE(parsed_complex_empty == expected_empty);
+    
+    // Verify splitted.size() == 0 condition is properly handled with Windows paths
+    WBE::Directory parsed_only_separators = WBE::FileSystem::parse_directory("D:\\\\\\\\");
+    WBE::Directory expected_d_empty({"D:"}, true);
+    ASSERT_TRUE(parsed_only_separators == expected_d_empty);
+}
+
 TEST(WindowsFileSystemTest, CombineDirectory) {
     WBE::Directory expected_absolute({ "E:", "hello", "world", "this", "is", "a", "test", "directory" }, true);
     WBE::Directory dir1({ "E:", "hello", "world" }, true);

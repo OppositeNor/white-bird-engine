@@ -119,11 +119,17 @@ public:
      */
     static std::string get_ext(const Path& p_path);
 
+    /**
+     * @brief Get the directory of the executable.
+     *
+     * @return The directory of the executable.
+     */
+    static Directory get_executable_dir();
+
 private:
     Directory root_directory;
     Directory resource_directory;
     Directory config_directory;
-    Directory get_executable_dir();
 };
 
 /**

@@ -93,6 +93,10 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const Directory& p_dire
     return p_ostream << static_cast<std::string>(p_directory);
 }
 
+inline Directory operator+(const Directory& p_first, const Directory& p_second) {
+    return p_first.combine(p_second);
+}
+
 }
 
 #endif

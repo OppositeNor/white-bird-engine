@@ -56,7 +56,7 @@ TEST(LinuxFileSystemTest, DirToString) {
 
 TEST(LinuxFileSystemTest, ParseDirectory) {
     WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
-    WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello/world//this/is/not/../a/test/./directory/XD");
+    WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello/world//this/is/not/../a/test/./directory");
     ASSERT_EQ(parsed_dir, expected);
     WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory("../hello/world/this/is/not/../a/test/./directory/XD/../");
     ASSERT_EQ(parsed_dir_1, expected);
@@ -65,7 +65,7 @@ TEST(LinuxFileSystemTest, ParseDirectory) {
     WBE::Directory expected_absolute({ "hello", "this", "is", "me" }, true);
     WBE::Directory parsed_dir_absolute = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
     ASSERT_EQ(parsed_dir_absolute, expected_absolute);
-    WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory("/./../hello/that/../this/is/me/XD");
+    WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory("/./../hello/that/../this/is/me/");
     ASSERT_EQ(parsed_dir_absolute_1, expected_absolute);
     WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
     ASSERT_EQ(parsed_dir_absolute_2, expected_absolute);
@@ -75,6 +75,36 @@ TEST(LinuxFileSystemTest, ParseDirectory) {
     WBE::Directory parsed_dir_absolute_empty = WBE::FileSystem::parse_directory("/");
     ASSERT_EQ(parsed_dir_relative_empty, expectd_relative_empty);
     ASSERT_EQ(parsed_dir_absolute_empty, expectd_absolute_empty);
+}
+
+TEST(LinuxFileSystemTest, ParseDirectoryEmptyEdgeCases) {
+    // Test specific edge case where splitting results in empty array
+    WBE::Directory expected_empty({}, false);
+    
+    // Empty string should return empty relative directory
+    WBE::Directory parsed_empty = WBE::FileSystem::parse_directory("");
+    ASSERT_EQ(parsed_empty, expected_empty);
+    
+    // String with only separators and dots should result in appropriate directories
+    WBE::Directory parsed_dots_only = WBE::FileSystem::parse_directory("./././.");
+    ASSERT_EQ(parsed_dots_only, expected_empty);
+    
+    // String with only double dots that cancel out
+    WBE::Directory parsed_cancelled = WBE::FileSystem::parse_directory("../dir/../");
+    ASSERT_EQ(parsed_cancelled, expected_empty);
+    
+    // Multiple slashes should be treated as single separators
+    WBE::Directory parsed_multiple_slashes = WBE::FileSystem::parse_directory("///");
+    WBE::Directory expected_absolute_empty({}, true);
+    ASSERT_EQ(parsed_multiple_slashes, expected_absolute_empty);
+    
+    // Complex case that results in empty after processing
+    WBE::Directory parsed_complex_empty = WBE::FileSystem::parse_directory("./a/../b/../c/../");
+    ASSERT_EQ(parsed_complex_empty, expected_empty);
+    
+    // Verify splitted.size() == 0 condition is properly handled
+    WBE::Directory parsed_only_separators = WBE::FileSystem::parse_directory("////");
+    ASSERT_EQ(parsed_only_separators, expected_absolute_empty);
 }
 
 TEST(LinuxFileSystemTest, CombineDirectory) {

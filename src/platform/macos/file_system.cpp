@@ -32,7 +32,9 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
     auto splitted = split_string(p_str, '/');
-    splitted.pop_back();
+    if (splitted.size() == 0) {
+        return Directory();
+    }
     std::vector<std::string> path_stack;
     path_stack.reserve(splitted.size());
     for (auto& dir_name : splitted) {
@@ -72,7 +74,8 @@ Directory FileSystem::get_file_dir(const std::string& p_path) {
     if (last_slash == std::string::npos) {
         Directory();
     }
-    return Directory(parse_directory(p_path.substr(0, last_slash)));
+    std::string dir_str = p_path.substr(0, last_slash + 1);
+    return Directory(parse_directory(dir_str));
 }
 
 std::string FileSystem::path_to_string(const Path& p_path) {
@@ -80,9 +83,12 @@ std::string FileSystem::path_to_string(const Path& p_path) {
 }
 
 std::string FileSystem::get_ext(const Path& p_path) {
-    // TODO: Test
     auto& file_name = p_path.get_file_name();
-    return file_name.substr(file_name.find_last_of('.'));
+    size_t ext_dest = file_name.find_last_of('.');
+    if (ext_dest == 0 || ext_dest == std::string::npos) {
+        return "";
+    }
+    return file_name.substr(ext_dest);
 }
 
 Directory FileSystem::get_executable_dir() {
