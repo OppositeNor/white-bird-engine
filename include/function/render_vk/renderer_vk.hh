@@ -268,10 +268,13 @@ private:
     void init_swap_chain_framebuffers();
     void setup_render_resource();
 
+    void recreate_swap_chain();
+
     void create_instance();
     void create_window_surface();
     void create_device();
     void create_swap_chain();
+    void clean_up_swap_chain();
     void create_command_pools();
     void create_async_objects();
 

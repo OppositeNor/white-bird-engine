@@ -81,14 +81,20 @@ void RendererVK::tick(double p_delta) {
     base_render_data.in_flight_fence = in_flight_fences[frame_counter];
 
     vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
-    vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
-    // Setup swap chain image.
+    // Aquire swap chain image.
     uint32_t image_index;
     auto image_available_semaphore = render_objects->render_start_tasks[frame_counter].render_task->task_semaphore.semaphore;
-    if (vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
+    VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        recreate_swap_chain();
+        return;
+    }
+    if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to acquire swap chain image.");
     }
+
+    vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
     render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
     auto curr_pipeline = run_pipeline[frame_counter];
 
@@ -162,6 +168,15 @@ void RendererVK::init_vulkan() {
     create_swap_chain();
     create_command_pools();
     create_async_objects();
+}
+
+void RendererVK::recreate_swap_chain() {
+    vkDeviceWaitIdle(logical_device);
+    clean_up_swap_chain();
+    create_swap_chain();
+    init_swap_chain_image_views();
+    init_swap_chain_framebuffers();
+    setup_base_render_data();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -313,7 +328,7 @@ void RendererVK::create_swap_chain() {
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(details.formats);
     VkPresentModeKHR present_mode = choose_swap_present_mode(details.present_modes);
     VkExtent2D extent = choose_swap_extent(details.capabilities);
-    uint32_t image_count = 3;
+    uint32_t image_count = 2;
     if (details.capabilities.maxImageCount != 0) {
         image_count = std::clamp(image_count, details.capabilities.minImageCount, details.capabilities.maxImageCount);
     }
@@ -354,7 +369,8 @@ void RendererVK::create_swap_chain() {
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = VK_NULL_HANDLE;
 
-    if (vkCreateSwapchainKHR(logical_device, &create_info, get_allocation_callbacks(), &swap_chain) != VK_SUCCESS) {
+    VkResult result = vkCreateSwapchainKHR(logical_device, &create_info, get_allocation_callbacks(), &swap_chain);
+    if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swap chain.");
     }
 
@@ -362,6 +378,11 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
+    if (frames_in_flight < swap_chain_images_count) {
+        wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+            std::format("frames_in_flight is required to be more than swap chain images; but get {} frames_in_flight and {} images."
+                        "resizing frames_in_flight to {}.", frames_in_flight, swap_chain_images_count, frames_in_flight));
+    }
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     frames_in_flight = game_config.frames_in_flight;
     swap_chain_image_format = surface_format.format;
@@ -378,6 +399,14 @@ void RendererVK::create_swap_chain() {
     scissor.offset.x = 0;
     scissor.offset.y = 0;
     scissor.extent = extent;
+}
+
+void RendererVK::clean_up_swap_chain() {
+    render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
+    render_objects->swap_chain_framebuffers.clear();
+    render_objects->swap_chain_image_views.clear();
+    swap_chain_images.clear();
+    vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
 }
 
 void RendererVK::init_swap_chain_image_views() {
