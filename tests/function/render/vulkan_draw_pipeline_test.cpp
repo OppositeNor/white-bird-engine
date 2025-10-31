@@ -46,9 +46,9 @@ int main(int p_argc, char* p_argv[]) {
     {
         WBE::ApplicationGame game_application;
         {
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
             setup_pipeline(game_application);
             game_application.run();
-            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
