@@ -14,20 +14,23 @@
 #}
 // {{ _prefix }}
 
-#include "core/serializer/serializer_yaml.hh"
-{% for config_header in metadata.configs_headers %}
-#include "{{ config_header }}"
+#include "utils/utils.hh"
+{% for config_option in metadata.structs %}
+{% if config_option.attribute | select("in", config_options) | list | length > 0  %}
+#include "{{ config_option.in_header }}"
+{% endif %}
 {% endfor %}
 
 namespace WhiteBirdEngine {
 
-{% for config in metadata.configs %}
+{% for config_option in metadata.structs %}
+{% if config_option.attribute | select("in", config_options) | list | length > 0  %}
 /**
- * @class ConfigOptionsSD<{{ config.struct_name }}>
- * @brief Config options serializer-deserializer for {{ config.struct_name }}.
+ * @class ConfigOptionsSD<{{ config_option.name }}>
+ * @brief Config options serializer-deserializer for {{ config_option.name }}.
  */
 template <>
-class ConfigOptionsSD<{{ config.struct_name }}> {
+class ConfigOptionsSD<{{ config_option.name }}> {
 public:
     ConfigOptionsSD() = default;
     ~ConfigOptionsSD() {}
@@ -36,34 +39,35 @@ public:
     ConfigOptionsSD& operator=(const ConfigOptionsSD&) = delete;
     ConfigOptionsSD& operator=(ConfigOptionsSD&&) = delete;
 
-    using ConfigType = {{ config.struct_name }};
+    using ConfigType = {{ config_option.name }};
 
     /**
-     * @brief Serialize a config.
+     * @brief Serialize a config option.
      *
-     * @param p_config The config to serialize.
+     * @param p_config_option The config option to serialize.
      */
     template <typename Serializer>
-    void serialize(Serializer& p_serializer, const ConfigType& p_config) {
-        p_serializer.push_context("{{ config.struct_name }}");
-        {% for field in config.fields %}
-        p_serializer.register_serialize("{{ field.field_name }}", p_config.{{ field.field_name }});
+    void serialize(Serializer& p_serializer, const ConfigType& p_config_option) {
+        p_serializer.push_context("{{ config_option.name }}");
+        {% for field in config_option.fields %}
+        p_serializer.register_serialize("{{ field.name }}", p_config_option.{{ field.name }});
         {% endfor %}
         p_serializer.pop_context();
     }
 
     /**
-     * @brief Deserialize a p_config.
+     * @brief Deserialize a config option.
      *
-     * @param p_config The config to deserialize.
+     * @param p_config_option The config to deserialize.
      */
     template <typename ParserData>
-    void deserialize(const ParserData& p_data, ConfigType& p_config) {
-        {% for field in p_config.fields %}
-        p_data.get_value("{{ field.field_name }}", p_p_config.{{ field.field_name }});
+    void deserialize(const ParserData& p_data, ConfigType& p_config_option) {
+        {% for field in config_option.fields %}
+        p_data.get_value("{{ field.name }}", p_config_option.{{ field.name }});
         {% endfor %}
     }
 };
+{% endif %}
 {% endfor %}
 
 }

@@ -27,11 +27,11 @@ namespace WhiteBirdEngine {
 {% for component in metadata.structs %}
 {% if component.attribute | select("in", components) | list | length > 0  %}
 /**
- * @class ComponentAccess<{{ component.struct_name }}>
- * @brief Component accessor for {{ component.struct_name }}.
+ * @class ComponentAccess<{{ component.name }}>
+ * @brief Component accessor for {{ component.name }}.
  */
 template <>
-class ComponentAccess<{{ component.struct_name }}> {
+class ComponentAccess<{{ component.name }}> {
 public:
     ComponentAccess() = default;
     ~ComponentAccess() {}
@@ -40,7 +40,7 @@ public:
     ComponentAccess& operator=(const ComponentAccess&) = delete;
     ComponentAccess& operator=(ComponentAccess&&) = delete;
 
-    using ComponentType = {{ component.struct_name }};
+    using ComponentType = {{ component.name }};
 
     /**
      * @brief List all fields of the component.
@@ -50,7 +50,7 @@ public:
     std::vector<std::string> list_fields() const {
         return {
             {% for field in component.fields %}
-            "{{ field.field_name }}",
+            "{{ field.name }}",
             {% endfor %}
         };
     }
@@ -59,34 +59,34 @@ public:
      * @brief Get the field by name.
      *
      * @param p_component The component instance.
-     * @param p_field_name The name of the field.
+     * @param p_name The name of the field.
      * @return A reference to the field.
      */
     template <typename T>
-    T& get_field(ComponentType& p_component, const std::string& p_field_name) const {
+    T& get_field(ComponentType& p_component, const std::string& p_name) const {
         {% for field in component.fields %}
-        if (p_field_name == "{{ field.field_name }}") {
-            return p_component.{{ field.field_name }};
+        if (p_name == "{{ field.name }}") {
+            return p_component.{{ field.name }};
         }
         {% endfor %}
-        throw std::runtime_error("Field not found: " + p_field_name);
+        throw std::runtime_error("Field not found: " + p_name);
     }
 
     /**
      * @brief Get the field by name.
      *
      * @param p_component The component instance.
-     * @param p_field_name The name of the field.
+     * @param p_name The name of the field.
      * @return A reference to the field.
      */
     template <typename T>
-    const T& get_field(const ComponentType& p_component, const std::string& p_field_name) const {
+    const T& get_field(const ComponentType& p_component, const std::string& p_name) const {
         {% for field in component.fields %}
-        if (p_field_name == "{{ field.field_name }}") {
-            return p_component.{{ field.field_name }};
+        if (p_name == "{{ field.name }}") {
+            return p_component.{{ field.name }};
         }
         {% endfor %}
-        throw std::runtime_error("Field not found: " + p_field_name);
+        throw std::runtime_error("Field not found: " + p_name);
     }
 };
 {% endif %}

@@ -1,0 +1,11 @@
+[
+    {
+        "output_name" : "vulkan_draw_pipeline_test.gen.cmake",
+        "template" : "executable_test.cmake.jinja",
+        "data" : {
+            "name" : "wbe_render_test",
+            "exe_source" : "vulkan_draw_pipeline_test.cpp"
+        }
+    }
+]
+

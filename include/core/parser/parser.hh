@@ -60,6 +60,11 @@ public:
         return static_cast<const ChildType*>(this)->get_all_keys();
     }
 
+    template <typename T>
+    void get_value(const std::string& p_key, T& p_value) const {
+        return static_cast<const ChildType*>(this)->get_value(p_key, p_value);
+    }
+
     /**
      * @brief Check if contains a key.
      *

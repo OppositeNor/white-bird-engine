@@ -88,7 +88,7 @@ public:
     }
 
     template <typename T>
-    void get_value(std::string& p_key, T& p_value) {
+    void get_value(const std::string& p_key, T& p_value) const {
         if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
             std::string result = get_value<std::string>(p_key);

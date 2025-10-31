@@ -27,11 +27,11 @@ namespace WhiteBirdEngine {
 {% for component in metadata.structs %}
 {% if component.attribute | select("in", components) | list | length > 0  %}
 /**
- * @class ComponentSD<{{ component.struct_name }}>
- * @brief Component serializer-deserializer for {{ component.struct_name }}.
+ * @class ComponentSD<{{ component.name }}>
+ * @brief Component serializer-deserializer for {{ component.name }}.
  */
 template <>
-class ComponentSD<{{ component.struct_name }}> {
+class ComponentSD<{{ component.name }}> {
 public:
     ComponentSD() = default;
     ~ComponentSD() {}
@@ -40,7 +40,7 @@ public:
     ComponentSD& operator=(const ComponentSD&) = delete;
     ComponentSD& operator=(ComponentSD&&) = delete;
 
-    using ComponentType = {{ component.struct_name }};
+    using ComponentType = {{ component.name }};
 
     /**
      * @brief Serialize a component.
@@ -49,9 +49,9 @@ public:
      */
     template <typename Serializer>
     void serialize(Serializer& p_serializer, const ComponentType& p_component) {
-        p_serializer.push_context("{{ component.struct_name }}");
+        p_serializer.push_context("{{ component.name }}");
         {% for field in component.fields %}
-        p_serializer.register_serialize("{{ field.field_name }}", p_component.{{ field.field_name }});
+        p_serializer.register_serialize("{{ field.name }}", p_component.{{ field.name }});
         {% endfor %}
         p_serializer.pop_context();
     }
@@ -64,7 +64,7 @@ public:
     template <typename ParserData>
     void deserialize(const ParserData& p_data, ComponentType& p_component) {
         {% for field in component.fields %}
-        p_data.get_value("{{ field.field_name }}", p_component.{{ field.field_name }});
+        p_data.get_value("{{ field.name }}", p_component.{{ field.name }});
         {% endfor %}
     }
 };

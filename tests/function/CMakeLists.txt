@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(render)
+
 set(WBE_TEST_EXE ${WBE_TEST_EXE}
     PARENT_SCOPE
 )

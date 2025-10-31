@@ -148,11 +148,9 @@ class WBEMetaparser:
     def _handle_visit_struct_decl(self, metadata, cursor, in_file):
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                print(f"Visiting {attr.spelling}")
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.structs)):
                     attributes = self._get_attributes(attr.spelling)
-                    print(attributes)
                     component_metadata = self._get_struct_metadata(cursor, attributes, in_file)
                     metadata.structs.append(component_metadata)
 
