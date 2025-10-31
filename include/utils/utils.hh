@@ -361,7 +361,7 @@ struct GameConfigOptions {
 };
 
 template <typename T>
-class ConfigSD {};
+class ConfigOptionsSD {};
 
 // Color space
 enum class ColorSpace {

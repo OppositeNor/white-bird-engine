@@ -23,18 +23,18 @@ namespace WhiteBirdEngine {
 
 {% for config in metadata.configs %}
 /**
- * @class ConfigSD<{{ config.struct_name }}>
- * @brief Config serializer-deserializer for {{ config.struct_name }}.
+ * @class ConfigOptionsSD<{{ config.struct_name }}>
+ * @brief Config options serializer-deserializer for {{ config.struct_name }}.
  */
 template <>
-class ConfigSD<{{ config.struct_name }}> {
+class ConfigOptionsSD<{{ config.struct_name }}> {
 public:
-    ConfigSD() = default;
-    ~ConfigSD() {}
-    ConfigSD(const ConfigSD&) = delete;
-    ConfigSD(ConfigSD&&) = delete;
-    ConfigSD& operator=(const ConfigSD&) = delete;
-    ConfigSD& operator=(ConfigSD&&) = delete;
+    ConfigOptionsSD() = default;
+    ~ConfigOptionsSD() {}
+    ConfigOptionsSD(const ConfigOptionsSD&) = delete;
+    ConfigOptionsSD(ConfigOptionsSD&&) = delete;
+    ConfigOptionsSD& operator=(const ConfigOptionsSD&) = delete;
+    ConfigOptionsSD& operator=(ConfigOptionsSD&&) = delete;
 
     using ConfigType = {{ config.struct_name }};
 

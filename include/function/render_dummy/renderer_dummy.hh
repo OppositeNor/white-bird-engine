@@ -27,6 +27,12 @@ public:
     RendererDummy() {}
     
     virtual ~RendererDummy() override {}
+
+    virtual void tick(double p_delta) override {}
+
+    virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {}
+
+    virtual void activate_pipeline(const std::string& p_pipeline_name) override {}
 private:
 };
 

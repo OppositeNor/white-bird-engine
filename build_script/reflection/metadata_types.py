@@ -21,8 +21,8 @@ class WBEFieldMetadata(BaseModel):
         field_type: The type of the field.
     """
     attribute : list[str] = Field(default_factory=list)
-    field_name : str = ""
-    field_type : str = ""
+    name : str = ""
+    type : str = ""
 
 class WBEMethodMetadata(BaseModel):
     """Method metadata.
@@ -35,8 +35,8 @@ class WBEMethodMetadata(BaseModel):
     """
     attribute : list[str] = Field(default_factory=list)
     method_name : str = ""
-    args_name : list[str] = Field(default_factory=list)
-    args_type : list[str] = Field(default_factory=list)
+    name : list[str] = Field(default_factory=list)
+    type : list[str] = Field(default_factory=list)
     ret_type : str = ""
 
 class WBEClassMetadata(BaseModel):
@@ -47,10 +47,10 @@ class WBEClassMetadata(BaseModel):
         fields: The fields of the class.
         methods: The methods of the class.
     """
-    attribute : list[str] = Field(default_factory=list)
-    class_name : str = ""
-    fields : list[WBEFieldMetadata] = Field(default_factory=list)
-    methods : list[WBEMethodMetadata] = Field(default_factory=list)
+    attribute : list[str] = Field(default_factory=list[str])
+    name : str = ""
+    fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
+    methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
 
 class WBELabelMetadata(BaseModel):
     """Label metadata.
@@ -59,10 +59,10 @@ class WBELabelMetadata(BaseModel):
         attribute: The attribute of the label.
         label_name: The name of the label.
     """
-    attribute : list[str] = Field(default_factory=list)
-    label_name : str = ""
+    attribute : list[str] = Field(default_factory=list[str])
+    name : str = ""
 
-class WBEComponentMetadata(BaseModel):
+class WBEStructMetadata(BaseModel):
     """Component metadata.
 
     Attributes: 
@@ -70,7 +70,9 @@ class WBEComponentMetadata(BaseModel):
         fields: The name of the fields.
         types: The types of the fields
     """
-    struct_name : str = ""
+    in_header : str = ""
+    name : str = ""
+    attribute : list[str] = Field(default_factory=list[str])
     fields : list[WBEFieldMetadata] = Field(default_factory=list)
 
 class WBEFileMetadata(BaseModel):
@@ -82,34 +84,32 @@ class WBEFileMetadata(BaseModel):
         deps: The dependencies of the file. Usually from include or import module.
         labels: The registered labels metadata.
         classes: The registered classes metadata.
+        structs: The registered structs metadata.
     """
     file_path : str = ""
     hashcode : str = ""
     deps : list[str] = Field(default_factory=list)
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
-    components : list[WBEComponentMetadata] = Field(default_factory=list)
+    structs : list[WBEStructMetadata] = Field(default_factory=list)
 
 class WBEMetadata(BaseModel):
     """Metadata.
 
     Attributes:
-        components_headers: The header files that the components are defined in.
         channels: The registrated channels.
         classes: The registrated classes.
-        components: The registrated components.
+        structs: The registrated structs.
     """
-    components_headers : list[str] = Field(default_factory=list[str])
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
-    components : list[WBEComponentMetadata] = Field(default_factory=list)
+    structs : list[WBEStructMetadata] = Field(default_factory=list[WBEStructMetadata])
 
     def sort(self):
         """Sor the fields. This may gurantee the order it generates will always be the same,
         which is usefull not triggering the CMake and metaparser's compilation for the generated
         files.
         """
-        self.components_headers.sort()
-        self.labels = sorted(self.labels, key=lambda label: label.label_name)
-        self.classes = sorted(self.classes, key=lambda cxx_class: cxx_class.class_name)
-        self.components = sorted(self.components, key=lambda component: component.struct_name)
+        self.labels = sorted(self.labels, key=lambda label: label.name)
+        self.classes = sorted(self.classes, key=lambda cxx_class: cxx_class.name)
+        self.structs = sorted(self.structs, key=lambda struct: struct.name)

@@ -16,12 +16,16 @@
 #ifndef __WBE_COMPONENT_ACCESS_GEN_HH__
 #define __WBE_COMPONENT_ACCESS_GEN_HH__
 
-{% for components_header in metadata.components_headers %}#include "{{ components_header }}"
+{% for component in metadata.structs %}
+{% if component.attribute | select("in", components) | list | length > 0  %}
+#include "{{ component.in_header }}"
+{% endif %}
 {% endfor %}
 
 namespace WhiteBirdEngine {
 
-{% for component in metadata.components %}
+{% for component in metadata.structs %}
+{% if component.attribute | select("in", components) | list | length > 0  %}
 /**
  * @class ComponentAccess<{{ component.struct_name }}>
  * @brief Component accessor for {{ component.struct_name }}.
@@ -85,6 +89,7 @@ public:
         throw std::runtime_error("Field not found: " + p_field_name);
     }
 };
+{% endif %}
 {% endfor %}
 }
 

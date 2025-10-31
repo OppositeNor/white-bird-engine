@@ -15,7 +15,10 @@
 #include "function/application/application_game.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/engine_function.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_dummy/renderer_dummy.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 
@@ -42,7 +45,15 @@ void ApplicationGame::run() {
 void ApplicationGame::init() {
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.5));
     // TODO: Create renderer based on config file.
-    renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
+    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    switch (game_config.render_api) {
+        case GameConfigOptions::RenderAPI::DUMMY:
+            renderer = make_ref<RendererDummy>(global_allocator());
+            break;
+        case GameConfigOptions::RenderAPI::VULKAN:
+            renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
+            break;
+    }
     // TODO
 }
 
