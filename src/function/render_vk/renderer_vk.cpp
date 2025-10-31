@@ -76,9 +76,9 @@ void RendererVK::tick(double p_delta) {
     }
 
     static uint32_t frame_counter = 1;
-    frame_counter = (frame_counter + 1) % swap_chain_images_count;
-
+    frame_counter = (frame_counter + 1) % frames_in_flight;
     base_render_data.in_flight_fence = in_flight_fences[frame_counter];
+
     vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
@@ -232,8 +232,8 @@ void RendererVK::init_swap_chain_framebuffers() {
 
 void RendererVK::setup_render_resource() {
     Ref<RTPrepareSwapChianImageFactory> start_task_factory = make_ref<RTPrepareSwapChianImageFactory>(allocator, &base_render_data);
-    render_objects->render_start_tasks.reserve(swap_chain_images_count);
-    for (size_t i = 0; i < swap_chain_images_count; ++i) {
+    render_objects->render_start_tasks.reserve(frames_in_flight);
+    for (size_t i = 0; i < frames_in_flight; ++i) {
         render_objects->render_start_tasks.push_back(
             {.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE, .render_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>()});
     }
@@ -361,6 +361,7 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
+    frames_in_flight = swap_chain_images_count + 1;
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
 
@@ -428,8 +429,8 @@ void RendererVK::create_async_objects() {
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     // Set the initial state of the fence to "signaled", since we don't have a "previous frame" at the first frame.
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    in_flight_fences.reserve(swap_chain_images_count);
-    for (size_t i = 0; i < swap_chain_images_count; ++i) {
+    in_flight_fences.reserve(frames_in_flight);
+    for (size_t i = 0; i < frames_in_flight; ++i) {
         VkFence fence;
         if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create in flight fence");
@@ -724,9 +725,9 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
     vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
 
 
-    pipeline_infos.reserve(swap_chain_images_count);
-    for (size_t i = 0; i < swap_chain_images_count; ++i) {
-        // Copy swap_chain_images_count amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
+    pipeline_infos.reserve(frames_in_flight);
+    for (size_t i = 0; i < frames_in_flight; ++i) {
+        // Copy frames_in_flight amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
         auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
         pipeline_info->pipeline_name = p_pipeline_name;
         process_tasks(p_root_task, pipeline_info, i);

@@ -143,6 +143,7 @@ private:
     VkSurfaceKHR surface;
     VkSwapchainKHR swap_chain;
     uint32_t swap_chain_images_count;
+    uint32_t frames_in_flight;
 
     VkQueue graphics_queue;
     VkQueue compute_queue;
