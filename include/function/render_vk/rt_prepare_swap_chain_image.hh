@@ -29,8 +29,31 @@ struct RTPrepareSwapChianImage final: public RenderTaskVK {
         : RenderTaskVK(p_render_data) {}
 
     virtual void perform(double p_delta) override {}
+
 };
 
+/**
+ * @class RTRunGraphicsPipelineFactory
+ * @brief Factory for RTRunGraphicsPipeline.
+ *
+ */
+class RTPrepareSwapChianImageFactory final : public RenderTaskFactoryVK {
+public:
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_signal_in_flight Should signal in flight fence.
+     */
+    RTPrepareSwapChianImageFactory(const BaseRenderDataVK* p_render_data)
+        : RenderTaskFactoryVK(p_render_data) {}
+    virtual ~RTPrepareSwapChianImageFactory() override {}
+
+    virtual Ref<RenderTask> create() const override {
+        return make_ref<RTPrepareSwapChianImage>(render_data->allocator, render_data);      
+    }
+
+};
 }
 
 #endif

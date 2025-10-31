@@ -15,6 +15,8 @@
 #ifndef __WBE_RT_RUN_GRAPHICS_PIPELINE_HH__
 #define __WBE_RT_RUN_GRAPHICS_PIPELINE_HH__
 
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <vulkan/vulkan_core.h>
@@ -26,18 +28,47 @@ namespace WhiteBirdEngine {
  *
  */
 struct RTRunGraphicsPipeline final : public RenderTaskVK {
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_signal_in_flight Should signal in flight fence.
+     */
     RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false);
     virtual ~RTRunGraphicsPipeline() override;
 
     virtual void perform(double p_delta) override;
 
-
 private:
     VkCommandBuffer command_buffer;
-    VkFence signal_fence;
+    bool signal_in_flight = false;
     void record_command_buffer();
 };
 
+/**
+ * @class RTRunGraphicsPipelineFactory
+ * @brief Factory for RTRunGraphicsPipeline.
+ *
+ */
+class RTRunGraphicsPipelineFactory final : public RenderTaskFactoryVK {
+public:
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_signal_in_flight Should signal in flight fence.
+     */
+    RTRunGraphicsPipelineFactory(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
+        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight) {}
+    virtual ~RTRunGraphicsPipelineFactory() override {}
+
+    virtual Ref<RenderTask> create() const override {
+        return make_ref<RTRunGraphicsPipeline>(render_data->allocator, render_data, signal_in_flight);      
+    }
+private:
+    bool signal_in_flight;
+
+};
 }
 
 #endif

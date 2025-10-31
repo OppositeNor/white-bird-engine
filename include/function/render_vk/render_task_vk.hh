@@ -83,7 +83,26 @@ protected:
             }
         }
     }
+};
 
+/**
+ * @class RenderTaskFactoryVK
+ * @brief Factory for RenderTaskVK.
+ *
+ */
+struct RenderTaskFactoryVK : public RenderTaskFactory {
+public:
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     */
+    RenderTaskFactoryVK(const BaseRenderDataVK* p_render_data)
+        : render_data(p_render_data) {}
+    virtual ~RenderTaskFactoryVK() {}
+
+protected:
+    const BaseRenderDataVK* render_data;
 };
 
 }

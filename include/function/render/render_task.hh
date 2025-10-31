@@ -54,6 +54,21 @@ struct RenderTask {
 };
 
 /**
+ * @class RenderTaskFactory
+ * @brief The factory to create RenderTask.
+ *
+ */
+class RenderTaskFactory {
+public:
+    RenderTaskFactory() {}
+    virtual ~RenderTaskFactory() {}
+    /**
+     * @brief Create the render task instance.
+     */
+    virtual Ref<RenderTask> create() const = 0;
+};
+
+/**
  * @class RendTaskInfo
  * @brief Render task info.
  *
@@ -71,7 +86,7 @@ struct RendTaskInfo {
     std::vector<RendResInfo> req_res;
 
     // The render task instance.
-    Ref<RenderTask> render_task = MEM_NULL;
+    Ref<RenderTaskFactory> render_task_factory = MEM_NULL;
 };
 
 

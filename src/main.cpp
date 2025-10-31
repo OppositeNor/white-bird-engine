@@ -48,10 +48,6 @@ int main(int p_argc, char* p_argv[]) {
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator layout: {}",
-            static_cast<std::string>(*WBE::global_allocator())));
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator layout: {}",
-            static_cast<std::string>(*(game_application.get_renderer_allocator()))));
     }
     auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (auto& profile : profiles) {
@@ -63,16 +59,13 @@ int main(int p_argc, char* p_argv[]) {
 
 void setup_pipeline(WBE::ApplicationGame& game_application) {
     auto render_allocator = game_application.get_renderer_allocator().get();
-    WBE::Ref<WBE::RTRunGraphicsPipeline> run_graphics_pipeline
-        = WBE::make_ref<WBE::RTRunGraphicsPipeline>(render_allocator,
-                                                    WBE::RendererVK::get_singleton()->get_base_render_data(),
-                                                    true);
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
     rend_task_info->prev.push_back(WBE::RT_PREPARE_SWAP_CHAIN_IMAGE);
     rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER, .type_id = WBE::ROT_FRAME_BUFFER_VK});
     rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE, .type_id = WBE::ROT_GRAPHICS_PIPELINE_VK});
-    rend_task_info->render_task = run_graphics_pipeline;
+    rend_task_info->render_task_factory
+        = WBE::make_ref<WBE::RTRunGraphicsPipelineFactory>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
     game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
     game_application.get_renderer()->activate_pipeline("test_pipeline");
 

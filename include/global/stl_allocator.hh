@@ -47,9 +47,9 @@ struct STLAllocator {
         using other = STLAllocator<U, AllocType, POCCA, POCMA, POCS>;
     };
 
-    using propagate_on_container_copy_assignment = std::conditional<POCCA, std::true_type, std::false_type>;
-    using propagate_on_container_move_assignment = std::conditional<POCMA, std::true_type, std::false_type>;
-    using propagate_on_container_swap = std::conditional<POCS, std::true_type, std::false_type>;
+    using propagate_on_container_copy_assignment = std::conditional<POCCA, std::true_type, std::false_type>::type;
+    using propagate_on_container_move_assignment = std::conditional<POCMA, std::true_type, std::false_type>::type;
+    using propagate_on_container_swap = std::conditional<POCS, std::true_type, std::false_type>::type;
 
     /**
      * @brief Constructor.

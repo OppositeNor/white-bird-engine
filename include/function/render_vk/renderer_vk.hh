@@ -72,14 +72,15 @@ public:
     virtual void tick(double p_delta) override;
 
     virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {
-        pipelines[p_pipeline_name] = compile_pipeline(p_pipeline_name, p_root_task);
+        pipelines.insert(std::pair(p_pipeline_name, compile_pipeline(p_pipeline_name, p_root_task)));
     }
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {
-        if (pipelines.find(p_pipeline_name) == pipelines.end()) {
+        auto find_result = pipelines.find(p_pipeline_name);
+        if (find_result == pipelines.end()) {
             throw std::runtime_error(std::format("Failed to activate pipeline: {}, pipeline not registered.", p_pipeline_name));
         }
-        activated_pipeline = pipelines[p_pipeline_name];
+        activated_pipeline = find_result->second;
     }
 
     /**
@@ -141,6 +142,7 @@ private:
 
     VkSurfaceKHR surface;
     VkSwapchainKHR swap_chain;
+    uint32_t swap_chain_images_count;
 
     VkQueue graphics_queue;
     VkQueue compute_queue;
@@ -156,7 +158,7 @@ private:
     VkCommandPool graphics_command_pool;
     VkCommandPool compute_command_pool;
 
-    VkFence in_flight_fence;
+    vector<VkFence> in_flight_fences;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
@@ -222,16 +224,17 @@ private:
     };
 
 
-    std::map<std::string, Ref<PipelineInfo>> pipelines;
+    std::map<std::string, vector<Ref<PipelineInfo>>> pipelines;
     std::unordered_map<RendResID, RefWeak<RendResVK>> rend_res;
     std::map<RendResID, RefWeak<RendResVK>> render_resources;
 
-    Ref<PipelineInfo> activated_pipeline;
+    vector<Ref<PipelineInfo>> activated_pipeline;
 
     // Render objects for the renderer.
     struct RenderObjects {
         RenderObjects(AllocType* p_allocator)
-            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
+            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator),
+            render_start_tasks(p_allocator) {}
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline.
@@ -247,7 +250,7 @@ private:
         // The base graphics pipeline resource.
         Ref<RendResVK> base_graphics_pipeline_resource;
         // The start render task.
-        TaskInfo render_start_task;
+        vector<TaskInfo> render_start_tasks;
     };
     Unique<RenderObjects> render_objects;
 
@@ -289,8 +292,8 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    Ref<PipelineInfo> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
-    void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
+    vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
+    void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 

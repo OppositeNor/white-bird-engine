@@ -41,19 +41,23 @@
 #include "utils/utils.hh"
 
 #include <SDL_vulkan.h>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <format>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
-    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)), swap_chain_images(p_allocator) {
+    allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
+    in_flight_fences(p_allocator), activated_pipeline(p_allocator)
+{
     singleton = this;
     init();
 }
@@ -64,25 +68,30 @@ RendererVK::~RendererVK() {
 }
 
 void RendererVK::tick(double p_delta) {
-    Ref<PipelineInfo> run_pipeline = activated_pipeline;
+    vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
 
-    if (run_pipeline == MEM_NULL) {
+    if (run_pipeline.size() == 0) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
     }
 
-    vkWaitForFences(logical_device, 1, &in_flight_fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(logical_device, 1, &in_flight_fence);
+    static uint32_t frame_counter = 1;
+    frame_counter = (frame_counter + 1) % swap_chain_images_count;
+
+    base_render_data.in_flight_fence = in_flight_fences[frame_counter];
+    vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
+    vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
     // Setup swap chain image.
     uint32_t image_index;
-    auto image_available_semaphore = render_objects->render_start_task.render_task->task_semaphore.semaphore;
+    auto image_available_semaphore = render_objects->render_start_tasks[frame_counter].render_task->task_semaphore.semaphore;
     if (vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index) != VK_SUCCESS) {
         throw std::runtime_error("Failed to acquire swap chain image.");
     }
     render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
+    auto curr_pipeline = run_pipeline[frame_counter];
 
-    for (auto& task_info : run_pipeline->task_infos) {
+    for (auto& task_info : curr_pipeline->task_infos) {
         if (task_info.render_task == MEM_NULL) {
             wbe_console_log(WBE_CHANNEL_RENDER)->warning(std::format("Render task {} is NULL. Skipped.", task_info.task_id));
             continue;
@@ -92,8 +101,8 @@ void RendererVK::tick(double p_delta) {
 
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.waitSemaphoreCount = run_pipeline->result_semaphores.size();
-    present_info.pWaitSemaphores = run_pipeline->result_semaphores.data();
+    present_info.waitSemaphoreCount = curr_pipeline->result_semaphores.size();
+    present_info.pWaitSemaphores = curr_pipeline->result_semaphores.data();
 
     VkSwapchainKHR swap_chains[] = {swap_chain};
     present_info.swapchainCount = 1;
@@ -119,10 +128,13 @@ void RendererVK::init() {
 }
 
 void RendererVK::terminate() {
+    vkDeviceWaitIdle(logical_device);
     pipelines.clear();
-    activated_pipeline = MEM_NULL;
+    activated_pipeline.clear();
     render_objects.reset();
-    vkDestroyFence(logical_device, in_flight_fence, get_allocation_callbacks());
+    for (auto fence : in_flight_fences) {
+        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
+    }
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -164,7 +176,13 @@ void RendererVK::setup_base_render_data() {
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
-    base_render_data.in_flight_fence = in_flight_fence;
+    if (in_flight_fences.size() > 0) {
+        base_render_data.in_flight_fence = in_flight_fences[0];
+    }
+    else {
+        base_render_data.in_flight_fence = VK_NULL_HANDLE;
+    }
+    base_render_data.current_swap_chain_index = 0;
 }
 
 void RendererVK::init_graphics_pipeline() {
@@ -200,9 +218,9 @@ void RendererVK::init_graphics_pipeline() {
 }
 
 void RendererVK::init_swap_chain_framebuffers() {
-    render_objects->swap_chain_framebuffers.resize(render_objects->swap_chain_image_views.size());
+    render_objects->swap_chain_framebuffers.resize(swap_chain_images_count);
     // Setup the framebuffer for each swap chain image view.
-    for (size_t i = 0; i < render_objects->swap_chain_image_views.size(); ++i) {
+    for (size_t i = 0; i < swap_chain_images_count; ++i) {
         ROFramebufferVK::Builder builder;
         builder.add_attachment(render_objects->swap_chain_image_views[i])
             .set_render_pass(render_objects->result_render_pass)
@@ -213,9 +231,12 @@ void RendererVK::init_swap_chain_framebuffers() {
 }
 
 void RendererVK::setup_render_resource() {
-    Ref<RTPrepareSwapChianImage> prepare_swap_chain_image_task = make_ref<RTPrepareSwapChianImage>(allocator, &base_render_data);
-    render_objects->render_start_task.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE;
-    render_objects->render_start_task.render_task = prepare_swap_chain_image_task;
+    Ref<RTPrepareSwapChianImageFactory> start_task_factory = make_ref<RTPrepareSwapChianImageFactory>(allocator, &base_render_data);
+    render_objects->render_start_tasks.reserve(swap_chain_images_count);
+    for (size_t i = 0; i < swap_chain_images_count; ++i) {
+        render_objects->render_start_tasks.push_back(
+            {.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE, .render_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>()});
+    }
 
     render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
     render_objects->swap_chain_framebuffer_resource->res_type_id = ROT_FRAME_BUFFER_VK;
@@ -337,10 +358,9 @@ void RendererVK::create_swap_chain() {
     }
 
     // Create swap chain images.
-    uint32_t swap_chain_image_count = 0;
-    vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_image_count, nullptr);
-    swap_chain_images.resize(swap_chain_image_count);
-    vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_image_count, swap_chain_images.data());
+    vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
+    swap_chain_images.resize(swap_chain_images_count);
+    vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
 
@@ -408,8 +428,13 @@ void RendererVK::create_async_objects() {
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     // Set the initial state of the fence to "signaled", since we don't have a "previous frame" at the first frame.
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &in_flight_fence) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create in flight fence");
+    in_flight_fences.reserve(swap_chain_images_count);
+    for (size_t i = 0; i < swap_chain_images_count; ++i) {
+        VkFence fence;
+        if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create in flight fence");
+        }
+        in_flight_fences.push_back(fence);
     }
 }
 
@@ -689,26 +714,34 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     return result;
 }
 
-Ref<RendererVK::PipelineInfo> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
+RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
     if (p_root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
     if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PREPARE_SWAP_CHAIN_IMAGE) {
         throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
     }
-    auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
-    pipeline_info->pipeline_name = p_pipeline_name;
-    process_tasks(p_root_task, pipeline_info);
-    return pipeline_info;
+    vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
+
+
+    pipeline_infos.reserve(swap_chain_images_count);
+    for (size_t i = 0; i < swap_chain_images_count; ++i) {
+        // Copy swap_chain_images_count amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
+        auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
+        pipeline_info->pipeline_name = p_pipeline_name;
+        process_tasks(p_root_task, pipeline_info, i);
+        pipeline_infos.push_back(pipeline_info);
+    }
+    return pipeline_infos;
 }
 
-void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
+void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index) {
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     // Push the render_start_task as the starting task.
-    p_pipeline_info->task_infos.push_back(render_objects->render_start_task);
+    p_pipeline_info->task_infos.push_back(render_objects->render_start_tasks[p_index]);
     std::vector<RendTaskID> dummy;
-    render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE, std::pair(render_objects->render_start_task.render_task, &dummy)));
+    render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE, std::pair(render_objects->render_start_tasks[p_index].render_task, &dummy)));
 
     unordered_set<Ref<RendTaskInfo>> visited(allocator);
     deque<Ref<RendTaskInfo>> to_visit(allocator);
@@ -720,7 +753,7 @@ void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
             visited.insert(curr);
 
             TaskInfo task_info;
-            task_info.render_task = curr->render_task.dynamic_cast_ref<RenderTaskVK>();
+            task_info.render_task = curr->render_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
 
             if (task_info.render_task == MEM_NULL) {
                 throw std::runtime_error(std::format(

@@ -17,6 +17,7 @@
 
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
+#include <cstdint>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -57,6 +58,8 @@ struct BaseRenderDataVK {
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence;
+    // The current swap chain index.
+    uint32_t current_swap_chain_index;
 };
 
 

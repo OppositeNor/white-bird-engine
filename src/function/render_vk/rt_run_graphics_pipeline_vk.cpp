@@ -25,7 +25,7 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
-    : RenderTaskVK(p_render_data) {
+    : RenderTaskVK(p_render_data), signal_in_flight(p_signal_in_flight) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -33,12 +33,6 @@ RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_da
     alloc_info.commandBufferCount = 1;
     if (vkAllocateCommandBuffers(render_data->logic_device, &alloc_info, &command_buffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffer.");
-    }
-    if (p_signal_in_flight) {
-        signal_fence = p_render_data->in_flight_fence;
-    }
-    else {
-        signal_fence = VK_NULL_HANDLE;
     }
 }
 
@@ -77,7 +71,7 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_fence) != VK_SUCCESS) {
+    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_in_flight ? render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 
