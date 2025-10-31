@@ -321,11 +321,15 @@ struct GameConfigOptions {
     /**
      * @brief The width of the window.
      */
-    uint32_t window_width = 1920;
+    uint32_t window_width = 1260;
     /**
      * @brief The height of the window.
      */
-    uint32_t window_height = 1080;
+    uint32_t window_height = 720;
+    /**
+     * @brief Frames in flight.
+     */
+    uint32_t frames_in_flight = 2;
     /**
      * @brief The index of the render device.
      * -1 if not specified, and white bird engine will automatically
@@ -355,6 +359,9 @@ struct GameConfigOptions {
      */
     int32_t limit_logic_fps = 60;
 };
+
+template <typename T>
+class ConfigSD {};
 
 // Color space
 enum class ColorSpace {

@@ -48,6 +48,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -75,7 +76,7 @@ void RendererVK::tick(double p_delta) {
         return;
     }
 
-    static uint32_t frame_counter = 1;
+    static uint32_t frame_counter = 0;
     frame_counter = (frame_counter + 1) % frames_in_flight;
     base_render_data.in_flight_fence = in_flight_fences[frame_counter];
 
@@ -312,7 +313,7 @@ void RendererVK::create_swap_chain() {
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(details.formats);
     VkPresentModeKHR present_mode = choose_swap_present_mode(details.present_modes);
     VkExtent2D extent = choose_swap_extent(details.capabilities);
-    uint32_t image_count = 2;
+    uint32_t image_count = 3;
     if (details.capabilities.maxImageCount != 0) {
         image_count = std::clamp(image_count, details.capabilities.minImageCount, details.capabilities.maxImageCount);
     }
@@ -361,7 +362,8 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
-    frames_in_flight = swap_chain_images_count + 1;
+    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    frames_in_flight = game_config.frames_in_flight;
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
 

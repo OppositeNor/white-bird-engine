@@ -16,6 +16,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "utils/defs.hh"
@@ -54,8 +55,8 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    vectorp<VkSemaphore> wait_semaphores(render_data->allocator);
-    vectorp<VkPipelineStageFlags> wait_stages(render_data->allocator);
+    vector<VkSemaphore, RenderAllocator> wait_semaphores(render_data->allocator);
+    vector<VkPipelineStageFlags, RenderAllocator> wait_stages(render_data->allocator);
     wait_semaphores.reserve(depend_tasks.size());
     wait_stages.reserve(depend_tasks.size());
     for (auto dep_task : depend_tasks) {
@@ -71,7 +72,8 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_in_flight ? render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_in_flight ?
+                      render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 

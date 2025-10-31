@@ -1,0 +1,69 @@
+{# Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+#}
+// {{ _prefix }}
+
+#include "core/serializer/serializer_yaml.hh"
+{% for config_header in metadata.configs_headers %}
+#include "{{ config_header }}"
+{% endfor %}
+
+namespace WhiteBirdEngine {
+
+{% for config in metadata.configs %}
+/**
+ * @class ConfigSD<{{ config.struct_name }}>
+ * @brief Config serializer-deserializer for {{ config.struct_name }}.
+ */
+template <>
+class ConfigSD<{{ config.struct_name }}> {
+public:
+    ConfigSD() = default;
+    ~ConfigSD() {}
+    ConfigSD(const ConfigSD&) = delete;
+    ConfigSD(ConfigSD&&) = delete;
+    ConfigSD& operator=(const ConfigSD&) = delete;
+    ConfigSD& operator=(ConfigSD&&) = delete;
+
+    using ConfigType = {{ config.struct_name }};
+
+    /**
+     * @brief Serialize a config.
+     *
+     * @param p_config The config to serialize.
+     */
+    template <typename Serializer>
+    void serialize(Serializer& p_serializer, const ConfigType& p_config) {
+        p_serializer.push_context("{{ config.struct_name }}");
+        {% for field in config.fields %}
+        p_serializer.register_serialize("{{ field.field_name }}", p_config.{{ field.field_name }});
+        {% endfor %}
+        p_serializer.pop_context();
+    }
+
+    /**
+     * @brief Deserialize a p_config.
+     *
+     * @param p_config The config to deserialize.
+     */
+    template <typename ParserData>
+    void deserialize(const ParserData& p_data, ConfigType& p_config) {
+        {% for field in p_config.fields %}
+        p_data.get_value("{{ field.field_name }}", p_p_config.{{ field.field_name }});
+        {% endfor %}
+    }
+};
+{% endfor %}
+
+}
