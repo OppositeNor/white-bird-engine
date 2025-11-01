@@ -16,6 +16,7 @@
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/engine_function.hh"
+#include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
 #include "utils/utils.hh"

@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_task.hh"
+#include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -55,8 +56,10 @@ int main(int p_argc, char* p_argv[]) {
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }
-    auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
-    for (auto& profile : profiles) {
+    auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    for (auto& profile : global_profiles) {
+        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Total: {} seconds",
+                                                                           profile.message, profile.start_time + profile.delta));
         WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Total: {} seconds",
                                                                            profile.message, profile.start_time + profile.delta));
     }
