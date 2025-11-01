@@ -58,10 +58,8 @@ int main(int p_argc, char* p_argv[]) {
     }
     auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (auto& profile : global_profiles) {
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Total: {} seconds",
-                                                                           profile.message, profile.start_time + profile.delta));
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Total: {} seconds",
-                                                                           profile.message, profile.start_time + profile.delta));
+        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds",
+                                                                           profile.message, profile.delta));
     }
     return EXIT_SUCCESS;
 }
