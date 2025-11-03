@@ -5,14 +5,13 @@ struct VSOutput {
     float3 color    : COLOR0;
 };
 
-
 VSOutput main(uint vertexID : SV_VertexID) {
     VSOutput output;
 
     float2 positions[3] = {
-        float2(-0.5,  0.5),
-        float2( 0.5,  0.5),
-        float2( 0.0, -0.5)
+        float2(-1.0, -1.0),
+        float2(-1.0,  3.0),
+        float2( 3.0, -1.0)
     };
 
     float3 colors[3] = {

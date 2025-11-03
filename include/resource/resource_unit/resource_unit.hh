@@ -15,7 +15,6 @@
 #ifndef __WBE_RESOURCE_UNIT_HH__
 #define __WBE_RESOURCE_UNIT_HH__
 
-#include "core/allocator/allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/surface/3d_primitive.hh"
@@ -150,10 +149,13 @@ struct RUVideo : public ResourceUnit {
     // TODO
 };
 
+struct RUMaterial : public ResourceUnit {
+    // TODO
+};
+
 /**
- * @class RUMesh3D
- * @brief 3D mesh resource unit. Contains the memory ids referencing vertices and
- * indices of a mesh, the number of vertices.
+ * @class RUSubmesh3D
+ * @brief 3D submesh resource unit.
  *
  * The data should always be pushed before pushing this resource unit, and the
  * release process should always be backwards (first release the resource unit, and
@@ -161,17 +163,15 @@ struct RUVideo : public ResourceUnit {
  * text resource unit in a stack allocator.
  */
 template <typename VertSlot>
-struct RUMesh3D : public ResourceUnit {
+struct RUSubmesh3D : public ResourceUnit {
     // The type of the vertex.
     using VertType = Vertex3D<VertSlot>;
+    // A NUL terminating string referencing the material this submes uses.
+    RefRes<char> material_key;
     // The vertices data.
-    MemID vertices_data;
-    // The indices data for the submeshes. It is ordered in chunks, with each chunk
-    // starting with a 4 byte integer indicating the size of the submesh, followed
-    // with a NUL terminated string, representing the submesh's material ID.
-    RefRes<char> submeshes_indices_data;
-    // The number of vertices of the mesh.
-    uint32_t vertices_count;
+    RefRes<VertType> vertices_data;
+    // The indices data.
+    RefRes<uint32_t> indices_data;
 };
 
 }

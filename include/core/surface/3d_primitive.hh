@@ -15,7 +15,7 @@
 #ifndef __WBE_3D_PRIMITIVE_HH__
 #define __WBE_3D_PRIMITIVE_HH__
 
-#include "core/container/atomic_array_list.hh"
+#include "core/memory/reference_raw.hh"
 #include "primitive_slots.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -94,7 +94,7 @@ struct Triangle3DIndx {
     /**
      * @brief The vertex array.
      */
-    Vertex3D<TVertSlot>* vert_array;
+    RefRaw<Vertex3D<TVertSlot>> vert_array;
     struct Indices {
         uint32_t vert_1;
         uint32_t vert_2;
@@ -136,24 +136,6 @@ using Triangle3DIndxTextured = Triangle3DIndx<SlotTextured>;
  * @brief Textured skinned triangle.
  */
 using Triangle3DTexBone = Triangle3D<SlotUVBone>;
-
-/**
- * @brief A submesh.
- *
- * @tparam VertSlot The vertex slot.
- */
-template <typename VertSlot>
-struct SubMesh {
-    /**
-     * @brief The vertices of the mesh.
-     */
-    AtomicArrayListP<Vertex3D<VertSlot>> triangle_vertices;
-    /**
-     * @brief The indices of the mesh.
-     */
-    AtomicArrayListP<uint32_t> triangle_indices;
-};
-
 }
 
 #endif

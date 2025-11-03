@@ -18,6 +18,7 @@
 #include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
 #include "global/stl_allocator.hh"
+#include <algorithm>
 #include <glm/glm.hpp>
 #include <cstddef>
 #include <cstdint>
