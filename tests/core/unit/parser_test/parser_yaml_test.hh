@@ -602,4 +602,81 @@ sequence:
     ASSERT_FALSE(nested.contains("key1")); // Not in nested level
 }
 
+TEST(ParserYAMLTest, ParseGLMVectors) {
+    WBE::ParserYAML parser;
+
+    const std::string glm_yaml = R"(
+v2:
+  x: 1.5
+  y: 2.5
+v3:
+  x: 1.0
+  y: 2.0
+  z: 3.0
+v4:
+  x: -1.25
+  y: 0.0
+  z: 4.5
+  w: 8.75
+)";
+
+    parser.parse_from_buffer(glm_yaml);
+
+    glm::vec2 v2 = parser.get_value<glm::vec2>("v2");
+    ASSERT_FLOAT_EQ(v2.x, 1.5f);
+    ASSERT_FLOAT_EQ(v2.y, 2.5f);
+
+    glm::vec3 v3 = parser.get_value<glm::vec3>("v3");
+    ASSERT_FLOAT_EQ(v3.x, 1.0f);
+    ASSERT_FLOAT_EQ(v3.y, 2.0f);
+    ASSERT_FLOAT_EQ(v3.z, 3.0f);
+
+    glm::vec4 v4 = parser.get_value<glm::vec4>("v4");
+    ASSERT_FLOAT_EQ(v4.x, -1.25f);
+    ASSERT_FLOAT_EQ(v4.y, 0.0f);
+    ASSERT_FLOAT_EQ(v4.z, 4.5f);
+    ASSERT_FLOAT_EQ(v4.w, 8.75f);
+
+    glm::vec2 v2ip;
+    parser.get_value<glm::vec2>("v2", v2ip);
+    ASSERT_FLOAT_EQ(v2ip.x, 1.5f);
+    ASSERT_FLOAT_EQ(v2ip.y, 2.5f);
+
+    glm::vec3 v3ip;
+    parser.get_value<glm::vec3>("v3", v3ip);
+    ASSERT_FLOAT_EQ(v3ip.x, 1.0f);
+    ASSERT_FLOAT_EQ(v3ip.y, 2.0f);
+    ASSERT_FLOAT_EQ(v3ip.z, 3.0f);
+
+    glm::vec4 v4ip;
+    parser.get_value<glm::vec4>("v4", v4ip);
+    ASSERT_FLOAT_EQ(v4ip.x, -1.25f);
+    ASSERT_FLOAT_EQ(v4ip.y, 0.0f);
+    ASSERT_FLOAT_EQ(v4ip.z, 4.5f);
+    ASSERT_FLOAT_EQ(v4ip.w, 8.75f);
+}
+
+TEST(ParserYAMLTest, ParseGLMVectorsMissingFields) {
+    WBE::ParserYAML parser;
+
+    const std::string glm_yaml = R"(
+v2:
+  x: 1.0
+v3:
+  x: 1.0
+  y: 2.0
+v4:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+)";
+
+    parser.parse_from_buffer(glm_yaml);
+
+    // Missing components should produce exceptions when accessed
+    ASSERT_THROW(parser.get_value<glm::vec2>("v2"), std::exception);
+    ASSERT_THROW(parser.get_value<glm::vec3>("v3"), std::exception);
+    ASSERT_THROW(parser.get_value<glm::vec4>("v4"), std::exception);
+}
+
 #endif

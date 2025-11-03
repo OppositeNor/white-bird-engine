@@ -254,9 +254,6 @@ inline std::string remove_hashtag_comments(std::string str) {
     return str;
 }
 
-template <typename T>
-class SerializableSD {};
-
 // Color space
 enum class ColorSpace {
     // RGB space

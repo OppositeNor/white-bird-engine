@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <glm/glm.hpp>
 
 namespace WhiteBirdEngine {
 
@@ -59,48 +60,93 @@ public:
 
     template <typename T>
     T get_value(const std::string& p_key) const {
-        if constexpr (std::same_as<T, std::vector<JSONData>>) {
-            std::vector<JSONData> result;
-            for (const auto& elem : data.at(p_key)) {
-                result.emplace_back(elem);
-            }
-            return result;
-        } else if constexpr (!std::same_as<T, JSONData>) {
-            return data.at(p_key).get<T>();
-        } else {
-            return JSONData(data.at(p_key).get<json>());
-        }
+        T result;
+        get_value<T>(p_key, result);
+        return result;
     }
 
     template <typename T>
-    T get_value() const {
-        if constexpr (std::same_as<T, std::vector<JSONData>>) {
-            std::vector<JSONData> result;
-            for (const auto& elem : data) {
-                result.emplace_back(elem);
-            }
-            return result;
-        } else if constexpr (!std::same_as<T, JSONData>) {
-            return data.get<T>();
-        } else {
-            return JSONData(data.get<json>());
-        }
+    T get() const {
+        T val;
+        get<T>(val);
+        return val;
     }
 
     template <typename T>
-    void get_value(const std::string& p_key, T& p_value) const {
-        if constexpr (BufferBaseConcept<T>) {
+    void get(T& p_value) const {
+        if constexpr (std::same_as<T, std::vector<JSONData>>) {
+            std::vector<JSONData> result;
+            for (const auto& elem : data.get<json>()) {
+                result.emplace_back(elem);
+            }
+            p_value = result;
+        } else if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
-            std::string result = get_value<std::string>(p_key);
+            std::string result = data.get<std::string>();
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
                     "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+        } else if constexpr (std::same_as<T, glm::vec2>) {
+            p_value = glm::vec2(
+                data.at("x").get<float>(),
+                data.at("y").get<float>());
+        } else if constexpr (std::same_as<T, glm::vec3>) {
+            p_value = glm::vec3(
+                data.at("x").get<float>(),
+                data.at("y").get<float>(),
+                data.at("z").get<float>());
+        } else if constexpr (std::same_as<T, glm::vec4>) {
+            p_value = glm::vec4(
+                data.at("x").get<float>(),
+                data.at("y").get<float>(),
+                data.at("z").get<float>(),
+                data.at("w").get<float>());
+        } else if constexpr (std::same_as<T, JSONData>) {
+            p_value = JSONData(data.get<json>());
+        } else {
+            p_value = data.get<T>();
         }
-        else {
-            p_value = get_value<T>(p_key);
+    }
+
+    template <typename T>
+    void get_value(const std::string& p_key, T& p_value) const {
+        if constexpr (std::same_as<T, std::vector<JSONData>>) {
+            std::vector<JSONData> result;
+            for (const auto& elem : data.at(p_key)) {
+                result.emplace_back(elem);
+            }
+            p_value = result;
+        } else if constexpr (BufferBaseConcept<T>) {
+            using BufferT = std::remove_cvref_t<T>;
+            std::string result = data.at(p_key).get<std::string>();
+            if (result.size() > BufferT::BUFFER_SIZE - 1) {
+                throw std::runtime_error(std::format(
+                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
+                    result, BufferT::BUFFER_SIZE, result.size()));
+            }
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+        } else if constexpr (std::same_as<T, glm::vec2>) {
+            p_value = glm::vec2(
+                data.at(p_key).at("x").get<float>(),
+                data.at(p_key).at("y").get<float>());
+        } else if constexpr (std::same_as<T, glm::vec3>) {
+            p_value = glm::vec3(
+                data.at(p_key).at("x").get<float>(),
+                data.at(p_key).at("y").get<float>(),
+                data.at(p_key).at("z").get<float>());
+        } else if constexpr (std::same_as<T, glm::vec4>) {
+            p_value = glm::vec4(
+                data.at(p_key).at("x").get<float>(),
+                data.at(p_key).at("y").get<float>(),
+                data.at(p_key).at("z").get<float>(),
+                data.at(p_key).at("w").get<float>());
+        } else if constexpr (std::same_as<T, JSONData>) {
+            p_value = JSONData(data.at(p_key).get<json>());
+        } else {
+            p_value = data.at(p_key).get<T>();
         }
     }
 
@@ -175,13 +221,18 @@ public:
     }
 
     template <typename T>
-    T get_value() const {
-        return data.get_value<T>();
+    void get_value(std::string& p_key, T&& p_value) {
+        return data.get_value<T>(std::forward<T>(p_value));
     }
 
     template <typename T>
-    void get_value(std::string& p_key, T&& p_value) {
-        return data.get_value<T>(std::forward<T>(p_value));
+    T get() const {
+        return data.get<T>();
+    }
+
+    template <typename T>
+    void get(T& p_val) const {
+        return data.get<T>(p_val);
     }
 
     /**

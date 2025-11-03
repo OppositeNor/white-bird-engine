@@ -568,4 +568,49 @@ TEST(ParserJSONTest, KeyManagementAndUtilities) {
     ASSERT_FALSE(nested.contains("key1")); // Not in nested level
 }
 
+TEST(ParserJSONTest, ParseGLMVectors) {
+    WBE::ParserJSON parser;
+
+    const std::string glm_json = R"({
+        "v2": { "x": 1.5, "y": 2.5 },
+        "v3": { "x": 1.0, "y": 2.0, "z": 3.0 },
+        "v4": { "x": -1.25, "y": 0.0, "z": 4.5, "w": 8.75 }
+    })";
+
+    parser.parse_from_buffer(glm_json);
+
+    glm::vec2 v2 = parser.get_value<glm::vec2>("v2");
+    ASSERT_FLOAT_EQ(v2.x, 1.5f);
+    ASSERT_FLOAT_EQ(v2.y, 2.5f);
+
+    glm::vec3 v3 = parser.get_value<glm::vec3>("v3");
+    ASSERT_FLOAT_EQ(v3.x, 1.0f);
+    ASSERT_FLOAT_EQ(v3.y, 2.0f);
+    ASSERT_FLOAT_EQ(v3.z, 3.0f);
+
+    glm::vec4 v4 = parser.get_value<glm::vec4>("v4");
+    ASSERT_FLOAT_EQ(v4.x, -1.25f);
+    ASSERT_FLOAT_EQ(v4.y, 0.0f);
+    ASSERT_FLOAT_EQ(v4.z, 4.5f);
+    ASSERT_FLOAT_EQ(v4.w, 8.75f);
+}
+
+TEST(ParserJSONTest, ParseGLMVectorsMissingFields) {
+    WBE::ParserJSON parser;
+
+    // v2 missing 'y', v3 missing 'z', v4 missing 'w'
+    const std::string glm_json = R"({
+        "v2": { "x": 1.0 },
+        "v3": { "x": 1.0, "y": 2.0 },
+        "v4": { "x": 0.0, "y": 0.0, "z": 0.0 }
+    })";
+
+    parser.parse_from_buffer(glm_json);
+
+    // Accessing incomplete vectors should throw (nlohmann::json::out_of_range)
+    ASSERT_THROW(parser.get_value<glm::vec2>("v2"), std::exception);
+    ASSERT_THROW(parser.get_value<glm::vec3>("v3"), std::exception);
+    ASSERT_THROW(parser.get_value<glm::vec4>("v4"), std::exception);
+}
+
 #endif

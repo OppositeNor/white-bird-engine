@@ -2,7 +2,11 @@ game_name : "White Bird Engine Demo"
 version_major : 1
 version_minor : 0
 version_patch : 0
-window_width : 1260
-window_height : 720
+window_width : 1920
+window_height : 1080
+frames_in_flight : 2
 render_device_index : -1
-render_api : "vulkan"
+limit_render_fps: 0
+limit_logic_fps: 60
+resizable: false
+render_api : "dummy"

@@ -168,7 +168,7 @@ class WBEMetaparser:
         deps = set()
         for inclusion in tu.get_includes():
             incl_path_abs = os.path.abspath(inclusion.include.name)
-            if incl_path_abs in self.sources:
+            if incl_path_abs in self.sources and '.gen' not in incl_path_abs:
                 deps.add(incl_path_abs)
         return list(deps)
 

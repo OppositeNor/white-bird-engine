@@ -30,6 +30,14 @@ namespace WhiteBirdEngine {
 template <typename ChildType>
 class ParserData {
 public:
+
+    /**
+     * @brief Get all the key values.
+     */
+    std::vector<std::string> get_all_keys() const {
+        return static_cast<const ChildType*>(this)->get_all_keys();
+    }
+
     /**
      * @brief Get the value of the parser data from a key.
      *
@@ -46,23 +54,34 @@ public:
      * @brief Get the value of the parser data.
      *
      * @tparam T The type of the value to get.
-     * @return The value of the parser data.
+     * @return The value of the key.
      */
     template <typename T>
-    T get_value() const {
-        return static_cast<ChildType*>(this)->template get_value<T>();
+    T get() const {
+        return static_cast<const ChildType*>(this)->get();
     }
 
     /**
-     * @brief Get all the key values.
+     * @brief Get a value.
+     *
+     * @tparam T The type of the value.
+     * @param p_value The value to write to.
      */
-    std::vector<std::string> get_all_keys() const {
-        return static_cast<const ChildType*>(this)->get_all_keys();
+    template <typename T>
+    void get(T& p_value) const {
+        static_cast<const ChildType*>(this)->get(p_value);
     }
 
+    /**
+     * @brief Get a value.
+     *
+     * @tparam T The type of the value.
+     * @param p_key The key to get value from.
+     * @param p_value The value to write to.
+     */
     template <typename T>
-    void get_value(const std::string& p_key, T& p_value) const {
-        return static_cast<const ChildType*>(this)->get_value(p_key, p_value);
+    void get(const std::string& p_key, T& p_value) const {
+        return static_cast<const ChildType*>(this)->get(p_key, p_value);
     }
 
     /**
@@ -123,6 +142,40 @@ public:
     template <typename T>
     T get_value(const std::string& p_key) const {
         return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
+    }
+
+    /**
+     * @brief Get the value of a given key.
+     *
+     * @tparam T The type of the value.
+     * @param p_key The key to get value from.
+     * @param p_val The output value of the key.
+     */
+    template <typename T>
+    void get_value(const std::string& p_key, T& p_val) const {
+        static_cast<const ChildType*>(this)->template get_value<T>(p_key, p_val);
+    }
+
+    /**
+     * @brief Get the value.
+     *
+     * @tparam T The type of the value.
+     * @return The value.
+     */
+    template <typename T>
+    T get() const {
+        return static_cast<const ChildType*>(this)->template get<T>();
+    }
+
+    /**
+     * @brief Get the value.
+     *
+     * @tparam T The type of the value.
+     * @param p_val The output value.
+     */
+    template <typename T>
+    void get(T& p_val) const {
+        static_cast<const ChildType*>(this)->template get<T>(p_val);
     }
 
     /**
