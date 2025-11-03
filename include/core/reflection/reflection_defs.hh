@@ -16,6 +16,7 @@
 #define __WBE_REFLECTION_HH__
 
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 
 #ifdef WBE_REFLECTION_PARSER
 #define WBE_ATTR(...) __attribute__((annotate(#__VA_ARGS__)))

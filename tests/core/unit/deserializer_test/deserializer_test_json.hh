@@ -12,4 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "reflection_test.hh"
+#ifndef __DESERIALIZER_TEST_JSON_HH__
+#define __DESERIALIZER_TEST_JSON_HH__
+
+#include "core/reflection/reflection_defs.hh"
+
+#endif

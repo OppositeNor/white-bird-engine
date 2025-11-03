@@ -15,7 +15,6 @@
 #ifndef __WBE_UTILS_HH__
 #define __WBE_UTILS_HH__
 
-#include "core/reflection/reflection_defs.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -255,121 +254,8 @@ inline std::string remove_hashtag_comments(std::string str) {
     return str;
 }
 
-/**
- * @class EngineConfigOptions
- * @brief Engine configurations.
- *
- */
-WBE_STRUCT(EngineConfigOptions, WBE_CONFIG_OPTION) {
-    /**
-     * @brief Name of the engine.
-     */
-    const char* engine_name = "White Bird Engine";
-    /**
-     * @brief Engine version major.
-     */
-    const uint32_t version_major = 0;
-    /**
-     * @brief Engine version minor.
-     */
-    const uint32_t version_minor = 0;
-    /**
-     * @brief Engine version patch.
-     */
-    const uint32_t version_patch = 1;
-
-    /**
-     * @brief The size of the tick stack.
-     */
-    WBE_META(WBE_REFLECT)
-    size_t single_tick_stack_size = WBE_KiB(64);
-    /**
-     * @brief The size of the global memory pool.
-     */
-    WBE_META(WBE_REFLECT)
-    size_t global_mem_pool_size = WBE_KiB(128);
-    /**
-     * @brief The size of the thread memory pool.
-     */
-    WBE_META(WBE_REFLECT)
-    size_t thread_mem_pool_size = WBE_KiB(16);
-
-    /**
-     * @brief The utility name while running the program.
-     */
-    WBE_META(WBE_REFLECT)
-    std::string utility_name;
-};
-
-/**
- * @class GameConfigOptions
- * @brief Configuration options for game.
- *
- */
-WBE_STRUCT(GameConfigOptions, WBE_CONFIG_OPTION) {
-    /**
-     * @brief The name of the game.
-     */
-    WBE_META(WBE_REFLECT)
-    std::string game_name = "White Bird Engine Demo";
-    /**
-     * @brief Game version major.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t version_major = 1;
-    /**
-     * @brief Game version minor.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t version_minor = 0;
-    /**
-     * @brief Game version patch.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t version_patch = 0;
-    /**
-     * @brief The width of the window.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t window_width = 1260;
-    /**
-     * @brief The height of the window.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t window_height = 720;
-    /**
-     * @brief Frames in flight.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t frames_in_flight = 2;
-    /**
-     * @brief The index of the render device.
-     * -1 if not specified, and white bird engine will automatically
-     *  choose the most optimal one.
-     */
-    WBE_META(WBE_REFLECT)
-    int32_t render_device_index = -1;
-
-    WBE_META(WBE_REFLECT)
-    std::string render_api;
-
-    /**
-     * @brief Set limit to the rendering fps. 0 stands for unlimited.
-     */
-    WBE_META(WBE_REFLECT)
-    int32_t limit_render_fps = 0;
-
-    /**
-     * @brief Set limit to the logic fps. 0 stands for unlimited.
-     * Unlimited logic FPS is strongly unrecognized, since logic computation will consume
-     * substancial amount of CPU resources.
-     */
-    WBE_META(WBE_REFLECT)
-    int32_t limit_logic_fps = 60;
-};
-
 template <typename T>
-class ConfigOptionsSD {};
+class SerializableSD {};
 
 // Color space
 enum class ColorSpace {

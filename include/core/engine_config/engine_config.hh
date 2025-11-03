@@ -15,13 +15,57 @@
 #ifndef __WBE_ENGINE_CONFIG_HH__
 #define __WBE_ENGINE_CONFIG_HH__
 
-#include "core/engine_config/engine_config_file_parser.hh"
-#include "core/parser/parser_yaml.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
-#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
+
+/**
+ * @class EngineConfigOptions
+ * @brief Engine configurations.
+ *
+ */
+WBE_STRUCT(EngineConfigOptions, WBE_CONFIG_OPTION) {
+    /**
+     * @brief Name of the engine.
+     */
+    const char* engine_name = "White Bird Engine";
+    /**
+     * @brief Engine version major.
+     */
+    const uint32_t version_major = 0;
+    /**
+     * @brief Engine version minor.
+     */
+    const uint32_t version_minor = 0;
+    /**
+     * @brief Engine version patch.
+     */
+    const uint32_t version_patch = 1;
+
+    /**
+     * @brief The size of the tick stack.
+     */
+    WBE_META(WBE_REFLECT)
+    size_t single_tick_stack_size = WBE_KiB(64);
+    /**
+     * @brief The size of the global memory pool.
+     */
+    WBE_META(WBE_REFLECT)
+    size_t global_mem_pool_size = WBE_KiB(128);
+    /**
+     * @brief The size of the thread memory pool.
+     */
+    WBE_META(WBE_REFLECT)
+    size_t thread_mem_pool_size = WBE_KiB(16);
+
+    /**
+     * @brief The utility name while running the program.
+     */
+    WBE_META(WBE_REFLECT)
+    std::string utility_name;
+};
 
 /**
  * @class EngineConfig
@@ -38,8 +82,7 @@ public:
      * @param p_argc argc
      * @param p_argv argv
      */
-    EngineConfig(const Path& p_config_file_path, int p_argc, char* p_argv[])
-        : config_file_parser(config_options, ParserYAML()) {
+    EngineConfig(const Path& p_config_file_path, int p_argc, char* p_argv[]) {
         parse_config_file(p_config_file_path);
         if (p_argc > 0) {
             parse_cla(p_argc, p_argv);
@@ -61,7 +104,6 @@ public:
     }
 
 private:
-    EngineConfigFileParser<ParserYAML> config_file_parser;
     EngineConfigOptions config_options;
 
     void parse_cla(int p_argc, char* p_argv[]) {
@@ -69,7 +111,7 @@ private:
     }
 
     void parse_config_file(const Path& p_path) {
-        config_file_parser.parse(p_path);
+        // TODO
     }
 
 };

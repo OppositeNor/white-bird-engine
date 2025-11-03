@@ -19,8 +19,11 @@
 #include "platform/file_system/path.hh"
 #include "utils/interface/singleton.hh"
 #include "utils/utils.hh"
-#include "generated/config_options_sd.gen.hh"
+#include "generated/serializables_sd.gen.hh"
+#include "game_config_options.hh"
+
 namespace WhiteBirdEngine {
+
 
 class GameConfig : public Singleton<GameConfig> {
 public:
@@ -28,7 +31,7 @@ public:
     GameConfig(const Path& p_config_file_path) {
         auto parser = ParserYAML();
         parser.parse(p_config_file_path);
-        ConfigOptionsSD<GameConfigOptions> config_options_sd;
+        SerializableSD<GameConfigOptions> config_options_sd;
         config_options_sd.deserialize(parser.get_data(), config_options);
     }
     ~GameConfig() {}

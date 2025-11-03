@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "render_test.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_task.hh"
 #include "function/render/renderer.hh"
@@ -31,10 +31,6 @@
 #include <ostream>
 
 namespace WBE = WhiteBirdEngine;
-
-namespace WhiteBirdEngine {
-WBE_LABEL(RT_RUN_PIPELINE, WBE_RENDER_TASK);
-}
 
 void setup_pipeline(WBE::ApplicationGame& game_application);
 

@@ -49,6 +49,9 @@ class WBEMetaparser:
         Args:
             cpp_file_path: The path to the C++ file.
         """
+        if ".gen" in cpp_file_path:
+            # skip the generated files.
+            return
         file_cache_path = os.path.join(self.cache_dir, f"{hash_str_sha256(cpp_file_path)}.json")
         self._get_metadata(cpp_file_path, file_cache_path)
 

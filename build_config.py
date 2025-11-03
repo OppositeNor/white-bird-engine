@@ -80,10 +80,9 @@ gen_info = {
         "WBE_RENDER_OBJECT_TYPE",
         "WBE_RENDER_TASK",
     ],
-    "components" : [
-        "WBE_COMPONENT"
-    ],
-    "config_options" : [
+    "serializables" : [
+        "WBE_SERIALIZABLE",
+        "WBE_COMPONENT",
         "WBE_CONFIG_OPTION"
-    ],
+    ]
 }

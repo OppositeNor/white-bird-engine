@@ -72,16 +72,24 @@ class WBEReflector:
     def checks(self) -> None:
         """Do checkings."""
         print("WBEReflect: Checking...")
+        self._check_redefinition(self.metadata.labels)
         self._check_hashing_collision("channels", self.metadata.labels, lambda label: hash_str(label.name))
 
     def _write_to_file(self, path : str, str_content : str) -> None:
         with open(path, "w+") as channel_file:
             channel_file.write(str_content)
 
-    def _check_hashing_collision(self, dict_name : str, strs : list, hash_function) -> None:
+    def _check_redefinition(self, objs : list) -> None:
+        seen = set()
+        for check in objs:
+            if check.name in seen:
+                raise RuntimeError(f"\"{check.name}\" is redefined.")
+            seen.add(check.name)
+
+    def _check_hashing_collision(self, dict_name : str, objs : list, hash_function) -> None:
         hash_val_set = set()
         dict_rev = dict()
-        for check in strs:
+        for check in objs:
             hash_code = hash_function(check)
             if hash_code in hash_val_set:
                 raise RuntimeError(f"Hasing collision of \"{dict_name}\" detected! Hash values of: \"{check}\" "

@@ -20,7 +20,6 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
-#include <vector>
 #include <cstring>
 
 namespace WBE = WhiteBirdEngine;
