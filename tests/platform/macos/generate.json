@@ -1,7 +1,7 @@
 [
     {
         "output_name" : "unit_test.gen.cmake",
-        "template" : "unit_test.jinja",
+        "template" : "unit_test.cmake.jinja",
         "data" : {
             "name" : "wbe_platform_macos_test"
         }
