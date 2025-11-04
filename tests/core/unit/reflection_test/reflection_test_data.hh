@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "utils/utils.hh"
 #include <glm/glm.hpp>
+#include <string>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -44,6 +45,15 @@ WBE_STRUCT(TestSerializable, WBE_SERIALIZABLE) {
     WBE::Buffer<16> buffer_test;
 };
 
-
+WBE_STRUCT(TestSerializableNesting, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    TestSerializable nested_test;
+    WBE_META(WBE_REFLECT)
+    int32_t nesting_id;
+    WBE_META(WBE_REFLECT)
+    std::string name;
+    WBE_META(WBE_REFLECT)
+    WBE::Buffer<8> small_buffer;
+};
 
 #endif

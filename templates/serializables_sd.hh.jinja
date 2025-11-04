@@ -66,7 +66,9 @@ public:
     template <typename ParserData>
     static void deserialize(const ParserData& p_data, ObjType& p_serializable) {
         {% for field in serializable.fields %}
-        SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(p_data.template get_value<ParserData>("{{ field.name }}"), p_serializable.{{ field.name }});
+        if (p_data.contains("{{ field.name }}")) {
+            SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(p_data.template get_value<ParserData>("{{ field.name }}"), p_serializable.{{ field.name }});
+        }
         {% endfor %}
     }
 };
