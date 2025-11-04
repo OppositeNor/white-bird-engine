@@ -84,9 +84,22 @@ class WBEMetaparser:
             print("Retrying...")
             return self._register_from_clang(cpp_file_path, cache_path)
 
+    def _sorted_metadata_by_dependency(self):
+        result = []
+        metadata_with_depth = {key : [0, value] for key, value in self._metadata.items()}
+        for _, metadata in metadata_with_depth.items():
+            deps = [metadata_with_depth.get(dep_metadata) for dep_metadata in metadata[1].deps]
+            for dep in deps:
+                if dep is not None:
+                    dep[0] += 1
+            result.append(metadata)
+        sorted(result, key=lambda v: v[0], reverse=True)
+        return [item[1] for item in result]
+
     def _export_metadata(self):
         result_metadata = WBEMetadata()
-        for _, metadata in self._metadata.items():
+        sorted_metadata = self._sorted_metadata_by_dependency()
+        for metadata in sorted_metadata:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
             result_metadata.structs.extend(metadata.structs)
