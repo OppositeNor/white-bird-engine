@@ -14,4 +14,4 @@
 */
 #include "deserializer_test_json.hh"
 #include "deserializer_test_yaml.hh"
-#include "serializer_test_json.hh"
+#include "serializer_test.hh"

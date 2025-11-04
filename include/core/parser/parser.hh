@@ -47,7 +47,7 @@ public:
      */
     template <typename T>
     void set_value(const std::string& p_key, T&& p_value) {
-        static_cast<ChildType*>(this)->set(p_key, std::forward<T>(p_value));
+        static_cast<ChildType*>(this)->set_value(p_key, std::forward<T>(p_value));
     }
 
     /**
