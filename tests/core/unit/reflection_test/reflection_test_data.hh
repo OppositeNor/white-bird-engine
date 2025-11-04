@@ -22,6 +22,9 @@
 
 namespace WBE = WhiteBirdEngine;
 
+WBE_STRUCT(TestEmptySerializable, WBE_SERIALIZABLE) {
+};
+
 WBE_STRUCT(TestSerializable, WBE_SERIALIZABLE) {
     WBE_META(WBE_REFLECT)
     int32_t  si32_test;
@@ -43,6 +46,17 @@ WBE_STRUCT(TestSerializable, WBE_SERIALIZABLE) {
     std::string str_test;
     WBE_META(WBE_REFLECT)
     WBE::Buffer<16> buffer_test;
+};
+
+WBE_STRUCT(TestPartialStruct, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    int32_t  si32_test;
+    WBE_META(WBE_REFLECT)
+    int64_t  si64_test;
+    WBE_META(WBE_REFLECT)
+    uint32_t ui32_test;
+    WBE_META(WBE_REFLECT)
+    uint64_t ui64_test;
 };
 
 WBE_STRUCT(TestSerializableNesting, WBE_SERIALIZABLE) {

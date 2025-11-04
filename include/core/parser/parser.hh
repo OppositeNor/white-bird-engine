@@ -62,6 +62,18 @@ public:
     }
 
     /**
+     * @brief Set a value. If the value was not recorded, a new value will be created.
+     *
+     * @tparam T The type of the value to set.
+     * @param p_key The key of the value.
+     * @param p_value The value to set to.
+     */
+    template <typename T>
+    void set(const std::string& p_key, T&& p_value) {
+        static_cast<ChildType*>(this)->set(p_key, std::forward<T>(p_value));
+    }
+
+    /**
      * @brief Get a value.
      *
      * @tparam T The type of the value.

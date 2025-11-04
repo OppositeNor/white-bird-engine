@@ -15,6 +15,7 @@
 #ifndef __WBE_SERIALIZER_YAML_HH__
 #define __WBE_SERIALIZER_YAML_HH__
 
+#include "core/parser/parser_yaml.hh"
 #include "serializer.hh"
 
 #include <fstream>
@@ -76,6 +77,10 @@ public:
         p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         std::string str(p_value.buffer);
         context_stack.back().second[p_key] = str;
+    }
+
+    YAMLData dump_data() const {
+        return YAMLData(context_stack.back().second);
     }
 
     std::string dump() const {

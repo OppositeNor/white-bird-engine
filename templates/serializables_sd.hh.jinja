@@ -51,11 +51,9 @@ public:
      */
     template <typename Serializer>
     static void serialize(Serializer& p_serializer, const ObjType& p_serializable) {
-        p_serializer.push_context("{{ serializable.name }}");
         {% for field in serializable.fields %}
         p_serializer.register_serialize("{{ field.name }}", p_serializable.{{ field.name }});
         {% endfor %}
-        p_serializer.pop_context();
     }
 
     /**

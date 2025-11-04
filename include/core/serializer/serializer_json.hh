@@ -15,12 +15,16 @@
 #ifndef __WBE_SERILIAZER_JSON_HH__
 #define __WBE_SERILIAZER_JSON_HH__
 
+#include "core/parser/parser_json.hh"
 #include "serializer.hh"
 #include "utils/utils.hh"
+#include <cstring>
+#include <glm/ext/vector_float3.hpp>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <glm/glm.hpp>
 
 namespace WhiteBirdEngine {
 
@@ -69,6 +73,27 @@ public:
         context_stack.back().second[std::move(back.first)] = std::move(back.second);
     }
 
+    template <SerializableGLM T>
+    void register_serialize(const std::string& p_key, T&& p_value) {
+        using Type = std::remove_cvref_t<T>;
+        if constexpr (std::same_as<Type, glm::vec2>) {
+            context_stack.back().second[p_key]["x"] = p_value.x;
+            context_stack.back().second[p_key]["y"] = p_value.y;
+        } else if constexpr (std::same_as<Type, glm::vec3>) {
+            context_stack.back().second[p_key]["x"] = p_value.x;
+            context_stack.back().second[p_key]["y"] = p_value.y;
+            context_stack.back().second[p_key]["z"] = p_value.z;
+        } else if constexpr (std::same_as<Type, glm::vec4>) {
+            context_stack.back().second[p_key]["x"] = p_value.x;
+            context_stack.back().second[p_key]["y"] = p_value.y;
+            context_stack.back().second[p_key]["z"] = p_value.z;
+            context_stack.back().second[p_key]["w"] = p_value.w;
+        }
+        else {
+            static_assert(false, "Not implemented.");
+        }
+    }
+
     template <SerializableJSON T> requires (!BufferBaseConcept<T>)
     void register_serialize(const std::string& p_key, T&& p_value) {
         context_stack.back().second[p_key] = std::forward<T>(p_value);
@@ -77,10 +102,16 @@ public:
     template <BufferBaseConcept T>
     void register_serialize(const std::string& p_key, T&& p_value) {
         using BufferT = std::remove_cvref_t<T>;
+        BufferT copy;
+        memcpy(copy.buffer, p_value.buffer, BufferT::BUFFER_SIZE);
         // Make sure the buffer don't overflow.
-        p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
+        copy.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         std::string str(p_value.buffer);
         context_stack.back().second[p_key] = str;
+    }
+
+    JSONData dump_data() const {
+        return JSONData(context_stack.back().second);
     }
 
     std::string dump() const {

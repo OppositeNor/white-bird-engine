@@ -59,6 +59,16 @@ public:
         : data(std::move(p_data)) {}
 
     template <typename T>
+    void set(const std::string& p_key, T&& p_value) {
+        if constexpr (std::same_as<std::remove_cvref_t<T>, JSONData>) {
+            data[p_key] = p_value.data;
+        }
+        else {
+            data[p_key] = std::forward<T>(p_value);
+        }
+    }
+
+    template <typename T>
     T get_value(const std::string& p_key) const {
         T result;
         get_value<T>(p_key, result);
@@ -168,6 +178,7 @@ public:
     bool contains(const std::string& p_key) const {
         return data.contains(p_key);
     }
+
 
 private:
     json data;

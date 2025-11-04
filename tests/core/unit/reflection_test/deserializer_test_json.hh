@@ -27,7 +27,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-class WBEDeserializerTest : public ::testing::Test {
+class WBEDeserializerJSONTest : public ::testing::Test {
 protected:
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
@@ -84,7 +84,15 @@ protected:
     R"(})";
 };
 
-TEST_F(WBEDeserializerTest, General) {
+TEST_F(WBEDeserializerJSONTest, Empty) {
+    WBE::SerializableSD<TestEmptySerializable> sd;
+    TestEmptySerializable test_obj;
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer("{}");
+    sd.deserialize(parser.get_data(), test_obj);
+}
+
+TEST_F(WBEDeserializerJSONTest, General) {
     WBE::SerializableSD<TestSerializable> sd;
     TestSerializable test_obj;
     WBE::ParserJSON parser;
@@ -102,7 +110,7 @@ TEST_F(WBEDeserializerTest, General) {
     EXPECT_TRUE(strcmp(test_obj.buffer_test.buffer, "how are you?") == 0);
 }
 
-TEST_F(WBEDeserializerTest, ZerosAndStrings) {
+TEST_F(WBEDeserializerJSONTest, ZerosAndStrings) {
     WBE::SerializableSD<TestSerializable> sd;
     TestSerializable test_obj;
     WBE::ParserJSON parser;
@@ -121,7 +129,7 @@ TEST_F(WBEDeserializerTest, ZerosAndStrings) {
     EXPECT_STREQ(test_obj.buffer_test.buffer, "");
 }
 
-TEST_F(WBEDeserializerTest, StringsAndBufferContent) {
+TEST_F(WBEDeserializerJSONTest, StringsAndBufferContent) {
     WBE::SerializableSD<TestSerializable> sd;
     TestSerializable test_obj;
     WBE::ParserJSON parser;
@@ -132,7 +140,7 @@ TEST_F(WBEDeserializerTest, StringsAndBufferContent) {
     EXPECT_STREQ(test_obj.buffer_test.buffer, "how are you?");
 }
 
-TEST_F(WBEDeserializerTest, BufferTooLongThrows) {
+TEST_F(WBEDeserializerJSONTest, BufferTooLongThrows) {
     WBE::SerializableSD<TestSerializable> sd;
     TestSerializable test_obj;
     WBE::ParserJSON parser;
@@ -146,7 +154,7 @@ TEST_F(WBEDeserializerTest, BufferTooLongThrows) {
     ASSERT_THROW(sd.deserialize(parser.get_data(), test_obj), std::runtime_error);
 }
 
-TEST_F(WBEDeserializerTest, PartialUpdateOnlyOneField) {
+TEST_F(WBEDeserializerJSONTest, PartialUpdateOnlyOneField) {
     WBE::SerializableSD<TestSerializable> sd;
     TestSerializable test_obj;
     // Initialize with sentinel values
@@ -168,7 +176,7 @@ TEST_F(WBEDeserializerTest, PartialUpdateOnlyOneField) {
     EXPECT_EQ(test_obj.str_test, std::string("orig"));
 }
 
-TEST_F(WBEDeserializerTest, NestingGeneral) {
+TEST_F(WBEDeserializerJSONTest, NestingGeneral) {
     WBE::SerializableSD<TestSerializableNesting> sd;
     TestSerializableNesting test_obj;
     WBE::ParserJSON parser;

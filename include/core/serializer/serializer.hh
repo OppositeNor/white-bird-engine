@@ -19,8 +19,22 @@
 #include "utils/defs.hh"
 #include <cstdint>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <glm/glm.hpp>
 namespace WhiteBirdEngine {
+
+/**
+ * @brief Serializable GLM datastructures.
+ *
+ * @tparam T The type to check.
+ */
+template <typename T>
+concept SerializableGLM =
+    std::same_as<std::remove_cvref_t<T>, glm::vec2> ||
+    std::same_as<std::remove_cvref_t<T>, glm::vec3> ||
+    std::same_as<std::remove_cvref_t<T>, glm::vec4>;
+
 
 template <typename ChildT>
 class Serializer {
@@ -67,6 +81,15 @@ public:
     template <typename T>
     void register_serialize(const std::string& p_key, T&& p_value) {
         static_cast<ChildT*>(this)->register_serialize(p_key, std::forward<T>(p_value));
+    }
+
+    /**
+     * @brief Dump the parser data.
+     *
+     * @return The parser data.
+     */
+    auto dump_data() const {
+        return static_cast<const ChildT*>(this)->dump();
     }
 
     /**

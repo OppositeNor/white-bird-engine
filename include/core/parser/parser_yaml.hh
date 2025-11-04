@@ -53,6 +53,16 @@ public:
         : node(std::move(p_node)) {}
 
     template <typename T>
+    void set(const std::string& p_key, T&& p_value) {
+        if constexpr (std::same_as<std::remove_cvref_t<T>, YAMLData>) {
+            node[p_key] = p_value.node;
+        }
+        else {
+            node[p_key] = std::forward<T>(p_value);
+        }
+    }
+
+    template <typename T>
     T get_value(const std::string& p_key) const {
         T result;
         get_value<T>(p_key, result);
