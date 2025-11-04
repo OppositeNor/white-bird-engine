@@ -47,18 +47,26 @@ public:
     /**
      * @brief Serialize.
      *
+     * @tparam ParserData The type of the data.
+     * @param p_key The key to insert into p_data.
+     * @param p_data The data to insert result.
      * @param p_serializable The object to serialize.
      */
-    template <typename Serializer>
-    static void serialize(Serializer& p_serializer, const ObjType& p_serializable) {
+    template <typename ParserData>
+    static void serialize(ParserData& p_data, const ObjType& p_serializable) {
+        ParserData result;
         {% for field in serializable.fields %}
-        p_serializer.register_serialize("{{ field.name }}", p_serializable.{{ field.name }});
+        SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
+        p_data.set_value("{{ field.name }}", result);
+        result = ParserData();
         {% endfor %}
     }
 
     /**
      * @brief Deserialize.
      *
+     * @tparam ParserData The type of the data.
+     * @param p_data The data to retrieve value from.
      * @param p_serializable The object to deserialize.
      */
     template <typename ParserData>

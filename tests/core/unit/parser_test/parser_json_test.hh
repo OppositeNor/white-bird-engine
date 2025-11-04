@@ -17,9 +17,8 @@
 
 #include <gtest/gtest.h>
 #include "core/parser/parser_json.hh"
-#include "core/serializer/serializer_json.hh"
 #include "parser_test_general.hh"
-#include <cstring>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -312,30 +311,6 @@ TEST(ParserJSONTest, BufferMaxCapacityRetrieval) {
     ASSERT_THROW(parser.get_data().get_value(key, buffer), std::runtime_error);
 }
 
-TEST(ParserJSONTest, BufferRoundTripSerialization) {
-    // Test round-trip: Buffer -> Serializer -> Parser -> Buffer
-    WBE::Buffer<64> original_buffer;
-    const char* test_str = "Round trip test with special chars: \n\t\"'";
-    strcpy(original_buffer.buffer, test_str);
-    
-    // Serialize
-    WBE::SerializerJSON serializer;
-    serializer.register_serialize("test_data", original_buffer);
-    std::string serialized = serializer.dump();
-    
-    // Parse
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(serialized);
-    
-    // Retrieve into new buffer
-    WBE::Buffer<64> retrieved_buffer;
-    std::string key = "test_data";
-    parser.get_data().get_value(key, retrieved_buffer);
-    
-    // Verify round-trip integrity
-    ASSERT_STREQ(original_buffer.buffer, retrieved_buffer.buffer);
-}
-
 TEST(ParserJSONTest, ComplexNestedStructures) {
     WBE::ParserJSON parser;
     
@@ -611,6 +586,46 @@ TEST(ParserJSONTest, ParseGLMVectorsMissingFields) {
     ASSERT_THROW(parser.get_value<glm::vec2>("v2"), std::exception);
     ASSERT_THROW(parser.get_value<glm::vec3>("v3"), std::exception);
     ASSERT_THROW(parser.get_value<glm::vec4>("v4"), std::exception);
+}
+
+TEST(ParserJSONTest, JSONDataSetMethod) {
+    // Test setting primitive values, arrays and nested JSONData via set()
+    WBE::JSONData root;
+
+    // Primitives
+    root.set_value("fruit", std::string("apple"));
+    root.set_value("number", 123);
+    root.set_value("floating", 3.14);
+
+    ASSERT_EQ(root.get_value<std::string>("fruit"), "apple");
+    ASSERT_EQ(root.get_value<int>("number"), 123);
+    ASSERT_DOUBLE_EQ(root.get_value<double>("floating"), 3.14);
+
+    // Arrays (will be forwarded into underlying nlohmann::json)
+    root.set_value("numbers", std::vector<int>{10, 20, 30});
+    auto nums = root.get_value<std::vector<int>>("numbers");
+    ASSERT_EQ(nums.size(), 3);
+    ASSERT_EQ(nums[0], 10);
+    ASSERT_EQ(nums[1], 20);
+    ASSERT_EQ(nums[2], 30);
+
+    // Nested JSONData by copy
+    WBE::JSONData child;
+    child.set_value("key1", "value1");
+    child.set_value("key2", 777);
+    root.set_value("child_copy", child); // should store child's internal json
+
+    auto child_copy = root.get_value<WBE::JSONData>("child_copy");
+    ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
+    ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
+
+    // Nested JSONData by move (rvalue)
+    WBE::JSONData child_move;
+    child_move.set_value("moved", "yes");
+    root.set_value("child_move", std::move(child_move));
+
+    auto child_moved = root.get_value<WBE::JSONData>("child_move");
+    ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
 }
 
 #endif

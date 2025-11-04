@@ -39,6 +39,29 @@ public:
     }
 
     /**
+     * @brief Set a value. If the value was not recorded, a new value will be created.
+     *
+     * @tparam T The type of the value to set.
+     * @param p_key The key of the value.
+     * @param p_value The value to set to.
+     */
+    template <typename T>
+    void set_value(const std::string& p_key, T&& p_value) {
+        static_cast<ChildType*>(this)->set(p_key, std::forward<T>(p_value));
+    }
+
+    /**
+     * @brief Set the current parser data to a value.
+     *
+     * @tparam T The type of the value to set.
+     * @param p_value The value to set to.
+     */
+    template <typename T>
+    void set(T&& p_value) {
+        static_cast<ChildType*>(this)->set(std::forward<T>(p_value));
+    }
+
+    /**
      * @brief Get the value of the parser data from a key.
      *
      * @tparam T The type of the value to get.
@@ -59,18 +82,6 @@ public:
     template <typename T>
     T get() const {
         return static_cast<const ChildType*>(this)->get();
-    }
-
-    /**
-     * @brief Set a value. If the value was not recorded, a new value will be created.
-     *
-     * @tparam T The type of the value to set.
-     * @param p_key The key of the value.
-     * @param p_value The value to set to.
-     */
-    template <typename T>
-    void set(const std::string& p_key, T&& p_value) {
-        static_cast<ChildType*>(this)->set(p_key, std::forward<T>(p_value));
     }
 
     /**

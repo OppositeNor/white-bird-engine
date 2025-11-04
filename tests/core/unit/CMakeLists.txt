@@ -18,7 +18,6 @@ add_subdirectory(logging_test)
 add_subdirectory(memory_test)
 add_subdirectory(parser_test)
 add_subdirectory(profiler_test)
-add_subdirectory(serializer_test)
 add_subdirectory(surface_test)
 add_subdirectory(reflection_test)
 

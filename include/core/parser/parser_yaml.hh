@@ -53,12 +53,73 @@ public:
         : node(std::move(p_node)) {}
 
     template <typename T>
-    void set(const std::string& p_key, T&& p_value) {
-        if constexpr (std::same_as<std::remove_cvref_t<T>, YAMLData>) {
+    void set_value(const std::string& p_key, T&& p_value) {
+        using Type = std::remove_cvref_t<T>;
+        if constexpr (std::same_as<Type, YAMLData>) {
             node[p_key] = p_value.node;
-        }
-        else {
+        } else if constexpr (BufferBaseConcept<T>) {
+            using BufferT = std::remove_cvref_t<T>;
+            std::string result = p_value.buffer;
+            if (result.size() > BufferT::BUFFER_SIZE - 1) {
+                throw std::runtime_error(std::format(
+                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
+                    result, BufferT::BUFFER_SIZE, result.size()));
+            }
+            node[p_key] = result;
+        } else if constexpr (std::same_as<Type, glm::vec2>) {
+            node[p_key]["x"] = p_value.x;
+            node[p_key]["y"] = p_value.y;
+        } else if constexpr (std::same_as<Type, glm::vec3>) {
+            node[p_key]["x"] = p_value.x;
+            node[p_key]["y"] = p_value.y;
+            node[p_key]["z"] = p_value.z;
+        } else if constexpr (std::same_as<Type, glm::vec4>) {
+            node[p_key]["x"] = p_value.x;
+            node[p_key]["y"] = p_value.y;
+            node[p_key]["z"] = p_value.z;
+            node[p_key]["w"] = p_value.w;
+        } else {
             node[p_key] = std::forward<T>(p_value);
+        }
+    }
+
+    /**
+     * @brief Set the current parser data to a value.
+     *
+     * @tparam T The type of the value to set.
+     * @param p_value The value to set to.
+     */
+    template <typename T>
+    void set(T&& p_value) {
+        using Type = std::remove_cvref_t<T>;
+        if constexpr (std::same_as<Type, YAMLData>) {
+            node = p_value.node;
+        } else if constexpr (BufferBaseConcept<T>) {
+            using BufferT = std::remove_cvref_t<T>;
+            std::string result = p_value.buffer;
+            if (result.size() > BufferT::BUFFER_SIZE - 1) {
+                throw std::runtime_error(std::format(
+                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
+                    result, BufferT::BUFFER_SIZE, result.size()));
+            }
+            node = result;
+        } else if constexpr (std::same_as<Type, glm::vec2>) {
+            node = yaml();
+            node["x"] = p_value.x;
+            node["y"] = p_value.y;
+        } else if constexpr (std::same_as<Type, glm::vec3>) {
+            node = yaml();
+            node["x"] = p_value.x;
+            node["y"] = p_value.y;
+            node["z"] = p_value.z;
+        } else if constexpr (std::same_as<Type, glm::vec4>) {
+            node = yaml();
+            node["x"] = p_value.x;
+            node["y"] = p_value.y;
+            node["z"] = p_value.z;
+            node["w"] = p_value.w;
+        } else {
+            node = std::forward<T>(p_value);
         }
     }
 
