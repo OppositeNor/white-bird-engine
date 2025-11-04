@@ -739,4 +739,44 @@ TEST(ParserYAMLTest, YAMLDataSetMethod) {
   ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
 }
 
+TEST(ParserYAMLTest, YAMLDataSetValueMethod) {
+  // Test setting primitive values, arrays and nested YAMLData via set_value(key, value)
+  WBE::YAMLData root;
+
+  // Primitives
+  root.set_value("fruit", std::string("apple"));
+  root.set_value("number", 123);
+  root.set_value("floating", 3.14);
+
+  ASSERT_EQ(root.get_value<std::string>("fruit"), "apple");
+  ASSERT_EQ(root.get_value<int>("number"), 123);
+  ASSERT_DOUBLE_EQ(root.get_value<double>("floating"), 3.14);
+
+  // Arrays
+  root.set_value("numbers", std::vector<int>{10, 20, 30});
+  auto nums = root.get_value<std::vector<int>>("numbers");
+  ASSERT_EQ(nums.size(), 3);
+  ASSERT_EQ(nums[0], 10);
+  ASSERT_EQ(nums[1], 20);
+  ASSERT_EQ(nums[2], 30);
+
+  // Nested YAMLData by copy
+  WBE::YAMLData child;
+  child.set_value("key1", "value1");
+  child.set_value("key2", 777);
+  root.set_value("child_copy", child);
+
+  auto child_copy = root.get_value<WBE::YAMLData>("child_copy");
+  ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
+  ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
+
+  // Nested YAMLData by move (rvalue)
+  WBE::YAMLData child_move;
+  child_move.set_value("moved", "yes");
+  root.set_value("child_move", std::move(child_move));
+
+  auto child_moved = root.get_value<WBE::YAMLData>("child_move");
+  ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
+}
+
 #endif

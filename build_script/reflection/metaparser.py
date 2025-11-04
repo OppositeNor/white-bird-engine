@@ -90,7 +90,6 @@ class WBEMetaparser:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
             result_metadata.structs.extend(metadata.structs)
-        result_metadata.sort()
         self.reflector.register_metadata(result_metadata)
 
     def _register_from_clang(self, cpp_file_path, cache_path):

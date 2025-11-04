@@ -94,6 +94,11 @@ public:
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, YAMLData>) {
             node = p_value.node;
+        } else if constexpr (std::same_as<Type, std::vector<YAMLData>>) {
+            node = yaml();
+            for (auto& item : p_value) {
+                node.push_back(item.node);
+            }
         } else if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
             std::string result = p_value.buffer;

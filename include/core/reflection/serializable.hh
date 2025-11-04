@@ -67,7 +67,7 @@ public:
         result.reserve(p_serializable.size());
         for (auto& val : p_serializable) {
             ParserData val_data;
-            val_data.set(p_serializable);
+            SerializableSD<T>::serialize(val_data, val);
             result.push_back(val_data);
         }
         p_data.set(result);
@@ -80,7 +80,12 @@ public:
      */
     template <typename ParserData>
     static void deserialize(const ParserData& p_data, ObjType& p_serializable) {
-         p_data.template get<ObjType>(p_serializable);
+        p_serializable.clear();
+        for (auto& data : p_data) {
+            T result;
+            SerializableSD<T>::deserialize(data, result);
+            p_serializable.push_back(result);
+        }
     }
 
 };

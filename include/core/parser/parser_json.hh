@@ -100,6 +100,11 @@ public:
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, JSONData>) {
             data = p_value.data;
+        } else if constexpr (std::same_as<Type, std::vector<JSONData>>) {
+            data = json();
+            for (auto& item : p_value) {
+                data.push_back(item.data);
+            }
         } else if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
             std::string result = p_value.buffer;
@@ -148,7 +153,7 @@ public:
         if constexpr (std::same_as<T, std::vector<JSONData>>) {
             std::vector<JSONData> result;
             for (const auto& elem : data.get<json>()) {
-                result.emplace_back(elem);
+                result.push_back(elem);
             }
             p_value = result;
         } else if constexpr (BufferBaseConcept<T>) {

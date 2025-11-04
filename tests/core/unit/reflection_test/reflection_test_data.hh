@@ -70,4 +70,42 @@ WBE_STRUCT(TestSerializableNesting, WBE_SERIALIZABLE) {
     WBE::Buffer<8> small_buffer;
 };
 
+// A simple container struct that holds vectors to test vector serialization
+WBE_STRUCT(TestVectorContainer, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    std::vector<int> ints;
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> strs;
+    WBE_META(WBE_REFLECT)
+    std::vector<TestSerializable> children;
+};
+
+// Depth-2 nested struct: contains a TestSerializable
+WBE_STRUCT(TestDepth2, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    TestSerializable nested;
+    WBE_META(WBE_REFLECT)
+    int32_t depth2_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string depth2_name;
+};
+
+// Depth-3 nested struct: contains a TestDepth2
+WBE_STRUCT(TestDepth3, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    TestDepth2 nested2;
+    WBE_META(WBE_REFLECT)
+    int32_t depth3_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string depth3_name;
+};
+
+// Container for vectors of deep structs
+WBE_STRUCT(TestDeepVectorContainer, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    std::vector<TestDepth2> vec2;
+    WBE_META(WBE_REFLECT)
+    std::vector<TestDepth3> vec3;
+};
+
 #endif

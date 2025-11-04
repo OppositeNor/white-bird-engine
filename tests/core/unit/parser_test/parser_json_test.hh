@@ -628,4 +628,58 @@ TEST(ParserJSONTest, JSONDataSetMethod) {
     ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
 }
 
+TEST(ParserJSONTest, JSONDataSetAssignMethod) {
+    // Test the single-argument set(T&&) that assigns the current data value
+    WBE::JSONData root;
+
+    // Primitives
+    root.set(std::string("apple"));
+    ASSERT_EQ(root.get<std::string>(), "apple");
+
+    root.set(123);
+    ASSERT_EQ(root.get<int>(), 123);
+
+    root.set(3.14);
+    ASSERT_DOUBLE_EQ(root.get<double>(), 3.14);
+
+    // Arrays
+    root.set(std::vector<int>{10, 20, 30});
+    auto nums = root.get<std::vector<int>>();
+    ASSERT_EQ(nums.size(), 3);
+    ASSERT_EQ(nums[0], 10);
+    ASSERT_EQ(nums[1], 20);
+    ASSERT_EQ(nums[2], 30);
+
+    // Buffer
+    WBE::Buffer<16> buf;
+    strcpy(buf.buffer, "bufval");
+    root.set(buf);
+    ASSERT_EQ(root.get<std::string>(), "bufval");
+
+    // glm vector
+    glm::vec3 v{1.0f, 2.0f, 3.0f};
+    root.set(v);
+    auto v_out = root.get<glm::vec3>();
+    ASSERT_FLOAT_EQ(v_out.x, 1.0f);
+    ASSERT_FLOAT_EQ(v_out.y, 2.0f);
+    ASSERT_FLOAT_EQ(v_out.z, 3.0f);
+
+    // Nested JSONData by copy
+    WBE::JSONData child;
+    child.set_value("key1", "value1");
+    child.set_value("key2", 777);
+    root.set(child);
+
+    auto child_copy = root.get<WBE::JSONData>();
+    ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
+    ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
+
+    // Nested JSONData by move
+    WBE::JSONData child_move2;
+    child_move2.set_value("moved", "yes");
+    root.set(std::move(child_move2));
+    auto child_moved2 = root.get<WBE::JSONData>();
+    ASSERT_EQ(child_moved2.get_value<std::string>("moved"), "yes");
+}
+
 #endif
