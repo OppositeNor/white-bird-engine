@@ -294,7 +294,7 @@ TEST_F(WBESerializerJSONTest, VectorOfSerializableSerialize) {
 
 TEST_F(WBESerializerJSONTest, StructWithVectorFieldSerialize) {
     // Build a container with vectors
-    TestVectorContainer container;
+    TestVectorContainer container{};
     container.ints = {10, 20, 30};
     container.strs = {"aa", "bb"};
 
@@ -335,7 +335,7 @@ TEST_F(WBESerializerJSONTest, StructWithVectorFieldSerialize) {
 }
 
 TEST_F(WBESerializerJSONTest, Depth2Serialize) {
-    TestDepth2 d2;
+    TestDepth2 d2{};
     d2.nested.si32_test = 11;
     d2.nested.str_test = "deep2";
     strcpy(d2.nested.buffer_test.buffer, "X");
@@ -356,7 +356,7 @@ TEST_F(WBESerializerJSONTest, Depth2Serialize) {
 }
 
 TEST_F(WBESerializerJSONTest, Depth3Serialize) {
-    TestDepth3 d3;
+    TestDepth3 d3{};
     d3.nested2.nested.si32_test = 21;
     d3.nested2.nested.str_test = "deep3";
     d3.depth3_id = 88;
@@ -375,15 +375,15 @@ TEST_F(WBESerializerJSONTest, Depth3Serialize) {
 }
 
 TEST_F(WBESerializerJSONTest, VectorOfDeepNestingSerialize) {
-    TestDeepVectorContainer container;
+    TestDeepVectorContainer container{};
 
-    TestDepth2 d2a; d2a.nested.si32_test = 31; d2a.depth2_id = 1; d2a.depth2_name = "d2a";
-    TestDepth2 d2b; d2b.nested.si32_test = 32; d2b.depth2_id = 2; d2b.depth2_name = "d2b";
+    TestDepth2 d2a{}; d2a.nested.si32_test = 31; d2a.depth2_id = 1; d2a.depth2_name = "d2a";
+    TestDepth2 d2b{}; d2b.nested.si32_test = 32; d2b.depth2_id = 2; d2b.depth2_name = "d2b";
     container.vec2.push_back(d2a);
     container.vec2.push_back(d2b);
 
-    TestDepth3 d3a; d3a.nested2.nested.si32_test = 41; d3a.depth3_id = 3; d3a.depth3_name = "d3a";
-    TestDepth3 d3b; d3b.nested2.nested.si32_test = 42; d3b.depth3_id = 4; d3b.depth3_name = "d3b";
+    TestDepth3 d3a{}; d3a.nested2.nested.si32_test = 41; d3a.depth3_id = 3; d3a.depth3_name = "d3a";
+    TestDepth3 d3b{}; d3b.nested2.nested.si32_test = 42; d3b.depth3_id = 4; d3b.depth3_name = "d3b";
     container.vec3.push_back(d3a);
     container.vec3.push_back(d3b);
 
