@@ -84,5 +84,8 @@ gen_info = {
         "WBE_SERIALIZABLE",
         "WBE_COMPONENT",
         "WBE_CONFIG_OPTION"
-    ]
+    ],
+    "gen_uuid" : [
+        "WBE_COMPONENT"
+    ],
 }

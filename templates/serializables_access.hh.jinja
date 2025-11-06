@@ -24,6 +24,10 @@
 
 namespace WhiteBirdEngine {
 
+
+template <typename T>
+class SerializableAccess {};
+
 {% for serializable in metadata.structs %}
 {% if serializable.attribute | select("in", serializables) | list | length > 0  %}
 /**
