@@ -151,7 +151,10 @@ if __name__ == "__main__":
         result = subprocess.run(_get_cmake_command_from_info(build_setup.build_target))
         if result.returncode != 0:
             raise RuntimeError("Failed to setup cmake build.")
-        result = subprocess.run(["cmake", "--build", build_setup.build_target["export-directory"]])
+        build_command = ["cmake", "--build", build_setup.build_target["export-directory"]]
+        if os.cpu_count() is not None:
+            build_command.extend(["-j", str(os.cpu_count())])
+        result = subprocess.run(build_command)
         if result.returncode != 0:
             raise RuntimeError("Failed to build with CMake.")
 

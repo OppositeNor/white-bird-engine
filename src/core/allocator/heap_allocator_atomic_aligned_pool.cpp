@@ -21,7 +21,6 @@
 #include <boost/thread/lock_types.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 

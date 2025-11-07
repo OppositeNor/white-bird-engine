@@ -198,7 +198,6 @@ class WBEMetaparser:
     def _get_class_metadata(self, cursor, attributes, in_file):
         result = WBEClassMetadata()
         result.in_header = in_file
-        print("in_header:", in_file)
         result.name = cursor.spelling
         result.attribute = attributes
         for field in cursor.get_children():

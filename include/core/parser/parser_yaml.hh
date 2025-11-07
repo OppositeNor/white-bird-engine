@@ -18,6 +18,7 @@
 #include "parser.hh"
 #include "utils/utils.hh"
 #include <format>
+#include <iostream>
 #include <yaml-cpp/yaml.h>
 #include <glm/glm.hpp>
 
@@ -33,7 +34,7 @@ class YAMLData : public ParserData<YAMLData> {
     friend class ParserYAML;
     friend std::ostream& operator<<(std::ostream& p_ostrem, const YAMLData& p_parser);
 public:
-    YAMLData() {}
+    YAMLData(): node(yaml()) {}
     ~YAMLData() {}
     YAMLData(const YAMLData& p_other)
         : node(p_other.node) {}

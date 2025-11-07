@@ -140,6 +140,7 @@ public:
         {% for field in serializable.fields %}
         SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
         p_data.set_value("{{ field.name }}", result);
+        result = ParserData();
         {% endfor %}
     }
 

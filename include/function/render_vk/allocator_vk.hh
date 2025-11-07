@@ -15,6 +15,7 @@
 #ifndef __WBE_ALLOCATOR_VK_HH__
 #define __WBE_ALLOCATOR_VK_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/core_utils.hh"
 #include <cstring>
 #include <vulkan/vulkan_core.h>
@@ -26,6 +27,7 @@ namespace WhiteBirdEngine {
  *
  */
 template <typename AllocType = HeapAllocatorDefault>
+    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
 class AllocatorVK {
 public:
 
@@ -67,6 +69,7 @@ private:
 };
 
 template <typename AllocType>
+    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
 void* AllocatorVK<AllocType>::allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
     if (p_size == 0) {
         return nullptr;
@@ -76,6 +79,7 @@ void* AllocatorVK<AllocType>::allocation(AllocatorVK* p_this, size_t p_size, siz
 }
 
 template <typename AllocType>
+    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
 void* AllocatorVK<AllocType>::reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
     if (p_size == 0) {
         free(p_this, p_original);
@@ -89,6 +93,7 @@ void* AllocatorVK<AllocType>::reallocation(AllocatorVK* p_this, void* p_original
 }
 
 template <typename AllocType>
+    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
 void AllocatorVK<AllocType>::free(AllocatorVK* p_this, void* p_memory) {
     if (p_memory == nullptr) {
         return;

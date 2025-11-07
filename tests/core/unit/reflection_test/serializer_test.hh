@@ -202,8 +202,8 @@ template <typename ParserDataType>
 inline void serializer_test_vector_serializables(ParserDataType p_data) {
     // Test serializing vector of TestSerializable objects
     std::vector<TestSerializable> vec;
-    TestSerializable a; a.si32_test = 1; a.str_test = "a"; strcpy(a.buffer_test.buffer, "A");
-    TestSerializable b; b.si32_test = 2; b.str_test = "b"; strcpy(b.buffer_test.buffer, "B");
+    TestSerializable a{}; a.si32_test = 1; a.str_test = "a"; strcpy(a.buffer_test.buffer, "A");
+    TestSerializable b{}; b.si32_test = 2; b.str_test = "b"; strcpy(b.buffer_test.buffer, "B");
     vec.push_back(a);
     vec.push_back(b);
 
@@ -226,8 +226,8 @@ inline void serializer_test_struct_with_vector_serializables(ParserDataType p_da
     container.ints = {10, 20, 30};
     container.strs = {"aa", "bb"};
 
-    TestSerializable a; a.si32_test = 5; a.str_test = "aa"; strcpy(a.buffer_test.buffer, "A");
-    TestSerializable b; b.si32_test = 6; b.str_test = "bb"; strcpy(b.buffer_test.buffer, "B");
+    TestSerializable a{}; a.si32_test = 5; a.str_test = "aa"; strcpy(a.buffer_test.buffer, "A");
+    TestSerializable b{}; b.si32_test = 6; b.str_test = "bb"; strcpy(b.buffer_test.buffer, "B");
     container.children.push_back(a);
     container.children.push_back(b);
 

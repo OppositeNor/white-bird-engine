@@ -18,7 +18,7 @@
 #include "core/allocator/heap_allocator_pool.hh"
 #include <cstdint>
 #include <cstring>
-#include <iostream>
+#include <format>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -36,7 +36,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
     : size(p_size) {
     if (p_size > MAX_TOTAL_SIZE) {
-        throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) + " exceeds maximum: " + std::to_string(MAX_TOTAL_SIZE) + ".");
+        throw std::runtime_error(std::format("Failed to create pool: size: {} exceeds maximum: {}.", p_size, MAX_TOTAL_SIZE));
     }
     mem_chunk = static_cast<char*>(malloc(p_size));
     if (mem_chunk == nullptr) {
@@ -67,7 +67,8 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.\nTrying to allocate: " + std::to_string(p_size) + " bytes.");
+  throw std::runtime_error(std::format("Failed to allocate memory: not enough space for memory pool.\n"
+                                       "Trying to allocate: {} bytes.", p_size));
 }
 
 void HeapAllocatorPool::deallocate(MemID p_mem) {

@@ -101,7 +101,7 @@ Directory FileSystem::get_executable_dir() {
         throw std::runtime_error("Buffer overflow for executable path finding.");
     }
     buf[len] = '\0';
-    return parse_directory(std::string(buf));
+    return get_file_dir(std::string(buf));
 }
 
 
