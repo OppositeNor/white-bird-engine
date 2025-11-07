@@ -33,6 +33,7 @@
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_prepare_swap_chain_image.hh"
 #include "generated/label_manager.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -255,13 +256,13 @@ void RendererVK::setup_render_resource() {
     }
 
     render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
-    render_objects->swap_chain_framebuffer_resource->res_type_id = ROT_FRAME_BUFFER_VK;
+    render_objects->swap_chain_framebuffer_resource->res_type_id = TypeUUID<ROFramebufferVK>::UUID;
     render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER;
     render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
     render_resources.insert(std::pair(REND_RES_SWAP_CHAIN_FRAMEBUFFER, render_objects->swap_chain_framebuffer_resource));
 
     render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator, &base_render_data);
-    render_objects->base_graphics_pipeline_resource->res_type_id = ROT_GRAPHICS_PIPELINE_VK;
+    render_objects->base_graphics_pipeline_resource->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
     render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE;
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));

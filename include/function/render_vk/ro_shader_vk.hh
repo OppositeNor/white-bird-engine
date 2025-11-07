@@ -16,21 +16,18 @@
 #define __WBE_RO_SHADER_VK_HH__
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <optional>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-WBE_LABEL(ROT_SHADER_VK, WBE_RENDER_OBJECT_TYPE);
-
 /**
  * @class ShaderVK
  * @brief Shader class for Vulkan.
  *
  */
-class ROShaderVK final : public RenderObjectVK {
+WBE_CLASS(ROShaderVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
 public:
     // Builder for ROShaderVK
     struct Builder {
@@ -48,7 +45,7 @@ public:
     };
 
     ROShaderVK() = delete;
-    ~ROShaderVK();
+    virtual ~ROShaderVK() override;
     ROShaderVK(const ROShaderVK&) = delete;
     ROShaderVK(ROShaderVK&&) = delete;
     ROShaderVK& operator=(const ROShaderVK&) = delete;
@@ -61,10 +58,6 @@ public:
      * @param p_builder Configuration builder.
      */
     ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
-
-    virtual RendResTID get_ro_type() const {
-        return ROT_SHADER_VK;
-    }
 
     /**
      * @brief Get the shader module.

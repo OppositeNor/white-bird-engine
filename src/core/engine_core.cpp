@@ -19,11 +19,13 @@
 #include "core/profiling/profiling_manager.hh"
 #include "core/parser/parser_json.hh"
 #include "generated/label_manager.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include <iostream>
 
 namespace WhiteBirdEngine {
 
 EngineCore::~EngineCore() {
+    delete type_uuid_manager;
     delete label_manager;
     delete profiling_manager;
     delete file_system;
@@ -60,6 +62,7 @@ void EngineCore::initialize(int p_argc, char* p_argv[]) {
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
     label_manager = new LabelManager();
+    type_uuid_manager = new TypeUUIDManager();
     singleton = this;
 }
 

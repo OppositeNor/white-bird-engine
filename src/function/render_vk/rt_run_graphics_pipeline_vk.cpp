@@ -16,6 +16,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "generated/type_uuid.gen.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -42,7 +43,7 @@ RTRunGraphicsPipeline::~RTRunGraphicsPipeline() {
 }
 
 void RTRunGraphicsPipeline::perform(double p_delta) {
-    check_req_res({ROT_FRAME_BUFFER_VK, ROT_GRAPHICS_PIPELINE_VK});
+    check_req_res({TypeUUID<ROFramebufferVK>::UUID, TypeUUID<ROGraphicsPipelineVK>::UUID});
     if (req_rend_res[0]->res == MEM_NULL) {
         throw std::runtime_error("Failed to perform render task: framebuffer must be specified.");
     }

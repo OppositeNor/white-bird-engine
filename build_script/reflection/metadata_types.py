@@ -39,7 +39,11 @@ class WBEMethodMetadata(BaseModel):
     type : list[str] = Field(default_factory=list)
     ret_type : str = ""
 
-class WBEClassMetadata(BaseModel):
+class WBETypeMetadata(BaseModel):
+    in_header : str = ""
+    name : str = ""
+
+class WBEClassMetadata(WBETypeMetadata):
     """Class metadata.
 
     Attributes: 
@@ -47,8 +51,9 @@ class WBEClassMetadata(BaseModel):
         fields: The fields of the class.
         methods: The methods of the class.
     """
-    attribute : list[str] = Field(default_factory=list[str])
+    in_header : str = ""
     name : str = ""
+    attribute : list[str] = Field(default_factory=list[str])
     fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
     methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
 
@@ -62,7 +67,7 @@ class WBELabelMetadata(BaseModel):
     attribute : list[str] = Field(default_factory=list[str])
     name : str = ""
 
-class WBEStructMetadata(BaseModel):
+class WBEStructMetadata(WBETypeMetadata):
     """Component metadata.
 
     Attributes: 
@@ -101,9 +106,10 @@ class WBEMetadata(BaseModel):
         classes: The registrated classes.
         structs: The registrated structs.
     """
-    labels : list[WBELabelMetadata] = Field(default_factory=list)
-    classes : list[WBEClassMetadata] = Field(default_factory=list)
+    labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
+    classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
     structs : list[WBEStructMetadata] = Field(default_factory=list[WBEStructMetadata])
+    types : list[WBETypeMetadata] = Field(default_factory=list[WBETypeMetadata])
 
     def sort(self):
         """Sor the fields. This may gurantee the order it generates will always be the same,

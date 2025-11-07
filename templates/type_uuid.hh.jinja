@@ -1,0 +1,86 @@
+{# Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+#}
+// {{ _prefix }}
+#ifndef __WBE_Type_UUID_HH__
+#define __WBE_Type_UUID_HH__
+
+#include "utils/utils.hh"
+{% for struct in metadata.types %}
+{% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
+#include "{{ struct.in_header }}"
+{% endif %}
+{% endfor %}
+
+#include <format>
+#include <stdexcept>
+
+namespace WhiteBirdEngine {
+template <typename T>
+struct TypeUUID {};
+
+{% for struct in metadata.types %}
+{% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
+/**
+ * @class TypeUUID<{{ struct.name }}>
+ * @brief Type UUID of <{{ struct.name }}>
+ */
+template <>
+struct TypeUUID<{{ struct.name }}> {
+    // The type.
+    using Type = {{ struct.name }};
+    // The type UUID.
+    static constexpr HashCode UUID = static_hash("{{ struct.name }}");
+};
+{% endif %}
+{% endfor %}
+
+/**
+ * @class TypeUUIDManager
+ * @brief Manager class for types' UUID.
+ */
+class TypeUUIDManager : public Singleton<TypeUUIDManager> {
+public:
+    TypeUUIDManager() : Singleton<TypeUUIDManager>() {
+        {% for struct in metadata.types %}
+        {% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
+        type_name_map[TypeUUID<{{ struct.name }}>::UUID] = "{{ struct.name }}";
+        {% endif %}
+        {% endfor %}
+    }
+    virtual ~TypeUUIDManager() override {
+    }
+
+    /**
+     * @brief Get the name of a type according to its type UUID.
+     *
+     * @param p_type_uuid The UUID of the type to get name from.
+     * @return The name of the type.
+     */
+    const std::string& get_type_name(HashCode p_type_uuid) const {
+        auto found = type_name_map.find(p_type_uuid);
+        if (found == type_name_map.end()) {
+            throw std::runtime_error(std::format("Type with id: {} not registered.", p_type_uuid));
+        }
+        return found->second;
+    }
+
+private:
+    std::map<HashCode, std::string> type_name_map;
+
+};
+
+}
+
+#endif

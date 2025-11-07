@@ -16,7 +16,7 @@ from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEStructMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEStructMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata, WBETypeMetadata
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
@@ -103,6 +103,7 @@ class WBEMetaparser:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
             result_metadata.structs.extend(metadata.structs)
+        result_metadata.types = list[WBETypeMetadata](result_metadata.classes) + list[WBETypeMetadata](result_metadata.structs)
         self.reflector.register_metadata(result_metadata)
 
     def _register_from_clang(self, cpp_file_path, cache_path):
@@ -130,7 +131,7 @@ class WBEMetaparser:
         if cursor.kind == clang.cindex.CursorKind.VAR_DECL:
             self._handle_visit_var_decl(metadata, cursor)
         elif cursor.kind == clang.cindex.CursorKind.CLASS_DECL:
-            self._handle_visit_class_decl(metadata, cursor)
+            self._handle_visit_class_decl(metadata, cursor, in_file)
         elif cursor.kind == clang.cindex.CursorKind.STRUCT_DECL:
             self._handle_visit_struct_decl(metadata, cursor, in_file)
 
@@ -151,13 +152,13 @@ class WBEMetaparser:
                     label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes)
                     metadata.labels.append(label_metadata)
 
-    def _handle_visit_class_decl(self, metadata, cursor):
+    def _handle_visit_class_decl(self, metadata, cursor, in_file):
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.classes)):
                     attributes = self._get_attributes(attr.spelling)
-                    class_metadata = self._get_class_metadata(cursor, attributes)
+                    class_metadata = self._get_class_metadata(cursor, attributes, in_file)
                     metadata.classes.append(class_metadata)
 
     def _handle_visit_struct_decl(self, metadata, cursor, in_file):
@@ -194,12 +195,23 @@ class WBEMetaparser:
                 return True
         return False
 
-    def _get_class_metadata(self, cursor, attributes):
+    def _get_class_metadata(self, cursor, attributes, in_file):
         result = WBEClassMetadata()
+        result.in_header = in_file
+        print("in_header:", in_file)
         result.name = cursor.spelling
         result.attribute = attributes
-        # TODO
-        return WBEClassMetadata(name=cursor.spelling)
+        for field in cursor.get_children():
+            if field.kind != clang.cindex.CursorKind.FIELD_DECL:
+                continue
+            for attr in field.get_children():
+                if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
+                    continue
+                attributes = self._get_attributes(attr.spelling)
+                if WBE_REFLECT in attributes:
+                    result.fields.append(WBEFieldMetadata(attribute=self._get_attributes(attr.spelling),
+                                                          name=field.spelling, type=field.type.spelling))
+        return result
 
     def _get_struct_metadata(self, cursor, attributes, in_file):
         result = WBEStructMetadata()

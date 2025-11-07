@@ -16,21 +16,18 @@
 #define __WBE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH__
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-WBE_LABEL(ROT_DESCRIPTOR_SET_LAYOUT_VK, WBE_RENDER_OBJECT_TYPE);
-
 /**
  * @class RODescriptorSetLayoutVK
  * @brief Descriptor set layout.
  *
  */
-class RODescriptorSetLayoutVK : public RenderObjectVK {
+WBE_CLASS(RODescriptorSetLayoutVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
 public:
     // Builder for RODescriptorSetLayoutVK
     struct Builder {
@@ -60,15 +57,6 @@ public:
      * @param p_builder Configuration builder.
      */
     RODescriptorSetLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-
-    /**
-     * @brief Get the vulkan descriptor set layout instance.
-     *
-     * @return The vulkan descriptor set layout instance.
-     */
-    virtual RendResTID get_ro_type() const override {
-        return ROT_DESCRIPTOR_SET_LAYOUT_VK;
-    }
 
     /**
      * @brief Get the vulkan descriptor set layout instance.

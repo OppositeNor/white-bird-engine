@@ -85,7 +85,8 @@ gen_info = {
         "WBE_COMPONENT",
         "WBE_CONFIG_OPTION"
     ],
-    "gen_uuid" : [
-        "WBE_COMPONENT"
+    "type_uuid" : [
+        "WBE_COMPONENT",
+        "WBE_RENDER_OBJECT"
     ],
 }

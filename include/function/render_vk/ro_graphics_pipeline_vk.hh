@@ -15,9 +15,8 @@
 #ifndef __WBE_RO_GRAPHICS_PIPELINE_VK_HH__
 #define __WBE_RO_GRAPHICS_PIPELINE_VK_HH__
 
-#include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_task.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
@@ -30,14 +29,12 @@
 
 namespace WhiteBirdEngine {
 
-WBE_LABEL(ROT_GRAPHICS_PIPELINE_VK, WBE_RENDER_OBJECT_TYPE);
-
 /**
  * @class ROGraphicsPipelineVK
  * @brief The graphics pipeline.
  *
  */
-class ROGraphicsPipelineVK final : public RenderObjectVK {
+WBE_CLASS(ROGraphicsPipelineVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
 public:
     /**
      * @class PipelineConfigurations
@@ -219,13 +216,6 @@ public:
      * @param p_shaders The list of shaders used in the pipeline.
      */
     ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config);
-
-    /**
-     * @brief Get the type of the render object.
-     */
-    virtual RendResTID get_ro_type() const override {
-        return ROT_GRAPHICS_PIPELINE_VK;
-    }
 
     /**
      * @brief Get the default configurations.

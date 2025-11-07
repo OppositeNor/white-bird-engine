@@ -15,7 +15,6 @@
 #ifndef __WBE_RENDER_OBJECT_HH__
 #define __WBE_RENDER_OBJECT_HH__
 
-#include "function/render/render_task.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -28,11 +27,6 @@ public:
 
     RenderObject() = default;
     virtual ~RenderObject() {}
-
-    /**
-     * @brief Get the type of the render object.
-     */
-    virtual RendResTID get_ro_type() const = 0;
 
 };
 

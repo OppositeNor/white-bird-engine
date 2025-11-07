@@ -21,6 +21,7 @@
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
 #include "generated/label_manager.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include "platform/file_system/file_system.hh"
 #include "utils/interface/singleton.hh"
 
@@ -64,36 +65,40 @@ public:
     /**
      * @brief The global clock starts recording when the engine core is constructed.
      */
-    Clock* global_clock;
+    Clock* global_clock = nullptr;
 
     /**
      * @brief File system.
      */
-    FileSystem* file_system;
+    FileSystem* file_system = nullptr;
     /**
      * @brief Engine configuration.
      */
-    EngineConfig* engine_config;
+    EngineConfig* engine_config = nullptr;
     /**
      * @brief Single tick stack allocator. Contents will be cleared every time a tick ends.
      */
-    StackAllocator* single_tick_allocator;
+    StackAllocator* single_tick_allocator = nullptr;
     /**
      * @brief Global pool allocator.
      */
-    HeapAllocatorAlignedPoolImplicitList* pool_allocator;
+    HeapAllocatorAlignedPoolImplicitList* pool_allocator = nullptr;
     /**
      * @brief Manager for logs.
      */
-    LoggingManager<LogStream, std::ostream>* stdio_logging_manager;
+    LoggingManager<LogStream, std::ostream>* stdio_logging_manager = nullptr;
     /**
      * @brief Manager for profiling.
      */
-    class ProfilingManager* profiling_manager;
+    class ProfilingManager* profiling_manager = nullptr;
     /**
      * @brief Manager for the labels.
      */
-    LabelManager* label_manager;
+    LabelManager* label_manager = nullptr;
+    /**
+     * @brief Manager for type UUIDs.
+     */
+    TypeUUIDManager* type_uuid_manager = nullptr;
 
 private:
     void parse_metadata(const Path& p_metadata_config_path);
