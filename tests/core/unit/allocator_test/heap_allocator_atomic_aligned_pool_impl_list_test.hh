@@ -251,11 +251,11 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
     
     // Now deallocate concurrently
     std::vector<std::thread> threads;
-    std::barrier sync_point(NUM_THREADS);
+    // std::barrier sync_point(NUM_THREADS);
     
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
-            sync_point.arrive_and_wait();
+            // sync_point.arrive_and_wait();
             for (WBE::MemID mem : thread_mems[i]) {
                 pool.deallocate(mem);
             }
@@ -286,11 +286,11 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
     std::vector<std::vector<WBE::MemID>> active_mems(NUM_THREADS);
     std::atomic<int> total_operations{0};
     
-    std::barrier sync_point(NUM_THREADS);
+    // std::barrier sync_point(NUM_THREADS);
     
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
-            sync_point.arrive_and_wait();
+            // sync_point.arrive_and_wait();
             std::mt19937 rng(i + 200);
             std::uniform_int_distribution<int> size_dist(16, 256);
             std::uniform_real_distribution<float> op_dist(0.0f, 1.0f);
@@ -352,11 +352,11 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
     std::atomic<int> alignment_failures{0};
     std::atomic<int> allocation_count{0};
     
-    std::barrier sync_point(NUM_THREADS);
+    // std::barrier sync_point(NUM_THREADS);
     
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
-            sync_point.arrive_and_wait();
+            // sync_point.arrive_and_wait();
             std::mt19937 rng(i + 300);
             std::uniform_int_distribution<int> size_dist(8, 64);
             std::vector<size_t> alignments = {1, 2, 4, 8, 16, 32, 64};

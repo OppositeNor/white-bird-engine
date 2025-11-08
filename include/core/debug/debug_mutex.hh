@@ -1,9 +1,9 @@
 #ifndef __WBE_DEBUG_MUTEX_HH__
 #define __WBE_DEBUG_MUTEX_HH__
 
-#include "boost/thread/pthread/shared_mutex.hpp"
 #include <atomic>
 #include <thread>
+#include <boost/thread/shared_mutex.hpp>
 namespace WhiteBirdEngine {
 
 #ifdef _DEBUG

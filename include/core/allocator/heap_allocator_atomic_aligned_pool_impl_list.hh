@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <limits>
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/pthread/shared_mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 #define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
 #define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))

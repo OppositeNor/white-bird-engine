@@ -18,7 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/pthread/shared_mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <limits>
 #include <memory>
 
