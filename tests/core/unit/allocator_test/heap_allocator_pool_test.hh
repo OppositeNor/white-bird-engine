@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_ALOCATOR_POOL_TEST_HH__
-#define __WBE_ALOCATOR_POOL_TEST_HH__
+#ifndef __WBE_HEAP_ALOCATOR_POOL_TEST_HH__
+#define __WBE_HEAP_ALOCATOR_POOL_TEST_HH__
 
 #include "core/allocator/heap_allocator_pool.hh"
 #include "global/global.hh"

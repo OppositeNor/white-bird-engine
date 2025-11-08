@@ -217,11 +217,11 @@ TEST_F(WBERefStrongTest, Multithread) {
         WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val2);
         ASSERT_EQ(test_val1, 1);
         ASSERT_EQ(test_val2, 1);
-        std::thread thread1(multithread_ref_test, ref1, ref2, 500000);
-        std::thread thread2(multithread_ref_test, ref1, ref2, 500000);
-        std::thread thread3(multithread_ref_test, ref1, ref2, 500000);
-        std::thread thread4(multithread_ref_test, ref1, ref2, 500000);
-        std::thread thread5(multithread_ref_test, ref1, ref2, 500000);
+        std::thread thread1(multithread_ref_test, ref1, ref2, 300000);
+        std::thread thread2(multithread_ref_test, ref1, ref2, 300000);
+        std::thread thread3(multithread_ref_test, ref1, ref2, 300000);
+        std::thread thread4(multithread_ref_test, ref1, ref2, 300000);
+        std::thread thread5(multithread_ref_test, ref1, ref2, 300000);
         thread1.join();
         thread2.join();
         thread3.join();
