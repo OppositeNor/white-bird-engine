@@ -22,7 +22,7 @@ public:
      */
     void lock() {
         mtx.lock();
-        unique_owner = std::this_thread::get_id();
+        unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
     }
 
     /**
@@ -32,7 +32,7 @@ public:
      */
     bool try_lock() {
         if (mtx.try_lock()) {
-            unique_owner = std::this_thread::get_id();
+            unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
             return true;
         }
         return false;
@@ -42,7 +42,7 @@ public:
      * @brief Unlock unique lock.
      */
     void unlock() {
-        unique_owner = std::thread::id{};
+        unique_owner.store(std::thread::id{}, std::memory_order_release);
         mtx.unlock();
     }
 

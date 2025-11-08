@@ -59,7 +59,8 @@ HeapAllocatorAtomicAlignedPoolImplicitList::~HeapAllocatorAtomicAlignedPoolImpli
 
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(!(mutex.is_unique_locked_by_current_thread()));
-    if (p_alignment % WORD_SIZE != 0) {
+    WBE_DEBUG_ASSERT(possible_valid == nullptr || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::IDLE);
+    if (p_alignment == 0 || p_alignment % WORD_SIZE != 0) {
         throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WORD_SIZE) + ".");
     }
     if (p_size == 0) {
@@ -86,6 +87,7 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t
 }
 
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::check_posible_free(size_t p_aligned_size, size_t p_alignment) {
+    WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
     if (possible_valid == nullptr) {
         return MEM_NULL;
     }
@@ -114,6 +116,7 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::check_posible_free(size_t p_al
 
 template <bool COALESCE_ENABLED>
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_size, size_t p_alignment) {
+    WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
     MemID possible_result = check_posible_free(p_aligned_size, p_alignment);
     if (possible_result != MEM_NULL) {
         return possible_result;
@@ -205,6 +208,7 @@ void* HeapAllocatorAtomicAlignedPoolImplicitList::acquire_memory(char* p_idle_ch
 }
 
 void HeapAllocatorAtomicAlignedPoolImplicitList::insert_free_memory(char* p_insert_start, size_t p_insert_size) {
+    WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
     WBE_HAAPIL_SET_CHUNK_HEADER(p_insert_start, HeaderType::IDLE, p_insert_size);
     coalesce_chunk(p_insert_start);
 }
