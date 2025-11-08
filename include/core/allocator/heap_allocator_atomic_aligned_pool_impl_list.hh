@@ -24,6 +24,7 @@
 #include <limits>
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <string>
 
 #define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
 #define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))
@@ -151,7 +152,6 @@ private:
     size_t size;
     char* mem_chunk;
     mutable char* possible_valid;
-
 #ifdef _DEBUG
     mutable DebugSharedMutex mutex;
 #else
@@ -180,6 +180,8 @@ private:
     void coalesce_all() const;
     void coalesce_chunk(char* p_chunk) const;
     bool unguarded_is_in_pool(MemID p_mem_id) const;
+
+    std::string unguarded_to_string() const;
 };
 
 }

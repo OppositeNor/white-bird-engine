@@ -3,7 +3,9 @@
 
 #include <atomic>
 #include <thread>
+#include <boost/thread/tss.hpp>
 #include <boost/thread/shared_mutex.hpp>
+
 namespace WhiteBirdEngine {
 
 #ifdef _DEBUG
@@ -15,7 +17,8 @@ namespace WhiteBirdEngine {
  */
 class DebugSharedMutex {
 public:
-    DebugSharedMutex() = default;
+    DebugSharedMutex() {
+    }
 
     /**
      * @brief Unique lock.

@@ -13,14 +13,15 @@
    limitations under the License.
 */
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
-#include "boost/thread/lock_types.hpp"
 #include "core/allocator/allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <boost/thread/lock_types.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
@@ -59,7 +60,6 @@ HeapAllocatorAtomicAlignedPoolImplicitList::~HeapAllocatorAtomicAlignedPoolImpli
 
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(!(mutex.is_unique_locked_by_current_thread()));
-    WBE_DEBUG_ASSERT(possible_valid == nullptr || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::IDLE);
     if (p_alignment == 0 || p_alignment % WORD_SIZE != 0) {
         throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WORD_SIZE) + ".");
     }
@@ -74,15 +74,17 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t
         coalesce_all();
         result = find_valid_chunk<false>(aligned_size, p_alignment);
         if (result != MEM_NULL) {
+            std::cout << unguarded_to_string() << std::endl;
             return result;
         }
     }
     else {
+        std::cout << unguarded_to_string() << std::endl;
         return result;
     }
     std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
         "Trying to allocate: " + std::to_string(aligned_size) + " bytes.\n"
-        "Pool status: " + static_cast<std::string>(*this);
+        "Pool status: " + unguarded_to_string();
     throw std::runtime_error(err_msg);
 }
 
@@ -269,11 +271,27 @@ void HeapAllocatorAtomicAlignedPoolImplicitList::coalesce_chunk(char* p_chunk) c
 }
 
 HeapAllocatorAtomicAlignedPoolImplicitList::operator std::string() const {
-    std::stringstream ss;
     boost::shared_lock lock(mutex);
+    return unguarded_to_string();
+}
+
+bool HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_is_in_pool(MemID p_mem_id) const {
+    char* curr = mem_chunk;
+    char* mem_ptr = reinterpret_cast<char*>(p_mem_id);
+    while (curr <= mem_ptr && curr < mem_chunk + size - WORD_SIZE) {
+        if (curr + WORD_SIZE == mem_ptr && WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
+            return true;
+        }
+        curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
+    }
+    return false;
+}
+
+std::string HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_to_string() const {
+    std::stringstream ss;
     ss << "{";
     ss << "\"type\":\"HeapAllocatorAtomicAlignedPoolImplicitList\",";
-    ss << "\"total_size\":" << get_total_size() << ",";
+    ss << "\"total_size\":" << size << ",";
     ss << "\"chunk_layout\":[";
     char* curr = mem_chunk;
     bool first = true;
@@ -292,22 +310,12 @@ HeapAllocatorAtomicAlignedPoolImplicitList::operator std::string() const {
             fragments_size += size;
         }
     }
+    if (curr != mem_chunk + size) {
+        throw std::runtime_error("Bad pool.");
+    }
     ss << "],";
     ss << "\"fragments_size:\"" << fragments_size;
     ss << "}";
     return ss.str();
 }
-
-bool HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_is_in_pool(MemID p_mem_id) const {
-    char* curr = mem_chunk;
-    char* mem_ptr = reinterpret_cast<char*>(p_mem_id);
-    while (curr <= mem_ptr && curr < mem_chunk + size - WORD_SIZE) {
-        if (curr + WORD_SIZE == mem_ptr && WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
-            return true;
-        }
-        curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
-    }
-    return false;
-}
-
 }
