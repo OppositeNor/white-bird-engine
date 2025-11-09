@@ -26,10 +26,10 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <string>
 
-#define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
-#define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))
-#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*p_header = (((Header)(p_head_type) << 60) | (p_size)))
-#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
+#define WBE_HAAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
+#define WBE_HAAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_mem_chunk))
+#define WBE_HAAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*p_header = (((Header)(p_head_type) << 60) | (p_size)))
+#define WBE_HAAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
 
 
 namespace WhiteBirdEngine {
@@ -101,13 +101,13 @@ public:
 
     virtual void clear() override {
         boost::unique_lock lock(mutex);
-        WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
+        WBE_HAAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
         possible_valid = mem_chunk;
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         boost::shared_lock lock(mutex);
-        return WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
+        return WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
     }
 
     /**
@@ -187,10 +187,10 @@ private:
 
 }
 
-#undef WBE_HAAPIL_GET_HEADER_SIZE
-#undef WBE_HAAPIL_GET_CHUNK_SIZE
-#undef WBE_HAAPIL_SET_HEADER
-#undef WBE_HAAPIL_SET_CHUNK_HEADER
+#undef WBE_HAAAPIL_GET_HEADER_SIZE
+#undef WBE_HAAAPIL_GET_CHUNK_SIZE
+#undef WBE_HAAAPIL_SET_HEADER
+#undef WBE_HAAAPIL_SET_CHUNK_HEADER
 
 
 #endif

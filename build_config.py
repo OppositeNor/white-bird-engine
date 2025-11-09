@@ -24,7 +24,7 @@ target_info = {
         "cpp-compiler" : "clang++",
         "export-directory" : "release",
         "cmake-build-type" : "Release",
-        "generator" : "Ninja",
+        # "generator" : "Ninja",
         "generate-tests" : True,
     },
     "deploy" : {

@@ -200,6 +200,7 @@ void* HeapAllocatorAtomicAlignedPoolImplicitList::acquire_memory(char* p_idle_ch
     size_t idle_before_size = p_mem_start - p_idle_chunk;
     // Get the inserted memory.
     WBE_HAAAPIL_SET_CHUNK_HEADER(p_mem_start, HeaderType::OCCUPIED, p_mem_size);
+    char* next_chunk = p_idle_chunk + p_mem_size;
     // Insert the idle memory before the acquired memory chunk.
     if (p_idle_chunk != p_mem_start) {
         WBE_HAAAPIL_SET_CHUNK_HEADER(p_idle_chunk, HeaderType::IDLE, idle_before_size);
@@ -212,8 +213,13 @@ void* HeapAllocatorAtomicAlignedPoolImplicitList::acquire_memory(char* p_idle_ch
         WBE_HAAAPIL_UPDATE_POSIBLE_VALID(p_mem_start + p_mem_size);
     }
     // If this acquire uses up the possible_valid,
-    if (possible_valid != nullptr && WBE_HAAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::OCCUPIED) {
-        possible_valid = nullptr;
+    if (possible_valid == nullptr || WBE_HAAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::OCCUPIED) {
+        if (next_chunk < mem_chunk + size && WBE_HAAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+            possible_valid = next_chunk;
+        }
+        else {
+            possible_valid = nullptr;
+        }
     }
     return p_mem_start;
 }

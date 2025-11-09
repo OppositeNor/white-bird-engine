@@ -159,6 +159,8 @@ if (WBE_MAKE_TEST)
     add_subdirectory(tests)
 endif()
 
+message(${WBE_TEST_EXE})
+
 # Run all tests
 if (WBE_MAKE_TEST)
     add_custom_target(wbe_run_tests
