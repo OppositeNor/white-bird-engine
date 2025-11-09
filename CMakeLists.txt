@@ -30,15 +30,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
 set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
 
-set(WBE_METADATA_OUTPUT_PATH ${WBE_RESOURCE_OUTPUT_DIR}/metadata.json)
-
 set(WBE_CONFIG_DIR ${WBE_RESOURCE_DIR}/config)
 set(WBE_CONFIG_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/config)
 
 set(WBE_METADATA_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/metadata_cache)
 
 set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
-set(WBE_TEST_ENV_RES_DIR ${WBE_TEST_ENV_DIR}/res)
 
 # Add dependencies subdirectories
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
@@ -70,16 +67,26 @@ if (NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Deploy")
-    ## for optimization
+    # for optimization
     add_compile_options(-O2 -DNDEBUG)
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-    ## for optimization and testing
+    # for optimization and testing
     add_compile_options(-O2 -g -DNDEBUG)
 else()
-    ## for gdb or valgrind
+    # for gdb or valgrind
     add_compile_options(-O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
     add_link_options(--coverage)
 endif()
+
+# Platform declerations
+if (WBE_BUILD_PLATFORM STREQUAL "Linux")
+    add_compile_options(-DWBE_TARGET_PLATFORM_LINUX)
+elseif(WBE_BUILD_PLATFORM STREQUAL "Windows")
+    add_compile_options(-DWBE_TARGET_PLATFORM_WINDOWS)
+elseif(WBE_BUILD_PLATFORM STREQUAL "Darwin")
+    add_compile_options(-DWBE_TARGET_PLATFORM_MACOS)
+endif()
+
 
 if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWBE_BUILD_TEST=OFF")
@@ -153,30 +160,9 @@ else()
 endif()
 
 # Generate test executables
-set(WBE_TEST_EXE "")
 if (WBE_MAKE_TEST)
     # Export tests
     add_subdirectory(tests)
 endif()
 
-message(${WBE_TEST_EXE})
 
-# Run all tests
-if (WBE_MAKE_TEST)
-    add_custom_target(wbe_run_tests
-        COMMENT "Running White Bird Engine tests..."
-        COMMAND python3 ${PROJECT_SOURCE_DIR}/test_script/run_tests.py ${WBE_TEST_EXE}
-    )
-
-    add_custom_target(wbe_setup_test_env
-        COMMENT "Setting up test_env..."
-        COMMAND ${CMAKE_COMMAND} -E copy
-            "${WBE_METADATA_OUTPUT_PATH}"
-            "${WBE_TEST_ENV_RES_DIR}"
-    )
-
-endif()
-
-if (WBE_MAKE_TEST)
-    add_dependencies(wbe_run_tests wbe_setup_test_env)
-endif()

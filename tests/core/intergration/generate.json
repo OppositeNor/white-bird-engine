@@ -1,9 +1,0 @@
-[
-    {
-        "output_name" : "integration_test.gen.cmake",
-        "template" : "integration_test.cmake.jinja",
-        "data" : {
-            "name" : "wbe_core_integration_test"
-        }
-    }
-]

@@ -1,9 +1,0 @@
-[
-    {
-        "output_name" : "unit_test.gen.cmake",
-        "template" : "unit_test.cmake.jinja",
-        "data" : {
-            "name" : "wbe_cla_test"
-        }
-    }
-]

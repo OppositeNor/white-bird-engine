@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-add_subdirectory(core)
-add_subdirectory(platform)
-add_subdirectory(utils_test)
-add_subdirectory(resource)
-add_subdirectory(global)
-add_subdirectory(function)
+file(GLOB_RECURSE WBE_UNIT_TEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp)
 
-set(WBE_TEST_EXE ${WBE_TEST_EXE}
-    PARENT_SCOPE
+add_executable(wbe_unit_test
+    ${WBE_UNIT_TEST_SOURCE}
+)
+
+target_link_libraries(wbe_unit_test PUBLIC
+    WBE_LIB
+    gtest_main
 )
 
