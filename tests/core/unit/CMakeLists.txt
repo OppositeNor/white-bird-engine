@@ -14,6 +14,7 @@
 
 add_subdirectory(allocator_test)
 add_subdirectory(cla_test)
+add_subdirectory(debug_utils_test)
 add_subdirectory(logging_test)
 add_subdirectory(memory_test)
 add_subdirectory(parser_test)

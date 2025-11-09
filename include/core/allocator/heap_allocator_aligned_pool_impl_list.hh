@@ -153,6 +153,7 @@ private:
         IDLE = 1,
     };
 
+    template <bool COALESCE_ENABLED>
     MemID check_posible_free(size_t p_aligned_size, size_t p_alignment);
     template <bool COALESCE_ENABLED>
     MemID find_valid_chunk(size_t p_aligned_size, size_t p_alignment);
@@ -160,7 +161,7 @@ private:
     char* get_next_free_memory(char* p_from);
     void* acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(char* p_insert_start, size_t p_insert_size);
-    char* get_chunk_before(void* p_loc);
+    void check_broken() const;
 
     void coalesce_all() const;
     void coalesce_chunk(char* p_chunk) const;

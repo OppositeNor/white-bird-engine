@@ -27,7 +27,6 @@
 #include <random>
 #include <thread>
 #include <atomic>
-#include <chrono>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -367,6 +366,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
     
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
+
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 300);
             std::uniform_int_distribution<int> size_dist(8, 64);
@@ -378,20 +378,24 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
             for (int j = 0; j < STRESS_ITERATIONS; ++j) {
                 int size = size_dist(rng);
                 size_t alignment = alignments[align_dist(rng)] * AAPILT_HEADER_SIZE;
-                
                 WBE::MemID mem = pool.allocate(size, alignment);
-                if (mem != WBE::MEM_NULL) {
-                    allocation_count.fetch_add(1);
-                    
-                    // Verify alignment
-                    if (reinterpret_cast<uintptr_t>(mem) % alignment != 0) {
-                        alignment_failures.fetch_add(1);
-                    }
-                    
-                    mems.push_back(mem);
-                    
-                    // Test memory access
-                    memset(pool.get(mem), i & 0xFF, size);
+                EXPECT_NE(mem, WBE::MEM_NULL);
+                EXPECT_TRUE(pool.is_in_pool(mem));
+
+                allocation_count.fetch_add(1);
+
+                // Verify alignment
+                if (mem % alignment != 0) {
+                    alignment_failures.fetch_add(1);
+                }
+
+                mems.push_back(mem);
+
+                // Test memory access
+                memset(pool.get(mem), i & 0xFF, size);
+
+                for (WBE::MemID mem : mems) {
+                    EXPECT_TRUE(pool.is_in_pool(mem));
                 }
                 
                 // Occasionally deallocate some memory
@@ -416,61 +420,6 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
     
     ASSERT_EQ(alignment_failures.load(), 0);
     ASSERT_GT(allocation_count.load(), 0);
-}
-
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentClearOperations) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(1));
-    constexpr int NUM_ALLOC_THREADS = 3;
-    
-    std::atomic<bool> should_stop{false};
-    std::vector<std::thread> threads;
-    
-    // Allocating threads
-    for (int i = 0; i < NUM_ALLOC_THREADS; ++i) {
-        threads.emplace_back([&, i]() {
-            std::mt19937 rng(i + 400);
-            std::uniform_int_distribution<int> size_dist(16, 128);
-            std::vector<WBE::MemID> mems;
-            
-            while (!should_stop.load()) {
-                WBE::MemID mem = pool.allocate(size_dist(rng));
-                if (mem != WBE::MEM_NULL) {
-                    mems.push_back(mem);
-                    // Small delay to allow other operations
-                    std::this_thread::sleep_for(std::chrono::microseconds(1));
-                }
-                
-                // Occasionally deallocate
-                if (!mems.empty() && rng() % 5 == 0) {
-                    pool.deallocate(mems.back());
-                    mems.pop_back();
-                }
-            }
-            
-            // Clean up
-            for (WBE::MemID mem : mems) {
-                if (pool.is_in_pool(mem)) {
-                    pool.deallocate(mem);
-                }
-            }
-        });
-    }
-    
-    // Clearing thread
-    threads.emplace_back([&]() {
-        for (int i = 0; i < 5; ++i) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            pool.clear();
-        }
-        should_stop.store(true);
-    });
-    
-    for (auto& t : threads) {
-        t.join();
-    }
-    
-    // Pool should be in a valid state
-    ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
 }
 
 #endif

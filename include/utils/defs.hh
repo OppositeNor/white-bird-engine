@@ -17,11 +17,15 @@
 
 #ifdef _DEBUG
 #include <cassert>
+// Block runs in debug builds.
+#define WBE_DEBUG(...) {__VA_ARGS__}
 // Assersion used in debug builds.
 #define WBE_DEBUG_ASSERT(...) assert(__VA_ARGS__)
 // Should enable profiling.
 #define WBE_ENABLE_PROFILING 1
 #else
+// Block runs in debug builds.
+#define WBE_DEBUG(...)
 // Assersion used in debug builds.
 #define WBE_DEBUG_ASSERT(...)
 // Should enable profiling.

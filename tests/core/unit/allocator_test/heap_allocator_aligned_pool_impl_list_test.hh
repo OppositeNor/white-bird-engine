@@ -17,18 +17,34 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/logging/log.hh"
+#include "global/global.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <gtest/gtest.h>
 #include <vector>
 #include <random>
 
 namespace WBE = WhiteBirdEngine;
 
-constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAlignedPoolImplicitList::WORD_SIZE;
 
-TEST(WBEAllocAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
+class WBEAllocAlignedPoolImplicitListTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    }
+
+    void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+    static constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAlignedPoolImplicitList::WORD_SIZE;
+};
+
+TEST_F(WBEAllocAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     WBE::MemID mem1 = pool.allocate(16);
     WBE::MemID mem2 = pool.allocate(16);
@@ -41,7 +57,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
     ASSERT_FALSE(pool.is_in_pool(mem2));
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     ASSERT_FALSE(pool.is_in_pool(WBE::MEM_NULL));
     WBE::MemID mem = pool.allocate(16);
@@ -50,14 +66,14 @@ TEST(WBEAllocAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange) {
     pool.deallocate(mem);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, ZeroSizeAllocation) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, ZeroSizeAllocation) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     WBE::MemID mem = pool.allocate(0);
     ASSERT_EQ(mem, WBE::MEM_NULL);
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(256);
     WBE::MemID mem = pool.allocate(8, 128);
     ASSERT_NE(mem, WBE::MEM_NULL);
@@ -66,7 +82,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
     ASSERT_EQ(pool.get_remain_size(), 256);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, PoolReuseAfterClear) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, PoolReuseAfterClear) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     pool.allocate(32);
     pool.clear();
@@ -77,7 +93,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, PoolReuseAfterClear) {
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(128);
     WBE::MemID mem1 = pool.allocate(16);
     WBE::MemID mem2 = pool.allocate(16);
@@ -89,7 +105,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MiB(1));
     std::vector<WBE::MemID> mems;
     std::mt19937 rng(42);
@@ -106,7 +122,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
     ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleFront) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleFront) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -121,7 +137,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleFront) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleBack) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleBack) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -136,7 +152,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleBack) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleMiddle) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleMiddle) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -153,7 +169,7 @@ TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleMiddle) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleEnd) {
+TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleEnd) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
@@ -164,6 +180,47 @@ TEST(WBEAllocAlignedPoolImplicitListTest, RemoveIdleEnd) {
     ASSERT_FALSE(pool.is_in_pool(mem3));
     pool.clear();
     ASSERT_EQ(pool.get_remain_size(), 1024);
+}
+
+TEST_F(WBEAllocAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
+    WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MiB(4));
+    constexpr int STRESS_ITERATIONS = 800;
+    std::mt19937 rng(300);
+    std::uniform_int_distribution<int> size_dist(8, 64);
+    std::vector<size_t> alignments = {1, 2, 4, 8, 16, 32, 64};
+    std::uniform_int_distribution<size_t> align_dist(0, alignments.size() - 1);
+
+    std::vector<WBE::MemID> mems;
+
+    for (int j = 0; j < STRESS_ITERATIONS; ++j) {
+        int size = size_dist(rng);
+        size_t alignment = alignments[align_dist(rng)] * AAPILT_HEADER_SIZE;
+        WBE::MemID mem = pool.allocate(size, alignment);
+        EXPECT_NE(mem, WBE::MEM_NULL);
+        EXPECT_TRUE(pool.is_in_pool(mem));
+
+        mems.push_back(mem);
+
+        // Test memory access
+        memset(pool.get(mem), 0xFF, size);
+
+        for (WBE::MemID mem : mems) {
+            EXPECT_TRUE(pool.is_in_pool(mem));
+        }
+
+        // Occasionally deallocate some memory
+        if (!mems.empty() && (j % 10 == 0)) {
+            std::uniform_int_distribution<size_t> idx_dist(0, mems.size() - 1);
+            size_t idx = idx_dist(rng);
+            pool.deallocate(mems[idx]);
+            mems.erase(mems.begin() + idx);
+        }
+    }
+
+    // Clean up remaining allocations
+    for (WBE::MemID mem : mems) {
+        pool.deallocate(mem);
+    }
 }
 
 #endif
