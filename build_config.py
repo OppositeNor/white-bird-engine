@@ -15,7 +15,7 @@ target_info = {
     "debug" : {
         "c-compiler" : "clang",
         "cpp-compiler" : "clang++",
-        "export-directory" : "build",
+        "export-directory" : "debug",
         "cmake-build-type" : "Debug",
         "generate-tests" : True,
     },
@@ -38,7 +38,7 @@ target_info = {
     "debug-gcc" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "build_gcc",
+        "export-directory" : "debug_gcc",
         "cmake-build-type" : "Debug",
         "generate-tests" : True,
     },

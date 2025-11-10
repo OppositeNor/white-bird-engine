@@ -38,7 +38,7 @@ include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
-build_dir = os.path.join(root_dir, build_target["export-directory"])
+build_dir = os.path.join(root_dir, os.path.join("build", build_target["export-directory"]))
 dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
 # Resource dirs
@@ -57,12 +57,15 @@ metadata_path = os.path.join(resource_output_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
 
-project_files = list_files(root_dir, ignore_dirs=["dependencies",
+gen_info_files = list_files(root_dir, ignore_dirs=[".cache", ".git",
+                                                   ".github", "__pycache__", "build"])
+gen_info_files = [gen_info for gen_info in gen_info_files if os.path.basename(gen_info) == "generate.json"]
+project_files = list_files(root_dir, ignore_dirs=["dependencies", "generated",
                                                   ".cache", ".git", ".github", "__pycache__",
-                                                  "build", "release", "deploy"])
-project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies",
+                                                  "build"])
+project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies", "generated",
                                                                 ".cache", ".git", ".github", "__pycache__",
-                                                                "build", "release", "deploy"])
+                                                                "build"])
 
 # Create directories
 os.makedirs(metadata_cache_dir, exist_ok=True)

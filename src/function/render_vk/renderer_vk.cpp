@@ -381,7 +381,7 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
     if (frames_in_flight < swap_chain_images_count) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning(
-            std::format("frames_in_flight is required to be more than swap chain images; but get {} frames_in_flight and {} images. "
+            std::format("frames_in_flight is required to be at least number of swap chain images; but get {} frames_in_flight and {} images. "
                         "Resizing frames_in_flight to {}.", frames_in_flight, swap_chain_images_count, swap_chain_images_count));
     }
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
