@@ -38,14 +38,14 @@ target_info = {
     "debug-gcc" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "build",
+        "export-directory" : "build_gcc",
         "cmake-build-type" : "Debug",
         "generate-tests" : True,
     },
     "release-gcc" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "release",
+        "export-directory" : "release_gcc",
         "cmake-build-type" : "Release",
         "generator" : "Ninja",
         "generate-tests" : True,
@@ -53,7 +53,7 @@ target_info = {
     "deploy-gcc" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "deploy",
+        "export-directory" : "deploy_gcc",
         "cmake-build-type" : "Deploy",
         "generator" : "Ninja",
         "generate-tests" : False,

@@ -6,6 +6,10 @@ build
 release
 deploy
 
+build_gcc
+release_gcc
+deploy_gcc
+
 __pycache__
 vgcore*
 
