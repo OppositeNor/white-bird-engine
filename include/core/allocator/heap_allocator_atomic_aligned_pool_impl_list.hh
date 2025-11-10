@@ -88,7 +88,7 @@ public:
         if (p_id == MEM_NULL) {
             return nullptr;
         }
-        boost::shared_lock lock(mutex);
+        // Get is not locked, potential data race with dealloc should be handled by the user.
         WBE_DEBUG_ASSERT(unguarded_is_in_pool(p_id));
         return reinterpret_cast<void*>(p_id);
     }

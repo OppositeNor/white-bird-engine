@@ -162,6 +162,8 @@ if __name__ == "__main__":
             print("WBEBuilder: Setting up test environemnt...")
             shutil.copy(os.path.join(build_setup.resource_output_dir, "metadata.json"), os.path.join(build_setup.test_env_resource_dir, "metadata.json"))
 
+        # For some reason my LSP only looks into build directory for compile_commands.json.
+        shutil.copy(os.path.join(build_setup.build_dir, "compile_commands.json"), "build")
         print("WBEBuilder: Finished!")
 
     except Exception as e:
