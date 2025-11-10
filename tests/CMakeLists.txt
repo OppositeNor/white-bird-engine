@@ -22,3 +22,5 @@ target_link_libraries(wbe_unit_test PUBLIC
     gtest_main
 )
 
+include(GoogleTest)
+gtest_discover_tests(wbe_unit_test)

@@ -137,6 +137,11 @@ public:
      */
     bool is_in_pool(MemID p_mem_id) const;
 
+    /**
+     * @brief Check if the pool is broken. Will throw if broken.
+     */
+    void check_broken() const;
+
 private:
 
     size_t size;
@@ -161,7 +166,6 @@ private:
     char* get_next_free_memory(char* p_from);
     void* acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(char* p_insert_start, size_t p_insert_size);
-    void check_broken() const;
 
     void coalesce_all() const;
     void coalesce_chunk(char* p_chunk) const;

@@ -17,7 +17,7 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/unique.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
 

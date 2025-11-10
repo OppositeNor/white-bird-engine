@@ -96,10 +96,6 @@ private:
     template <typename VertType>
     static bool is_vertex_ear(const VertType* p_vertex_list, uint32_t p_vert_count, uint32_t p_index) {
         for (uint32_t i = p_index + 2; i != (p_index + p_vert_count - 2) % p_vert_count; i = (i + 1) % p_vert_count) {
-            glm::vec2 prev_to_this = get_vert(p_vertex_list, p_vert_count, i)->position
-                - get_vert(p_vertex_list, p_vert_count, i - 1)->position;
-            glm::vec2 this_to_next = get_vert(p_vertex_list, p_vert_count, i + 1)->position
-                - get_vert(p_vertex_list, p_vert_count, i)->position;
             glm::vec2 i_pos = get_vert(p_vertex_list, p_vert_count, i)->position;
             glm::vec2 vert_next_pos = get_vert(p_vertex_list, p_vert_count, p_index + 1)->position;
             glm::vec2 vert_prev_pos = get_vert(p_vertex_list, p_vert_count, p_index - 1)->position;

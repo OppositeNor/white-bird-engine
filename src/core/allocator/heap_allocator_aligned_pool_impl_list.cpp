@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -70,8 +71,8 @@ HeapAllocatorAlignedPoolImplicitList::~HeapAllocatorAlignedPoolImplicitList() {
 
 MemID HeapAllocatorAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG(check_broken();)
-    if (p_alignment % WORD_SIZE != 0) {
-        throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WORD_SIZE) + ".");
+    if (p_alignment == 0 || p_alignment % WORD_SIZE != 0) {
+        throw std::runtime_error(std::format("Allocation alignment must not be 0 and should be a multiple of {}.", WORD_SIZE));
     }
     if (p_size == 0) {
         return MEM_NULL;

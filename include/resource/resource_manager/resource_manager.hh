@@ -19,7 +19,6 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
-#include "global/global.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
