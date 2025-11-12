@@ -297,7 +297,7 @@ private:
     }
 
     vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
-    void process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index);
+    void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 

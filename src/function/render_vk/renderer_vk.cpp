@@ -379,13 +379,13 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
+    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    frames_in_flight = game_config.frames_in_flight;
     if (frames_in_flight < swap_chain_images_count) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning(
             std::format("frames_in_flight is required to be at least number of swap chain images; but get {} frames_in_flight and {} images. "
                         "Resizing frames_in_flight to {}.", frames_in_flight, swap_chain_images_count, swap_chain_images_count));
     }
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
-    frames_in_flight = game_config.frames_in_flight;
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
 
@@ -762,13 +762,13 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
         // Copy frames_in_flight amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
         auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
         pipeline_info->pipeline_name = p_pipeline_name;
-        process_tasks(p_root_task, pipeline_info, i);
+        compile_tasks(p_root_task, pipeline_info, i);
         pipeline_infos.push_back(pipeline_info);
     }
     return pipeline_infos;
 }
 
-void RendererVK::process_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index) {
+void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index) {
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     // Push the render_start_task as the starting task.

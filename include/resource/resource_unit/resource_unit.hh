@@ -174,6 +174,18 @@ struct RUSubmesh3D : public ResourceUnit {
     RefRes<uint32_t> indices_data;
 };
 
+/**
+ * @class RUMesh
+ * @brief 3DD mesh resource unit.
+ *
+ */
+struct RUMesh {
+    // Number of submeshes.
+    uint32_t submesh_count;
+    // NUL terminated strings of keys of submeshes.
+    RefRes<char> submesh_keys;
+};
+
 }
 
 #endif
