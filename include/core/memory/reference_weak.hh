@@ -168,10 +168,7 @@ public:
      * @return True if the reference is NULL, false otherwise.
      */
     bool is_null() const {
-        if (!is_valid()) {
-            return false;
-        }
-        return control_block->allocator == nullptr || control_block->mem_id == MEM_NULL;
+        return !(is_valid()) || control_block->allocator == nullptr || control_block->mem_id == MEM_NULL;
     }
 
 private:

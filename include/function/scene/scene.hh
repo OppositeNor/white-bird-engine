@@ -15,17 +15,39 @@
 #ifndef __WBE_SCENE_HH__
 #define __WBE_SCENE_HH__
 
-#include "core/reflection/reflection_defs.hh"
-
+#include "core/core_utils.hh"
 namespace WhiteBirdEngine {
 
 /**
  * @class Scene
  * @brief Scene class.
  */
-WBE_CLASS(Scene, WBE_SERIALIZE_SCRIPT) {
+class Scene {
 public:
-    // TODO
+    Scene(HeapAllocatorDefault* p_allocator)
+        : allocator(p_allocator) {}
+
+    /**
+     * @brief Get the allocator of the scene.
+     *
+     * @return The allocator of the scene.
+     */
+    HeapAllocatorDefault* get_allocator() {
+        return allocator;
+    }
+
+
+    /**
+     * @brief Get the allocator of the scene.
+     *
+     * @return The allocator of the scene.
+     */
+    const HeapAllocatorDefault* get_allocator() const {
+        return allocator;
+    }
+
+private:
+    HeapAllocatorDefault* allocator;
 };
 
 }

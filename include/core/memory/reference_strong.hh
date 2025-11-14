@@ -25,7 +25,6 @@
 
 namespace WhiteBirdEngine {
 
-
 /**
  * @class Ref
  * @brief The reference to a memory resource.
@@ -322,6 +321,11 @@ private:
     mutable ControlBlock* control_block;
 };
 
+template <typename T>
+concept ThisRefAsignable = requires(T* p_ins, Ref<T> p_ref) {
+    p_ins->set_ref_of_this(p_ref);
+};
+
 /**
  * @brief Make a reference with given constructor arguments.
  *
@@ -337,7 +341,11 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }
     MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
-    return Ref<T, AllocType>(p_allocator, id);
+    Ref<T, AllocType> result(p_allocator, id);
+    if constexpr (ThisRefAsignable<T>) {
+        result->set_ref_of_this(result);
+    }
+    return result;
 }
 
 }
