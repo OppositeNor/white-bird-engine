@@ -41,7 +41,7 @@ protected:
     }
 
     std::unique_ptr<WBE::Global> global;
-    static constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAlignedPoolImplicitList::WORD_SIZE;
+    static constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAlignedPoolImplicitList::HEADER_SIZE;
 };
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
@@ -83,19 +83,55 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, ZeroSizeAllocation) {
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
+TEST_F(WBEAllocAlignedPoolImplicitListTest, AlignmentTest) {
+    WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList allocator
+        = WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList(WBE_MiB(0.5));
+    constexpr size_t ALIGN_REQ = alignof(WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList::Header);
+    WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
+    ASSERT_EQ(mem1 % ALIGN_REQ, 0);
+    WBE::MemID mem2 = allocator.allocate(1, ALIGN_REQ * 2);
+    ASSERT_EQ(mem2 % 2 * ALIGN_REQ, 0);
+    WBE::MemID mem3 = allocator.allocate(1, ALIGN_REQ * 3);
+    ASSERT_EQ(mem3 % 3 * ALIGN_REQ, 0);
+    WBE::MemID mem4 = allocator.allocate(1, ALIGN_REQ * 4);
+    ASSERT_EQ(mem4 % 4 * ALIGN_REQ, 0);
+    WBE::MemID mem5 = allocator.allocate(1, ALIGN_REQ * 5);
+    ASSERT_EQ(mem5 % 5 * ALIGN_REQ, 0);
+    WBE::MemID mem6 = allocator.allocate(1, ALIGN_REQ * 6);
+    ASSERT_EQ(mem6 % 6 * ALIGN_REQ, 0);
+    WBE::MemID mem7 = allocator.allocate(1, ALIGN_REQ * 7);
+    ASSERT_EQ(mem7 % 7 * ALIGN_REQ, 0);
+    WBE::MemID mem8 = allocator.allocate(1, ALIGN_REQ * 8);
+    ASSERT_EQ(mem8 % 8 * ALIGN_REQ, 0);
+    WBE::MemID mem9 = allocator.allocate(1, ALIGN_REQ * 9);
+    ASSERT_EQ(mem9 % 9 * ALIGN_REQ, 0);
+    WBE::MemID mem10 = allocator.allocate(1, ALIGN_REQ * 10);
+    ASSERT_EQ(mem10 % 10 * ALIGN_REQ, 0);
+
+    // False alignments
+    ASSERT_THROW(allocator.allocate(3, 0), std::runtime_error);
+    ASSERT_THROW(allocator.allocate(3, ALIGN_REQ * 2 + 1), std::runtime_error);
+
+    allocator.deallocate(mem1);
+    allocator.deallocate(mem2);
+    allocator.deallocate(mem3);
+    allocator.deallocate(mem4);
+    allocator.deallocate(mem5);
+    allocator.deallocate(mem6);
+    allocator.deallocate(mem7);
+    allocator.deallocate(mem8);
+    allocator.deallocate(mem9);
+    allocator.deallocate(mem10);
+
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
+}
+
 TEST_F(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
     WBE::HeapAllocatorAlignedPoolImplicitList pool(256);
     WBE::MemID mem = pool.allocate(8, 128);
     ASSERT_NE(mem, WBE::MEM_NULL);
     ASSERT_EQ(mem % 128, 0);
     pool.deallocate(mem);
-    ASSERT_EQ(pool.get_remain_size(), 256);
-}
-
-TEST_F(WBEAllocAlignedPoolImplicitListTest, FalseAlignment) {
-    WBE::HeapAllocatorAlignedPoolImplicitList pool(256);
-    ASSERT_THROW(pool.allocate(8, 3), std::runtime_error);
-    ASSERT_THROW(pool.allocate(8, 0), std::runtime_error);
     ASSERT_EQ(pool.get_remain_size(), 256);
 }
 

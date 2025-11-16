@@ -58,7 +58,7 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
 
     auto alloc_func = [&](int thread_idx) {
         for (int i = 0; i < allocs_per_thread; ++i) {
-            WBE::MemID mem = allocator.allocate(8, 8);
+            WBE::MemID mem = allocator.allocate(8);
             ASSERT_NE(mem, WBE::MEM_NULL);
             mem_ids[thread_idx * allocs_per_thread + i] = mem;
             ++alloc_count;
@@ -126,7 +126,7 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
         std::vector<WBE::MemID>& mems = thread_mem_ids[thread_idx];
         for (int i = 0; i < ops_per_thread; ++i) {
             if (i % 2 == 0) {
-                WBE::MemID mem = allocator.allocate(8, 8);
+                WBE::MemID mem = allocator.allocate(8);
                 if (mem != WBE::MEM_NULL) {
                     mems.push_back(mem);
                     ++alloc_count;
@@ -165,7 +165,7 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
         for (int i = 0; i < ops_per_thread; ++i) {
             int op = std::rand() % 3;
             if (op == 0) {
-                WBE::MemID mem = allocator.allocate(8, 8);
+                WBE::MemID mem = allocator.allocate(8);
                 ASSERT_TRUE(mem != WBE::MEM_NULL);
                 int val = std::rand();
                 void* ptr = allocator.get(mem);
@@ -202,7 +202,7 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
     std::vector<WBE::MemID> mem_ids(num_threads * allocs_per_thread);
     // Allocate all memory in single thread for simplicity
     for (int i = 0; i < num_threads * allocs_per_thread; ++i) {
-        WBE::MemID mem = allocator.allocate(8, 8);
+        WBE::MemID mem = allocator.allocate(8);
         ASSERT_NE(mem, WBE::MEM_NULL);
         mem_ids[i] = mem;
     }

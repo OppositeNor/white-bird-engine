@@ -19,7 +19,6 @@
 #include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
-#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 
@@ -44,7 +43,7 @@ void ApplicationGame::run() {
 }
 
 void ApplicationGame::init() {
-    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.5));
+    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
     // TODO: Create renderer based on config file.
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     if (game_config.render_api == "vulkan") {

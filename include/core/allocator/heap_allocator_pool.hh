@@ -58,7 +58,7 @@ public:
     /**
      * @brief The size of the allocated memory header.
      */
-    static constexpr size_t HEADER_SIZE = sizeof(Header);
+    static constexpr size_t HEADER_SIZE = WBE_DEFAULT_ALIGNMENT;
 
     /**
      * @brief The maximum total size that the allocator can contain.

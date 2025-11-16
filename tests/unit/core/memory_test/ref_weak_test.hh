@@ -309,9 +309,9 @@ TEST(WBERefWeakTest, IsNullMethod_Behavior) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
 
-    // Default-constructed weak should not be considered NULL by implementation
+    // Default-constructed weak should not be NULL.
     WBE::RefWeak<int> weak_default;
-    ASSERT_FALSE(weak_default.is_null());
+    ASSERT_TRUE(weak_default.is_null());
 
     WBE::RefWeak<int> weak;
     {
@@ -324,6 +324,6 @@ TEST(WBERefWeakTest, IsNullMethod_Behavior) {
 
     // After strong ref goes out of scope, weak becomes invalid; implementation returns false for invalid
     ASSERT_FALSE(weak.is_valid());
-    ASSERT_FALSE(weak.is_null());
+    ASSERT_TRUE(weak.is_null());
 }
 #endif

@@ -21,6 +21,7 @@
 #include <boost/thread/lock_types.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <stdexcept>
 #include <string>
 
@@ -54,8 +55,11 @@ HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
 }
 
 MemID HeapAllocatorAtomicAlignedPool::allocate(size_t p_size, size_t p_alignment) {
-    if (p_alignment % WBE_DEFAULT_ALIGNMENT != 0) {
-        throw std::runtime_error("Failed to allocate resource: allocation alignment must be a multiple of " + std::to_string(WBE_DEFAULT_ALIGNMENT) + ".");
+    if (p_alignment == 0) {
+        throw std::runtime_error("Failed to allocate resource: allocation alignment must not be 0.");
+    }
+    if (p_alignment % alignof(Header) != 0) {
+        throw std::runtime_error(std::format("Allocation alignment must be a multiple of {}", alignof(Header)));
     }
     if (p_size == 0) {
         return MEM_NULL;

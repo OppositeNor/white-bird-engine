@@ -54,7 +54,7 @@ HeapAllocatorAtomicAlignedPoolImplicitList::HeapAllocatorAtomicAlignedPoolImplic
     if (p_size > TOTAL_SIZE_MASK) {
         throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) + " exceeds maximum: " + std::to_string(TOTAL_SIZE_MASK) + ".");
     }
-    mem_chunk = static_cast<char*>(aligned_alloc(WORD_SIZE, p_size));
+    mem_chunk = static_cast<char*>(aligned_alloc(HEADER_SIZE, p_size));
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to create pool: malloc failed.");
     }
@@ -73,14 +73,17 @@ HeapAllocatorAtomicAlignedPoolImplicitList::~HeapAllocatorAtomicAlignedPoolImpli
 
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(!(mutex.is_unique_locked_by_current_thread()));
-    if (p_alignment == 0 || p_alignment % WORD_SIZE != 0) {
-        throw std::runtime_error(std::format("Allocation alignment must not be 0, and has to be a multiple of {}.", WORD_SIZE));
+    if (p_alignment == 0) {
+        throw std::runtime_error("Allocation alignment must not be 0.");
     }
     if (p_size == 0) {
         return MEM_NULL;
     }
+    if (p_alignment % alignof(Header)) {
+        throw std::runtime_error(std::format("Allocation alignment must be a multiple of {}.", alignof(Header)));
+    }
     // Clamp the padding size to the default alignment.
-    size_t aligned_size = get_align_size(p_size, WORD_SIZE) + WORD_SIZE;
+    size_t aligned_size = get_align_size(p_size, HEADER_SIZE) + HEADER_SIZE;
     boost::unique_lock lock(mutex);
     MemID result = find_valid_chunk<false>(aligned_size, p_alignment);
     if (result == MEM_NULL) {
@@ -102,23 +105,25 @@ template <bool COALESCE_ENABLED>
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::check_posible_free(size_t p_aligned_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
     if constexpr (COALESCE_ENABLED) {
-        coalesce_chunk(possible_valid);
+        if (possible_valid != nullptr) {
+            coalesce_chunk(possible_valid);
+        }
     }
     WBE_DEBUG_ASSERT(possible_valid == nullptr || WBE_HAAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::IDLE);
     if (possible_valid == nullptr) {
         return MEM_NULL;
     }
-    uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(possible_valid) + WORD_SIZE;
+    uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(possible_valid) + HEADER_SIZE;
     char* idle_mem_start = reinterpret_cast<char*>(
         proxy_mem_start_addr % p_alignment == 0 ?
             // Already aligned.
             proxy_mem_start_addr
             // Not aligned, align by finding the next value that is a multiple of p_alignment.
-          : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) - WORD_SIZE;
+          : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) - HEADER_SIZE;
     // If idle node valid, insert.
     if (idle_mem_start + p_aligned_size <= possible_valid + WBE_HAAAPIL_GET_CHUNK_SIZE(possible_valid)) {
         void* result_loc = acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
-        MemID result_id = reinterpret_cast<MemID>(result_loc) + WORD_SIZE;
+        MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
         *static_cast<Header*>(result_loc) = p_aligned_size;
         internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
         return result_id;
@@ -136,15 +141,15 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::find_valid_chunk(size_t p_alig
     char* free_memory = get_next_free_memory<true, COALESCE_ENABLED>(mem_chunk);
     while (free_memory != nullptr) {
         // Find the aligned starting point.
-        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(free_memory) + WORD_SIZE;
+        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(free_memory) + HEADER_SIZE;
         char* idle_mem_start = reinterpret_cast<char*>(
             (proxy_mem_start_addr / p_alignment) * p_alignment == proxy_mem_start_addr ?
                 proxy_mem_start_addr : (proxy_mem_start_addr / p_alignment + 1) * p_alignment
-        ) - WORD_SIZE;
+        ) - HEADER_SIZE;
         // If idle node valid, insert.
         if (idle_mem_start + p_aligned_size <= free_memory + WBE_HAAAPIL_GET_CHUNK_SIZE(free_memory)) {
             void* result_loc = acquire_memory(free_memory, idle_mem_start, p_aligned_size);
-            MemID result_id = reinterpret_cast<MemID>(result_loc) + WORD_SIZE;
+            MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
             *static_cast<Header*>(result_loc) = p_aligned_size;
             internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
             return result_id;
@@ -160,10 +165,10 @@ void HeapAllocatorAtomicAlignedPoolImplicitList::deallocate(MemID p_mem) {
     if (p_mem == MEM_NULL) {
         return;
     }
-    char* data_loc = reinterpret_cast<char*>(p_mem - WORD_SIZE);
+    char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
     boost::unique_lock lock(mutex);
     WBE_DEBUG_ASSERT(unguarded_is_in_pool(p_mem));
-    size_t data_size = WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - WORD_SIZE)));
+    size_t data_size = WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - HEADER_SIZE)));
     insert_free_memory(data_loc, data_size);
 }
 
@@ -251,7 +256,7 @@ bool HeapAllocatorAtomicAlignedPoolImplicitList::is_in_pool(MemID p_mem_id) cons
     return unguarded_is_in_pool(p_mem_id);
 }
 
-void HeapAllocatorAtomicAlignedPoolImplicitList::check_broken() const {
+void HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_check_broken() const {
     char* curr = mem_chunk;
     if (possible_valid != nullptr && WBE_HAAAPIL_GET_CHUNK_TYPE(possible_valid) != HeaderType::IDLE) {
         throw std::runtime_error("Broken possible_valid.");
@@ -299,8 +304,8 @@ HeapAllocatorAtomicAlignedPoolImplicitList::operator std::string() const {
 bool HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_is_in_pool(MemID p_mem_id) const {
     char* curr = mem_chunk;
     char* mem_ptr = reinterpret_cast<char*>(p_mem_id);
-    while (curr <= mem_ptr && curr < mem_chunk + size - WORD_SIZE) {
-        if (curr + WORD_SIZE == mem_ptr && WBE_HAAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
+    while (curr <= mem_ptr && curr < mem_chunk + size - HEADER_SIZE) {
+        if (curr + HEADER_SIZE == mem_ptr && WBE_HAAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
             return true;
         }
         curr += WBE_HAAAPIL_GET_CHUNK_SIZE(curr);

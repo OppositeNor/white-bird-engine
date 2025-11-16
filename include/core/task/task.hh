@@ -12,28 +12,24 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_COMMAND_BUFFER_RING_HH__
-#define __WBE_COMMAND_BUFFER_RING_HH__
-
-#include "command_buffer.hh"
-#include <cstddef>
+#ifndef __WBE_TAKS_HH__
+#define __WBE_TAKS_HH__
 
 namespace WhiteBirdEngine {
 
 /**
- * @class CommandBufferRing
- * @brief Command buffer, ring buffer version.
+ * @class Task
+ * @brief A task that is presentable.
  *
  */
-class CommandBufferRing final : public CommandBuffer {
-public:
-    CommandBufferRing(size_t p_buffer_size);
-    virtual ~CommandBufferRing() override;
-    virtual Ref<Command> retrieve_command() override;
+struct Task {
+    Task() {}
+    virtual ~Task() {}
 
-    virtual void add_command(Ref<Command> p_command) override;
-    // TODO
-private:
+    /**
+     * @brief Perform the task.
+     */
+    virtual void perform() = 0;
 };
 
 }

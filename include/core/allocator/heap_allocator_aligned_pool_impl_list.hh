@@ -62,7 +62,7 @@ public:
     /**
      * @brief The size of the allocated memory header.
      */
-    static constexpr size_t WORD_SIZE = sizeof(Header);
+    static constexpr size_t HEADER_SIZE = WBE_DEFAULT_ALIGNMENT;
 
     /**
      * @brief The maximum total size that the allocator can contain.
@@ -76,7 +76,7 @@ public:
      */
     HeapAllocatorAlignedPoolImplicitList(size_t p_size);
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment = WORD_SIZE) override;
+    virtual MemID allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -99,7 +99,7 @@ public:
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - WORD_SIZE)));
+        return WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)));
     }
 
     /**

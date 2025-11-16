@@ -15,7 +15,7 @@
 #ifndef __WBE_RENDERER_HH__
 #define __WBE_RENDERER_HH__
 
-#include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/core_utils.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_task.hh"
 #include "utils/interface/singleton.hh"
@@ -23,7 +23,7 @@ namespace WhiteBirdEngine {
 
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
 
-using RenderAllocator = HeapAllocatorAlignedPool;
+using RenderAllocator = HeapAllocatorDefault;
 
 /**
  * @class Renderer

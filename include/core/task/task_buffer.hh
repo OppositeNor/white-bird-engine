@@ -12,34 +12,33 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_COMMAND_BUFFER_HH__
-#define __WBE_COMMAND_BUFFER_HH__
+#ifndef __WBE_TAKS_BUFFER_HH__
+#define __WBE_TAKS_BUFFER_HH__
 
-#include "core/command/command.hh"
+#include "core/task/task.hh"
 #include "core/memory/reference_strong.hh"
 namespace WhiteBirdEngine {
 
 /**
- * @class CommandBuffer
- * @brief Stores a buffer that contians all the command for an instance to execute.
- * @note This has nothing to do with the command buffer in rendering APIs.
+ * @class TaskBuffer
+ * @brief Stores a buffer that contians all the task for an instance to execute.
  */
-class CommandBuffer {
+class TaskBuffer {
 public:
-    CommandBuffer() = default;
-    virtual ~CommandBuffer() {}
+    TaskBuffer() = default;
+    virtual ~TaskBuffer() {}
 
     /**
-     * @brief Retrieve a command from a buffer.
+     * @brief Retrieve a task from a buffer. If the buffer is empty, return MEM_NULL.
      */
-    virtual Ref<Command> retrieve_command() = 0;
+    virtual Ref<Task> retrieve_task() = 0;
 
     /**
-     * @brief Add a command to the buffer.
+     * @brief Add a task to the buffer.
      *
-     * @param p_command The command to add to the buffer.
+     * @param p_task The task to add to the buffer.
      */
-    virtual void add_command(Ref<Command> p_command) = 0;
+    virtual void add_task(Ref<Task> p_task) = 0;
 };
 
 }
