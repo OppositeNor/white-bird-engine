@@ -1,9 +1,9 @@
 // ps_6_0
 struct PSInput {
-    float3 color : COLOR0;
+    float2 uv : COLOR0;
 };
 
 float4 main(PSInput input) : SV_Target {
-    return float4(input.color, 1.0);
+    return float4(input.uv, 0.0, 1.0);
 }
 
