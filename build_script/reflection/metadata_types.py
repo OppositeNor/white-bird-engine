@@ -110,6 +110,7 @@ class WBEMetadata(BaseModel):
     classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
     structs : list[WBEStructMetadata] = Field(default_factory=list[WBEStructMetadata])
     types : list[WBETypeMetadata] = Field(default_factory=list[WBETypeMetadata])
+    attr_count : dict[str, int] = Field(default_factory=dict[str, int])
 
     def sort(self):
         """Sor the fields. This may gurantee the order it generates will always be the same,

@@ -16,7 +16,6 @@
 #define __WBE_SCENE_NODE_HH__
 
 #include "scene.hh"
-#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/stl_allocator.hh"
 #include <stdexcept>
@@ -29,14 +28,12 @@ namespace WhiteBirdEngine {
  */
 class SceneNode {
 protected:
-    template <typename T>
-    using vector = ::WhiteBirdEngine::vector<T, HeapAllocatorDefault>;
 public:
 
     virtual ~SceneNode() {}
     SceneNode(const SceneNode&) = delete;
     SceneNode(SceneNode&& p_other)
-        : parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
+        : name(std::move(p_other.name)), parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
     }
     SceneNode& operator=(const SceneNode&) = delete;
     SceneNode& operator=(SceneNode&& p_other) {
@@ -51,7 +48,7 @@ public:
      * @param p_scene The scene of this node lives in.
      */
     SceneNode(Ref<Scene> p_scene)
-        : children(p_scene->get_allocator()) {}
+        : name(p_scene->get_allocator()), children(p_scene->get_allocator()) {}
 
     /**
      * @brief Set the reference referencing this instance.
@@ -110,8 +107,12 @@ public:
 
 
 private:
+    using string = string<>;
+
+
     RefWeak<SceneNode> this_ref;
 
+    string name;
     RefWeak<SceneNode> parent;
     vector<Ref<SceneNode>> children;
 };

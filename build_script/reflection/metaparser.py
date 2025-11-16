@@ -42,6 +42,7 @@ class WBEMetaparser:
         self.cache_dir = cache_dir
         self.sources = sources
         self._metadata = {}
+        self._attr_count_tracker = {}
 
     def parse(self, cpp_file_path : str):
         """Parse the C++ file.
@@ -101,6 +102,7 @@ class WBEMetaparser:
             result_metadata.classes.extend(metadata.classes)
             result_metadata.structs.extend(metadata.structs)
         result_metadata.types = list[WBETypeMetadata](result_metadata.classes) + list[WBETypeMetadata](result_metadata.structs)
+        result_metadata.attr_count = self._attr_count_tracker
         self.reflector.register_metadata(result_metadata)
 
     def _register_from_clang(self, cpp_file_path, cache_path):
@@ -146,6 +148,7 @@ class WBEMetaparser:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.labels)):
                     attributes = self._get_attributes(attr.spelling)
+                    self._attr_count_tracker.update({ attr : self._attr_count_tracker.get(attr, 0) + 1 for attr in attributes })
                     label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes)
                     metadata.labels.append(label_metadata)
 
@@ -155,6 +158,7 @@ class WBEMetaparser:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.classes)):
                     attributes = self._get_attributes(attr.spelling)
+                    self._attr_count_tracker.update({ attr : self._attr_count_tracker.get(attr, 0) + 1 for attr in attributes })
                     class_metadata = self._get_class_metadata(cursor, attributes, in_file)
                     metadata.classes.append(class_metadata)
 
@@ -164,6 +168,7 @@ class WBEMetaparser:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.structs)):
                     attributes = self._get_attributes(attr.spelling)
+                    self._attr_count_tracker.update({ attr : self._attr_count_tracker.get(attr, 0) + 1 for attr in attributes })
                     component_metadata = self._get_struct_metadata(cursor, attributes, in_file)
                     metadata.structs.append(component_metadata)
 

@@ -31,7 +31,6 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "global/stl_allocator.hh"
-#include "utils/defs.hh"
 
 #include <SDL.h>
 #include <cstdint>
@@ -121,7 +120,6 @@ private:
     template <typename T>
     using deque = ::WhiteBirdEngine::deque<T, AllocType>;
     using string = ::WhiteBirdEngine::string<AllocType>;
-
 
     inline static RendererVK* singleton = nullptr;
 

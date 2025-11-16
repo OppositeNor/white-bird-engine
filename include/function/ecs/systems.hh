@@ -15,8 +15,8 @@
 #ifndef __WBE_SYSTEMS_HH__
 #define __WBE_SYSTEMS_HH__
 
+#include "function/ecs/components.hh"
 #include "glm/ext/matrix_transform.hpp"
-#include "generated/component_sd.gen.hh"
 #include <bitset>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

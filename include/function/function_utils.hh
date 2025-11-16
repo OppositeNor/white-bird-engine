@@ -15,7 +15,11 @@
 #ifndef __WBE_FUNTION_UTILS_HH__
 #define __WBE_FUNTION_UTILS_HH__
 
+#include "utils/utils.hh"
 namespace WhiteBirdEngine {
+
+using EntityID = HashCode;
+using ComponID = HashCode;
 
 }
 

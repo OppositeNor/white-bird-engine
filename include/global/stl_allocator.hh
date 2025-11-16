@@ -116,64 +116,34 @@ struct STLAllocator {
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType>
+template <typename T, typename AllocType = HeapAllocatorDefault>
 using vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
- * @brief STL vector that uses a pool allocator.
- *
- * @tparam T The type of the values in the vector.
- * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
- */
-template <typename T>
-using vectorp = vector<T, HeapAllocatorDefault>;
-
-/**
  * @brief STL set that uses a custom allocator.
  *
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType>
+template <typename T, typename AllocType = HeapAllocatorDefault>
 using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
- * @brief STL set that uses a pool allocator.
- *
- * @tparam T The type of the values in the vector.
- */
-template <typename T>
-using setp = set<T, HeapAllocatorDefault>;
-
-/**
  * @brief STL set that uses a custom allocator.
  *
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType>
+template <typename T, typename AllocType = HeapAllocatorDefault>
 using unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
-
-/**
- * @brief STL set that uses a custom allocator.
- *
- * @tparam T The type of the values in the set.
- */
-template <typename T, typename AllocType>
-using unordered_setp = unordered_set<T, HeapAllocatorDefault>;
 
 /**
  * @brief STL string that uses a custom allocator.
  *
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename AllocType>
+template <typename AllocType = HeapAllocatorDefault>
 using string = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false, true, false>>;
-
-/**
- * @brief STL string that uses a pool allocator.
- */
-using stringp = string<HeapAllocatorDefault>;
 
 /**
  * @brief STL deque that uses a custom allocator.
@@ -181,16 +151,8 @@ using stringp = string<HeapAllocatorDefault>;
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType>
+template <typename T, typename AllocType = HeapAllocatorDefault>
 using deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
-
-/**
- * @brief STL string that uses a pool allocator.
- *
- * @tparam T The type of the values in the vector.
- */
-template <typename T>
-using dequep = deque<T, HeapAllocatorDefault>;
 
 /**
  * @brief Short name for stl allocator that uses HeapAllocatorDefault.
