@@ -35,7 +35,8 @@ public:
 
     /**
      * @brief Add a task to the buffer.
-     *
+     * 
+     * @throws std::runtime_error If buffer overflow.
      * @param p_task The task to add to the buffer.
      */
     virtual void add_task(Ref<Task> p_task) = 0;

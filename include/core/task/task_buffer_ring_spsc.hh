@@ -50,8 +50,8 @@ public:
 
 private:
     vector<Ref<Task>> buffer;
-    std::atomic<size_t> head;
-    std::atomic<size_t> tail;
+    alignas(WBE_CACHELINE_SIZE) std::atomic<size_t> head;
+    alignas(WBE_CACHELINE_SIZE) std::atomic<size_t> tail;
 };
 
 }

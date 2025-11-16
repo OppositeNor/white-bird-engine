@@ -116,4 +116,6 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 
 #define WBE_FLOAT_TOLARENCE 0.0000001
 
+#define WBE_CACHELINE_SIZE std::hardware_destructive_interference_size
+
 #endif

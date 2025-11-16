@@ -294,15 +294,15 @@ private:
         MemID control_block_mem_id;
         MemID mem_id;
         AllocType* allocator;
-        std::atomic<uint32_t> weak_ref_counter;
-        std::atomic<uint32_t> strong_ref_counter;
+        alignas(WBE_CACHELINE_SIZE) std::atomic<uint32_t> weak_ref_counter;
+        alignas(WBE_CACHELINE_SIZE) std::atomic<uint32_t> strong_ref_counter;
     };
 
     void ref() const {
         if (control_block == nullptr) {
             return;
         }
-        control_block->strong_ref_counter.fetch_add(1, std::memory_order_acq_rel);
+        control_block->strong_ref_counter.fetch_add(1, std::memory_order_release);
     }
 
     void deref() const {

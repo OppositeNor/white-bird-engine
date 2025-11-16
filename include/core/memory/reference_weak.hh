@@ -178,7 +178,7 @@ private:
         if (control_block == nullptr) {
             return;
         }
-        control_block->weak_ref_counter.fetch_add(1, std::memory_order_acq_rel);
+        control_block->weak_ref_counter.fetch_add(1, std::memory_order_release);
     }
 
     void deref() const {
