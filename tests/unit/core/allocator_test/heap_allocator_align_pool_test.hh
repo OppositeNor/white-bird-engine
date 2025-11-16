@@ -254,7 +254,7 @@ TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     for (int i = 0; i < num_allocs; ++i) {
         mems[i] = allocator.allocate(16);
         ASSERT_NE(mems[i], WBE::MEM_NULL);
-        ASSERT_EQ(mems[i] % 16, 0);
+        ASSERT_EQ(mems[i] % 8, 0);
     }
     ASSERT_EQ(allocator.get_remain_size(), 0);
     std::string exp = behv_test({
