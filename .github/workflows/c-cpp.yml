@@ -81,7 +81,7 @@ jobs:
 
 
     - name: Build
-    # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
+      # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: python build.py -t ${{ matrix.target }}
 
     - name: Test
