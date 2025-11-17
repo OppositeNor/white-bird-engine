@@ -77,7 +77,7 @@ jobs:
         path: |
           .git/modules
           **/.git
-        key: submodules-${{ hashFiles('.gitmodules') }}
+        key: submodules-${{ hashFiles('.gitmodules', '**/.gitmodules') }}
 
     - name: Update submodules
       run: git submodule update --init --recursive
