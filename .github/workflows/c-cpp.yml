@@ -40,6 +40,8 @@ jobs:
           # - os: windows-latest
           #   c_compiler: clang\
 
+    steps:
+
     - name: Install dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get update && sudo apt-get install -y valgrind
@@ -53,7 +55,6 @@ jobs:
         ldconfig -p | grep clang
         python -c "from ctypes.util import find_library; print(find_library('clang'), find_library('libclang'))"
 
-    steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
