@@ -118,7 +118,11 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 
 #define WBE_FLOAT_TOLARENCE 0.0000001
 
+#ifdef __cpp_lib_hardware_interference_size
 // Avoiding two atomic variables be allocated into the same cacheline, causing memory sharing.
 #define WBE_NO_FALSE_SHARING alignas(std::hardware_destructive_interference_size)
+#else
+#define WBE_NO_FALSE_SHARING
+#endif
 
 #endif
