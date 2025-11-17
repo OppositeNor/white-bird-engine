@@ -91,4 +91,4 @@ jobs:
       run: python build.py -t ${{ matrix.target }}
 
     - name: Test
-      run: valgrind ${{ steps.strings.outputs.build-output-dir }}/tests/wbe_unit_test
+      run: valgrind ${{ steps.strings.outputs.build-output-dir }}/tests/unit/wbe_unit_test
