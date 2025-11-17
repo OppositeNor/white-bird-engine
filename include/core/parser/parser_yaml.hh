@@ -154,7 +154,7 @@ public:
                     "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
-            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
         } else if constexpr (std::same_as<T, std::vector<YAMLData>>) {
             p_value.clear();
             for (const auto& elem : node) {
@@ -192,7 +192,7 @@ public:
                     "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
-            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
         } else if constexpr (std::same_as<T, std::vector<YAMLData>>) {
             std::vector<YAMLData> result;
             for (const auto& elem : node[p_key]) {

@@ -164,7 +164,7 @@ public:
                     "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
-            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
         } else if constexpr (std::same_as<T, glm::vec2>) {
             p_value = glm::vec2(
                 data.at("x").get<float>(),
@@ -203,7 +203,7 @@ public:
                     "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
-            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE);
+            strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
         } else if constexpr (std::same_as<T, glm::vec2>) {
             p_value = glm::vec2(
                 data.at(p_key).at("x").get<float>(),
