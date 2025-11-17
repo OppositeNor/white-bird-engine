@@ -102,9 +102,8 @@ TEST_F(WBEUniqueTest, ComparisonOperators) {
     ASSERT_TRUE(u1 == nullptr);
     
     // Test exception throwing for invalid comparisons
-    bool _;
-    ASSERT_THROW(_ = u2 == (void*)0x1234, std::runtime_error);
-    ASSERT_THROW(_ = u1 == WBE::MemID(42), std::runtime_error);
+    ASSERT_THROW(u2.operator ==((void*)0x1234), std::runtime_error);
+    ASSERT_THROW(u1.operator ==(WBE::MemID(42)), std::runtime_error);
 }
 
 TEST_F(WBEUniqueTest, CallLoggingWithMakeUnique) {
@@ -181,21 +180,8 @@ TEST_F(WBEUniqueTest, MemIDComparisonOperator) {
     
     // Test exception throwing for non-null MemID comparison
     WBE::MemID non_null_id(42);
-    bool threw_exception = false;
-    try {
-        bool _ = empty_unique == non_null_id;
-    } catch (const std::runtime_error&) {
-        threw_exception = true;
-    }
-    ASSERT_TRUE(threw_exception);
-    
-    threw_exception = false;
-    try {
-        bool _ = valid_unique == non_null_id;
-    } catch (const std::runtime_error&) {
-        threw_exception = true;
-    }
-    ASSERT_TRUE(threw_exception);
+    ASSERT_THROW(empty_unique.operator ==(non_null_id), std::runtime_error);
+    ASSERT_THROW(valid_unique.operator ==(non_null_id), std::runtime_error);
 }
 
 TEST_F(WBEUniqueTest, VoidPointerComparisonOperator) {
@@ -213,7 +199,7 @@ TEST_F(WBEUniqueTest, VoidPointerComparisonOperator) {
     void* non_null_ptr = reinterpret_cast<void*>(0x1234);
     bool threw_exception = false;
     try {
-        bool _ = empty_unique == non_null_ptr;
+        empty_unique.operator ==(non_null_ptr);
     } catch (const std::runtime_error&) {
         threw_exception = true;
     }

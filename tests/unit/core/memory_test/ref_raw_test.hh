@@ -279,11 +279,11 @@ TEST(WBERefRawTest, ComparisonExceptions) {
     
     // Test exception for non-null pointer comparison
     void* non_null_ptr = reinterpret_cast<void*>(0x1234);
-    ASSERT_THROW(bool _ = ref == non_null_ptr, std::runtime_error);
+    ASSERT_THROW(ref.operator ==(non_null_ptr), std::runtime_error);
     
     // Test exception for non-null MemID comparison
     WBE::MemID non_null_id(42);
-    ASSERT_THROW(bool _ = ref == non_null_id, std::runtime_error);
+    ASSERT_THROW(ref.operator ==(non_null_id), std::runtime_error);
     
     ASSERT_EQ(TestObject::instance_count, 0);
 }
