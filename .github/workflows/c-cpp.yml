@@ -74,7 +74,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/release" >> "$GITHUB_OUTPUT"
+        echo "build-output-dir=${{ github.workspace }}build/release" >> "$GITHUB_OUTPUT"
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
@@ -91,4 +91,4 @@ jobs:
       run: python build.py -t ${{ matrix.target }}
 
     - name: Test
-      run: valgrind ${{ steps.strings.outputs.build-output-dir }}/tests/unit/wbe_unit_test
+      run: valgrind ${{ steps.strings.outputs.build-output-dir }}/tests/wbe_unit_test
