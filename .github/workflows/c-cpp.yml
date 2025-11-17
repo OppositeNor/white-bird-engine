@@ -64,12 +64,11 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get update && sudo apt-get install -y valgrind
   
-    - name: Install LLVM and Clang
+    - name: Install LLVM/Clang and libclang
       if: matrix.os == 'ubuntu-latest'
-      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-      # uses: KyleMayes/install-llvm-action@v2
-      # with:
-      #   version: "20.1"
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libclang-dev llvm-dev lld
       
     - name: Setup pip dependencies
       run: pip install -r requirements.txt
