@@ -44,7 +44,7 @@ jobs:
 
     - name: Install dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y valgrind libtinfo5
+      run: sudo apt-get update && sudo apt-get install -y valgrind
   
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v2
@@ -54,6 +54,7 @@ jobs:
     - name: Link llvm shared libraries (Linux)
       if: contains(matrix.os, 'ubuntu')
       run: sudo ln -s libclang-11.so.1 /lib/x86_64-linux-gnu/libclang.so
+         | ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.5
       working-directory: ${{ env.LLVM_PATH }}/lib
 
     - uses: actions/checkout@v4
