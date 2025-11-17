@@ -15,6 +15,8 @@
 #ifndef __WBE_DEFS_HH__
 #define __WBE_DEFS_HH__
 
+#include <new>
+
 #ifdef _DEBUG
 #include <cassert>
 // Block runs in debug builds.
