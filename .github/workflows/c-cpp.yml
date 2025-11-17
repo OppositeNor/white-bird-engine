@@ -40,6 +40,19 @@ jobs:
           # - os: windows-latest
           #   c_compiler: clang\
 
+    - name: Install dependencies (ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y valgrind
+  
+    - name: Install LLVM/Clang and libclang
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libclang-dev llvm-dev lld
+        clang --version
+        ldconfig -p | grep clang
+        python -c "from ctypes.util import find_library; print(find_library('clang'), find_library('libclang'))"
+
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
@@ -59,16 +72,6 @@ jobs:
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/release" >> "$GITHUB_OUTPUT"
-
-    - name: Install dependencies (ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y valgrind
-  
-    - name: Install LLVM/Clang and libclang
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang libclang-dev llvm-dev lld
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
