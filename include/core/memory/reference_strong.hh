@@ -294,8 +294,8 @@ private:
         MemID control_block_mem_id;
         MemID mem_id;
         AllocType* allocator;
-        alignas(WBE_CACHELINE_SIZE) std::atomic<uint32_t> weak_ref_counter;
-        alignas(WBE_CACHELINE_SIZE) std::atomic<uint32_t> strong_ref_counter;
+        WBE_NO_FALSE_SHARING std::atomic<uint32_t> weak_ref_counter;
+        WBE_NO_FALSE_SHARING std::atomic<uint32_t> strong_ref_counter;
     };
 
     void ref() const {

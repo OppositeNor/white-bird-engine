@@ -1,4 +1,5 @@
-// ps_6_0
+// frag
+
 struct PSInput {
     float2 uv : COLOR0;
 };

@@ -1,4 +1,4 @@
-// vs_6_0
+// vert
 
 struct VSOutput {
     float4 position : SV_Position;

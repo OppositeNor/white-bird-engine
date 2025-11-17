@@ -89,9 +89,10 @@ def _compile_shaders():
         with open(hlsl_file, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
         if first_line.startswith("//"):
-            profile = first_line[2:].strip()
-            if profile not in ["vs_6_0", "ps_6_0", "cs_6_0", "gs_6_0", "hs_6_0", "ds_6_0"]:
-                print(f"Unsupported profile for {hlsl_file} : {profile}, skipped.")
+            shader_stage = first_line[2:].strip()
+            if shader_stage not in ["vertex", "vert", "fragment", "frag", "tesscontrol",
+                    "tesc", "tesseval", "tese", "geometry", "geom", "compute", "comp"]:
+                print(f"Unsupported shader stage for {hlsl_file} : {shader_stage}, skipped.")
                 continue
         else:
             # Files without a profile header are considered to be header files, skipped.
@@ -99,11 +100,11 @@ def _compile_shaders():
 
         output_file = os.path.join(build_setup.shaders_output_dir, (hlsl_file.stem + ".spv"))
         cmd = [
-            "dxc",
-            "-T", profile,
-            "-E", "main",
-            "-spirv",
-            "-Fo", str(output_file),
+            "glslc",
+            f"-fshader-stage={shader_stage}",
+            "-I", build_setup.shaders_dir,
+            "-fentry-point=main",
+            "-o", str(output_file),
             str(hlsl_file)
         ]
         print("Compiling:", hlsl_file)
