@@ -74,7 +74,7 @@ jobs:
       uses: humbletim/install-vulkan-sdk@v1.2
       with:
         version: 1.4.309.0
-      cache: true
+        cache: true
 
     - name: Setup pip dependencies
       run: pip install -r requirements.txt
