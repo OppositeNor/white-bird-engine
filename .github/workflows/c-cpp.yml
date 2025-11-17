@@ -41,6 +41,17 @@ jobs:
           #   c_compiler: clang\
 
     steps:
+  
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "10.0"
+
+    - name: Link shared libraries (Linux)
+      if: contains(matrix.os, 'ubuntu')
+      run: sudo ln -s libclang-11.so.1 /lib/x86_64-linux-gnu/libclang.so
+         | sudo ln -s libtinfo-11.so.1 /lib/x86_64-linux-gnu/libtinfo.so
+      working-directory: ${{ env.LLVM_PATH }}/lib
 
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
@@ -57,16 +68,6 @@ jobs:
     - name: Install dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get update && sudo apt-get install -y valgrind
-  
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v2
-      with:
-        version: "10.0"
-
-    - name: Symlink libclang.so (Linux)
-      if: contains(matrix.os, 'ubuntu')
-      run: sudo ln -s libclang-11.so.1 /lib/x86_64-linux-gnu/libclang.so
-      working-directory: ${{ env.LLVM_PATH }}/lib
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
