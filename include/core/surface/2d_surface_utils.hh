@@ -83,7 +83,7 @@ private:
 
     template <typename VertType>
     static void remove_vertex(VertType* p_vert_list, uint32_t p_vert_count, uint32_t p_index) {
-        for (uint32_t i = p_index; i < p_vert_count; ++i) {
+        for (uint32_t i = p_index; i < p_vert_count - 1; ++i) {
             p_vert_list[i] = p_vert_list[i + 1];
         }
     }

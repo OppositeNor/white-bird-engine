@@ -167,7 +167,7 @@ TEST(SurfaceTest2D, TriangulationWithWBEVertex2D) {
         WBE::Vertex2D<>* vert3;
     };
     
-    WBETriangle triangles[2];
+    WBETriangle triangles[2] = {};
     
     EXPECT_NO_THROW(
         WBE::SurfaceUtils2D::triangulate(vertices, 4, triangles)
