@@ -72,6 +72,7 @@ public:
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
             data[p_key] = result;
+            p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<Type, glm::vec2>) {
             data[p_key]["x"] = p_value.x;
             data[p_key]["y"] = p_value.y;

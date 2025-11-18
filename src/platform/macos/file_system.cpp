@@ -92,16 +92,16 @@ std::string FileSystem::get_ext(const Path& p_path) {
 }
 
 Directory FileSystem::get_executable_dir() {
-    char buf[1024];
-    ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf));
+    Buffer<1024> buf;
+    ssize_t len = readlink("/proc/self/exe", buf.buffer, buf.BUFFER_SIZE);
     if (len < 0) {
         throw std::runtime_error("Failed to get the executable path.");
     }
     if (len >= 1024) {
         throw std::runtime_error("Buffer overflow for executable path finding.");
     }
-    buf[len] = '\0';
-    return get_file_dir(std::string(buf));
+    buf.buffer[len] = '\0';
+    return get_file_dir(std::string(buf.buffer));
 }
 
 
