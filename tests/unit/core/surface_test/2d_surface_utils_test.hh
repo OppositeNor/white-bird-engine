@@ -78,7 +78,7 @@ TEST(SurfaceTest2D, TriangulationPentagon) {
         {{-0.588f, 1.0f}},   // Left top
         {{-0.951f, 0.309f}}  // Left bottom
     };
-    TestTriangle triangles[3]; // n-2 triangles for n vertices
+    TestTriangle triangles[3] = {}; // n-2 triangles for n vertices
     
     EXPECT_NO_THROW(
         WBE::SurfaceUtils2D::triangulate(vertices, 5, triangles)
@@ -94,7 +94,7 @@ TEST(SurfaceTest2D, TriangulationPentagon) {
 
 TEST(SurfaceTest2D, TriangulationNullVertexList) {
     // Test null vertex list - should throw exception
-    TestTriangle triangles[1];
+    TestTriangle triangles[1] = {};
     
     EXPECT_THROW((WBE::SurfaceUtils2D::triangulate<TestVertex, TestTriangle>(nullptr, 3, triangles)), std::runtime_error);
 }
@@ -120,7 +120,7 @@ TEST(SurfaceTest2D, TriangulationCollinearVertices) {
         {{1.0f, 0.0f}},
         {{0.5f, 1.0f}}
     };
-    TestTriangle triangles[2];
+    TestTriangle triangles[2] = {};
     
     EXPECT_NO_THROW(
         WBE::SurfaceUtils2D::triangulate(vertices, 4, triangles)
@@ -137,7 +137,7 @@ TEST(SurfaceTest2D, TriangulationComplexPolygon) {
         {{-0.5f, -0.866f}},  // Bottom-left
         {{0.5f, -0.866f}}    // Bottom-right
     };
-    TestTriangle triangles[4]; // n-2 triangles for n vertices
+    TestTriangle triangles[4] = {}; // n-2 triangles for n vertices
     
     EXPECT_NO_THROW(
         WBE::SurfaceUtils2D::triangulate(vertices, 6, triangles)
