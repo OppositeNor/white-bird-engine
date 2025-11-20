@@ -5,6 +5,6 @@
     },
     "main_shader_pixl": {
         "type": "binary",
-        "path": "shaders/main_pipeline_pixl.spv"
+        "path": "shaders/main_pipeline_frag.spv"
     }
 }

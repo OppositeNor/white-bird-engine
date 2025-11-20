@@ -70,7 +70,7 @@ def _gather_license():
                 continue
             for lf in license_files:
                 target_name = f"{subdir.name}_{lf.name}"
-                target_path = output_dir / target_name
+                target_path = os.path.join(output_dir, target_name)
                 shutil.copy2(lf, target_path)
 
             # Apache license requires to also include a NOTICE file if exists:
@@ -79,7 +79,7 @@ def _gather_license():
             if notice_files:
                 for nf in notice_files:
                     target_name = f"{subdir.name}_{nf.name}"
-                    target_path = output_dir / target_name
+                    target_path = os.path.join(output_dir, target_name)
                     print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
