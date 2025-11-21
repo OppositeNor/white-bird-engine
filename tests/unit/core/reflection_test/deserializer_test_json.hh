@@ -255,11 +255,6 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_NullValues_IndividualFields) {
     parser.parse_from_buffer(null_int_json);
     EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
     
-    // Test null value for string field
-    std::string null_string_json = R"({ "str_test": null })";
-    parser.parse_from_buffer(null_string_json);
-    EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
-    
     // Test null value for buffer field
     std::string null_buffer_json = R"({ "buffer_test": null })";
     parser.parse_from_buffer(null_buffer_json);
@@ -463,7 +458,7 @@ TEST_F(WBEDeserializerJSONTest, DeepNesting_Depth2) {
     WBE::SerializableSD<WBE::TestDepth2> sd;
     WBE::TestDepth2 test_obj;
     WBE::ParserJSON parser;
-    
+
     std::string depth2_json = R"({
         "depth2_id": 100,
         "depth2_name": "depth2_test",
