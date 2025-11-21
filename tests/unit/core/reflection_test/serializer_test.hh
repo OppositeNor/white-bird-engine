@@ -645,6 +645,467 @@ inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     EXPECT_EQ(arr[1].template get_value<glm::vec2>("child_vector"), glm::vec2(3.0f, 4.0f));
 }
 
+// Dynamic serialization test functions (JSON only since dynamic serialization is JSON-specific)
+inline void dynamic_serializer_test_basic() {
+    WBE::JSONData json_data;
+    WBE::TestSerializable serializable{};
+    
+    // Set some test values
+    serializable.si32_test = 42;
+    serializable.si64_test = -1337;
+    serializable.ui32_test = 256;
+    serializable.ui64_test = 512;
+    serializable.f32_test = 3.14159f;
+    serializable.f64_test = 2.71828;
+    serializable.vec3_test = glm::vec3(1.0f, 2.0f, 3.0f);
+    serializable.vec4_test = glm::vec4(4.0f, 5.0f, 6.0f, 7.0f);
+    serializable.str_test = "dynamic_test";
+    strcpy(serializable.buffer_test.buffer, "dyn_buffer");
+
+    // Use dynamic serialization
+    serializable.serialize(json_data);
+
+    // Verify all fields were serialized correctly
+    EXPECT_TRUE(json_data.contains("si32_test"));
+    EXPECT_TRUE(json_data.contains("si64_test"));
+    EXPECT_TRUE(json_data.contains("ui32_test"));
+    EXPECT_TRUE(json_data.contains("ui64_test"));
+    EXPECT_TRUE(json_data.contains("f32_test"));
+    EXPECT_TRUE(json_data.contains("f64_test"));
+    EXPECT_TRUE(json_data.contains("vec3_test"));
+    EXPECT_TRUE(json_data.contains("vec4_test"));
+    EXPECT_TRUE(json_data.contains("str_test"));
+    EXPECT_TRUE(json_data.contains("buffer_test"));
+
+    EXPECT_EQ(json_data.get_value<int32_t>("si32_test"), 42);
+    EXPECT_EQ(json_data.get_value<int64_t>("si64_test"), -1337);
+    EXPECT_EQ(json_data.get_value<uint32_t>("ui32_test"), 256u);
+    EXPECT_EQ(json_data.get_value<uint64_t>("ui64_test"), 512u);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("f32_test"), 3.14159f);
+    EXPECT_DOUBLE_EQ(json_data.get_value<double>("f64_test"), 2.71828);
+    EXPECT_EQ(json_data.get_value<glm::vec3>("vec3_test"), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(json_data.get_value<glm::vec4>("vec4_test"), glm::vec4(4.0f, 5.0f, 6.0f, 7.0f));
+    EXPECT_EQ(json_data.get_value<std::string>("str_test"), std::string("dynamic_test"));
+    EXPECT_EQ(json_data.get_value<std::string>("buffer_test"), std::string("dyn_buffer"));
+}
+
+inline void dynamic_serializer_test_inheritance() {
+    WBE::JSONData json_data;
+    WBE::TestInheritedChild child{};
+    
+    // Set inherited base fields
+    child.base_id = 100;
+    child.base_name = "dynamic_base";
+    child.base_value = 1.23f;
+    
+    // Set child fields
+    child.child_id = 200;
+    child.child_name = "dynamic_child";
+    child.child_value = 4.56;
+
+    // Use dynamic serialization
+    child.serialize(json_data);
+
+    // Verify both inherited and child fields were serialized
+    EXPECT_TRUE(json_data.contains("base_id"));
+    EXPECT_TRUE(json_data.contains("base_name"));
+    EXPECT_TRUE(json_data.contains("base_value"));
+    EXPECT_TRUE(json_data.contains("child_id"));
+    EXPECT_TRUE(json_data.contains("child_name"));
+    EXPECT_TRUE(json_data.contains("child_value"));
+
+    EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 100);
+    EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("dynamic_base"));
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 1.23f);
+    EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 200);
+    EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("dynamic_child"));
+    EXPECT_DOUBLE_EQ(json_data.get_value<double>("child_value"), 4.56);
+}
+
+inline void dynamic_serializer_test_multiple_inheritance() {
+    WBE::JSONData json_data;
+    WBE::TestMultipleInheritanceChild child{};
+    
+    // Set fields from first parent (A)
+    child.a_id = 111;
+    child.a_name = "dynamic_a";
+    child.a_value = 1.11f;
+    
+    // Set fields from second parent (B)
+    child.b_id = 222;
+    child.b_name = "dynamic_b";
+    child.b_value = 2.22;
+    
+    // Set child's own fields
+    child.child_id = 333;
+    child.child_name = "dynamic_multi_child";
+    child.child_vector = glm::vec2(9.9f, 8.8f);
+
+    // Use dynamic serialization
+    child.serialize(json_data);
+
+    // Verify all fields from both parents and child are serialized
+    EXPECT_TRUE(json_data.contains("a_id"));
+    EXPECT_TRUE(json_data.contains("a_name"));
+    EXPECT_TRUE(json_data.contains("a_value"));
+    EXPECT_TRUE(json_data.contains("b_id"));
+    EXPECT_TRUE(json_data.contains("b_name"));
+    EXPECT_TRUE(json_data.contains("b_value"));
+    EXPECT_TRUE(json_data.contains("child_id"));
+    EXPECT_TRUE(json_data.contains("child_name"));
+    EXPECT_TRUE(json_data.contains("child_vector"));
+
+    EXPECT_EQ(json_data.get_value<int32_t>("a_id"), 111);
+    EXPECT_EQ(json_data.get_value<std::string>("a_name"), std::string("dynamic_a"));
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("a_value"), 1.11f);
+    EXPECT_EQ(json_data.get_value<int32_t>("b_id"), 222);
+    EXPECT_EQ(json_data.get_value<std::string>("b_name"), std::string("dynamic_b"));
+    EXPECT_DOUBLE_EQ(json_data.get_value<double>("b_value"), 2.22);
+    EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 333);
+    EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("dynamic_multi_child"));
+    EXPECT_EQ(json_data.get_value<glm::vec2>("child_vector"), glm::vec2(9.9f, 8.8f));
+}
+
+inline void dynamic_serializer_test_polymorphism() {
+    // Test polymorphic serialization through base pointer
+    WBE::JSONData json_data_base, json_data_child;
+    
+    // Create objects
+    WBE::TestInheritedBase base{};
+    base.base_id = 42;
+    base.base_name = "poly_base";
+    base.base_value = 1.0f;
+    
+    WBE::TestInheritedChild child{};
+    child.base_id = 84;
+    child.base_name = "poly_child_base";
+    child.base_value = 2.0f;
+    child.child_id = 168;
+    child.child_name = "poly_child";
+    child.child_value = 3.0;
+
+    // Test direct serialization
+    base.serialize(json_data_base);
+    child.serialize(json_data_child);
+
+    // Verify base object serialization
+    EXPECT_TRUE(json_data_base.contains("base_id"));
+    EXPECT_TRUE(json_data_base.contains("base_name"));
+    EXPECT_TRUE(json_data_base.contains("base_value"));
+    EXPECT_FALSE(json_data_base.contains("child_id"));  // Should not contain child fields
+    EXPECT_FALSE(json_data_base.contains("child_name"));
+    EXPECT_FALSE(json_data_base.contains("child_value"));
+
+    // Verify child object serialization includes all fields
+    EXPECT_TRUE(json_data_child.contains("base_id"));
+    EXPECT_TRUE(json_data_child.contains("base_name"));
+    EXPECT_TRUE(json_data_child.contains("base_value"));
+    EXPECT_TRUE(json_data_child.contains("child_id"));
+    EXPECT_TRUE(json_data_child.contains("child_name"));
+    EXPECT_TRUE(json_data_child.contains("child_value"));
+
+    EXPECT_EQ(json_data_child.get_value<int32_t>("base_id"), 84);
+    EXPECT_EQ(json_data_child.get_value<std::string>("base_name"), std::string("poly_child_base"));
+    EXPECT_FLOAT_EQ(json_data_child.get_value<float>("base_value"), 2.0f);
+    EXPECT_EQ(json_data_child.get_value<int32_t>("child_id"), 168);
+    EXPECT_EQ(json_data_child.get_value<std::string>("child_name"), std::string("poly_child"));
+    EXPECT_DOUBLE_EQ(json_data_child.get_value<double>("child_value"), 3.0);
+}
+
+inline void dynamic_serializer_test_nested_objects() {
+    WBE::JSONData json_data;
+    WBE::TestInheritedWithNested obj{};
+    
+    // Set inherited base fields
+    obj.base_id = 999;
+    obj.base_name = "dynamic_nested_base";
+    obj.base_value = 7.77f;
+    
+    // Set child fields
+    obj.child_numbers = {10, 20, 30, 40};
+    obj.nested_object.si32_test = 888;
+    obj.nested_object.str_test = "dynamic_nested_string";
+    strcpy(obj.nested_object.buffer_test.buffer, "dyn_nest");
+
+    // Use dynamic serialization
+    obj.serialize(json_data);
+
+    // Check inherited base fields
+    EXPECT_TRUE(json_data.contains("base_id"));
+    EXPECT_TRUE(json_data.contains("base_name"));
+    EXPECT_TRUE(json_data.contains("base_value"));
+    EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 999);
+    EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("dynamic_nested_base"));
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 7.77f);
+
+    // Check child fields
+    EXPECT_TRUE(json_data.contains("child_numbers"));
+    EXPECT_TRUE(json_data.contains("nested_object"));
+
+    auto numbers = json_data.get_value<WBE::JSONData>("child_numbers").get<std::vector<int>>();
+    ASSERT_EQ(numbers.size(), 4u);
+    EXPECT_EQ(numbers[0], 10);
+    EXPECT_EQ(numbers[1], 20);
+    EXPECT_EQ(numbers[2], 30);
+    EXPECT_EQ(numbers[3], 40);
+
+    auto nested = json_data.get_value<WBE::JSONData>("nested_object");
+    EXPECT_EQ(nested.get_value<int32_t>("si32_test"), 888);
+    EXPECT_EQ(nested.get_value<std::string>("str_test"), std::string("dynamic_nested_string"));
+    EXPECT_EQ(nested.get_value<std::string>("buffer_test"), std::string("dyn_nest"));
+}
+
+// Dynamic dispatch test functions
+inline void dynamic_dispatch_test_single_inheritance() {
+    WBE::JSONData json_data_base, json_data_child;
+    
+    // Create derived object
+    auto child = std::make_unique<WBE::TestInheritedChild>();
+    child->base_id = 500;
+    child->base_name = "dispatch_base";
+    child->base_value = 5.5f;
+    child->child_id = 600;
+    child->child_name = "dispatch_child";
+    child->child_value = 6.6;
+
+    // Test dynamic dispatch through base pointer
+    WBE::Serializable* base_ptr = child.get();
+    base_ptr->serialize(json_data_base);
+
+    // Also test direct child serialization for comparison
+    child->serialize(json_data_child);
+
+    // Both should produce identical results (dynamic dispatch should serialize the full derived object)
+    EXPECT_TRUE(json_data_base.contains("base_id"));
+    EXPECT_TRUE(json_data_base.contains("base_name"));
+    EXPECT_TRUE(json_data_base.contains("base_value"));
+    EXPECT_TRUE(json_data_base.contains("child_id"));
+    EXPECT_TRUE(json_data_base.contains("child_name"));
+    EXPECT_TRUE(json_data_base.contains("child_value"));
+
+    // Verify values match
+    EXPECT_EQ(json_data_base.get_value<int32_t>("base_id"), 500);
+    EXPECT_EQ(json_data_base.get_value<std::string>("base_name"), std::string("dispatch_base"));
+    EXPECT_FLOAT_EQ(json_data_base.get_value<float>("base_value"), 5.5f);
+    EXPECT_EQ(json_data_base.get_value<int32_t>("child_id"), 600);
+    EXPECT_EQ(json_data_base.get_value<std::string>("child_name"), std::string("dispatch_child"));
+    EXPECT_DOUBLE_EQ(json_data_base.get_value<double>("child_value"), 6.6);
+
+    // Results should be identical between base pointer and direct access
+    EXPECT_EQ(json_data_base.get_value<int32_t>("base_id"), json_data_child.get_value<int32_t>("base_id"));
+    EXPECT_EQ(json_data_base.get_value<std::string>("base_name"), json_data_child.get_value<std::string>("base_name"));
+    EXPECT_FLOAT_EQ(json_data_base.get_value<float>("base_value"), json_data_child.get_value<float>("base_value"));
+    EXPECT_EQ(json_data_base.get_value<int32_t>("child_id"), json_data_child.get_value<int32_t>("child_id"));
+    EXPECT_EQ(json_data_base.get_value<std::string>("child_name"), json_data_child.get_value<std::string>("child_name"));
+    EXPECT_DOUBLE_EQ(json_data_base.get_value<double>("child_value"), json_data_child.get_value<double>("child_value"));
+}
+
+inline void dynamic_dispatch_test_multilevel_inheritance() {
+    WBE::JSONData json_data_base, json_data_child, json_data_grandchild;
+    
+    // Create grandchild object
+    auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
+    grandchild->base_id = 100;
+    grandchild->base_name = "dispatch_grandparent";
+    grandchild->base_value = 1.0f;
+    grandchild->child_id = 200;
+    grandchild->child_name = "dispatch_parent";
+    grandchild->child_value = 2.0;
+    grandchild->grandchild_id = 300;
+    grandchild->grandchild_name = "dispatch_grandchild";
+    grandchild->grandchild_vector = glm::vec3(7.0f, 8.0f, 9.0f);
+
+    // Test dynamic dispatch through different inheritance levels
+    WBE::Serializable* base_ptr = grandchild.get();
+    WBE::TestInheritedBase* intermediate_ptr = grandchild.get();
+    WBE::TestInheritedChild* child_ptr = grandchild.get();
+
+    base_ptr->serialize(json_data_base);
+    intermediate_ptr->serialize(json_data_child);
+    child_ptr->serialize(json_data_grandchild);
+
+    // All should serialize the complete grandchild object due to dynamic dispatch
+    auto verify_complete_serialization = [&](const WBE::JSONData& data, const std::string& test_name) {
+        EXPECT_TRUE(data.contains("base_id")) << "Missing base_id in " << test_name;
+        EXPECT_TRUE(data.contains("base_name")) << "Missing base_name in " << test_name;
+        EXPECT_TRUE(data.contains("base_value")) << "Missing base_value in " << test_name;
+        EXPECT_TRUE(data.contains("child_id")) << "Missing child_id in " << test_name;
+        EXPECT_TRUE(data.contains("child_name")) << "Missing child_name in " << test_name;
+        EXPECT_TRUE(data.contains("child_value")) << "Missing child_value in " << test_name;
+        EXPECT_TRUE(data.contains("grandchild_id")) << "Missing grandchild_id in " << test_name;
+        EXPECT_TRUE(data.contains("grandchild_name")) << "Missing grandchild_name in " << test_name;
+        EXPECT_TRUE(data.contains("grandchild_vector")) << "Missing grandchild_vector in " << test_name;
+
+        EXPECT_EQ(data.get_value<int32_t>("base_id"), 100);
+        EXPECT_EQ(data.get_value<std::string>("base_name"), std::string("dispatch_grandparent"));
+        EXPECT_FLOAT_EQ(data.get_value<float>("base_value"), 1.0f);
+        EXPECT_EQ(data.get_value<int32_t>("child_id"), 200);
+        EXPECT_EQ(data.get_value<std::string>("child_name"), std::string("dispatch_parent"));
+        EXPECT_DOUBLE_EQ(data.get_value<double>("child_value"), 2.0);
+        EXPECT_EQ(data.get_value<int32_t>("grandchild_id"), 300);
+        EXPECT_EQ(data.get_value<std::string>("grandchild_name"), std::string("dispatch_grandchild"));
+        EXPECT_EQ(data.get_value<glm::vec3>("grandchild_vector"), glm::vec3(7.0f, 8.0f, 9.0f));
+    };
+
+    verify_complete_serialization(json_data_base, "base_ptr");
+    verify_complete_serialization(json_data_child, "intermediate_ptr");
+    verify_complete_serialization(json_data_grandchild, "child_ptr");
+}
+
+inline void dynamic_dispatch_test_multiple_inheritance() {
+    WBE::JSONData json_data_a, json_data_b;
+    
+    // Create multiple inheritance child
+    auto child = std::make_unique<WBE::TestMultipleInheritanceChild>();
+    child->a_id = 777;
+    child->a_name = "dispatch_a";
+    child->a_value = 7.77f;
+    child->b_id = 888;
+    child->b_name = "dispatch_b";
+    child->b_value = 8.88;
+    child->child_id = 999;
+    child->child_name = "dispatch_multi_child";
+    child->child_vector = glm::vec2(10.0f, 11.0f);
+
+    // Test dynamic dispatch through different parent pointers
+    WBE::TestMultipleInheritanceA* a_ptr = child.get();
+    WBE::TestMultipleInheritanceB* b_ptr = child.get();
+
+    a_ptr->serialize(json_data_a);
+    b_ptr->serialize(json_data_b);
+
+    // All should serialize the complete child object
+    auto verify_complete_multi_serialization = [&](const WBE::JSONData& data, const std::string& test_name) {
+        EXPECT_TRUE(data.contains("a_id")) << "Missing a_id in " << test_name;
+        EXPECT_TRUE(data.contains("a_name")) << "Missing a_name in " << test_name;
+        EXPECT_TRUE(data.contains("a_value")) << "Missing a_value in " << test_name;
+        EXPECT_TRUE(data.contains("b_id")) << "Missing b_id in " << test_name;
+        EXPECT_TRUE(data.contains("b_name")) << "Missing b_name in " << test_name;
+        EXPECT_TRUE(data.contains("b_value")) << "Missing b_value in " << test_name;
+        EXPECT_TRUE(data.contains("child_id")) << "Missing child_id in " << test_name;
+        EXPECT_TRUE(data.contains("child_name")) << "Missing child_name in " << test_name;
+        EXPECT_TRUE(data.contains("child_vector")) << "Missing child_vector in " << test_name;
+
+        EXPECT_EQ(data.get_value<int32_t>("a_id"), 777);
+        EXPECT_EQ(data.get_value<std::string>("a_name"), std::string("dispatch_a"));
+        EXPECT_FLOAT_EQ(data.get_value<float>("a_value"), 7.77f);
+        EXPECT_EQ(data.get_value<int32_t>("b_id"), 888);
+        EXPECT_EQ(data.get_value<std::string>("b_name"), std::string("dispatch_b"));
+        EXPECT_DOUBLE_EQ(data.get_value<double>("b_value"), 8.88);
+        EXPECT_EQ(data.get_value<int32_t>("child_id"), 999);
+        EXPECT_EQ(data.get_value<std::string>("child_name"), std::string("dispatch_multi_child"));
+        EXPECT_EQ(data.get_value<glm::vec2>("child_vector"), glm::vec2(10.0f, 11.0f));
+    };
+
+    verify_complete_multi_serialization(json_data_a, "a_ptr");
+    verify_complete_multi_serialization(json_data_b, "b_ptr");
+}
+
+inline void dynamic_dispatch_test_polymorphic_container() {
+    // Test dynamic dispatch with polymorphic containers
+    std::vector<std::unique_ptr<WBE::Serializable>> objects;
+    
+    // Create different types of objects
+    auto base = std::make_unique<WBE::TestInheritedBase>();
+    base->base_id = 1;
+    base->base_name = "container_base";
+    base->base_value = 1.1f;
+    
+    auto child = std::make_unique<WBE::TestInheritedChild>();
+    child->base_id = 2;
+    child->base_name = "container_child_base";
+    child->base_value = 2.2f;
+    child->child_id = 22;
+    child->child_name = "container_child";
+    child->child_value = 2.22;
+    
+    auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
+    grandchild->base_id = 3;
+    grandchild->base_name = "container_grandchild_base";
+    grandchild->base_value = 3.3f;
+    grandchild->child_id = 33;
+    grandchild->child_name = "container_grandchild_child";
+    grandchild->child_value = 3.33;
+    grandchild->grandchild_id = 333;
+    grandchild->grandchild_name = "container_grandchild";
+    grandchild->grandchild_vector = glm::vec3(3.0f, 3.0f, 3.0f);
+
+    // Store in polymorphic container
+    objects.push_back(std::move(base));
+    objects.push_back(std::move(child));
+    objects.push_back(std::move(grandchild));
+
+    // Serialize each object through base pointer
+    std::vector<WBE::JSONData> serialized_data(3);
+    for (size_t i = 0; i < objects.size(); ++i) {
+        objects[i]->serialize(serialized_data[i]);
+    }
+
+    // Verify first object (base) - should only have base fields
+    EXPECT_TRUE(serialized_data[0].contains("base_id"));
+    EXPECT_TRUE(serialized_data[0].contains("base_name"));
+    EXPECT_TRUE(serialized_data[0].contains("base_value"));
+    EXPECT_FALSE(serialized_data[0].contains("child_id"));
+    EXPECT_FALSE(serialized_data[0].contains("grandchild_id"));
+
+    // Verify second object (child) - should have base + child fields
+    EXPECT_TRUE(serialized_data[1].contains("base_id"));
+    EXPECT_TRUE(serialized_data[1].contains("base_name"));
+    EXPECT_TRUE(serialized_data[1].contains("base_value"));
+    EXPECT_TRUE(serialized_data[1].contains("child_id"));
+    EXPECT_TRUE(serialized_data[1].contains("child_name"));
+    EXPECT_TRUE(serialized_data[1].contains("child_value"));
+    EXPECT_FALSE(serialized_data[1].contains("grandchild_id"));
+
+    // Verify third object (grandchild) - should have all fields
+    EXPECT_TRUE(serialized_data[2].contains("base_id"));
+    EXPECT_TRUE(serialized_data[2].contains("base_name"));
+    EXPECT_TRUE(serialized_data[2].contains("base_value"));
+    EXPECT_TRUE(serialized_data[2].contains("child_id"));
+    EXPECT_TRUE(serialized_data[2].contains("child_name"));
+    EXPECT_TRUE(serialized_data[2].contains("child_value"));
+    EXPECT_TRUE(serialized_data[2].contains("grandchild_id"));
+    EXPECT_TRUE(serialized_data[2].contains("grandchild_name"));
+    EXPECT_TRUE(serialized_data[2].contains("grandchild_vector"));
+
+    // Verify values
+    EXPECT_EQ(serialized_data[0].get_value<int32_t>("base_id"), 1);
+    EXPECT_EQ(serialized_data[1].get_value<int32_t>("child_id"), 22);
+    EXPECT_EQ(serialized_data[2].get_value<int32_t>("grandchild_id"), 333);
+}
+
+inline void dynamic_dispatch_test_reference_semantics() {
+    WBE::JSONData json_data;
+    
+    // Test dynamic dispatch through references
+    WBE::TestInheritedChild child{};
+    child.base_id = 42;
+    child.base_name = "ref_base";
+    child.base_value = 4.2f;
+    child.child_id = 84;
+    child.child_name = "ref_child";
+    child.child_value = 8.4;
+
+    // Serialize through base reference
+    WBE::Serializable& base_ref = child;
+    base_ref.serialize(json_data);
+
+    // Should serialize the complete child object
+    EXPECT_TRUE(json_data.contains("base_id"));
+    EXPECT_TRUE(json_data.contains("base_name"));
+    EXPECT_TRUE(json_data.contains("base_value"));
+    EXPECT_TRUE(json_data.contains("child_id"));
+    EXPECT_TRUE(json_data.contains("child_name"));
+    EXPECT_TRUE(json_data.contains("child_value"));
+
+    EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 42);
+    EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("ref_base"));
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 4.2f);
+    EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 84);
+    EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("ref_child"));
+    EXPECT_DOUBLE_EQ(json_data.get_value<double>("child_value"), 8.4);
+}
+
 TEST_F(WBESerializerTest, DefaultConstruct) {
     WBE::JSONData json_data;
     serializer_test_default_construct(json_data);
@@ -771,6 +1232,48 @@ TEST_F(WBESerializerTest, MultipleInheritanceVectorSerialize) {
     serializer_test_multiple_inheritance_vector(json_data);
     WBE::YAMLData yaml_data;
     serializer_test_multiple_inheritance_vector(yaml_data);
+}
+
+// Dynamic serialization tests (JSON only)
+TEST_F(WBESerializerTest, DynamicSerializationBasic) {
+    dynamic_serializer_test_basic();
+}
+
+TEST_F(WBESerializerTest, DynamicSerializationInheritance) {
+    dynamic_serializer_test_inheritance();
+}
+
+TEST_F(WBESerializerTest, DynamicSerializationMultipleInheritance) {
+    dynamic_serializer_test_multiple_inheritance();
+}
+
+TEST_F(WBESerializerTest, DynamicSerializationPolymorphism) {
+    dynamic_serializer_test_polymorphism();
+}
+
+TEST_F(WBESerializerTest, DynamicSerializationNestedObjects) {
+    dynamic_serializer_test_nested_objects();
+}
+
+// Dynamic dispatch tests
+TEST_F(WBESerializerTest, DynamicDispatchSingleInheritance) {
+    dynamic_dispatch_test_single_inheritance();
+}
+
+TEST_F(WBESerializerTest, DynamicDispatchMultilevelInheritance) {
+    dynamic_dispatch_test_multilevel_inheritance();
+}
+
+TEST_F(WBESerializerTest, DynamicDispatchMultipleInheritance) {
+    dynamic_dispatch_test_multiple_inheritance();
+}
+
+TEST_F(WBESerializerTest, DynamicDispatchPolymorphicContainer) {
+    dynamic_dispatch_test_polymorphic_container();
+}
+
+TEST_F(WBESerializerTest, DynamicDispatchReferenceSemantics) {
+    dynamic_dispatch_test_reference_semantics();
 }
 
 #endif
