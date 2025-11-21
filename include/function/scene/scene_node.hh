@@ -111,11 +111,9 @@ public:
 
 
 private:
-    using string = string<>;
-
     RefWeak<SceneNode> this_ref;
 
-    string name;
+    string<> name;
     RefWeak<SceneNode> parent;
     vector<Ref<SceneNode>> children;
 };
