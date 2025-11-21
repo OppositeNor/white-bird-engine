@@ -102,8 +102,8 @@ nested_test:
 };
 
 TEST_F(WBEDeserializerYAMLTest, General) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserYAML parser;
     parser.parse_from_buffer(test_serialize_yaml_general);
     sd.deserialize(parser.get_data(), test_obj);
@@ -120,8 +120,8 @@ TEST_F(WBEDeserializerYAMLTest, General) {
 }
 
 TEST_F(WBEDeserializerYAMLTest, ZerosAndStrings) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserYAML parser;
     parser.parse_from_buffer(test_serialize_yaml_zeros);
     sd.deserialize(parser.get_data(), test_obj);
@@ -139,8 +139,8 @@ TEST_F(WBEDeserializerYAMLTest, ZerosAndStrings) {
 }
 
 TEST_F(WBEDeserializerYAMLTest, StringsAndBufferContent) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserYAML parser;
     parser.parse_from_buffer(test_serialize_yaml_general);
     sd.deserialize(parser.get_data(), test_obj);
@@ -150,8 +150,8 @@ TEST_F(WBEDeserializerYAMLTest, StringsAndBufferContent) {
 }
 
 TEST_F(WBEDeserializerYAMLTest, BufferTooLongThrows) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserYAML parser;
 
     // Create YAML where buffer_test is longer than Buffer<16>
@@ -164,8 +164,8 @@ TEST_F(WBEDeserializerYAMLTest, BufferTooLongThrows) {
 }
 
 TEST_F(WBEDeserializerYAMLTest, PartialUpdateOnlyOneField) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     // Initialize with sentinel values
     test_obj.si32_test = 100;
     test_obj.si64_test = 200;
@@ -186,8 +186,8 @@ TEST_F(WBEDeserializerYAMLTest, PartialUpdateOnlyOneField) {
 }
 
 TEST_F(WBEDeserializerYAMLTest, NestingGeneral) {
-    WBE::SerializableSD<TestSerializableNesting> sd;
-    TestSerializableNesting test_obj;
+    WBE::SerializableSD<WBE::TestSerializableNesting> sd;
+    WBE::TestSerializableNesting test_obj;
     WBE::ParserYAML parser;
     parser.parse_from_buffer(test_serialize_yaml_nesting);
     sd.deserialize(parser.get_data(), test_obj);

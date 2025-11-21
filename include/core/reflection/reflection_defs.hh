@@ -32,4 +32,42 @@
 
 #endif
 
+namespace WhiteBirdEngine {
+/**
+ * @class SerializableSD
+ * @brief Serializer/deserializer for genenral types.
+ * @tparam T The type to serialize/deserialize.
+ */
+template <typename T>
+class SerializableSD {
+public:
+
+    using ObjType = T;
+
+    /**
+     * @brief Serialize.
+     *
+     * @param p_key The key to insert into p_data.
+     * @param p_data The data to insert result.
+     * @param p_serializable The object to serialize.
+     */
+    template <typename ParserDataType>
+    static void serialize(ParserDataType& p_data, const ObjType& p_serializable) {
+        p_data.set(p_serializable);
+    }
+
+    /**
+     * @brief Deserialize.
+     *
+     * @param p_serializable The object to deserialize.
+     */
+    template <typename ParserDataType>
+    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
+         p_data.template get<ObjType>(p_serializable);
+    }
+
+};
+
+}
+
 #endif

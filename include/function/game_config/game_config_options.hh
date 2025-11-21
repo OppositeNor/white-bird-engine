@@ -17,6 +17,7 @@
 #define __WBE_GAME_CONFIG_OPTIONS_HH__
 
 #include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable.hh"
 
 namespace WhiteBirdEngine {
 /**
@@ -24,7 +25,8 @@ namespace WhiteBirdEngine {
  * @brief Configuration options for game.
  *
  */
-WBE_STRUCT(GameConfigOptions, WBE_CONFIG_OPTION) {
+WBE_STRUCT(GameConfigOptions, WBE_CONFIG_OPTION) final : public Serializable {
+    WBE_DECL_SERIALIZABLE(GameConfigOptions)
     /**
      * @brief The name of the game.
      */

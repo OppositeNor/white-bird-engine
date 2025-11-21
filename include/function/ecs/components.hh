@@ -18,6 +18,7 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <glm/glm.hpp>
@@ -50,7 +51,8 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
  * @class ComponentLabel
  * @brief Label of the entity.
  */
-WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
+WBE_STRUCT(ComponentLabel, WBE_COMPONENT) final : public Serializable {
+    WBE_DECL_SERIALIZABLE(ComponentLabel)
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
     WBE_META(WBE_REFLECT)
@@ -66,7 +68,8 @@ WBE_STRUCT(ComponentLabel, WBE_COMPONENT) {
  * @class ComponentTransform
  * @brief Transform component.
  */
-WBE_STRUCT(ComponentTransform, WBE_COMPONENT) {
+WBE_STRUCT(ComponentTransform, WBE_COMPONENT) final : public Serializable {
+    WBE_DECL_SERIALIZABLE(ComponentTransform)
     // The position value, ordered x, y, z
     WBE_META(WBE_REFLECT)
     glm::vec3 position;

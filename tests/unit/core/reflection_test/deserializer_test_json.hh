@@ -85,16 +85,16 @@ protected:
 };
 
 TEST_F(WBEDeserializerJSONTest, Empty) {
-    WBE::SerializableSD<TestEmptySerializable> sd;
-    TestEmptySerializable test_obj;
+    WBE::SerializableSD<WBE::TestEmptySerializable> sd;
+    WBE::TestEmptySerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer("{}");
     sd.deserialize(parser.get_data(), test_obj);
 }
 
 TEST_F(WBEDeserializerJSONTest, General) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_general);
     sd.deserialize(parser.get_data(), test_obj);
@@ -111,8 +111,8 @@ TEST_F(WBEDeserializerJSONTest, General) {
 }
 
 TEST_F(WBEDeserializerJSONTest, ZerosAndStrings) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_zeros);
     sd.deserialize(parser.get_data(), test_obj);
@@ -130,8 +130,8 @@ TEST_F(WBEDeserializerJSONTest, ZerosAndStrings) {
 }
 
 TEST_F(WBEDeserializerJSONTest, StringsAndBufferContent) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_general);
     sd.deserialize(parser.get_data(), test_obj);
@@ -141,8 +141,8 @@ TEST_F(WBEDeserializerJSONTest, StringsAndBufferContent) {
 }
 
 TEST_F(WBEDeserializerJSONTest, BufferTooLongThrows) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
 
     // Create JSON where buffer_test is longer than Buffer<16>
@@ -155,8 +155,8 @@ TEST_F(WBEDeserializerJSONTest, BufferTooLongThrows) {
 }
 
 TEST_F(WBEDeserializerJSONTest, PartialUpdateOnlyOneField) {
-    WBE::SerializableSD<TestSerializable> sd;
-    TestSerializable test_obj;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
+    WBE::TestSerializable test_obj;
     // Initialize with sentinel values
     test_obj.si32_test = 100;
     test_obj.si64_test = 200;
@@ -177,8 +177,8 @@ TEST_F(WBEDeserializerJSONTest, PartialUpdateOnlyOneField) {
 }
 
 TEST_F(WBEDeserializerJSONTest, NestingGeneral) {
-    WBE::SerializableSD<TestSerializableNesting> sd;
-    TestSerializableNesting test_obj;
+    WBE::SerializableSD<WBE::TestSerializableNesting> sd;
+    WBE::TestSerializableNesting test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_nesting);
     sd.deserialize(parser.get_data(), test_obj);

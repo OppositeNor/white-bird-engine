@@ -16,7 +16,9 @@
 #define __WBE_ENGINE_CONFIG_HH__
 
 #include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable.hh"
 #include "platform/file_system/path.hh"
+#include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
@@ -26,7 +28,10 @@ namespace WhiteBirdEngine {
  * @brief Engine configurations.
  *
  */
-WBE_STRUCT(EngineConfigOptions, WBE_CONFIG_OPTION) {
+WBE_STRUCT(EngineConfigOptions, WBE_CONFIG_OPTION) final : public Serializable {
+
+    WBE_DECL_SERIALIZABLE(EngineConfigOptions)
+
     /**
      * @brief Name of the engine.
      */

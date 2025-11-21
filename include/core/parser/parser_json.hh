@@ -27,6 +27,7 @@
 #include <string>
 #include <type_traits>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace WhiteBirdEngine {
 
@@ -80,7 +81,7 @@ public:
             data[p_key]["x"] = p_value.x;
             data[p_key]["y"] = p_value.y;
             data[p_key]["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             data[p_key]["x"] = p_value.x;
             data[p_key]["y"] = p_value.y;
             data[p_key]["z"] = p_value.z;
@@ -124,7 +125,7 @@ public:
             data["x"] = p_value.x;
             data["y"] = p_value.y;
             data["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             data = json();
             data["x"] = p_value.x;
             data["y"] = p_value.y;
@@ -175,8 +176,8 @@ public:
                 data.at("x").get<float>(),
                 data.at("y").get<float>(),
                 data.at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(
+        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
+            p_value = T(
                 data.at("x").get<float>(),
                 data.at("y").get<float>(),
                 data.at("z").get<float>(),
@@ -214,8 +215,8 @@ public:
                 data.at(p_key).at("x").get<float>(),
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(
+        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
+            p_value = T(
                 data.at(p_key).at("x").get<float>(),
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>(),

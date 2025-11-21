@@ -21,6 +21,7 @@
 #include <iostream>
 #include <yaml-cpp/yaml.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace WhiteBirdEngine {
 
@@ -74,7 +75,7 @@ public:
             node[p_key]["x"] = p_value.x;
             node[p_key]["y"] = p_value.y;
             node[p_key]["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             node[p_key]["x"] = p_value.x;
             node[p_key]["y"] = p_value.y;
             node[p_key]["z"] = p_value.z;
@@ -118,7 +119,7 @@ public:
             node["x"] = p_value.x;
             node["y"] = p_value.y;
             node["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             node = yaml();
             node["x"] = p_value.x;
             node["y"] = p_value.y;
@@ -171,6 +172,12 @@ public:
                 node["z"].as<float>());
         } else if constexpr (std::same_as<T, glm::vec4>) {
             p_value = glm::vec4(
+                node["x"].as<float>(),
+                node["y"].as<float>(),
+                node["z"].as<float>(),
+                node["w"].as<float>());
+        } else if constexpr (std::same_as<T, glm::quat>) {
+            p_value = glm::quat(
                 node["x"].as<float>(),
                 node["y"].as<float>(),
                 node["z"].as<float>(),

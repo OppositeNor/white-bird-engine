@@ -1,17 +1,27 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #ifndef __WBE_SERIALIZABLE_HH__
 #define __WBE_SERIALIZABLE_HH__
 
+#include "core/parser/parser_json.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "utils/utils.hh"
-#include <string_view>
 
 #define WBE_DECL_SERIALIZABLE(class_name)\
-    virtual std::string_view get_type() const override {\
-        return #class_name;\
-    }\
-    virtual TypeID get_type_id() const override {\
-        return static_hash(#class_name);\
-    }
+    friend class ::WhiteBirdEngine::SerializableSD<class_name>;\
+    virtual void serialize(::WhiteBirdEngine::JSONData& p_data) const override;\
+    virtual void deserialize(const ::WhiteBirdEngine::JSONData& p_data) override;
 
 namespace WhiteBirdEngine {
 
@@ -20,22 +30,24 @@ namespace WhiteBirdEngine {
  * @brief Serializable struct.
  *
  */
-WBE_CLASS(Serializable) {
+WBE_CLASS(Serializable, WBE_SERIALIZABLE) {
 public:
-    /**
-     * @brief Get the type of the serializable in string.
-     * 
-     * @return The type of the serializable in string.
-     */
-    virtual std::string_view get_type() const = 0;
+    Serializable() = default;
+    virtual ~Serializable() {}
 
     /**
-     * @brief Get the type ID of the serializable.
+     * @brief Serialize.
      *
-     * @return The type ID of the serializable.
+     * @param p_data The data to store serialization.
      */
-    virtual TypeID get_type_id() const = 0;
+    virtual void serialize(JSONData& p_data) const = 0;
 
+    /**
+     * @brief Deserialize.
+     *
+     * @param p_data The data to find data from.
+     */
+    virtual void deserialize(const JSONData& p_data) = 0;
 };
 
 

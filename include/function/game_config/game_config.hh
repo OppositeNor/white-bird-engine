@@ -30,8 +30,7 @@ public:
     GameConfig(const Path& p_config_file_path) {
         auto parser = ParserYAML();
         parser.parse(p_config_file_path);
-        SerializableSD<GameConfigOptions> config_options_sd;
-        config_options_sd.deserialize(parser.get_data(), config_options);
+        SerializableSD<GameConfigOptions>::deserialize(parser.get_data(), config_options);
     }
     ~GameConfig() {}
 

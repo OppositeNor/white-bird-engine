@@ -43,8 +43,8 @@ protected:
 };
 template <typename ParserDataType>
 inline void serializer_test_default_construct(ParserDataType p_data) {
-    TestSerializable serializable{};
-    WBE::SerializableSD<TestSerializable> sd;
+    WBE::TestSerializable serializable{};
+    WBE::SerializableSD<WBE::TestSerializable> sd;
     sd.serialize(p_data, serializable);
     EXPECT_TRUE(p_data.contains("si32_test"));
     EXPECT_TRUE(p_data.contains("si64_test"));
@@ -69,7 +69,7 @@ inline void serializer_test_default_construct(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_general(ParserDataType p_data) {
-    TestSerializable serializable;
+    WBE::TestSerializable serializable;
     // populate with non-default values
     serializable.si32_test = 3;
     serializable.si64_test = -62;
@@ -82,7 +82,7 @@ inline void serializer_test_general(ParserDataType p_data) {
     serializable.str_test = "Hello!";
     strcpy(serializable.buffer_test.buffer, "how are you?");
 
-    WBE::SerializableSD<TestSerializable> sd;
+    WBE::SerializableSD<WBE::TestSerializable> sd;
     sd.serialize(p_data, serializable);
 
     // verify keys and values
@@ -111,7 +111,7 @@ inline void serializer_test_general(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_nesting(ParserDataType p_data) {
-    TestSerializableNesting serializable{};
+    WBE::TestSerializableNesting serializable{};
     // fill nested_test
     serializable.nesting_id = 7;
     serializable.name = "parent";
@@ -127,7 +127,7 @@ inline void serializer_test_nesting(ParserDataType p_data) {
     serializable.nested_test.str_test = "Hello!";
     strcpy(serializable.nested_test.buffer_test.buffer, "how are you?");
 
-    WBE::SerializableSD<TestSerializableNesting> sd;
+    WBE::SerializableSD<WBE::TestSerializableNesting> sd;
     sd.serialize(p_data, serializable);
 
     // Top-level checks
@@ -156,15 +156,15 @@ inline void serializer_test_nesting(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_deep_nesting(ParserDataType p_data) {
-    // Depth-2: TestDepth2 contains TestSerializable
-    TestDepth2 td2{};
+    // Depth-2: TestDepth2 contains WBE::TestSerializable
+    WBE::TestDepth2 td2{};
     td2.depth2_id = 123;
     td2.depth2_name = "depth2";
     td2.nested.si32_test = 9;
     td2.nested.str_test = "deep";
     strcpy(td2.nested.buffer_test.buffer, "B2");
 
-    WBE::SerializableSD<TestDepth2> sd;
+    WBE::SerializableSD<WBE::TestDepth2> sd;
     sd.serialize(p_data, td2);
 
     EXPECT_TRUE(p_data.contains("nested"));
@@ -200,14 +200,14 @@ inline void serializer_test_vector_primitives(ParserDataType p_data_ints, Parser
 
 template <typename ParserDataType>
 inline void serializer_test_vector_serializables(ParserDataType p_data) {
-    // Test serializing vector of TestSerializable objects
-    std::vector<TestSerializable> vec;
-    TestSerializable a{}; a.si32_test = 1; a.str_test = "a"; strcpy(a.buffer_test.buffer, "A");
-    TestSerializable b{}; b.si32_test = 2; b.str_test = "b"; strcpy(b.buffer_test.buffer, "B");
+    // Test serializing vector of WBE::TestSerializable objects
+    std::vector<WBE::TestSerializable> vec;
+    WBE::TestSerializable a{}; a.si32_test = 1; a.str_test = "a"; strcpy(a.buffer_test.buffer, "A");
+    WBE::TestSerializable b{}; b.si32_test = 2; b.str_test = "b"; strcpy(b.buffer_test.buffer, "B");
     vec.push_back(a);
     vec.push_back(b);
 
-    WBE::SerializableSD<std::vector<TestSerializable>> sd_vec;
+    WBE::SerializableSD<std::vector<WBE::TestSerializable>> sd_vec;
     sd_vec.serialize(p_data, vec);
 
     // Expect an array of objects
@@ -222,16 +222,16 @@ inline void serializer_test_vector_serializables(ParserDataType p_data) {
 template <typename ParserDataType>
 inline void serializer_test_struct_with_vector_serializables(ParserDataType p_data) {
     // Build a container with vectors
-    TestVectorContainer container{};
+    WBE::TestVectorContainer container{};
     container.ints = {10, 20, 30};
     container.strs = {"aa", "bb"};
 
-    TestSerializable a{}; a.si32_test = 5; a.str_test = "aa"; strcpy(a.buffer_test.buffer, "A");
-    TestSerializable b{}; b.si32_test = 6; b.str_test = "bb"; strcpy(b.buffer_test.buffer, "B");
+    WBE::TestSerializable a{}; a.si32_test = 5; a.str_test = "aa"; strcpy(a.buffer_test.buffer, "A");
+    WBE::TestSerializable b{}; b.si32_test = 6; b.str_test = "bb"; strcpy(b.buffer_test.buffer, "B");
     container.children.push_back(a);
     container.children.push_back(b);
 
-    WBE::SerializableSD<TestVectorContainer> sd;
+    WBE::SerializableSD<WBE::TestVectorContainer> sd;
     sd.serialize(p_data, container);
 
     // Top-level fields
@@ -263,14 +263,14 @@ inline void serializer_test_struct_with_vector_serializables(ParserDataType p_da
 
 template <typename ParserDataType>
 inline void serializer_test_depth_2(ParserDataType p_data) {
-    TestDepth2 d2{};
+    WBE::TestDepth2 d2{};
     d2.nested.si32_test = 11;
     d2.nested.str_test = "deep2";
     strcpy(d2.nested.buffer_test.buffer, "X");
     d2.depth2_id = 77;
     d2.depth2_name = "level2";
 
-    WBE::SerializableSD<TestDepth2> sd;
+    WBE::SerializableSD<WBE::TestDepth2> sd;
     sd.serialize(p_data, d2);
 
     EXPECT_TRUE(p_data.contains("nested"));
@@ -284,13 +284,13 @@ inline void serializer_test_depth_2(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_depth_3(ParserDataType p_data) {
-    TestDepth3 d3{};
+    WBE::TestDepth3 d3{};
     d3.nested2.nested.si32_test = 21;
     d3.nested2.nested.str_test = "deep3";
     d3.depth3_id = 88;
     d3.depth3_name = "level3";
 
-    WBE::SerializableSD<TestDepth3> sd;
+    WBE::SerializableSD<WBE::TestDepth3> sd;
     sd.serialize(p_data, d3);
 
     EXPECT_TRUE(p_data.contains("nested2"));
@@ -303,19 +303,19 @@ inline void serializer_test_depth_3(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_vector_with_deep_nesting(ParserDataType p_data) {
-    TestDeepVectorContainer container{};
+    WBE::TestDeepVectorContainer container{};
 
-    TestDepth2 d2a{}; d2a.nested.si32_test = 31; d2a.depth2_id = 1; d2a.depth2_name = "d2a";
-    TestDepth2 d2b{}; d2b.nested.si32_test = 32; d2b.depth2_id = 2; d2b.depth2_name = "d2b";
+    WBE::TestDepth2 d2a{}; d2a.nested.si32_test = 31; d2a.depth2_id = 1; d2a.depth2_name = "d2a";
+    WBE::TestDepth2 d2b{}; d2b.nested.si32_test = 32; d2b.depth2_id = 2; d2b.depth2_name = "d2b";
     container.vec2.push_back(d2a);
     container.vec2.push_back(d2b);
 
-    TestDepth3 d3a{}; d3a.nested2.nested.si32_test = 41; d3a.depth3_id = 3; d3a.depth3_name = "d3a";
-    TestDepth3 d3b{}; d3b.nested2.nested.si32_test = 42; d3b.depth3_id = 4; d3b.depth3_name = "d3b";
+    WBE::TestDepth3 d3a{}; d3a.nested2.nested.si32_test = 41; d3a.depth3_id = 3; d3a.depth3_name = "d3a";
+    WBE::TestDepth3 d3b{}; d3b.nested2.nested.si32_test = 42; d3b.depth3_id = 4; d3b.depth3_name = "d3b";
     container.vec3.push_back(d3a);
     container.vec3.push_back(d3b);
 
-    WBE::SerializableSD<TestDeepVectorContainer> sd;
+    WBE::SerializableSD<WBE::TestDeepVectorContainer> sd;
     sd.serialize(p_data, container);
 
     EXPECT_TRUE(p_data.contains("vec2"));
@@ -335,12 +335,12 @@ inline void serializer_vector_with_deep_nesting(ParserDataType p_data) {
 // Inheritance test functions
 template <typename ParserDataType>
 inline void serializer_test_inheritance_base(ParserDataType p_data) {
-    TestInheritedBase base{};
+    WBE::TestInheritedBase base{};
     base.base_id = 42;
     base.base_name = "base_test";
     base.base_value = 3.14f;
 
-    WBE::SerializableSD<TestInheritedBase> sd;
+    WBE::SerializableSD<WBE::TestInheritedBase> sd;
     sd.serialize(p_data, base);
 
     EXPECT_TRUE(p_data.contains("base_id"));
@@ -354,7 +354,7 @@ inline void serializer_test_inheritance_base(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_inheritance_child(ParserDataType p_data) {
-    TestInheritedChild child{};
+    WBE::TestInheritedChild child{};
     // Set inherited fields
     child.base_id = 100;
     child.base_name = "inherited_base";
@@ -364,7 +364,7 @@ inline void serializer_test_inheritance_child(ParserDataType p_data) {
     child.child_name = "child_test";
     child.child_value = 1.414;
 
-    WBE::SerializableSD<TestInheritedChild> sd;
+    WBE::SerializableSD<WBE::TestInheritedChild> sd;
     sd.serialize(p_data, child);
 
     // Check that both base and child fields are serialized
@@ -388,7 +388,7 @@ inline void serializer_test_inheritance_child(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
-    TestInheritedGrandchild grandchild{};
+    WBE::TestInheritedGrandchild grandchild{};
     // Set base fields
     grandchild.base_id = 10;
     grandchild.base_name = "grandparent";
@@ -402,7 +402,7 @@ inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
     grandchild.grandchild_name = "grandchild";
     grandchild.grandchild_vector = glm::vec3(1.0f, 2.0f, 3.0f);
 
-    WBE::SerializableSD<TestInheritedGrandchild> sd;
+    WBE::SerializableSD<WBE::TestInheritedGrandchild> sd;
     sd.serialize(p_data, grandchild);
 
     // Check all levels of inheritance are serialized
@@ -430,7 +430,7 @@ inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
-    TestInheritedWithNested obj{};
+    WBE::TestInheritedWithNested obj{};
     // Set inherited base fields
     obj.base_id = 555;
     obj.base_name = "nested_base";
@@ -441,7 +441,7 @@ inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
     obj.nested_object.str_test = "nested_string";
     strcpy(obj.nested_object.buffer_test.buffer, "nested_buf");
 
-    WBE::SerializableSD<TestInheritedWithNested> sd;
+    WBE::SerializableSD<WBE::TestInheritedWithNested> sd;
     sd.serialize(p_data, obj);
 
     // Check inherited base fields
@@ -471,20 +471,20 @@ inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
 template <typename ParserDataType>
 inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     // Test vector of inherited objects
-    std::vector<TestInheritedChild> children;
+    std::vector<WBE::TestInheritedChild> children;
     
-    TestInheritedChild child1{};
+    WBE::TestInheritedChild child1{};
     child1.base_id = 1; child1.base_name = "base1"; child1.base_value = 1.1f;
     child1.child_id = 11; child1.child_name = "child1"; child1.child_value = 11.1;
     
-    TestInheritedChild child2{};
+    WBE::TestInheritedChild child2{};
     child2.base_id = 2; child2.base_name = "base2"; child2.base_value = 2.2f;
     child2.child_id = 22; child2.child_name = "child2"; child2.child_value = 22.2;
     
     children.push_back(child1);
     children.push_back(child2);
 
-    WBE::SerializableSD<std::vector<TestInheritedChild>> sd;
+    WBE::SerializableSD<std::vector<WBE::TestInheritedChild>> sd;
     sd.serialize(p_data, children);
 
     auto arr = p_data.template get<std::vector<ParserDataType>>();
@@ -510,7 +510,7 @@ inline void serializer_test_inheritance_vector(ParserDataType p_data) {
 // Multiple inheritance test functions
 template <typename ParserDataType>
 inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
-    TestMultipleInheritanceChild child{};
+    WBE::TestMultipleInheritanceChild child{};
     // Set fields from first parent (A)
     child.a_id = 100;
     child.a_name = "parent_a";
@@ -524,7 +524,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
     child.child_name = "multi_child";
     child.child_vector = glm::vec2(7.7f, 8.8f);
 
-    WBE::SerializableSD<TestMultipleInheritanceChild> sd;
+    WBE::SerializableSD<WBE::TestMultipleInheritanceChild> sd;
     sd.serialize(p_data, child);
 
     // Check all fields from both parents and child are serialized
@@ -555,7 +555,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
 
 template <typename ParserDataType>
 inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
-    TestDiamondChild diamond{};
+    WBE::TestDiamondChild diamond{};
     // Set fields from virtual base
     diamond.diamond_base_id = 42;
     diamond.diamond_base_name = "diamond_base";
@@ -569,7 +569,7 @@ inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
     diamond.diamond_child_id = 30;
     diamond.diamond_child_name = "diamond_child";
 
-    WBE::SerializableSD<TestDiamondChild> sd;
+    WBE::SerializableSD<WBE::TestDiamondChild> sd;
     sd.serialize(p_data, diamond);
 
     // Check all fields are serialized
@@ -601,14 +601,14 @@ inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
 template <typename ParserDataType>
 inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     // Test vector of multiple inheritance objects
-    std::vector<TestMultipleInheritanceChild> children;
+    std::vector<WBE::TestMultipleInheritanceChild> children;
     
-    TestMultipleInheritanceChild child1{};
+    WBE::TestMultipleInheritanceChild child1{};
     child1.a_id = 1; child1.a_name = "a1"; child1.a_value = 1.1f;
     child1.b_id = 2; child1.b_name = "b1"; child1.b_value = 2.2;
     child1.child_id = 3; child1.child_name = "c1"; child1.child_vector = glm::vec2(1.0f, 2.0f);
     
-    TestMultipleInheritanceChild child2{};
+    WBE::TestMultipleInheritanceChild child2{};
     child2.a_id = 11; child2.a_name = "a2"; child2.a_value = 11.1f;
     child2.b_id = 22; child2.b_name = "b2"; child2.b_value = 22.2;
     child2.child_id = 33; child2.child_name = "c2"; child2.child_vector = glm::vec2(3.0f, 4.0f);
@@ -616,7 +616,7 @@ inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     children.push_back(child1);
     children.push_back(child2);
 
-    WBE::SerializableSD<std::vector<TestMultipleInheritanceChild>> sd;
+    WBE::SerializableSD<std::vector<WBE::TestMultipleInheritanceChild>> sd;
     sd.serialize(p_data, children);
 
     auto arr = p_data.template get<std::vector<ParserDataType>>();

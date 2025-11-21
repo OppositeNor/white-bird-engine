@@ -139,6 +139,7 @@ add_subdirectory(src/core)
 add_subdirectory(src/resource)
 add_subdirectory(src/function)
 add_subdirectory(src/global)
+add_subdirectory(src/generated)
 
 add_library(WBE_LIB
     ${WBE_SOURCES}

@@ -1,0 +1,10 @@
+[
+    {
+        "output_name" : "serializable_impl.gen.cpp",
+        "template" : "serializable_impl.cpp.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "serializables" : ".serializables"
+        }
+    }
+]

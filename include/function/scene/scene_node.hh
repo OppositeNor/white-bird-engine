@@ -32,7 +32,7 @@ WBE_CLASS(SceneNode) : public Object {
 protected:
 public:
 
-    WBE_DECL_SERIALIZABLE(SceneNode);
+    WBE_DECL_OBJECT(SceneNode)
 
     virtual ~SceneNode() {}
     SceneNode(const SceneNode&) = delete;
