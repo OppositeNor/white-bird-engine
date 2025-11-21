@@ -57,7 +57,7 @@ constexpr size_t get_align_size(size_t p_size, size_t p_alignment) {
 }
 
 using HashCode = uint32_t;
-using UUID = uint32_t;
+using TypeID = uint32_t;
 
 /**
  * @brief Hash a string in compile time.

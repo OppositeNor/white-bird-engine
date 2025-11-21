@@ -17,6 +17,8 @@
 
 #include "scene.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/object/object.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "global/stl_allocator.hh"
 #include <stdexcept>
 namespace WhiteBirdEngine {
@@ -26,9 +28,11 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class SceneNode {
+WBE_CLASS(SceneNode) : public Object {
 protected:
 public:
+
+    WBE_DECL_SERIALIZABLE(SceneNode);
 
     virtual ~SceneNode() {}
     SceneNode(const SceneNode&) = delete;
@@ -108,7 +112,6 @@ public:
 
 private:
     using string = string<>;
-
 
     RefWeak<SceneNode> this_ref;
 

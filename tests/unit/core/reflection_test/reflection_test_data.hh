@@ -108,4 +108,41 @@ WBE_STRUCT(TestDeepVectorContainer, WBE_SERIALIZABLE) {
     std::vector<TestDepth3> vec3;
 };
 
+// Inheritance test structures
+WBE_STRUCT(TestInheritedBase, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    int32_t base_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string base_name;
+    WBE_META(WBE_REFLECT)
+    float base_value = 0.0f;
+};
+
+WBE_STRUCT(TestInheritedChild, WBE_SERIALIZABLE) : public TestInheritedBase {
+    WBE_META(WBE_REFLECT)
+    int32_t child_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string child_name;
+    WBE_META(WBE_REFLECT)
+    double child_value = 0.0;
+};
+
+// Multi-level inheritance test
+WBE_STRUCT(TestInheritedGrandchild, WBE_SERIALIZABLE) : public TestInheritedChild {
+    WBE_META(WBE_REFLECT)
+    int32_t grandchild_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string grandchild_name;
+    WBE_META(WBE_REFLECT)
+    glm::vec3 grandchild_vector;
+};
+
+// Inheritance with nested serializable objects
+WBE_STRUCT(TestInheritedWithNested, WBE_SERIALIZABLE) : public TestInheritedBase {
+    WBE_META(WBE_REFLECT)
+    TestSerializable nested_object;
+    WBE_META(WBE_REFLECT)
+    std::vector<int> child_numbers;
+};
+
 #endif

@@ -16,7 +16,7 @@
 #ifndef __WBE_SERIALIZABLES_ACCESS_GEN_HH__
 #define __WBE_SERIALIZABLES_ACCESS_GEN_HH__
 
-{% for serializable in metadata.structs %}
+{% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", serializables) | list | length > 0  %}
 #include "{{ serializable.in_header }}"
 {% endif %}
@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
 template <typename T>
 class SerializableAccess {};
 
-{% for serializable in metadata.structs %}
+{% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", serializables) | list | length > 0  %}
 /**
  * @class SerializableAccess<{{ serializable.name }}>

@@ -332,6 +332,181 @@ inline void serializer_vector_with_deep_nesting(ParserDataType p_data) {
     EXPECT_EQ(out_vec3[1].template get_value<int32_t>("depth3_id"), 4);
 }
 
+// Inheritance test functions
+template <typename ParserDataType>
+inline void serializer_test_inheritance_base(ParserDataType p_data) {
+    TestInheritedBase base{};
+    base.base_id = 42;
+    base.base_name = "base_test";
+    base.base_value = 3.14f;
+
+    WBE::SerializableSD<TestInheritedBase> sd;
+    sd.serialize(p_data, base);
+
+    EXPECT_TRUE(p_data.contains("base_id"));
+    EXPECT_TRUE(p_data.contains("base_name"));
+    EXPECT_TRUE(p_data.contains("base_value"));
+
+    EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 42);
+    EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("base_test"));
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 3.14f);
+}
+
+template <typename ParserDataType>
+inline void serializer_test_inheritance_child(ParserDataType p_data) {
+    TestInheritedChild child{};
+    // Set inherited fields
+    child.base_id = 100;
+    child.base_name = "inherited_base";
+    child.base_value = 2.71f;
+    // Set child fields
+    child.child_id = 200;
+    child.child_name = "child_test";
+    child.child_value = 1.414;
+
+    WBE::SerializableSD<TestInheritedChild> sd;
+    sd.serialize(p_data, child);
+
+    // Check that both base and child fields are serialized
+    EXPECT_TRUE(p_data.contains("base_id"));
+    EXPECT_TRUE(p_data.contains("base_name"));
+    EXPECT_TRUE(p_data.contains("base_value"));
+    EXPECT_TRUE(p_data.contains("child_id"));
+    EXPECT_TRUE(p_data.contains("child_name"));
+    EXPECT_TRUE(p_data.contains("child_value"));
+
+    // Verify inherited fields
+    EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 100);
+    EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("inherited_base"));
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 2.71f);
+
+    // Verify child fields
+    EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 200);
+    EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("child_test"));
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("child_value"), 1.414);
+}
+
+template <typename ParserDataType>
+inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
+    TestInheritedGrandchild grandchild{};
+    // Set base fields
+    grandchild.base_id = 10;
+    grandchild.base_name = "grandparent";
+    grandchild.base_value = 1.0f;
+    // Set child fields
+    grandchild.child_id = 20;
+    grandchild.child_name = "parent";
+    grandchild.child_value = 2.0;
+    // Set grandchild fields
+    grandchild.grandchild_id = 30;
+    grandchild.grandchild_name = "grandchild";
+    grandchild.grandchild_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+
+    WBE::SerializableSD<TestInheritedGrandchild> sd;
+    sd.serialize(p_data, grandchild);
+
+    // Check all levels of inheritance are serialized
+    EXPECT_TRUE(p_data.contains("base_id"));
+    EXPECT_TRUE(p_data.contains("base_name"));
+    EXPECT_TRUE(p_data.contains("base_value"));
+    EXPECT_TRUE(p_data.contains("child_id"));
+    EXPECT_TRUE(p_data.contains("child_name"));
+    EXPECT_TRUE(p_data.contains("child_value"));
+    EXPECT_TRUE(p_data.contains("grandchild_id"));
+    EXPECT_TRUE(p_data.contains("grandchild_name"));
+    EXPECT_TRUE(p_data.contains("grandchild_vector"));
+
+    // Verify all fields
+    EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 10);
+    EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("grandparent"));
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 1.0f);
+    EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 20);
+    EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("parent"));
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("child_value"), 2.0);
+    EXPECT_EQ(p_data.template get_value<int32_t>("grandchild_id"), 30);
+    EXPECT_EQ(p_data.template get_value<std::string>("grandchild_name"), std::string("grandchild"));
+    EXPECT_EQ(p_data.template get_value<glm::vec3>("grandchild_vector"), glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+template <typename ParserDataType>
+inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
+    TestInheritedWithNested obj{};
+    // Set inherited base fields
+    obj.base_id = 555;
+    obj.base_name = "nested_base";
+    obj.base_value = 9.99f;
+    // Set child fields
+    obj.child_numbers = {1, 2, 3, 4, 5};
+    obj.nested_object.si32_test = 777;
+    obj.nested_object.str_test = "nested_string";
+    strcpy(obj.nested_object.buffer_test.buffer, "nested_buf");
+
+    WBE::SerializableSD<TestInheritedWithNested> sd;
+    sd.serialize(p_data, obj);
+
+    // Check inherited base fields
+    EXPECT_TRUE(p_data.contains("base_id"));
+    EXPECT_TRUE(p_data.contains("base_name"));
+    EXPECT_TRUE(p_data.contains("base_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 555);
+    EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("nested_base"));
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 9.99f);
+
+    // Check child fields
+    EXPECT_TRUE(p_data.contains("child_numbers"));
+    EXPECT_TRUE(p_data.contains("nested_object"));
+
+    auto numbers = p_data.template get_value<ParserDataType>("child_numbers").template get<std::vector<int>>();
+    ASSERT_EQ(numbers.size(), 5u);
+    for (size_t i = 0; i < numbers.size(); ++i) {
+        EXPECT_EQ(numbers[i], static_cast<int>(i + 1));
+    }
+
+    auto nested = p_data.template get_value<ParserDataType>("nested_object");
+    EXPECT_EQ(nested.template get_value<int32_t>("si32_test"), 777);
+    EXPECT_EQ(nested.template get_value<std::string>("str_test"), std::string("nested_string"));
+    EXPECT_EQ(nested.template get_value<std::string>("buffer_test"), std::string("nested_buf"));
+}
+
+template <typename ParserDataType>
+inline void serializer_test_inheritance_vector(ParserDataType p_data) {
+    // Test vector of inherited objects
+    std::vector<TestInheritedChild> children;
+    
+    TestInheritedChild child1{};
+    child1.base_id = 1; child1.base_name = "base1"; child1.base_value = 1.1f;
+    child1.child_id = 11; child1.child_name = "child1"; child1.child_value = 11.1;
+    
+    TestInheritedChild child2{};
+    child2.base_id = 2; child2.base_name = "base2"; child2.base_value = 2.2f;
+    child2.child_id = 22; child2.child_name = "child2"; child2.child_value = 22.2;
+    
+    children.push_back(child1);
+    children.push_back(child2);
+
+    WBE::SerializableSD<std::vector<TestInheritedChild>> sd;
+    sd.serialize(p_data, children);
+
+    auto arr = p_data.template get<std::vector<ParserDataType>>();
+    ASSERT_EQ(arr.size(), 2u);
+
+    // Check first child
+    EXPECT_EQ(arr[0].template get_value<int32_t>("base_id"), 1);
+    EXPECT_EQ(arr[0].template get_value<std::string>("base_name"), std::string("base1"));
+    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("base_value"), 1.1f);
+    EXPECT_EQ(arr[0].template get_value<int32_t>("child_id"), 11);
+    EXPECT_EQ(arr[0].template get_value<std::string>("child_name"), std::string("child1"));
+    EXPECT_DOUBLE_EQ(arr[0].template get_value<double>("child_value"), 11.1);
+
+    // Check second child
+    EXPECT_EQ(arr[1].template get_value<int32_t>("base_id"), 2);
+    EXPECT_EQ(arr[1].template get_value<std::string>("base_name"), std::string("base2"));
+    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("base_value"), 2.2f);
+    EXPECT_EQ(arr[1].template get_value<int32_t>("child_id"), 22);
+    EXPECT_EQ(arr[1].template get_value<std::string>("child_name"), std::string("child2"));
+    EXPECT_DOUBLE_EQ(arr[1].template get_value<double>("child_value"), 22.2);
+}
+
 TEST_F(WBESerializerTest, DefaultConstruct) {
     WBE::JSONData json_data;
     serializer_test_default_construct(json_data);
@@ -402,5 +577,40 @@ TEST_F(WBESerializerTest, VectorOfDeepNestingSerialize) {
     serializer_vector_with_deep_nesting(yaml_data);
 }
 
+// Inheritance serialization tests
+TEST_F(WBESerializerTest, InheritanceBaseSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_inheritance_base(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_inheritance_base(yaml_data);
+}
+
+TEST_F(WBESerializerTest, InheritanceChildSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_inheritance_child(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_inheritance_child(yaml_data);
+}
+
+TEST_F(WBESerializerTest, InheritanceMultilevelSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_inheritance_multilevel(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_inheritance_multilevel(yaml_data);
+}
+
+TEST_F(WBESerializerTest, InheritanceWithNestedSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_inheritance_with_nested(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_inheritance_with_nested(yaml_data);
+}
+
+TEST_F(WBESerializerTest, InheritanceVectorSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_inheritance_vector(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_inheritance_vector(yaml_data);
+}
 
 #endif

@@ -28,8 +28,7 @@
         "output_name" : "type_uuid.gen.hh",
         "template" : "type_uuid.hh.jinja",
         "data" : {
-            "metadata" : ".metadata",
-            "type_uuid" : ".type_uuid"
+            "metadata" : ".metadata"
         }
     }
 ]

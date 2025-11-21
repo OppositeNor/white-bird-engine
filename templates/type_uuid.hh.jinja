@@ -17,10 +17,8 @@
 #define __WBE_Type_UUID_HH__
 
 #include "utils/utils.hh"
-{% for struct in metadata.types %}
-{% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
-#include "{{ struct.in_header }}"
-{% endif %}
+{% for type in metadata.classes %}
+#include "{{ type.in_header }}"
 {% endfor %}
 
 #include <format>
@@ -30,33 +28,29 @@ namespace WhiteBirdEngine {
 template <typename T>
 struct TypeUUID {};
 
-{% for struct in metadata.types %}
-{% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
+{% for type in metadata.classes %}
 /**
- * @class TypeUUID<{{ struct.name }}>
- * @brief Type UUID of <{{ struct.name }}>
+ * @class TypeUUID<{{ type.name }}>
+ * @brief Type UUID of <{{ type.name }}>
  */
 template <>
-struct TypeUUID<{{ struct.name }}> {
+struct TypeUUID<{{ type.name }}> {
     // The type.
-    using Type = {{ struct.name }};
+    using Type = {{ type.name }};
     // The type UUID.
-    static constexpr HashCode UUID = static_hash("{{ struct.name }}");
+    static constexpr TypeID UUID = static_hash("{{ type.name }}");
 };
-{% endif %}
 {% endfor %}
 
 /**
  * @class TypeUUIDManager
- * @brief Manager class for types' UUID.
+ * @brief Manager class for types' ID.
  */
 class TypeUUIDManager : public Singleton<TypeUUIDManager> {
 public:
     TypeUUIDManager() : Singleton<TypeUUIDManager>() {
-        {% for struct in metadata.types %}
-        {% if struct.attribute | select("in", type_uuid) | list | length > 0  %}
-        type_name_map[TypeUUID<{{ struct.name }}>::UUID] = "{{ struct.name }}";
-        {% endif %}
+        {% for type in metadata.classes %}
+        type_name_map[TypeUUID<{{ type.name }}>::UUID] = "{{ type.name }}";
         {% endfor %}
     }
     virtual ~TypeUUIDManager() override {
@@ -68,7 +62,7 @@ public:
      * @param p_type_uuid The UUID of the type to get name from.
      * @return The name of the type.
      */
-    const std::string& get_type_name(HashCode p_type_uuid) const {
+    const std::string& get_type_name(TypeID p_type_uuid) const {
         auto found = type_name_map.find(p_type_uuid);
         if (found == type_name_map.end()) {
             throw std::runtime_error(std::format("Type with id: {} not registered.", p_type_uuid));
@@ -77,7 +71,7 @@ public:
     }
 
 private:
-    std::map<HashCode, std::string> type_name_map;
+    std::map<TypeID, std::string> type_name_map;
 
 };
 

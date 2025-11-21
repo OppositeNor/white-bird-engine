@@ -106,12 +106,12 @@ private:
 
     RUType get_res_type(const std::string& p_type);
 
-    void load_ru_image(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
-    void load_ru_audio(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
-    void load_ru_video(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
-    void load_ru_text(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
-    void load_ru_font(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
-    void load_ru_binary(const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key,  StackAllocator& p_allocator);
+    void load_ru_image(const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
+    void load_ru_audio(const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
+    void load_ru_video(const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
+    void load_ru_text(const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
+    void load_ru_font(const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator);
+    void load_ru_binary(const typename ParserType::DataType& p_parser_data, const std::string& p_key,  StackAllocator& p_allocator);
 };
 
 template <ParserConcept ParserType>
@@ -147,39 +147,39 @@ ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, Sta
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_image(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     RULoaderImage loader;
     loader.load<typename ParserType::DataType>(*this, p_key, p_parser_data);
 }
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_audio(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_video(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_text(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     RULoaderText loader;
     loader.load<typename ParserType::DataType>(*this, p_key, p_parser_data);
 }
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_font(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     // TODO
 }
 
 template <ParserConcept ParserType>
 void ResourceChunkLoadFile<ParserType>::load_ru_binary(
-    const ParserData<typename ParserType::DataType>& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
+    const typename ParserType::DataType& p_parser_data, const std::string& p_key, StackAllocator& p_allocator) {
     RULoaderBinary loader;
     loader.load<typename ParserType::DataType>(*this, p_key, p_parser_data);
 }

@@ -40,7 +40,7 @@ public:
      * @param p_parser_data The parser data.
      */
     template <ParserDataConcept ParserDataType>
-    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserData<ParserDataType>& p_parser_data) {
+    RefRes<char> load(ResourceChunk& p_chunk, const std::string& p_key, const ParserDataType& p_parser_data) {
         return static_cast<ChildT*>(this)->template load<ParserDataType>(p_chunk, p_parser_data);
     }
 };
