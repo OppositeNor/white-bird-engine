@@ -507,6 +507,144 @@ inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     EXPECT_DOUBLE_EQ(arr[1].template get_value<double>("child_value"), 22.2);
 }
 
+// Multiple inheritance test functions
+template <typename ParserDataType>
+inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
+    TestMultipleInheritanceChild child{};
+    // Set fields from first parent (A)
+    child.a_id = 100;
+    child.a_name = "parent_a";
+    child.a_value = 1.23f;
+    // Set fields from second parent (B)
+    child.b_id = 200;
+    child.b_name = "parent_b";
+    child.b_value = 4.56;
+    // Set child's own fields
+    child.child_id = 300;
+    child.child_name = "multi_child";
+    child.child_vector = glm::vec2(7.7f, 8.8f);
+
+    WBE::SerializableSD<TestMultipleInheritanceChild> sd;
+    sd.serialize(p_data, child);
+
+    // Check all fields from both parents and child are serialized
+    // Fields from parent A
+    EXPECT_TRUE(p_data.contains("a_id"));
+    EXPECT_TRUE(p_data.contains("a_name"));
+    EXPECT_TRUE(p_data.contains("a_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("a_id"), 100);
+    EXPECT_EQ(p_data.template get_value<std::string>("a_name"), std::string("parent_a"));
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("a_value"), 1.23f);
+
+    // Fields from parent B
+    EXPECT_TRUE(p_data.contains("b_id"));
+    EXPECT_TRUE(p_data.contains("b_name"));
+    EXPECT_TRUE(p_data.contains("b_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("b_id"), 200);
+    EXPECT_EQ(p_data.template get_value<std::string>("b_name"), std::string("parent_b"));
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("b_value"), 4.56);
+
+    // Child's own fields
+    EXPECT_TRUE(p_data.contains("child_id"));
+    EXPECT_TRUE(p_data.contains("child_name"));
+    EXPECT_TRUE(p_data.contains("child_vector"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 300);
+    EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("multi_child"));
+    EXPECT_EQ(p_data.template get_value<glm::vec2>("child_vector"), glm::vec2(7.7f, 8.8f));
+}
+
+template <typename ParserDataType>
+inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
+    TestDiamondChild diamond{};
+    // Set fields from virtual base
+    diamond.diamond_base_id = 42;
+    diamond.diamond_base_name = "diamond_base";
+    // Set fields from left parent
+    diamond.left_id = 10;
+    diamond.left_value = 1.5f;
+    // Set fields from right parent
+    diamond.right_id = 20;
+    diamond.right_value = 2.5;
+    // Set child's own fields
+    diamond.diamond_child_id = 30;
+    diamond.diamond_child_name = "diamond_child";
+
+    WBE::SerializableSD<TestDiamondChild> sd;
+    sd.serialize(p_data, diamond);
+
+    // Check all fields are serialized
+    // Virtual base fields (should appear only once)
+    EXPECT_TRUE(p_data.contains("diamond_base_id"));
+    EXPECT_TRUE(p_data.contains("diamond_base_name"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("diamond_base_id"), 42);
+    EXPECT_EQ(p_data.template get_value<std::string>("diamond_base_name"), std::string("diamond_base"));
+
+    // Left parent fields
+    EXPECT_TRUE(p_data.contains("left_id"));
+    EXPECT_TRUE(p_data.contains("left_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("left_id"), 10);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("left_value"), 1.5f);
+
+    // Right parent fields
+    EXPECT_TRUE(p_data.contains("right_id"));
+    EXPECT_TRUE(p_data.contains("right_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("right_id"), 20);
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("right_value"), 2.5);
+
+    // Child's own fields
+    EXPECT_TRUE(p_data.contains("diamond_child_id"));
+    EXPECT_TRUE(p_data.contains("diamond_child_name"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("diamond_child_id"), 30);
+    EXPECT_EQ(p_data.template get_value<std::string>("diamond_child_name"), std::string("diamond_child"));
+}
+
+template <typename ParserDataType>
+inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
+    // Test vector of multiple inheritance objects
+    std::vector<TestMultipleInheritanceChild> children;
+    
+    TestMultipleInheritanceChild child1{};
+    child1.a_id = 1; child1.a_name = "a1"; child1.a_value = 1.1f;
+    child1.b_id = 2; child1.b_name = "b1"; child1.b_value = 2.2;
+    child1.child_id = 3; child1.child_name = "c1"; child1.child_vector = glm::vec2(1.0f, 2.0f);
+    
+    TestMultipleInheritanceChild child2{};
+    child2.a_id = 11; child2.a_name = "a2"; child2.a_value = 11.1f;
+    child2.b_id = 22; child2.b_name = "b2"; child2.b_value = 22.2;
+    child2.child_id = 33; child2.child_name = "c2"; child2.child_vector = glm::vec2(3.0f, 4.0f);
+    
+    children.push_back(child1);
+    children.push_back(child2);
+
+    WBE::SerializableSD<std::vector<TestMultipleInheritanceChild>> sd;
+    sd.serialize(p_data, children);
+
+    auto arr = p_data.template get<std::vector<ParserDataType>>();
+    ASSERT_EQ(arr.size(), 2u);
+
+    // Check first child - all inheritance levels
+    EXPECT_EQ(arr[0].template get_value<int32_t>("a_id"), 1);
+    EXPECT_EQ(arr[0].template get_value<std::string>("a_name"), std::string("a1"));
+    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("a_value"), 1.1f);
+    EXPECT_EQ(arr[0].template get_value<int32_t>("b_id"), 2);
+    EXPECT_EQ(arr[0].template get_value<std::string>("b_name"), std::string("b1"));
+    EXPECT_DOUBLE_EQ(arr[0].template get_value<double>("b_value"), 2.2);
+    EXPECT_EQ(arr[0].template get_value<int32_t>("child_id"), 3);
+    EXPECT_EQ(arr[0].template get_value<std::string>("child_name"), std::string("c1"));
+    EXPECT_EQ(arr[0].template get_value<glm::vec2>("child_vector"), glm::vec2(1.0f, 2.0f));
+
+    // Check second child
+    EXPECT_EQ(arr[1].template get_value<int32_t>("a_id"), 11);
+    EXPECT_EQ(arr[1].template get_value<std::string>("a_name"), std::string("a2"));
+    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("a_value"), 11.1f);
+    EXPECT_EQ(arr[1].template get_value<int32_t>("b_id"), 22);
+    EXPECT_EQ(arr[1].template get_value<std::string>("b_name"), std::string("b2"));
+    EXPECT_DOUBLE_EQ(arr[1].template get_value<double>("b_value"), 22.2);
+    EXPECT_EQ(arr[1].template get_value<int32_t>("child_id"), 33);
+    EXPECT_EQ(arr[1].template get_value<std::string>("child_name"), std::string("c2"));
+    EXPECT_EQ(arr[1].template get_value<glm::vec2>("child_vector"), glm::vec2(3.0f, 4.0f));
+}
+
 TEST_F(WBESerializerTest, DefaultConstruct) {
     WBE::JSONData json_data;
     serializer_test_default_construct(json_data);
@@ -611,6 +749,28 @@ TEST_F(WBESerializerTest, InheritanceVectorSerialize) {
     serializer_test_inheritance_vector(json_data);
     WBE::YAMLData yaml_data;
     serializer_test_inheritance_vector(yaml_data);
+}
+
+// Multiple inheritance serialization tests
+TEST_F(WBESerializerTest, MultipleInheritanceSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_multiple_inheritance(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_multiple_inheritance(yaml_data);
+}
+
+TEST_F(WBESerializerTest, DiamondInheritanceSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_diamond_inheritance(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_diamond_inheritance(yaml_data);
+}
+
+TEST_F(WBESerializerTest, MultipleInheritanceVectorSerialize) {
+    WBE::JSONData json_data;
+    serializer_test_multiple_inheritance_vector(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_multiple_inheritance_vector(yaml_data);
 }
 
 #endif

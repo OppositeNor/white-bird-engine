@@ -145,4 +145,61 @@ WBE_STRUCT(TestInheritedWithNested, WBE_SERIALIZABLE) : public TestInheritedBase
     std::vector<int> child_numbers;
 };
 
+// Multiple inheritance test structures
+WBE_STRUCT(TestMultipleInheritanceA, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    int32_t a_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string a_name;
+    WBE_META(WBE_REFLECT)
+    float a_value = 0.0f;
+};
+
+WBE_STRUCT(TestMultipleInheritanceB, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    int32_t b_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string b_name;
+    WBE_META(WBE_REFLECT)
+    double b_value = 0.0;
+};
+
+WBE_STRUCT(TestMultipleInheritanceChild, WBE_SERIALIZABLE) : public TestMultipleInheritanceA, public TestMultipleInheritanceB {
+    WBE_META(WBE_REFLECT)
+    int32_t child_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string child_name;
+    WBE_META(WBE_REFLECT)
+    glm::vec2 child_vector;
+};
+
+// Diamond inheritance pattern test
+WBE_STRUCT(TestDiamondBase, WBE_SERIALIZABLE) {
+    WBE_META(WBE_REFLECT)
+    int32_t diamond_base_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string diamond_base_name;
+};
+
+WBE_STRUCT(TestDiamondLeft, WBE_SERIALIZABLE) : virtual public TestDiamondBase {
+    WBE_META(WBE_REFLECT)
+    int32_t left_id = 0;
+    WBE_META(WBE_REFLECT)
+    float left_value = 0.0f;
+};
+
+WBE_STRUCT(TestDiamondRight, WBE_SERIALIZABLE) : virtual public TestDiamondBase {
+    WBE_META(WBE_REFLECT)
+    int32_t right_id = 0;
+    WBE_META(WBE_REFLECT)
+    double right_value = 0.0;
+};
+
+WBE_STRUCT(TestDiamondChild, WBE_SERIALIZABLE) : public TestDiamondLeft, public TestDiamondRight {
+    WBE_META(WBE_REFLECT)
+    int32_t diamond_child_id = 0;
+    WBE_META(WBE_REFLECT)
+    std::string diamond_child_name;
+};
+
 #endif
