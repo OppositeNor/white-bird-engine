@@ -42,7 +42,6 @@ class WBEMetaparser:
         self.cache_dir = cache_dir
         self.sources = sources
         self._metadata = {}
-        self._attr_count_tracker = {}
         self._class_table = {}
 
     def parse(self, cpp_file_path : str):
@@ -101,7 +100,6 @@ class WBEMetaparser:
         for metadata in sorted_metadata:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
-        result_metadata.attr_count = self._attr_count_tracker
         self.reflector.register_metadata(result_metadata)
 
     def _register_from_clang(self, cpp_file_path, cache_path):
@@ -145,7 +143,6 @@ class WBEMetaparser:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.labels)):
                     attributes = self._get_attributes(attr.spelling)
-                    self._attr_count_tracker.update({ attr : self._attr_count_tracker.get(attr, 0) + 1 for attr in attributes })
                     label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes)
                     metadata.labels.append(label_metadata)
 
@@ -155,7 +152,6 @@ class WBEMetaparser:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.classes)):
                     attributes = self._get_attributes(attr.spelling)
-                    self._attr_count_tracker.update({ attr : self._attr_count_tracker.get(attr, 0) + 1 for attr in attributes })
                     class_metadata = self._get_class_metadata(cursor, attributes, in_file)
                     metadata.classes.append(class_metadata)
 

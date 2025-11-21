@@ -74,7 +74,6 @@ class WBEFileMetadata(BaseModel):
         deps: The dependencies of the file. Usually from include or import module.
         labels: The registered labels metadata.
         classes: The registered classes metadata.
-        structs: The registered structs metadata.
     """
     file_path : str = ""
     hashcode : str = ""
@@ -86,13 +85,11 @@ class WBEMetadata(BaseModel):
     """Metadata.
 
     Attributes:
-        channels: The registrated channels.
+        labels: The registrated lables.
         classes: The registrated classes.
-        structs: The registrated structs.
     """
     labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
     classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
-    attr_count : dict[str, int] = Field(default_factory=dict[str, int])
 
     def sort(self):
         """Sor the fields. This may gurantee the order it generates will always be the same,
