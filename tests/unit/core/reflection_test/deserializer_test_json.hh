@@ -666,4 +666,262 @@ TEST_F(WBEDeserializerJSONTest, GLMVectors_MissingComponentsError) {
     EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
 }
 
+// Dynamic deserialization tests
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_Basic) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    parser.parse_from_buffer(test_serialize_json_general);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.si32_test, 3);
+    EXPECT_EQ(test_obj.si64_test, -62);
+    EXPECT_EQ(test_obj.ui32_test, 42);
+    EXPECT_EQ(test_obj.ui64_test, 59);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 3.14f);
+    EXPECT_FLOAT_EQ(test_obj.f64_test, 2.718);
+    EXPECT_EQ(test_obj.vec3_test, glm::vec3(1, -2, 3));
+    EXPECT_EQ(test_obj.vec4_test, glm::vec4(1, -2, 3, -4));
+    EXPECT_EQ(test_obj.str_test, "Hello!");
+    EXPECT_STREQ(test_obj.buffer_test.buffer, "how are you?");
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_EmptySerializable) {
+    WBE::TestEmptySerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    parser.parse_from_buffer("{}");
+    EXPECT_NO_THROW(test_obj.deserialize(parser.get_data()));
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_Nesting) {
+    WBE::TestSerializableNesting test_obj;
+    WBE::ParserJSON parser;
+    
+    parser.parse_from_buffer(test_serialize_json_nesting);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.nesting_id, 7);
+    EXPECT_EQ(test_obj.name, "parent");
+    EXPECT_STREQ(test_obj.small_buffer.buffer, "abc");
+    
+    // Check nested object was properly deserialized
+    EXPECT_EQ(test_obj.nested_test.si32_test, 3);
+    EXPECT_EQ(test_obj.nested_test.str_test, "Hello!");
+    EXPECT_FLOAT_EQ(test_obj.nested_test.f32_test, 3.14f);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_VectorContainer) {
+    WBE::TestVectorContainer test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string vectors_json = R"({
+        "ints": [1, 2, 3, -4, 0],
+        "strs": ["hello", "world", "", "test"],
+        "children": [
+            {
+                "si32_test": 10,
+                "str_test": "child1"
+            },
+            {
+                "si32_test": 20,
+                "str_test": "child2"
+            }
+        ]
+    })";
+    
+    parser.parse_from_buffer(vectors_json);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.ints.size(), 5);
+    EXPECT_EQ(test_obj.ints[0], 1);
+    EXPECT_EQ(test_obj.ints[3], -4);
+    
+    EXPECT_EQ(test_obj.strs.size(), 4);
+    EXPECT_EQ(test_obj.strs[0], "hello");
+    EXPECT_EQ(test_obj.strs[2], "");
+    
+    EXPECT_EQ(test_obj.children.size(), 2);
+    EXPECT_EQ(test_obj.children[0].si32_test, 10);
+    EXPECT_EQ(test_obj.children[0].str_test, "child1");
+    EXPECT_EQ(test_obj.children[1].si32_test, 20);
+    EXPECT_EQ(test_obj.children[1].str_test, "child2");
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_DeepNesting) {
+    WBE::TestDepth3 test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string depth3_json = R"({
+        "depth3_id": 200,
+        "depth3_name": "depth3_test",
+        "nested2": {
+            "depth2_id": 100,
+            "depth2_name": "depth2_nested",
+            "nested": {
+                "si32_test": 42,
+                "str_test": "deeply_nested",
+                "vec3_test": {"x": 1.0, "y": 2.0, "z": 3.0}
+            }
+        }
+    })";
+    
+    parser.parse_from_buffer(depth3_json);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.depth3_id, 200);
+    EXPECT_EQ(test_obj.depth3_name, "depth3_test");
+    EXPECT_EQ(test_obj.nested2.depth2_id, 100);
+    EXPECT_EQ(test_obj.nested2.depth2_name, "depth2_nested");
+    EXPECT_EQ(test_obj.nested2.nested.si32_test, 42);
+    EXPECT_EQ(test_obj.nested2.nested.str_test, "deeply_nested");
+    EXPECT_EQ(test_obj.nested2.nested.vec3_test, glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_PartialUpdate) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    // Initialize with known values
+    test_obj.si32_test = 999;
+    test_obj.si64_test = 888;
+    test_obj.str_test = "original";
+    test_obj.f32_test = 123.45f;
+    
+    // JSON only contains some fields
+    std::string partial_json = R"({
+        "si32_test": 42,
+        "str_test": "updated"
+    })";
+    
+    parser.parse_from_buffer(partial_json);
+    test_obj.deserialize(parser.get_data());
+    
+    // Updated fields
+    EXPECT_EQ(test_obj.si32_test, 42);
+    EXPECT_EQ(test_obj.str_test, "updated");
+    
+    // Unchanged fields (should retain original values)
+    EXPECT_EQ(test_obj.si64_test, 888);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 123.45f);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_NullValues) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string null_json = R"({
+        "si32_test": null,
+        "str_test": null
+    })";
+    
+    parser.parse_from_buffer(null_json);
+    // Should throw exception for null values on non-pointer types
+    EXPECT_THROW(test_obj.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_TypeMismatch) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string mismatch_json = R"({
+        "si32_test": "not_a_number",
+        "str_test": 12345
+    })";
+    
+    parser.parse_from_buffer(mismatch_json);
+    // Should throw exception for type mismatches
+    EXPECT_THROW(test_obj.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_MalformedJSON) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    // Test malformed JSON
+    EXPECT_THROW(parser.parse_from_buffer("{ malformed json }"), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_BufferOverflow) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    // Create JSON where buffer_test is longer than Buffer<16>
+    std::string long_buffer_json = R"({ "buffer_test": ")";
+    long_buffer_json += std::string(32, 'A');
+    long_buffer_json += R"(" })";
+    
+    parser.parse_from_buffer(long_buffer_json);
+    // Should throw exception for buffer overflow
+    EXPECT_THROW(test_obj.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_IncompleteVectors) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string incomplete_vector_json = R"({
+        "vec3_test": {"x": 1.0, "y": 2.0}
+    })";
+    
+    parser.parse_from_buffer(incomplete_vector_json);
+    // Should throw exception for incomplete vector components
+    EXPECT_THROW(test_obj.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ExtremeValues) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string extreme_json = R"({
+        "si32_test": 2147483647,
+        "si64_test": -9223372036854775808,
+        "ui32_test": 4294967295,
+        "ui64_test": 18446744073709551615,
+        "f32_test": 3.4028235e+38,
+        "f64_test": -1.7976931348623157e+308
+    })";
+    
+    parser.parse_from_buffer(extreme_json);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.si32_test, std::numeric_limits<int32_t>::max());
+    EXPECT_EQ(test_obj.si64_test, std::numeric_limits<int64_t>::min());
+    EXPECT_EQ(test_obj.ui32_test, std::numeric_limits<uint32_t>::max());
+    EXPECT_EQ(test_obj.ui64_test, std::numeric_limits<uint64_t>::max());
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_UnicodeStrings) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    std::string unicode_json = R"({
+        "str_test": "Hello 世界 🌍 ñáéíóú"
+    })";
+    
+    parser.parse_from_buffer(unicode_json);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.str_test, "Hello 世界 🌍 ñáéíóú");
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ZeroValues) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+    
+    parser.parse_from_buffer(test_serialize_json_zeros);
+    test_obj.deserialize(parser.get_data());
+    
+    EXPECT_EQ(test_obj.si32_test, 0);
+    EXPECT_EQ(test_obj.si64_test, 0);
+    EXPECT_EQ(test_obj.ui32_test, 0u);
+    EXPECT_EQ(test_obj.ui64_test, 0u);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 0.0f);
+    EXPECT_FLOAT_EQ(test_obj.f64_test, 0.0);
+    EXPECT_EQ(test_obj.vec3_test, glm::vec3(0,0,0));
+    EXPECT_EQ(test_obj.vec4_test, glm::vec4(0,0,0,0));
+    EXPECT_EQ(test_obj.str_test, "");
+    EXPECT_STREQ(test_obj.buffer_test.buffer, "");
+}
+
 #endif
