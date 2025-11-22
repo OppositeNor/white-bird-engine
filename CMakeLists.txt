@@ -79,7 +79,7 @@ endif()
 
 if (WBE_MAKE_TEST AND CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
     message("Enabling coverage tests.")
-    add_compile_options(--coverage)
+    add_compile_options(--coverage -Wno-stringop-truncation)
     add_link_options(--coverage)
 endif()
 
