@@ -924,4 +924,329 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ZeroValues) {
     EXPECT_STREQ(test_obj.buffer_test.buffer, "");
 }
 
+// Dynamic dispatch tests using WBE::Serializable base class
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_SingleInheritance_BasePointer) {
+    std::unique_ptr<WBE::Serializable> test_obj = std::make_unique<WBE::TestInheritedChild>();
+    WBE::ParserJSON parser;
+    
+    std::string inheritance_json = R"({
+        "base_id": 100,
+        "base_name": "base_object",
+        "base_value": 3.14,
+        "child_id": 200,
+        "child_name": "child_object",
+        "child_value": 2.718
+    })";
+    
+    parser.parse_from_buffer(inheritance_json);
+    // Dynamic dispatch - should call TestInheritedChild::deserialize
+    test_obj->deserialize(parser.get_data());
+    
+    // Cast back to verify proper deserialization
+    WBE::TestInheritedChild* child_ptr = dynamic_cast<WBE::TestInheritedChild*>(test_obj.get());
+    ASSERT_NE(child_ptr, nullptr);
+    
+    // Check base class fields
+    EXPECT_EQ(child_ptr->base_id, 100);
+    EXPECT_EQ(child_ptr->base_name, "base_object");
+    EXPECT_FLOAT_EQ(child_ptr->base_value, 3.14f);
+    
+    // Check child class fields
+    EXPECT_EQ(child_ptr->child_id, 200);
+    EXPECT_EQ(child_ptr->child_name, "child_object");
+    EXPECT_DOUBLE_EQ(child_ptr->child_value, 2.718);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_MultilevelInheritance_BasePointer) {
+    std::unique_ptr<WBE::Serializable> test_obj = std::make_unique<WBE::TestInheritedGrandchild>();
+    WBE::ParserJSON parser;
+    
+    std::string grandchild_json = R"({
+        "base_id": 100,
+        "base_name": "base_level",
+        "base_value": 1.0,
+        "child_id": 200,
+        "child_name": "child_level",
+        "child_value": 2.0,
+        "grandchild_id": 300,
+        "grandchild_name": "grandchild_level",
+        "grandchild_vector": {"x": 1.0, "y": 2.0, "z": 3.0}
+    })";
+    
+    parser.parse_from_buffer(grandchild_json);
+    // Dynamic dispatch - should call TestInheritedGrandchild::deserialize
+    test_obj->deserialize(parser.get_data());
+    
+    // Cast back to verify proper deserialization
+    WBE::TestInheritedGrandchild* grandchild_ptr = dynamic_cast<WBE::TestInheritedGrandchild*>(test_obj.get());
+    ASSERT_NE(grandchild_ptr, nullptr);
+    
+    // Check all levels of inheritance
+    EXPECT_EQ(grandchild_ptr->base_id, 100);
+    EXPECT_EQ(grandchild_ptr->base_name, "base_level");
+    EXPECT_FLOAT_EQ(grandchild_ptr->base_value, 1.0f);
+    EXPECT_EQ(grandchild_ptr->child_id, 200);
+    EXPECT_EQ(grandchild_ptr->child_name, "child_level");
+    EXPECT_DOUBLE_EQ(grandchild_ptr->child_value, 2.0);
+    EXPECT_EQ(grandchild_ptr->grandchild_id, 300);
+    EXPECT_EQ(grandchild_ptr->grandchild_name, "grandchild_level");
+    EXPECT_EQ(grandchild_ptr->grandchild_vector, glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_MultipleInheritance_BasePointer) {
+    std::unique_ptr<WBE::TestMultipleInheritanceA> test_obj_a = std::make_unique<WBE::TestMultipleInheritanceChild>();
+    std::unique_ptr<WBE::TestMultipleInheritanceB> test_obj_b = std::make_unique<WBE::TestMultipleInheritanceChild>();
+    
+    std::string multiple_inheritance_json = R"({
+        "a_id": 100,
+        "a_name": "from_a",
+        "a_value": 1.5,
+        "b_id": 200,
+        "b_name": "from_b",
+        "b_value": 2.5,
+        "child_id": 300,
+        "child_name": "multiple_child",
+        "child_vector": {"x": 10.0, "y": 20.0}
+    })";
+
+    auto test_func = [&multiple_inheritance_json](WBE::Serializable* test_obj) {
+        WBE::ParserJSON parser;
+        parser.parse_from_buffer(multiple_inheritance_json);
+        // Dynamic dispatch - should call TestMultipleInheritanceChild::deserialize
+        test_obj->deserialize(parser.get_data());
+
+        // Cast back to verify proper deserialization
+        WBE::TestMultipleInheritanceChild* child_ptr = dynamic_cast<WBE::TestMultipleInheritanceChild*>(test_obj);
+        ASSERT_NE(child_ptr, nullptr);
+
+        // Check fields from both base classes and child
+        EXPECT_EQ(child_ptr->a_id, 100);
+        EXPECT_EQ(child_ptr->a_name, "from_a");
+        EXPECT_FLOAT_EQ(child_ptr->a_value, 1.5f);
+        EXPECT_EQ(child_ptr->b_id, 200);
+        EXPECT_EQ(child_ptr->b_name, "from_b");
+        EXPECT_DOUBLE_EQ(child_ptr->b_value, 2.5);
+        EXPECT_EQ(child_ptr->child_id, 300);
+        EXPECT_EQ(child_ptr->child_name, "multiple_child");
+        EXPECT_EQ(child_ptr->child_vector, glm::vec2(10.0f, 20.0f));
+    };
+    test_func(test_obj_a.get());
+    test_func(test_obj_b.get());
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_DiamondInheritance_BasePointer) {
+    std::unique_ptr<WBE::Serializable> test_obj = std::make_unique<WBE::TestDiamondChild>();
+    WBE::ParserJSON parser;
+    
+    std::string diamond_json = R"({
+        "diamond_base_id": 50,
+        "diamond_base_name": "diamond_base",
+        "left_id": 100,
+        "left_value": 3.14,
+        "right_id": 200,
+        "right_value": 2.718,
+        "diamond_child_id": 300,
+        "diamond_child_name": "diamond_child"
+    })";
+    
+    parser.parse_from_buffer(diamond_json);
+    // Dynamic dispatch - should call TestDiamondChild::deserialize
+    test_obj->deserialize(parser.get_data());
+    
+    // Cast back to verify proper deserialization
+    WBE::TestDiamondChild* diamond_ptr = dynamic_cast<WBE::TestDiamondChild*>(test_obj.get());
+    ASSERT_NE(diamond_ptr, nullptr);
+    
+    // Check diamond pattern fields
+    EXPECT_EQ(diamond_ptr->diamond_base_id, 50);
+    EXPECT_EQ(diamond_ptr->diamond_base_name, "diamond_base");
+    EXPECT_EQ(diamond_ptr->left_id, 100);
+    EXPECT_FLOAT_EQ(diamond_ptr->left_value, 3.14f);
+    EXPECT_EQ(diamond_ptr->right_id, 200);
+    EXPECT_DOUBLE_EQ(diamond_ptr->right_value, 2.718);
+    EXPECT_EQ(diamond_ptr->diamond_child_id, 300);
+    EXPECT_EQ(diamond_ptr->diamond_child_name, "diamond_child");
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_PolymorphicContainer) {
+    std::vector<std::unique_ptr<WBE::Serializable>> objects;
+    WBE::ParserJSON parser;
+    
+    // Create different types of objects
+    objects.push_back(std::make_unique<WBE::TestSerializable>());
+    objects.push_back(std::make_unique<WBE::TestInheritedChild>());
+    objects.push_back(std::make_unique<WBE::TestInheritedGrandchild>());
+    objects.push_back(std::make_unique<WBE::TestVectorContainer>());
+    
+    // Test basic serializable
+    std::string basic_json = R"({
+        "si32_test": 42,
+        "str_test": "basic_test"
+    })";
+    parser.parse_from_buffer(basic_json);
+    objects[0]->deserialize(parser.get_data());
+    
+    WBE::TestSerializable* basic_ptr = dynamic_cast<WBE::TestSerializable*>(objects[0].get());
+    ASSERT_NE(basic_ptr, nullptr);
+    EXPECT_EQ(basic_ptr->si32_test, 42);
+    EXPECT_EQ(basic_ptr->str_test, "basic_test");
+    
+    // Test inherited child
+    std::string child_json = R"({
+        "base_id": 100,
+        "base_name": "polymorphic_base",
+        "child_id": 200,
+        "child_name": "polymorphic_child"
+    })";
+    parser.parse_from_buffer(child_json);
+    objects[1]->deserialize(parser.get_data());
+    
+    WBE::TestInheritedChild* child_ptr = dynamic_cast<WBE::TestInheritedChild*>(objects[1].get());
+    ASSERT_NE(child_ptr, nullptr);
+    EXPECT_EQ(child_ptr->base_id, 100);
+    EXPECT_EQ(child_ptr->base_name, "polymorphic_base");
+    EXPECT_EQ(child_ptr->child_id, 200);
+    EXPECT_EQ(child_ptr->child_name, "polymorphic_child");
+    
+    // Test grandchild
+    std::string grandchild_json = R"({
+        "grandchild_id": 300,
+        "grandchild_name": "polymorphic_grandchild"
+    })";
+    parser.parse_from_buffer(grandchild_json);
+    objects[2]->deserialize(parser.get_data());
+    
+    WBE::TestInheritedGrandchild* grandchild_ptr = dynamic_cast<WBE::TestInheritedGrandchild*>(objects[2].get());
+    ASSERT_NE(grandchild_ptr, nullptr);
+    EXPECT_EQ(grandchild_ptr->grandchild_id, 300);
+    EXPECT_EQ(grandchild_ptr->grandchild_name, "polymorphic_grandchild");
+    
+    // Test vector container
+    std::string vector_json = R"({
+        "ints": [1, 2, 3],
+        "strs": ["poly", "morphic"]
+    })";
+    parser.parse_from_buffer(vector_json);
+    objects[3]->deserialize(parser.get_data());
+    
+    WBE::TestVectorContainer* vector_ptr = dynamic_cast<WBE::TestVectorContainer*>(objects[3].get());
+    ASSERT_NE(vector_ptr, nullptr);
+    EXPECT_EQ(vector_ptr->ints.size(), 3);
+    EXPECT_EQ(vector_ptr->ints[0], 1);
+    EXPECT_EQ(vector_ptr->strs.size(), 2);
+    EXPECT_EQ(vector_ptr->strs[0], "poly");
+    EXPECT_EQ(vector_ptr->strs[1], "morphic");
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
+    // Simulate runtime type resolution scenario
+    auto create_object = [](const std::string& type_name) -> std::unique_ptr<WBE::Serializable> {
+        if (type_name == "TestSerializable") {
+            return std::make_unique<WBE::TestSerializable>();
+        } else if (type_name == "TestInheritedChild") {
+            return std::make_unique<WBE::TestInheritedChild>();
+        } else if (type_name == "TestInheritedGrandchild") {
+            return std::make_unique<WBE::TestInheritedGrandchild>();
+        } else if (type_name == "TestVectorContainer") {
+            return std::make_unique<WBE::TestVectorContainer>();
+        }
+        return nullptr;
+    };
+    
+    struct TestCase {
+        std::string type_name;
+        std::string json_data;
+        std::function<void(WBE::Serializable*)> validator;
+    };
+    
+    std::vector<TestCase> test_cases = {
+        {
+            "TestSerializable",
+            R"({"si32_test": 123, "str_test": "runtime_test"})",
+            [](WBE::Serializable* obj) {
+                auto* ptr = dynamic_cast<WBE::TestSerializable*>(obj);
+                ASSERT_NE(ptr, nullptr);
+                EXPECT_EQ(ptr->si32_test, 123);
+                EXPECT_EQ(ptr->str_test, "runtime_test");
+            }
+        },
+        {
+            "TestInheritedChild",
+            R"({"base_id": 456, "child_id": 789})",
+            [](WBE::Serializable* obj) {
+                auto* ptr = dynamic_cast<WBE::TestInheritedChild*>(obj);
+                ASSERT_NE(ptr, nullptr);
+                EXPECT_EQ(ptr->base_id, 456);
+                EXPECT_EQ(ptr->child_id, 789);
+            }
+        },
+        {
+            "TestVectorContainer",
+            R"({"ints": [10, 20, 30]})",
+            [](WBE::Serializable* obj) {
+                auto* ptr = dynamic_cast<WBE::TestVectorContainer*>(obj);
+                ASSERT_NE(ptr, nullptr);
+                EXPECT_EQ(ptr->ints.size(), 3);
+                EXPECT_EQ(ptr->ints[1], 20);
+            }
+        }
+    };
+    
+    WBE::ParserJSON parser;
+    
+    for (const auto& test_case : test_cases) {
+        auto obj = create_object(test_case.type_name);
+        ASSERT_NE(obj, nullptr) << "Failed to create object of type: " << test_case.type_name;
+        
+        parser.parse_from_buffer(test_case.json_data);
+        // Dynamic dispatch based on runtime type
+        obj->deserialize(parser.get_data());
+        
+        // Validate using type-specific validator
+        test_case.validator(obj.get());
+    }
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_ErrorHandling_BasePointer) {
+    std::unique_ptr<WBE::Serializable> test_obj = std::make_unique<WBE::TestInheritedChild>();
+    WBE::ParserJSON parser;
+    
+    // Test error handling with dynamic dispatch
+    std::string error_json = R"({
+        "base_id": null,
+        "child_name": "test"
+    })";
+    
+    parser.parse_from_buffer(error_json);
+    // Should throw exception even with dynamic dispatch
+    EXPECT_THROW(test_obj->deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEDeserializerJSONTest, DynamicDispatch_PartialUpdate_BasePointer) {
+    std::unique_ptr<WBE::Serializable> test_obj = std::make_unique<WBE::TestInheritedChild>();
+    WBE::ParserJSON parser;
+    
+    // Initialize with known values through direct access
+    WBE::TestInheritedChild* child_ptr = dynamic_cast<WBE::TestInheritedChild*>(test_obj.get());
+    child_ptr->base_id = 999;
+    child_ptr->base_name = "original";
+    child_ptr->child_id = 888;
+    child_ptr->child_name = "original_child";
+    
+    // Partial update through base pointer
+    std::string partial_json = R"({
+        "base_id": 111,
+        "child_name": "updated_child"
+    })";
+    
+    parser.parse_from_buffer(partial_json);
+    test_obj->deserialize(parser.get_data());
+    
+    // Verify partial update worked correctly
+    EXPECT_EQ(child_ptr->base_id, 111);
+    EXPECT_EQ(child_ptr->child_name, "updated_child");
+    EXPECT_EQ(child_ptr->base_name, "original");
+    EXPECT_EQ(child_ptr->child_id, 888);
+}
+
 #endif
