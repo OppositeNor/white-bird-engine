@@ -156,6 +156,7 @@ public:
                     result, BufferT::BUFFER_SIZE, result.size()));
             }
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
+            p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<T, std::vector<YAMLData>>) {
             p_value.clear();
             for (const auto& elem : node) {
