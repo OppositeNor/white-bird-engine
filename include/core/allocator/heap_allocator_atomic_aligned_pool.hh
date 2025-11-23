@@ -81,8 +81,9 @@ public:
         if (p_id == MEM_NULL) {
             return nullptr;
         }
-        boost::shared_lock lock(mutex);
-        WBE_DEBUG_ASSERT(unguard_is_in_pool(p_id));
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        // getting the resource is not protected by a lock. The user should protect a resource's use
+        // from allocation and deallocation by themselves.
         return reinterpret_cast<void*>(p_id);
     }
 

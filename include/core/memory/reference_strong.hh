@@ -291,11 +291,11 @@ private:
             weak_ref_counter.store(0, std::memory_order_release);
             strong_ref_counter.store(0, std::memory_order_release);
         }
-        WBE_NO_FALSE_SHARING std::atomic<uint32_t> weak_ref_counter;
-        WBE_NO_FALSE_SHARING std::atomic<uint32_t> strong_ref_counter;
         MemID control_block_mem_id;
         MemID mem_id;
         AllocType* allocator;
+        WBE_NO_FALSE_SHARING std::atomic<uint32_t> weak_ref_counter;
+        WBE_NO_FALSE_SHARING std::atomic<uint32_t> strong_ref_counter;
     };
 
     void ref() const {
