@@ -49,9 +49,9 @@ public:
     virtual void add_task(Ref<Task> p_task) override;
 
 private:
-    vector<Ref<Task>> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
+    vector<Ref<Task>> buffer;
 };
 
 }
