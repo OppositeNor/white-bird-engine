@@ -291,7 +291,8 @@ private:
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
-        return allocator_vk->get_allocation_callbacks();
+        // return allocator_vk->get_allocation_callbacks();
+        return nullptr;
     }
 
     vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
