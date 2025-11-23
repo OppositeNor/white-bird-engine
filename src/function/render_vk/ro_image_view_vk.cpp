@@ -24,6 +24,7 @@
 namespace WhiteBirdEngine {
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
+    image_obj = p_image;
     image = WBE_REQUIRES_VALID(p_image)->get_image();
     return *this;
 }

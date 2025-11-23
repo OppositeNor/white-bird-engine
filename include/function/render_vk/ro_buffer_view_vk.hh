@@ -134,15 +134,6 @@ public:
         return exposed_fields;
     }
 
-    /**
-     * @brief Get the exposed fields.
-     *
-     * @return The exposed fields.
-     */
-    ExposedFields& fields() {
-        return exposed_fields;
-    }
-
 private:
     VkBufferView buffer_view;
     ExposedFields exposed_fields;

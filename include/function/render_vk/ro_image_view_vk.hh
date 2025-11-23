@@ -35,6 +35,8 @@ public:
     // Builder for ROImageViewVK
     struct Builder {
         friend ROImageViewVK;
+        // The image object, MEM_NULL if not provided.
+        Ref<ROImageVK> image_obj;
         // Source image.
         Required<VkImage> image;
         // Image view type.
@@ -95,8 +97,18 @@ public:
         return image_view;
     }
 
+    struct ExposedFields {
+        Ref<ROImageVK> image = MEM_NULL;
+    };
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
+
 private:    
     VkImageView image_view;
+
+    ExposedFields exposed_fields;
 
     void init(const Builder& p_builder);
 };

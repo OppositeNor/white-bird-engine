@@ -147,15 +147,6 @@ public:
      *
      * @return The exposed fields of framebuffer.
      */
-    ExposedFields& fields() {
-        return exposed_fields;
-    }
-
-    /**
-     * @brief Get the exposed fields of framebuffer.
-     *
-     * @return The exposed fields of framebuffer.
-     */
     const ExposedFields& fields() const {
         return exposed_fields;
     }
