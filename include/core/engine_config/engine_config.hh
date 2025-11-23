@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Engine configurations.
  *
  */
-WBE_STRUCT(EngineConfigOptions, WBE_CONFIG_OPTION) final : public Serializable {
+struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializable {
 
     WBE_DECL_SERIALIZABLE(EngineConfigOptions)
 

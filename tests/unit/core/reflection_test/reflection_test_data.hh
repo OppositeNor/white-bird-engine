@@ -22,11 +22,11 @@
 #include <string>
 
 namespace WhiteBirdEngine {
-WBE_STRUCT(TestEmptySerializable, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestEmptySerializable final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestEmptySerializable)
 };
 
-WBE_STRUCT(TestSerializable, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestSerializable final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializable)
 
     WBE_META(WBE_REFLECT)
@@ -51,7 +51,7 @@ WBE_STRUCT(TestSerializable, WBE_SERIALIZABLE) final : public Serializable {
     Buffer<16> buffer_test;
 };
 
-WBE_STRUCT(TestPartialStruct, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestPartialStruct final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestPartialStruct)
 
     WBE_META(WBE_REFLECT)
@@ -64,7 +64,7 @@ WBE_STRUCT(TestPartialStruct, WBE_SERIALIZABLE) final : public Serializable {
     uint64_t ui64_test;
 };
 
-WBE_STRUCT(TestSerializableNesting, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestSerializableNesting final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializableNesting)
 
     WBE_META(WBE_REFLECT)
@@ -78,7 +78,7 @@ WBE_STRUCT(TestSerializableNesting, WBE_SERIALIZABLE) final : public Serializabl
 };
 
 // A simple container struct that holds vectors to test vector serialization
-WBE_STRUCT(TestVectorContainer, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestVectorContainer final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestVectorContainer)
 
     WBE_META(WBE_REFLECT)
@@ -90,7 +90,7 @@ WBE_STRUCT(TestVectorContainer, WBE_SERIALIZABLE) final : public Serializable {
 };
 
 // Depth-2 nested struct: contains a TestSerializable
-WBE_STRUCT(TestDepth2, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestDepth2 final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDepth2)
 
     WBE_META(WBE_REFLECT)
@@ -102,7 +102,7 @@ WBE_STRUCT(TestDepth2, WBE_SERIALIZABLE) final : public Serializable {
 };
 
 // Depth-3 nested struct: contains a TestDepth2
-WBE_STRUCT(TestDepth3, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestDepth3 final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDepth3)
     WBE_META(WBE_REFLECT)
     TestDepth2 nested2;
@@ -113,7 +113,7 @@ WBE_STRUCT(TestDepth3, WBE_SERIALIZABLE) final : public Serializable {
 };
 
 // Container for vectors of deep structs
-WBE_STRUCT(TestDeepVectorContainer, WBE_SERIALIZABLE) final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestDeepVectorContainer final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDeepVectorContainer)
 
     WBE_META(WBE_REFLECT)
@@ -123,7 +123,7 @@ WBE_STRUCT(TestDeepVectorContainer, WBE_SERIALIZABLE) final : public Serializabl
 };
 
 // Inheritance test structures
-WBE_STRUCT(TestInheritedBase, WBE_SERIALIZABLE) : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestInheritedBase : public Serializable {
     WBE_DECL_SERIALIZABLE(TestInheritedBase)
 
     WBE_META(WBE_REFLECT)
@@ -134,7 +134,7 @@ WBE_STRUCT(TestInheritedBase, WBE_SERIALIZABLE) : public Serializable {
     float base_value = 0.0f;
 };
 
-WBE_STRUCT(TestInheritedChild, WBE_SERIALIZABLE) : public TestInheritedBase {
+struct WBE_META(WBE_SERIALIZABLE) TestInheritedChild : public TestInheritedBase {
     WBE_DECL_SERIALIZABLE(TestInheritedChild)
 
     WBE_META(WBE_REFLECT)
@@ -146,7 +146,7 @@ WBE_STRUCT(TestInheritedChild, WBE_SERIALIZABLE) : public TestInheritedBase {
 };
 
 // Multi-level inheritance test
-WBE_STRUCT(TestInheritedGrandchild, WBE_SERIALIZABLE) : public TestInheritedChild {
+struct WBE_META(WBE_SERIALIZABLE) TestInheritedGrandchild : public TestInheritedChild {
     WBE_DECL_SERIALIZABLE(TestInheritedGrandchild)
 
     WBE_META(WBE_REFLECT)
@@ -158,7 +158,7 @@ WBE_STRUCT(TestInheritedGrandchild, WBE_SERIALIZABLE) : public TestInheritedChil
 };
 
 // Inheritance with nested serializable objects
-WBE_STRUCT(TestInheritedWithNested, WBE_SERIALIZABLE) : public TestInheritedBase {
+struct WBE_META(WBE_SERIALIZABLE) TestInheritedWithNested : public TestInheritedBase {
     WBE_DECL_SERIALIZABLE(TestInheritedWithNested)
 
     WBE_META(WBE_REFLECT)
@@ -168,7 +168,7 @@ WBE_STRUCT(TestInheritedWithNested, WBE_SERIALIZABLE) : public TestInheritedBase
 };
 
 // Multiple inheritance test structures
-WBE_STRUCT(TestMultipleInheritanceA, WBE_SERIALIZABLE) : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceA : public Serializable {
     WBE_DECL_SERIALIZABLE(TestMultipleInheritanceA)
 
     WBE_META(WBE_REFLECT)
@@ -179,7 +179,7 @@ WBE_STRUCT(TestMultipleInheritanceA, WBE_SERIALIZABLE) : public Serializable {
     float a_value = 0.0f;
 };
 
-WBE_STRUCT(TestMultipleInheritanceB, WBE_SERIALIZABLE) : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceB : public Serializable {
     WBE_DECL_SERIALIZABLE(TestMultipleInheritanceB)
     WBE_META(WBE_REFLECT)
     int32_t b_id = 0;
@@ -189,7 +189,7 @@ WBE_STRUCT(TestMultipleInheritanceB, WBE_SERIALIZABLE) : public Serializable {
     double b_value = 0.0;
 };
 
-WBE_STRUCT(TestMultipleInheritanceChild, WBE_SERIALIZABLE) final : public TestMultipleInheritanceA, public TestMultipleInheritanceB {
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceChild final : public TestMultipleInheritanceA, public TestMultipleInheritanceB {
     WBE_DECL_SERIALIZABLE(TestMultipleInheritanceChild)
 
     WBE_META(WBE_REFLECT)
@@ -201,7 +201,7 @@ WBE_STRUCT(TestMultipleInheritanceChild, WBE_SERIALIZABLE) final : public TestMu
 };
 
 // Diamond inheritance pattern test
-WBE_STRUCT(TestDiamondBase, WBE_SERIALIZABLE) : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondBase : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDiamondBase)
 
     WBE_META(WBE_REFLECT)
@@ -210,7 +210,7 @@ WBE_STRUCT(TestDiamondBase, WBE_SERIALIZABLE) : public Serializable {
     std::string diamond_base_name;
 };
 
-WBE_STRUCT(TestDiamondLeft, WBE_SERIALIZABLE) : virtual public TestDiamondBase {
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondLeft : virtual public TestDiamondBase {
     WBE_DECL_SERIALIZABLE(TestDiamondLeft)
 
     WBE_META(WBE_REFLECT)
@@ -219,7 +219,7 @@ WBE_STRUCT(TestDiamondLeft, WBE_SERIALIZABLE) : virtual public TestDiamondBase {
     float left_value = 0.0f;
 };
 
-WBE_STRUCT(TestDiamondRight, WBE_SERIALIZABLE) : virtual public TestDiamondBase {
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondRight : virtual public TestDiamondBase {
     WBE_DECL_SERIALIZABLE(TestDiamondRight)
 
     WBE_META(WBE_REFLECT)
@@ -228,7 +228,7 @@ WBE_STRUCT(TestDiamondRight, WBE_SERIALIZABLE) : virtual public TestDiamondBase 
     double right_value = 0.0;
 };
 
-WBE_STRUCT(TestDiamondChild, WBE_SERIALIZABLE) final : public TestDiamondLeft, public TestDiamondRight {
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondChild final : public TestDiamondLeft, public TestDiamondRight {
     WBE_DECL_SERIALIZABLE(TestDiamondChild)
 
     WBE_META(WBE_REFLECT)

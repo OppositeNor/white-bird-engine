@@ -39,7 +39,7 @@ namespace WhiteBirdEngine {
  * @brief Object class.
  *
  */
-WBE_CLASS(Object, WBE_SERIALIZABLE) : public Serializable {
+class WBE_META(WBE_SERIALIZABLE) Object : public Serializable {
 public:
     WBE_DECL_SERIALIZABLE(Object)
 

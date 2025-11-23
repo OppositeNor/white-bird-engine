@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  * @brief Pipeline layout.
  *
  */
-WBE_CLASS(ROPipelineLayoutVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROPipelineLayoutVK final : public RenderObjectVK {
 public:
     // Builder for ROPipelineLayoutVK
     struct Builder {

@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  * @brief Serializable struct.
  *
  */
-WBE_CLASS(Serializable, WBE_SERIALIZABLE) {
+class WBE_META(WBE_SERIALIZABLE) Serializable {
 public:
     Serializable() = default;
     virtual ~Serializable() {}

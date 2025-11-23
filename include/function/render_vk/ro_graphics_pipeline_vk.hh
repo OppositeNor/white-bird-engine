@@ -22,6 +22,7 @@
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -34,7 +35,7 @@ namespace WhiteBirdEngine {
  * @brief The graphics pipeline.
  *
  */
-WBE_CLASS(ROGraphicsPipelineVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROGraphicsPipelineVK final : public RenderObjectVK {
 public:
     /**
      * @class PipelineConfigurations
@@ -183,7 +184,7 @@ public:
         // Input assembly stage configurations.
         InputAssemblyConfig input_assembly{};
         // Teselation stage configurations.
-        std::optional<TesselationConfig> tesselation;
+        Required<TesselationConfig> tesselation;
         // Viewport state configuration.
         ViewportStateConfig viewport{};
         // Rasterization stage configurations.
@@ -269,7 +270,7 @@ private:
         VkPipelineViewportStateCreateInfo viewport_state;
         VkPipelineVertexInputStateCreateInfo vertex_input_state;
         VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
-        std::optional<VkPipelineTessellationStateCreateInfo> tessellation_state;
+        Required<VkPipelineTessellationStateCreateInfo> tessellation_state;
         VkPipelineRasterizationStateCreateInfo rasterization_state;
         VkPipelineMultisampleStateCreateInfo multisample_state;
         VkPipelineDepthStencilStateCreateInfo depth_stencil_state;

@@ -26,24 +26,6 @@
 #include <string_view>
 namespace WhiteBirdEngine {
 
-/**
- * @class ComponentSD
- * @brief Component serialize deserialize class.
- *
- * @tparam T Component type.
- */
-template <typename T>
-class ComponentSD {};
-
-/**
- * @class ComponentAccess
- * @brief The accessor of the component.
- *
- * @tparam T Component type.
- */
-template <typename T>
-class ComponentAccess {};
-
 template <typename T>
 using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
@@ -51,7 +33,7 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
  * @class ComponentLabel
  * @brief Label of the entity.
  */
-WBE_STRUCT(ComponentLabel, WBE_COMPONENT) final : public Serializable {
+struct WBE_META(WBE_COMPONENT) ComponentLabel final : public Serializable {
     WBE_DECL_SERIALIZABLE(ComponentLabel)
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
@@ -68,7 +50,7 @@ WBE_STRUCT(ComponentLabel, WBE_COMPONENT) final : public Serializable {
  * @class ComponentTransform
  * @brief Transform component.
  */
-WBE_STRUCT(ComponentTransform, WBE_COMPONENT) final : public Serializable {
+struct WBE_META(WBE_COMPONENT) ComponentTransform final : public Serializable {
     WBE_DECL_SERIALIZABLE(ComponentTransform)
     // The position value, ordered x, y, z
     WBE_META(WBE_REFLECT)

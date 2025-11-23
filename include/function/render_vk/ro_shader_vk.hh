@@ -18,7 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include <optional>
+#include "utils/utils.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -27,13 +27,13 @@ namespace WhiteBirdEngine {
  * @brief Shader class for Vulkan.
  *
  */
-WBE_CLASS(ROShaderVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROShaderVK final : public RenderObjectVK {
 public:
     // Builder for ROShaderVK
     struct Builder {
         friend ROShaderVK;
         // The source code of the shader.
-        std::optional<const char*> code;
+        Required<const char*> code;
         // Size of the code.
         size_t code_size;
 

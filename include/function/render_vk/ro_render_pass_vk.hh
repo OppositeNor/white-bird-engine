@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @brief Render pass.
  *
  */
-WBE_CLASS(RORenderPassVK, WBE_RENDER_OBJECT) : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) RORenderPassVK : public RenderObjectVK {
 public:
     // Builder for RORenderPassVK
     struct Builder {

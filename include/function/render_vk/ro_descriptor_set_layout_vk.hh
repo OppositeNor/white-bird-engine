@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @brief Descriptor set layout.
  *
  */
-WBE_CLASS(RODescriptorSetLayoutVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetLayoutVK final : public RenderObjectVK {
 public:
     // Builder for RODescriptorSetLayoutVK
     struct Builder {

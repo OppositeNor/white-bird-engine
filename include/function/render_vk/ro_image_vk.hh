@@ -18,9 +18,9 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
-#include <optional>
 #include <set>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -30,23 +30,23 @@ namespace WhiteBirdEngine {
  * @brief Image.
  *
  */
-WBE_CLASS(ROImageVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK {
 public:
     // Builder for ROImageVK
     struct Builder {
         friend ROImageVK;
         // Image type.
-        std::optional<VkImageType> image_type;
+        Required<VkImageType> image_type;
         // Image format.
-        std::optional<VkFormat> format;
+        Required<VkFormat> format;
         // Image extent.
-        std::optional<VkExtent3D> extent;
+        Required<VkExtent3D> extent;
         // Mipmap level.
         uint32_t mipmap_level = 1;
         // Number of layers.
         uint32_t layers_count = 1;
         // Image usages.
-        std::optional<VkImageUsageFlags> usage;
+        Required<VkImageUsageFlags> usage;
         // Queue family indices.
         std::set<uint32_t> queue_family_indices;
 

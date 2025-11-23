@@ -264,6 +264,14 @@ enum class ColorSpace {
 
 using ChannelID = HashCode;
 
+/**
+ * @brief A better name for the required field.
+ *
+ * @tparam T The type of the required value.
+ */
+template <typename T>
+using Required = std::optional<T>; // What's optional is actually required...
+
 template <typename T>
 inline T required(const std::string& p_value_name, std::optional<T> p_optional_value) {
     if (!p_optional_value.has_value()) {

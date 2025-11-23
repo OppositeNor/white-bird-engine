@@ -28,7 +28,7 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-WBE_CLASS(SceneNode) : public Object {
+class WBE_META() SceneNode : public Object {
 protected:
 public:
 

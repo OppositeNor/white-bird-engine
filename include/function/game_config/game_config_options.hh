@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
  * @brief Configuration options for game.
  *
  */
-WBE_STRUCT(GameConfigOptions, WBE_CONFIG_OPTION) final : public Serializable {
+struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable {
     WBE_DECL_SERIALIZABLE(GameConfigOptions)
     /**
      * @brief The name of the game.

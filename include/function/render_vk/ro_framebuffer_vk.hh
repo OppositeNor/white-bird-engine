@@ -22,6 +22,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "glm/fwd.hpp"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -33,7 +34,7 @@ namespace WhiteBirdEngine {
  * @brief Framebuffer render object.
  *
  */
-WBE_CLASS(ROFramebufferVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROFramebufferVK final : public RenderObjectVK {
 public:
 
     /**
@@ -49,9 +50,9 @@ public:
         // The render pass this framebuffer will be compatable with.
         Ref<RORenderPassVK> render_pass;
         // The width of the framebuffer.
-        std::optional<uint32_t> width;
+        Required<uint32_t> width;
         // The height of the framebuffer.
-        std::optional<uint32_t> height;
+        Required<uint32_t> height;
         // The layers of the framebuffer.
         uint32_t layers = 1;
 

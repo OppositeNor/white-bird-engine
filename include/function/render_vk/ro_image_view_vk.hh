@@ -20,6 +20,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "utils/utils.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -29,17 +30,17 @@ namespace WhiteBirdEngine {
  * @brief Vulkan image view object.
  *
  */
-WBE_CLASS(ROImageViewVK, WBE_RENDER_OBJECT) final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public RenderObjectVK {
 public:
     // Builder for ROImageViewVK
     struct Builder {
         friend ROImageViewVK;
         // Source image.
-        std::optional<VkImage> image;
+        Required<VkImage> image;
         // Image view type.
-        std::optional<VkImageViewType> view_type;
+        Required<VkImageViewType> view_type;
         // Image format.
-        std::optional<VkFormat> format;
+        Required<VkFormat> format;
         // Component mapping.
         VkComponentMapping components = {
             .r = VK_COMPONENT_SWIZZLE_IDENTITY,

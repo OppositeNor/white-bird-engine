@@ -20,14 +20,10 @@
 #ifdef WBE_REFLECTION_PARSER
 #define WBE_ATTR(...) __attribute__((annotate(#__VA_ARGS__)))
 #define WBE_META(...) WBE_ATTR(WBE, __VA_ARGS__)
-#define WBE_CLASS(class_name, ...) class WBE_META(__VA_ARGS__) class_name
-#define WBE_STRUCT(struct_name, ...) struct WBE_META(__VA_ARGS__) struct_name
 #define WBE_LABEL(label_name, ...) constexpr HashCode WBE_META(__VA_ARGS__) label_name = static_hash(WBE_EXPAND_STR(label_name));
 
 #else
 #define WBE_META(...)
-#define WBE_CLASS(class_name, ...) class class_name
-#define WBE_STRUCT(struct_name, ...) struct struct_name
 #define WBE_LABEL(label_name, ...) constexpr HashCode label_name = static_hash(WBE_EXPAND_STR(label_name));
 
 #endif
