@@ -24,22 +24,15 @@
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
-#include "platform/file_system/file_system.hh"
 #include <cstdlib>
 #include <format>
-#include <iostream>
-#include <ostream>
 
 namespace WBE = WhiteBirdEngine;
 
 void setup_pipeline(WBE::ApplicationGame& game_application);
 
 int main(int p_argc, char* p_argv[]) {
-    if (p_argc < 2) {
-        std::cout << "Usage: " << p_argv[0] << " [root_dir]" << std::endl;
-        return EXIT_FAILURE;
-    }
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::FileSystem::parse_directory(p_argv[1]));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
     {
         WBE::ApplicationGame game_application;
         {

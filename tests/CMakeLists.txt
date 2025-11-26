@@ -20,7 +20,7 @@ add_executable(wbe_unit_test
 )
 
 target_link_libraries(wbe_unit_test PUBLIC
-    WBE_LIB
+    WBE_ENGINE
     gtest_main
 )
 
@@ -31,7 +31,7 @@ add_executable(wbe_benchmark_test
 )
 
 target_link_libraries(wbe_benchmark_test PUBLIC
-    WBE_LIB
+    WBE_ENGINE
     benchmark_main
 )
 

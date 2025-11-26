@@ -15,18 +15,22 @@ cmake_minimum_required(VERSION 3.20)
 
 project(WhiteBirdEngine)
 
-# Options
-option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
-set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
-
 # Use C++ 20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # Export compile commands
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Options
+option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
+option(WBE_BINARY_DIR "The binary output directory." ${CMAKE_BINARY_DIR}/bin)
+option(WBE_BUILD_SHARED "Should build shared library" ON)
+
+
 # Define output paths
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
+
 set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
 set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
 
@@ -36,6 +40,14 @@ set(WBE_CONFIG_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/config)
 set(WBE_METADATA_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/metadata_cache)
 
 set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
+set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
+
+if(WBE_BUILD_SHARED)
+    set(WBE_LIB_BUILD_TYPE SHARED)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+else()
+    set(WBE_LIB_BUILD_TYPE STATIC)
+endif()
 
 # Add dependencies subdirectories
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
@@ -46,7 +58,6 @@ else()
     set(SDL_SHARED OFF)
     add_subdirectory(dependencies/SDL2)
 endif()
-set(BUILD_TESTING OFF)
 find_package(Vulkan REQUIRED)
 
 set(YAML_BUILD_SHARED_LIBS OFF)
@@ -56,6 +67,7 @@ add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
 add_subdirectory(dependencies/boost)
 if (WBE_MAKE_TEST)
+    set(BENCHMARK_ENABLE_TESTING OFF)
     add_subdirectory(dependencies/googletest)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
     add_subdirectory(dependencies/google-benchmark)
@@ -64,7 +76,7 @@ endif()
 
 # Set C++ build flags
 if (NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -pedantic-errors -fPIC")
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Deploy")
     # for optimization
@@ -141,16 +153,16 @@ add_subdirectory(src/function)
 add_subdirectory(src/global)
 add_subdirectory(src/generated)
 
-add_library(WBE_LIB
+add_library(WBE_ENGINE ${WBE_LIB_BUILD_TYPE}
     ${WBE_SOURCES}
 )
 
-target_link_libraries(WBE_LIB INTERFACE
+target_link_libraries(WBE_ENGINE PUBLIC
     ${libs}
 )
 
 set(libs ${libs}
-    WBE_LIB
+    WBE_ENGINE
 )
 
 # Create executable
@@ -161,7 +173,7 @@ else()
         ${PROJECT_SOURCE_DIR}/src/main.cpp
     )
     target_link_libraries(${PROJECT_NAME} PUBLIC
-        ${libs}
+        WBE_ENGINE
     )
 endif()
 

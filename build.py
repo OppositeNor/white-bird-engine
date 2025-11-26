@@ -34,6 +34,9 @@ def _get_cmake_command_from_info(build_info):
     result = ["cmake"]
     result.append("-B")
     result.append(build_setup.build_dir)
+    result.append(f"-DWBE_BINARY_DIR={build_setup.binary_dir}")
+    result.append(f"-DWBE_BUILD_SHARED={"ON" if build_info["build-shared"] else "OFF"}")
+    print("result:", result)
     if build_info.get("generator") is not None:
         result.append("-G")
         result.append(build_info["generator"])
