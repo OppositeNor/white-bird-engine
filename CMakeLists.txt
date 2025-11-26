@@ -57,7 +57,6 @@ else()
     set(SDL_STATIC OFF)
     set(SDL_SHARED ON)
     add_subdirectory(dependencies/SDL2)
-    message("SDL2_DISABLE_INSTALL: ${SDL2_DISABLE_INSTALL}")
 endif()
 find_package(Vulkan REQUIRED)
 
