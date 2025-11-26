@@ -129,10 +129,10 @@ VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     }
     else {
         create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.queueFamilyIndexCount = queue_family_indices.size();
+        std::vector<uint32_t> queue_family_indices_array(queue_family_indices.begin(), queue_family_indices.end());
+        create_info.pQueueFamilyIndices = queue_family_indices_array.data();
     }
-    create_info.queueFamilyIndexCount = queue_family_indices.size();
-    std::vector<uint32_t> queue_family_indices_array(queue_family_indices.begin(), queue_family_indices.end());
-    create_info.pQueueFamilyIndices = queue_family_indices_array.data();
     VkImage result;
     if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan image.");

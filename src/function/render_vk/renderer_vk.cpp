@@ -57,7 +57,8 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator)
     : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
-    in_flight_fences(p_allocator), activated_pipeline(p_allocator)
+    in_flight_fences(p_allocator), base_render_data(p_allocator),
+    activated_pipeline(p_allocator)
 {
     singleton = this;
     init();
@@ -199,6 +200,7 @@ void RendererVK::setup_base_render_data() {
         base_render_data.in_flight_fence = VK_NULL_HANDLE;
     }
     base_render_data.current_swap_chain_index = 0;
+    base_render_data.queue_family_indices = queue_family_indices.get_unique_indices();
 }
 
 void RendererVK::init_graphics_pipeline() {
@@ -534,7 +536,7 @@ void RendererVK::create_physical_device() {
 void RendererVK::create_logical_device() {
     // Setup queues create info.
     float queue_priority = 1.0;
-    set<int> indices = queue_family_indices.get_unique_indices();
+    set<uint32_t> indices = queue_family_indices.get_unique_indices();
     vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
     queues_create_info.reserve(indices.size());
     for (int elem : indices) {

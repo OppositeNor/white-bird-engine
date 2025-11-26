@@ -29,6 +29,8 @@ namespace WhiteBirdEngine {
  *
  */
 struct BaseRenderDataVK {
+    BaseRenderDataVK(RenderAllocator* p_allocator)
+        : queue_family_indices(p_allocator) {}
     // The render allocator.
     RenderAllocator* allocator;
     // The render database.
@@ -42,9 +44,9 @@ struct BaseRenderDataVK {
     VkExtent2D swap_chain_extent;
     // Callback for allocator.
     VkAllocationCallbacks* allocation_callbacks;
-    // Graphics queue family index.
+    // Graphics queue family.
     VkQueue graphics_queue;
-    // Compute queue family index.
+    // Compute queue family.
     VkQueue compute_queue;
     // The viewport for the final presentation.
     VkViewport viewport;
@@ -60,6 +62,9 @@ struct BaseRenderDataVK {
     VkFence in_flight_fence;
     // The current swap chain index.
     uint32_t current_swap_chain_index;
+
+    // The queue family indices.
+    set<uint32_t> queue_family_indices;
 };
 
 

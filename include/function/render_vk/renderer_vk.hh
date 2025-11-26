@@ -183,14 +183,14 @@ private:
                 && compute.has_value()
                 && present.has_value();
         }
-        set<int> get_unique_indices() const {
-            set<int> result(allocator);
+        set<uint32_t> get_unique_indices() const {
+            set<uint32_t> result(allocator);
             result.insert(graphics.value());
             result.insert(compute.value());
             result.insert(present.value());
             return result;
         }
-    } queue_family_indices;
+    };
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
@@ -205,8 +205,6 @@ private:
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };
-
-    BaseRenderDataVK base_render_data;
 
     struct TaskInfo {
         RendTaskID task_id;
@@ -223,6 +221,8 @@ private:
     };
 
 
+    BaseRenderDataVK base_render_data;
+    QueueFamilyIndices queue_family_indices;
     std::map<std::string, vector<Ref<PipelineInfo>>> pipelines;
     std::unordered_map<RendResID, RefWeak<RendResVK>> rend_res;
     std::map<RendResID, RefWeak<RendResVK>> render_resources;

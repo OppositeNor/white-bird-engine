@@ -47,7 +47,9 @@ public:
         uint32_t layers_count = 1;
         // Image usages.
         Required<VkImageUsageFlags> usage;
-        // Queue family indices.
+        // Queue family indices. Either this size is 1 or is empty will make the imagae
+        // created in exclusive sharing mode, otherwise it will be created in concurrent
+        // sharing mode.
         std::set<uint32_t> queue_family_indices;
 
         // Set the image type.
