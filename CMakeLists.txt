@@ -54,9 +54,10 @@ if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android dependencies
 else()
     set(SDL_TEST OFF)
-    set(SDL_STATIC ON)
-    set(SDL_SHARED OFF)
+    set(SDL_STATIC OFF)
+    set(SDL_SHARED ON)
     add_subdirectory(dependencies/SDL2)
+    message("SDL2_DISABLE_INSTALL: ${SDL2_DISABLE_INSTALL}")
 endif()
 find_package(Vulkan REQUIRED)
 
@@ -139,7 +140,7 @@ include_directories(
 
 set(libs ${libs}
     Vulkan::Vulkan
-    SDL2::SDL2-static
+    SDL2::SDL2
     yaml-cpp::yaml-cpp
     boost_thread
 )
@@ -156,6 +157,7 @@ add_subdirectory(src/generated)
 add_library(WBE_ENGINE ${WBE_LIB_BUILD_TYPE}
     ${WBE_SOURCES}
 )
+add_library(WBE::Engine ALIAS WBE_ENGINE)
 
 target_link_libraries(WBE_ENGINE PUBLIC
     ${libs}
