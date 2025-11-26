@@ -39,7 +39,6 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
-
 #include <SDL_vulkan.h>
 #include <cstddef>
 #include <cstdint>

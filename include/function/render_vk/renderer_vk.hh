@@ -291,14 +291,7 @@ private:
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
-#ifdef _DEBUG
-        // Use the vulkan allocator in debug, which this allocator makes more check
-        // on memory safetiness, and it could be profiled by getting the memory status.
         return allocator_vk->get_allocation_callbacks();
-#else
-        // Use the vulkan default allocator in release, since this is much faster.
-        return nullptr;
-#endif
     }
 
     vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
