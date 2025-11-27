@@ -3,6 +3,7 @@
 
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -103,6 +104,13 @@ public:
     VkBuffer get_buffer() const {
         return buffer;
     }
+
+    /**
+     * @brief Update the buffer.
+     *
+     * @param p_data The data to be updated to.
+     */
+    void update_buffer(const vector<char>& p_data);
 
 private:
     VkBuffer buffer;

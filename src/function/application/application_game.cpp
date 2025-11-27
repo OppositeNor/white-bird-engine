@@ -14,11 +14,13 @@
 */
 #include "function/application/application_game.hh"
 #include "core/engine_core.hh"
+#include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/engine_function.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
+#include <format>
 
 namespace WhiteBirdEngine {
 
@@ -44,13 +46,17 @@ void ApplicationGame::run() {
 
 void ApplicationGame::init() {
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
-    // TODO: Create renderer based on config file.
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     if (game_config.render_api == "vulkan") {
         renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
     }
+    else if (game_config.render_api == "dummy") {
+        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
+    }
     else {
-        renderer = make_ref<RendererDummy>(global_allocator());
+        wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+            std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
+        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }
 }
 

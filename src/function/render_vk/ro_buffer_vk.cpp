@@ -46,10 +46,12 @@ VkBuffer ROBufferVK::Builder::build(const BaseRenderDataVK* p_render_data) const
 ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     buffer = p_builder.build(p_render_data);
+    // TODO: Allocate memory for the buffer.
 }
 
 ROBufferVK::~ROBufferVK() {
     vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
+    // TODO: Deallocate memory for the buffer.
 }
 
 }

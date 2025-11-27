@@ -17,6 +17,7 @@
 
 #include "core/core_utils.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
@@ -44,6 +45,11 @@ public:
     virtual void tick(double p_delta) = 0;
 
     /**
+     * @brief Get the instance of the render database.
+     */
+    virtual Ref<RenderDatabase<RenderAllocator>> get_render_database() = 0;
+
+    /**
      * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
      *
      * @todo Test
@@ -59,6 +65,11 @@ public:
      * @param p_pipeline_name The name of the pipeline to activate.
      */
     virtual void activate_pipeline(const std::string& p_pipeline_name) = 0;
+
+    /**
+     * @brief Update the static opaque triangles data.
+     */
+    virtual void update_static_opaque_triangles() = 0;
 protected:
 
 private:

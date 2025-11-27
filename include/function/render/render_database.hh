@@ -36,7 +36,7 @@ namespace WhiteBirdEngine {
 template <typename AllocType>
 class RenderDatabase {
 private:
-    template <typename T>
+    template <typename T, typename Allocator = AllocType>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;
     template <typename T>
     using set = ::WhiteBirdEngine::set<T, AllocType>;
@@ -70,7 +70,8 @@ public:
     }
 
     /**
-     * @brief Set the dynamic opaque triangles.
+     * @brief Set the dynamic opaque triangles. Note that dynamic mean those objects could be transformed within
+     * the scene by transformations handled in the GPU side.
      *
      * @param p_vertices The vertices of the triangles. Note that this vector have to be at the same memory pool
      * with this render database.
@@ -80,6 +81,76 @@ public:
     void set_dynamic_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
         set_opaque_triangles_linear(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
                                     dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
+    }
+
+    /**
+     * @brief Get the static opaque triangle vertices.
+     *
+     * @return The static opaque triangle vertices.
+     */
+    const vector<Vertex3DTextured>& get_static_opaque_triangle_vertices() const {
+        return static_opaque_triangle_vertices;
+    }
+
+    /**
+     * @brief Get the static opaque triangle indices.
+     *
+     * @return The static opaque triangle indices.
+     */
+    const vector<uint32_t>& get_static_opaque_triangle_indices() const {
+        return static_opaque_triangle_indices;
+    }
+
+    /**
+     * @brief Get the static opaque triangle map, which maps a material ID, to the index of indices in static_opaque_triangle_indices,
+     * and the number of triangles of this object with the specified material.
+     */
+    const std::map<MaterialID, std::pair<size_t, size_t>>& get_static_opaque_triangle_map() const {
+        return static_opaque_triangle_map;
+    }
+
+    /**
+     * @brief Get the object ID each static opaque triangle's vertices is associated to.
+     *
+     * @return The object ID each index is associated to.
+     */
+    const vector<uint32_t>& get_static_opaque_triangle_obj_id() const {
+        return static_opaque_triangle_obj_id;
+    }
+
+    /**
+     * @brief Get the dynamic opaque triangle vertices.
+     *
+     * @return The dynamic opaque triangle vertices.
+     */
+    const vector<Vertex3DTextured>& get_dynamic_opaque_triangle_vertices() const {
+        return dynamic_opaque_triangle_vertices;
+    }
+
+    /**
+     * @brief Get the dynamic opaque triangle indices.
+     *
+     * @return The dynamic opaque triangle indices.
+     */
+    const vector<uint32_t>& get_dynamic_opaque_triangle_indices() const {
+        return dynamic_opaque_triangle_indices;
+    }
+
+    /**
+     * @brief Get the dynamic opaque triangle map, which maps a material ID, to the index of indices in dynamic_opaque_triangle_indices,
+     * and the number of triangles of this object with the specified material.
+     */
+    const std::map<MaterialID, std::pair<size_t, size_t>>& get_dynamic_opaque_triangle_map() const {
+        return dynamic_opaque_triangle_map;
+    }
+
+    /**
+     * @brief Get the object ID each dynamic opaque triangle's vertices is associated to.
+     *
+     * @return The object ID each index is associated to.
+     */
+    const vector<uint32_t>& get_dynamic_opaque_triangle_obj_id() const {
+        return dynamic_opaque_triangle_obj_id;
     }
 
 private:

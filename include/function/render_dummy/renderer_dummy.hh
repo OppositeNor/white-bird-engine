@@ -14,6 +14,8 @@
 */
 #ifndef __WBE_RENDERER_DUMMY_H__
 #define __WBE_RENDERER_DUMMY_H__
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 namespace WhiteBirdEngine {
 
@@ -24,16 +26,26 @@ namespace WhiteBirdEngine {
  */
 class RendererDummy final : public Renderer {
 public:
-    RendererDummy() {}
+    RendererDummy(RenderAllocator* p_allocator)
+        : dummy_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)) {}
     
     virtual ~RendererDummy() override {}
 
     virtual void tick(double p_delta) override {}
 
+    virtual Ref<RenderDatabase<RenderAllocator>> get_render_database() override {
+        // Because of RAII, we have to return a valid database since the caller is going to assume
+        // this is valid.
+        return dummy_database;
+    }
+
     virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {}
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {}
+
+    virtual void update_static_opaque_triangles() override {}
 private:
+    Ref<RenderDatabase<RenderAllocator>> dummy_database;
 };
 
 }

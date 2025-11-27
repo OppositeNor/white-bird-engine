@@ -267,6 +267,7 @@ void RendererVK::setup_render_resource() {
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));
 
+    render_objects->static_opaque_triangles_buffer = MEM_NULL; // TODO: create static_opaque_triangles_buffer.
 }
 
 void RendererVK::create_instance() {
@@ -838,6 +839,10 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
         p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->req_rend_res.push_back(rend_res);
     }
+}
+
+void RendererVK::update_static_opaque_triangles() {
+    // TODO: Implement.
 }
 
 }
