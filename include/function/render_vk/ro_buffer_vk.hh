@@ -127,6 +127,14 @@ public:
      */
     void update_buffer(const char* p_data, size_t p_offset, size_t p_size);
 
+    /**
+     * @brief Update the buffer.
+     *
+     * @param p_data The data to be updated to.
+     * @param p_size The size of data that will be transmitted.
+     */
+    void update_buffer(const char* p_data, size_t p_size);
+
     const ExposedFields& fields() const {
         return exposed_fields;
     }

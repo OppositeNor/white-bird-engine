@@ -71,4 +71,8 @@ void ROBufferVK::update_buffer(const char* p_data, size_t p_offset, size_t p_siz
     vkUnmapMemory(render_data->logic_device, buffer_memory);
 }
 
+void ROBufferVK::update_buffer(const char* p_data, size_t p_size) {
+    update_buffer(p_data, 0, p_size);
+}
+
 }
