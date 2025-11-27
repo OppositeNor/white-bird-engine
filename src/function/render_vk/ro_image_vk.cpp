@@ -154,6 +154,7 @@ ROImageVK::~ROImageVK() {
 
 void ROImageVK::init(const Builder& p_builder) {
     image = p_builder.build(render_data);
+    // TODO: allocate memory for image.
 }
 
 }

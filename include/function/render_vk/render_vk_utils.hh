@@ -18,6 +18,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include <cstdint>
+#include <functional>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -65,6 +66,10 @@ struct BaseRenderDataVK {
 
     // The queue family indices.
     set<uint32_t> queue_family_indices;
+
+    // A function that finds a suitable memory type for a certain memory property.
+    std::function<uint32_t(uint32_t, VkMemoryPropertyFlags)> find_memory_type;
+
 };
 
 

@@ -28,13 +28,35 @@ namespace WhiteBirdEngine {
  */
 class RenderObjectVK : public RenderObject {
 public:
-    RenderObjectVK(const BaseRenderDataVK* p_render_data);
-    virtual ~RenderObjectVK() override;
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     */
+    RenderObjectVK(const BaseRenderDataVK* p_render_data)
+        : render_data(p_render_data) {}
+    virtual ~RenderObjectVK() override {}
 
 protected:
+    /**
+     * @brief The base render data.
+     */
     const BaseRenderDataVK* render_data;
-private:
-    void init();
+    /**
+     * @brief Allocate a device memory.
+     *
+     * @param p_memory_requirements The memroy requirements for allocating memory.
+     * @param p_memory_properties The properties that the allocated memory should have.
+     * @return The allocated device memory.
+     */
+    VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, VkMemoryPropertyFlags p_memory_properties) const;
+
+    /**
+     * @brief Deallocate a device memory.
+     *
+     * @param p_device_memory The device memory to deallocate.
+     */
+    void deallocate_device_memory(VkDeviceMemory p_device_memory) const;
 };
 
 /**

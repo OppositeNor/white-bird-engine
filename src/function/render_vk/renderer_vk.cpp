@@ -44,6 +44,7 @@
 #include <cstdint>
 #include <deque>
 #include <format>
+#include <functional>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -200,6 +201,9 @@ void RendererVK::setup_base_render_data() {
     }
     base_render_data.current_swap_chain_index = 0;
     base_render_data.queue_family_indices = queue_family_indices.get_unique_indices();
+    base_render_data.find_memory_type = [this](uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) -> uint32_t {
+        return this->find_memory_type(p_type_filter, p_properties);
+    };
 }
 
 void RendererVK::init_graphics_pipeline() {
@@ -531,6 +535,7 @@ void RendererVK::create_physical_device() {
     string device_name(device_properties.deviceName, allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
 }
 
 void RendererVK::create_logical_device() {
@@ -843,6 +848,16 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
 
 void RendererVK::update_static_opaque_triangles() {
     // TODO: Implement.
+}
+
+uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const {
+    for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
+        // Find the first memory property that could be used.
+        if (p_type_filter & (1 >> i)) {
+            return i;
+        }
+    }
+    throw std::runtime_error("Failed to find a suitable physical device.");
 }
 
 }

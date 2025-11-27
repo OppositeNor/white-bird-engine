@@ -15,7 +15,10 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include <cstdint>
+#include <cstring>
+#include <format>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -26,7 +29,7 @@ VkBuffer ROBufferVK::Builder::build(const BaseRenderDataVK* p_render_data) const
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = size;
-    create_info.usage = usage;
+    create_info.usage = WBE_REQUIRED(usage);
     if (queue_family_indices.size() > 1) {
         create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
         std::vector<uint32_t> vec_queue_family_indices(queue_family_indices.begin(), queue_family_indices.end());
@@ -46,12 +49,26 @@ VkBuffer ROBufferVK::Builder::build(const BaseRenderDataVK* p_render_data) const
 ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     buffer = p_builder.build(p_render_data);
-    // TODO: Allocate memory for the buffer.
+    VkMemoryRequirements memory_requirements;
+    vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
+    buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
 ROBufferVK::~ROBufferVK() {
     vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-    // TODO: Deallocate memory for the buffer.
+    deallocate_device_memory(buffer_memory);
+}
+
+void ROBufferVK::update_buffer(const char* p_data, size_t p_offset, size_t p_size) {
+    if (p_offset + p_size > exposed_fields.buffer_size) {
+        throw std::runtime_error(
+            std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with size {}.",
+                        p_offset, p_offset + p_size, exposed_fields.buffer_size));
+    }
+    void* mapped_memory = nullptr;
+    vkMapMemory(render_data->logic_device, buffer_memory, p_offset, p_size, 0, &mapped_memory);
+    memcpy(mapped_memory, p_data, p_size);
+    vkUnmapMemory(render_data->logic_device, buffer_memory);
 }
 
 }

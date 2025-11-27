@@ -3,8 +3,8 @@
 
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <set>
@@ -13,6 +13,16 @@ namespace WhiteBirdEngine {
 
 class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public RenderObjectVK {
 public:
+
+    /**
+     * @class ExposedFields
+     * @brief The exposed fields of ro_buffer_vk.
+     *
+     */
+    struct ExposedFields {
+        size_t buffer_size;
+    };
+
     /**
      * @class Builder
      * @brief The builder object for ROBufferVK.
@@ -24,7 +34,7 @@ public:
         // The size of the buffer.
         size_t size = WBE_KiB(4);
         // The usage of the buffer.
-        VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        Required<VkBufferUsageFlags> usage;
         // Queue families this buffer is going to be used across. Either this size is 1 or is empty will
         // make the buffer created in exclusive sharing mode, otherwise it will be created in concurrent
         // sharing mode.
@@ -59,7 +69,12 @@ public:
          * @return *this.
          */
         Builder& add_usage(VkBufferUsageFlags p_usage) {
-            usage |= p_usage;
+            if (usage.has_value()) {
+                *usage |= p_usage;
+            }
+            else {
+                usage = p_usage;
+            }
             return *this;
         }
 
@@ -110,10 +125,16 @@ public:
      *
      * @param p_data The data to be updated to.
      */
-    void update_buffer(const vector<char>& p_data);
+    void update_buffer(const char* p_data, size_t p_offset, size_t p_size);
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     VkBuffer buffer;
+    VkDeviceMemory buffer_memory;
+    ExposedFields exposed_fields;
 };
 }
 

@@ -135,6 +135,7 @@ private:
     VkInstance vk_instance;
 
     VkPhysicalDevice physical_device;
+    VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
     VkDevice logical_device;
 
     VkSurfaceKHR surface;
@@ -300,6 +301,7 @@ private:
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 
+    uint32_t find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const;
 };
 
 }

@@ -13,19 +13,25 @@
    limitations under the License.
 */
 #include "function/render_vk/render_object_vk.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RenderObjectVK::RenderObjectVK(const BaseRenderDataVK* p_render_data)
-    : render_data(p_render_data) {
-    init();
+VkDeviceMemory RenderObjectVK::allocate_device_memory(VkMemoryRequirements p_memory_requirements, VkMemoryPropertyFlags p_memory_properties) const {
+    VkMemoryAllocateInfo allocate_info{};
+    allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocate_info.allocationSize = p_memory_requirements.size;
+    allocate_info.memoryTypeIndex = render_data->find_memory_type(p_memory_requirements.memoryTypeBits, p_memory_properties);
+    VkDeviceMemory result;
+    if (vkAllocateMemory(render_data->logic_device, &allocate_info, render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate memory.");
+    }
+    return result;
 }
 
-RenderObjectVK::~RenderObjectVK() {
-}
-
-void RenderObjectVK::init() {
+void RenderObjectVK::deallocate_device_memory(VkDeviceMemory p_device_memory) const {
+    vkFreeMemory(render_data->logic_device, p_device_memory, render_data->allocation_callbacks);
 }
 
 }
