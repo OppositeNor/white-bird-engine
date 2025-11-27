@@ -25,7 +25,6 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -249,7 +248,7 @@ private:
         // The base graphics pipeline resource.
         Ref<RendResVK> base_graphics_pipeline_resource;
         // The buffer that stores data of the scenes' static opaque triangles' status.
-        Ref<ROBufferVK> static_opaque_triangles_buffer;
+        Ref<RendResVK> static_opaque_triangles_vertices_buffer_resource;
         // The start render task.
         vector<TaskInfo> render_start_tasks;
     };

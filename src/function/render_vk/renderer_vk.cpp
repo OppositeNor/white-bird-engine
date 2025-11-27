@@ -25,6 +25,7 @@
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -271,7 +272,11 @@ void RendererVK::setup_render_resource() {
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE, render_objects->base_graphics_pipeline_resource));
 
-    render_objects->static_opaque_triangles_buffer = MEM_NULL; // TODO: create static_opaque_triangles_buffer.
+    render_objects->static_opaque_triangles_vertices_buffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->static_opaque_triangles_vertices_buffer_resource->res_type_id = TypeUUID<ROBufferVK>::UUID;
+    render_objects->static_opaque_triangles_vertices_buffer_resource->res_id = REND_RES_STATIC_OPAQUE_TRIANGLES;
+    render_objects->static_opaque_triangles_vertices_buffer_resource->res = MEM_NULL;
+    render_resources.insert(std::pair(REND_RES_STATIC_OPAQUE_TRIANGLES, render_objects->static_opaque_triangles_vertices_buffer_resource));
 }
 
 void RendererVK::create_instance() {
@@ -847,7 +852,17 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
 }
 
 void RendererVK::update_static_opaque_triangles() {
-    // TODO: Implement.
+    auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
+    ROBufferVK::Builder builder;
+    auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
+    if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
+        static_opaque_triangles_vertices.size() != res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
+        // If size does not match, create a larger buffer.
+        builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
+        res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
+    }
+    res.dynamic_cast_ref<ROBufferVK>()->update_buffer(static_opaque_triangles_vertices.data(),
+                                                      static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured));
 }
 
 uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const {
