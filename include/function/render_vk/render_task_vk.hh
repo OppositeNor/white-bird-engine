@@ -46,6 +46,7 @@ struct SemaphoreVK {
             type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
             type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
             type_create_info.initialValue = 0;
+            create_info.pNext = &type_create_info;
         }
         if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create semaphore.");
