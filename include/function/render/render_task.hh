@@ -47,25 +47,18 @@ struct RendResInfo {
 struct RenderTask {
     RenderTask() = default;
     virtual ~RenderTask() {};
+
+    /**
+     * @brief Initialize the render task (since render task does not follow RAII, meaning
+     * calling the constructor does not fully initialize a render task, this method could provide
+     * a place where the full initialization could be performed).
+     */
+    virtual void init() = 0;
+
     /**
      * @brief Perform the render task.
      */
     virtual void perform(double p_delta) = 0;
-};
-
-/**
- * @class RenderTaskFactory
- * @brief The factory to create RenderTask.
- *
- */
-class RenderTaskFactory {
-public:
-    RenderTaskFactory() {}
-    virtual ~RenderTaskFactory() {}
-    /**
-     * @brief Create the render task instance.
-     */
-    virtual Ref<RenderTask> create() const = 0;
 };
 
 /**
@@ -86,7 +79,22 @@ struct RendTaskInfo {
     std::vector<RendResInfo> req_res;
 
     // The render task instance.
-    Ref<RenderTaskFactory> render_task_factory = MEM_NULL;
+    Ref<class RenderTaskFactory> render_task_factory = MEM_NULL;
+};
+
+/**
+ * @class RenderTaskFactory
+ * @brief The factory to create RenderTask.
+ *
+ */
+class RenderTaskFactory {
+public:
+    RenderTaskFactory() {}
+    virtual ~RenderTaskFactory() {}
+    /**
+     * @brief Create the render task instance.
+     */
+    virtual Ref<RenderTask> create() const = 0;
 };
 
 

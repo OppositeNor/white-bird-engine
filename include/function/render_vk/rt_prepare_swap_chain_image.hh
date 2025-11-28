@@ -25,9 +25,15 @@ namespace WhiteBirdEngine {
  *
  */
 struct RTPrepareSwapChianImage final: public RenderTaskVK {
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     */
     RTPrepareSwapChianImage(const BaseRenderDataVK* p_render_data)
         : RenderTaskVK(p_render_data) {}
 
+    virtual void init() override {}
     virtual void perform(double p_delta) override {}
 
 };

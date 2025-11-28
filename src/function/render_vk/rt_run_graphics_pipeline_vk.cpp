@@ -17,17 +17,17 @@
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "generated/type_uuid.gen.hh"
-#include "function/render/renderer.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "utils/defs.hh"
+#include <cstddef>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
-    : RenderTaskVK(p_render_data), signal_in_flight(p_signal_in_flight) {
+    : RenderTaskVK(p_render_data), signal_in_flight(p_signal_in_flight), wait_stages(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -42,7 +42,15 @@ RTRunGraphicsPipeline::~RTRunGraphicsPipeline() {
     vkFreeCommandBuffers(render_data->logic_device, render_data->graphics_command_pool, 1, &command_buffer);
 }
 
+void RTRunGraphicsPipeline::init() {
+    wait_stages.resize(depend_semaphores.size());
+    for (size_t i = 0; i < depend_semaphores.size(); ++i) {
+        wait_stages[i] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    }
+}
+
 void RTRunGraphicsPipeline::perform(double p_delta) {
+    // The resources may be loaded in-flight, so we should check if they are valid every single frame.
     check_req_res({TypeUUID<ROFramebufferVK>::UUID, TypeUUID<ROGraphicsPipelineVK>::UUID});
     if (req_rend_res[0]->res == MEM_NULL) {
         throw std::runtime_error("Failed to perform render task: framebuffer must be specified.");
@@ -56,18 +64,10 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    vector<VkSemaphore, RenderAllocator> wait_semaphores(render_data->allocator);
-    vector<VkPipelineStageFlags, RenderAllocator> wait_stages(render_data->allocator);
-    wait_semaphores.reserve(depend_tasks.size());
-    wait_stages.reserve(depend_tasks.size());
-    for (auto dep_task : depend_tasks) {
-        wait_semaphores.push_back(dep_task->task_semaphore.semaphore);
-        wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    }
     VkSemaphore signal_semaphores[] = {task_semaphore.semaphore};
 
-    submit_info.waitSemaphoreCount = wait_semaphores.size();
-    submit_info.pWaitSemaphores = wait_semaphores.data();
+    submit_info.waitSemaphoreCount = depend_semaphores.size();
+    submit_info.pWaitSemaphores = depend_semaphores.data();
     submit_info.pWaitDstStageMask = wait_stages.data();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;

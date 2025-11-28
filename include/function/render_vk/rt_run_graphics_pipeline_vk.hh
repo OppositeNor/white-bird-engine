@@ -37,11 +37,14 @@ struct RTRunGraphicsPipeline final : public RenderTaskVK {
     RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false);
     virtual ~RTRunGraphicsPipeline() override;
 
+    virtual void init() override;
+
     virtual void perform(double p_delta) override;
 
 private:
     VkCommandBuffer command_buffer;
     bool signal_in_flight = false;
+    vector<VkPipelineStageFlags> wait_stages;
     void record_command_buffer();
 };
 

@@ -16,7 +16,9 @@
 #define __WBE_RENDERER_HH__
 
 #include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/input_manager/input_manager.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
 #include "utils/interface/singleton.hh"
@@ -70,6 +72,14 @@ public:
      * @brief Update the static opaque triangles data.
      */
     virtual void update_static_opaque_triangles() = 0;
+
+    /**
+     * @brief Pool events.
+     *
+     * @param p_should_close Should the application be closed.
+     * @param p_input_manager The input manager instance to be updated.
+     */
+    virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) = 0;
 protected:
 
 private:

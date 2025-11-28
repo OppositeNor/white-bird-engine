@@ -32,6 +32,19 @@ public:
      */
     virtual void run() = 0;
 
+    /**
+     * @brief Get the difference between pair of render frames.
+     *
+     * @return The difference between pair of render frames.
+     */
+    virtual double get_render_delta() const = 0;
+
+    /**
+     * @brief Get the difference between pair of logic frames.
+     *
+     * @return The difference between pair of logic frames.
+     */
+    virtual double get_logic_delta() const = 0;
 };
 
 }

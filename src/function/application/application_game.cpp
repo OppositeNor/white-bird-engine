@@ -20,7 +20,9 @@
 #include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
+#include <atomic>
 #include <format>
+#include <thread>
 
 namespace WhiteBirdEngine {
 
@@ -29,24 +31,18 @@ ApplicationGame::ApplicationGame() {
 }
 
 void ApplicationGame::run() {
-    bool should_close = false;
-    SDL_Event event;
-    while (!should_close) {
-        while (SDL_PollEvent(&event)) {
-            // TODO: replace with event handler.
-            switch (event.type) {
-                case SDL_QUIT:
-                    should_close = true;
-                    break;
-            }
-        }
-        render_tick(0.01);
-    }
+    std::jthread render_thread([this]() {
+        run_render();
+    });
 }
 
 void ApplicationGame::init() {
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    // Initialize the deltas into a very small number.
+    render_delta.store(0.0001, std::memory_order_seq_cst);
+    logic_delta.store(0.0001, std::memory_order_seq_cst);
+
     if (game_config.render_api == "vulkan") {
         renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
     }
@@ -60,12 +56,26 @@ void ApplicationGame::init() {
     }
 }
 
-void ApplicationGame::render_tick(double p_delta) {
-    renderer->tick(p_delta);
+void ApplicationGame::run_render() {
+    bool local_should_close = false;
+    auto* global_clock = EngineCore::get_singleton()->global_clock;
+    double start_time, end_time;
+    while (!local_should_close) {
+        start_time = global_clock->get_duration();
+        renderer->pool_events(local_should_close, input_manager);
+        should_close.store(local_should_close, std::memory_order_release);
+        renderer->tick(render_delta.load(std::memory_order_relaxed));
+        end_time =  global_clock->get_duration();
+        render_delta.store(end_time - start_time, std::memory_order_release);
+    }
 }
 
-void ApplicationGame::logic_tick(double p_delta) {
-    // TODO
+void ApplicationGame::run_logic() {
+    bool local_should_close = false;
+    while (!local_should_close) {
+        // TODO
+        local_should_close = should_close.load(std::memory_order_acquire);
+    }
 }
 
 }

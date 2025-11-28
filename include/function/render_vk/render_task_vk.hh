@@ -25,6 +25,7 @@
 #include <format>
 #include <initializer_list>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
 /**
@@ -35,10 +36,17 @@ namespace WhiteBirdEngine {
 struct SemaphoreVK {
     VkSemaphore semaphore;
     const BaseRenderDataVK* render_data;
-    SemaphoreVK(const BaseRenderDataVK* p_render_data)
+    SemaphoreVK(const BaseRenderDataVK* p_render_data, bool p_binary = false)
         : render_data(p_render_data) {
         VkSemaphoreCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        if (!p_binary) {
+            // Create timeline semaphore
+            VkSemaphoreTypeCreateInfo type_create_info{};
+            type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            type_create_info.initialValue = 0;
+        }
         if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create semaphore.");
         }
@@ -54,17 +62,17 @@ struct SemaphoreVK {
  *
  */
 struct RenderTaskVK : public RenderTask {
-    RenderTaskVK(const BaseRenderDataVK* p_render_data)
-        : task_semaphore(p_render_data), render_data(p_render_data) {}
+    RenderTaskVK(const BaseRenderDataVK* p_render_data, bool p_use_binary_semaphore = false)
+        : task_semaphore(p_render_data, p_use_binary_semaphore), render_data(p_render_data) {}
     virtual ~RenderTaskVK() {}
     /**
      * @brief The required resources. This will be filled in the order of the req_res field in RendTaskInfo.
      */
     std::vector<Ref<RendResVK>> req_rend_res;
     /**
-     * @brief The tasks this task depends on.
+     * @brief The semaphores this task depends on. This will be filled with unique semaphores of the dependent tasks.
      */
-    std::vector<Ref<RenderTaskVK>> depend_tasks;
+    std::vector<VkSemaphore> depend_semaphores;
 
     SemaphoreVK task_semaphore;
 

@@ -89,6 +89,8 @@ public:
 
     virtual void update_static_opaque_triangles() override;
 
+    virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override;
+
     /**
      * @brief Get the singleton instance.
      *

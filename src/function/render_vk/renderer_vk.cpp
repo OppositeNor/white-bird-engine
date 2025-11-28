@@ -122,6 +122,32 @@ void RendererVK::tick(double p_delta) {
     vkQueuePresentKHR(present_queue, &present_info);
 }
 
+void RendererVK::update_static_opaque_triangles() {
+    auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
+    ROBufferVK::Builder builder;
+    auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
+    if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
+        static_opaque_triangles_vertices.size() != res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
+        // If size does not match, create a larger buffer.
+        builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
+        res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
+    }
+    res.dynamic_cast_ref<ROBufferVK>()->update_buffer(static_opaque_triangles_vertices.data(),
+                                                      static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured));
+}
+
+void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                p_should_close = true;
+                break;
+            // TODO: update input manager.
+        }
+    }
+}
+
 void RendererVK::init() {
     render_objects = make_unique<RenderObjects>(allocator, allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
@@ -818,11 +844,17 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
             }
         }
     }
+    // Setup tasks semaphore dependencies.
     for (auto rend_task : p_pipeline_info->task_infos) {
         auto* dep_tasks = render_task_map[rend_task.task_id].second;
         for (auto dep_task_id : *dep_tasks) {
-            rend_task.render_task->depend_tasks.push_back(render_task_map[dep_task_id].first);
+            rend_task.render_task->depend_semaphores.push_back(
+                render_task_map[dep_task_id].first->task_semaphore.semaphore);
         }
+    }
+    // Initialize the tasks.
+    for (auto rend_task : p_pipeline_info->task_infos) {
+        rend_task.render_task->init();
     }
 }
 
@@ -849,20 +881,6 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
         p_pipeline->rend_res.push_back(rend_res);
         p_task_info.render_task->req_rend_res.push_back(rend_res);
     }
-}
-
-void RendererVK::update_static_opaque_triangles() {
-    auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
-    ROBufferVK::Builder builder;
-    auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
-    if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
-        static_opaque_triangles_vertices.size() != res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
-        // If size does not match, create a larger buffer.
-        builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
-        res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
-    }
-    res.dynamic_cast_ref<ROBufferVK>()->update_buffer(static_opaque_triangles_vertices.data(),
-                                                      static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured));
 }
 
 uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const {

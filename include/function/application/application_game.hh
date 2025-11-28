@@ -17,7 +17,10 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/application/application.hh"
+#include "function/input_manager/input_manager.hh"
 #include "function/render/renderer.hh"
+#include "utils/defs.hh"
+#include <atomic>
 namespace WhiteBirdEngine {
 
 /**
@@ -36,9 +39,6 @@ public:
 
     virtual void run() override;
 
-    void render_tick(double p_delta);
-    void logic_tick(double p_delta);
-
     /**
      * @brief Get the allocator for the renderer.
      *
@@ -52,11 +52,27 @@ public:
         return renderer;
     }
 
+    virtual double get_render_delta() const override {
+        return render_delta.load(std::memory_order_acquire);
+    }
+
+    virtual double get_logic_delta() const override {
+        return logic_delta.load(std::memory_order_acquire);
+    }
+
 private:
     Ref<RenderAllocator> renderer_allocator;
+    Ref<InputManager> input_manager;
     void init();
+    void run_render();
+    void run_logic();
+
+    WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
+    WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
+    WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
 protected:
     Ref<Renderer> renderer;
+
 };
 
 }
