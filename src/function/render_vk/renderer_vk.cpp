@@ -246,9 +246,10 @@ void RendererVK::init_graphics_pipeline() {
     Ref<ROShaderVK> pixel_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
 
     // Initialize shader configurations.
-    ROGraphicsPipelineVK::Config::ShaderConfig shader_config{};
-    shader_config.push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader);
-    shader_config.push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, pixel_shader);
+    ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
+    shader_config
+        .push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader)
+        .push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, pixel_shader);
 
     // Initialize vertex inputs.
     ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config{};

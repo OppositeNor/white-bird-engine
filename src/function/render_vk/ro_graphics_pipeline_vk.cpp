@@ -14,7 +14,6 @@
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include "core/core_utils.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -156,8 +155,8 @@ void ROGraphicsPipelineVK::setup_depth_stencil_state_create_info(const Config& p
     auto& depth_stencil_config = p_config.depth_test;
     VkPipelineDepthStencilStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    create_info.depthTestEnable = depth_stencil_config.depth_test_enable;
-    create_info.depthWriteEnable = depth_stencil_config.depth_write_enable;
+    create_info.depthTestEnable = depth_stencil_config.depth_test_enabled;
+    create_info.depthWriteEnable = depth_stencil_config.depth_write_enabled;
     create_info.depthCompareOp = depth_stencil_config.depth_compare_op;
     create_info.stencilTestEnable = VK_FALSE;
     p_pipeline_create_infos.depth_stencil_state = create_info;
@@ -168,7 +167,7 @@ void ROGraphicsPipelineVK::setup_color_blend_state_create_info(const Config& p_c
     auto& color_blend_config = p_config.color_blend;
     VkPipelineColorBlendStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    create_info.logicOpEnable = color_blend_config.logic_op_enable;
+    create_info.logicOpEnable = color_blend_config.logic_op_enabled;
     create_info.logicOp = color_blend_config.logic_op;
     create_info.attachmentCount = color_blend_config.attachments.size();
     create_info.pAttachments = color_blend_config.attachments.data();
