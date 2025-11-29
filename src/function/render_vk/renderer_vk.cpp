@@ -73,7 +73,6 @@ RendererVK::~RendererVK() {
 
 void RendererVK::tick(double p_delta) {
     vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
-
     if (run_pipeline.size() == 0) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
@@ -88,7 +87,7 @@ void RendererVK::tick(double p_delta) {
     // Aquire swap chain image.
     uint32_t image_index;
     VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX,
-                                            render_objects->image_available_semaphore->get_semaphore(),
+                                            run_pipeline[frame_counter]->image_available_semaphore->get_semaphore(),
                                             VK_NULL_HANDLE, &image_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         recreate_swap_chain();
@@ -290,7 +289,6 @@ void RendererVK::init_swap_chain_framebuffers() {
 }
 
 void RendererVK::setup_render_resource() {
-
     render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
     render_objects->swap_chain_framebuffer_resource->res_type_id = TypeUUID<ROFramebufferVK>::UUID;
     render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK;
@@ -308,7 +306,6 @@ void RendererVK::setup_render_resource() {
     render_objects->static_opaque_triangles_vertices_buffer_resource->res_id = REND_RES_STATIC_OPAQUE_TRIANGLES_VK;
     render_objects->static_opaque_triangles_vertices_buffer_resource->res = MEM_NULL;
     render_resources.insert(std::pair(REND_RES_STATIC_OPAQUE_TRIANGLES_VK, render_objects->static_opaque_triangles_vertices_buffer_resource));
-    render_objects->image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
 }
 
 void RendererVK::create_instance() {
@@ -824,16 +821,45 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
 void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index) {
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
-    // Push the render_start_task as the starting task.
+    // Setup image available semaphores
+    p_pipeline_info->image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
 
+    // Setup start task.
     Ref<RTPrepareSwapChianImageFactoryVK> start_task_factory = make_ref<RTPrepareSwapChianImageFactoryVK>(allocator, &base_render_data);
     Ref<RenderTaskVK> start_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
-    start_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, true);
-    start_task->depend_semaphores.push_back(render_objects->image_available_semaphore);
+    start_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, false);
     p_pipeline_info->task_infos.push_back({.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE_VK, .render_task = start_task});
+    start_task->depend_semaphores.push_back(p_pipeline_info->image_available_semaphore);
     std::vector<RendTaskID> dummy;
     render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, std::pair(start_task, &dummy)));
 
+    // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
+    process_tasks_bfs(p_root_task, p_pipeline_info, render_task_map);
+
+    // Setup other properties according to the constructed graph.
+    uint64_t max_depth = 0;
+    for (auto rend_task : p_pipeline_info->task_infos) {
+        auto* dep_tasks = render_task_map[rend_task.task_id].second;
+        for (auto dep_task_id : *dep_tasks) {
+            // Setup tasks semaphore dependencies.
+            auto dep_task = render_task_map[dep_task_id].first;
+            rend_task.render_task->depend_semaphores.push_back(dep_task->task_semaphore);
+            // This was originally implemented for something else that was removed,
+            // but this might be useful in the future, so I'll keep it here.
+            rend_task.render_task->node_depth = std::max(rend_task.render_task->node_depth, dep_task->node_depth + 1);
+        }
+        max_depth = std::max(rend_task.render_task->node_depth, max_depth);
+    }
+    p_pipeline_info->max_depth = max_depth;
+
+    // Initialize the tasks.
+    for (auto rend_task : p_pipeline_info->task_infos) {
+        rend_task.render_task->setup();
+    }
+}
+
+void RendererVK::process_tasks_bfs(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
+                                   std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map) {
     unordered_set<Ref<RendTaskInfo>> visited(allocator);
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
@@ -855,7 +881,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
             register_render_resources(curr, task_info, p_pipeline_info);
             p_pipeline_info->task_infos.push_back(task_info);
 
-            render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
             task_info.render_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, curr->next.size() <= 1);
             if (curr->next.empty()) {
                 p_pipeline_info->result_semaphores.push_back(task_info.render_task->task_semaphore);
@@ -865,24 +891,6 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
                 to_visit.push_back(next);
             }
         }
-    }
-    uint64_t max_depth = 0;
-    for (auto rend_task : p_pipeline_info->task_infos) {
-        auto* dep_tasks = render_task_map[rend_task.task_id].second;
-        for (auto dep_task_id : *dep_tasks) {
-            // Setup tasks semaphore dependencies.
-            auto dep_task = render_task_map[dep_task_id].first;
-            rend_task.render_task->depend_semaphores.push_back(dep_task->task_semaphore);
-            rend_task.render_task->node_depth = std::max(rend_task.render_task->node_depth, dep_task->node_depth + 1);
-        }
-        max_depth = std::max(rend_task.render_task->node_depth, max_depth);
-    }
-    p_pipeline_info->task_infos[0].render_task->depend_semaphores.push_back(render_objects->image_available_semaphore);
-    p_pipeline_info->max_depth = max_depth;
-
-    // Initialize the tasks.
-    for (auto rend_task : p_pipeline_info->task_infos) {
-        rend_task.render_task->setup();
     }
 }
 
@@ -920,5 +928,4 @@ uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFl
     }
     throw std::runtime_error("Failed to find a suitable physical device.");
 }
-
 }

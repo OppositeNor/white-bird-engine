@@ -218,6 +218,7 @@ private:
         string pipeline_name;
         vector<Ref<RendResVK>> rend_res;
         vector<TaskInfo> task_infos;
+        Ref<SemaphoreVK> image_available_semaphore;
         vector<Ref<SemaphoreVK>> result_semaphores;
         uint64_t max_depth;
         PipelineInfo(AllocType* p_allocator)
@@ -254,8 +255,6 @@ private:
         Ref<RendResVK> base_graphics_pipeline_resource;
         // The buffer that stores data of the scenes' static opaque triangles' status.
         Ref<RendResVK> static_opaque_triangles_vertices_buffer_resource;
-        // Image avialable semaphore.
-        Ref<SemaphoreVK> image_available_semaphore;
     };
     Unique<RenderObjects> render_objects;
 
@@ -302,6 +301,8 @@ private:
 
     vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
     void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index);
+    void process_tasks_bfs(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
+                           std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 
