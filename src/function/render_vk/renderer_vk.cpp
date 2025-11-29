@@ -827,9 +827,8 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     // Setup start task.
     Ref<RTPrepareSwapChianImageFactoryVK> start_task_factory = make_ref<RTPrepareSwapChianImageFactoryVK>(allocator, &base_render_data);
     Ref<RenderTaskVK> start_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
-    start_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, false);
+    start_task->task_semaphore = p_pipeline_info->image_available_semaphore;
     p_pipeline_info->task_infos.push_back({.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE_VK, .render_task = start_task});
-    start_task->depend_semaphores.push_back(p_pipeline_info->image_available_semaphore);
     std::vector<RendTaskID> dummy;
     render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, std::pair(start_task, &dummy)));
 

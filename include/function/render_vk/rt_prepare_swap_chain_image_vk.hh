@@ -34,7 +34,7 @@ struct RTPrepareSwapChianImageVK final: public RenderTaskVK {
         : RenderTaskVK(p_render_data) {}
 
     virtual void init() override {}
-    virtual void perform(double p_delta) override;
+    virtual void perform(double p_delta) override {}
 
 };
 
