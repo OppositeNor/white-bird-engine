@@ -64,6 +64,11 @@ struct BaseRenderDataVK {
     // The current swap chain index.
     uint32_t current_swap_chain_index;
 
+    // The current number of frames.
+    uint64_t current_frame;
+    // The maximum depth of the render graph in the current pipeline.
+    uint64_t max_depth;
+
     // The queue family indices.
     set<uint32_t> queue_family_indices;
 

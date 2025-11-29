@@ -12,25 +12,25 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_PREPARE_SWAP_CHAIN_IMAGE_HH__
-#define __WBE_PREPARE_SWAP_CHAIN_IMAGE_HH__
+#ifndef __WBE_PREPARE_SWAP_CHAIN_IMAGE_VK_HH__
+#define __WBE_PREPARE_SWAP_CHAIN_IMAGE_VK_HH__
 
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 namespace WhiteBirdEngine {
 
 /**
- * @class RTPrepareSwapChianImage
+ * @class RTPrepareSwapChianImageVK
  * @brief A dummy render task to hold the semaphore for swap chain image preparing.
  *
  */
-struct RTPrepareSwapChianImage final: public RenderTaskVK {
+struct RTPrepareSwapChianImageVK final: public RenderTaskVK {
     /**
      * @brief Constructor.
      *
      * @param p_render_data The base render data.
      */
-    RTPrepareSwapChianImage(const BaseRenderDataVK* p_render_data)
+    RTPrepareSwapChianImageVK(const BaseRenderDataVK* p_render_data)
         : RenderTaskVK(p_render_data) {}
 
     virtual void init() override {}
@@ -39,11 +39,11 @@ struct RTPrepareSwapChianImage final: public RenderTaskVK {
 };
 
 /**
- * @class RTRunGraphicsPipelineFactory
+ * @class RTRunGraphicsPipelineFactoryVK
  * @brief Factory for RTRunGraphicsPipeline.
  *
  */
-class RTPrepareSwapChianImageFactory final : public RenderTaskFactoryVK {
+class RTPrepareSwapChianImageFactoryVK final : public RenderTaskFactoryVK {
 public:
     /**
      * @brief Constructor.
@@ -51,12 +51,12 @@ public:
      * @param p_render_data The render data.
      * @param p_signal_in_flight Should signal in flight fence.
      */
-    RTPrepareSwapChianImageFactory(const BaseRenderDataVK* p_render_data)
+    RTPrepareSwapChianImageFactoryVK(const BaseRenderDataVK* p_render_data)
         : RenderTaskFactoryVK(p_render_data) {}
-    virtual ~RTPrepareSwapChianImageFactory() override {}
+    virtual ~RTPrepareSwapChianImageFactoryVK() override {}
 
     virtual Ref<RenderTask> create() const override {
-        return make_ref<RTPrepareSwapChianImage>(render_data->allocator, render_data);      
+        return make_ref<RTPrepareSwapChianImageVK>(render_data->allocator, render_data);      
     }
 
 };

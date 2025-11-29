@@ -21,12 +21,13 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "utils/defs.hh"
 #include <cstddef>
+#include <cstring>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
     : RenderTaskVK(p_render_data), signal_in_flight(p_signal_in_flight), wait_stages(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -38,18 +39,18 @@ RTRunGraphicsPipeline::RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_da
     }
 }
 
-RTRunGraphicsPipeline::~RTRunGraphicsPipeline() {
+RTRunGraphicsPipelineVK::~RTRunGraphicsPipelineVK() {
     vkFreeCommandBuffers(render_data->logic_device, render_data->graphics_command_pool, 1, &command_buffer);
 }
 
-void RTRunGraphicsPipeline::init() {
-    wait_stages.resize(depend_semaphores.size());
+void RTRunGraphicsPipelineVK::init() {
+    wait_stages.reserve(depend_semaphores.size());
     for (size_t i = 0; i < depend_semaphores.size(); ++i) {
-        wait_stages[i] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     }
 }
 
-void RTRunGraphicsPipeline::perform(double p_delta) {
+void RTRunGraphicsPipelineVK::perform(double p_delta) {
     // The resources may be loaded in-flight, so we should check if they are valid every single frame.
     check_req_res({TypeUUID<ROFramebufferVK>::UUID, TypeUUID<ROGraphicsPipelineVK>::UUID});
     if (req_rend_res[0]->res == MEM_NULL) {
@@ -64,11 +65,20 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore signal_semaphores[] = {task_semaphore.semaphore};
-
+    VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
     submit_info.waitSemaphoreCount = depend_semaphores.size();
-    submit_info.pWaitSemaphores = depend_semaphores.data();
+    submit_info.pWaitSemaphores = get_dependent_semaphores_instance();
     submit_info.pWaitDstStageMask = wait_stages.data();
+
+    // Setup timeline semaphore submit info.
+    VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info{};
+    timeline_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
+    timeline_semaphore_submit_info.pSignalSemaphoreValues = &render_data->current_frame;
+    timeline_semaphore_submit_info.waitSemaphoreValueCount = depend_semaphore_timeline_wait_values.size();
+    timeline_semaphore_submit_info.pWaitSemaphoreValues = get_depend_semaphore_timeline_wait_values();
+    submit_info.pNext = &timeline_semaphore_submit_info;
+
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;
     submit_info.signalSemaphoreCount = 1;
@@ -80,7 +90,7 @@ void RTRunGraphicsPipeline::perform(double p_delta) {
 
 }
 
-void RTRunGraphicsPipeline::record_command_buffer() {
+void RTRunGraphicsPipelineVK::record_command_buffer() {
     Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
     Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
 

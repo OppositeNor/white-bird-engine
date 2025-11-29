@@ -57,11 +57,11 @@ void setup_pipeline(WBE::ApplicationGame& game_application) {
     auto render_allocator = game_application.get_renderer_allocator().get();
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
-    rend_task_info->prev.push_back(WBE::RT_PREPARE_SWAP_CHAIN_IMAGE);
-    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER, .type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID});
-    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID});
+    rend_task_info->prev.push_back(WBE::RT_PREPARE_SWAP_CHAIN_IMAGE_VK);
+    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, .type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID});
+    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE_VK, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID});
     rend_task_info->render_task_factory
-        = WBE::make_ref<WBE::RTRunGraphicsPipelineFactory>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
+        = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
     game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
     game_application.get_renderer()->activate_pipeline("test_pipeline");
 

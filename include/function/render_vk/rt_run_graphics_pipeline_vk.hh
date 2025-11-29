@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RT_RUN_GRAPHICS_PIPELINE_HH__
-#define __WBE_RT_RUN_GRAPHICS_PIPELINE_HH__
+#ifndef __WBE_RT_RUN_GRAPHICS_PIPELINE_VK_HH__
+#define __WBE_RT_RUN_GRAPHICS_PIPELINE_VK_HH__
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
@@ -23,19 +23,19 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RTRunGraphicsPipeline
+ * @class RTRunGraphicsPipelineVK
  * @brief Render task that runs a graphics pipeline and produces an image.
  *
  */
-struct RTRunGraphicsPipeline final : public RenderTaskVK {
+struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     /**
      * @brief Constructor.
      *
      * @param p_render_data The render data.
      * @param p_signal_in_flight Should signal in flight fence.
      */
-    RTRunGraphicsPipeline(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false);
-    virtual ~RTRunGraphicsPipeline() override;
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false);
+    virtual ~RTRunGraphicsPipelineVK() override;
 
     virtual void init() override;
 
@@ -49,11 +49,11 @@ private:
 };
 
 /**
- * @class RTRunGraphicsPipelineFactory
+ * @class RTRunGraphicsPipelineFactoryVK
  * @brief Factory for RTRunGraphicsPipeline.
  *
  */
-class RTRunGraphicsPipelineFactory final : public RenderTaskFactoryVK {
+class RTRunGraphicsPipelineFactoryVK final : public RenderTaskFactoryVK {
 public:
     /**
      * @brief Constructor.
@@ -61,12 +61,12 @@ public:
      * @param p_render_data The render data.
      * @param p_signal_in_flight Should signal in flight fence.
      */
-    RTRunGraphicsPipelineFactory(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
+    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
         : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight) {}
-    virtual ~RTRunGraphicsPipelineFactory() override {}
+    virtual ~RTRunGraphicsPipelineFactoryVK() override {}
 
     virtual Ref<RenderTask> create() const override {
-        return make_ref<RTRunGraphicsPipeline>(render_data->allocator, render_data, signal_in_flight);      
+        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, signal_in_flight);      
     }
 private:
     bool signal_in_flight;

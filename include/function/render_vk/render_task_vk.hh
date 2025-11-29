@@ -20,42 +20,15 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/semaphore_vk.hh"
 #include "generated/label_manager.gen.hh"
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <initializer_list>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
-
-/**
- * @class SemaphoreVK
- * @brief Vulkan semaphore container.
- *
- */
-struct SemaphoreVK {
-    VkSemaphore semaphore;
-    const BaseRenderDataVK* render_data;
-    SemaphoreVK(const BaseRenderDataVK* p_render_data, bool p_binary = false)
-        : render_data(p_render_data) {
-        VkSemaphoreCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        if (!p_binary) {
-            // Create timeline semaphore
-            VkSemaphoreTypeCreateInfo type_create_info{};
-            type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-            type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-            type_create_info.initialValue = 0;
-            create_info.pNext = &type_create_info;
-        }
-        if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create semaphore.");
-        }
-    }
-    ~SemaphoreVK() {
-        vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
-    }
-};
 
 /**
  * @class RenderTaskVK
@@ -64,21 +37,52 @@ struct SemaphoreVK {
  */
 struct RenderTaskVK : public RenderTask {
     RenderTaskVK(const BaseRenderDataVK* p_render_data, bool p_use_binary_semaphore = false)
-        : task_semaphore(p_render_data, p_use_binary_semaphore), render_data(p_render_data) {}
+        : req_rend_res(p_render_data->allocator), depend_semaphores(p_render_data->allocator),
+        depend_semaphores_inst(p_render_data->allocator), depend_semaphore_timeline_wait_values(p_render_data->allocator),
+        render_data(p_render_data) {}
     virtual ~RenderTaskVK() {}
+
+    /**
+     * @brief Setup the render task.
+     */
+    void setup() {
+        WBE_DEBUG_ASSERT(task_semaphore != MEM_NULL);
+        // update semaphore_timeline_wait_values size
+        size_t timeline_semaphores = 0;
+        for (auto& semaphore : depend_semaphores) {
+            WBE_DEBUG_ASSERT(semaphore != MEM_NULL);
+            ++timeline_semaphores;
+        }
+        depend_semaphore_timeline_wait_values.resize(timeline_semaphores);
+        depend_semaphores_inst.resize(depend_semaphores.size());
+        init();
+    }
+
     /**
      * @brief The required resources. This will be filled in the order of the req_res field in RendTaskInfo.
      */
-    std::vector<Ref<RendResVK>> req_rend_res;
+    vector<Ref<RendResVK>> req_rend_res;
     /**
      * @brief The semaphores this task depends on. This will be filled with unique semaphores of the dependent tasks.
      */
-    std::vector<VkSemaphore> depend_semaphores;
+    vector<Ref<SemaphoreVK>> depend_semaphores;
+    vector<VkSemaphore> depend_semaphores_inst;
+    vector<uint64_t> depend_semaphore_timeline_wait_values;
 
-    SemaphoreVK task_semaphore;
+    /**
+     * @brief The depth of node of this task in the render graph.
+     */
+    uint64_t node_depth = 0;
+
+    Ref<SemaphoreVK> task_semaphore;
 
 protected:
     const BaseRenderDataVK* render_data;
+    /**
+     * @brief Check if the types of required resources matches the resources in req_rend_res.
+     *
+     * @param p_expected_req_res The expected resources types.
+     */
     void check_req_res(std::initializer_list<RendResTID> p_expected_req_res) {
         if (req_rend_res.size() != p_expected_req_res.size()) {
             throw std::runtime_error(std::format(
@@ -91,6 +95,32 @@ protected:
                     LabelManager::get_singleton()->get_label_name(*(p_expected_req_res.begin() + i))));
             }
         }
+    }
+
+    /**
+     * @brief Get the dependent semaphore timeline semaphores' wait values.
+     *
+     * @return The dependent semaphores wait values.
+     */
+    const uint64_t* get_depend_semaphore_timeline_wait_values() {
+        size_t n = depend_semaphore_timeline_wait_values.size();
+        for (size_t i = 0; i < n; ++i) {
+            depend_semaphore_timeline_wait_values[i] = render_data->current_frame;
+        }
+        return depend_semaphore_timeline_wait_values.data();
+    }
+
+    /**
+     * @brief Get the dependent semaphores vulkan semaphore instances.
+     *
+     * @return The dependent semaphores vulkan semaphore instances.
+     */
+    const VkSemaphore* get_dependent_semaphores_instance() {
+        size_t n = depend_semaphores_inst.size();
+        for (size_t i = 0; i < n; ++i) {
+            depend_semaphores_inst[i] = depend_semaphores[i]->get_semaphore();
+        }
+        return depend_semaphores_inst.data();
     }
 };
 

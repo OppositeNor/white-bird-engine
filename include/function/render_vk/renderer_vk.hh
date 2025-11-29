@@ -46,11 +46,11 @@
 
 namespace WhiteBirdEngine {
 
-WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_VK, WBE_RENDER_RESOURCE);
 
-WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE, WBE_RENDER_TASK);
+WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, WBE_RENDER_TASK);
 
 /**
  * @class RendererVK
@@ -59,7 +59,9 @@ WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE, WBE_RENDER_TASK);
  */
 class RendererVK final : public Renderer {
 public:
+
     using AllocType = RenderAllocator;
+    static constexpr uint32_t VULKAN_API_VERSION = VK_API_VERSION_1_2;
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
@@ -165,7 +167,7 @@ private:
     };
 
     const std::vector<const char*> enabled_device_extensions {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
 #ifdef WBE_VK_ENABLE_VALIDATION
@@ -216,9 +218,11 @@ private:
         string pipeline_name;
         vector<Ref<RendResVK>> rend_res;
         vector<TaskInfo> task_infos;
-        vector<VkSemaphore> result_semaphores;
+        vector<Ref<SemaphoreVK>> result_semaphores;
+        uint64_t max_depth;
         PipelineInfo(AllocType* p_allocator)
-            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator), result_semaphores(p_allocator) {}
+            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator),
+            result_semaphores(p_allocator) {}
     };
 
 
@@ -233,8 +237,7 @@ private:
     // Render objects for the renderer.
     struct RenderObjects {
         RenderObjects(AllocType* p_allocator)
-            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator),
-            render_start_tasks(p_allocator) {}
+            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline.
@@ -251,8 +254,8 @@ private:
         Ref<RendResVK> base_graphics_pipeline_resource;
         // The buffer that stores data of the scenes' static opaque triangles' status.
         Ref<RendResVK> static_opaque_triangles_vertices_buffer_resource;
-        // The start render task.
-        vector<TaskInfo> render_start_tasks;
+        // Image avialable semaphore.
+        Ref<SemaphoreVK> image_available_semaphore;
     };
     Unique<RenderObjects> render_objects;
 
