@@ -832,8 +832,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     std::vector<RendTaskID> dummy;
     render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, std::pair(start_task, &dummy)));
 
-    // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
-    process_tasks_bfs(p_root_task, p_pipeline_info, render_task_map);
+    compile_render_graph(p_root_task, p_pipeline_info, render_task_map);
 
     // Setup other properties according to the constructed graph.
     uint64_t max_depth = 0;
@@ -857,38 +856,48 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     }
 }
 
-void RendererVK::process_tasks_bfs(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
-                                   std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map) {
-    unordered_set<Ref<RendTaskInfo>> visited(allocator);
+void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
+                                      std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map) {
+    // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
+    // Performing BFS should be the most optimal way for optimizing synchronozation, since the nodes with the same
+    // depth has no dependencies among them.
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
+    unordered_set<Ref<RendTaskInfo>> visited(allocator);
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
-        if (visited.find(curr) == visited.end()) {
-            visited.insert(curr);
+        if (visited.find(curr) != visited.end()) {
+            continue;
+        }
+        visited.insert(curr);
+        for (auto next : curr->next) {
+            to_visit.push_back(next);
+        }
 
-            TaskInfo task_info;
-            task_info.render_task = curr->render_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
+        TaskInfo task_info;
+        // Set render task.
+        task_info.render_task = curr->render_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
+        if (task_info.render_task == MEM_NULL) {
+            throw std::runtime_error(std::format(
+                "Failed to convert RenderTask {} to RenderTaskVK. This task is probably not a Vulkan task.",
+                LabelManager::get_singleton()->get_label_name(curr->task_id)));
+        }
 
-            if (task_info.render_task == MEM_NULL) {
-                throw std::runtime_error(std::format(
-                    "Failed to convert RenderTask {} to RenderTaskVK. This task is probably not a Vulkan task.",
-                    LabelManager::get_singleton()->get_label_name(curr->task_id)));
-            }
-            task_info.task_id = curr->task_id;
-            register_render_resources(curr, task_info, p_pipeline_info);
-            p_pipeline_info->task_infos.push_back(task_info);
+        // Set task ID.
+        task_info.task_id = curr->task_id;
+        // Register associated resources.
+        register_render_resources(curr, task_info, p_pipeline_info);
+        // Push the node to the pipeline.
+        p_pipeline_info->task_infos.push_back(task_info);
 
-            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
-            task_info.render_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, curr->next.size() <= 1);
-            if (curr->next.empty()) {
-                p_pipeline_info->result_semaphores.push_back(task_info.render_task->task_semaphore);
-            }
-
-            for (auto next : curr->next) {
-                to_visit.push_back(next);
-            }
+        // Keep track on the tasks' dependencies.
+        p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+        // Initializes semaphore. If more than one task depend on this task, create a timeline semaphore. Otherwise use a binary semaphore.
+        task_info.render_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, curr->next.size() <= 1);
+        if (curr->next.empty()) {
+            // If this is the last task, keep track on their semaphores, to track when the tasks finish.
+            p_pipeline_info->result_semaphores.push_back(task_info.render_task->task_semaphore);
         }
     }
 }
@@ -899,7 +908,7 @@ Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
         auto rend_res = make_ref<RendResVK>(allocator, &base_render_data);
         rend_res->res_type_id = p_type_id;
         rend_res->res_id = p_res;
-        // It is the users' responsibility to initialize this field.
+        // TODO: initialize resource.
         rend_res->res = MEM_NULL;
         render_resources.insert({p_res, rend_res});
         return rend_res;

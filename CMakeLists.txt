@@ -29,7 +29,7 @@ option(WBE_BUILD_SHARED "Should build shared library" ON)
 
 # Define output paths
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${WBE_BINARY_DIR}/libs)
 
 set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
 set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
@@ -95,13 +95,19 @@ if (WBE_MAKE_TEST AND CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
     add_link_options(--coverage)
 endif()
 
-# Platform declerations
+# Platform specific configurations.
 if (WBE_BUILD_PLATFORM STREQUAL "Linux")
     add_compile_options(-DWBE_TARGET_PLATFORM_LINUX)
+    if (WBE_BUILD_SHARED)
+        set(WBE_USE_RPATH_LIBRARY ON)
+    endif()
 elseif(WBE_BUILD_PLATFORM STREQUAL "Windows")
     add_compile_options(-DWBE_TARGET_PLATFORM_WINDOWS)
 elseif(WBE_BUILD_PLATFORM STREQUAL "Darwin")
     add_compile_options(-DWBE_TARGET_PLATFORM_MACOS)
+    if (WBE_BUILD_SHARED)
+        set(WBE_USE_RPATH_LIBRARY ON)
+    endif()
 endif()
 
 
@@ -173,7 +179,14 @@ else()
     add_executable(${PROJECT_NAME}
         ${PROJECT_SOURCE_DIR}/src/main.cpp
     )
-    target_link_libraries(${PROJECT_NAME} PUBLIC
+    if (WBE_USE_RPATH_LIBRARY)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "$ORIGIN/libs"
+        SKIP_BUILD_RPATH FALSE
+        )
+    endif()
+    target_link_libraries(${PROJECT_NAME} PRIVATE
         WBE_ENGINE
     )
 endif()

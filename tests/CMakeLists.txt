@@ -19,7 +19,7 @@ add_executable(wbe_unit_test
     ${WBE_UNIT_TEST_SOURCE}
 )
 
-target_link_libraries(wbe_unit_test PUBLIC
+target_link_libraries(wbe_unit_test PRIVATE
     WBE_ENGINE
     gtest_main
 )
@@ -30,10 +30,23 @@ add_executable(wbe_benchmark_test
     ${WBE_UNIT_TEST_BENCHMARK}
 )
 
-target_link_libraries(wbe_benchmark_test PUBLIC
+target_link_libraries(wbe_benchmark_test PRIVATE
     WBE_ENGINE
     benchmark_main
 )
+
+if (WBE_USE_RPATH_LIBRARY)
+    set_target_properties(wbe_unit_test PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "$ORIGIN/libs"
+        SKIP_BUILD_RPATH FALSE
+    )
+    set_target_properties(wbe_benchmark_test PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "$ORIGIN/libs"
+        SKIP_BUILD_RPATH FALSE
+    )
+endif()
 
 include(GoogleTest)
 
