@@ -15,7 +15,6 @@
 #include "global/global.hh"
 #include "core/engine_core.hh"
 #include "function/engine_function.hh"
-#include "platform/os/os.hh"
 #include "resource/engine_resource.hh"
 
 namespace WhiteBirdEngine {
@@ -43,7 +42,6 @@ Global::~Global() {
     engine_function.reset();
     delete engine_core;
     singleton = nullptr;
-    OS::wait_all();
 }
 
 

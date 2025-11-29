@@ -16,25 +16,7 @@
 #include "platform/os/os.hh"
 
 namespace WhiteBirdEngine {
-
-PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[], const char* p_envp[]) {
     // TODO
-    return -1;
-}
-
-PID OS::execute(bool p_background, const char* p_exec_path, const char* p_argv[]) {
-    // TODO
-    return -1;
-}
-
-PID OS::fork_process() {
-    // TODO
-    return -1;
-}
-
-void OS::wait_process(PID p_pid) {
-    // TODO
-}
 
 }
 
