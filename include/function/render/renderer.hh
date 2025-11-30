@@ -80,7 +80,6 @@ public:
      * @param p_input_manager The input manager instance to be updated.
      */
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) = 0;
-protected:
 
 private:
     void initialize_render_pass();

@@ -23,6 +23,34 @@
 #include <string>
 namespace WhiteBirdEngine {
 
+/**
+ * @class ThisRef
+ * @brief Interface for objects that could be able to get a reference of themselves (this_ref).
+ * If this object is not created as a reference, this_ref will be MEM_NULL.
+ *
+ * @tparam T The type of the class.
+ */
+template <typename T>
+class ThisRef {
+public:
+
+    ThisRef() {}
+    virtual ~ThisRef() {}
+
+    /**
+     * @brief Set the reference referencing this instance.
+     *
+     * @param p_ref_of_this The reference referencing this instance.
+     */
+    void set_ref_of_this(Ref<T> p_ref_of_this) {
+        WBE_DEBUG_ASSERT(this_ref.is_null());
+        this_ref = p_ref_of_this;
+    }
+
+protected:
+    RefWeak<T> this_ref;
+};
+
 template <typename T>
 T& required(const std::string& p_name, Ref<T> p_ref) {
     if (p_ref == MEM_NULL) {

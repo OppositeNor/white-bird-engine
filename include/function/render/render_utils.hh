@@ -12,25 +12,28 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_TAKS_HH__
-#define __WBE_TAKS_HH__
+#ifndef __WBE_RENDER_UTILS_HH__
+#define __WBE_RENDER_UTILS_HH__
+
+#include "core/job/job.hh"
+#include "function/render/renderer.hh"
 
 namespace WhiteBirdEngine {
 
 /**
- * @class Task
- * @brief A task that is presentable.
+ * @class RenderJob
+ * @brief A render job.
  *
  */
-struct Task {
-    Task() {}
-    virtual ~Task() {}
-
+struct JobRender : public Job<JobRender> {
     /**
-     * @brief Perform the task.
+     * @brief Perform the job.
+     *
+     * @param p_renderer The renderer instance.
      */
-    virtual void perform() = 0;
+    virtual void perform(Ref<Renderer> p_renderer) = 0;
 };
+
 
 }
 

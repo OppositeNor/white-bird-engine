@@ -21,6 +21,7 @@
 #include "function/engine_function.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
+#include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -56,8 +57,9 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(AllocType* p_allocator)
-    : allocator(p_allocator), render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
+RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer)
+    : job_buffer(p_job_buffer), allocator(p_allocator),
+    render_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)),
     allocator_vk(make_ref<AllocatorVK<AllocType>>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
     in_flight_fences(p_allocator), base_render_data(p_allocator),
     activated_pipeline(p_allocator)
@@ -72,6 +74,16 @@ RendererVK::~RendererVK() {
 }
 
 void RendererVK::tick(double p_delta) {
+    WBE_DEBUG_ASSERT(!(this_ref.is_null()));
+    // Run some jobs stored in the job buffer.
+    for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
+        Ref<JobRender> job = job_buffer->retrieve_job();
+        if (job == MEM_NULL) {
+            break;
+        }
+        job->perform(this_ref.lock());
+    }
+
     vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
     if (run_pipeline.size() == 0) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");

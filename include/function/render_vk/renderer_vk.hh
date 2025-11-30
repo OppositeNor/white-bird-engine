@@ -15,10 +15,13 @@
 #ifndef __WBE_RENDERER_VK_HH__
 #define __WBE_RENDERER_VK_HH__
 
+#include "core/core_utils.hh"
+#include "core/job/job_buffer_ring_spsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
@@ -33,6 +36,7 @@
 #include "global/stl_allocator.hh"
 
 #include <SDL.h>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <map>
@@ -57,11 +61,20 @@ WBE_LABEL(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, WBE_RENDER_TASK);
  * @brief Vulkan renderer.
  *
  */
-class RendererVK final : public Renderer {
+class RendererVK final : public Renderer, public ThisRef<RendererVK> {
 public:
 
     using AllocType = RenderAllocator;
+
+    /**
+     * @brief The version of Vulkan will be used for the renderer.
+     */
     static constexpr uint32_t VULKAN_API_VERSION = VK_API_VERSION_1_2;
+
+    /**
+     * @brief The number of jobs that would be runned per frame.
+     */
+    static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 10;
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
@@ -69,7 +82,14 @@ public:
     RendererVK& operator=(const RendererVK&) = delete;
     RendererVK& operator=(RendererVK&&) = delete;
 
-    RendererVK(AllocType* p_allocator);
+    /**
+     * @brief Constructor.
+     *
+     * @param p_allocator The allocator that the render resources will be allocated on. This will also be the allocator
+     * for Vulkan.
+     * @param p_job_buffer The render job buffer. Used for committing jobs for the renderer to perform.
+     */
+    RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer);
 
     virtual void tick(double p_delta) override;
 
@@ -112,6 +132,7 @@ public:
     }
 
 private:
+    Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
     template <typename T>
     using vector = ::WhiteBirdEngine::vector<T, AllocType>;

@@ -12,9 +12,5 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDER_DEFS_HH__
-#define __WBE_RENDER_DEFS_HH__
 
-// TODO
-
-#endif
+#include "job_buffer_ring_spsc_test.hh"

@@ -16,6 +16,8 @@
 #define __WBE_APPLICATION_GAME_HH__
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_utils.hh"
+#include "core/job/job_buffer_ring_spsc.hh"
 #include "function/application/application.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/renderer.hh"
@@ -39,6 +41,14 @@ public:
 
     virtual void run() override;
 
+    virtual double get_render_delta() const override {
+        return render_delta.load(std::memory_order_acquire);
+    }
+
+    virtual double get_logic_delta() const override {
+        return logic_delta.load(std::memory_order_acquire);
+    }
+
     /**
      * @brief Get the allocator for the renderer.
      *
@@ -48,16 +58,20 @@ public:
         return renderer_allocator;
     }
 
+    /**
+     * @brief Get the renderer instance.
+     *
+     * @return The renderer instance.
+     */
     Ref<Renderer> get_renderer() const {
         return renderer;
     }
 
-    virtual double get_render_delta() const override {
-        return render_delta.load(std::memory_order_acquire);
-    }
-
-    virtual double get_logic_delta() const override {
-        return logic_delta.load(std::memory_order_acquire);
+    /**
+     * @brief Add a job for the renderer.
+     */
+    void add_render_job(Ref<JobRender> p_job) {
+        render_job_buffer->add_job(p_job);
     }
 
 private:
@@ -66,6 +80,8 @@ private:
     void init();
     void run_render();
     void run_logic();
+
+    Ref<JobBufferRingSPSC<JobRender>> render_job_buffer;
 
     WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;

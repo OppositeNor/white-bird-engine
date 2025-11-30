@@ -12,34 +12,40 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_TAKS_BUFFER_HH__
-#define __WBE_TAKS_BUFFER_HH__
+#ifndef __WBE_JOB_BUFFER_HH__
+#define __WBE_JOB_BUFFER_HH__
 
-#include "core/task/task.hh"
 #include "core/memory/reference_strong.hh"
 namespace WhiteBirdEngine {
 
 /**
- * @class TaskBuffer
- * @brief Stores a buffer that contians all the task for an instance to execute.
+ * @class JobBuffer
+ * @brief Stores a buffer that contians all the job for an instance to execute.
  */
-class TaskBuffer {
+template <typename ChildT, typename JobT>
+class JobBuffer {
 public:
-    TaskBuffer() = default;
-    virtual ~TaskBuffer() {}
+    JobBuffer() = default;
+    virtual ~JobBuffer() {}
+
+    using JobType = JobT;
 
     /**
-     * @brief Retrieve a task from a buffer. If the buffer is empty, return MEM_NULL.
+     * @brief Retrieve a job from a buffer. If the buffer is empty, return MEM_NULL.
      */
-    virtual Ref<Task> retrieve_task() = 0;
+    Ref<JobType> retrieve_job() {
+        return static_cast<ChildT*>(this)->retrieve_job();
+    }
 
     /**
-     * @brief Add a task to the buffer.
+     * @brief Add a job to the buffer.
      * 
      * @throws std::runtime_error If buffer overflow.
-     * @param p_task The task to add to the buffer.
+     * @param p_job The job to add to the buffer.
      */
-    virtual void add_task(Ref<Task> p_task) = 0;
+    void add_job(Ref<JobType> p_job) {
+        return static_cast<ChildT*>(this)->add_job();
+    }
 };
 
 }

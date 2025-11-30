@@ -15,6 +15,7 @@
 #ifndef __WBE_SCENE_NODE_HH__
 #define __WBE_SCENE_NODE_HH__
 
+#include "core/core_utils.hh"
 #include "scene.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/object/object.hh"
@@ -28,7 +29,7 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class WBE_META() SceneNode : public Object {
+class WBE_META() SceneNode : public Object, public ThisRef<SceneNode> {
 protected:
 public:
 
@@ -53,16 +54,6 @@ public:
      */
     SceneNode(Ref<Scene> p_scene)
         : name(p_scene->get_allocator()), children(p_scene->get_allocator()) {}
-
-    /**
-     * @brief Set the reference referencing this instance.
-     *
-     * @param p_ref_of_this The reference referencing this instance.
-     */
-    void set_ref_of_this(Ref<SceneNode> p_ref_of_this) {
-        WBE_DEBUG_ASSERT(this_ref.is_null());
-        this_ref = p_ref_of_this;
-    }
 
     /**
      * @brief Remove a node in chilid.
@@ -111,8 +102,6 @@ public:
 
 
 private:
-    RefWeak<SceneNode> this_ref;
-
     string<> name;
     RefWeak<SceneNode> parent;
     vector<Ref<SceneNode>> children;

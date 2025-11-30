@@ -18,7 +18,6 @@ add_subdirectory(cla)
 add_subdirectory(engine_config)
 add_subdirectory(logging)
 add_subdirectory(profiling)
-add_subdirectory(task)
 add_subdirectory(utils)
 
 set(WBE_SOURCES

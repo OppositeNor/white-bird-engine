@@ -44,7 +44,7 @@ void ApplicationGame::init() {
     logic_delta.store(0.0001, std::memory_order_seq_cst);
 
     if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get());
+        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), render_job_buffer);
     }
     else if (game_config.render_api == "dummy") {
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());

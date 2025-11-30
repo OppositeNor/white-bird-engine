@@ -12,5 +12,22 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#ifndef __WBE_JOB_HH__
+#define __WBE_JOB_HH__
 
-#include "task_buffer_ring_spsc_test.hh"
+namespace WhiteBirdEngine {
+
+/**
+ * @class Job
+ * @brief A job.
+ *
+ */
+template <typename ChildT>
+struct Job {
+    Job() {}
+    virtual ~Job() {}
+};
+
+}
+
+#endif
