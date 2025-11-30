@@ -50,15 +50,16 @@ jobs:
         python-version: '3.13'
         cache: 'pip' # caching pip dependencies
 
-    - name: Cache submodules
+    - name: Cache dependencies
+      id: cache-dependencies
       uses: actions/cache@v4
       with:
         path: |
-          .git/modules
-          depedencies/**/.git
+          depedencies
         key: submodules-${{ hashFiles('.gitmodules') }}
 
     - name: Checkout submodules
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         submodules: recursive
