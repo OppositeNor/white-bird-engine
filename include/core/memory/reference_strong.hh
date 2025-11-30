@@ -314,16 +314,13 @@ private:
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             // If all the references of the control block is freed, destroy the object.
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
-            control_block = nullptr;
         }
         // Dereference the hidden weak reference.
         weak_deref();
+        control_block = nullptr;
     }
 
     void weak_deref() const {
-        if (control_block == nullptr) {
-            return;
-        }
         uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
         if (weak_ref_count == 1 && control_block->strong_ref_counter.load(std::memory_order_acquire) == 0) {
             // If this is the last weak reference referencing this, and no strong reference is referencing this, destroy the control block.

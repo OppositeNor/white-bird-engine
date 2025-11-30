@@ -27,7 +27,7 @@ namespace WBE = WhiteBirdEngine;
 class TestClassWeak {
 public:
     TestClassWeak(std::stringstream& p_ss)
-        : ss(&p_ss), test_val(0) {
+    : ss(&p_ss), test_val(0) {
         (*ss) << "Construct.\n";
     }
 
@@ -72,39 +72,46 @@ TEST(WBERefWeakTest, General) {
         "Set test val: 5.\n"
         "Destruct.\n"
     ));
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 TEST(WBERefWeakTest, FirstStrongDestruct) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
-    WBE::RefWeak<int> ref_weak;
-    ASSERT_FALSE(ref_weak.is_valid());
     {
-        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&pool_allocator, 3);
-        ref_weak = ref;
-        ASSERT_TRUE(ref_weak.is_valid());
+        WBE::RefWeak<int> ref_weak;
+        ASSERT_FALSE(ref_weak.is_valid());
+        {
+            WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&pool_allocator, 3);
+            ref_weak = ref;
+            ASSERT_TRUE(ref_weak.is_valid());
+        }
+        ASSERT_FALSE(ref_weak.is_valid());
     }
-    ASSERT_FALSE(ref_weak.is_valid());
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 TEST(WBERefWeakTest, FirstWeakDestruct) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
-    WBE::Ref<int> ref = WBE::make_ref<int>(&pool_allocator, 3);
-    ASSERT_FALSE(ref.is_null());
     {
-        WBE::RefWeak<int> ref_weak = ref;
-        ASSERT_TRUE(ref_weak.is_valid());
-        ASSERT_EQ(*ref, 3);
-        ASSERT_EQ(*(ref_weak.lock()), 3);
+        WBE::Ref<int> ref = WBE::make_ref<int>(&pool_allocator, 3);
+        ASSERT_FALSE(ref.is_null());
+        {
+            WBE::RefWeak<int> ref_weak = ref;
+            ASSERT_TRUE(ref_weak.is_valid());
+            ASSERT_EQ(*ref, 3);
+            ASSERT_EQ(*(ref_weak.lock()), 3);
+        }
+        ASSERT_FALSE(ref.is_null());
     }
-    ASSERT_FALSE(ref.is_null());
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 class TestClassWeakChild : public TestClassWeak {
 public:
     TestClassWeakChild(std::stringstream& p_ss)
-        : TestClassWeak(p_ss) {
+    : TestClassWeak(p_ss) {
         (*ss) << "Child construct.\n";
     }
 
@@ -127,40 +134,42 @@ TEST(WBERefWeakTest, Polymorphic) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
     std::stringstream test_ss;
-    WBE::RefWeak<TestClassWeakChild> ref_weak_child;
     {
-        WBE::Ref<TestClassWeakChild> ref = WBE::Ref<TestClassWeakChild>::make_ref(&pool_allocator, test_ss);
-        ref_weak_child = ref;
+        WBE::RefWeak<TestClassWeakChild> ref_weak_child;
         {
-            WBE::RefWeak<TestClassWeak> ref_weak = ref;
-            ASSERT_EQ(ref->test_val, 0);
-            ref_weak.lock()->set_test_val(5);
+            WBE::Ref<TestClassWeakChild> ref = WBE::Ref<TestClassWeakChild>::make_ref(&pool_allocator, test_ss);
+            ref_weak_child = ref;
+            {
+                WBE::RefWeak<TestClassWeak> ref_weak = ref;
+                ASSERT_EQ(ref->test_val, 0);
+                ref_weak.lock()->set_test_val(5);
+                ASSERT_EQ(test_ss.str(), std::string(
+                    "Construct.\n"
+                    "Child construct.\n"
+                    "Child set test val: 5.\n"
+                ));
+                ASSERT_EQ(ref->test_val, 5);
+            }
+            ref_weak_child.lock()->set_test_val(10);
             ASSERT_EQ(test_ss.str(), std::string(
                 "Construct.\n"
                 "Child construct.\n"
                 "Child set test val: 5.\n"
+                "Child set test val: 10.\n"
             ));
-            ASSERT_EQ(ref->test_val, 5);
+            ASSERT_EQ(ref->test_val, 10);
         }
-        ref_weak_child.lock()->set_test_val(10);
         ASSERT_EQ(test_ss.str(), std::string(
             "Construct.\n"
             "Child construct.\n"
             "Child set test val: 5.\n"
             "Child set test val: 10.\n"
+            "Child destruct.\n"
+            "Destruct.\n"
         ));
-        ASSERT_EQ(ref->test_val, 10);
+        ASSERT_FALSE(ref_weak_child.is_valid());
     }
-    ASSERT_EQ(test_ss.str(), std::string(
-        "Construct.\n"
-        "Child construct.\n"
-        "Child set test val: 5.\n"
-        "Child set test val: 10.\n"
-        "Child destruct.\n"
-        "Destruct.\n"
-    ));
-    ASSERT_FALSE(ref_weak_child.is_valid());
-    
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeak> p_ref2, uint32_t p_iteration_count) {
@@ -219,19 +228,23 @@ TEST(WBERefWeak, Multithread) {
     }
     ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nDestruct.\n"));
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 TEST(WBERefWeak, InvaldLockTest) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
-    WBE::RefWeak<int> ref_weak;
-    ASSERT_EQ(ref_weak.lock(), nullptr);
     {
-        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&pool_allocator);
-        ref_weak = ref;
-        ASSERT_NE(ref_weak.lock(), nullptr);
+        WBE::RefWeak<int> ref_weak;
+        ASSERT_EQ(ref_weak.lock(), nullptr);
+        {
+            WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&pool_allocator);
+            ref_weak = ref;
+            ASSERT_NE(ref_weak.lock(), nullptr);
+        }
+        ASSERT_EQ(ref_weak.lock(), nullptr);
     }
-    ASSERT_EQ(ref_weak.lock(), nullptr);
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeakChild> p_ref2, uint32_t p_iteration_count) {
@@ -318,27 +331,31 @@ TEST(WBERefStrongWeak, Multithread) {
     }
     ASSERT_EQ(test_ss1.str(), std::string("Construct.\nDestruct.\n"));
     ASSERT_EQ(test_ss2.str(), std::string("Construct.\nChild construct.\nChild destruct.\nDestruct.\n"));
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 
 TEST(WBERefWeakTest, IsNullMethod_Behavior) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
-
-    // Default-constructed weak should not be NULL.
-    WBE::RefWeak<int> weak_default;
-    ASSERT_TRUE(weak_default.is_null());
-
-    WBE::RefWeak<int> weak;
     {
-        WBE::Ref<int> strong = WBE::Ref<int>::make_ref(&pool_allocator, 7);
-        weak = strong;
-        ASSERT_TRUE(weak.is_valid());
-        // While valid, is_null() delegates to lock()->is_null() which is false for a live Ref
-        ASSERT_FALSE(weak.is_null());
-    }
+        // Default-constructed weak should not be NULL.
+        WBE::RefWeak<int> weak_default;
+        ASSERT_TRUE(weak_default.is_null());
 
-    // After strong ref goes out of scope, weak becomes invalid; implementation returns false for invalid
-    ASSERT_FALSE(weak.is_valid());
-    ASSERT_TRUE(weak.is_null());
+        WBE::RefWeak<int> weak;
+        {
+            WBE::Ref<int> strong = WBE::Ref<int>::make_ref(&pool_allocator, 7);
+            weak = strong;
+            ASSERT_TRUE(weak.is_valid());
+            // While valid, is_null() delegates to lock()->is_null() which is false for a live Ref
+            ASSERT_FALSE(weak.is_null());
+        }
+
+        // After strong ref goes out of scope, weak becomes invalid; implementation returns false for invalid
+        ASSERT_FALSE(weak.is_valid());
+        ASSERT_TRUE(weak.is_null());
+
+    }
+    ASSERT_TRUE(pool_allocator.is_empty());
 }
 #endif
