@@ -185,9 +185,9 @@ private:
         if (control_block == nullptr) {
             return;
         }
-        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel) - 1;
-        uint32_t total_count = control_block->strong_ref_counter.load(std::memory_order_acquire) + weak_ref_count;
-        if (weak_ref_count == 0 && total_count == 0) {
+        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
+        if (weak_ref_count == 1 && control_block->strong_ref_counter.load(std::memory_order_acquire) == 0) {
+            // If this is the last weak reference referencing this, and no strong reference is referencing this, destroy the control block.
             destroy_obj<typename Ref<T>::ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
         }
         control_block = nullptr;

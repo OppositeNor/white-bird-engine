@@ -15,6 +15,7 @@
 #ifndef __WBE_REF_WEAK_TEST_HH__
 #define __WBE_REF_WEAK_TEST_HH__
 
+#include "core/memory/reference_strong.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include "core/memory/reference_weak.hh"
 #include "global/global.hh"
@@ -73,7 +74,7 @@ TEST(WBERefWeakTest, General) {
     ));
 }
 
-TEST(WBERefWeakTest, Valid) {
+TEST(WBERefWeakTest, FirstStrongDestruct) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::MockHeapAllocatorAligned pool_allocator(1024);
     WBE::RefWeak<int> ref_weak;
@@ -84,6 +85,20 @@ TEST(WBERefWeakTest, Valid) {
         ASSERT_TRUE(ref_weak.is_valid());
     }
     ASSERT_FALSE(ref_weak.is_valid());
+}
+
+TEST(WBERefWeakTest, FirstWeakDestruct) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    WBE::MockHeapAllocatorAligned pool_allocator(1024);
+    WBE::Ref<int> ref = WBE::make_ref<int>(&pool_allocator, 3);
+    ASSERT_FALSE(ref.is_null());
+    {
+        WBE::RefWeak<int> ref_weak = ref;
+        ASSERT_TRUE(ref_weak.is_valid());
+        ASSERT_EQ(*ref, 3);
+        ASSERT_EQ(*(ref_weak.lock()), 3);
+    }
+    ASSERT_FALSE(ref.is_null());
 }
 
 class TestClassWeakChild : public TestClassWeak {

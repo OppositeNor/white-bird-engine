@@ -76,17 +76,18 @@ public:
 
 private:
     Ref<RenderAllocator> renderer_allocator;
+
     Ref<InputManager> input_manager;
+
     void init();
     void run_render();
     void run_logic();
-
-    Ref<JobBufferRingSPSC<JobRender>> render_job_buffer;
 
     WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
 protected:
+    Ref<JobBufferRingSPSC<JobRender>> render_job_buffer;
     Ref<Renderer> renderer;
 
 };

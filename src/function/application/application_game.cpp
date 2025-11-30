@@ -14,9 +14,11 @@
 */
 #include "function/application/application_game.hh"
 #include "core/engine_core.hh"
+#include "core/job/job_buffer_ring_spsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/engine_function.hh"
+#include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
@@ -37,12 +39,13 @@ void ApplicationGame::run() {
 }
 
 void ApplicationGame::init() {
-    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     // Initialize the deltas into a very small number.
     render_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);
 
+    render_job_buffer = make_ref<JobBufferRingSPSC<JobRender>>(global_allocator(), global_allocator(), 64);
+    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
     if (game_config.render_api == "vulkan") {
         renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), render_job_buffer);
     }

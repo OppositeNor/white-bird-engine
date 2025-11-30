@@ -294,8 +294,8 @@ private:
         MemID control_block_mem_id;
         MemID mem_id;
         AllocType* allocator;
-        WBE_NO_FALSE_SHARING std::atomic<uint32_t> weak_ref_counter;
-        WBE_NO_FALSE_SHARING std::atomic<uint32_t> strong_ref_counter;
+        std::atomic<uint64_t> weak_ref_counter;
+        std::atomic<uint64_t> strong_ref_counter;
     };
 
     void ref() const {
@@ -303,6 +303,8 @@ private:
             return;
         }
         control_block->strong_ref_counter.fetch_add(1, std::memory_order_release);
+        // For all strong reference, create a hidden weak reference, since only weak reference could destruct control block.
+        control_block->weak_ref_counter.fetch_add(1, std::memory_order_release);
     }
 
     void deref() const {
@@ -310,12 +312,23 @@ private:
             return;
         }
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            // If all the references of the control block is freed, destroy the object.
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
-            if (control_block->weak_ref_counter.load(std::memory_order_acquire) == 0) {
-                destroy_obj<ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
-            }
             control_block = nullptr;
         }
+        weak_deref();
+    }
+
+    void weak_deref() const {
+        if (control_block == nullptr) {
+            return;
+        }
+        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
+        if (weak_ref_count == 1 && control_block->strong_ref_counter.load(std::memory_order_acquire) == 0) {
+            // If this is the last weak reference referencing this, and no strong reference is referencing this, destroy the control block.
+            destroy_obj<typename Ref<T>::ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
+        }
+        control_block = nullptr;
     }
 
     mutable ControlBlock* control_block;
