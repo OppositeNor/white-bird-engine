@@ -316,6 +316,7 @@ private:
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
             control_block = nullptr;
         }
+        // Dereference the hidden weak reference.
         weak_deref();
     }
 
