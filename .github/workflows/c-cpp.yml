@@ -50,6 +50,13 @@ jobs:
         python-version: '3.13'
         cache: 'pip' # caching pip dependencies
 
+    - name: Checkout submodules
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
     - name: Cache dependencies
       id: cache-dependencies
       uses: actions/cache@v4
@@ -57,13 +64,6 @@ jobs:
         path: |
           depedencies
         key: submodules-${{ hashFiles('.gitmodules') }}
-
-    - name: Checkout submodules
-      if: steps.cache-dependencies.outputs.cache-hit != 'true'
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
 
     - name: Update submodules
       run: git submodule update --init --recursive
@@ -83,6 +83,15 @@ jobs:
 
     - name: Setup pip dependencies
       run: pip install -r requirements.txt
+
+    - name: Cache metadata
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          build/release/metadata_cache
+          build/release-gcc/metadata_cache
+        key: metadata-cache
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
