@@ -302,18 +302,21 @@ void RendererVK::init_swap_chain_framebuffers() {
 }
 
 void RendererVK::setup_render_resource() {
+    // Setup swap_chain_framebuffer_resource.
     render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
     render_objects->swap_chain_framebuffer_resource->res_type_id = TypeUUID<ROFramebufferVK>::UUID;
     render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK;
     render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
     render_resources.insert(std::pair(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffer_resource));
 
+    // Setup base_graphics_pipeline_resource.
     render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator, &base_render_data);
     render_objects->base_graphics_pipeline_resource->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
     render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE_VK;
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE_VK, render_objects->base_graphics_pipeline_resource));
 
+    // Setup static_opaque_triangles_vertices_buffer_resource.
     render_objects->static_opaque_triangles_vertices_buffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
     render_objects->static_opaque_triangles_vertices_buffer_resource->res_type_id = TypeUUID<ROBufferVK>::UUID;
     render_objects->static_opaque_triangles_vertices_buffer_resource->res_id = REND_RES_STATIC_OPAQUE_TRIANGLES_VK;
@@ -818,7 +821,6 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
         throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
     }
     vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
-
 
     pipeline_infos.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {

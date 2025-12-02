@@ -15,10 +15,99 @@
 #ifndef __WBE_INPUT_MANAGER_HH__
 #define __WBE_INPUT_MANAGER_HH__
 
+#include "key_codes.hh"
 namespace WhiteBirdEngine {
 
+/**
+ * @class InputStatus
+ * @brief The input status.
+ *
+ */
+struct InputStatus {
+    /**
+     * @brief Code describing input status.
+     */
+    enum InputStatusCode {
+        // Unknown key status.
+        KEY_UNKNOWN = 0b0000,
+        // The key is up.
+        KEY_UP      = 0b0001,
+        // The key is down.
+        KEY_DOWN    = 0b0010,
+        // The action just happened.
+        KEY_JUST    = 0b0100,
+        // The key is just up.
+        KEY_JUST_UP     = 0b0101,
+        // The key is just down.
+        KEY_JUST_DOWN   = 0b0110,
+    } status_code;
+
+    /**
+     * @brief Is the key action just happened.
+     *
+     * @return True if the key action just happened. False otherwise.
+     */
+    bool is_just() const {
+        return status_code & KEY_JUST;
+    }
+
+    /**
+     * @brief Is key up.
+     *
+     * @return True if the key is up. False otherwise.
+     */
+    bool is_up() const {
+        return status_code & KEY_UP;
+    }
+
+    /**
+     * @brief Is the key just up.
+     *
+     * @return True if the key just up. False otherwise.
+     */
+    bool is_just_up() const {
+        return status_code == KEY_JUST_UP;
+    }
+
+    /**
+     * @brief Is key up.
+     *
+     * @return True if the key is up. False otherwise.
+     */
+    bool is_down() const {
+        return status_code & KEY_DOWN;
+    }
+
+    /**
+     * @brief Is the key just up.
+     *
+     * @return True if the key just up. False otherwise.
+     */
+    bool is_just_down() const {
+        return status_code == KEY_JUST_DOWN;
+    }
+};
+
+/**
+ * @class InputManager
+ * @brief Manages user inputs.
+ *
+ */
 class InputManager {
-    // TODO
+public:
+    InputManager() = default;
+    virtual ~InputManager() {}
+
+    /**
+     * @brief Get the input status of a key.
+     *
+     * @param p_key_code The key code to get input status from.
+     * @return The input status.
+     */
+    virtual InputStatus get_input_status(KeyCode p_key_code) const = 0;
+
+
+
 };
 
 }
