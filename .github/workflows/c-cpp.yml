@@ -60,14 +60,8 @@ jobs:
           dependencies
         key: submodules-${{ hashFiles('.gitmodules') }}
 
-    - name: Checkout submodules
-      if: steps.cache-dependencies.outputs.cache-hit != 'true'
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
     - name: Update submodules
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
       run: git submodule update --init --recursive
 
     - name: Set reusable strings
