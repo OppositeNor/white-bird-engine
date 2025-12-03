@@ -62,7 +62,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          depedencies
+          dependencies
         key: submodules-${{ hashFiles('.gitmodules') }}
 
     - name: Update submodules

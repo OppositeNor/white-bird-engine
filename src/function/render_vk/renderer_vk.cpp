@@ -148,8 +148,8 @@ void RendererVK::update_static_opaque_triangles() {
     ROBufferVK::Builder builder;
     auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
     if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
-        static_opaque_triangles_vertices.size() != res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
-        // If size does not match, create a larger buffer.
+        static_opaque_triangles_vertices.size() > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_capacity) {
+        // If size exceeds buffer capacity, create a new buffer.
         builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
         res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
     }

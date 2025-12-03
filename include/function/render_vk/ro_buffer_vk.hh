@@ -39,6 +39,7 @@ public:
      */
     struct ExposedFields {
         size_t buffer_size;
+        size_t buffer_capacity;
     };
 
     /**
