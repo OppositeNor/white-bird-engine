@@ -12,10 +12,33 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
 #ifndef __WBE_RESOURCE_UNIT_POPULATOR_HH__
 #define __WBE_RESOURCE_UNIT_POPULATOR_HH__
 
-// TODO
+#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_unit/resource_unit.hh"
+namespace WhiteBirdEngine {
+/**
+ * @class RUPopulator
+ * @brief Populator class. Populates the resource from its scheme to the
+ * resource chunk.
+ *
+ */
+class RUPopulator {
+public:
+    RUPopulator() = default;
+    virtual ~RUPopulator() {}
+
+    /**
+     * @brief Populate the resource.
+     *
+     * @param p_res_chunk The resource chunk to insert resource data.
+     * @param p_scheme The resource scheme.
+     */
+    virtual void populate(ResourceChunk& p_res_chunk, RUScheme& p_scheme) const = 0;
+};
+
+}
+
 
 #endif
