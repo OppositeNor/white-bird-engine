@@ -101,7 +101,6 @@ public:
     TypeUUIDManager* type_uuid_manager = nullptr;
 
 private:
-    void parse_metadata(const Path& p_metadata_config_path);
     void initialize(int p_argc, char* p_argv[]);
     inline static EngineCore* singleton;
 };
