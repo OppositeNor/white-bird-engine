@@ -17,7 +17,6 @@
 #include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
 #include "core/profiling/profiling_manager.hh"
-#include "core/parser/parser_json.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include <iostream>
