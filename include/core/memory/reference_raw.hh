@@ -288,6 +288,15 @@ public:
     }
 
     /**
+     * @brief Get the size of the data.
+     *
+     * @return The size of the data.
+     */
+    size_t get_size() const {
+        return num * sizeof(T);
+    }
+
+    /**
      * @brief Is the reference NULL.
      *
      * @return true if the reference is NULL, false otherwise.
