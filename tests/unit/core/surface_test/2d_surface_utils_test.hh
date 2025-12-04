@@ -153,18 +153,18 @@ TEST(SurfaceTest2D, TriangulationComplexPolygon) {
 
 TEST(SurfaceTest2D, TriangulationWithWBEVertex2D) {
     // Test using actual WBE::Vertex2D structure
-    WBE::Vertex2D<> vertices[4] = {
-        {{glm::vec2{0.0f, 0.0f}}, 0.0f, {}},  // Bottom-left
-        {{glm::vec2{1.0f, 0.0f}}, 0.0f, {}},  // Bottom-right
-        {{glm::vec2{1.0f, 1.0f}}, 0.0f, {}},  // Top-right
-        {{glm::vec2{0.0f, 1.0f}}, 0.0f, {}}   // Top-left
+    WBE::Vertex2D vertices[4] = {
+        {{glm::vec2{0.0f, 0.0f}}, 0.0f},  // Bottom-left
+        {{glm::vec2{1.0f, 0.0f}}, 0.0f},  // Bottom-right
+        {{glm::vec2{1.0f, 1.0f}}, 0.0f},  // Top-right
+        {{glm::vec2{0.0f, 1.0f}}, 0.0f}   // Top-left
     };
     
     // Triangle structure that uses WBE::Vertex2D pointers
     struct WBETriangle {
-        WBE::Vertex2D<>* vert1;
-        WBE::Vertex2D<>* vert2;
-        WBE::Vertex2D<>* vert3;
+        WBE::Vertex2D* vert1;
+        WBE::Vertex2D* vert2;
+        WBE::Vertex2D* vert3;
     };
     
     WBETriangle triangles[2] = {};

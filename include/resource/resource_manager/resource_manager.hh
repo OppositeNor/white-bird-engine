@@ -22,6 +22,7 @@
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
 #include <stdexcept>

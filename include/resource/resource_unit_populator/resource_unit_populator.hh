@@ -12,5 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "ru_image_test.hh"
-#include "ru_loader_ppm3_test.hh"
+
+#ifndef __WBE_RESOURCE_UNIT_POPULATOR_HH__
+#define __WBE_RESOURCE_UNIT_POPULATOR_HH__
+
+// TODO
+
+#endif
