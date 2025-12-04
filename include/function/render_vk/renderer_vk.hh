@@ -139,7 +139,7 @@ private:
     template <typename T>
     using set = ::WhiteBirdEngine::set<T, AllocType>;
     template <typename T>
-    using unordered_set = ::WhiteBirdEngine::unordered_set<T, AllocType>;
+    using hash_set = ::WhiteBirdEngine::hash_set<T, AllocType>;
     template <typename T>
     using deque = ::WhiteBirdEngine::deque<T, AllocType>;
     using string = ::WhiteBirdEngine::string<AllocType>;

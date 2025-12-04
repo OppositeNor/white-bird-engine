@@ -135,7 +135,7 @@ using set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType = HeapAllocatorDefault>
-using unordered_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
+using hash_set = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
  * @brief STL string that uses a custom allocator.

@@ -878,7 +878,7 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
     // depth has no dependencies among them.
     deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
-    unordered_set<Ref<RendTaskInfo>> visited(allocator);
+    hash_set<Ref<RendTaskInfo>> visited(allocator);
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
