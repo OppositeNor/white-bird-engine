@@ -197,7 +197,6 @@ class WBEMetaparser:
                         continue
                     attributes = self._get_attributes(attr.spelling)
                     if WBE_REFLECT in attributes:
-                        print("attributes:", attributes)
                         result.fields.append(WBEFieldMetadata(attribute=attributes,
                                                               name=field.spelling, type=field.type.spelling))
         return result

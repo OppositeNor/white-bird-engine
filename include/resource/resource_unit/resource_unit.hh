@@ -45,8 +45,10 @@ using RefRes = RefRaw<T, StackAllocator>;
 struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
     WBE_DECL_SERIALIZABLE(RUScheme)
     // The id of the resource.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string id;
     // The type of the resource.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string type;
 };
 

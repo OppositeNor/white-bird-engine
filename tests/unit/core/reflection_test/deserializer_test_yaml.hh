@@ -663,4 +663,289 @@ TEST_F(WBEDeserializerYAMLTest, GLMVectors_MissingComponentsError) {
     EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
 }
 
+// Tests for new required fields structures
+TEST_F(WBEDeserializerYAMLTest, RequiredFields_BaseClass) {
+    WBE::SerializableSD<WBE::TestRequiredFieldsBase> sd;
+    WBE::TestRequiredFieldsBase test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string required_yaml = R"(required_id: 123
+required_name: "test_base"
+optional_value: 2.5
+)";
+    
+    parser.parse_from_buffer(required_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_id, 123);
+    EXPECT_EQ(test_obj.required_name, "test_base");
+    EXPECT_FLOAT_EQ(test_obj.optional_value, 2.5f);
+}
+
+TEST_F(WBEDeserializerYAMLTest, RequiredFields_BaseClass_MissingRequired) {
+    WBE::SerializableSD<WBE::TestRequiredFieldsBase> sd;
+    WBE::TestRequiredFieldsBase test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string missing_required_yaml = R"(required_id: 123
+)";
+    
+    parser.parse_from_buffer(missing_required_yaml);
+    EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
+}
+
+TEST_F(WBEDeserializerYAMLTest, RequiredFields_ChildInheritance) {
+    WBE::SerializableSD<WBE::TestRequiredFieldsChild> sd;
+    WBE::TestRequiredFieldsChild test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string child_required_yaml = R"(required_id: 456
+required_name: "test_child"
+optional_value: 3.14
+required_child_field: "child_data"
+optional_child_value: 5.5
+required_vector:
+  x: 1.0
+  y: 2.0
+  z: 3.0
+)";
+    
+    parser.parse_from_buffer(child_required_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_id, 456);
+    EXPECT_EQ(test_obj.required_name, "test_child");
+    EXPECT_FLOAT_EQ(test_obj.optional_value, 3.14f);
+    EXPECT_EQ(test_obj.required_child_field, "child_data");
+    EXPECT_DOUBLE_EQ(test_obj.optional_child_value, 5.5);
+    EXPECT_EQ(test_obj.required_vector, glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST_F(WBEDeserializerYAMLTest, RequiredFields_MultipleInheritance) {
+    WBE::SerializableSD<WBE::TestMultipleRequiredChild> sd;
+    WBE::TestMultipleRequiredChild test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string multiple_required_yaml = R"(required_a_id: 100
+optional_a_name: "a_name"
+required_b_value: 2.71
+optional_b_desc: "b_description"
+required_child_info: "child_info"
+optional_child_count: 42
+)";
+    
+    parser.parse_from_buffer(multiple_required_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_a_id, 100);
+    EXPECT_EQ(test_obj.optional_a_name, "a_name");
+    EXPECT_FLOAT_EQ(test_obj.required_b_value, 2.71f);
+    EXPECT_EQ(test_obj.optional_b_desc, "b_description");
+    EXPECT_EQ(test_obj.required_child_info, "child_info");
+    EXPECT_EQ(test_obj.optional_child_count, 42);
+}
+
+TEST_F(WBEDeserializerYAMLTest, RequiredFields_DiamondInheritance) {
+    WBE::SerializableSD<WBE::TestDiamondRequiredChild> sd;
+    WBE::TestDiamondRequiredChild test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string diamond_required_yaml = R"(required_diamond_base: "diamond_base_value"
+optional_diamond_id: 999
+required_left_data: 123.456
+required_right_vector:
+  x: 5.0
+  y: 6.0
+required_final_field: "final_value"
+optional_final_flag: true
+)";
+    
+    parser.parse_from_buffer(diamond_required_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_diamond_base, "diamond_base_value");
+    EXPECT_EQ(test_obj.optional_diamond_id, 999);
+    EXPECT_DOUBLE_EQ(test_obj.required_left_data, 123.456);
+    EXPECT_EQ(test_obj.required_right_vector, glm::vec2(5.0f, 6.0f));
+    EXPECT_EQ(test_obj.required_final_field, "final_value");
+    EXPECT_TRUE(test_obj.optional_final_flag);
+}
+
+// Tests for static serializable structures (WBE_SERIALIZABLE_STATIC)
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_Basic) {
+    WBE::SerializableSD<WBE::TestStaticSerializable> sd;
+    WBE::TestStaticSerializable test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string static_yaml = R"(static_id: 789
+static_name: "static_test"
+static_value: 9.87
+)";
+    
+    parser.parse_from_buffer(static_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.static_id, 789);
+    EXPECT_EQ(test_obj.static_name, "static_test");
+    EXPECT_FLOAT_EQ(test_obj.static_value, 9.87f);
+}
+
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_WithRequired) {
+    WBE::SerializableSD<WBE::TestStaticWithRequired> sd;
+    WBE::TestStaticWithRequired test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string static_required_yaml = R"(required_static_field: "static_required"
+optional_static_number: 100
+required_static_vector:
+  x: 7.0
+  y: 8.0
+  z: 9.0
+)";
+    
+    parser.parse_from_buffer(static_required_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_static_field, "static_required");
+    EXPECT_EQ(test_obj.optional_static_number, 100);
+    EXPECT_EQ(test_obj.required_static_vector, glm::vec3(7.0f, 8.0f, 9.0f));
+}
+
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_WithRequired_MissingRequired) {
+    WBE::SerializableSD<WBE::TestStaticWithRequired> sd;
+    WBE::TestStaticWithRequired test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string missing_static_required_yaml = R"(optional_static_number: 100
+)";
+    
+    parser.parse_from_buffer(missing_static_required_yaml);
+    EXPECT_THROW(sd.deserialize(parser.get_data(), test_obj), std::exception);
+}
+
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_Complex) {
+    WBE::SerializableSD<WBE::TestStaticComplex> sd;
+    WBE::TestStaticComplex test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string static_complex_yaml = R"(static_numbers:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+static_strings:
+  - "static1"
+  - "static2"
+required_static_buffer: "static_buffer_data"
+nested_static:
+  static_id: 555
+  static_name: "nested_static"
+  static_value: 1.23
+)";
+    
+    parser.parse_from_buffer(static_complex_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.static_numbers.size(), 5);
+    EXPECT_EQ(test_obj.static_numbers[0], 1);
+    EXPECT_EQ(test_obj.static_numbers[4], 5);
+    EXPECT_EQ(test_obj.static_strings.size(), 2);
+    EXPECT_EQ(test_obj.static_strings[0], "static1");
+    EXPECT_EQ(test_obj.static_strings[1], "static2");
+    EXPECT_STREQ(test_obj.required_static_buffer.buffer, "static_buffer_data");
+    EXPECT_EQ(test_obj.nested_static.static_id, 555);
+    EXPECT_EQ(test_obj.nested_static.static_name, "nested_static");
+    EXPECT_FLOAT_EQ(test_obj.nested_static.static_value, 1.23f);
+}
+
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_Empty) {
+    WBE::SerializableSD<WBE::TestStaticEmpty> sd;
+    WBE::TestStaticEmpty test_obj;
+    WBE::ParserYAML parser;
+    
+    parser.parse_from_buffer("{}");
+    EXPECT_NO_THROW(sd.deserialize(parser.get_data(), test_obj));
+}
+
+TEST_F(WBEDeserializerYAMLTest, StaticSerializable_VectorTypes) {
+    WBE::SerializableSD<WBE::TestStaticVectorTypes> sd;
+    WBE::TestStaticVectorTypes test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string static_vector_yaml = R"(vec2_field:
+  x: 10.0
+  y: 11.0
+vec3_field:
+  x: 12.0
+  y: 13.0
+  z: 14.0
+vec4_field:
+  x: 15.0
+  y: 16.0
+  z: 17.0
+  w: 18.0
+required_identifier: "vector_test"
+)";
+    
+    parser.parse_from_buffer(static_vector_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.vec2_field, glm::vec2(10.0f, 11.0f));
+    EXPECT_EQ(test_obj.vec3_field, glm::vec3(12.0f, 13.0f, 14.0f));
+    EXPECT_EQ(test_obj.vec4_field, glm::vec4(15.0f, 16.0f, 17.0f, 18.0f));
+    EXPECT_EQ(test_obj.required_identifier, "vector_test");
+}
+
+TEST_F(WBEDeserializerYAMLTest, MixedContainer_RequiredAndStatic) {
+    WBE::SerializableSD<WBE::TestMixedContainer> sd;
+    WBE::TestMixedContainer test_obj;
+    WBE::ParserYAML parser;
+    
+    std::string mixed_yaml = R"(required_objects:
+  - required_id: 1
+    required_name: "obj1"
+    optional_value: 1.1
+  - required_id: 2
+    required_name: "obj2"
+static_objects:
+  - static_id: 10
+    static_name: "static1"
+    static_value: 2.2
+required_child:
+  required_id: 999
+  required_name: "child_test"
+  required_child_field: "child_value"
+  required_vector:
+    x: 1.0
+    y: 2.0
+    z: 3.0
+optional_static:
+  static_numbers:
+    - 100
+    - 200
+  required_static_buffer: "mixed_buffer"
+)";
+    
+    parser.parse_from_buffer(mixed_yaml);
+    sd.deserialize(parser.get_data(), test_obj);
+    
+    EXPECT_EQ(test_obj.required_objects.size(), 2);
+    EXPECT_EQ(test_obj.required_objects[0].required_id, 1);
+    EXPECT_EQ(test_obj.required_objects[0].required_name, "obj1");
+    EXPECT_FLOAT_EQ(test_obj.required_objects[0].optional_value, 1.1f);
+    
+    EXPECT_EQ(test_obj.static_objects.size(), 1);
+    EXPECT_EQ(test_obj.static_objects[0].static_id, 10);
+    EXPECT_EQ(test_obj.static_objects[0].static_name, "static1");
+    
+    EXPECT_EQ(test_obj.required_child.required_id, 999);
+    EXPECT_EQ(test_obj.required_child.required_name, "child_test");
+    EXPECT_EQ(test_obj.required_child.required_child_field, "child_value");
+    
+    EXPECT_EQ(test_obj.optional_static.static_numbers.size(), 2);
+    EXPECT_EQ(test_obj.optional_static.static_numbers[0], 100);
+    EXPECT_STREQ(test_obj.optional_static.required_static_buffer.buffer, "mixed_buffer");
+}
+
 #endif
