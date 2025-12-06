@@ -23,7 +23,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Options
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
-option(WBE_BINARY_DIR "The binary output directory." ${CMAKE_BINARY_DIR}/bin)
+set(WBE_BINARY_DIR ${CMAKE_BINARY_DIR}/bin CACHE STRING "The binary output directory.")
 option(WBE_BUILD_SHARED "Should build shared library" ON)
 
 
