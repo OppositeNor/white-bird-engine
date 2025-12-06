@@ -246,6 +246,8 @@ struct RUAudio : public ResourceUnit {
 struct RUBinary : public ResourceUnit {
     // The binary data.
     RefRes<char> data;
+    // The size of the binary data.
+    size_t size;
 };
 
 /**
@@ -294,7 +296,7 @@ struct RUImage : public ResourceUnit {
 
 /**
  * @class RUText
- * @brief Text resource unit. contains encoding type, size (in bytes, excluding
+ * @brief Text resource unit. contains encoding type, size (in bytes, including
  * the NUL terminater) and a MemID pointing to the data chunk that stores the data
  * of the string (ends with a NUL terminater).
  *
@@ -308,6 +310,8 @@ struct RUText : public ResourceUnit {
     EncodeType encode_type = EncodeType::UTF8;
     // The text data.
     RefRes<char> text_data;
+    // The size of the text data, including the NUL terminator.
+    size_t size;
 };
 
 /**

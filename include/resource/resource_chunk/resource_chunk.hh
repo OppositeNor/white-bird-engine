@@ -39,10 +39,10 @@ public:
     /**
      * @brief Get the resource from a key.
      *
-     * @param p_key The key to get resource from.
+     * @param p_id The identifier of the resource unit.
      * @return The resource reference of the resource.
      */
-    virtual RefRes<char> get_resource(const std::string& p_key) const = 0;
+    virtual RefRes<char> get_resource(const std::string& p_id) const = 0;
 
     /**
      * @brief Get the total size of the chunk.
@@ -55,14 +55,14 @@ public:
      * @brief Push a resource unit to the chunk.
      *
      * @tparam T The type of the resource unit.
-     * @param p_res_key The key of the resource unit. Setting this to empty string will make this resource unit anonymous.
+     * @param p_id The identifier of the resource unit.
      * @param p_allocator The allocator to allocate memory.
      * @param p_res The resource unit instance.
      * @return The memory id of the pushed resource unit.
      */
     template <ResourceUnitConcept T>
-    RefRes<char> push_res_unit(const std::string& p_res_key, const T& p_res) {
-        return push_res_unit_ptr(p_res_key, &p_res, sizeof(T));
+    RefRes<char> push_res_unit(const std::string& p_id, const T& p_res) {
+        return push_res_unit_ptr(p_id, &p_res, sizeof(T));
     }
 
     /**

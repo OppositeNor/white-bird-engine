@@ -37,6 +37,8 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_s
     auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
     RUBinary resource_unit;
     resource_unit.data = data;
+    resource_unit.size = file_content.size();
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_scheme) const {
@@ -87,6 +89,7 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_sch
     auto data = p_res_chunk.push_data(file_content.size() + 1, file_content.c_str());
     RUText resource_unit;
     resource_unit.text_data = data;
+    resource_unit.size = file_content.size() + 1;
     resource_unit.encode_type = get_encode_type_from_str(p_scheme.encode_type);
     p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
