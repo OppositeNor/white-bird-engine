@@ -30,6 +30,12 @@ class RUPopulator final : public RUPopulatorInterface {
 public:
     RUPopulator();
     virtual ~RUPopulator() override {}
+    RUPopulator(const RUPopulator&)
+        : RUPopulator() {}
+    RUPopulator(RUPopulator&&)
+        : RUPopulator() {}
+    RUPopulator& operator=(const RUPopulator&) { return *this; }
+    RUPopulator& operator=(RUPopulator&&) { return *this; }
 
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_scheme) const override;
