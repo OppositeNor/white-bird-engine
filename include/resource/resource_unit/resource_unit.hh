@@ -171,7 +171,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
     RUSchemeMaterial material;
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
-    std::string material_id;
+    std::string material_id = "";
     // The vertices data.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<Vertex3DTextured> vertices_data;

@@ -19,7 +19,6 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
 #include <stdexcept>
@@ -70,7 +69,7 @@ public:
      * @param p_chunk The resource chunk to get resource from.
      * @param p_key The key of the resource.
      */
-    template <ResourceUnitConcept T>
+    template <typename T>
     T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_key) {
         return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_key).get());
     }
@@ -102,11 +101,22 @@ public:
     }
 
     /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_chunk_id The ID of the chunk/
+     * @return The resource chunk.
+     */
+    template <typename T>
+    T* get_resource(const std::string& p_key) const {
+        return reinterpret_cast<T*>(find_resource_chunk_containing_key(p_key)->get_resource(p_key).get());
+    }
+
+    /**
      * @brief Get a resource by its memory ID.
      *
      * @param p_memid The memory ID of the resource.
      */
-    template <ResourceUnitConcept T>
+    template <typename T>
     T* get_res_by_memid(MemID p_memid) {
         return stack_allocator.get_obj<T>(p_memid);
     }
@@ -128,6 +138,8 @@ private:
     ResourceChunkID global_res_chunk_id;
     std::vector<Ref<ResourceChunk>> resource_chunks;
     StackAllocator stack_allocator;
+
+    Ref<ResourceChunk> find_resource_chunk_containing_key(const std::string& p_key) const;
 
     inline static ResourceManager* singleton = nullptr;
 };

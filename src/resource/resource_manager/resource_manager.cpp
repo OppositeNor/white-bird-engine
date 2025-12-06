@@ -33,5 +33,13 @@ ResourceManager::~ResourceManager() {
     stack_allocator.clear();
 }
 
+Ref<ResourceChunk> ResourceManager::find_resource_chunk_containing_key(const std::string& p_key) const {
+    for (const Ref<ResourceChunk>& chunk : resource_chunks) {
+        if (chunk->contains(p_key)) {
+            return chunk;
+        }
+    }
+    throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_key));
+}
 
 }

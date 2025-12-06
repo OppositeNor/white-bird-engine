@@ -13,12 +13,19 @@
    limitations under the License.
 */
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
+#include "core/allocator/allocator.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <memory>
 
 namespace WhiteBirdEngine {
+
+RUPopulator::RUPopulator() {
+    resource_manager = ResourceManager::get_singleton();
+}
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const {
     // TODO
@@ -38,30 +45,40 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_sch
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) const {
     auto file_path = get_resource_path(p_scheme.path);
-    uint32_t width, height, file_channels;
+    std::unique_ptr<unsigned char> image_data;
+    RUImage resource_unit;
     if (p_scheme.is_hdr) {
-        auto image_data = load_image_data_hdr(file_path, p_scheme.channel_count,
-                                              p_scheme.flip_h, p_scheme.flip_v,
-                                              width, height, file_channels);
+        resolve_hdr_image_data(p_res_chunk, p_scheme, resource_unit);
     }
     else{
-        auto image_data = load_image_data(file_path, p_scheme.channel_count,
-                                          p_scheme.flip_h, p_scheme.flip_v,
-                                          width, height, file_channels);
+        resolve_image_data(p_res_chunk, p_scheme, resource_unit);
     }
-    RUImage resource_unit;
-    resource_unit.width = width;
-    resource_unit.height = height;
-    resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-    resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_scheme) const {
-    // TODO
+    resolve_material(p_res_chunk, p_scheme);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const {
+    if (p_scheme.indices_data.size() % 3 != 0) {
+        throw std::runtime_error(std::format(
+            "Failed to populate submesh 3D resource unit: indices data size {} is not a multiple of 3.",
+            p_scheme.indices_data.size()));
+    }
+    RUSubmesh3D resource_unit;
+    if (p_scheme.material_id == "") {
+        p_res_chunk.create_ref_to(reinterpret_cast<void**>(&resource_unit.material), p_scheme.material_id);
+    }
+    else {
+        resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
+    }
+    auto vertices_data = p_res_chunk.push_data(
+        p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
+    auto indices_data = p_res_chunk.push_data(
+        p_scheme.indices_data.size() * sizeof(uint32_t), p_scheme.indices_data.data());
     // TODO
+    // std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3, (Triangle3DIndxTextured){.vert_array = vertices_data});
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const {
@@ -71,11 +88,43 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_sch
     RUText resource_unit;
     resource_unit.text_data = data;
     resource_unit.encode_type = get_encode_type_from_str(p_scheme.encode_type);
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const {
     // TODO
 }
 
+void RUPopulator::resolve_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const {
+    auto file_path = get_resource_path(p_scheme.path);
+    uint32_t width, height, file_channels;
+    auto image_data = load_image_data(
+        file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v,
+        width, height, file_channels);
+    p_resource_unit.width = width;
+    p_resource_unit.height = height;
+    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
+    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count, image_data.get());
+    p_resource_unit.image_data = data;
+}
+
+void RUPopulator::resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const {
+    auto file_path = get_resource_path(p_scheme.path);
+    uint32_t width, height, file_channels;
+    auto image_data = load_image_data_hdr(
+        file_path, p_scheme.channel_count,  p_scheme.flip_h, p_scheme.flip_v,
+        width, height, file_channels);
+    p_resource_unit.width = width;
+    p_resource_unit.height = height;
+    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
+    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), image_data.get());
+    p_resource_unit.image_data = data;
+}
+
+RefRes<RUMaterial> RUPopulator::resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const {
+    return MEM_NULL; // TODO
+}
 
 }

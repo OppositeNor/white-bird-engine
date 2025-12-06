@@ -55,7 +55,7 @@ public:
      * @brief Push a resource unit to the chunk.
      *
      * @tparam T The type of the resource unit.
-     * @param p_res_key The key of the resource unit.
+     * @param p_res_key The key of the resource unit. Setting this to empty string will make this resource unit anonymous.
      * @param p_allocator The allocator to allocate memory.
      * @param p_res The resource unit instance.
      * @return The memory id of the pushed resource unit.
@@ -114,6 +114,28 @@ public:
      * @return The pointer to the data to get.
      */
     virtual const void* get_data(MemID p_mem_id) const = 0;
+
+    /**
+     * @brief Get all resource keys in the chunk.
+     */
+    virtual std::vector<std::string> get_all_keys() const = 0;
+
+    /**
+     * @brief Check if the chunk contains a resource with the given key.
+     *
+     * @param p_res_key The key to check.
+     * @return True if the chunk contains the resource, false otherwise.
+     */
+    virtual bool contains(const std::string& p_res_key) const = 0;
+
+    /**
+     * @brief Create a reference to a resource in the chunk.
+     * This reference will be resolved after the resource chunk is loaded.
+     *
+     * @param p_ptr The pointer to store the reference.
+     * @param p_key The key of the resource to reference.
+     */
+    virtual void create_ref_to(void** p_ptr, const std::string& p_key) = 0;
 
 protected:
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;

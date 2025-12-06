@@ -86,26 +86,41 @@ public:
         return allocator->get(p_mem_id);
     }
 
+    virtual bool contains(const std::string& p_res_key) const override {
+        return resource_map.find(p_res_key) != resource_map.end();
+    }
+
+    virtual void create_ref_to(void** p_ptr, const std::string& p_key) override {
+        ref_map[p_ptr] = p_key;
+    }
+
+    virtual std::vector<std::string> get_all_keys() const override {
+        std::vector<std::string> result;
+        for (const auto& [key, _] : resource_map) {
+            result.push_back(key);
+        }
+        return result;
+    }
+
 protected:
 
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
-        if (is_already_registered(p_res_key)) {
+        if (p_res_key != "" && resource_map.find(p_res_key) != resource_map.end()) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
         memcpy(allocator->get(result_mem_id), p_res, p_size);
         RefRes<char> result(result_mem_id, allocator);
-        resource_map[p_res_key.c_str()] = result;
+        if (p_res_key != "") {
+            resource_map[p_res_key.c_str()] = result;
+        }
         return result;
-    }
-
-    bool is_already_registered(const std::string& p_res_key) {
-        return resource_map.contains(p_res_key.c_str());
     }
 private:
     size_t total_size;
     std::unordered_map<std::string, RefRes<char>> resource_map;
+    std::unordered_map<void**, std::string> ref_map;
     StackAllocator* allocator;
 
     RUType get_res_type(std::string p_type);
@@ -114,6 +129,13 @@ private:
 
     template <typename RUSchemeType>
     void populate_scheme(const ParserType::DataType& p_parser_data);
+
+    void resolve_refs() {
+        auto resource_manager = ResourceManager::get_singleton();
+        for (auto& [ptr, key] : ref_map) {
+            *ptr = resource_manager->get_resource<void>(key);
+        }
+    }
 };
 
 template <ParserConcept ParserType>
@@ -154,6 +176,7 @@ ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, Sta
                 break;
         }
     }
+    resolve_refs();
 }
 
 template <ParserConcept ParserType>

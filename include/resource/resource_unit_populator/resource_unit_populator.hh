@@ -15,13 +15,15 @@
 #ifndef __WBE_RESOURCE_UNIT_POPULATOR_HH__
 #define __WBE_RESOURCE_UNIT_POPULATOR_HH__
 
+#include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource_unit_populator_interface.hh"
 
 namespace WhiteBirdEngine {
 
 class RUPopulator final : public RUPopulatorInterface {
 public:
-    RUPopulator() = default;
+    RUPopulator();
     virtual ~RUPopulator() override {}
 
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const override;
@@ -32,6 +34,13 @@ public:
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const override;
+
+private:
+    ResourceManager* resource_manager;
+
+    void resolve_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const;
+    void resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const;
+    RefRes<RUMaterial> resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const;
 };
 
 }
