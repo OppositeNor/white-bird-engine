@@ -242,20 +242,6 @@ public:
         return !(*this == p_obj);
     }
 
-    T& operator[](size_t p_index) {
-        if (allocator == nullptr) {
-            throw std::runtime_error("Cannot access elements of a RefRaw with null allocator.");
-        }
-        return static_cast<T*>(allocator->get(mem_id))[p_index];
-    }
-
-    const T& operator[](size_t p_index) const {
-        if (allocator == nullptr) {
-            throw std::runtime_error("Cannot access elements of a RefRaw with null allocator.");
-        }
-        return static_cast<const T*>(allocator->get(mem_id))[p_index];
-    }
-
     /**
      * @brief Is the reference NULL.
      *

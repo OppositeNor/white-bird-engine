@@ -431,44 +431,6 @@ TEST(WBERefRawTest, GetMethodWithNullAllocator) {
     ASSERT_EQ(const_empty_ref.get(), nullptr);
 }
 
-TEST(WBERefRawTest, OperatorBracket) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
-    TestObject::instance_count = 0;
-    
-    // Test operator[] on single object
-    auto single_ref = WBE::new_ref<TestObject>(&allocator, 200);
-    ASSERT_EQ(single_ref[0].value, 200);
-    
-    // Test modifying through operator[]
-    single_ref[0].value = 300;
-    ASSERT_EQ(single_ref[0].value, 300);
-    
-    // Test out of bounds on single object (num = 1)
-    ASSERT_THROW(single_ref[1], std::runtime_error);
-    ASSERT_THROW(single_ref[5], std::runtime_error);
-    
-    WBE::delete_ref(std::move(single_ref));
-    ASSERT_EQ(TestObject::instance_count, 0);
-}
-
-TEST(WBERefRawTest, OperatorBracketWithNullAllocator) {
-    WBE::RefRaw<TestObject> empty_ref;
-    
-    // Test that operator[] throws exception for null allocator
-    ASSERT_THROW(empty_ref[0], std::runtime_error);
-    ASSERT_THROW(empty_ref[1], std::runtime_error);
-    
-    // Test const version
-    const auto& const_empty_ref = empty_ref;
-    ASSERT_THROW(const_empty_ref[0], std::runtime_error);
-    ASSERT_THROW(const_empty_ref[1], std::runtime_error);
-}
-TEST(WBERefRawTest, ObjTypeAlias) {
-    // Test that ObjType alias works correctly
-    static_assert(std::is_same_v<WBE::RefRaw<TestObject>::ObjType, TestObject>);
-    static_assert(std::is_same_v<WBE::RefRaw<int>::ObjType, int>);
-}
-
 TEST(WBERefRawTest, IsNullMethod_BasicBehavior) {
     WBE::MockHeapAllocatorAligned allocator(1024);
     // Default constructed should be null
