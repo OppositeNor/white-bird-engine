@@ -16,6 +16,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 
 namespace WhiteBirdEngine {
 
@@ -24,7 +25,11 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_sc
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_scheme) const {
-    // TODO
+    auto file_path = get_resource_path(p_scheme.path);
+    auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
+    auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
+    RUBinary resource_unit;
+    resource_unit.data = data;
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_scheme) const {
@@ -32,7 +37,23 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_sch
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) const {
-    // TODO
+    auto file_path = get_resource_path(p_scheme.path);
+    uint32_t width, height, file_channels;
+    if (p_scheme.is_hdr) {
+        auto image_data = load_image_data_hdr(file_path, p_scheme.channel_count,
+                                              p_scheme.flip_h, p_scheme.flip_v,
+                                              width, height, file_channels);
+    }
+    else{
+        auto image_data = load_image_data(file_path, p_scheme.channel_count,
+                                          p_scheme.flip_h, p_scheme.flip_v,
+                                          width, height, file_channels);
+    }
+    RUImage resource_unit;
+    resource_unit.width = width;
+    resource_unit.height = height;
+    resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
+    resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_scheme) const {

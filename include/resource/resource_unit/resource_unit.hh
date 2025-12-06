@@ -108,21 +108,21 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeFont : public RUScheme {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemeImage : public RUScheme {
     WBE_DECL_SERIALIZABLE(RUSchemeImage)
-    // The width of the image (in pixels). Could be read from file.
+    // The channel count of the image. Read from file if set to 0.
     WBE_META(WBE_REFLECT)
-    int32_t width = -1;
-    // The height of the image (in pixels). Could be read from file.
-    WBE_META(WBE_REFLECT)
-    int32_t height = -1;
-    // The channel count of the image.
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    uint32_t channel_count;
-    // The color space of the image.
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string color_space;
+    uint32_t channel_count = 0;
     // Image configurations.
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    bool is_hdr;
+    WBE_META(WBE_REFLECT)
+    bool is_hdr = false;
+    // Flip the image horizontally.
+    WBE_META(WBE_REFLECT)
+    bool flip_h = false;
+    // Flip the image vertically.
+    WBE_META(WBE_REFLECT)
+    bool flip_v = false;
+    // The color space of the image.
+    WBE_META(WBE_REFLECT)
+    std::string color_space = "srgb";
     // The path to the image file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;

@@ -13,3 +13,4 @@
    limitations under the License.
 */
 #include "resource_scheme_deserialization_test.hh"
+#include "resource_utils_test.hh"

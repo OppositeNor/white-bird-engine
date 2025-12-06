@@ -132,10 +132,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     {
         "id": "test_image_01",
         "type": "image",
-        "width": 1920,
-        "height": 1080,
         "channel_count": 4,
-        "color_space": "RGBA",
+        "color_space": "rgb",
         "is_hdr": false,
         "path": "images/test_image_01.png"
     }
@@ -146,10 +144,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
-    ASSERT_EQ(scheme.width, 1920);
-    ASSERT_EQ(scheme.height, 1080);
     ASSERT_EQ(scheme.channel_count, 4u);
-    ASSERT_EQ(scheme.color_space, "RGBA");
+    ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
 }
@@ -159,10 +155,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     {
         "id": "test_image_hdr",
         "type": "image",
-        "width": 2048,
-        "height": 2048,
         "channel_count": 3,
-        "color_space": "RGB",
+        "color_space": "rgb",
         "is_hdr": true,
         "path": "images/test_image_hdr.hdr"
     }
@@ -173,10 +167,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
-    ASSERT_EQ(scheme.width, 2048);
-    ASSERT_EQ(scheme.height, 2048);
     ASSERT_EQ(scheme.channel_count, 3u);
-    ASSERT_EQ(scheme.color_space, "RGB");
+    ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_TRUE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
 }
@@ -186,9 +178,6 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     {
         "id": "test_image_minimal",
         "type": "image",
-        "channel_count": 3,
-        "color_space": "RGB",
-        "is_hdr": false,
         "path": "images/test_minimal.jpg"
     }
     )";
@@ -198,10 +187,10 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_minimal");
     ASSERT_EQ(scheme.type, "image");
-    ASSERT_EQ(scheme.width, -1); // Default value
-    ASSERT_EQ(scheme.height, -1); // Default value
-    ASSERT_EQ(scheme.channel_count, 3u);
-    ASSERT_EQ(scheme.color_space, "RGB");
+    ASSERT_EQ(scheme.channel_count, 0);
+    ASSERT_EQ(scheme.flip_h, false);
+    ASSERT_EQ(scheme.flip_v, false);
+    ASSERT_EQ(scheme.color_space, "srgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }
@@ -453,7 +442,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingType) {
     {
         "id": "test_image",
         "channel_count": 3,
-        "color_space": "RGB",
+        "color_space": "rgb",
         "is_hdr": false,
         "path": "images/test.jpg"
     }

@@ -25,7 +25,6 @@ namespace WhiteBirdEngine {
 /**
  * @brief Parse a resource path relative to the resource directory.
  *
- * @todo Test
  * @param p_res_path The resource path.
  * @return The resource path relative to the resource directory.
  */
@@ -53,7 +52,6 @@ inline Path parse_res_rel_path(const std::string& p_res_path) {
 /**
  * @brief Parse a resource path.
  *
- * @todo Test
  * @param p_res_path The resource path.
  * @return The path to the resource in the filesystem.
  */
@@ -85,35 +83,32 @@ void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint
 /**
  * @brief Rotate the image clockwise.
  *
- * @todo Test
  * @param p_data The data of the image.
  * @param p_width The width of the image.
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_cw(unsigned char* p_data, int p_width, int p_height, int p_channel);
+void img_rotate_cw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Rotate the image counter-clockwise.
  *
- * @todo Test
  * @param p_data The data of the image.
  * @param p_width The width of the image.
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_ccw(unsigned char* p_data, int p_width, int p_height, int p_channel);
+void img_rotate_ccw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Rotate the image 180 degrees.
  *
- * @todo Test
  * @param p_data The data of the image.
  * @param p_width The width of the image.
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_180(unsigned char* p_data, int p_width, int p_height, int p_channel);
+void img_rotate_180(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Load image data from a image file.
@@ -133,12 +128,78 @@ std::unique_ptr<unsigned char> load_image_data(const Path& p_path, uint32_t p_de
                                                uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
 
 /**
+ * @brief Load HDR image data from a image file.
+ *
+ * @todo Test
+ * @param p_path The path to the file.
+ * @param p_desired_channels The desired channel count of the image. The image will reformatted according to
+ * this, or will not if this value is 0.
+ * @param p_flip_h Flip the image horizontally if true.
+ * @param p_flip_v Flip the image vertically if true.
+ * @param p_width Output: the width of the image
+ * @param p_height Output: the height of the image.
+ * @param p_file_channels Output: The channel count of the image in its original file.
+ * @return The image data.
+ */
+std::unique_ptr<float> load_image_data_hdr(const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v,
+                                           uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
+/**
+ * @brief Flip an hdr image horizontally.
+ *
+ * @param p_data The data of the hdr image to be fliped.
+ * @param p_width The width of the hdr image.
+ * @param p_height The height of the hdr image.
+ * @param p_channels The channel count of the hdr image.
+ */
+void img_flip_h_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+
+/**
+ * @brief Flip an hdr image vertically.
+ *
+ * @param p_data The data of the hdr image to be fliped.
+ * @param p_width The width of the hdr image.
+ * @param p_height The height of the hdr image.
+ * @param p_channels The channel count of the hdr image.
+ */
+void img_flip_v_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+
+/**
+ * @brief Rotate the hdr image clockwise.
+ *
+ * @param p_data The data of the hdr image.
+ * @param p_width The width of the hdr image.
+ * @param p_height The height of the hdr image.
+ * @param p_channel The channel count of the hdr image.
+ */
+void img_rotate_cw_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+
+/**
+ * @brief Rotate the hdr image counter-clockwise.
+ *
+ * @param p_data The data of the hdr image.
+ * @param p_width The width of the hdr image.
+ * @param p_height The height of the hdr image.
+ * @param p_channel The channel count of the hdr image.
+ */
+void img_rotate_ccw_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+
+/**
+ * @brief Rotate the hdr image 180 degrees.
+ *
+ * @param p_data The data of the hdr image.
+ * @param p_width The width of the hdr image.
+ * @param p_height The height of the hdr image.
+ * @param p_channel The channel count of the hdr image.
+ */
+void img_rotate_180_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+
+/**
  * @brief Get the color space from a string.
  *
  * @param p_color_space The string of the color space.
  * @return The according color space.
  */
-inline ColorSpace get_color_space(const std::string& p_color_space) {
+inline ColorSpace get_color_space_from_str(const std::string& p_color_space) {
     if (p_color_space == "srgb") {
         return ColorSpace::SRGB;
     }
