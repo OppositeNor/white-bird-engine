@@ -13,7 +13,8 @@
 # limitations under the License.
 file(GLOB wbe_resource_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-add_subdirectory(resource_chunk)
+add_subdirectory(resource_manager)
+add_subdirectory(resource_unit_populator)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

@@ -15,30 +15,25 @@
 #ifndef __WBE_RESOURCE_UNIT_POPULATOR_HH__
 #define __WBE_RESOURCE_UNIT_POPULATOR_HH__
 
-#include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_unit/resource_unit.hh"
+#include "resource_unit_populator_interface.hh"
+
 namespace WhiteBirdEngine {
-/**
- * @class RUPopulator
- * @brief Populator class. Populates the resource from its scheme to the
- * resource chunk.
- *
- */
-class RUPopulator {
+
+class RUPopulator final : public RUPopulatorInterface {
 public:
     RUPopulator() = default;
-    virtual ~RUPopulator() {}
+    virtual ~RUPopulator() override {}
 
-    /**
-     * @brief Populate the resource.
-     *
-     * @param p_res_chunk The resource chunk to insert resource data.
-     * @param p_scheme The resource scheme.
-     */
-    virtual void populate(ResourceChunk& p_res_chunk, RUScheme& p_scheme) const = 0;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const override;
 };
 
 }
-
 
 #endif

@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-file(GLOB wbe_resource_chunk_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB wbe_resource_unit_populator_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 set(wbe_resource_src
     ${wbe_resource_src}
-    ${wbe_resource_chunk_src}
+    ${wbe_resource_unit_populator_src}
     PARENT_SCOPE
 )
 

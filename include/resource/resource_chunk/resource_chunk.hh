@@ -73,7 +73,7 @@ public:
      * @param p_allocator The allocator to allocate memory.
      * @return The result memory id.
      */
-    virtual RefRes<char> push_data(size_t p_res_size, void* p_res) = 0;
+    virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;
 
     /**
      * @brief Get the data at ID.

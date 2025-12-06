@@ -12,7 +12,26 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "resource/resource_manager/resource_manager.hh"
+#include "core/engine_core.hh"
+#include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
+#include "resource/resource_utils.hh"
 
 namespace WhiteBirdEngine {
+
+ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
+    : stack_allocator(p_alloc_size) {
+    singleton = this;
+    global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
+        global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
+}
+
+ResourceManager::~ResourceManager() {
+    singleton = nullptr;
+    resource_chunks.clear();
+    stack_allocator.clear();
+}
+
+
 }

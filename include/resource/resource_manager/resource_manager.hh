@@ -18,11 +18,8 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "resource/resource_utils.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
 #include <stdexcept>
@@ -37,18 +34,15 @@ namespace WhiteBirdEngine {
  */
 class ResourceManager : public Singleton<ResourceManager> {
 public:
-    virtual ~ResourceManager() override {
-        singleton = nullptr;
-        resource_chunks.clear();
-        stack_allocator.clear();
-    }
 
-    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
-        : stack_allocator(p_alloc_size) {
-        singleton = this;
-        global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
-            global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
-    }
+    virtual ~ResourceManager() override;
+    /**
+     * @brief Constructor.
+     *
+     * @param p_alloc_size The total capacity of the resource manager.
+     * @param p_global_res_path The path to the global resources.
+     */
+    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path);
 
     /**
      * @brief Register a resource chunk.
@@ -81,6 +75,12 @@ public:
         return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_key).get());
     }
 
+    /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_chunk_id The ID of the chunk/
+     * @return The resource chunk.
+     */
     Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
@@ -88,6 +88,12 @@ public:
         return resource_chunks[p_chunk_id];
     }
 
+    /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_chunk_id The ID of the chunk/
+     * @return The resource chunk.
+     */
     Ref<const ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");

@@ -22,7 +22,9 @@
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
@@ -64,16 +66,12 @@ public:
         return resource_map.at(p_key.c_str());
     }
 
-    virtual RefRes<char> push_data(size_t p_res_size, void* p_res) override {
+    virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) override {
         total_size += p_res_size;
         MemID result_mem_id = allocator->allocate(p_res_size);
         memcpy(allocator->get(result_mem_id), p_res, p_res_size);
         RefRes<char> result(result_mem_id, allocator);
         return result;
-    }
-
-    bool is_already_registered(const std::string& p_res_key) {
-        return resource_map.contains(p_res_key.c_str());
     }
 
     virtual size_t get_size() const override {
@@ -91,6 +89,9 @@ public:
 protected:
 
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
+        if (is_already_registered(p_res_key)) {
+            throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
+        }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
         memcpy(allocator->get(result_mem_id), p_res, p_size);
@@ -99,6 +100,9 @@ protected:
         return result;
     }
 
+    bool is_already_registered(const std::string& p_res_key) {
+        return resource_map.contains(p_res_key.c_str());
+    }
 private:
     size_t total_size;
     std::unordered_map<std::string, RefRes<char>> resource_map;
@@ -106,7 +110,19 @@ private:
 
     RUType get_res_type(std::string p_type);
 
+    RUPopulator populator;
+
+    template <typename RUSchemeType>
+    void populate_scheme(const ParserType::DataType& p_parser_data);
 };
+
+template <ParserConcept ParserType>
+template <typename RUSchemeType>
+void ResourceChunkLoadFile<ParserType>::populate_scheme(const ParserType::DataType& p_parser_data) {
+    RUSchemeType scheme;
+    scheme.deserialize(p_parser_data);
+    populator.populate(*this, scheme);
+}
 
 template <ParserConcept ParserType>
 ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, StackAllocator& p_allocator) {
@@ -115,25 +131,26 @@ ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, Sta
     parser.parse(p_path);
     std::vector<std::string> keys = parser.get_all_keys();
     for (auto& key : keys) {
-        auto res_type = get_res_type(parser.template get_value<typename ParserType::DataType>(key).template get_value<std::string>("type"));
+        auto value = parser.template get_value<typename ParserType::DataType>(key);
+        auto res_type = get_res_type(value.template get_value<std::string>("type"));
         switch (res_type) {
             case AUDIO:
-                // TODO
+                populate_scheme<RUSchemeAudio>(value);
                 break;
             case BINARY:
-                // TODO
+                populate_scheme<RUSchemeBinary>(value);
                 break;
             case FONT:
-                // TODO
+                populate_scheme<RUSchemeFont>(value);
                 break;
             case IMAGE:
-                // TODO
+                populate_scheme<RUSchemeImage>(value);
                 break;
             case TEXT:
-                // TODO
+                populate_scheme<RUSchemeText>(value);
                 break;
             case VIDEO:
-                //TODO
+                populate_scheme<RUSchemeVideo>(value);
                 break;
         }
     }
