@@ -15,6 +15,7 @@
 #ifndef __WBE_3D_PRIMITIVE_HH__
 #define __WBE_3D_PRIMITIVE_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "primitive_slots.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -83,12 +84,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3DTextured : public Vertex3D {
  *
  * @tparam TVertType The type of the vertices.
  */
-template <typename TVertType>
+template <typename TVertType, typename AllocatorType = Allocator>
 struct Triangle3DIndx {
     /**
      * @brief The vertex array.
      */
-    RefRaw<TVertType> vert_array;
+    RefRaw<TVertType, AllocatorType> vert_array;
     struct Indices {
         uint32_t vert_1;
         uint32_t vert_2;

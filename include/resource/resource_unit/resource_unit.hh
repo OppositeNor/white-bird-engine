@@ -15,7 +15,7 @@
 #ifndef __WBE_RESOURCE_UNIT_HH__
 #define __WBE_RESOURCE_UNIT_HH__
 
-#include "core/allocator/stack_allocator.hh"
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
@@ -35,7 +35,7 @@ template <typename T>
 concept ResourceUnitConcept = is_resource_unit<T>;
 
 template <typename T>
-using RefRes = RefRaw<T, StackAllocator>;
+using RefRes = RefRaw<T, Allocator>;
 
 /**
  * @class ResourceScheme

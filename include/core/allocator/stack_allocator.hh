@@ -46,10 +46,10 @@ struct AllocatorTrait<class StackAllocator> {
  * @brief Stack style allocation. Can only allocate and deallocate from the top of the stack.
  * @todo Test
  */
-class StackAllocator {
+class StackAllocator final : public Allocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
-    ~StackAllocator() {}
+    virtual ~StackAllocator() override {}
     StackAllocator(const StackAllocator&) = delete;
     StackAllocator(StackAllocator&&) = delete;
     StackAllocator& operator=(const StackAllocator&) = delete;
@@ -96,7 +96,7 @@ public:
      *
      * @param p_id The ID of the memory to get.
      */
-    void* get(MemID p_id) const {
+    virtual void* get(MemID p_id) const override {
         WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return std::bit_cast<void*>(p_id);
     }

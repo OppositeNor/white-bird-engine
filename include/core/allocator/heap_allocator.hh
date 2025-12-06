@@ -30,10 +30,10 @@ struct AllocatorTrait<class HeapAllocator> {
  * @brief Heap allocator.
  *
  */
-class HeapAllocator {
+class HeapAllocator : public Allocator {
 public:
     HeapAllocator() = default;
-    virtual ~HeapAllocator() {}
+    virtual ~HeapAllocator() override {}
 
     /**
      * @brief Allocate memory of a specific size.
@@ -59,7 +59,7 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    virtual void* get(MemID p_id) const = 0;
+    virtual void* get(MemID p_id) const override = 0;
 
     /**
      * @brief Is the allocator empty.

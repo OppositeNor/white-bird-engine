@@ -14,6 +14,7 @@
 */
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include "core/allocator/allocator.hh"
+#include "core/surface/3d_primitive.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
@@ -79,8 +80,17 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
         p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
     auto indices_data = p_res_chunk.push_data(
         p_scheme.indices_data.size() * sizeof(uint32_t), p_scheme.indices_data.data());
-    // TODO
-    // std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3, (Triangle3DIndxTextured){.vert_array = vertices_data});
+
+    std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        triangles[i].vert_array = vertices_data.reint_cast<Vertex3DTextured>();
+        triangles[i].vertex_indices[0] = p_scheme.indices_data[i * 3];
+        triangles[i].vertex_indices[1] = p_scheme.indices_data[i * 3 + 1];
+        triangles[i].vertex_indices[2] = p_scheme.indices_data[i * 3 + 2];
+    }
+
+    auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
+    resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const {

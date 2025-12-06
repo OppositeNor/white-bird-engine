@@ -81,29 +81,48 @@ public:
     }
 
     template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
     RefRaw(const RefRaw<T1, AllocType1>& p_other)
     : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
     template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
     RefRaw(RefRaw<T1, AllocType1>&& p_other)
     : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
     RefRaw& operator=(const RefRaw<T1, AllocType1>& p_other) {
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         return *this;
     }
     template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
     RefRaw& operator=(RefRaw<T1, AllocType1>&& p_other) {
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
         return *this;
+    }
+
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    operator RefRaw<T1, AllocType1>() {
+        RefRaw<T1, AllocType1> converted(mem_id, allocator);
+        return converted;
+    }
+
+    /**
+     * @brief Reinterpret cast this reference to T1.
+     *
+     * @tparam T1 The type to cast to.
+     * @return The casted reference.
+     */
+    template <typename T1, typename AllocType1 = AllocType>
+    RefRaw<T1, AllocType1> reint_cast() {
+        RefRaw<T1, AllocType1> result(mem_id, allocator);
+        return result;
     }
 
     /**

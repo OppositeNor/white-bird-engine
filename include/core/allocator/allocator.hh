@@ -60,6 +60,28 @@ concept AllocatorTraitConcept = requires {
     // the allocated resource.
     { bool(T::WILL_ADDR_MOVE) } -> std::same_as<bool>;
 };
+
+/**
+ * @class Allocator
+ * @brief The allocator class.
+ *
+ */
+class Allocator {
+public:
+
+    Allocator() = default;
+    virtual ~Allocator() {}
+
+    /**
+     * @brief Get the pointer pointing to the resource.
+     *
+     * @param p_id The resource id to get the pointer from.
+     * @return The pointer of the resource.
+     */
+    virtual void* get(MemID p_id) const = 0;
+
+};
+
 }
 
 #endif
