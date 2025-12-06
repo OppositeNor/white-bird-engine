@@ -66,7 +66,7 @@ public:
         p_serializable.clear();
         auto data_vector = p_data.template get<std::vector<ParserDataType>>();
         for (auto& data : data_vector) {
-            T result;
+            T result{};
             SerializableSD<T>::deserialize(data, result);
             p_serializable.push_back(result);
         }
