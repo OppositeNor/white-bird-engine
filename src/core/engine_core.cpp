@@ -17,7 +17,6 @@
 #include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
 #include "core/profiling/profiling_manager.hh"
-#include "core/parser/parser_json.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include <iostream>
@@ -50,15 +49,9 @@ EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir)
     initialize(p_argc, p_argv);
 }
 
-void EngineCore::parse_metadata(const Path& p_metadata_config_path) {
-    ParserJSON parser;
-    parser.parse(p_metadata_config_path);
-}
-
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
     engine_config = new EngineConfig(Path(file_system->get_config_directory(), "engine_config.yaml"), p_argc, p_argv);
     pool_allocator = new HeapAllocatorAlignedPoolImplicitList(engine_config->get_config_options().global_mem_pool_size);
-    parse_metadata(Path(file_system->get_resource_directory(), "metadata.json"));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
     label_manager = new LabelManager();

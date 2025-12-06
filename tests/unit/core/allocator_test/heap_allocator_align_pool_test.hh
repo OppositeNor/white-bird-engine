@@ -31,6 +31,7 @@ namespace WBE = WhiteBirdEngine;
 constexpr size_t AAPT_HEADER_SIZE = WBE::HeapAllocatorAlignedPool::HEADER_SIZE;
 
 class WBEAllocAlignedPoolTest : public ::testing::Test {
+protected:
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     }

@@ -39,10 +39,10 @@ public:
     /**
      * @brief Get the resource from a key.
      *
-     * @param p_key The key to get resource from.
+     * @param p_id The identifier of the resource unit.
      * @return The resource reference of the resource.
      */
-    virtual RefRes<char> get_resource(const std::string& p_key) const = 0;
+    virtual RefRes<char> get_resource(const std::string& p_id) const = 0;
 
     /**
      * @brief Get the total size of the chunk.
@@ -55,14 +55,14 @@ public:
      * @brief Push a resource unit to the chunk.
      *
      * @tparam T The type of the resource unit.
-     * @param p_res_key The key of the resource unit.
+     * @param p_id The identifier of the resource unit.
      * @param p_allocator The allocator to allocate memory.
      * @param p_res The resource unit instance.
      * @return The memory id of the pushed resource unit.
      */
     template <ResourceUnitConcept T>
-    RefRes<char> push_res_unit(const std::string& p_res_key, const T& p_res) {
-        return push_res_unit_ptr(p_res_key, &p_res, sizeof(T));
+    RefRes<char> push_res_unit(const std::string& p_id, const T& p_res) {
+        return push_res_unit_ptr(p_id, &p_res, sizeof(T));
     }
 
     /**
@@ -73,7 +73,7 @@ public:
      * @param p_allocator The allocator to allocate memory.
      * @return The result memory id.
      */
-    virtual RefRes<char> push_data(size_t p_res_size, void* p_res) = 0;
+    virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;
 
     /**
      * @brief Get the data at ID.
@@ -114,6 +114,28 @@ public:
      * @return The pointer to the data to get.
      */
     virtual const void* get_data(MemID p_mem_id) const = 0;
+
+    /**
+     * @brief Get all resource keys in the chunk.
+     */
+    virtual std::vector<std::string> get_all_keys() const = 0;
+
+    /**
+     * @brief Check if the chunk contains a resource with the given key.
+     *
+     * @param p_res_key The key to check.
+     * @return True if the chunk contains the resource, false otherwise.
+     */
+    virtual bool contains(const std::string& p_res_key) const = 0;
+
+    /**
+     * @brief Create a reference to a resource in the chunk.
+     * This reference will be resolved after the resource chunk is loaded.
+     *
+     * @param p_ptr The pointer to store the reference.
+     * @param p_key The key of the resource to reference.
+     */
+    virtual void create_ref_to(void** p_ptr, const std::string& p_key) = 0;
 
 protected:
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;

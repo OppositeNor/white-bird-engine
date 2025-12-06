@@ -15,6 +15,7 @@
 #ifndef __WBE_2D_PRIMITIVES_HH__
 #define __WBE_2D_PRIMITIVES_HH__
 
+#include "core/reflection/reflection_defs.hh"
 #include "primitive_slots.hh"
 #include <glm/glm.hpp>
 
@@ -26,8 +27,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the slot.
  */
-template <typename T = EmptySlot>
-struct Vertex2D {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2D {
     /**
      * @brief The position of the vertex.
      */
@@ -36,55 +36,36 @@ struct Vertex2D {
      * @brief The depth of the vertex.
      */
     float depth;
-    /**
-     * @brief The slot of the vertex for extension properties.
-     */
-    T slot;
+};
+
+/**
+ * @brief Textured vertex.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2DTextured : public Vertex2D {
+    WBE_VERT_SLOT_TEXTURED
 };
 
 /**
  * @class Triangle2D
  * @brief 2D triangle.
  *
- * @tparam TVertSlot The type of the vertex slot.
- * @tparam TSlot The type of the triangle slot.
+ * @tparam TVertType The type of the vertices.
  */
-template <typename TVertSlot, typename TSlot = EmptySlot>
+template <typename TVertType>
 struct Triangle2D {
     /**
      * @brief The first vertex.
      */
-    Vertex2D<TVertSlot> vert1;
+    TVertType vert1;
     /**
      * @brief The second vertex.
      */
-    Vertex2D<TVertSlot> vert2;
+    TVertType vert2;
     /**
      * @brief The third vertex.
      */
-    Vertex2D<TVertSlot> vert3;
-    /**
-     * @brief The slot of the triangle for extension properties.
-     */
-    TSlot slot;
+    TVertType vert3;
 };
-
-/**
- * @brief Colored triangle.
- */
-using Triangle2DColored = Triangle2D<SlotColor>;
-
-/**
- * @brief Textured triangle.
- */
-using Triangle2DTextured = Triangle2D<SlotTextured>;
-
-/**
- * @brief Textured skinned triangle.
- */
-using Triangle2DTexBone = Triangle2D<SlotUVBone>;
-
-
 };
 
 #endif

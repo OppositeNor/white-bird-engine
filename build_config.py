@@ -85,6 +85,10 @@ gen_info = {
         "WBE_CHANNEL",
         "WBE_RENDER_OBJECT_TYPE",
         "WBE_RENDER_TASK",
+        "WBE_RESOURCE_UNIT",
+    ],
+    "static_serializables" : [
+        "WBE_SERIALIZABLE_STATIC",
     ],
     "serializables" : [
         "WBE_SERIALIZABLE",
@@ -92,3 +96,5 @@ gen_info = {
         "WBE_CONFIG_OPTION"
     ],
 }
+
+gen_info["static_serializables"].extend(gen_info["serializables"])

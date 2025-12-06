@@ -52,7 +52,8 @@ public:
         {% for label in metadata.labels %}
         {% if label.attribute | select("in", dynamic_labels) | list | length > 0  %}
         dynamic_labels.push_back("{{ label.name }}");
-        hash_to_name.insert(std::pair(static_hash("{{ label.name }}"), std::string("{{ label.name }}")));
+        label_to_name.insert(std::pair(static_hash("{{ label.name }}"), std::string("{{ label.name }}")));
+        name_to_label.insert(std::pair(std::string("{{ label.name }}"), static_hash("{{ label.name }}")));
         {% endif %}
         {% endfor %}
     }
@@ -67,7 +68,17 @@ public:
      * @return The name of the label
      */
     const std::string& get_label_name(HashCode p_label) const {
-        return hash_to_name.at(p_label);
+        return label_to_name.at(p_label);
+    }
+
+    /**
+     * @brief Get the label from the label's name.
+     *
+     * @param p_name The name of the label.
+     * @return The label.
+     */
+    HashCode get_label_from_name(const std::string& p_name) const {
+        return name_to_label.at(p_name);
     }
 
     /**
@@ -77,7 +88,7 @@ public:
      */
     void register_label(const std::string& p_name) {
         dynamic_labels.push_back(p_name);
-        hash_to_name.insert(std::pair(dynam_hash(p_name), p_name));
+        label_to_name.insert(std::pair(dynam_hash(p_name), p_name));
     }
 
     /**
@@ -90,7 +101,8 @@ public:
 private:
     inline static LabelManager* singleton = nullptr;
     std::vector<std::string> dynamic_labels;
-    std::map<HashCode, std::string> hash_to_name;
+    std::map<HashCode, std::string> label_to_name;
+    std::map<std::string, HashCode> name_to_label;
 };
 
 }

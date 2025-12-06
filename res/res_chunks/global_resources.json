@@ -1,10 +1,43 @@
 {
-    "main_shader_vert": {
-        "type": "binary",
-        "path": "shaders/main_pipeline_vert.spv"
-    },
-    "main_shader_pixl": {
-        "type": "binary",
-        "path": "shaders/main_pipeline_frag.spv"
-    }
+    "include": [],
+    "resources": [
+        {
+            "id": "main_shader_vert",
+            "type": "binary",
+            "path": "assets/shaders/main_pipeline_vert.spv"
+        },
+        {
+            "id": "main_shader_pixl",
+            "type": "binary",
+            "path": "assets/shaders/main_pipeline_frag.spv"
+        },
+        {
+            "id": "default_material",
+            "type": "material",
+            "shading_model": {
+                "type": "resource_reference",
+                "id": "cook_torrance_pbr"
+            },
+            "textures": {
+                "normal": {
+                    "type": "image",
+                    "path": "assets/images/default_normal.png",
+                    "color_space": "rgb",
+                    "channel_count": 3
+                },
+                "albedo": {
+                    "type": "image",
+                    "path": "assets/images/default_albedo.png",
+                    "color_space": "srgb",
+                    "channel_count": 3
+                },
+                "roughness_metallic_ao": {
+                    "type": "image",
+                    "path": "assets/images/default_rma.png",
+                    "color_space": "rgb",
+                    "channel_count": 3
+                }
+            }
+        }
+    ]
 }

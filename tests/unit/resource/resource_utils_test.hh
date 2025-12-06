@@ -1,0 +1,432 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#ifndef __WBE_RESOURCE_UTILS_TEST_HH__
+#define __WBE_RESOURCE_UTILS_TEST_HH__
+
+#include "resource/resource_utils.hh"
+#include "global/global.hh"
+#include "utils/utils.hh"
+#include <gtest/gtest.h>
+#include <memory>
+#include <vector>
+#include <cstring>
+#include <stdexcept>
+
+namespace WBE = WhiteBirdEngine;
+
+class WBEResourceUtilsTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    }
+
+    void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+
+    // Helper function to create test image data
+    std::unique_ptr<unsigned char[]> create_test_image(uint32_t width, uint32_t height, uint32_t channels) {
+        auto data = std::make_unique<unsigned char[]>(width * height * channels);
+        
+        // Fill with test pattern: gradient with recognizable corner values
+        for (uint32_t y = 0; y < height; ++y) {
+            for (uint32_t x = 0; x < width; ++x) {
+                uint32_t index = (y * width + x) * channels;
+                
+                // Create a pattern where we can easily verify transformations
+                // Avoid divide by zero when width or height is 1
+                for (uint32_t c = 0; c < channels; ++c) {
+                    uint32_t x_component = (width > 1) ? (x * 255 / (width - 1)) : 255;
+                    uint32_t y_component = (height > 1) ? (y * 255 / (height - 1)) : 255;
+                    data[index + c] = static_cast<unsigned char>(
+                        (x_component + y_component + c * 50) % 256
+                    );
+                }
+            }
+        }
+        
+        return data;
+    }
+
+    // Helper function to create test HDR image data
+    std::unique_ptr<float[]> create_test_image_hdr(uint32_t width, uint32_t height, uint32_t channels) {
+        auto data = std::make_unique<float[]>(width * height * channels);
+        
+        // Fill with test pattern for HDR data
+        for (uint32_t y = 0; y < height; ++y) {
+            for (uint32_t x = 0; x < width; ++x) {
+                uint32_t index = (y * width + x) * channels;
+                
+                for (uint32_t c = 0; c < channels; ++c) {
+                    // Avoid divide by zero when width or height is 1
+                    float x_component = (width > 1) ? static_cast<float>(x) / (width - 1) : 1.0f;
+                    float y_component = (height > 1) ? static_cast<float>(y) / (height - 1) : 1.0f;
+                    data[index + c] = x_component + y_component + static_cast<float>(c) * 0.1f;
+                }
+            }
+        }
+        
+        return data;
+    }
+
+    // Helper to get pixel value
+    unsigned char get_pixel(unsigned char* data, uint32_t x, uint32_t y, uint32_t width, uint32_t channels, uint32_t channel = 0) {
+        return data[(y * width + x) * channels + channel];
+    }
+
+    // Helper to get HDR pixel value
+    float get_pixel_hdr(float* data, uint32_t x, uint32_t y, uint32_t width, uint32_t channels, uint32_t channel = 0) {
+        return data[(y * width + x) * channels + channel];
+    }
+};
+
+// Test horizontal flip for regular images
+TEST_F(WBEResourceUtilsTest, ImageFlipHorizontal) {
+    const uint32_t width = 4;
+    const uint32_t height = 3;
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(width, height, channels);
+    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    std::memcpy(data.get(), original.get(), width * height * channels);
+    
+    // Store original corner values for verification
+    auto top_left = get_pixel(original.get(), 0, 0, width, channels);
+    auto top_right = get_pixel(original.get(), width - 1, 0, width, channels);
+    auto bottom_left = get_pixel(original.get(), 0, height - 1, width, channels);
+    auto bottom_right = get_pixel(original.get(), width - 1, height - 1, width, channels);
+    
+    WBE::img_flip_h(data.get(), width, height, channels);
+    
+    // After horizontal flip: left becomes right, right becomes left
+    EXPECT_EQ(get_pixel(data.get(), width - 1, 0, width, channels), top_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, width, channels), top_right);
+    EXPECT_EQ(get_pixel(data.get(), width - 1, height - 1, width, channels), bottom_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, height - 1, width, channels), bottom_right);
+}
+
+// Test vertical flip for regular images
+TEST_F(WBEResourceUtilsTest, ImageFlipVertical) {
+    const uint32_t width = 4;
+    const uint32_t height = 3;
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(width, height, channels);
+    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    std::memcpy(data.get(), original.get(), width * height * channels);
+    
+    // Store original corner values for verification
+    auto top_left = get_pixel(original.get(), 0, 0, width, channels);
+    auto top_right = get_pixel(original.get(), width - 1, 0, width, channels);
+    auto bottom_left = get_pixel(original.get(), 0, height - 1, width, channels);
+    auto bottom_right = get_pixel(original.get(), width - 1, height - 1, width, channels);
+    
+    WBE::img_flip_v(data.get(), width, height, channels);
+    
+    // After vertical flip: top becomes bottom, bottom becomes top
+    EXPECT_EQ(get_pixel(data.get(), 0, height - 1, width, channels), top_left);
+    EXPECT_EQ(get_pixel(data.get(), width - 1, height - 1, width, channels), top_right);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, width, channels), bottom_left);
+    EXPECT_EQ(get_pixel(data.get(), width - 1, 0, width, channels), bottom_right);
+}
+
+// Test clockwise rotation for square images
+TEST_F(WBEResourceUtilsTest, ImageRotateClockwise) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(size, size, channels);
+    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels);
+    
+    // Store original corner values
+    auto top_left = get_pixel(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_cw(data.get(), size, size, channels);
+    
+    // After 90° clockwise rotation:
+    // top_left -> top_right, top_right -> bottom_right
+    // bottom_left -> top_left, bottom_right -> bottom_left
+    EXPECT_EQ(get_pixel(data.get(), size - 1, 0, size, channels), top_left);
+    EXPECT_EQ(get_pixel(data.get(), size - 1, size - 1, size, channels), top_right);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), bottom_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, size - 1, size, channels), bottom_right);
+}
+
+// Test counter-clockwise rotation for square images
+TEST_F(WBEResourceUtilsTest, ImageRotateCounterClockwise) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(size, size, channels);
+    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels);
+    
+    // Store original corner values
+    auto top_left = get_pixel(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_ccw(data.get(), size, size, channels);
+    
+    // After 90° counter-clockwise rotation:
+    // top_left -> bottom_left, top_right -> top_left
+    // bottom_left -> bottom_right, bottom_right -> top_right
+    EXPECT_EQ(get_pixel(data.get(), 0, size - 1, size, channels), top_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), top_right);
+    EXPECT_EQ(get_pixel(data.get(), size - 1, size - 1, size, channels), bottom_left);
+    EXPECT_EQ(get_pixel(data.get(), size - 1, 0, size, channels), bottom_right);
+}
+
+// Test 180-degree rotation for square images
+TEST_F(WBEResourceUtilsTest, ImageRotate180) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(size, size, channels);
+    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels);
+    
+    // Store original corner values
+    auto top_left = get_pixel(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_180(data.get(), size, size, channels);
+    
+    // After 180° rotation: corners swap diagonally
+    EXPECT_EQ(get_pixel(data.get(), size - 1, size - 1, size, channels), top_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, size - 1, size, channels), top_right);
+    EXPECT_EQ(get_pixel(data.get(), size - 1, 0, size, channels), bottom_left);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), bottom_right);
+}
+
+// Test horizontal flip for HDR images
+TEST_F(WBEResourceUtilsTest, ImageFlipHorizontalHDR) {
+    const uint32_t width = 4;
+    const uint32_t height = 3;
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image_hdr(width, height, channels);
+    auto data = std::make_unique<float[]>(width * height * channels);
+    std::memcpy(data.get(), original.get(), width * height * channels * sizeof(float));
+    
+    // Store original corner values
+    auto top_left = get_pixel_hdr(original.get(), 0, 0, width, channels);
+    auto top_right = get_pixel_hdr(original.get(), width - 1, 0, width, channels);
+    auto bottom_left = get_pixel_hdr(original.get(), 0, height - 1, width, channels);
+    auto bottom_right = get_pixel_hdr(original.get(), width - 1, height - 1, width, channels);
+    
+    WBE::img_flip_h_hdr(data.get(), width, height, channels);
+    
+    // After horizontal flip: left becomes right, right becomes left
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), width - 1, 0, width, channels), top_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, 0, width, channels), top_right);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), width - 1, height - 1, width, channels), bottom_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, height - 1, width, channels), bottom_right);
+}
+
+// Test vertical flip for HDR images
+TEST_F(WBEResourceUtilsTest, ImageFlipVerticalHDR) {
+    const uint32_t width = 4;
+    const uint32_t height = 3;
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image_hdr(width, height, channels);
+    auto data = std::make_unique<float[]>(width * height * channels);
+    std::memcpy(data.get(), original.get(), width * height * channels * sizeof(float));
+    
+    // Store original corner values
+    auto top_left = get_pixel_hdr(original.get(), 0, 0, width, channels);
+    auto top_right = get_pixel_hdr(original.get(), width - 1, 0, width, channels);
+    auto bottom_left = get_pixel_hdr(original.get(), 0, height - 1, width, channels);
+    auto bottom_right = get_pixel_hdr(original.get(), width - 1, height - 1, width, channels);
+    
+    WBE::img_flip_v_hdr(data.get(), width, height, channels);
+    
+    // After vertical flip: top becomes bottom, bottom becomes top
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, height - 1, width, channels), top_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), width - 1, height - 1, width, channels), top_right);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, 0, width, channels), bottom_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), width - 1, 0, width, channels), bottom_right);
+}
+
+// Test clockwise rotation for square HDR images
+TEST_F(WBEResourceUtilsTest, ImageRotateClockwiseHDR) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image_hdr(size, size, channels);
+    auto data = std::make_unique<float[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels * sizeof(float));
+    
+    // Store original corner values
+    auto top_left = get_pixel_hdr(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel_hdr(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel_hdr(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel_hdr(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_cw_hdr(data.get(), size, size, channels);
+    
+    // After 90° clockwise rotation
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, 0, size, channels), top_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, size - 1, size, channels), top_right);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, 0, size, channels), bottom_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, size - 1, size, channels), bottom_right);
+}
+
+// Test counter-clockwise rotation for square HDR images
+TEST_F(WBEResourceUtilsTest, ImageRotateCounterClockwiseHDR) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image_hdr(size, size, channels);
+    auto data = std::make_unique<float[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels * sizeof(float));
+    
+    // Store original corner values
+    auto top_left = get_pixel_hdr(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel_hdr(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel_hdr(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel_hdr(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_ccw_hdr(data.get(), size, size, channels);
+    
+    // After 90° counter-clockwise rotation
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, size - 1, size, channels), top_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, 0, size, channels), top_right);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, size - 1, size, channels), bottom_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, 0, size, channels), bottom_right);
+}
+
+// Test 180-degree rotation for square HDR images
+TEST_F(WBEResourceUtilsTest, ImageRotate180HDR) {
+    const uint32_t size = 4; // Square image only
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image_hdr(size, size, channels);
+    auto data = std::make_unique<float[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels * sizeof(float));
+    
+    // Store original corner values
+    auto top_left = get_pixel_hdr(original.get(), 0, 0, size, channels);
+    auto top_right = get_pixel_hdr(original.get(), size - 1, 0, size, channels);
+    auto bottom_left = get_pixel_hdr(original.get(), 0, size - 1, size, channels);
+    auto bottom_right = get_pixel_hdr(original.get(), size - 1, size - 1, size, channels);
+    
+    WBE::img_rotate_180_hdr(data.get(), size, size, channels);
+    
+    // After 180° rotation: corners swap diagonally
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, size - 1, size, channels), top_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, size - 1, size, channels), top_right);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), size - 1, 0, size, channels), bottom_left);
+    EXPECT_FLOAT_EQ(get_pixel_hdr(data.get(), 0, 0, size, channels), bottom_right);
+}
+
+// Test color space string parsing
+TEST_F(WBEResourceUtilsTest, ColorSpaceFromString) {
+    // Test valid color spaces
+    EXPECT_EQ(WBE::get_color_space_from_str("srgb"), WBE::ColorSpace::SRGB);
+    EXPECT_EQ(WBE::get_color_space_from_str("rgb"), WBE::ColorSpace::RGB);
+    
+    // Test invalid color space
+    EXPECT_THROW(WBE::get_color_space_from_str("invalid"), std::runtime_error);
+    EXPECT_THROW(WBE::get_color_space_from_str(""), std::runtime_error);
+    EXPECT_THROW(WBE::get_color_space_from_str("RGB"), std::runtime_error); // Case sensitive
+}
+
+// Test combined transformations
+TEST_F(WBEResourceUtilsTest, CombinedTransformations) {
+    const uint32_t width = 4;
+    const uint32_t height = 4; // Square for rotation
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(width, height, channels);
+    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    
+    // Test: horizontal flip + vertical flip should equal 180° rotation
+    std::memcpy(data.get(), original.get(), width * height * channels);
+    WBE::img_flip_h(data.get(), width, height, channels);
+    WBE::img_flip_v(data.get(), width, height, channels);
+    
+    auto rotation_data = std::make_unique<unsigned char[]>(width * height * channels);
+    std::memcpy(rotation_data.get(), original.get(), width * height * channels);
+    WBE::img_rotate_180(rotation_data.get(), width, height, channels);
+    
+    // Compare results
+    for (uint32_t i = 0; i < width * height * channels; ++i) {
+        EXPECT_EQ(data[i], rotation_data[i]) << "Mismatch at index " << i;
+    }
+}
+
+// Test different channel counts
+TEST_F(WBEResourceUtilsTest, DifferentChannelCounts) {
+    const uint32_t size = 4;
+    
+    // Test with different channel counts: 1 (grayscale), 3 (RGB), 4 (RGBA)
+    for (uint32_t channels : {1u, 3u, 4u}) {
+        auto original = create_test_image(size, size, channels);
+        auto data = std::make_unique<unsigned char[]>(size * size * channels);
+        std::memcpy(data.get(), original.get(), size * size * channels);
+        
+        // Test that transformations don't crash with different channel counts
+        WBE::img_flip_h(data.get(), size, size, channels);
+        WBE::img_flip_v(data.get(), size, size, channels);
+        WBE::img_rotate_cw(data.get(), size, size, channels);
+        WBE::img_rotate_ccw(data.get(), size, size, channels);
+        WBE::img_rotate_180(data.get(), size, size, channels);
+        
+        // Verify data is still valid (no crashes, no out-of-bounds access)
+        SUCCEED();
+    }
+}
+
+// Test edge cases with small images
+TEST_F(WBEResourceUtilsTest, SmallImages) {
+    // Test 1x1 square image
+    const uint32_t size = 1;
+    const uint32_t channels = 3;
+    
+    auto original = create_test_image(size, size, channels);
+    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    std::memcpy(data.get(), original.get(), size * size * channels);
+    
+    auto original_value = get_pixel(original.get(), 0, 0, size, channels);
+    
+    // All transformations should leave a 1x1 image unchanged
+    WBE::img_flip_h(data.get(), size, size, channels);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+    
+    WBE::img_flip_v(data.get(), size, size, channels);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+    
+    WBE::img_rotate_cw(data.get(), size, size, channels);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+    
+    WBE::img_rotate_ccw(data.get(), size, size, channels);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+    
+    WBE::img_rotate_180(data.get(), size, size, channels);
+    EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+}
+
+#endif

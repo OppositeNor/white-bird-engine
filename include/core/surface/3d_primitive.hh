@@ -15,8 +15,10 @@
 #ifndef __WBE_3D_PRIMITIVE_HH__
 #define __WBE_3D_PRIMITIVE_HH__
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "primitive_slots.hh"
+#include "core/reflection/reflection_defs.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
 
@@ -28,8 +30,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the slot.
  */
-template <typename T = EmptySlot>
-struct Vertex3D {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3D {
     /**
      * @brief The position of the vertex.
      */
@@ -46,55 +47,49 @@ struct Vertex3D {
      * @brief The bitangent vector of the vertex.
      */
     glm::vec3 bitangent;
-    /**
-     * @brief The slot used for extension.
-     */
-    T slot;
 };
 
 /**
  * @class Triangle3D
  * @brief 3D triangle.
  *
- * @tparam TVertSlot The type of vertex.
- * @tparam TSlot The type of the triangle slot.
+ * @tparam TVertType The type of vertices.
  */
-template <typename TVertSlot, typename TSlot = EmptySlot>
+template <typename TVertType>
 struct Triangle3D {
     /**
      * @brief The first vertex of the triangle.
      */
-    Vertex3D<TVertSlot> vert1;
+    TVertType vert1;
     /**
      * @brief The second vertex of the triangle.
      */
-    Vertex3D<TVertSlot> vert2;
+    TVertType vert2;
     /**
      * @brief The third vertex of the triangle.
      */
-    Vertex3D<TVertSlot> vert3;
-    /**
-     * @brief The slot used for extension.
-     */
-    TSlot slot;
+    TVertType vert3;
 };
 
 /**
- * @brief Textured triangle.
+ * @brief Textured vertex.
  */
-using Vertex3DTextured = Vertex3D<SlotTextured>;
+struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3DTextured : public Vertex3D {
+    WBE_VERT_SLOT_TEXTURED
+};
 
 /**
  * @class Triangle3DIndx
  * @brief Indexed 3D triangle.
  *
+ * @tparam TVertType The type of the vertices.
  */
-template <typename TVertSlot, typename TSlot = EmptySlot>
+template <typename TVertType, typename AllocatorType = Allocator>
 struct Triangle3DIndx {
     /**
      * @brief The vertex array.
      */
-    RefRaw<Vertex3D<TVertSlot>> vert_array;
+    RefRaw<TVertType, AllocatorType> vert_array;
     struct Indices {
         uint32_t vert_1;
         uint32_t vert_2;
@@ -111,31 +106,9 @@ struct Triangle3DIndx {
      * @brief The object ID of this triangle.
      */
     uint32_t obj_id;
-    /**
-     * @brief The slot used for extension.
-     */
-    TSlot slot;
 };
 
-/**
- * @brief Colored triangle.
- */
-using Triangle3DColored = Triangle3D<SlotColor>;
-
-/**
- * @brief Textured triangle.
- */
-using Triangle3DTextured = Triangle3D<SlotTextured>;
-
-/**
- * @brief Textured triangle.
- */
-using Triangle3DIndxTextured = Triangle3DIndx<SlotTextured>;
-
-/**
- * @brief Textured skinned triangle.
- */
-using Triangle3DTexBone = Triangle3D<SlotUVBone>;
+using Triangle3DIndxTextured = Triangle3DIndx<Vertex3DTextured>;
 }
 
 #endif

@@ -237,6 +237,159 @@ struct WBE_META(WBE_SERIALIZABLE) TestDiamondChild final : public TestDiamondLef
     std::string diamond_child_name;
 };
 
+// Test structures with required fields and different inheritance patterns
+struct WBE_META(WBE_SERIALIZABLE) TestRequiredFieldsBase : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestRequiredFieldsBase)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    int32_t required_id;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_name;
+    WBE_META(WBE_REFLECT)
+    float optional_value = 1.0f;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestRequiredFieldsChild : public TestRequiredFieldsBase {
+    WBE_DECL_SERIALIZABLE(TestRequiredFieldsChild)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_child_field;
+    WBE_META(WBE_REFLECT)
+    double optional_child_value = 2.0;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 required_vector;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceA : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestMultipleRequiredInheritanceA)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    int32_t required_a_id;
+    WBE_META(WBE_REFLECT)
+    std::string optional_a_name;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceB : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestMultipleRequiredInheritanceB)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float required_b_value;
+    WBE_META(WBE_REFLECT)
+    std::string optional_b_desc;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredChild final : public TestMultipleRequiredInheritanceA, public TestMultipleRequiredInheritanceB {
+    WBE_DECL_SERIALIZABLE(TestMultipleRequiredChild)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_child_info;
+    WBE_META(WBE_REFLECT)
+    int32_t optional_child_count = 0;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondRequiredBase : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestDiamondRequiredBase)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_diamond_base;
+    WBE_META(WBE_REFLECT)
+    int32_t optional_diamond_id = 0;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondRequiredLeft : virtual public TestDiamondRequiredBase {
+    WBE_DECL_SERIALIZABLE(TestDiamondRequiredLeft)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    double required_left_data;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondRequiredRight : virtual public TestDiamondRequiredBase {
+    WBE_DECL_SERIALIZABLE(TestDiamondRequiredRight)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec2 required_right_vector;
+};
+
+struct WBE_META(WBE_SERIALIZABLE) TestDiamondRequiredChild final : public TestDiamondRequiredLeft, public TestDiamondRequiredRight {
+    WBE_DECL_SERIALIZABLE(TestDiamondRequiredChild)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_final_field;
+    WBE_META(WBE_REFLECT)
+    bool optional_final_flag = false;
+};
+
+// Test structures with WBE_SERIALIZABLE_STATIC (static-only serialization)
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticSerializable {
+    WBE_META(WBE_REFLECT)
+    int32_t static_id;
+    WBE_META(WBE_REFLECT)
+    std::string static_name;
+    WBE_META(WBE_REFLECT)
+    float static_value;
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticWithRequired {
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_static_field;
+    WBE_META(WBE_REFLECT)
+    int32_t optional_static_number = 42;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 required_static_vector;
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticComplex {
+    WBE_META(WBE_REFLECT)
+    std::vector<int> static_numbers;
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> static_strings;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    Buffer<32> required_static_buffer;
+    WBE_META(WBE_REFLECT)
+    TestStaticSerializable nested_static;
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticEmpty {
+    // Empty static serializable for testing
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticVectorTypes {
+    WBE_META(WBE_REFLECT)
+    glm::vec2 vec2_field;
+    WBE_META(WBE_REFLECT)
+    glm::vec3 vec3_field;
+    WBE_META(WBE_REFLECT)
+    glm::vec4 vec4_field;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string required_identifier;
+};
+
+// Mixed container for testing various serialization scenarios
+struct WBE_META(WBE_SERIALIZABLE) TestMixedContainer final : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestMixedContainer)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<TestRequiredFieldsBase> required_objects;
+    WBE_META(WBE_REFLECT)
+    std::vector<TestStaticSerializable> static_objects;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    TestRequiredFieldsChild required_child;
+    WBE_META(WBE_REFLECT)
+    TestStaticComplex optional_static;
+};
+
+// Nested required fields test
+struct WBE_META(WBE_SERIALIZABLE) TestNestedRequired final : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestNestedRequired)
+
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    TestRequiredFieldsChild nested_required;
+    WBE_META(WBE_REFLECT)
+    int32_t optional_id = 0;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<TestStaticWithRequired> required_static_vector;
+};
+
 }
 
 #endif

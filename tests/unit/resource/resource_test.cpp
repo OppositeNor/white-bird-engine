@@ -12,5 +12,5 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "ru_image_test.hh"
-#include "ru_loader_ppm3_test.hh"
+#include "resource_scheme_deserialization_test.hh"
+#include "resource_utils_test.hh"

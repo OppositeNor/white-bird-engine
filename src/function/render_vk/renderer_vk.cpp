@@ -261,6 +261,7 @@ void RendererVK::init_graphics_pipeline() {
     // Initialize shaders.
     ROShaderVK::Builder shader_builder;
     RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_vert");
+    // TODO: update
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
     Ref<ROShaderVK> vertex_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
     shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_pixl");

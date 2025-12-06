@@ -1276,4 +1276,286 @@ TEST_F(WBESerializerTest, DynamicDispatchReferenceSemantics) {
     dynamic_dispatch_test_reference_semantics();
 }
 
+// Serialization tests for new required fields structures
+template <typename ParserDataType>
+inline void test_required_fields_serialization(ParserDataType p_data) {
+    WBE::TestRequiredFieldsBase base_obj;
+    base_obj.required_id = 123;
+    base_obj.required_name = "test_base";
+    base_obj.optional_value = 2.5f;
+    
+    WBE::SerializableSD<WBE::TestRequiredFieldsBase> base_sd;
+    base_sd.serialize(p_data, base_obj);
+    
+    EXPECT_TRUE(p_data.contains("required_id"));
+    EXPECT_TRUE(p_data.contains("required_name"));
+    EXPECT_TRUE(p_data.contains("optional_value"));
+    EXPECT_EQ(p_data.template get_value<int32_t>("required_id"), 123);
+    EXPECT_EQ(p_data.template get_value<std::string>("required_name"), "test_base");
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("optional_value"), 2.5f);
+}
+
+template <typename ParserDataType>
+inline void test_required_fields_child_serialization(ParserDataType p_data) {
+    WBE::TestRequiredFieldsChild child_obj;
+    child_obj.required_id = 456;
+    child_obj.required_name = "test_child";
+    child_obj.optional_value = 3.14f;
+    child_obj.required_child_field = "child_data";
+    child_obj.optional_child_value = 5.5;
+    child_obj.required_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+    
+    WBE::SerializableSD<WBE::TestRequiredFieldsChild> child_sd;
+    child_sd.serialize(p_data, child_obj);
+    
+    // Base class fields
+    EXPECT_TRUE(p_data.contains("required_id"));
+    EXPECT_TRUE(p_data.contains("required_name"));
+    EXPECT_TRUE(p_data.contains("optional_value"));
+    
+    // Child class fields
+    EXPECT_TRUE(p_data.contains("required_child_field"));
+    EXPECT_TRUE(p_data.contains("optional_child_value"));
+    EXPECT_TRUE(p_data.contains("required_vector"));
+    
+    EXPECT_EQ(p_data.template get_value<int32_t>("required_id"), 456);
+    EXPECT_EQ(p_data.template get_value<std::string>("required_name"), "test_child");
+    EXPECT_EQ(p_data.template get_value<std::string>("required_child_field"), "child_data");
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("optional_child_value"), 5.5);
+}
+
+template <typename ParserDataType>
+inline void test_multiple_required_inheritance_serialization(ParserDataType p_data) {
+    WBE::TestMultipleRequiredChild multi_obj;
+    multi_obj.required_a_id = 100;
+    multi_obj.optional_a_name = "a_name";
+    multi_obj.required_b_value = 2.71f;
+    multi_obj.optional_b_desc = "b_description";
+    multi_obj.required_child_info = "child_info";
+    multi_obj.optional_child_count = 42;
+    
+    WBE::SerializableSD<WBE::TestMultipleRequiredChild> multi_sd;
+    multi_sd.serialize(p_data, multi_obj);
+    
+    EXPECT_TRUE(p_data.contains("required_a_id"));
+    EXPECT_TRUE(p_data.contains("optional_a_name"));
+    EXPECT_TRUE(p_data.contains("required_b_value"));
+    EXPECT_TRUE(p_data.contains("optional_b_desc"));
+    EXPECT_TRUE(p_data.contains("required_child_info"));
+    EXPECT_TRUE(p_data.contains("optional_child_count"));
+    
+    EXPECT_EQ(p_data.template get_value<int32_t>("required_a_id"), 100);
+    EXPECT_EQ(p_data.template get_value<std::string>("optional_a_name"), "a_name");
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("required_b_value"), 2.71f);
+    EXPECT_EQ(p_data.template get_value<std::string>("optional_b_desc"), "b_description");
+    EXPECT_EQ(p_data.template get_value<std::string>("required_child_info"), "child_info");
+    EXPECT_EQ(p_data.template get_value<int32_t>("optional_child_count"), 42);
+}
+
+template <typename ParserDataType>
+inline void test_static_serializable_serialization(ParserDataType p_data) {
+    WBE::TestStaticSerializable static_obj;
+    static_obj.static_id = 789;
+    static_obj.static_name = "static_test";
+    static_obj.static_value = 9.87f;
+    
+    WBE::SerializableSD<WBE::TestStaticSerializable> static_sd;
+    static_sd.serialize(p_data, static_obj);
+    
+    EXPECT_TRUE(p_data.contains("static_id"));
+    EXPECT_TRUE(p_data.contains("static_name"));
+    EXPECT_TRUE(p_data.contains("static_value"));
+    
+    EXPECT_EQ(p_data.template get_value<int32_t>("static_id"), 789);
+    EXPECT_EQ(p_data.template get_value<std::string>("static_name"), "static_test");
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("static_value"), 9.87f);
+}
+
+template <typename ParserDataType>
+inline void test_static_with_required_serialization(ParserDataType p_data) {
+    WBE::TestStaticWithRequired static_req_obj;
+    static_req_obj.required_static_field = "static_required";
+    static_req_obj.optional_static_number = 100;
+    static_req_obj.required_static_vector = glm::vec3(7.0f, 8.0f, 9.0f);
+    
+    WBE::SerializableSD<WBE::TestStaticWithRequired> static_req_sd;
+    static_req_sd.serialize(p_data, static_req_obj);
+    
+    EXPECT_TRUE(p_data.contains("required_static_field"));
+    EXPECT_TRUE(p_data.contains("optional_static_number"));
+    EXPECT_TRUE(p_data.contains("required_static_vector"));
+    
+    EXPECT_EQ(p_data.template get_value<std::string>("required_static_field"), "static_required");
+    EXPECT_EQ(p_data.template get_value<int32_t>("optional_static_number"), 100);
+}
+
+template <typename ParserDataType>
+inline void test_static_complex_serialization(ParserDataType p_data) {
+    WBE::TestStaticComplex static_complex_obj;
+    static_complex_obj.static_numbers = {1, 2, 3, 4, 5};
+    static_complex_obj.static_strings = {"static1", "static2"};
+    strcpy(static_complex_obj.required_static_buffer.buffer, "static_buffer_data");
+    static_complex_obj.nested_static.static_id = 555;
+    static_complex_obj.nested_static.static_name = "nested_static";
+    static_complex_obj.nested_static.static_value = 1.23f;
+    
+    WBE::SerializableSD<WBE::TestStaticComplex> static_complex_sd;
+    static_complex_sd.serialize(p_data, static_complex_obj);
+    
+    EXPECT_TRUE(p_data.contains("static_numbers"));
+    EXPECT_TRUE(p_data.contains("static_strings"));
+    EXPECT_TRUE(p_data.contains("required_static_buffer"));
+    EXPECT_TRUE(p_data.contains("nested_static"));
+    
+    auto numbers_array = p_data.template get_value<std::vector<ParserDataType>>("static_numbers");
+    EXPECT_EQ(numbers_array.size(), 5);
+    EXPECT_EQ(numbers_array[0].template get<int>(), 1);
+    EXPECT_EQ(numbers_array[4].template get<int>(), 5);
+    
+    auto strings_array = p_data.template get_value<std::vector<ParserDataType>>("static_strings");
+    EXPECT_EQ(strings_array.size(), 2);
+    EXPECT_EQ(strings_array[0].template get<std::string>(), "static1");
+    EXPECT_EQ(strings_array[1].template get<std::string>(), "static2");
+    
+    EXPECT_EQ(p_data.template get_value<std::string>("required_static_buffer"), "static_buffer_data");
+    
+    auto nested_static = p_data.template get_value<ParserDataType>("nested_static");
+    EXPECT_TRUE(nested_static.contains("static_id"));
+    EXPECT_TRUE(nested_static.contains("static_name"));
+    EXPECT_TRUE(nested_static.contains("static_value"));
+}
+
+template <typename ParserDataType>
+inline void test_mixed_container_serialization(ParserDataType p_data) {
+    WBE::TestMixedContainer mixed_obj;
+    
+    // Add required objects
+    WBE::TestRequiredFieldsBase req_obj1;
+    req_obj1.required_id = 1;
+    req_obj1.required_name = "obj1";
+    req_obj1.optional_value = 1.1f;
+    
+    WBE::TestRequiredFieldsBase req_obj2;
+    req_obj2.required_id = 2;
+    req_obj2.required_name = "obj2";
+    req_obj2.optional_value = 1.0f; // default
+    
+    mixed_obj.required_objects = {req_obj1, req_obj2};
+    
+    // Add static objects
+    WBE::TestStaticSerializable static_obj;
+    static_obj.static_id = 10;
+    static_obj.static_name = "static1";
+    static_obj.static_value = 2.2f;
+    
+    mixed_obj.static_objects = {static_obj};
+    
+    // Set required child
+    mixed_obj.required_child.required_id = 999;
+    mixed_obj.required_child.required_name = "child_test";
+    mixed_obj.required_child.required_child_field = "child_value";
+    mixed_obj.required_child.required_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+    
+    // Set optional static
+    mixed_obj.optional_static.static_numbers = {100, 200};
+    strcpy(mixed_obj.optional_static.required_static_buffer.buffer, "mixed_buffer");
+    
+    WBE::SerializableSD<WBE::TestMixedContainer> mixed_sd;
+    mixed_sd.serialize(p_data, mixed_obj);
+    
+    EXPECT_TRUE(p_data.contains("required_objects"));
+    EXPECT_TRUE(p_data.contains("static_objects"));
+    EXPECT_TRUE(p_data.contains("required_child"));
+    EXPECT_TRUE(p_data.contains("optional_static"));
+    
+    auto req_objects_array = p_data.template get_value<std::vector<ParserDataType>>("required_objects");
+    EXPECT_EQ(req_objects_array.size(), 2);
+    auto req_obj_0 = req_objects_array[0].template get<ParserDataType>();
+    EXPECT_EQ(req_obj_0.template get_value<int32_t>("required_id"), 1);
+    EXPECT_EQ(req_obj_0.template get_value<std::string>("required_name"), "obj1");
+    
+    auto static_objects_array = p_data.template get_value<std::vector<ParserDataType>>("static_objects");
+    EXPECT_EQ(static_objects_array.size(), 1);
+    auto static_obj_0 = static_objects_array[0].template get<ParserDataType>();
+    EXPECT_EQ(static_obj_0.template get_value<int32_t>("static_id"), 10);
+    
+    auto required_child = p_data.template get_value<ParserDataType>("required_child");
+    EXPECT_EQ(required_child.template get_value<int32_t>("required_id"), 999);
+    EXPECT_EQ(required_child.template get_value<std::string>("required_name"), "child_test");
+    
+    auto optional_static = p_data.template get_value<ParserDataType>("optional_static");
+    EXPECT_TRUE(optional_static.contains("static_numbers"));
+    EXPECT_TRUE(optional_static.contains("required_static_buffer"));
+}
+
+TEST_F(WBESerializerTest, RequiredFieldsBaseSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_required_fields_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_required_fields_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, RequiredFieldsChildSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_required_fields_child_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_required_fields_child_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, MultipleRequiredInheritanceSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_multiple_required_inheritance_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_multiple_required_inheritance_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, StaticSerializableSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_static_serializable_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_static_serializable_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, StaticWithRequiredSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_static_with_required_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_static_with_required_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, StaticComplexSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_static_complex_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_static_complex_serialization(yaml_data);
+}
+
+TEST_F(WBESerializerTest, MixedContainerSerialization) {
+    WBE::ParserJSON json_parser;
+    auto json_data = json_parser.get_data();
+    test_mixed_container_serialization(json_data);
+    
+    WBE::ParserYAML yaml_parser;
+    auto yaml_data = yaml_parser.get_data();
+    test_mixed_container_serialization(yaml_data);
+}
+
 #endif

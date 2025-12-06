@@ -248,8 +248,7 @@ public:
     bool contains(const std::string& p_key) const {
         return data.contains(p_key);
     }
-
-
+  
 private:
     json data;
 };

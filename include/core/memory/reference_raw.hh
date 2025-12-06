@@ -20,7 +20,6 @@
 #include "core/allocator/stack_allocator.hh"
 #include <concepts>
 #include <cstddef>
-#include <format>
 #include <stdexcept>
 namespace WhiteBirdEngine {
 
@@ -42,20 +41,18 @@ public:
     RefRaw() = default;
     ~RefRaw() {}
     RefRaw(const RefRaw& p_other)
-        : mem_id(p_other.mem_id), num(p_other.num), allocator(p_other.allocator) {}
+        : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
     RefRaw(RefRaw&& p_other)
-        : mem_id(p_other.mem_id), num(p_other.num), allocator(p_other.allocator) {
+        : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     RefRaw& operator=(const RefRaw& p_other) {
         mem_id = p_other.mem_id;
-        num = p_other.num;
         allocator = p_other.allocator;
         return *this;
     }
     RefRaw& operator=(RefRaw&& p_other) {
         mem_id = p_other.mem_id;
-        num = p_other.num;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
         return *this;
@@ -68,7 +65,7 @@ public:
      * @param p_allocator The allocator for the memory ID.
      */
     RefRaw(MemID p_mem_id, AllocType* p_allocator)
-    : mem_id(p_mem_id), num(1), allocator(p_allocator) {}
+    : mem_id(p_mem_id), allocator(p_allocator) {}
 
     /**
      * @brief Constructor.
@@ -77,52 +74,55 @@ public:
      * @param p_mem_id The memory ID.
      */
     RefRaw(MemID p_mem_id)
-    : mem_id(MEM_NULL), num(1), allocator(nullptr) {
+    : mem_id(MEM_NULL), allocator(nullptr) {
         if (p_mem_id != MEM_NULL) {
             throw std::runtime_error("Allocator not specified.");
         }
     }
 
-    /**
-     * @brief Constructor.
-     *
-     * @param p_mem_id The memory ID.
-     * @param p_num The number of instance.
-     * @param p_allocator The allocator for the memory ID.
-     */
-    RefRaw(MemID p_mem_id, size_t p_num, AllocType* p_allocator)
-    : mem_id(p_mem_id), num(p_num), allocator(p_allocator) {
-        if (p_num == 0) {
-            throw std::runtime_error("Number of instance should be more than 0.");
-        }
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    RefRaw(const RefRaw<T1, AllocType1>& p_other)
+    : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    RefRaw(RefRaw<T1, AllocType1>&& p_other)
+    : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+        p_other.mem_id = MEM_NULL;
+    }
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    RefRaw& operator=(const RefRaw<T1, AllocType1>& p_other) {
+        mem_id = p_other.mem_id;
+        allocator = p_other.allocator;
+        return *this;
+    }
+    template <typename T1, typename AllocType1>
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    RefRaw& operator=(RefRaw<T1, AllocType1>&& p_other) {
+        mem_id = p_other.mem_id;
+        allocator = p_other.allocator;
+        p_other.mem_id = MEM_NULL;
+        return *this;
     }
 
     template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
-    RefRaw(const RefRaw<T1, AllocType1>& p_other)
-    : mem_id(p_other.mem_id), num(p_other.num), allocator(p_other.allocator) {}
-    template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
-    RefRaw(RefRaw<T1, AllocType1>&& p_other)
-    : mem_id(p_other.mem_id), num(p_other.num), allocator(p_other.allocator) {
-        p_other.mem_id = MEM_NULL;
+    requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
+    operator RefRaw<T1, AllocType1>() {
+        RefRaw<T1, AllocType1> converted(mem_id, allocator);
+        return converted;
     }
-    template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
-    RefRaw& operator=(const RefRaw<T1, AllocType1>& p_other) {
-        mem_id = p_other.mem_id;
-        num = p_other.num;
-        allocator = p_other.allocator;
-        return *this;
-    }
-    template <typename T1, typename AllocType1>
-    requires std::convertible_to<T1, T> && (!std::same_as<T1, T>)
-    RefRaw& operator=(RefRaw<T1, AllocType1>&& p_other) {
-        mem_id = p_other.mem_id;
-        num = p_other.num;
-        allocator = p_other.allocator;
-        p_other.mem_id = MEM_NULL;
-        return *this;
+
+    /**
+     * @brief Reinterpret cast this reference to T1.
+     *
+     * @tparam T1 The type to cast to.
+     * @return The casted reference.
+     */
+    template <typename T1, typename AllocType1 = AllocType>
+    RefRaw<T1, AllocType1> reint_cast() {
+        RefRaw<T1, AllocType1> result(mem_id, allocator);
+        return result;
     }
 
     /**
@@ -162,20 +162,10 @@ public:
             return;
         }
         if constexpr (std::same_as<T, StackAllocator>) {
-            if (p_ref.num == 1) {
-                pop_stack_obj<T>(*(p_ref.allocator), p_ref.mem_id);
-            }
-            else {
-                pop_stack_obj_array<T>(*(p_ref.allocator), p_ref.mem_id);
-            }
+            pop_stack_obj<T>(*(p_ref.allocator), p_ref.mem_id);
         }
         else {
-            if (p_ref.num == 1) {
-                destroy_obj<T>(*(p_ref.allocator), p_ref.mem_id);
-            }
-            else {
-                destroy_array<T>(*(p_ref.allocator), p_ref.mem_id, p_ref.num);
-            }
+            destroy_obj<T>(*(p_ref.allocator), p_ref.mem_id);
         }
         p_ref.mem_id = MEM_NULL;
     }
@@ -205,14 +195,11 @@ public:
      *
      * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
-    T* get(size_t p_index = 0) {
+    T* get() {
         if (allocator == nullptr) {
             return nullptr;
         }
-        if (p_index >= num) {
-            throw std::runtime_error(std::format("Failed to get instance at index: {}, index out of bounds.", p_index));
-        }
-        return &(static_cast<T*>(allocator->get(mem_id))[p_index]);
+        return static_cast<T*>(allocator->get(mem_id));
     }
 
     /**
@@ -220,14 +207,11 @@ public:
      *
      * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
      */
-    const T* get(size_t p_index = 0) const {
+    const T* get() const {
         if (allocator == nullptr) {
             return nullptr;
         }
-        if (p_index >= num) {
-            throw std::runtime_error(std::format("Failed to get instance at index: {}, index out of bounds.", p_index));
-        }
-        return &(static_cast<const T*>(allocator->get(mem_id))[p_index]);
+        return static_cast<const T*>(allocator->get(mem_id));
     }
 
     template <typename T1, typename AllocType1>
@@ -262,9 +246,6 @@ public:
         if (allocator == nullptr) {
             throw std::runtime_error("Cannot access elements of a RefRaw with null allocator.");
         }
-        if (p_index >= num) {
-            throw std::runtime_error(std::format("Failed to get instance at index: {}, index out of bounds.", p_index));
-        }
         return static_cast<T*>(allocator->get(mem_id))[p_index];
     }
 
@@ -272,19 +253,7 @@ public:
         if (allocator == nullptr) {
             throw std::runtime_error("Cannot access elements of a RefRaw with null allocator.");
         }
-        if (p_index >= num) {
-            throw std::runtime_error(std::format("Failed to get instance at index: {}, index out of bounds.", p_index));
-        }
         return static_cast<const T*>(allocator->get(mem_id))[p_index];
-    }
-
-    /**
-     * @brief Get the number of instances.
-     *
-     * @return The number of instances.
-     */
-    size_t get_num() const {
-        return num;
     }
 
     /**
@@ -298,7 +267,6 @@ public:
 
 private:
     MemID mem_id = MEM_NULL;
-    size_t num;
     AllocType* allocator = nullptr;
 };
 

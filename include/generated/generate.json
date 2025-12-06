@@ -4,7 +4,8 @@
         "template" : "serializables_sd.hh.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "serializables" : ".serializables"
+            "serializables" : ".serializables",
+            "static_serializables" : ".static_serializables"
         }
     },
     {
@@ -12,7 +13,8 @@
         "template" : "serializables_access.hh.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "serializables" : ".serializables"
+            "serializables" : ".serializables",
+            "static_serializables" : ".static_serializables"
         }
     },
     {

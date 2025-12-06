@@ -17,6 +17,7 @@ from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
 from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata
+import build_setup
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
@@ -55,7 +56,9 @@ class WBEMetaparser:
 
     def export(self):
         """Export"""
-        self._export_metadata()
+        if build_setup.build_target["generate-tests"]:
+            # Used for testing.
+            self._export_metadata_file()
 
     def _get_metadata(self, cpp_file_path, cache_path):
         preloaded = self._metadata.get(cpp_file_path)
@@ -94,7 +97,7 @@ class WBEMetaparser:
         sorted(result, key=lambda v: v[0], reverse=True)
         return [item[1] for item in result]
 
-    def _export_metadata(self):
+    def _export_metadata_file(self):
         result_metadata = WBEMetadata()
         sorted_metadata = self._sorted_metadata_by_dependency()
         for metadata in sorted_metadata:
@@ -194,7 +197,7 @@ class WBEMetaparser:
                         continue
                     attributes = self._get_attributes(attr.spelling)
                     if WBE_REFLECT in attributes:
-                        result.fields.append(WBEFieldMetadata(attribute=self._get_attributes(attr.spelling),
+                        result.fields.append(WBEFieldMetadata(attribute=attributes,
                                                               name=field.spelling, type=field.type.spelling))
         return result
 

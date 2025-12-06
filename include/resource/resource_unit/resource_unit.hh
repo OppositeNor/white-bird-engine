@@ -15,8 +15,10 @@
 #ifndef __WBE_RESOURCE_UNIT_HH__
 #define __WBE_RESOURCE_UNIT_HH__
 
-#include "core/allocator/stack_allocator.hh"
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_raw.hh"
+#include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable.hh"
 #include "core/surface/3d_primitive.hh"
 #include "utils/utils.hh"
 #include <bitset>
@@ -33,7 +35,164 @@ template <typename T>
 concept ResourceUnitConcept = is_resource_unit<T>;
 
 template <typename T>
-using RefRes = RefRaw<T, StackAllocator>;
+using RefRes = RefRaw<T, Allocator>;
+
+/**
+ * @class ResourceScheme
+ * @brief The scheme of a resource unit.
+ *
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
+    WBE_DECL_SERIALIZABLE(RUScheme)
+    // The id of the resource.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string id;
+    // The type of the resource.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string type;
+};
+
+/**
+ * @class RUSchemeAudio
+ * @brief The scheme of RUAudio.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeAudio final : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeAudio)
+    // Sample rate of the audio. Could be read from file.
+    WBE_META(WBE_REFLECT)
+    int32_t sample_rate = -1;
+    // The number of channels of the audio (typically 1 or 2). Could be read
+    // from file.
+    WBE_META(WBE_REFLECT)
+    uint32_t channels = 1;
+    // The bit depth per sample. Could be read from file.
+    WBE_META(WBE_REFLECT)
+    int32_t bit_depth = -1;
+    // The duration of the audio. Could be read from file.
+    WBE_META(WBE_REFLECT)
+    float duration = -1.0f;
+    // The number of frames of the audio. Could be read from file.
+    WBE_META(WBE_REFLECT)
+    int32_t frame_count = -1;
+    // Is the audio loaded in stream.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    bool is_stream;
+    // The path to the audio file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+};
+
+/**
+ * @class RUSchemeBinary
+ * @brief The scheme of RUBinary.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeBinary : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeBinary)
+    // The path to the binary file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+};
+
+/**
+ * @class RUSchemeFont
+ * @brief The scheme of RUFont.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeFont : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeFont)
+    // TODO
+};
+
+/**
+ * @class RUSchemeImage
+ * @brief The scheme of RUImage.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeImage : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeImage)
+    // The channel count of the image. Read from file if set to 0.
+    WBE_META(WBE_REFLECT)
+    uint32_t channel_count = 0;
+    // Image configurations.
+    WBE_META(WBE_REFLECT)
+    bool is_hdr = false;
+    // Flip the image horizontally.
+    WBE_META(WBE_REFLECT)
+    bool flip_h = false;
+    // Flip the image vertically.
+    WBE_META(WBE_REFLECT)
+    bool flip_v = false;
+    // The color space of the image.
+    WBE_META(WBE_REFLECT)
+    std::string color_space = "srgb";
+    // The path to the image file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+};
+
+/**
+ * @class RUSchemeText
+ * @brief The scheme of RUText.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeText : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeText)
+    // The path to the text file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+    // The encoding type. UTF8 by default.
+    WBE_META(WBE_REFLECT)
+    std::string encode_type = "utf8";
+};
+
+/**
+ * @class RUSchemeVideo
+ * @brief The scheme of RUVideo.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeVideo : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeVideo)
+    // TODO
+};
+
+/**
+ * @class RUSchemeMaterial
+ * @brief The scheme of RUMaterial.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeMaterial)
+    // TODO
+};
+
+/**
+ * @class RUSchemeSubmesh3D
+ * @brief The scheme of RUSubmesh3D.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeSubmesh3D)
+    // The material if it could be populated in place.
+    WBE_META(WBE_REFLECT)
+    RUSchemeMaterial material;
+    // A string referencing unpopulated material.
+    WBE_META(WBE_REFLECT)
+    std::string material_id = "";
+    // The vertices data.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<Vertex3DTextured> vertices_data;
+    // The indices data.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<uint32_t> indices_data;
+};
+
+/**
+ * @class RUSchemeMesh
+ * @brief The scheme of RUMesh.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeMesh)
+    // Submeshes that could be populated in place.
+    WBE_META(WBE_REFLECT)
+    std::vector<RUSchemeSubmesh3D> submeshes;
+    // Submesh ids referencing unpopulated submeshes.
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> submeshes_id;
+};
 
 /**
  * @class RUAudio
@@ -47,7 +206,10 @@ using RefRes = RefRaw<T, StackAllocator>;
  * in a stack allocator.
  */
 struct RUAudio : public ResourceUnit {
-    enum AudioConfigBit {
+    /**
+     * @brief Configurations to this resource unit.
+     */
+    enum AudioConfig {
         // Should the audio be streamed. If true, then audio data will be a stb_vorbis object.
         IS_STREAM,
         // To track the total number of bits.
@@ -67,6 +229,7 @@ struct RUAudio : public ResourceUnit {
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The data of the audio.
     RefRes<char> audio_data;
+
 };
 
 /**
@@ -81,19 +244,23 @@ struct RUAudio : public ResourceUnit {
  *
  */
 struct RUBinary : public ResourceUnit {
-    // The size of the binary data size (in bytes).
-    size_t size;
     // The binary data.
     RefRes<char> data;
+    // The size of the binary data.
+    size_t size;
 };
 
+/**
+ * @class RUFont
+ * @brief Font resource unit.
+ */
 struct RUFont : public ResourceUnit {
     // TODO
 };
 
 /**
  * @class RUImage
- * @brief Image resource unit. Contails descriptions of an image
+ * @brief Image resource unit. Contains descriptions of an image
  * resource and a MemID to the resource of the image data.
  *
  * The image data should always be pushed as data before pushing this
@@ -104,13 +271,15 @@ struct RUFont : public ResourceUnit {
  *
  */
 struct RUImage : public ResourceUnit {
-    enum ImageConfigBit {
+    /**
+     * @brief Configurations to this resource unit.
+     */
+    enum ImageConfig {
         // Is the image an HDR image (32 bit instead of 8 bit)
         IS_HDR,
         // To track the total number of bits.
         TOTAL_CONFIG_BIT
     };
-
     // The width of the image (in pixels).
     uint32_t width;
     // The height of the image (in pixels).
@@ -121,13 +290,13 @@ struct RUImage : public ResourceUnit {
     ColorSpace color_space;
     // Image configurations.
     std::bitset<TOTAL_CONFIG_BIT> config;
-    // The memory ID of the image data.
+    // The image data.
     RefRes<char> image_data;
 };
 
 /**
  * @class RUText
- * @brief Text resource unit. contains encoding type, size (in bytes, excluding
+ * @brief Text resource unit. contains encoding type, size (in bytes, including
  * the NUL terminater) and a MemID pointing to the data chunk that stores the data
  * of the string (ends with a NUL terminater).
  *
@@ -139,16 +308,24 @@ struct RUImage : public ResourceUnit {
 struct RUText : public ResourceUnit {
     // The encoding type.
     EncodeType encode_type = EncodeType::UTF8;
-    // The size of the string (in bytes)
-    size_t size;
-    // The memid of the text data.
+    // The text data.
     RefRes<char> text_data;
+    // The size of the text data, including the NUL terminator.
+    size_t size;
 };
 
+/**
+ * @class RUVideo
+ * @brief Video resource unit.
+ */
 struct RUVideo : public ResourceUnit {
     // TODO
 };
 
+/**
+ * @class RUMaterial
+ * @brief Material resource unit.
+ */
 struct RUMaterial : public ResourceUnit {
     // TODO
 };
@@ -162,28 +339,19 @@ struct RUMaterial : public ResourceUnit {
  * then release the data) It is recommended to store the image data right before the
  * text resource unit in a stack allocator.
  */
-template <typename VertSlot>
 struct RUSubmesh3D : public ResourceUnit {
-    // The type of the vertex.
-    using VertType = Vertex3D<VertSlot>;
-    // A NUL terminating string referencing the material this submes uses.
-    RefRes<char> material_key;
-    // The vertices data.
-    RefRes<VertType> vertices_data;
-    // The indices data.
-    RefRes<uint32_t> indices_data;
+    // A reference to the material.
+    RefRes<RUMaterial> material;
+    RefRes<Triangle3DIndxTextured> triangles;
 };
 
 /**
  * @class RUMesh
- * @brief 3DD mesh resource unit.
- *
+ * @brief 3D mesh resource unit.
  */
-struct RUMesh {
-    // Number of submeshes.
-    uint32_t submesh_count;
-    // NUL terminated strings of keys of submeshes.
-    RefRes<char> submesh_keys;
+struct RUMesh : public ResourceUnit {
+    // The submeshes.
+    RefRes<RefRes<RUSubmesh3D>> submeshes;
 };
 
 }

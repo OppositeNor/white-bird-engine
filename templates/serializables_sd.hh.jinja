@@ -18,7 +18,7 @@
 #define __WBE_SERIALIZABLES_SD_HH__
 
 {% for serializable in metadata.classes %}
-{% if serializable.attribute | select("in", serializables) | list | length > 0  %}
+{% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}
 #include "{{ serializable.in_header }}"
 {% endif %}
 {% endfor %}
@@ -75,7 +75,7 @@ public:
 };
 
 {% for serializable in metadata.classes %}
-{% if serializable.attribute | select("in", serializables) | list | length > 0  %}
+{% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}
 /**
  * @class SerializableSD<{{ serializable.name }}>
  * @brief Serializer/deserializer for {{ serializable.name }}.
@@ -117,7 +117,7 @@ public:
 {% endfor %}
 
 {% for serializable in metadata.classes %}
-{% if serializable.attribute | select("in", serializables) | list | length > 0  %}
+{% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}
 /**
  * @brief Serialize.
  *
@@ -151,11 +151,17 @@ void SerializableSD<{{ serializable.name }}>::deserialize(const ParserDataType& 
     {% for extended_parent in serializable.extended_parents %}
     SerializableSD<{{ extended_parent }}>::deserialize(p_data, p_serializable);
     {% endfor %}
+
     {% for field in serializable.fields %}
+    {% if "WBE_REFLECT_REQUIRED" in field.attribute %}
+    SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
+            p_data.template get_value<ParserDataType>("{{ field.name }}"), p_serializable.{{ field.name }});
+    {% else %}
     if (p_data.contains("{{ field.name }}")) {
         SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
                 p_data.template get_value<ParserDataType>("{{ field.name }}"), p_serializable.{{ field.name }});
     }
+    {% endif %}
     {% endfor %}
 }
 {% endif %}

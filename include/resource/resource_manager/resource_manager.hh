@@ -18,10 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_chunk/resource_chunk_load_file.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
 #include <stdexcept>
@@ -36,18 +33,15 @@ namespace WhiteBirdEngine {
  */
 class ResourceManager : public Singleton<ResourceManager> {
 public:
-    virtual ~ResourceManager() override {
-        singleton = nullptr;
-        resource_chunks.clear();
-        stack_allocator.clear();
-    }
 
-    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
-        : stack_allocator(p_alloc_size) {
-        singleton = this;
-        global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
-            global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
-    }
+    virtual ~ResourceManager() override;
+    /**
+     * @brief Constructor.
+     *
+     * @param p_alloc_size The total capacity of the resource manager.
+     * @param p_global_res_path The path to the global resources.
+     */
+    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path);
 
     /**
      * @brief Register a resource chunk.
@@ -75,11 +69,17 @@ public:
      * @param p_chunk The resource chunk to get resource from.
      * @param p_key The key of the resource.
      */
-    template <ResourceUnitConcept T>
-    T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_key) {
-        return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_key).get());
+    template <typename T>
+    T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_id) {
+        return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_id).get());
     }
 
+    /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_chunk_id The ID of the chunk/
+     * @return The resource chunk.
+     */
     Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
@@ -87,6 +87,12 @@ public:
         return resource_chunks[p_chunk_id];
     }
 
+    /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_chunk_id The ID of the chunk/
+     * @return The resource chunk.
+     */
     Ref<const ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
@@ -95,11 +101,22 @@ public:
     }
 
     /**
+     * @brief Get the resource chunk according to the chunk's ID.
+     *
+     * @param p_id The ID of the chunk.
+     * @return The resource chunk.
+     */
+    template <typename T>
+    T* get_resource(const std::string& p_id) const {
+        return reinterpret_cast<T*>(find_resource_chunk_containing_key(p_id)->get_resource(p_id).get());
+    }
+
+    /**
      * @brief Get a resource by its memory ID.
      *
      * @param p_memid The memory ID of the resource.
      */
-    template <ResourceUnitConcept T>
+    template <typename T>
     T* get_res_by_memid(MemID p_memid) {
         return stack_allocator.get_obj<T>(p_memid);
     }
@@ -121,6 +138,8 @@ private:
     ResourceChunkID global_res_chunk_id;
     std::vector<Ref<ResourceChunk>> resource_chunks;
     StackAllocator stack_allocator;
+
+    Ref<ResourceChunk> find_resource_chunk_containing_key(const std::string& p_key) const;
 
     inline static ResourceManager* singleton = nullptr;
 };
