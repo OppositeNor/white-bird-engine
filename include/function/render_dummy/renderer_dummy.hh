@@ -27,13 +27,13 @@ namespace WhiteBirdEngine {
 class RendererDummy final : public Renderer {
 public:
     RendererDummy(RenderAllocator* p_allocator)
-        : dummy_database(make_ref<RenderDatabase<RenderAllocator>>(p_allocator, p_allocator)) {}
+        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {}
     
     virtual ~RendererDummy() override {}
 
     virtual void tick(double p_delta) override {}
 
-    virtual Ref<RenderDatabase<RenderAllocator>> get_render_database() override {
+    virtual Ref<RenderDatabase> get_render_database() override {
         // Because of RAII, we have to return a valid database since the caller is going to assume
         // this is valid.
         return dummy_database;
@@ -47,7 +47,7 @@ public:
 
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override {}
 private:
-    Ref<RenderDatabase<RenderAllocator>> dummy_database;
+    Ref<RenderDatabase> dummy_database;
 };
 
 }

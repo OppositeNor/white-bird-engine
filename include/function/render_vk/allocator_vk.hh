@@ -15,8 +15,7 @@
 #ifndef __WBE_ALLOCATOR_VK_HH__
 #define __WBE_ALLOCATOR_VK_HH__
 
-#include "core/allocator/allocator.hh"
-#include "core/core_utils.hh"
+#include "function/render/renderer.hh"
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -26,11 +25,9 @@ namespace WhiteBirdEngine {
  * @brief Allocator for Vulkan.
  *
  */
-template <typename AllocType = HeapAllocatorDefault>
-    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
 class AllocatorVK {
+    using AllocType = RenderAllocator;
 public:
-
     ~AllocatorVK() {}
     AllocatorVK(const AllocatorVK&) = delete;
     AllocatorVK(AllocatorVK&&) = delete;
@@ -67,40 +64,6 @@ private:
     VkAllocationCallbacks allocator_callbacks{};
     AllocType* allocator;
 };
-
-template <typename AllocType>
-    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
-void* AllocatorVK<AllocType>::allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
-    if (p_size == 0) {
-        return nullptr;
-    }
-    void* result = std::bit_cast<void*>(p_this->allocator->allocate(p_size, p_alignment));
-    return result;
-}
-
-template <typename AllocType>
-    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
-void* AllocatorVK<AllocType>::reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
-    if (p_size == 0) {
-        free(p_this, p_original);
-        return nullptr;
-    }
-    size_t original_size = p_this->allocator->get_allocated_data_size(std::bit_cast<MemID>(p_original));
-    void* dest = std::bit_cast<void*>(p_this->allocator->allocate(p_size, p_alignment));
-    memcpy(dest, p_original, std::min(original_size, p_size));
-    p_this->allocator->deallocate(std::bit_cast<MemID>(p_original));
-    return dest;
-}
-
-template <typename AllocType>
-    requires (!AllocatorTrait<AllocType>::WILL_ADDR_MOVE)
-void AllocatorVK<AllocType>::free(AllocatorVK* p_this, void* p_memory) {
-    if (p_memory == nullptr) {
-        return;
-    }
-    p_this->allocator->deallocate(std::bit_cast<MemID>(p_memory));
-}
-
 }
 
 #endif

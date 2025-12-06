@@ -43,7 +43,7 @@ public:
      */
     void involke(double p_delta) {
         for (auto& task : render_tasks) {
-            task->involke(p_delta);
+            task->perform(p_delta);
         }
     }
 protected:

@@ -15,18 +15,16 @@
 #ifndef __WBE_RENDERER_HH__
 #define __WBE_RENDERER_HH__
 
-#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/input_manager/input_manager.hh"
 #include "function/render/render_database.hh"
+#include "render_defs.hh"
+#include "function/input_manager/input_manager.hh"
 #include "function/render/render_task.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
 
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
-
-using RenderAllocator = HeapAllocatorDefault;
 
 /**
  * @class Renderer
@@ -49,7 +47,7 @@ public:
     /**
      * @brief Get the instance of the render database.
      */
-    virtual Ref<RenderDatabase<RenderAllocator>> get_render_database() = 0;
+    virtual Ref<RenderDatabase> get_render_database() = 0;
 
     /**
      * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.

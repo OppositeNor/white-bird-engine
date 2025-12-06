@@ -35,7 +35,7 @@ struct BaseRenderDataVK {
     // The render allocator.
     RenderAllocator* allocator;
     // The render database.
-    RenderDatabase<RenderAllocator>* render_database;
+    RenderDatabase* render_database;
 
     // The logic device.
     VkDevice logic_device;

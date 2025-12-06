@@ -105,7 +105,7 @@ public:
         activated_pipeline = find_result->second;
     }
 
-    virtual Ref<RenderDatabase<RenderAllocator>> get_render_database() override {
+    virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
     }
 
@@ -151,8 +151,8 @@ private:
 
 
     AllocType* allocator;
-    Ref<RenderDatabase<RenderAllocator>> render_database;
-    Ref<AllocatorVK<AllocType>> allocator_vk;
+    Ref<RenderDatabase> render_database;
+    Ref<AllocatorVK> allocator_vk;
 
     // Vulkan properties
     SDL_Window* window;
