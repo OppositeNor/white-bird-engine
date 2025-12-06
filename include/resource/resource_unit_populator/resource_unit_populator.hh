@@ -21,6 +21,11 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class RUPopulator
+ * @brief The implementation of the resource unit populator.
+ * @todo Test
+ */
 class RUPopulator final : public RUPopulatorInterface {
 public:
     RUPopulator();
