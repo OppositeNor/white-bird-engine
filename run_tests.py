@@ -8,4 +8,4 @@ run_command = ['valgrind',
               '--error-exitcode=42',
               str(os.path.join(binary_dir, 'wbe_unit_test'))]
 
-subprocess.run(run_command)
+exit(subprocess.run(run_command).returncode)
