@@ -131,7 +131,7 @@ void SerializableSD<{{ serializable.name }}>::serialize(ParserDataType& p_data, 
     {% for extended_parent in serializable.extended_parents %}
     SerializableSD<{{ extended_parent }}>::serialize(p_data, p_serializable);
     {% endfor %}
-    ParserDataType result;
+    ParserDataType result{};
     {% for field in serializable.fields %}
     SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
     p_data.set_value("{{ field.name }}", result);
