@@ -87,7 +87,7 @@ jobs:
         path: |
           build/release/metadata_cache
           build/release-gcc/metadata_cache
-        key: metadata-cache-${{ hashFiles('build/release/metadata_cache/*.json') }}
+        key: metadata-cache-${{ hashFiles('build/release/metadata_cache/**') }}
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
