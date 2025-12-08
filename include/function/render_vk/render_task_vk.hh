@@ -16,17 +16,20 @@
 #define __WBE_RENDER_TASK_VK_HH__
 
 #include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "generated/label_manager.gen.hh"
+#include "global/stl_allocator.hh"
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <initializer_list>
 #include <stdexcept>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -116,6 +119,88 @@ protected:
             depend_semaphores_inst[i] = depend_semaphores[i]->get_semaphore();
         }
         return depend_semaphores_inst.data();
+    }
+
+    /**
+     * @class RecordCommandBufferGuard
+     * @brief RAII guard for recording command buffer.
+     *
+     */
+    class RecordCommandBufferGuard {
+    public:
+        /**
+         * @brief Constructor.
+         *
+         * @param p_command_buffer The command buffer to record.
+         */
+        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr)
+            : command_buffer(p_command_buffer) {
+            VkCommandBufferBeginInfo begin_info{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.flags = 0;
+            begin_info.pInheritanceInfo = p_inheritance_info;
+            if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to begin recording command buffer.");
+            }
+        }
+
+        ~RecordCommandBufferGuard() {
+            if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
+                // Destructor cannot throw an exception. 
+                wbe_console_log()->error("Failed to record command buffer.");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        VkCommandBuffer command_buffer;
+    };
+
+    /**
+     * @brief Get the timeline semaphore submit info.
+     *
+     * @return The timeline semaphore submit info.
+     */
+    VkTimelineSemaphoreSubmitInfo get_timeline_semaphore_si() {
+        VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info{};
+        timeline_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+        timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
+        timeline_semaphore_submit_info.pSignalSemaphoreValues = &render_data->current_frame;
+        timeline_semaphore_submit_info.waitSemaphoreValueCount = depend_semaphore_timeline_wait_values.size();
+        timeline_semaphore_submit_info.pWaitSemaphoreValues = get_depend_semaphore_timeline_wait_values();
+        return timeline_semaphore_submit_info;
+    }
+
+    /**
+     * @brief Submit the command buffer to the queue.
+     *
+     * @param p_command_buffer The command buffer to submit.
+     * @param p_queue The queue that the command buffer is submitting to.
+     * @param p_wait_stages The stages to wait on.
+     * @param p_signal_in_flight_fence Should this command buffer signal the in-flight fence.
+     */
+    void submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
+                               const vector<VkPipelineStageFlags>& p_wait_stages,
+                               bool p_signal_in_flight_fence) {
+        VkSubmitInfo submit_info{};
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
+        submit_info.waitSemaphoreCount = depend_semaphores.size();
+        submit_info.pWaitSemaphores = get_dependent_semaphores_instance();
+        submit_info.pWaitDstStageMask = p_wait_stages.data();
+
+        // Setup timeline semaphore submit info.
+        VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info = get_timeline_semaphore_si();
+        submit_info.pNext = &timeline_semaphore_submit_info;
+
+        submit_info.commandBufferCount = 1;
+        submit_info.pCommandBuffers = &p_command_buffer;
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = signal_semaphores;
+        if (vkQueueSubmit(p_queue, 1, &submit_info, p_signal_in_flight_fence ?
+                          render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit draw command buffer to queue.");
+        }
     }
 };
 

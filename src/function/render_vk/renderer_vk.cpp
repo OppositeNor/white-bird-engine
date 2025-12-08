@@ -33,7 +33,7 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "function/render_vk/rt_prepare_swap_chain_image_vk.hh"
+#include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
@@ -256,15 +256,13 @@ void RendererVK::setup_base_render_data() {
 }
 
 void RendererVK::init_graphics_pipeline() {
-    ResourceChunkID global_res_chunk_id = ResourceManager::get_singleton()->global_res_chunk();
-
     // Initialize shaders.
     ROShaderVK::Builder shader_builder;
-    RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_vert");
+    RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_vert");
     // TODO: update
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
     Ref<ROShaderVK> vertex_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
-    shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>(global_res_chunk_id, "main_shader_pixl");
+    shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_frag");
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
     Ref<ROShaderVK> pixel_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
 
@@ -818,7 +816,7 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
     if (p_root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
-    if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PREPARE_SWAP_CHAIN_IMAGE_VK) {
+    if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PRE_EXECUTE_PIPELINE_VK) {
         throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
     }
     vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
@@ -841,12 +839,13 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     p_pipeline_info->image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
 
     // Setup start task.
-    Ref<RTPrepareSwapChianImageFactoryVK> start_task_factory = make_ref<RTPrepareSwapChianImageFactoryVK>(allocator, &base_render_data);
+    Ref<RTPreExecutePipelineFactoryVK> start_task_factory
+        = make_ref<RTPreExecutePipelineFactoryVK>(allocator, &base_render_data, p_pipeline_info->image_available_semaphore);
     Ref<RenderTaskVK> start_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
-    start_task->task_semaphore = p_pipeline_info->image_available_semaphore;
-    p_pipeline_info->task_infos.push_back({.task_id = RT_PREPARE_SWAP_CHAIN_IMAGE_VK, .render_task = start_task});
+    start_task->task_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
+    p_pipeline_info->task_infos.push_back({.task_id = RT_PRE_EXECUTE_PIPELINE_VK, .render_task = start_task});
     std::vector<RendTaskID> dummy;
-    render_task_map.insert(std::pair(RT_PREPARE_SWAP_CHAIN_IMAGE_VK, std::pair(start_task, &dummy)));
+    render_task_map.insert(std::pair(RT_PRE_EXECUTE_PIPELINE_VK, std::pair(start_task, &dummy)));
 
     compile_render_graph(p_root_task, p_pipeline_info, render_task_map);
 

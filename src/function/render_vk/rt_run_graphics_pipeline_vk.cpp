@@ -27,8 +27,8 @@
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight)
-    : RenderTaskVK(p_render_data), signal_in_flight(p_signal_in_flight), wait_stages(p_render_data->allocator) {
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence)
+    : RenderTaskVK(p_render_data), signal_in_flight_fence(p_signal_in_flight_fence), wait_stages(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -61,46 +61,14 @@ void RTRunGraphicsPipelineVK::perform(double p_delta) {
     }
     vkResetCommandBuffer(command_buffer, 0);
     record_command_buffer();
-
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
-    submit_info.waitSemaphoreCount = depend_semaphores.size();
-    submit_info.pWaitSemaphores = get_dependent_semaphores_instance();
-    submit_info.pWaitDstStageMask = wait_stages.data();
-
-    // Setup timeline semaphore submit info.
-    VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info{};
-    timeline_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-    timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
-    timeline_semaphore_submit_info.pSignalSemaphoreValues = &render_data->current_frame;
-    timeline_semaphore_submit_info.waitSemaphoreValueCount = depend_semaphore_timeline_wait_values.size();
-    timeline_semaphore_submit_info.pWaitSemaphoreValues = get_depend_semaphore_timeline_wait_values();
-    submit_info.pNext = &timeline_semaphore_submit_info;
-
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, signal_in_flight ?
-                      render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer to queue.");
-    }
-
+    submit_command_buffer(command_buffer, render_data->graphics_queue, wait_stages, signal_in_flight_fence);
 }
 
 void RTRunGraphicsPipelineVK::record_command_buffer() {
+    RecordCommandBufferGuard record_command_buffer_guard(command_buffer);
+
     Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
     Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
-
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = 0;
-    begin_info.pInheritanceInfo = nullptr;
-    if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin recording command buffer.");
-    }
 
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -126,9 +94,7 @@ void RTRunGraphicsPipelineVK::record_command_buffer() {
     vkCmdDraw(command_buffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(command_buffer);
-    if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to end command buffer.");
-    }
 }
+
 
 }

@@ -14,3 +14,6 @@
 prohibited.
 
 - Template use in layers above function layer (including function layer) is prohibited.
+
+- Unleass you are doing testing, do not try-catch any exceptions. All exceptions in the project
+are thrown as `std::runtime_exception`, and should cause a crash on the program.
