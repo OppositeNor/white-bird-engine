@@ -30,51 +30,51 @@ struct WBE_META(WBE_SERIALIZABLE) TestSerializable final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializable)
 
     WBE_META(WBE_REFLECT)
-    int32_t  si32_test;
+    int32_t  si32_test = 0;
     WBE_META(WBE_REFLECT)
-    int64_t  si64_test;
+    int64_t  si64_test = 0;
     WBE_META(WBE_REFLECT)
-    uint32_t ui32_test;
+    uint32_t ui32_test = 0;
     WBE_META(WBE_REFLECT)
-    uint64_t ui64_test;
+    uint64_t ui64_test = 0;
     WBE_META(WBE_REFLECT)
-    float    f32_test;
+    float    f32_test = 0.0f;
     WBE_META(WBE_REFLECT)
-    double   f64_test;
+    double   f64_test = 0.0;
     WBE_META(WBE_REFLECT)
-    glm::vec3 vec3_test;
+    glm::vec3 vec3_test = glm::vec3(0.0f);
     WBE_META(WBE_REFLECT)
-    glm::vec4 vec4_test;
+    glm::vec4 vec4_test = glm::vec4(0.0f);
     WBE_META(WBE_REFLECT)
-    std::string str_test;
+    std::string str_test = "";
     WBE_META(WBE_REFLECT)
-    Buffer<16> buffer_test;
+    Buffer<16> buffer_test = {};
 };
 
 struct WBE_META(WBE_SERIALIZABLE) TestPartialStruct final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestPartialStruct)
 
     WBE_META(WBE_REFLECT)
-    int32_t  si32_test;
+    int32_t  si32_test = 0;
     WBE_META(WBE_REFLECT)
-    int64_t  si64_test;
+    int64_t  si64_test = 0;
     WBE_META(WBE_REFLECT)
-    uint32_t ui32_test;
+    uint32_t ui32_test = 0;
     WBE_META(WBE_REFLECT)
-    uint64_t ui64_test;
+    uint64_t ui64_test = 0;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) TestSerializableNesting final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializableNesting)
 
     WBE_META(WBE_REFLECT)
-    TestSerializable nested_test;
+    TestSerializable nested_test = {};
     WBE_META(WBE_REFLECT)
-    int32_t nesting_id;
+    int32_t nesting_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string name;
+    std::string name = "";
     WBE_META(WBE_REFLECT)
-    Buffer<8> small_buffer;
+    Buffer<8> small_buffer = {};
 };
 
 // A simple container struct that holds vectors to test vector serialization
@@ -82,11 +82,11 @@ struct WBE_META(WBE_SERIALIZABLE) TestVectorContainer final : public Serializabl
     WBE_DECL_SERIALIZABLE(TestVectorContainer)
 
     WBE_META(WBE_REFLECT)
-    std::vector<int> ints;
+    std::vector<int> ints = {};
     WBE_META(WBE_REFLECT)
-    std::vector<std::string> strs;
+    std::vector<std::string> strs = {};
     WBE_META(WBE_REFLECT)
-    std::vector<TestSerializable> children;
+    std::vector<TestSerializable> children = {};
 };
 
 // Depth-2 nested struct: contains a TestSerializable
@@ -94,22 +94,22 @@ struct WBE_META(WBE_SERIALIZABLE) TestDepth2 final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDepth2)
 
     WBE_META(WBE_REFLECT)
-    TestSerializable nested;
+    TestSerializable nested = {};
     WBE_META(WBE_REFLECT)
     int32_t depth2_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string depth2_name;
+    std::string depth2_name = "";
 };
 
 // Depth-3 nested struct: contains a TestDepth2
 struct WBE_META(WBE_SERIALIZABLE) TestDepth3 final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestDepth3)
     WBE_META(WBE_REFLECT)
-    TestDepth2 nested2;
+    TestDepth2 nested2 = {};
     WBE_META(WBE_REFLECT)
     int32_t depth3_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string depth3_name;
+    std::string depth3_name = "";
 };
 
 // Container for vectors of deep structs
@@ -117,9 +117,9 @@ struct WBE_META(WBE_SERIALIZABLE) TestDeepVectorContainer final : public Seriali
     WBE_DECL_SERIALIZABLE(TestDeepVectorContainer)
 
     WBE_META(WBE_REFLECT)
-    std::vector<TestDepth2> vec2;
+    std::vector<TestDepth2> vec2 = {};
     WBE_META(WBE_REFLECT)
-    std::vector<TestDepth3> vec3;
+    std::vector<TestDepth3> vec3 = {};
 };
 
 // Inheritance test structures
@@ -129,7 +129,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestInheritedBase : public Serializable {
     WBE_META(WBE_REFLECT)
     int32_t base_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string base_name;
+    std::string base_name = "";
     WBE_META(WBE_REFLECT)
     float base_value = 0.0f;
 };
@@ -140,7 +140,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestInheritedChild : public TestInheritedBase 
     WBE_META(WBE_REFLECT)
     int32_t child_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string child_name;
+    std::string child_name = "";
     WBE_META(WBE_REFLECT)
     double child_value = 0.0;
 };
@@ -152,9 +152,9 @@ struct WBE_META(WBE_SERIALIZABLE) TestInheritedGrandchild : public TestInherited
     WBE_META(WBE_REFLECT)
     int32_t grandchild_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string grandchild_name;
+    std::string grandchild_name = "";
     WBE_META(WBE_REFLECT)
-    glm::vec3 grandchild_vector;
+    glm::vec3 grandchild_vector = glm::vec3(0.0f);
 };
 
 // Inheritance with nested serializable objects
@@ -162,9 +162,9 @@ struct WBE_META(WBE_SERIALIZABLE) TestInheritedWithNested : public TestInherited
     WBE_DECL_SERIALIZABLE(TestInheritedWithNested)
 
     WBE_META(WBE_REFLECT)
-    TestSerializable nested_object;
+    TestSerializable nested_object = {};
     WBE_META(WBE_REFLECT)
-    std::vector<int> child_numbers;
+    std::vector<int> child_numbers = {};
 };
 
 // Multiple inheritance test structures
@@ -174,7 +174,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceA : public Serializable
     WBE_META(WBE_REFLECT)
     int32_t a_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string a_name;
+    std::string a_name = "";
     WBE_META(WBE_REFLECT)
     float a_value = 0.0f;
 };
@@ -184,7 +184,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceB : public Serializable
     WBE_META(WBE_REFLECT)
     int32_t b_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string b_name;
+    std::string b_name = "";
     WBE_META(WBE_REFLECT)
     double b_value = 0.0;
 };
@@ -195,9 +195,9 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleInheritanceChild final : public Te
     WBE_META(WBE_REFLECT)
     int32_t child_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string child_name;
+    std::string child_name = "";
     WBE_META(WBE_REFLECT)
-    glm::vec2 child_vector;
+    glm::vec2 child_vector = glm::vec2(0.0f);
 };
 
 // Diamond inheritance pattern test
@@ -207,7 +207,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestDiamondBase : public Serializable {
     WBE_META(WBE_REFLECT)
     int32_t diamond_base_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string diamond_base_name;
+    std::string diamond_base_name = "";
 };
 
 struct WBE_META(WBE_SERIALIZABLE) TestDiamondLeft : virtual public TestDiamondBase {
@@ -234,7 +234,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestDiamondChild final : public TestDiamondLef
     WBE_META(WBE_REFLECT)
     int32_t diamond_child_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string diamond_child_name;
+    std::string diamond_child_name = "";
 };
 
 // Test structures with required fields and different inheritance patterns
@@ -266,7 +266,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceA : public Seri
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     int32_t required_a_id;
     WBE_META(WBE_REFLECT)
-    std::string optional_a_name;
+    std::string optional_a_name = "";
 };
 
 struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceB : public Serializable {
@@ -275,7 +275,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceB : public Seri
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     float required_b_value;
     WBE_META(WBE_REFLECT)
-    std::string optional_b_desc;
+    std::string optional_b_desc = "";
 };
 
 struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredChild final : public TestMultipleRequiredInheritanceA, public TestMultipleRequiredInheritanceB {
@@ -322,11 +322,11 @@ struct WBE_META(WBE_SERIALIZABLE) TestDiamondRequiredChild final : public TestDi
 // Test structures with WBE_SERIALIZABLE_STATIC (static-only serialization)
 struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticSerializable {
     WBE_META(WBE_REFLECT)
-    int32_t static_id;
+    int32_t static_id = 0;
     WBE_META(WBE_REFLECT)
-    std::string static_name;
+    std::string static_name = "";
     WBE_META(WBE_REFLECT)
-    float static_value;
+    float static_value = 0.0f;
 };
 
 struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticWithRequired {
@@ -340,13 +340,13 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticWithRequired {
 
 struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticComplex {
     WBE_META(WBE_REFLECT)
-    std::vector<int> static_numbers;
+    std::vector<int> static_numbers = {};
     WBE_META(WBE_REFLECT)
-    std::vector<std::string> static_strings;
+    std::vector<std::string> static_strings = {};
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     Buffer<32> required_static_buffer;
     WBE_META(WBE_REFLECT)
-    TestStaticSerializable nested_static;
+    TestStaticSerializable nested_static = {};
 };
 
 struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticEmpty {
@@ -355,11 +355,11 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticEmpty {
 
 struct WBE_META(WBE_SERIALIZABLE_STATIC) TestStaticVectorTypes {
     WBE_META(WBE_REFLECT)
-    glm::vec2 vec2_field;
+    glm::vec2 vec2_field = glm::vec2(0.0f);
     WBE_META(WBE_REFLECT)
-    glm::vec3 vec3_field;
+    glm::vec3 vec3_field = glm::vec3(0.0f);
     WBE_META(WBE_REFLECT)
-    glm::vec4 vec4_field;
+    glm::vec4 vec4_field = glm::vec4(0.0f);
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string required_identifier;
 };
@@ -371,11 +371,11 @@ struct WBE_META(WBE_SERIALIZABLE) TestMixedContainer final : public Serializable
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<TestRequiredFieldsBase> required_objects;
     WBE_META(WBE_REFLECT)
-    std::vector<TestStaticSerializable> static_objects;
+    std::vector<TestStaticSerializable> static_objects = {};
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     TestRequiredFieldsChild required_child;
     WBE_META(WBE_REFLECT)
-    TestStaticComplex optional_static;
+    TestStaticComplex optional_static = {};
 };
 
 // Nested required fields test
