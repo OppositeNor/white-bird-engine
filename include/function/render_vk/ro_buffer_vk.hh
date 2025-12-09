@@ -39,7 +39,6 @@ public:
      */
     struct ExposedFields {
         size_t buffer_size;
-        size_t buffer_capacity;
     };
 
     /**
@@ -159,6 +158,7 @@ public:
     }
 
 private:
+    void* mapped_memory = nullptr;
     VkBuffer buffer;
     VkDeviceMemory buffer_memory;
     ExposedFields exposed_fields;

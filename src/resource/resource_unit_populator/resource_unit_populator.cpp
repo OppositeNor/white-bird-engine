@@ -14,12 +14,15 @@
 */
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
 #include "core/surface/3d_primitive.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <cstring>
+#include <format>
 #include <memory>
 
 namespace WhiteBirdEngine {
@@ -63,6 +66,10 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p
     resolve_material(p_res_chunk, p_scheme);
 }
 
+void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMesh& p_scheme) const {
+    // TODO
+}
+
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const {
     if (p_scheme.indices_data.size() % 3 != 0) {
         throw std::runtime_error(std::format(
@@ -91,6 +98,7 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
 
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
     resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
+    wbe_console_log()->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const {

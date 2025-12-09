@@ -16,7 +16,6 @@
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
-#include "resource/resource_utils.hh"
 
 namespace WhiteBirdEngine {
 
@@ -24,7 +23,7 @@ ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_globa
     : stack_allocator(p_alloc_size) {
     singleton = this;
     global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
-        global_allocator(), get_resource_path("res_chunks/global_resources.json"), stack_allocator));
+        global_allocator(), p_global_res_path, stack_allocator));
 }
 
 ResourceManager::~ResourceManager() {

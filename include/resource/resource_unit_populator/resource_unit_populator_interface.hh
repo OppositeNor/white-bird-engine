@@ -70,6 +70,14 @@ public:
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_scheme) const = 0;
 
     /**
+     * @brief Populate the mesh resource.
+     *
+     * @param p_res_chunk The resource chunk to insert resource data.
+     * @param p_scheme The resource scheme.
+     */
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMesh& p_scheme) const = 0;
+
+    /**
      * @brief Populate the submesh 3d resource.
      *
      * @param p_res_chunk The resource chunk to insert resource data.

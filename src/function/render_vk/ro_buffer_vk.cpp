@@ -53,7 +53,7 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
     buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     exposed_fields.buffer_size = p_builder.size;
-    exposed_fields.buffer_capacity = p_builder.size;
+    vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
 }
 
 ROBufferVK::~ROBufferVK() {
@@ -62,16 +62,14 @@ ROBufferVK::~ROBufferVK() {
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_offset, size_t p_size) {
-    if (p_offset + p_size > exposed_fields.buffer_capacity) {
+    if (p_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(
             std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
-                        p_offset, p_offset + p_size, exposed_fields.buffer_capacity));
+                        p_offset, p_offset + p_size, exposed_fields.buffer_size));
     }
-    void* mapped_memory = nullptr;
-    vkMapMemory(render_data->logic_device, buffer_memory, p_offset, p_size, 0, &mapped_memory);
+    // TODO: Prevent data race
     memcpy(mapped_memory, p_data, p_size);
     vkUnmapMemory(render_data->logic_device, buffer_memory);
-    exposed_fields.buffer_size = p_size;
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_size) {

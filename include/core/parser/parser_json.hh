@@ -283,16 +283,24 @@ public:
     }
 
     void parse(const Path& p_path) {
-        std::ifstream f;
-        f.open(static_cast<std::string>(p_path));
-        if (!f.is_open()) {
-            throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
+        try {
+            std::ifstream f;
+            f.open(static_cast<std::string>(p_path));
+            if (!f.is_open()) {
+                throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
+            }
+            data.data = json::parse(f);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to parse JSON file at path: " + static_cast<std::string>(p_path) + ". Error: " + e.what());
         }
-        data.data = json::parse(f);
     }
 
     void parse_from_buffer(const std::string& p_buffer) {
-        data.data = json::parse(p_buffer);
+        try {
+            data.data = json::parse(p_buffer);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to parse JSON from buffer. Error: " + std::string(e.what()));
+        }
     }
 
     template <typename T>

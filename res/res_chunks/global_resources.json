@@ -1,5 +1,7 @@
 {
-    "include": [],
+    "include": [
+        "assets/meshes/cube.json"
+    ],
     "resources": [
         {
             "id": "main_shader_vert",

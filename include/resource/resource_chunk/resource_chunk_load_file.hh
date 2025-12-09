@@ -19,11 +19,13 @@
 #include "core/parser/parser.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "generated/label_manager.gen.hh"
-#include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
+#include "resource/resource_utils.hh"
 #include <cstring>
+#include <format>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -36,6 +38,8 @@ WBE_LABEL(BINARY, WBE_RESOURCE_UNIT);
 WBE_LABEL(MATERIAL, WBE_RESOURCE_UNIT);
 WBE_LABEL(FONT, WBE_RESOURCE_UNIT);
 WBE_LABEL(IMAGE, WBE_RESOURCE_UNIT);
+WBE_LABEL(MESH, WBE_RESOURCE_UNIT);
+WBE_LABEL(SUBMESH, WBE_RESOURCE_UNIT);
 WBE_LABEL(TEXT, WBE_RESOURCE_UNIT);
 WBE_LABEL(VIDEO, WBE_RESOURCE_UNIT);
 using RUType = HashCode;
@@ -59,9 +63,10 @@ public:
     /**
      * @brief Constructor
      *
+     * @param p_path The resource path to the resource file.
      * @param p_parser The parser to get resource from.
      */
-    ResourceChunkLoadFile(const Path& p_path, StackAllocator& p_allocator);
+    ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator);
 
     virtual RefRes<char> get_resource(const std::string& p_id) const override {
         return resource_map.at(p_id);
@@ -126,6 +131,7 @@ private:
     std::unordered_map<void**, std::string> ref_map;
     StackAllocator* allocator;
 
+    void resolve_load_resource(std::set<std::string>& p_included_pathes, const std::string& p_res_chunk_path);
     RUType get_res_type(std::string p_type);
 
     RUPopulator populator;
@@ -142,19 +148,24 @@ private:
 };
 
 template <ParserConcept ParserType>
-template <typename RUSchemeType>
-void ResourceChunkLoadFile<ParserType>::populate_scheme(const ParserDataType& p_parser_data) {
-    RUSchemeType scheme;
-    scheme.deserialize(p_parser_data);
-    populator.populate(*this, scheme);
-}
+void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
+    if (p_included_pathes.contains(p_res_chunk_path)) {
+        throw std::runtime_error(std::format("Include recursion found: {}", p_res_chunk_path));
+    }
+    p_included_pathes.insert(p_res_chunk_path);
 
-template <ParserConcept ParserType>
-ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, StackAllocator& p_allocator) {
-    allocator = &p_allocator;
+    auto rc_file_path = get_resource_path(p_res_chunk_path);
     ParserType parser;
-    parser.parse(p_path);
-    // TODO: resolve include
+    parser.parse(rc_file_path);
+
+    if (parser.contains("include")) {
+        // Resolve includes
+        auto included_resource_chunks = parser.template get_value<std::vector<std::string>>("include");
+        for (auto& include_path : included_resource_chunks) {
+            resolve_load_resource(p_included_pathes, include_path);
+        }
+    }
+
     std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
     for (auto& res : resources) {
         auto res_type = get_res_type(res.template get_value<std::string>("type"));
@@ -171,6 +182,15 @@ ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, Sta
             case IMAGE:
                 populate_scheme<RUSchemeImage>(res);
                 break;
+            case MATERIAL:
+                populate_scheme<RUSchemeMaterial>(res);
+                break;
+            case MESH:
+                populate_scheme<RUSchemeMesh>(res);
+                break;
+            case SUBMESH:
+                populate_scheme<RUSchemeSubmesh3D>(res);
+                break;
             case TEXT:
                 populate_scheme<RUSchemeText>(res);
                 break;
@@ -179,6 +199,22 @@ ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const Path& p_path, Sta
                 break;
         }
     }
+    resolve_refs();
+}
+
+template <ParserConcept ParserType>
+template <typename RUSchemeType>
+void ResourceChunkLoadFile<ParserType>::populate_scheme(const ParserDataType& p_parser_data) {
+    RUSchemeType scheme;
+    scheme.deserialize(p_parser_data);
+    populator.populate(*this, scheme);
+}
+
+template <ParserConcept ParserType>
+ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
+    allocator = &p_allocator;
+    std::set<std::string> included_pathes;
+    resolve_load_resource(included_pathes, p_path);
     resolve_refs();
 }
 

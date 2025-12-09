@@ -148,7 +148,7 @@ void RendererVK::update_static_opaque_triangles() {
     ROBufferVK::Builder builder;
     auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
     if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
-        static_opaque_triangles_vertices.size() > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_capacity) {
+        static_opaque_triangles_vertices.size() > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
         // If size exceeds buffer capacity, create a new buffer.
         builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
         res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
@@ -680,12 +680,15 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
     auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
     if (pick_device_index >= 0) {
+        // The refered device index is provided, use the index to pick device. If failed to pick, fall back to automatic picking.
         if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
+            // Index out of range.
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). Picking"
                 " an alternative device.", pick_device_index, p_physical_devices.size()));
         }
         else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
+            // Device is not suitable.
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             string device_name(device_properties.deviceName, allocator);
@@ -694,6 +697,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
                 " Picking an alternative device.", device_name));
         }
         else {
+            // Successfully pick the device.
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             string device_name(device_properties.deviceName, allocator);
@@ -702,6 +706,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
             return;
         }
     }
+    // Pick a suitable device.
     for (auto& device : p_physical_devices) {
         if (!is_device_suitable(device)) {
             continue;
@@ -836,11 +841,12 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     // Setup image available semaphores
-    p_pipeline_info->image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
+    auto image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
+    p_pipeline_info->image_available_semaphore = image_available_semaphore;
 
     // Setup start task.
     Ref<RTPreExecutePipelineFactoryVK> start_task_factory
-        = make_ref<RTPreExecutePipelineFactoryVK>(allocator, &base_render_data, p_pipeline_info->image_available_semaphore);
+        = make_ref<RTPreExecutePipelineFactoryVK>(allocator, &base_render_data, image_available_semaphore);
     Ref<RenderTaskVK> start_task = start_task_factory->create().dynamic_cast_ref<RenderTaskVK>();
     start_task->task_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
     p_pipeline_info->task_infos.push_back({.task_id = RT_PRE_EXECUTE_PIPELINE_VK, .render_task = start_task});
