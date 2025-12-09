@@ -57,14 +57,10 @@ void RTPreExecutePipelineVK::submit_command_buffer() {
 
     VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
     VkSemaphore wait_semaphores[] = {prepare_image_semaphore->get_semaphore()};
-    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_NONE};
-    submit_info.waitSemaphoreCount = depend_semaphores.size();
+    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+    submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = wait_semaphores;
     submit_info.pWaitDstStageMask = wait_stages;
-
-    // Setup timeline semaphore submit info.
-    VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info = get_timeline_semaphore_si();
-    submit_info.pNext = &timeline_semaphore_submit_info;
 
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffer;

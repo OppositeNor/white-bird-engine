@@ -102,8 +102,9 @@ void RendererVK::tick(double p_delta) {
 
     // Aquire swap chain image.
     uint32_t image_index;
+    auto image_available_semaphore = run_pipeline[frame_counter]->image_available_semaphore->get_semaphore();
     VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX,
-                                            run_pipeline[frame_counter]->image_available_semaphore->get_semaphore(),
+                                            image_available_semaphore,
                                             VK_NULL_HANDLE, &image_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         recreate_swap_chain();
@@ -119,7 +120,8 @@ void RendererVK::tick(double p_delta) {
 
     for (auto& task_info : curr_pipeline->task_infos) {
         if (task_info.render_task == MEM_NULL) {
-            wbe_console_log(WBE_CHANNEL_RENDER)->warning(std::format("Render task {} is NULL. Skipped.", task_info.task_id));
+            wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+                std::format("Render task {} is NULL. Skipped.", LabelManager::get_singleton()->get_label_name(task_info.task_id)));
             continue;
         }
         task_info.render_task->perform(p_delta);
