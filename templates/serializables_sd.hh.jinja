@@ -49,7 +49,7 @@ public:
         std::vector<ParserDataType> result;
         result.reserve(p_serializable.size());
         for (auto& val : p_serializable) {
-            ParserDataType val_data;
+            ParserDataType val_data{};
             SerializableSD<T>::serialize(val_data, val);
             result.push_back(val_data);
         }
