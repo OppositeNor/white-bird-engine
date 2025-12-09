@@ -17,8 +17,6 @@
 
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
-#include "global/stl_allocator.hh"
-#include <functional>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -39,19 +37,10 @@ struct RTPreExecutePipelineVK final: public RenderTaskVK {
 
     virtual void init() override {
         // Reserve for 8 tasks
-        pre_execute_tasks_queue.reserve(8);
     }
     virtual void perform(double p_delta) override;
 
-    /**
-     * @brief Push a pre-execute task to the task queue.
-     */
-    void push_pre_execute_task(std::function<void(VkCommandBuffer)>&& p_task) {
-        pre_execute_tasks_queue.push_back(std::move(p_task));
-    }
-
 private:
-    vector<std::function<void(VkCommandBuffer)>> pre_execute_tasks_queue;
     Ref<SemaphoreVK> prepare_image_semaphore;
     VkCommandBuffer command_buffer;
     void record_command_buffer();

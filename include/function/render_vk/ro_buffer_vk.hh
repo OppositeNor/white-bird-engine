@@ -15,6 +15,7 @@
 #ifndef __WBE_RO_BUFFER_VK_HH__
 #define __WBE_RO_BUFFER_VK_HH__
 
+#include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
@@ -141,9 +142,11 @@ public:
     /**
      * @brief Update the buffer.
      *
-     * @param p_data The data to be updated to.
+     * @param p_data The data to copy from.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to.
+     * @param p_size The size of the data in bytes that would be copied to the buffer.
      */
-    void update_buffer(const void* p_data, size_t p_offset, size_t p_size);
+    void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
 
     /**
      * @brief Update the buffer.
@@ -152,6 +155,40 @@ public:
      * @param p_size The size of data that will be transmitted.
      */
     void update_buffer(const void* p_data, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_src_offset The offset to copy data from in p_data.
+     * @param p_dst_offset The offset to copy data to in the buffer.
+     * @param p_size The size to copy (in bytes).
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to. This has to be a multiple of 4.
+     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data);
 
     const ExposedFields& fields() const {
         return exposed_fields;

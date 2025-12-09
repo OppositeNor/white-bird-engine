@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  */
 struct BaseRenderDataVK {
     BaseRenderDataVK(RenderAllocator* p_allocator)
-        : queue_family_indices(p_allocator) {}
+        : queue_family_indices(p_allocator), pre_execute_tasks_queue(p_allocator) {}
     // The render allocator.
     RenderAllocator* allocator;
     // The render database.
@@ -71,6 +71,9 @@ struct BaseRenderDataVK {
 
     // The queue family indices.
     set<uint32_t> queue_family_indices;
+
+    // Task to execute in the pre-execution task.
+    vector<std::function<void(VkCommandBuffer)>> pre_execute_tasks_queue;
 
     // A function that finds a suitable memory type for a certain memory property.
     std::function<uint32_t(uint32_t, VkMemoryPropertyFlags)> find_memory_type;

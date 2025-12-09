@@ -15,6 +15,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <cstring>
@@ -74,6 +75,41 @@ void ROBufferVK::update_buffer(const void* p_data, size_t p_offset, size_t p_siz
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_size) {
     update_buffer(p_data, 0, p_size);
+}
+
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
+    if (p_dst_offset + p_size > exposed_fields.buffer_size) {
+        throw std::runtime_error(
+            std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
+                        p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
+    }
+    if (p_src_offset + p_size > p_data->exposed_fields.buffer_size) {
+        throw std::runtime_error(
+            std::format("Failed to update buffer: trying to read a region ({} to {}) from a buffer with capacity {}.",
+                        p_src_offset, p_src_offset + p_size, p_data->exposed_fields.buffer_size));
+    }
+    VkBufferCopy copy_region{};
+    copy_region.srcOffset = p_src_offset;
+    copy_region.dstOffset = p_dst_offset;
+    copy_region.size = p_size;
+    // Register a pre-execute task to copy the buffer.
+    RendererVK::get_singleton()->add_pre_execute_task(
+        [src_buffer = p_data->get_buffer(), dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
+            vkCmdCopyBuffer(p_command_buffer, src_buffer, dst_buffer, 1, &copy_region);
+        }
+    );
+}
+
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_offset, size_t p_size) {
+    update_buffer(p_data, 0, p_offset, p_size);
+}
+
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_size) {
+    update_buffer(p_data, 0, 0, p_size);
+}
+
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
+    update_buffer(p_data, 0, 0, p_data->exposed_fields.buffer_size);
 }
 
 }

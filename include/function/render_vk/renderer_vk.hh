@@ -131,6 +131,24 @@ public:
         return &base_render_data;
     }
 
+    /**
+     * @brief Add a pre-execute task to the pre-execute task queue.
+     *
+     * @param p_task The task to be added.
+     */
+    void add_pre_execute_task(const std::function<void(VkCommandBuffer)>& p_task) {
+        base_render_data.pre_execute_tasks_queue.push_back(p_task);
+    }
+
+    /**
+     * @brief Add a pre-execute task to the pre-execute task queue.
+     *
+     * @param p_task The task to be added.
+     */
+    void add_pre_execute_task(std::function<void(VkCommandBuffer)>&& p_task) {
+        base_render_data.pre_execute_tasks_queue.push_back(std::move(p_task));
+    }
+
 private:
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 

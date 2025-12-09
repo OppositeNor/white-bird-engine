@@ -76,6 +76,9 @@ RendererVK::~RendererVK() {
 
 void RendererVK::tick(double p_delta) {
     WBE_DEBUG_ASSERT(!(this_ref.is_null()));
+    // Clear pre-execute tasks queue.
+    base_render_data.pre_execute_tasks_queue.clear();
+
     // Run some jobs stored in the job buffer.
     for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
         Ref<JobRender> job = job_buffer->retrieve_job();

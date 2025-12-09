@@ -19,7 +19,7 @@
 namespace WhiteBirdEngine {
 
 RTPreExecutePipelineVK::RTPreExecutePipelineVK(const BaseRenderDataVK* p_render_data, Ref<SemaphoreVK> p_prepare_image_semaphore)
-: RenderTaskVK(p_render_data), pre_execute_tasks_queue(p_render_data->allocator), prepare_image_semaphore(p_prepare_image_semaphore) {
+: RenderTaskVK(p_render_data), prepare_image_semaphore(p_prepare_image_semaphore) {
     WBE_DEBUG_ASSERT(p_prepare_image_semaphore != MEM_NULL);
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -46,10 +46,9 @@ void RTPreExecutePipelineVK::perform(double p_delta) {
 void RTPreExecutePipelineVK::record_command_buffer() {
     RecordCommandBufferGuard record_command_buffer_guard(command_buffer);
     // Execute the pre-execution tasks
-    for (auto& task : pre_execute_tasks_queue) {
+    for (auto& task : render_data->pre_execute_tasks_queue) {
         task(command_buffer);
     }
-    pre_execute_tasks_queue.clear();
 }
 
 void RTPreExecutePipelineVK::submit_command_buffer() {
