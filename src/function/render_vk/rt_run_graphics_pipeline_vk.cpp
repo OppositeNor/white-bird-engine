@@ -95,6 +95,4 @@ void RTRunGraphicsPipelineVK::record_command_buffer() {
 
     vkCmdEndRenderPass(command_buffer);
 }
-
-
 }

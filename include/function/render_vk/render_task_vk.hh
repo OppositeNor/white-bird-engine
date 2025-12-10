@@ -95,9 +95,12 @@ protected:
     struct MemoryBarrierBuilder {
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        // The source stage.
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
-        // TODO: add barrier stage.
+        // The destination stage.
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
         /**
          * @brief Set the source access.
@@ -107,6 +110,19 @@ protected:
          */
         MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask) {
             src_access_mask = p_src_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @param p_src_stage The source pipeline stage.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+            src_access_mask = p_src_access_mask;
+            src_stage_mask = p_src_stage_mask;
             return *this;
         }
 
@@ -122,6 +138,19 @@ protected:
         }
 
         /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @param p_dst_stage_mask The destination pipeline stage.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+            dst_access_mask = p_dst_access_mask;
+            dst_stage_mask = p_dst_stage_mask;
+            return *this;
+        }
+
+        /**
          * @brief Set access.
          *
          * @param p_src_access_mask The source access bit mask.
@@ -131,6 +160,24 @@ protected:
         MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set access.
+         *
+         * @param p_src_access_mask The source access bit mask.
+         * @param p_src_stage_mask The source pipeline stage.
+         * @param p_dst_access_mask The destination access bit mask.
+         * @param p_dst_stage_mask The destination pipeline stage.
+         * @return 
+         */
+        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask,
+                                         VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+            src_access_mask = p_src_access_mask;
+            src_stage_mask = p_src_stage_mask;
+            dst_access_mask = p_dst_access_mask;
+            dst_stage_mask = p_dst_stage_mask;
             return *this;
         }
 
@@ -149,9 +196,13 @@ protected:
      */
     struct BufferMemoryBarrierBuilder {
         // The source access.
-        VkAccessFlags src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        VkAccessFlags2 src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        // The source stage.
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The destination access.
-        VkAccessFlags dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+        VkAccessFlags2 dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+        // The destination stage.
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
         // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
         uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
@@ -178,6 +229,19 @@ protected:
         }
 
         /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @param p_src_stage The source pipeline stage.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+            src_access_mask = p_src_access_mask;
+            src_stage_mask = p_src_stage_mask;
+            return *this;
+        }
+
+        /**
          * @brief Set the destination access.
          *
          * @param p_dst_access_mask The access bit mask.
@@ -189,11 +253,24 @@ protected:
         }
 
         /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @param p_dst_stage_mask The destination pipeline stage.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+            dst_access_mask = p_dst_access_mask;
+            dst_stage_mask = p_dst_stage_mask;
+            return *this;
+        }
+
+        /**
          * @brief Set access.
          *
          * @param p_src_access_mask The source access bit mask.
          * @param p_dst_access_mask The destination access bit mask.
-         * @return *this.
+         * @return 
          */
         BufferMemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;

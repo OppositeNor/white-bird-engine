@@ -54,7 +54,9 @@ VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
     VkMemoryBarrier2 result{};
     result.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     result.srcAccessMask = src_access_mask;
+    result.srcStageMask = src_stage_mask;
     result.dstAccessMask = dst_access_mask;
+    result.dstStageMask = dst_stage_mask;
     return result;
 }
 
@@ -90,7 +92,7 @@ const vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_subm
     WBE_DEBUG_ASSERT(p_wait_stages.size() == depend_semaphores_submit_infos.size());
     size_t n = depend_semaphores_submit_infos.size();
     for (size_t i = 0; i < n; ++i) {
-        depend_semaphores_submit_infos[i] = depend_semaphores[i]->get_submit_info(p_wait_stages[i]);
+        depend_semaphores_submit_infos[i] = depend_semaphores[i]->get_submit_info(p_wait_stages[i], render_data->current_frame);
     }
     return depend_semaphores_submit_infos;
 }
@@ -99,7 +101,7 @@ void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQue
                                          const vector<VkPipelineStageFlags2>& p_wait_stages,
                                          VkPipelineStageFlags2 p_signal_stage,
                                          bool p_signal_in_flight_fence) {
-    VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage);
+    VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage, render_data->current_frame);
     auto& wait_semaphores = get_dependent_semaphores_submit_infos(p_wait_stages);
     VkCommandBufferSubmitInfo command_buffer_submit_info{};
     command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
