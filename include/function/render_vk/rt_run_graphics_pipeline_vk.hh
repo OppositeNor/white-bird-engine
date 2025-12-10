@@ -44,7 +44,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 private:
     VkCommandBuffer command_buffer;
     bool signal_in_flight_fence = false;
-    vector<VkPipelineStageFlags> wait_stages;
+    vector<VkPipelineStageFlags2> wait_stages;
     void record_command_buffer();
 };
 

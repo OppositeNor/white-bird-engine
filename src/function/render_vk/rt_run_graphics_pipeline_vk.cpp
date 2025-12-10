@@ -46,7 +46,7 @@ RTRunGraphicsPipelineVK::~RTRunGraphicsPipelineVK() {
 void RTRunGraphicsPipelineVK::init() {
     wait_stages.reserve(depend_semaphores.size());
     for (size_t i = 0; i < depend_semaphores.size(); ++i) {
-        wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        wait_stages.push_back(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
     }
 }
 
@@ -61,7 +61,7 @@ void RTRunGraphicsPipelineVK::perform(double p_delta) {
     }
     vkResetCommandBuffer(command_buffer, 0);
     record_command_buffer();
-    submit_command_buffer(command_buffer, render_data->graphics_queue, wait_stages, signal_in_flight_fence);
+    submit_command_buffer(command_buffer, render_data->graphics_queue, wait_stages, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, signal_in_flight_fence);
 }
 
 void RTRunGraphicsPipelineVK::record_command_buffer() {

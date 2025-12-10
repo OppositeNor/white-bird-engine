@@ -52,21 +52,22 @@ void RTPreExecutePipelineVK::record_command_buffer() {
 }
 
 void RTPreExecutePipelineVK::submit_command_buffer() {
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSubmitInfo2 submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
 
-    VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
-    VkSemaphore wait_semaphores[] = {prepare_image_semaphore->get_semaphore()};
-    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = wait_semaphores;
-    submit_info.pWaitDstStageMask = wait_stages;
+    VkSemaphoreSubmitInfo wait_submit_info = prepare_image_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    VkSemaphoreSubmitInfo signal_submit_info = task_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    VkCommandBufferSubmitInfo command_buffer_submit_info{};
+    command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command_buffer_submit_info.commandBuffer = command_buffer;
 
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(render_data->graphics_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
+    submit_info.commandBufferInfoCount = 1;
+    submit_info.pCommandBufferInfos = &command_buffer_submit_info;
+    submit_info.waitSemaphoreInfoCount = 1;
+    submit_info.pWaitSemaphoreInfos = &wait_submit_info;
+    submit_info.signalSemaphoreInfoCount = 1;
+    submit_info.pSignalSemaphoreInfos = &signal_submit_info;
+    if (vkQueueSubmit2(render_data->graphics_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 }

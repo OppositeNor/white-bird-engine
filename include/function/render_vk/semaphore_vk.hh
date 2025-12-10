@@ -16,6 +16,7 @@
 #define __WBE_SEMAPHORE_VK_HH__
 
 #include "function/render_vk/render_vk_utils.hh"
+#include <cstdint>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -63,6 +64,22 @@ public:
      */
     VkSemaphore get_semaphore() const {
         return semaphore;
+    }
+
+    /**
+     * @brief Get the semaphore's submit info.
+     *
+     * @param p_pipeline_stage The stage that the semaphore is applied on.
+     * @param p_value The value to wait/signal if this semaphore is a timeline semaphore. If not, this value is ignored.
+     * @return The semaphore's create info.
+     */
+    VkSemaphoreSubmitInfo get_submit_info(VkPipelineStageFlags2 p_pipeline_stage, uint64_t p_value = 0) const {
+        VkSemaphoreSubmitInfo submit_info{};
+        submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        submit_info.semaphore = semaphore;
+        submit_info.stageMask = p_pipeline_stage;
+        submit_info.value = p_value;
+        return submit_info;
     }
 
 private:

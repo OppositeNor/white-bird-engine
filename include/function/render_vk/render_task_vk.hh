@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
 struct RenderTaskVK : public RenderTask {
     RenderTaskVK(const BaseRenderDataVK* p_render_data, bool p_use_binary_semaphore = false)
         : req_rend_res(p_render_data->allocator), depend_semaphores(p_render_data->allocator),
-        depend_semaphores_inst(p_render_data->allocator), depend_semaphore_timeline_wait_values(p_render_data->allocator),
+        depend_semaphores_submit_infos(p_render_data->allocator),
         render_data(p_render_data) {}
     virtual ~RenderTaskVK() {}
 
@@ -47,8 +47,7 @@ struct RenderTaskVK : public RenderTask {
     void setup() {
         WBE_DEBUG_ASSERT(task_semaphore != MEM_NULL);
         // update semaphore_timeline_wait_values size
-        depend_semaphore_timeline_wait_values.resize(depend_semaphores.size());
-        depend_semaphores_inst.resize(depend_semaphores.size());
+        depend_semaphores_submit_infos.resize(depend_semaphores.size(), VkSemaphoreSubmitInfo{});
         init();
     }
 
@@ -60,8 +59,7 @@ struct RenderTaskVK : public RenderTask {
      * @brief The semaphores this task depends on. This will be filled with unique semaphores of the dependent tasks.
      */
     vector<Ref<SemaphoreVK>> depend_semaphores;
-    vector<VkSemaphore> depend_semaphores_inst;
-    vector<uint64_t> depend_semaphore_timeline_wait_values;
+    vector<VkSemaphoreSubmitInfo> depend_semaphores_submit_infos;
 
     /**
      * @brief The depth of node of this task in the render graph.
@@ -97,9 +95,10 @@ protected:
      */
     struct MemoryBarrierBuilder {
         // The source access.
-        VkAccessFlags src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        VkAccessFlags2 src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
         // The destination access.
-        VkAccessFlags dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+        VkAccessFlags2 dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+        // TODO: add barrier stage.
 
         /**
          * @brief Set the source access.
@@ -141,7 +140,7 @@ protected:
          *
          * @return The barrier instance.
          */
-        VkMemoryBarrier build() const;
+        VkMemoryBarrier2 build() const;
     };
 
     /**
@@ -268,25 +267,11 @@ protected:
     void check_req_res(std::initializer_list<RendResTID> p_expected_req_res);
 
     /**
-     * @brief Get the dependent semaphore timeline semaphores' wait values.
-     *
-     * @return The dependent semaphores wait values.
-     */
-    const uint64_t* get_depend_semaphore_timeline_wait_values();
-
-    /**
      * @brief Get the dependent semaphores vulkan semaphore instances.
      *
      * @return The dependent semaphores vulkan semaphore instances.
      */
-    const VkSemaphore* get_dependent_semaphores_instance();
-
-    /**
-     * @brief Get the timeline semaphore submit info.
-     *
-     * @return The timeline semaphore submit info.
-     */
-    VkTimelineSemaphoreSubmitInfo get_timeline_semaphore_si();
+    const vector<VkSemaphoreSubmitInfo>& get_dependent_semaphores_submit_infos(const vector<VkPipelineStageFlags2>& p_wait_stages);
 
     /**
      * @brief Submit the command buffer to the queue.
@@ -297,7 +282,8 @@ protected:
      * @param p_signal_in_flight_fence Should this command buffer signal the in-flight fence.
      */
     void submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                               const vector<VkPipelineStageFlags>& p_wait_stages,
+                               const vector<VkPipelineStageFlags2>& p_wait_stages,
+                               VkPipelineStageFlags2 p_signal_stage,
                                bool p_signal_in_flight_fence);
 
 };

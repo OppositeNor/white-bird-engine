@@ -636,6 +636,11 @@ void RendererVK::create_logical_device() {
     semaphore_features.timelineSemaphore = VK_TRUE;
     create_info.pNext = &semaphore_features;
 
+    VkPhysicalDeviceSynchronization2Features sync2_features{};
+    sync2_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    sync2_features.synchronization2 = VK_TRUE;
+    semaphore_features.pNext = &sync2_features;
+
     // Create logical device.
     if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device.");

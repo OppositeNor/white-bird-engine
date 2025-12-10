@@ -69,7 +69,7 @@ public:
     /**
      * @brief The version of Vulkan will be used for the renderer.
      */
-    static constexpr uint32_t VULKAN_API_VERSION = VK_API_VERSION_1_2;
+    static constexpr uint32_t VULKAN_API_VERSION = VK_API_VERSION_1_3;
 
     /**
      * @brief The number of jobs that would be runned per frame.

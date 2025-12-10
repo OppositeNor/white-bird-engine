@@ -23,7 +23,6 @@
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
-#include <cstdint>
 #include <format>
 #include <initializer_list>
 #include <stdexcept>
@@ -51,8 +50,8 @@ RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
     }
 }
 
-VkMemoryBarrier RenderTaskVK::MemoryBarrierBuilder::build() const {
-    VkMemoryBarrier result{};
+VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
+    VkMemoryBarrier2 result{};
     result.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     result.srcAccessMask = src_access_mask;
     result.dstAccessMask = dst_access_mask;
@@ -86,53 +85,36 @@ void RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_re
     }
 }
 
-const uint64_t* RenderTaskVK::get_depend_semaphore_timeline_wait_values() {
-    size_t n = depend_semaphore_timeline_wait_values.size();
+const vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const vector<VkPipelineStageFlags2>& p_wait_stages) {
+    WBE_DEBUG_ASSERT(depend_semaphores.size() == depend_semaphores_submit_infos.size());
+    WBE_DEBUG_ASSERT(p_wait_stages.size() == depend_semaphores_submit_infos.size());
+    size_t n = depend_semaphores_submit_infos.size();
     for (size_t i = 0; i < n; ++i) {
-        depend_semaphore_timeline_wait_values[i] = render_data->current_frame;
+        depend_semaphores_submit_infos[i] = depend_semaphores[i]->get_submit_info(p_wait_stages[i]);
     }
-    return depend_semaphore_timeline_wait_values.data();
-}
-
-const VkSemaphore* RenderTaskVK::get_dependent_semaphores_instance() {
-    size_t n = depend_semaphores_inst.size();
-    for (size_t i = 0; i < n; ++i) {
-        depend_semaphores_inst[i] = depend_semaphores[i]->get_semaphore();
-    }
-    return depend_semaphores_inst.data();
-}
-
-VkTimelineSemaphoreSubmitInfo RenderTaskVK::get_timeline_semaphore_si() {
-    VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info{};
-    timeline_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-    timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
-    timeline_semaphore_submit_info.pSignalSemaphoreValues = &render_data->current_frame;
-    timeline_semaphore_submit_info.waitSemaphoreValueCount = depend_semaphore_timeline_wait_values.size();
-    timeline_semaphore_submit_info.pWaitSemaphoreValues = get_depend_semaphore_timeline_wait_values();
-    return timeline_semaphore_submit_info;
+    return depend_semaphores_submit_infos;
 }
 
 void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                                         const vector<VkPipelineStageFlags>& p_wait_stages,
+                                         const vector<VkPipelineStageFlags2>& p_wait_stages,
+                                         VkPipelineStageFlags2 p_signal_stage,
                                          bool p_signal_in_flight_fence) {
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage);
+    auto& wait_semaphores = get_dependent_semaphores_submit_infos(p_wait_stages);
+    VkCommandBufferSubmitInfo command_buffer_submit_info{};
+    command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command_buffer_submit_info.commandBuffer = p_command_buffer;
 
-    VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
-    submit_info.waitSemaphoreCount = depend_semaphores.size();
-    submit_info.pWaitSemaphores = get_dependent_semaphores_instance();
-    submit_info.pWaitDstStageMask = p_wait_stages.data();
-
-    // Setup timeline semaphore submit info.
-    VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info = get_timeline_semaphore_si();
-    submit_info.pNext = &timeline_semaphore_submit_info;
-
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &p_command_buffer;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = signal_semaphores;
-    if (vkQueueSubmit(p_queue, 1, &submit_info, p_signal_in_flight_fence ?
-                      render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
+    VkSubmitInfo2 submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit_info.commandBufferInfoCount = 1;
+    submit_info.pCommandBufferInfos = &command_buffer_submit_info;
+    submit_info.waitSemaphoreInfoCount = wait_semaphores.size();
+    submit_info.pWaitSemaphoreInfos = wait_semaphores.data();
+    submit_info.signalSemaphoreInfoCount = 1;
+    submit_info.pSignalSemaphoreInfos = &signal_semaphore_submit_info;
+    if (vkQueueSubmit2(p_queue, 1, &submit_info, p_signal_in_flight_fence ?
+                       render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
 }
