@@ -46,7 +46,6 @@ struct RenderTaskVK : public RenderTask {
      */
     void setup() {
         WBE_DEBUG_ASSERT(task_semaphore != MEM_NULL);
-        // update semaphore_timeline_wait_values size
         depend_semaphores_submit_infos.resize(depend_semaphores.size(), VkSemaphoreSubmitInfo{});
         init();
     }
