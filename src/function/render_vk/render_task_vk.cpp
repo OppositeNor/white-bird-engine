@@ -52,7 +52,7 @@ RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
 
 VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
     VkMemoryBarrier2 result{};
-    result.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    result.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
     result.srcAccessMask = src_access_mask;
     result.srcStageMask = src_stage_mask;
     result.dstAccessMask = dst_access_mask;
@@ -60,11 +60,13 @@ VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
     return result;
 }
 
-VkBufferMemoryBarrier RenderTaskVK::BufferMemoryBarrierBuilder::build() const {
-    VkBufferMemoryBarrier result{};
-    result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+VkBufferMemoryBarrier2 RenderTaskVK::BufferMemoryBarrierBuilder::build() const {
+    VkBufferMemoryBarrier2 result{};
+    result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
     result.srcAccessMask = src_access_mask;
+    result.srcStageMask = src_stage_mask;
     result.dstAccessMask = dst_access_mask;
+    result.dstStageMask = dst_stage_mask;
     result.srcQueueFamilyIndex = src_queue_family_index;
     result.dstQueueFamilyIndex = dst_queue_family_index;
     result.buffer = WBE_REQUIRED(buffer).get_buffer();

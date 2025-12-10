@@ -329,7 +329,7 @@ protected:
          *
          * @return The barrier instance.
          */
-        VkBufferMemoryBarrier build() const;
+        VkBufferMemoryBarrier2 build() const;
     };
 
     // TODO: Image barrier
