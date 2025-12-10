@@ -16,19 +16,15 @@
 #define __WBE_RENDER_TASK_VK_HH__
 
 #include "core/allocator/allocator.hh"
-#include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "generated/label_manager.gen.hh"
 #include "global/stl_allocator.hh"
-#include <cstddef>
 #include <cstdint>
-#include <format>
 #include <initializer_list>
-#include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -75,52 +71,6 @@ struct RenderTaskVK : public RenderTask {
     Ref<SemaphoreVK> task_semaphore;
 
 protected:
-    const BaseRenderDataVK* render_data;
-    /**
-     * @brief Check if the types of required resources matches the resources in req_rend_res.
-     *
-     * @param p_expected_req_res The expected resources types.
-     */
-    void check_req_res(std::initializer_list<RendResTID> p_expected_req_res) {
-        if (req_rend_res.size() != p_expected_req_res.size()) {
-            throw std::runtime_error(std::format(
-                "Number of required resources doesn't match: expected: {}, actual: {}.", p_expected_req_res.size(), req_rend_res.size()));
-        }
-        for (size_t i = 0; i < p_expected_req_res.size(); ++i) {
-            if (req_rend_res[i] == MEM_NULL) {
-                throw std::runtime_error(std::format(
-                    "Render task's required resource type mismatch: expected: {}, actual: NULL.",
-                    LabelManager::get_singleton()->get_label_name(*(p_expected_req_res.begin() + i))));
-            }
-        }
-    }
-
-    /**
-     * @brief Get the dependent semaphore timeline semaphores' wait values.
-     *
-     * @return The dependent semaphores wait values.
-     */
-    const uint64_t* get_depend_semaphore_timeline_wait_values() {
-        size_t n = depend_semaphore_timeline_wait_values.size();
-        for (size_t i = 0; i < n; ++i) {
-            depend_semaphore_timeline_wait_values[i] = render_data->current_frame;
-        }
-        return depend_semaphore_timeline_wait_values.data();
-    }
-
-    /**
-     * @brief Get the dependent semaphores vulkan semaphore instances.
-     *
-     * @return The dependent semaphores vulkan semaphore instances.
-     */
-    const VkSemaphore* get_dependent_semaphores_instance() {
-        size_t n = depend_semaphores_inst.size();
-        for (size_t i = 0; i < n; ++i) {
-            depend_semaphores_inst[i] = depend_semaphores[i]->get_semaphore();
-        }
-        return depend_semaphores_inst.data();
-    }
-
     /**
      * @class RecordCommandBufferGuard
      * @brief RAII guard for recording command buffer.
@@ -133,42 +83,210 @@ protected:
          *
          * @param p_command_buffer The command buffer to record.
          */
-        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr)
-            : command_buffer(p_command_buffer) {
-            VkCommandBufferBeginInfo begin_info{};
-            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            begin_info.flags = 0;
-            begin_info.pInheritanceInfo = p_inheritance_info;
-            if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to begin recording command buffer.");
-            }
-        }
+        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
 
-        ~RecordCommandBufferGuard() {
-            if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
-                // Destructor cannot throw an exception. 
-                wbe_console_log()->error("Failed to record command buffer.");
-                exit(EXIT_FAILURE);
-            }
-        }
+        ~RecordCommandBufferGuard();
 
         VkCommandBuffer command_buffer;
     };
+
+    /**
+     * @class MemoryBarrierBuilder
+     * @brief Builder for memory barriers.
+     *
+     */
+    struct MemoryBarrierBuilder {
+        // The source access.
+        VkAccessFlags src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        // The destination access.
+        VkAccessFlags dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+
+        /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask) {
+            src_access_mask = p_src_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask) {
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set access.
+         *
+         * @param p_src_access_mask The source access bit mask.
+         * @param p_dst_access_mask The destination access bit mask.
+         * @return 
+         */
+        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+            src_access_mask = p_src_access_mask;
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Build the barrier.
+         *
+         * @return The barrier instance.
+         */
+        VkMemoryBarrier build() const;
+    };
+
+    /**
+     * @class BufferMemoryBarrierBuilder
+     * @brief Builder for buffer memory barriers.
+     *
+     */
+    struct BufferMemoryBarrierBuilder {
+        // The source access.
+        VkAccessFlags src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
+        // The destination access.
+        VkAccessFlags dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
+        // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
+        // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+        // The destination queue family to tranfer ownership. If all the ownerships in ROBufferVK is
+        // set in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+        // The buffer to set barrier on.
+        Ref<ROBufferVK> buffer;
+        // The offset of the data to apply barrier on in the buffer.
+        VkDeviceSize offset = 0;
+        // The size of the data to apply barrier on in the buffer. If set to 0, the barrier is 
+        // going to be applied from offset to the end of barrier.
+        VkDeviceSize size = 0;
+
+        /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask) {
+            src_access_mask = p_src_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask) {
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set access.
+         *
+         * @param p_src_access_mask The source access bit mask.
+         * @param p_dst_access_mask The destination access bit mask.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+            src_access_mask = p_src_access_mask;
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the buffer to apply the barrier on.
+         *
+         * @param p_buffer The buffer to apply the barrier on.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_buffer(Ref<ROBufferVK> p_buffer) {
+            buffer = p_buffer;
+            return *this;
+        }
+
+        /**
+         * @brief Set the offset of the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_offset The offset.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_offset(VkDeviceSize p_offset) {
+            offset = p_offset;
+            return *this;
+        }
+
+        /**
+         * @brief Set the size of the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_size(VkDeviceSize p_size) {
+            size = p_size;
+            return *this;
+        }
+
+        /**
+         * @brief Set the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_offset The offset.
+         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @return *this.
+         */
+        BufferMemoryBarrierBuilder& set_data_region(VkDeviceSize p_offset, VkDeviceSize p_size) {
+            offset = p_offset;
+            size = p_size;
+            return *this;
+        }
+
+        /**
+         * @brief Build the barrier.
+         *
+         * @return The barrier instance.
+         */
+        VkBufferMemoryBarrier build() const;
+    };
+
+    // TODO: Image barrier
+
+    const BaseRenderDataVK* render_data;
+    /**
+     * @brief Check if the types of required resources matches the resources in req_rend_res.
+     *
+     * @param p_expected_req_res The expected resources types.
+     */
+    void check_req_res(std::initializer_list<RendResTID> p_expected_req_res);
+
+    /**
+     * @brief Get the dependent semaphore timeline semaphores' wait values.
+     *
+     * @return The dependent semaphores wait values.
+     */
+    const uint64_t* get_depend_semaphore_timeline_wait_values();
+
+    /**
+     * @brief Get the dependent semaphores vulkan semaphore instances.
+     *
+     * @return The dependent semaphores vulkan semaphore instances.
+     */
+    const VkSemaphore* get_dependent_semaphores_instance();
 
     /**
      * @brief Get the timeline semaphore submit info.
      *
      * @return The timeline semaphore submit info.
      */
-    VkTimelineSemaphoreSubmitInfo get_timeline_semaphore_si() {
-        VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info{};
-        timeline_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
-        timeline_semaphore_submit_info.pSignalSemaphoreValues = &render_data->current_frame;
-        timeline_semaphore_submit_info.waitSemaphoreValueCount = depend_semaphore_timeline_wait_values.size();
-        timeline_semaphore_submit_info.pWaitSemaphoreValues = get_depend_semaphore_timeline_wait_values();
-        return timeline_semaphore_submit_info;
-    }
+    VkTimelineSemaphoreSubmitInfo get_timeline_semaphore_si();
 
     /**
      * @brief Submit the command buffer to the queue.
@@ -180,28 +298,8 @@ protected:
      */
     void submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
                                const vector<VkPipelineStageFlags>& p_wait_stages,
-                               bool p_signal_in_flight_fence) {
-        VkSubmitInfo submit_info{};
-        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+                               bool p_signal_in_flight_fence);
 
-        VkSemaphore signal_semaphores[] = {task_semaphore->get_semaphore()};
-        submit_info.waitSemaphoreCount = depend_semaphores.size();
-        submit_info.pWaitSemaphores = get_dependent_semaphores_instance();
-        submit_info.pWaitDstStageMask = p_wait_stages.data();
-
-        // Setup timeline semaphore submit info.
-        VkTimelineSemaphoreSubmitInfo timeline_semaphore_submit_info = get_timeline_semaphore_si();
-        submit_info.pNext = &timeline_semaphore_submit_info;
-
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &p_command_buffer;
-        submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = signal_semaphores;
-        if (vkQueueSubmit(p_queue, 1, &submit_info, p_signal_in_flight_fence ?
-                          render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to submit draw command buffer to queue.");
-        }
-    }
 };
 
 /**
@@ -217,7 +315,7 @@ public:
      * @param p_render_data The base render data.
      */
     RenderTaskFactoryVK(const BaseRenderDataVK* p_render_data)
-        : render_data(p_render_data) {}
+    : render_data(p_render_data) {}
     virtual ~RenderTaskFactoryVK() {}
 
 protected:
