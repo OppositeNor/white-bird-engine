@@ -58,7 +58,7 @@ public:
 
         // Set the attachment image views.
         Builder& set_attachments(const std::vector<Ref<ROImageViewVK>>& p_attachments) {
-            for (auto& attachment : p_attachments) {
+            for (const auto& attachment : p_attachments) {
                 add_attachment(attachment);
             }
             return *this;
@@ -117,9 +117,11 @@ public:
     private:
         VkFramebuffer build(const BaseRenderDataVK* p_render_data) const;
     };
+    ROFramebufferVK() = delete;
+    virtual ~ROFramebufferVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROFramebufferVK);
 
     ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~ROFramebufferVK() override;
 
     /**
      * @brief Get the framebuffer instance.
@@ -156,6 +158,6 @@ private:
     ExposedFields exposed_fields;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

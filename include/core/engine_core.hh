@@ -34,11 +34,9 @@ namespace WhiteBirdEngine {
  */
 class EngineCore : public Singleton<EngineCore> {
 public:
+    EngineCore() = delete;
     virtual ~EngineCore() override;
-    EngineCore(const EngineCore&) = delete;
-    EngineCore(EngineCore&&) = delete;
-    EngineCore& operator=(const EngineCore&) = delete;
-    EngineCore& operator=(EngineCore&&) = delete;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineCore);
 
     /**
      * @brief Constructor.

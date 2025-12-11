@@ -78,6 +78,9 @@ public:
     private:
         VkImageView build(const BaseRenderDataVK* p_render_data) const;
     };
+    ROImageViewVK() = delete;
+    virtual ~ROImageViewVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageViewVK);
 
     /**
      * @brief Constructor.
@@ -86,7 +89,6 @@ public:
      * @param p_builder Configuration builder.
      */
     ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~ROImageViewVK() override;
 
     /**
      * @brief Get the image view instance.
@@ -113,6 +115,6 @@ private:
     void init(const Builder& p_builder);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

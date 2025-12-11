@@ -31,7 +31,7 @@ class RenderObjectVK : public RenderObject {
 public:
     RenderObjectVK() = delete;
     virtual ~RenderObjectVK() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RenderObjectVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderObjectVK);
 
     /**
      * @brief Constructor.

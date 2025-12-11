@@ -37,16 +37,16 @@ RenderDatabase::RenderDatabase(AllocType* p_allocator)
 
 void RenderDatabase::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-    vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-    vector<uint32_t>& p_opaque_triangle_indices,
-    vector<uint32_t>& p_opaque_triangle_obj_id,
-    vector<Vertex3DTextured>&& p_vertices,
-    vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
+    Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+    Vector<uint32_t>& p_opaque_triangle_indices,
+    Vector<uint32_t>& p_opaque_triangle_obj_id,
+    Vector<Vertex3DTextured>&& p_vertices,
+    Vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
 
     p_opaque_triangle_map.clear();
     p_opaque_triangle_vertices = std::move(p_vertices);
-    p_opaque_triangle_indices = vector<uint32_t>(allocator);
-    p_opaque_triangle_obj_id = vector<uint32_t>(allocator);
+    p_opaque_triangle_indices = Vector<uint32_t>(allocator);
+    p_opaque_triangle_obj_id = Vector<uint32_t>(allocator);
 
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
@@ -76,16 +76,16 @@ void RenderDatabase::set_opaque_triangles_linear(
 
 void RenderDatabase::set_opaque_triangles_linear(
     std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-    vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-    vector<uint32_t>& p_opaque_triangle_indices,
-    vector<uint32_t>& p_opaque_triangle_obj_id,
-    const vector<Vertex3DTextured>& p_vertices,
-    vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices) {
+    Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+    Vector<uint32_t>& p_opaque_triangle_indices,
+    Vector<uint32_t>& p_opaque_triangle_obj_id,
+    const Vector<Vertex3DTextured>& p_vertices,
+    Vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices) {
 
     p_opaque_triangle_map.clear();
     p_opaque_triangle_vertices = p_vertices;
-    p_opaque_triangle_indices = vector<uint32_t>(allocator);
-    p_opaque_triangle_obj_id = vector<uint32_t>(allocator);
+    p_opaque_triangle_indices = Vector<uint32_t>(allocator);
+    p_opaque_triangle_obj_id = Vector<uint32_t>(allocator);
 
     using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
     std::sort(p_indices.begin(), p_indices.end(), [](
@@ -113,4 +113,4 @@ void RenderDatabase::set_opaque_triangles_linear(
 }
 
 
-}
+} // namespace WhiteBirdEngine

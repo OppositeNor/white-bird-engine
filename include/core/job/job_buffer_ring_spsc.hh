@@ -36,11 +36,7 @@ public:
     // The type of the job this buffer is holding.
     using JobType = JobT;
 
-    virtual ~JobBufferRingSPSC() override {}
-    JobBufferRingSPSC(const JobBufferRingSPSC&) = delete;
-    JobBufferRingSPSC(JobBufferRingSPSC&&) = delete;
-    JobBufferRingSPSC& operator=(const JobBufferRingSPSC&) = delete;
-    JobBufferRingSPSC& operator=(JobBufferRingSPSC&&) = delete;
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(JobBufferRingSPSC);
 
     /**
      * @brief Constructor.
@@ -54,12 +50,14 @@ public:
     void add_job(Ref<JobType> p_job);
 
 private:
-    vector<Ref<JobType>> buffer;
+    Vector<Ref<JobType>> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };
 
-#define WBE_RING_INCREMENT(x) ((x) + 1) % buffer.size()
+constexpr size_t ring_increment(size_t p_i, size_t p_buffer_size) {
+    return ((p_i) + 1) % p_buffer_size;
+} 
 
 template <typename JobType>
 JobBufferRingSPSC<JobType>::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
@@ -78,14 +76,14 @@ Ref<JobType> JobBufferRingSPSC<JobType>::retrieve_job() {
         return MEM_NULL;
     }
     Ref<JobType> result = buffer[tail_l];
-    tail.store(WBE_RING_INCREMENT(tail_l), std::memory_order_release);
+    tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
     return result;
 }
 
 template <typename JobType>
 void JobBufferRingSPSC<JobType>::add_job(Ref<JobType> p_job) {
     size_t head_l = head.load(std::memory_order_relaxed);
-    size_t next = WBE_RING_INCREMENT(head_l);
+    size_t next = ring_increment(head_l, buffer.size());
     if (next == tail.load(std::memory_order_acquire)) {
         throw std::runtime_error("Buffer overflow.");
     }
@@ -96,6 +94,6 @@ void JobBufferRingSPSC<JobType>::add_job(Ref<JobType> p_job) {
 
 #undef WBE_RING_INCREMENT
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

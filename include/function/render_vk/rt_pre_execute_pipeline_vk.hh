@@ -35,7 +35,7 @@ struct RTPreExecutePipelineVK final: public RenderTaskVK {
      */
     RTPreExecutePipelineVK(const BaseRenderDataVK* p_render_data, Ref<SemaphoreVK> p_prepare_image_semaphore);
     virtual ~RTPreExecutePipelineVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RTPreExecutePipelineVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RTPreExecutePipelineVK);
 
     virtual void init() override {}
     virtual void perform(double p_delta) override;
@@ -71,6 +71,6 @@ public:
 private:
     Ref<SemaphoreVK> prepare_image_semaphore;
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

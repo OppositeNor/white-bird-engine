@@ -46,7 +46,6 @@ RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
     if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
         // Destructor cannot throw an exception. 
         wbe_console_log()->error("Failed to record command buffer.");
-        exit(EXIT_FAILURE);
     }
 }
 
@@ -84,12 +83,12 @@ void RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_re
         if (req_rend_res[i] == MEM_NULL) {
             throw std::runtime_error(std::format(
                 "Render task's required resource type mismatch: expected: {}, actual: NULL.",
-                LabelManager::get_singleton()->get_label_name(*(p_expected_req_res.begin() + i))));
+                LabelManager::get_singleton()->get_label_name(p_expected_req_res.begin()[i])));
         }
     }
 }
 
-const vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const vector<VkPipelineStageFlags2>& p_wait_stages) {
+const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const Vector<VkPipelineStageFlags2>& p_wait_stages) {
     WBE_DEBUG_ASSERT(depend_semaphores.size() == depend_semaphores_submit_infos.size());
     WBE_DEBUG_ASSERT(p_wait_stages.size() == depend_semaphores_submit_infos.size());
     size_t n = depend_semaphores_submit_infos.size();
@@ -100,11 +99,11 @@ const vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_subm
 }
 
 void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                                         const vector<VkPipelineStageFlags2>& p_wait_stages,
+                                         const Vector<VkPipelineStageFlags2>& p_wait_stages,
                                          VkPipelineStageFlags2 p_signal_stage,
                                          bool p_signal_in_flight_fence) {
     VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage, render_data->current_frame);
-    auto& wait_semaphores = get_dependent_semaphores_submit_infos(p_wait_stages);
+    const auto& wait_semaphores = get_dependent_semaphores_submit_infos(p_wait_stages);
     VkCommandBufferSubmitInfo command_buffer_submit_info{};
     command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     command_buffer_submit_info.commandBuffer = p_command_buffer;
@@ -123,4 +122,4 @@ void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQue
     }
 }
 
-}
+} // namespace WhiteBirdEngine

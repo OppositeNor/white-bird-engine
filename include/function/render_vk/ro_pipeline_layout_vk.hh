@@ -53,7 +53,7 @@ public:
     };
     ROPipelineLayoutVK() = delete;
     virtual ~ROPipelineLayoutVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(ROPipelineLayoutVK)
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROPipelineLayoutVK)
 
     /**
      * @brief Constructor.

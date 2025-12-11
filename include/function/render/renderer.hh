@@ -34,8 +34,7 @@ WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
  */
 class Renderer : public Singleton<Renderer> {
 public:
-    Renderer() = default;
-    virtual ~Renderer() {}
+    WBE_R6_DEFAULT_OVERRIDE(Renderer)
 
     /**
      * @brief Called every frame.
@@ -84,6 +83,5 @@ private:
 
 };
 
-}
-
+} // namespace WhiteBirdEngine
 #endif

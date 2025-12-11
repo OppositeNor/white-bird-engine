@@ -45,7 +45,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <format>
 #include <functional>
 #include <map>
@@ -88,7 +87,7 @@ void RendererVK::tick(double p_delta) {
         job->perform(this_ref.lock());
     }
 
-    vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
+    Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
     if (run_pipeline.size() == 0) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
@@ -130,7 +129,7 @@ void RendererVK::tick(double p_delta) {
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.waitSemaphoreCount = curr_pipeline->result_semaphores.size();
-    vector<VkSemaphore> result_semaphores(allocator);
+    Vector<VkSemaphore> result_semaphores(allocator);
     result_semaphores.reserve(curr_pipeline->result_semaphores.size());
     for (auto& semaphore : curr_pipeline->result_semaphores) {
         result_semaphores.push_back(semaphore->get_semaphore());
@@ -364,7 +363,7 @@ void RendererVK::create_instance() {
     // Setup instance extensions.
     uint32_t extensions_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
-    vector<const char*> extension_names(extensions_count, allocator);
+    Vector<const char*> extension_names(extensions_count, allocator);
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
     create_info.enabledExtensionCount = extensions_count;
     create_info.ppEnabledExtensionNames = extension_names.data();
@@ -415,7 +414,7 @@ void RendererVK::create_swap_chain() {
     // If we have to use the image between multiple queue families, we have to specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we don't have to explicitly transfer ownership.
-        vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), allocator);
+        Vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), allocator);
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = unique_indices_array.data();
@@ -583,14 +582,14 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    vector<VkPhysicalDevice> physical_devices(physical_device_count, allocator);
+    Vector<VkPhysicalDevice> physical_devices(physical_device_count, allocator);
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
 
     // Pick one that's the most suitable.
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    string device_name(device_properties.deviceName, allocator);
+    String device_name(device_properties.deviceName, allocator);
     wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
     vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
@@ -599,8 +598,8 @@ void RendererVK::create_physical_device() {
 void RendererVK::create_logical_device() {
     // Setup queues create info.
     float queue_priority = 1.0;
-    set<uint32_t> indices = queue_family_indices.get_unique_indices();
-    vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
+    Set<uint32_t> indices = queue_family_indices.get_unique_indices();
+    Vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
     queues_create_info.reserve(indices.size());
     for (uint32_t elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
@@ -659,7 +658,7 @@ void RendererVK::create_logical_device() {
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
     uint32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, nullptr);
-    vector<VkExtensionProperties> extension_properties(extension_count, allocator);
+    Vector<VkExtensionProperties> extension_properties(extension_count, allocator);
     vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, extension_properties.data());
     std::set<std::string> enabled_extensions(enabled_device_extensions.begin(), enabled_device_extensions.end());
     for (const auto& extension : extension_properties) {
@@ -671,7 +670,7 @@ bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
 bool RendererVK::check_validation_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-    vector<VkLayerProperties> layer_properties(layer_count, allocator);
+    Vector<VkLayerProperties> layer_properties(layer_count, allocator);
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
     for (const auto* name : validation_layers) {
         bool layer_found = false;
@@ -689,7 +688,7 @@ bool RendererVK::check_validation_layer_support() {
     return true;
 }
 
-void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices) {
+void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
@@ -705,7 +704,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
             // Device is not suitable.
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string device_name(device_properties.deviceName, allocator);
+            String device_name(device_properties.deviceName, allocator);
             wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
                 " Picking an alternative device.", device_name));
@@ -714,7 +713,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
             // Successfully pick the device.
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            string device_name(device_properties.deviceName, allocator);
+            String device_name(device_properties.deviceName, allocator);
             physical_device = p_physical_devices[pick_device_index];
             wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
@@ -764,7 +763,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     indices.allocator = allocator;
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
-    vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);
+    Vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
     int i = 0;
     for (auto& queue_family_property : queue_family_properties) {
@@ -788,8 +787,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 }
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
-    SwapChainSupportDetails details{.formats = vector<VkSurfaceFormatKHR>(allocator),
-        .present_modes = vector<VkPresentModeKHR>(allocator)};
+    SwapChainSupportDetails details{.formats = Vector<VkSurfaceFormatKHR>(allocator),
+        .present_modes = Vector<VkPresentModeKHR>(allocator)};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -802,7 +801,7 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
     return details;
 }
 
-VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats) {
+VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurfaceFormatKHR>& p_available_formats) {
     for (const auto& available_format : p_available_formats) {
         if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB
             && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -812,7 +811,7 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const vector<VkSurface
     return p_available_formats[0];
 }
 
-VkPresentModeKHR RendererVK::choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes) {
+VkPresentModeKHR RendererVK::choose_swap_present_mode(const Vector<VkPresentModeKHR>& p_available_present_modes) {
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
             return VK_PRESENT_MODE_IMMEDIATE_KHR;
@@ -847,14 +846,14 @@ void RendererVK::setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent)
     scissor.extent = p_swap_chain_extent;
 }
 
-RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
+RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
     if (p_root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
     if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PRE_EXECUTE_PIPELINE_VK) {
         throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
     }
-    vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
+    Vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
 
     pipeline_infos.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
@@ -912,9 +911,9 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
     // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
     // Performing BFS should be the most optimal way for optimizing synchronozation, since the nodes with the same
     // depth has no dependencies among them.
-    deque<Ref<RendTaskInfo>> to_visit(allocator);
+    Deque<Ref<RendTaskInfo>> to_visit(allocator);
     to_visit.push_back(p_root_task);
-    hash_set<Ref<RendTaskInfo>> visited(allocator);
+    HashSet<Ref<RendTaskInfo>> visited(allocator);
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();

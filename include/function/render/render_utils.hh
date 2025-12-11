@@ -35,6 +35,6 @@ struct JobRender : public Job<JobRender> {
 };
 
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

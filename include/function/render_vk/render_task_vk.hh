@@ -23,6 +23,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "global/stl_allocator.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <initializer_list>
 #include <vector>
@@ -35,11 +36,14 @@ namespace WhiteBirdEngine {
  *
  */
 struct RenderTaskVK : public RenderTask {
-    RenderTaskVK(const BaseRenderDataVK* p_render_data, bool p_use_binary_semaphore = false)
+    RenderTaskVK() = delete;
+    virtual ~RenderTaskVK() = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderTaskVK);
+
+    RenderTaskVK(const BaseRenderDataVK* p_render_data)
         : req_rend_res(p_render_data->allocator), depend_semaphores(p_render_data->allocator),
         depend_semaphores_submit_infos(p_render_data->allocator),
         render_data(p_render_data) {}
-    virtual ~RenderTaskVK() {}
 
     /**
      * @brief Setup the render task.
@@ -53,12 +57,12 @@ struct RenderTaskVK : public RenderTask {
     /**
      * @brief The required resources. This will be filled in the order of the req_res field in RendTaskInfo.
      */
-    vector<Ref<RendResVK>> req_rend_res;
+    Vector<Ref<RendResVK>> req_rend_res;
     /**
      * @brief The semaphores this task depends on. This will be filled with unique semaphores of the dependent tasks.
      */
-    vector<Ref<SemaphoreVK>> depend_semaphores;
-    vector<VkSemaphoreSubmitInfo> depend_semaphores_submit_infos;
+    Vector<Ref<SemaphoreVK>> depend_semaphores;
+    Vector<VkSemaphoreSubmitInfo> depend_semaphores_submit_infos;
 
     /**
      * @brief The depth of node of this task in the render graph.
@@ -75,14 +79,16 @@ protected:
      */
     class RecordCommandBufferGuard {
     public:
+        RecordCommandBufferGuard() = delete;
+        ~RecordCommandBufferGuard();
+        WBE_R6_NDCD_DELETE_COPY_MOVE(RecordCommandBufferGuard);
+
         /**
          * @brief Constructor.
          *
          * @param p_command_buffer The command buffer to record.
          */
         RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
-
-        ~RecordCommandBufferGuard();
 
         VkCommandBuffer command_buffer;
     };
@@ -96,11 +102,11 @@ protected:
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
         // The source stage.
-        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
         // The destination stage.
-        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
 
         /**
          * @brief Set the source access.
@@ -198,11 +204,11 @@ protected:
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_MEMORY_WRITE_BIT;
         // The source stage.
-        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_MEMORY_READ_BIT;
         // The destination stage.
-        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
         // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
         // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
         uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
@@ -347,7 +353,7 @@ protected:
      *
      * @return The dependent semaphores vulkan semaphore instances.
      */
-    const vector<VkSemaphoreSubmitInfo>& get_dependent_semaphores_submit_infos(const vector<VkPipelineStageFlags2>& p_wait_stages);
+    const Vector<VkSemaphoreSubmitInfo>& get_dependent_semaphores_submit_infos(const Vector<VkPipelineStageFlags2>& p_wait_stages);
 
     /**
      * @brief Submit the command buffer to the queue.
@@ -358,7 +364,7 @@ protected:
      * @param p_signal_in_flight_fence Should this command buffer signal the in-flight fence.
      */
     void submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                               const vector<VkPipelineStageFlags2>& p_wait_stages,
+                               const Vector<VkPipelineStageFlags2>& p_wait_stages,
                                VkPipelineStageFlags2 p_signal_stage,
                                bool p_signal_in_flight_fence);
 
@@ -371,6 +377,8 @@ protected:
  */
 struct RenderTaskFactoryVK : public RenderTaskFactory {
 public:
+    WBE_R6_DEFAULT_OVERRIDE(RenderTaskFactoryVK)
+
     /**
      * @brief Constructor.
      *
@@ -378,12 +386,11 @@ public:
      */
     RenderTaskFactoryVK(const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data) {}
-    virtual ~RenderTaskFactoryVK() {}
 
 protected:
-    const BaseRenderDataVK* render_data;
+    const BaseRenderDataVK* render_data = nullptr;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

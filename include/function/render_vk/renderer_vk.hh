@@ -153,14 +153,14 @@ private:
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
     template <typename T>
-    using vector = ::WhiteBirdEngine::vector<T, AllocType>;
+    using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
     template <typename T>
-    using set = ::WhiteBirdEngine::set<T, AllocType>;
+    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
     template <typename T>
-    using hash_set = ::WhiteBirdEngine::hash_set<T, AllocType>;
+    using HashSet = ::WhiteBirdEngine::HashSet<T, AllocType>;
     template <typename T>
-    using deque = ::WhiteBirdEngine::deque<T, AllocType>;
-    using string = ::WhiteBirdEngine::string<AllocType>;
+    using Deque = ::WhiteBirdEngine::Deque<T, AllocType>;
+    using String = ::WhiteBirdEngine::String<AllocType>;
 
     inline static RendererVK* singleton = nullptr;
 
@@ -189,7 +189,7 @@ private:
     VkQueue compute_queue = VK_NULL_HANDLE;
     VkQueue present_queue = VK_NULL_HANDLE;
 
-    vector<VkImage> swap_chain_images;
+    Vector<VkImage> swap_chain_images;
     VkFormat swap_chain_image_format = VK_FORMAT_UNDEFINED;
     VkExtent2D swap_chain_extent{};
 
@@ -199,7 +199,7 @@ private:
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
-    vector<VkFence> in_flight_fences;
+    Vector<VkFence> in_flight_fences;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"
@@ -225,8 +225,8 @@ private:
                 && compute.has_value()
                 && present.has_value();
         }
-        set<uint32_t> get_unique_indices() const {
-            set<uint32_t> result(allocator);
+        Set<uint32_t> get_unique_indices() const {
+            Set<uint32_t> result(allocator);
             result.insert(graphics.value());
             result.insert(compute.value());
             result.insert(present.value());
@@ -236,8 +236,8 @@ private:
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
-        vector<VkSurfaceFormatKHR> formats;
-        vector<VkPresentModeKHR> present_modes;
+        Vector<VkSurfaceFormatKHR> formats;
+        Vector<VkPresentModeKHR> present_modes;
         bool is_adequate() const {
             return !formats.empty() && !present_modes.empty();
         }
@@ -254,11 +254,11 @@ private:
     };
 
     struct PipelineInfo {
-        string pipeline_name;
-        vector<Ref<RendResVK>> rend_res;
-        vector<TaskInfo> task_infos;
+        String pipeline_name;
+        Vector<Ref<RendResVK>> rend_res;
+        Vector<TaskInfo> task_infos;
         Ref<SemaphoreVK> image_available_semaphore;
-        vector<Ref<SemaphoreVK>> result_semaphores;
+        Vector<Ref<SemaphoreVK>> result_semaphores;
         uint64_t max_depth = 0;
         PipelineInfo(AllocType* p_allocator)
             : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator),
@@ -268,11 +268,11 @@ private:
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
-    std::map<std::string, vector<Ref<PipelineInfo>>> pipelines;
+    std::map<std::string, Vector<Ref<PipelineInfo>>> pipelines;
     std::unordered_map<RendResID, RefWeak<RendResVK>> rend_res;
     std::map<RendResID, RefWeak<RendResVK>> render_resources;
 
-    vector<Ref<PipelineInfo>> activated_pipeline;
+    Vector<Ref<PipelineInfo>> activated_pipeline;
 
     // Render objects for the renderer.
     struct RenderObjects {
@@ -285,9 +285,9 @@ private:
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain image views.
-        vector<Ref<ROImageViewVK>> swap_chain_image_views;
+        Vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // Framebuffers in the swap chain.
-        vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
+        Vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
         // The swap chain image resource.
         Ref<RendResVK> swap_chain_framebuffer_resource;
         // The base graphics pipeline resource.
@@ -322,7 +322,7 @@ private:
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_validation_layer_support();
-    void pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices);
+    void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
 
@@ -330,8 +330,8 @@ private:
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
     SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
-    VkSurfaceFormatKHR choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats);
-    VkPresentModeKHR choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes);
+    VkSurfaceFormatKHR choose_swap_surface_format(const Vector<VkSurfaceFormatKHR>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const Vector<VkPresentModeKHR>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
     void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
@@ -339,7 +339,7 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
+    Vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
     void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
     void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
                            std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map);

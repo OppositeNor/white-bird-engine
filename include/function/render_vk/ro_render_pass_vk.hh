@@ -55,9 +55,10 @@ public:
     private:
         VkRenderPass build(const BaseRenderDataVK* p_render_data) const;
     };
+
     RORenderPassVK() = delete;
     virtual ~RORenderPassVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RORenderPassVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RORenderPassVK);
 
     /**
      * @brief Constructor.

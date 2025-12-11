@@ -27,14 +27,17 @@ Checks: >
   -readability-convert-member-functions-to-static,
   -readability-function-size,
   -readability-simplify-boolean-expr,
+  -readability-use-anyofallof,
   -bugprone-easily-swappable-parameters,
   -misc-non-private-member-variables-in-classes,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-do-while,
   -cert-err58-cpp,
   -google-readability-avoid-underscore-in-googletest-name,
   -google-explicit-constructor,
   -google-readability-todo,
+  -google-default-arguments,
   -hicpp-named-parameter,
   -hicpp-function-size,
   -hicpp-avoid-c-arrays,
@@ -49,6 +52,7 @@ Checks: >
   -modernize-avoid-c-arrays,
   -modernize-pass-by-value,
   -modernize-use-auto,
+  -modernize-use-ranges,
   -cppcoreguidelines-owning-memory,
   -cppcoreguidelines-no-malloc,
   -cppcoreguidelines-avoid-c-arrays,
@@ -58,7 +62,9 @@ Checks: >
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
   -cppcoreguidelines-rvalue-reference-param-not-moved,
-  -cppcoreguidelines-pro-bounds-constant-array-index
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -performance-no-int-to-ptr
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets

@@ -19,8 +19,8 @@
 #include "function/render/material.hh"
 #include "render_defs.hh"
 #include "global/stl_allocator.hh"
+#include "utils/defs.hh"
 
-#include <algorithm>
 #include <glm/glm.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -38,16 +38,13 @@ class RenderDatabase {
 private:
     using AllocType = RenderAllocator;
     template <typename T, typename Allocator = AllocType>
-    using vector = ::WhiteBirdEngine::vector<T, AllocType>;
+    using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
     template <typename T>
-    using set = ::WhiteBirdEngine::set<T, AllocType>;
+    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
 public:
 
-    ~RenderDatabase() {}
-    RenderDatabase(const RenderDatabase&) = delete;
-    RenderDatabase(RenderDatabase&&) = delete;
-    RenderDatabase& operator=(const RenderDatabase&) = delete;
-    RenderDatabase& operator=(RenderDatabase&&) = delete;
+    ~RenderDatabase() = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase);
 
     /**
      * @brief Constructor.
@@ -81,7 +78,7 @@ public:
     template <typename VertType, typename IndxType>
     void set_dynamic_opaque_triangles(VertType&& p_vertices, IndxType&& p_indices) {
         set_opaque_triangles_linear(dynamic_opaque_triangle_map, dynamic_opaque_triangle_vertices, dynamic_opaque_triangle_indices,
-                                    dynamic_opaque_triangle_obj_id, std::move(p_vertices), std::move(p_indices));
+                                    dynamic_opaque_triangle_obj_id, std::forward(p_vertices), std::forward(p_indices));
     }
 
     /**
@@ -89,7 +86,7 @@ public:
      *
      * @return The static opaque triangle vertices.
      */
-    const vector<Vertex3DTextured>& get_static_opaque_triangle_vertices() const {
+    const Vector<Vertex3DTextured>& get_static_opaque_triangle_vertices() const {
         return static_opaque_triangle_vertices;
     }
 
@@ -98,7 +95,7 @@ public:
      *
      * @return The static opaque triangle indices.
      */
-    const vector<uint32_t>& get_static_opaque_triangle_indices() const {
+    const Vector<uint32_t>& get_static_opaque_triangle_indices() const {
         return static_opaque_triangle_indices;
     }
 
@@ -115,7 +112,7 @@ public:
      *
      * @return The object ID each index is associated to.
      */
-    const vector<uint32_t>& get_static_opaque_triangle_obj_id() const {
+    const Vector<uint32_t>& get_static_opaque_triangle_obj_id() const {
         return static_opaque_triangle_obj_id;
     }
 
@@ -124,7 +121,7 @@ public:
      *
      * @return The dynamic opaque triangle vertices.
      */
-    const vector<Vertex3DTextured>& get_dynamic_opaque_triangle_vertices() const {
+    const Vector<Vertex3DTextured>& get_dynamic_opaque_triangle_vertices() const {
         return dynamic_opaque_triangle_vertices;
     }
 
@@ -133,7 +130,7 @@ public:
      *
      * @return The dynamic opaque triangle indices.
      */
-    const vector<uint32_t>& get_dynamic_opaque_triangle_indices() const {
+    const Vector<uint32_t>& get_dynamic_opaque_triangle_indices() const {
         return dynamic_opaque_triangle_indices;
     }
 
@@ -150,7 +147,7 @@ public:
      *
      * @return The object ID each index is associated to.
      */
-    const vector<uint32_t>& get_dynamic_opaque_triangle_obj_id() const {
+    const Vector<uint32_t>& get_dynamic_opaque_triangle_obj_id() const {
         return dynamic_opaque_triangle_obj_id;
     }
 
@@ -158,36 +155,36 @@ private:
 
     AllocType* allocator;
     std::map<MaterialID, std::pair<size_t, size_t>> static_opaque_triangle_map;
-    vector<Vertex3DTextured> static_opaque_triangle_vertices;
-    vector<uint32_t> static_opaque_triangle_indices;
-    vector<uint32_t> static_opaque_triangle_obj_id;
-    vector<glm::mat4> static_opaque_transform_mats;
+    Vector<Vertex3DTextured> static_opaque_triangle_vertices;
+    Vector<uint32_t> static_opaque_triangle_indices;
+    Vector<uint32_t> static_opaque_triangle_obj_id;
+    Vector<glm::mat4> static_opaque_transform_mats;
 
     // TODO: change dynamic opaque triangles implementation
     std::map<MaterialID, std::pair<size_t, size_t>> dynamic_opaque_triangle_map;
-    vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
-    vector<uint32_t> dynamic_opaque_triangle_indices;
-    vector<uint32_t> dynamic_opaque_triangle_obj_id;
+    Vector<Vertex3DTextured> dynamic_opaque_triangle_vertices;
+    Vector<uint32_t> dynamic_opaque_triangle_indices;
+    Vector<uint32_t> dynamic_opaque_triangle_obj_id;
 
     void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-        vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-        vector<uint32_t>& p_opaque_triangle_indices,
-        vector<uint32_t>& p_opaque_triangle_obj_id,
-        vector<Vertex3DTextured>&& p_vertices,
-        vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
+        Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+        Vector<uint32_t>& p_opaque_triangle_indices,
+        Vector<uint32_t>& p_opaque_triangle_obj_id,
+        Vector<Vertex3DTextured>&& p_vertices,
+        Vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices);
 
     void set_opaque_triangles_linear(
         std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-        vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-        vector<uint32_t>& p_opaque_triangle_indices,
-        vector<uint32_t>& p_opaque_triangle_obj_id,
-        const vector<Vertex3DTextured>& p_vertices,
-        vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices);
+        Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
+        Vector<uint32_t>& p_opaque_triangle_indices,
+        Vector<uint32_t>& p_opaque_triangle_obj_id,
+        const Vector<Vertex3DTextured>& p_vertices,
+        Vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices);
 
 };
 
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

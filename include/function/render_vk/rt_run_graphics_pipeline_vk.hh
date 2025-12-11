@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
     virtual ~RTRunGraphicsPipelineVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RTRunGraphicsPipelineVK)
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RTRunGraphicsPipelineVK)
 
     /**
      * @brief Constructor.
@@ -47,7 +47,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 private:
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     bool signal_in_flight_fence = false;
-    vector<VkPipelineStageFlags2> wait_stages;
+    Vector<VkPipelineStageFlags2> wait_stages;
     void record_command_buffer();
 };
 

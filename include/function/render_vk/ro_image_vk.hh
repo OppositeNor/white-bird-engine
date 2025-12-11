@@ -91,6 +91,9 @@ public:
     private:
         VkImage build(const BaseRenderDataVK* p_render_data) const;
     };
+    ROImageVK() = delete;
+    virtual ~ROImageVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageVK);
 
     /**
      * @brief Constructor.
@@ -99,9 +102,6 @@ public:
      * @param p_builder Configuration builder.
      */
     ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~ROImageVK() override;
-
-    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(ROImageVK);
 
     /**
      * @brief Get image instance.

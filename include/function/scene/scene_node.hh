@@ -35,13 +35,13 @@ public:
 
     WBE_DECL_OBJECT(SceneNode)
 
-    virtual ~SceneNode() {}
+    virtual ~SceneNode() override = default;
     SceneNode(const SceneNode&) = delete;
-    SceneNode(SceneNode&& p_other)
+    SceneNode(SceneNode&& p_other) noexcept
         : name(std::move(p_other.name)), parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
     }
     SceneNode& operator=(const SceneNode&) = delete;
-    SceneNode& operator=(SceneNode&& p_other) {
+    SceneNode& operator=(SceneNode&& p_other) noexcept {
         parent = std::move(p_other.parent);
         children = std::move(p_other.children);
         return *this;
@@ -76,9 +76,9 @@ public:
      * @param p_node The node to check.
      * @return True if the node has the children, false otherwise.
      */
-    bool has_children(Ref<SceneNode> p_node) {
-        for (auto iter = children.begin(); iter != children.end(); ++iter) {
-            if (*iter == p_node) {
+    bool has_children(Ref<SceneNode> p_node) const {
+        for (const auto& child : children) {
+            if (child == p_node) {
                 return true;
             }
         }
@@ -102,12 +102,12 @@ public:
 
 
 private:
-    string<> name;
+    String<> name;
     RefWeak<SceneNode> parent;
-    vector<Ref<SceneNode>> children;
+    Vector<Ref<SceneNode>> children;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 
 #endif
