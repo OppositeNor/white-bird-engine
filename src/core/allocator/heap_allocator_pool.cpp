@@ -29,7 +29,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
     if (!is_empty()) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
-    free(mem_chunk);
+    free(mem_chunk); // NOLINT(hicpp-no-malloc)
     mem_chunk = nullptr;
 }
 
@@ -38,7 +38,7 @@ HeapAllocatorPool::HeapAllocatorPool(size_t p_size)
     if (p_size > MAX_TOTAL_SIZE) {
         throw std::runtime_error(std::format("Failed to create pool: size: {} exceeds maximum: {}.", p_size, MAX_TOTAL_SIZE));
     }
-    mem_chunk = static_cast<char*>(malloc(p_size));
+    mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT(hicpp-no-malloc)
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to create pool: malloc failed.");
     }
@@ -59,7 +59,8 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
             *reinterpret_cast<uint64_t*>(result) = p_size;
-            max_data_loc_tracker = std::max(max_data_loc_tracker, (size_t)result + p_size - (size_t)mem_chunk);
+            max_data_loc_tracker = std::max(max_data_loc_tracker, reinterpret_cast<uintptr_t>(result)
+                                            + p_size - reinterpret_cast<uintptr_t>(mem_chunk));
             return reinterpret_cast<MemID>(result) + HEADER_SIZE;
         }
         if ((*valid_idle_node)->next == nullptr) {
@@ -168,13 +169,15 @@ size_t HeapAllocatorPool::get_remain_size() const {
 HeapAllocatorPool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
-    ss << "\"type\":\"HeapAllocatorPool\",";
+    ss << R"("type":"HeapAllocatorPool",)";
     ss << "\"total_size\":" << get_total_size() << ",";
     ss << "\"free_chunk_layout\":[";
     IdleListNode* node = idle_list_head.get();
     bool first = true;
     while (node != nullptr) {
-        if (!first) ss << ",";
+        if (!first) {
+            ss << ",";
+        }
         first = false;
         ss << "{"
            << "\"begin\":" << (node->mem_start - mem_chunk) << ","
@@ -187,5 +190,5 @@ HeapAllocatorPool::operator std::string() const {
     return ss.str();
 }
 
-}
+} // namespace WhiteBirdEngine
 

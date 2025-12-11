@@ -26,7 +26,7 @@ Ref<CLAASTNode> CLAParser::parse(const std::vector<CLAToken>& p_tokens) {
     std::string utility_name;
     std::vector<Ref<CLAASTNode>> operations;
     parse_state = ParseState::START;
-    for (auto& token : p_tokens) {
+    for (const auto& token : p_tokens) {
         process_token(token, utility_name, operations);
     }
     Ref<CLAASTNodeRoot> root_node = make_ref<CLAASTNodeRoot>(global_allocator(), utility_name, std::move(operations));

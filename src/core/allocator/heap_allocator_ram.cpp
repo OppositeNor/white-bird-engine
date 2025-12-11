@@ -22,8 +22,8 @@ HeapAllocatorRAM::~HeapAllocatorRAM() {
     if (allocated.size() != 0) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorRAM not empty during destruction.");
     }
-    for (auto& iter : allocated) {
-        free(get(iter));
+    for (const auto& iter : allocated) {
+        free(get(iter)); // NOLINT(hicpp-no-malloc)
     }
 }
 
@@ -31,7 +31,7 @@ MemID HeapAllocatorRAM::allocate(size_t p_size) {
     if (p_size == 0) {
         return MEM_NULL;
     }
-    MemID result = std::bit_cast<MemID>(malloc(p_size));
+    MemID result = std::bit_cast<MemID>(malloc(p_size)); // NOLINT(hicpp-no-malloc)
     allocated.insert(result);
     return result;
 }
@@ -41,9 +41,7 @@ void HeapAllocatorRAM::deallocate(MemID p_mem) {
     if (iter == allocated.end()) {
         throw std::runtime_error("Failed to deallocate memory: memory not allocated by this allocator.");
     }
-    free(get(p_mem));
+    free(get(p_mem)); // NOLINT(hicpp-no-malloc)
     allocated.erase(p_mem);
 }
-
-
-}
+} // namespace WhiteBirdEngine

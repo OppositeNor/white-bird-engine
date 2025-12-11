@@ -25,7 +25,7 @@ HeapAllocatorFixedSizePool::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
     }
-    free(mem_chunk);
+    free(mem_chunk); // NOLINT(hicpp-no-malloc)
 }
 
 inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {
@@ -62,7 +62,7 @@ inline void HeapAllocatorFixedSizePool::deallocate(MemID p_mem) {
 inline HeapAllocatorFixedSizePool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
-    ss << "\"type\":\"HeapAllocatorFixedSizePool\",";
+    ss << R"("type":"HeapAllocatorFixedSizePool",)";
     ss << "\"size\":" << element_size << ",";
     ss << "\"obj_count\":" << obj_count() << ",";
     ss << "\"max_obj\":" << static_cast<uint32_t>(max_obj) << ",";
@@ -70,7 +70,9 @@ inline HeapAllocatorFixedSizePool::operator std::string() const {
     auto alloc_mems = get_allocated();
     bool first = true;
     for (auto alloc_mem : alloc_mems) {
-        if (!first) ss << ",";
+        if (!first) {
+            ss << ",";
+        }
         first = false;
         ss << alloc_mem;
     }
@@ -78,6 +80,4 @@ inline HeapAllocatorFixedSizePool::operator std::string() const {
     ss << "}";
     return ss.str();
 }
-
-
-}
+} // namespace WhiteBirdEngine

@@ -67,7 +67,7 @@ HeapAllocatorAtomicAlignedPoolImplicitList::~HeapAllocatorAtomicAlignedPoolImpli
     if (!is_empty()) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed. Allocator status: " + static_cast<std::string>(*this));
     }
-    free(mem_chunk);
+    free(mem_chunk); // NOLINT(hicpp-no-malloc)
     mem_chunk = nullptr;
 }
 
@@ -101,10 +101,10 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::allocate(size_t p_size, size_t
     throw std::runtime_error(err_msg);
 }
 
-template <bool COALESCE_ENABLED>
+template <bool CoalesceEnabled>
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::check_posible_free(size_t p_aligned_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
-    if constexpr (COALESCE_ENABLED) {
+    if constexpr (CoalesceEnabled) {
         if (possible_valid != nullptr) {
             coalesce_chunk(possible_valid);
         }
@@ -125,20 +125,22 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::check_posible_free(size_t p_al
         void* result_loc = acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
         MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
         *static_cast<Header*>(result_loc) = p_aligned_size;
-        internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
+        internal_fragmentation_tracker
+            = std::max(internal_fragmentation_tracker, reinterpret_cast<uintptr_t>(result_loc)
+                       + p_aligned_size - reinterpret_cast<size_t>(mem_chunk));
         return result_id;
     }
     return MEM_NULL;
 }
 
-template <bool COALESCE_ENABLED>
+template <bool CoalesceEnabled>
 MemID HeapAllocatorAtomicAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
-    MemID possible_result = check_posible_free<COALESCE_ENABLED>(p_aligned_size, p_alignment);
+    MemID possible_result = check_posible_free<CoalesceEnabled>(p_aligned_size, p_alignment);
     if (possible_result != MEM_NULL) {
         return possible_result;
     }
-    char* free_memory = get_next_free_memory<true, COALESCE_ENABLED>(mem_chunk);
+    char* free_memory = get_next_free_memory<true, CoalesceEnabled>(mem_chunk);
     while (free_memory != nullptr) {
         // Find the aligned starting point.
         uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(free_memory) + HEADER_SIZE;
@@ -151,10 +153,12 @@ MemID HeapAllocatorAtomicAlignedPoolImplicitList::find_valid_chunk(size_t p_alig
             void* result_loc = acquire_memory(free_memory, idle_mem_start, p_aligned_size);
             MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
             *static_cast<Header*>(result_loc) = p_aligned_size;
-            internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + p_aligned_size - (size_t)mem_chunk);
+            internal_fragmentation_tracker
+                = std::max(internal_fragmentation_tracker, reinterpret_cast<uintptr_t>(result_loc)
+                           + p_aligned_size - reinterpret_cast<size_t>(mem_chunk));
             return result_id;
         }
-        free_memory = get_next_free_memory<false, COALESCE_ENABLED>(free_memory);
+        free_memory = get_next_free_memory<false, CoalesceEnabled>(free_memory);
     }
     // If not found, return null.
     return MEM_NULL;
@@ -172,10 +176,10 @@ void HeapAllocatorAtomicAlignedPoolImplicitList::deallocate(MemID p_mem) {
     insert_free_memory(data_loc, data_size);
 }
 
-template <bool CHECK_FIRST, bool COALESCE_ENABLED>
+template <bool CheckFirst, bool CoalesceEnabled>
 char* HeapAllocatorAtomicAlignedPoolImplicitList::get_next_free_memory(char* p_from) {
     WBE_DEBUG_ASSERT(mutex.is_unique_locked_by_current_thread());
-    if constexpr (CHECK_FIRST) {
+    if constexpr (CheckFirst) {
         while (WBE_HAAAPIL_GET_CHUNK_TYPE(p_from) != HeaderType::IDLE) {
             p_from += WBE_HAAAPIL_GET_CHUNK_SIZE(p_from);
             if (p_from >= mem_chunk + size) {
@@ -191,7 +195,7 @@ char* HeapAllocatorAtomicAlignedPoolImplicitList::get_next_free_memory(char* p_f
             }
         } while (WBE_HAAAPIL_GET_CHUNK_TYPE(p_from) != HeaderType::IDLE);
     }
-    if constexpr (COALESCE_ENABLED) {
+    if constexpr (CoalesceEnabled) {
         coalesce_chunk(p_from);
     }
     return p_from;
@@ -316,14 +320,16 @@ bool HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_is_in_pool(MemID p_me
 std::string HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_to_string() const {
     std::stringstream ss;
     ss << "{";
-    ss << "\"type\":\"HeapAllocatorAtomicAlignedPoolImplicitList\",";
+    ss << R"("type":"HeapAllocatorAtomicAlignedPoolImplicitList",)";
     ss << "\"total_size\":" << size << ",";
     ss << "\"chunk_layout\":[";
     char* curr = mem_chunk;
     bool first = true;
     uint32_t fragments_size = 0;
     while (curr < mem_chunk + size) {
-        if (!first) ss << ",";
+        if (!first) {
+            ss << ",";
+        }
         first = false;
         bool occupied = WBE_HAAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED;
         ss << "{"
@@ -344,4 +350,4 @@ std::string HeapAllocatorAtomicAlignedPoolImplicitList::unguarded_to_string() co
     ss << "}";
     return ss.str();
 }
-}
+} // namespace WhiteBirdEngine

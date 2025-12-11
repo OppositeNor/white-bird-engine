@@ -24,13 +24,13 @@
 namespace WhiteBirdEngine {
 
 void CLAASTVisitorToString::visit(CLAASTNodeRoot* p_node) {
-    ss << std::string(2 * indent_depth, ' ') << "utility: " << p_node->get_utility_name() << "\n";
+    ss << std::string(2UL * indent_depth, ' ') << "utility: " << p_node->get_utility_name() << "\n";
     auto operations = p_node->get_operations();
     if (!operations.empty()) {
-        ss << std::string(2 * indent_depth, ' ') << "operations:\n";
+        ss << std::string(2UL * indent_depth, ' ') << "operations:\n";
         ++indent_depth;
         for (auto& operation : operations) {
-            ss << std::string(2 * indent_depth, ' ') << "- ";
+            ss << std::string(2UL * indent_depth, ' ') << "- ";
             operation->accept(this);
         }
         --indent_depth;
@@ -45,9 +45,9 @@ void CLAASTVisitorToString::visit(class CLAASTNodeOperation* p_node) {
     ss << "operation: " << p_node->get_operation_name() << "\n";
     auto arguments = p_node->get_arguments();
     if (!arguments.empty()) {
-        ss << std::string(2 * (indent_depth + 1), ' ') << "arguments:\n";
+        ss << std::string(2UL * (indent_depth + 1), ' ') << "arguments:\n";
         for (auto& argument : arguments) {
-            ss << std::string(2 * (indent_depth + 2), ' ') << "- " << argument << "\n";
+            ss << std::string(2UL * (indent_depth + 2), ' ') << "- " << argument << "\n";
         }
     }
 }
@@ -66,11 +66,11 @@ void CLAASTVisitorAssembler::visit(CLAASTNodeRootOperand* p_node) {
 
 void CLAASTVisitorAssembler::visit(CLAASTNodeOperation* p_node) {
     std::string operation_name = p_node->get_operation_name();
-    int32_t arg_num;
+    int32_t arg_num = 0;
     if (!get_operation_arg_count(operation_name, p_node, arg_num)) {
         return;
     }
-    int32_t input_arg_num = p_node->get_arguments().size();
+    size_t input_arg_num = p_node->get_arguments().size();
     if (input_arg_num < arg_num) {
         throw std::runtime_error("Failed to parse operation: " + operation_name + ", not enough arguments. Expected: "
                                  + std::to_string(arg_num) + ", inputed: " + std::to_string(input_arg_num) + ".");
@@ -98,14 +98,14 @@ bool CLAASTVisitorAssembler::get_operation_arg_count(std::string& p_op_name, CLA
 }
 
 void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num) {
-    auto& arguments = p_node->get_arguments();
-    int32_t input_arg_num = p_node->get_arguments().size();
+    const auto& arguments = p_node->get_arguments();
+    size_t input_arg_num = p_node->get_arguments().size();
     if (p_arg_num < 0) {
-        p_arg_num = arguments.size();
+        p_arg_num = static_cast<int32_t>(arguments.size());
     }
     CLAOperation operation{};
     operation.operation_name = p_op_name;
-    int32_t i;
+    int32_t i = 0;
     for (i = 0; i < p_arg_num; ++i) {
         operation.arguments.push_back(arguments[i]);
     }
@@ -115,4 +115,4 @@ void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const st
     root.operations.push_back(operation);
 }
 
-}
+} // namespace WhiteBirdEngine

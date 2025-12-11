@@ -325,4 +325,4 @@ HeapAllocatorAlignedPoolImplicitList::operator std::string() const {
     return ss.str();
 }
 
-}
+} // namespace WhiteBirdEngine

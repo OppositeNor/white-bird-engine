@@ -47,7 +47,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> final : public AllocatorTr
 class HeapAllocatorAlignedPool final : public HeapAllocatorAligned {
 public:
     HeapAllocatorAlignedPool()
-        : HeapAllocatorAlignedPool(WBE_KiB(64)) {}
+        : HeapAllocatorAlignedPool(WBE_KiB(64UL)) {}
     virtual ~HeapAllocatorAlignedPool() override;
     HeapAllocatorAlignedPool(const HeapAllocatorAlignedPool&) = delete;
     HeapAllocatorAlignedPool(HeapAllocatorAlignedPool&&) = delete;
@@ -133,8 +133,8 @@ public:
 private:
 
     struct IdleListNode {
-        size_t size;
-        char* mem_start;
+        size_t size = 0;
+        char* mem_start = nullptr;
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
@@ -151,6 +151,6 @@ private:
     size_t internal_fragmentation_tracker = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

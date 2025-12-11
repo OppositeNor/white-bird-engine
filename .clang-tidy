@@ -30,6 +30,7 @@ Checks: >
   -readability-use-anyofallof,
   -bugprone-easily-swappable-parameters,
   -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-avoid-do-while,

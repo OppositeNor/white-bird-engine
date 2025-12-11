@@ -83,7 +83,8 @@ MemID HeapAllocatorAlignedPool::allocate(size_t p_size, size_t p_alignment) {
             void* result_loc = acquire_memory(*valid_idle_node, idle_node_mem_start, aligned_size);
             MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
             *static_cast<Header*>(result_loc) = aligned_size;
-            internal_fragmentation_tracker = std::max(internal_fragmentation_tracker, (size_t)result_loc + aligned_size - (size_t)mem_chunk);
+            internal_fragmentation_tracker
+                = std::max(internal_fragmentation_tracker, reinterpret_cast<uintptr_t>(result_loc) + aligned_size - reinterpret_cast<uint64_t>(mem_chunk));
             return result_id;
         }
         valid_idle_node = &((*valid_idle_node)->next);
@@ -128,18 +129,16 @@ void* HeapAllocatorAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_
         }
         return node_mem_start;
     }
-    else {
-        int node_size_diff = p_mem_start - p_node->mem_start;
-        if (p_mem_start + p_mem_size != p_node->mem_start + p_node->size) {
-            std::unique_ptr<IdleListNode> node_next = std::make_unique<IdleListNode>();
-            node_next->mem_start = p_mem_start + p_mem_size;
-            node_next->size = p_node->size - node_size_diff - p_mem_size;
-            node_next->next = std::move(p_node->next);
-            p_node->next = std::move(node_next);
-        }
-        p_node->size = node_size_diff;
-        return p_mem_start;
+    size_t node_size_diff = p_mem_start - p_node->mem_start;
+    if (p_mem_start + p_mem_size != p_node->mem_start + p_node->size) {
+        std::unique_ptr<IdleListNode> node_next = std::make_unique<IdleListNode>();
+        node_next->mem_start = p_mem_start + p_mem_size;
+        node_next->size = p_node->size - node_size_diff - p_mem_size;
+        node_next->next = std::move(p_node->next);
+        p_node->next = std::move(node_next);
     }
+    p_node->size = node_size_diff;
+    return p_mem_start;
 }
 
 void HeapAllocatorAlignedPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
@@ -231,13 +230,15 @@ bool HeapAllocatorAlignedPool::is_in_pool(MemID p_mem_id) const {
 HeapAllocatorAlignedPool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
-    ss << "\"type\":\"HeapAllocatorAlignedPool\",";
+    ss << R"("type":"HeapAllocatorAlignedPool",)";
     ss << "\"total_size\":" << get_total_size() << ",";
     ss << "\"free_chunk_layout\":[";
     IdleListNode* node = idle_list_head.get();
     bool first = true;
     while (node != nullptr) {
-        if (!first) ss << ",";
+        if (!first) {
+            ss << ",";
+        }
         first = false;
         ss << "{"
             << "\"begin\":" << (node->mem_start - mem_chunk) << ","
@@ -250,4 +251,4 @@ HeapAllocatorAlignedPool::operator std::string() const {
     return ss.str();
 }
 
-}
+} // namespace WhiteBirdEngine
