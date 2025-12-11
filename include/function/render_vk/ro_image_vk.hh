@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -69,11 +70,11 @@ public:
         // Make a 2D image.
         Builder& image_2d(glm::uvec2 p_size);
         // Make a 2D image.
-        Builder& image_2d(VkExtent2D p_size);
+        Builder& image_2d(VkExtent2D p_extent);
         // Make a 3D image.
         Builder& image_3d(glm::uvec3 p_size);
         // Make a 3D image.
-        Builder& image_3d(VkExtent3D p_size);
+        Builder& image_3d(VkExtent3D p_extent);
         // Make an RGB image with each element 8 bit wide.
         Builder& rgb();
         // Make an SRGB image with each element 8 bit wide.
@@ -100,6 +101,8 @@ public:
     ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROImageVK() override;
 
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(ROImageVK);
+
     /**
      * @brief Get image instance.
      *
@@ -110,11 +113,11 @@ public:
     }
 
 private:
-    VkImage image;
+    VkImage image = VK_NULL_HANDLE;
 
     void init(const Builder& p_config);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

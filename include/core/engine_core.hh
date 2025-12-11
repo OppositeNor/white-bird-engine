@@ -34,7 +34,11 @@ namespace WhiteBirdEngine {
  */
 class EngineCore : public Singleton<EngineCore> {
 public:
-    ~EngineCore();
+    virtual ~EngineCore() override;
+    EngineCore(const EngineCore&) = delete;
+    EngineCore(EngineCore&&) = delete;
+    EngineCore& operator=(const EngineCore&) = delete;
+    EngineCore& operator=(EngineCore&&) = delete;
 
     /**
      * @brief Constructor.
@@ -114,6 +118,6 @@ inline HeapAllocatorAlignedPoolImplicitList* global_allocator() {
     return EngineCore::get_singleton()->pool_allocator;
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -48,6 +48,6 @@ private:
     ProfileData profile_data;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

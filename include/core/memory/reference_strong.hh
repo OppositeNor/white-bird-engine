@@ -58,12 +58,12 @@ public:
         p_other.ref();
         control_block = p_other.control_block;
     }
-    Ref(Ref&& p_other) {
+    Ref(Ref&& p_other) noexcept {
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
     }
     Ref& operator=(const Ref& p_other) {
-        if (*this == p_other) {
+        if (this == &p_other) {
             return *this;
         }
         deref();
@@ -71,7 +71,7 @@ public:
         control_block = p_other.control_block;
         return *this;
     }
-    Ref& operator=(Ref&& p_other) {
+    Ref& operator=(Ref&& p_other) noexcept {
         if (*this == p_other) {
             return *this;
         }
@@ -97,7 +97,7 @@ public:
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
-    Ref(Ref<T1, AllocType1>&& p_other) {
+    Ref(Ref<T1, AllocType1>&& p_other) noexcept {
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
@@ -114,7 +114,7 @@ public:
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
-    Ref& operator=(Ref<T1, AllocType1>&& p_other) {
+    Ref& operator=(Ref<T1, AllocType1>&& p_other) noexcept {
         if (*this == p_other) {
             return *this;
         }
@@ -291,7 +291,7 @@ private:
             weak_ref_counter.store(0, std::memory_order_release);
             strong_ref_counter.store(0, std::memory_order_release);
         }
-        MemID control_block_mem_id;
+        MemID control_block_mem_id = MEM_NULL;
         MemID mem_id;
         AllocType* allocator;
         std::atomic<uint64_t> weak_ref_counter;
@@ -359,7 +359,7 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
     return result;
 }
 
-}
+} // namespace WhiteBirdEngine
 
 namespace std {
 /**
@@ -370,7 +370,7 @@ namespace std {
  * @return 
  */
 template <typename T, typename AllocType>
-struct hash<::WhiteBirdEngine::Ref<T, AllocType>> {
+struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT(cert-dcl58-cpp)
     size_t operator()(const ::WhiteBirdEngine::Ref<T, AllocType>& p_ref) const {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
@@ -380,6 +380,6 @@ struct hash<::WhiteBirdEngine::Ref<T, AllocType>> {
     }
 
 };
-}
+} // namespace std
 
 #endif

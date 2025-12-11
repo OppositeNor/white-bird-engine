@@ -18,6 +18,7 @@
 #include "function/render/render_object.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -28,14 +29,21 @@ namespace WhiteBirdEngine {
  */
 class RenderObjectVK : public RenderObject {
 public:
+    RenderObjectVK() = delete;
+    virtual ~RenderObjectVK() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RenderObjectVK);
+
     /**
      * @brief Constructor.
      *
      * @param p_render_data The base render data.
      */
     RenderObjectVK(const BaseRenderDataVK* p_render_data)
-        : render_data(p_render_data) {}
-    virtual ~RenderObjectVK() override {}
+        : render_data(p_render_data) {
+        if (p_render_data == nullptr) {
+            throw std::runtime_error("Render data is nullptr.");
+        }
+    }
 
 protected:
     /**
@@ -68,9 +76,7 @@ struct RendResVK {
     RendResTID res_type_id;
     RendResID res_id;
     Ref<RenderObjectVK> res;
-    RendResVK(const BaseRenderDataVK* p_render_data) {}
-    
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

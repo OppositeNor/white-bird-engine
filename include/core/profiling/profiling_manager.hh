@@ -34,7 +34,11 @@ namespace WhiteBirdEngine {
 class ProfilingManager : public Singleton<ProfilingManager> {
 public:
     ProfilingManager() = default;
-    virtual ~ProfilingManager() override {}
+    virtual ~ProfilingManager() override = default;
+    ProfilingManager(const ProfilingManager&) = delete;
+    ProfilingManager(ProfilingManager&&) = delete;
+    ProfilingManager& operator=(const ProfilingManager&) = delete;
+    ProfilingManager& operator=(ProfilingManager&&) = delete;
 
     /**
      * @class ProfileData
@@ -49,7 +53,7 @@ public:
         std::string file;
         uint32_t line;
 
-        operator std::string() const {
+        explicit operator std::string() const {
             std::stringstream ss;
             ss << R"({"channel":")" << get_label_name(channel) << '\"'
                << R"(,"message":")" << message << '\"'
@@ -102,6 +106,6 @@ private:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

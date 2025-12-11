@@ -96,8 +96,8 @@ void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint
     // Use temporary buffer to increase locality
     uint32_t row_size = p_width * p_channels;
     std::unique_ptr<unsigned char[]> temp = std::make_unique<unsigned char[]>(row_size);
-    unsigned char* source_row;
-    unsigned char* target_row;
+    unsigned char* source_row = nullptr;
+    unsigned char* target_row = nullptr;
     for (uint32_t i = 0; i < p_height / 2; ++i) {
         source_row = p_data + i * row_size;
         target_row = p_data + (p_height - i - 1) * row_size;

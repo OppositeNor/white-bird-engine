@@ -35,7 +35,7 @@ public:
         // The source code of the shader.
         Required<const char*> code;
         // Size of the code.
-        size_t code_size;
+        Required<size_t> code_size;
 
         // Set the shader source code.
         Builder& set_code(const char* p_code, size_t p_code_size);
@@ -67,11 +67,11 @@ public:
     VkShaderModule get_shader_module() const;
 
 private:
-    VkShaderModule shader_module;
+    VkShaderModule shader_module = VK_NULL_HANDLE;
 
     void init(const Builder& p_builder);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

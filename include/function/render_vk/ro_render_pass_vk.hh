@@ -55,6 +55,9 @@ public:
     private:
         VkRenderPass build(const BaseRenderDataVK* p_render_data) const;
     };
+    RORenderPassVK() = delete;
+    virtual ~RORenderPassVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RORenderPassVK);
 
     /**
      * @brief Constructor.
@@ -63,7 +66,6 @@ public:
      * @param p_builder Configuration builder.
      */
     RORenderPassVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~RORenderPassVK() override;
 
     /**
      * @brief Get the render pass instance.
@@ -80,6 +82,6 @@ private:
     void init(const Builder& p_builder);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

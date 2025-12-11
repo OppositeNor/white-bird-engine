@@ -33,7 +33,11 @@ namespace WhiteBirdEngine {
 class WBE_META(WBE_SERIALIZABLE) Serializable {
 public:
     Serializable() = default;
-    virtual ~Serializable() {}
+    virtual ~Serializable() = default;
+    Serializable(const Serializable&) = default;
+    Serializable(Serializable&&) = default;
+    Serializable& operator=(const Serializable&) = default;
+    Serializable& operator=(Serializable&&) = default;
 
     /**
      * @brief Serialize.
@@ -51,6 +55,6 @@ public:
 };
 
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

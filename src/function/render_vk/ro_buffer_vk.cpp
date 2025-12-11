@@ -62,11 +62,11 @@ ROBufferVK::~ROBufferVK() {
     deallocate_device_memory(buffer_memory);
 }
 
-void ROBufferVK::update_buffer(const void* p_data, size_t p_offset, size_t p_size) {
-    if (p_offset + p_size > exposed_fields.buffer_size) {
+void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
+    if (p_dst_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(
             std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
-                        p_offset, p_offset + p_size, exposed_fields.buffer_size));
+                        p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
     }
     // TODO: Prevent data race
     memcpy(mapped_memory, p_data, p_size);

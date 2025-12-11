@@ -32,20 +32,17 @@ VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data)
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.pCode = reinterpret_cast<const uint32_t*>(WBE_REQUIRED(code));
-    create_info.codeSize = code_size;
+    create_info.codeSize = WBE_REQUIRED(code_size);
     
-    VkShaderModule result;
+    VkShaderModule result = VK_NULL_HANDLE;
     if (vkCreateShaderModule(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create shader module.");
     }
     return result;
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
-    if (p_render_data == nullptr) {
-        throw std::runtime_error("Render data is nullptr.");
-    }
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
+    : RenderObjectVK(p_base_render_data) {
     init(p_builder);
 }
 
@@ -61,4 +58,4 @@ void ROShaderVK::init(const Builder& p_builder) {
     shader_module = p_builder.build(render_data);
 }
 
-}
+} // namespace WhiteBirdEngine

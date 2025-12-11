@@ -35,8 +35,7 @@ EngineCore::~EngineCore() {
     singleton = nullptr;
 }
 
-EngineCore::EngineCore(int p_argc, char* p_argv[])
-    : Singleton<EngineCore>() {
+EngineCore::EngineCore(int p_argc, char* p_argv[]) {
     global_clock = new Clock();
     file_system = new FileSystem();
     initialize(p_argc, p_argv);

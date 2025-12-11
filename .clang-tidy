@@ -1,0 +1,224 @@
+# Clang-tidy configuration for White Bird Engine
+# Based on the coding style observed in include/core and src/core files
+
+Checks: >
+  *,
+  -altera-*,
+  -android-*,
+  -fuchsia-*,
+  -llvm-*,
+  -llvmlibc-*,
+  -zircon-*,
+  -abseil-*,
+  -boost-*,
+  -darwin-*,
+  -linuxkernel-*,
+  -mpi-*,
+  -objc-*,
+  -openmp-*,
+  -portability-*,
+  -performance-unnecessary-value-param,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-isolate-declaration,
+  -readability-convert-member-functions-to-static,
+  -readability-function-size,
+  -readability-simplify-boolean-expr,
+  -bugprone-easily-swappable-parameters,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cert-err58-cpp,
+  -google-readability-avoid-underscore-in-googletest-name,
+  -google-explicit-constructor,
+  -google-readability-todo,
+  -hicpp-named-parameter,
+  -hicpp-function-size,
+  -hicpp-avoid-c-arrays,
+  -hicpp-use-override,
+  -hicpp-explicit-conversions,
+  -hicpp-no-array-decay,
+  -hicpp-signed-bitwise,
+  -hicpp-use-auto,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -modernize-use-override,
+  -modernize-avoid-c-arrays,
+  -modernize-pass-by-value,
+  -modernize-use-auto,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-no-malloc,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-explicit-virtual-functions,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-prefer-member-initializer,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-rvalue-reference-param-not-moved,
+  -cppcoreguidelines-pro-bounds-constant-array-index
+
+CheckOptions:
+  # Include order: local headers with quotes first, then system headers with angle brackets
+  # Both should be alphabetically sorted
+  - key: llvm-include-order.priority
+    value: "1"
+  
+  # Naming conventions based on observed patterns
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.ClassPrefix
+    value: ""
+  - key: readability-identifier-naming.ClassSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructPrefix
+    value: ""
+  - key: readability-identifier-naming.StructSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.FunctionPrefix
+    value: ""
+  - key: readability-identifier-naming.FunctionSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.MethodCase
+    value: lower_case
+  - key: readability-identifier-naming.MethodPrefix
+    value: ""
+  - key: readability-identifier-naming.MethodSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.VariablePrefix
+    value: ""
+  - key: readability-identifier-naming.VariableSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterPrefix
+    value: "p_"
+  - key: readability-identifier-naming.ParameterSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.MemberPrefix
+    value: ""
+  - key: readability-identifier-naming.MemberSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumPrefix
+    value: ""
+  - key: readability-identifier-naming.EnumSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.EnumConstantPrefix
+    value: ""
+  - key: readability-identifier-naming.EnumConstantSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstexprVariablePrefix
+    value: ""
+  - key: readability-identifier-naming.ConstexprVariableSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: ""
+  - key: readability-identifier-naming.GlobalConstantSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionPrefix
+    value: "WBE_"
+  - key: readability-identifier-naming.MacroDefinitionSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.NamespaceCase
+    value: CamelCase
+  - key: readability-identifier-naming.NamespacePrefix
+    value: ""
+  - key: readability-identifier-naming.NamespaceSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateParameterPrefix
+    value: ""
+  - key: readability-identifier-naming.TemplateParameterSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefPrefix
+    value: ""
+  - key: readability-identifier-naming.TypedefSuffix
+    value: ""
+  
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasPrefix
+    value: ""
+  - key: readability-identifier-naming.TypeAliasSuffix
+    value: ""
+  
+  # Line length and formatting
+  - key: readability-line-length.LineLength
+    value: 120
+  
+  # Require explicit virtual keyword for all virtual functions
+  - key: modernize-use-override.AllowOverrideAndFinal
+    value: "true"
+  - key: modernize-use-override.IgnoreDestructors
+    value: "false"
+  - key: modernize-use-override.FinalSpelling
+    value: "final"
+  - key: modernize-use-override.OverrideSpelling
+    value: "override"
+  
+  # Function size limits
+  - key: readability-function-size.LineThreshold
+    value: 100
+  - key: readability-function-size.StatementThreshold
+    value: 50
+  - key: readability-function-size.BranchThreshold
+    value: 20
+  - key: readability-function-size.ParameterThreshold
+    value: 8
+  
+  # Header guard format based on observed pattern: __WBE_FILENAME_HH__
+  - key: llvm-header-guard.HeaderFileExtensions
+    value: "h,hh,hpp,hxx"
+  
+  # Braces and formatting preferences
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: "1"
+
+HeaderFilterRegex: '^(?!.*dependencies/).*/(include|src)/.*\.(h|hh|hpp|hxx)$'
+
+SystemHeaders: false
+
+WarningsAsErrors: ''
+
+# Inherit parent config if exists
+InheritParentConfig: false
+
+# Use .clang-format file for formatting
+FormatStyle: file

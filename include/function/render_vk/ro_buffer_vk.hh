@@ -196,8 +196,8 @@ public:
 
 private:
     void* mapped_memory = nullptr;
-    VkBuffer buffer;
-    VkDeviceMemory buffer_memory;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
     ExposedFields exposed_fields;
 };
 }

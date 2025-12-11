@@ -25,15 +25,15 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
     create_info.renderPass = render_pass->get_render_pass();
     std::vector<VkImageView> attachments_data;
     attachments_data.reserve(attachments.size());
-    for (auto& attachment : attachments) {
-        attachments_data.push_back(attachment->get_image_view());
+    for (const auto& attachment : attachments) {
+        attachments_data.emplace_back(attachment->get_image_view());
     }
     create_info.attachmentCount = attachments_data.size();
     create_info.pAttachments = attachments_data.data();
     create_info.width = WBE_REQUIRED(width);
     create_info.height = WBE_REQUIRED(height);
     create_info.layers = layers;
-    VkFramebuffer result;
+    VkFramebuffer result = VK_NULL_HANDLE;
     if (vkCreateFramebuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }

@@ -34,8 +34,12 @@ template <typename T>
 class ThisRef {
 public:
 
-    ThisRef() {}
-    virtual ~ThisRef() {}
+    ThisRef() = default;
+    virtual ~ThisRef() = default;
+    ThisRef(const ThisRef&) = default;
+    ThisRef(ThisRef&&) = default;
+    ThisRef& operator=(const ThisRef&) = default;
+    ThisRef& operator=(ThisRef&&) = default;
 
     /**
      * @brief Set the reference referencing this instance.
@@ -77,6 +81,6 @@ RefWeak<T> requires_valid(const std::string& p_name, RefWeak<T> p_ref) {
 
 using HeapAllocatorDefault = HeapAllocatorAlignedPoolImplicitList;
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

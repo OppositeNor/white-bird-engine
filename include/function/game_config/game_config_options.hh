@@ -88,8 +88,7 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
     int32_t limit_logic_fps = 60;
 };
 
-
-}
+} // namespace WhiteBirdEngine
 
 
 #endif

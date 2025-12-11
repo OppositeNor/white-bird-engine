@@ -19,13 +19,14 @@
 #include "global/global.hh"
 #include <cstdlib>
 #include <format>
+#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 
 int main(int p_argc, char* p_argv[]) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
     {
-        WBE::ApplicationGame game_application;
+        WBE::ApplicationGame const game_application;
         {
             // Not running the application is also an option.
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
@@ -36,8 +37,8 @@ int main(int p_argc, char* p_argv[]) {
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {} bytes", renderer_alloc_max));
         }
     }
-    auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
-    for (auto& profile : profiles) {
+    const auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    for (const auto& profile : profiles) {
         WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)
             ->message(std::format("{}: Total: {} seconds", profile.message, profile.start_time + profile.delta));
     }

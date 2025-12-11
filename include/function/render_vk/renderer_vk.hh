@@ -168,36 +168,36 @@ private:
     using STLAlloc = STLAllocator<T, AllocType, false, true, false>;
 
 
-    AllocType* allocator;
+    AllocType* allocator = nullptr;
     Ref<RenderDatabase> render_database;
     Ref<AllocatorVK> allocator_vk;
 
     // Vulkan properties
-    SDL_Window* window;
-    VkInstance vk_instance;
+    SDL_Window* window = nullptr;
+    VkInstance vk_instance = VK_NULL_HANDLE;
 
-    VkPhysicalDevice physical_device;
-    VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-    VkDevice logical_device;
+    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    VkPhysicalDeviceMemoryProperties physical_device_memory_properties{};
+    VkDevice logical_device = VK_NULL_HANDLE;
 
-    VkSurfaceKHR surface;
-    VkSwapchainKHR swap_chain;
-    uint32_t swap_chain_images_count;
-    uint32_t frames_in_flight;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
+    uint32_t swap_chain_images_count = 0;
+    uint32_t frames_in_flight = 0;
 
-    VkQueue graphics_queue;
-    VkQueue compute_queue;
-    VkQueue present_queue;
+    VkQueue graphics_queue = VK_NULL_HANDLE;
+    VkQueue compute_queue = VK_NULL_HANDLE;
+    VkQueue present_queue = VK_NULL_HANDLE;
 
     vector<VkImage> swap_chain_images;
-    VkFormat swap_chain_image_format;
-    VkExtent2D swap_chain_extent;
+    VkFormat swap_chain_image_format = VK_FORMAT_UNDEFINED;
+    VkExtent2D swap_chain_extent{};
 
     VkViewport viewport{};
     VkRect2D scissor{};
 
-    VkCommandPool graphics_command_pool;
-    VkCommandPool compute_command_pool;
+    VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
+    VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
     vector<VkFence> in_flight_fences;
 
@@ -210,17 +210,17 @@ private:
     };
 
 #ifdef WBE_VK_ENABLE_VALIDATION
-    constexpr static bool enable_validation_layer = true;
+    constexpr static bool ENABLE_VALIDATION_LAYER = true;
 #else
     constexpr static bool enable_validation_layer = false;
 #endif
 
     struct QueueFamilyIndices {
-        AllocType* allocator;
+        AllocType* allocator = nullptr;
         std::optional<uint32_t> graphics;   // For basic pipeline rendering
         std::optional<uint32_t> compute;    // For compute shader
         std::optional<uint32_t> present;    // For presenting contents in window
-        bool is_complete() {
+        bool is_complete() const {
             return graphics.has_value()
                 && compute.has_value()
                 && present.has_value();
@@ -238,7 +238,7 @@ private:
         VkSurfaceCapabilitiesKHR capabilities;
         vector<VkSurfaceFormatKHR> formats;
         vector<VkPresentModeKHR> present_modes;
-        bool is_adequate() {
+        bool is_adequate() const {
             return !formats.empty() && !present_modes.empty();
         }
     };
@@ -259,7 +259,7 @@ private:
         vector<TaskInfo> task_infos;
         Ref<SemaphoreVK> image_available_semaphore;
         vector<Ref<SemaphoreVK>> result_semaphores;
-        uint64_t max_depth;
+        uint64_t max_depth = 0;
         PipelineInfo(AllocType* p_allocator)
             : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator),
             result_semaphores(p_allocator) {}
@@ -333,13 +333,14 @@ private:
     VkSurfaceFormatKHR choose_swap_surface_format(const vector<VkSurfaceFormatKHR>& p_available_formats);
     VkPresentModeKHR choose_swap_present_mode(const vector<VkPresentModeKHR>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
+    void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
         return allocator_vk->get_allocation_callbacks();
     }
 
     vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
-    void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index);
+    void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
     void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
                            std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
@@ -348,6 +349,6 @@ private:
     uint32_t find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -17,6 +17,7 @@
 
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -34,10 +35,9 @@ struct RTPreExecutePipelineVK final: public RenderTaskVK {
      */
     RTPreExecutePipelineVK(const BaseRenderDataVK* p_render_data, Ref<SemaphoreVK> p_prepare_image_semaphore);
     virtual ~RTPreExecutePipelineVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RTPreExecutePipelineVK);
 
-    virtual void init() override {
-        // Reserve for 8 tasks
-    }
+    virtual void init() override {}
     virtual void perform(double p_delta) override;
 
 private:
@@ -62,7 +62,7 @@ public:
      */
     RTPreExecutePipelineFactoryVK(const BaseRenderDataVK* p_render_data, Ref<SemaphoreVK> p_prepare_image_semaphore)
         : RenderTaskFactoryVK(p_render_data), prepare_image_semaphore(p_prepare_image_semaphore) {}
-    virtual ~RTPreExecutePipelineFactoryVK() override {}
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(RTPreExecutePipelineFactoryVK);
 
     virtual Ref<RenderTask> create() const override {
         return make_ref<RTPreExecutePipelineVK>(render_data->allocator, render_data, prepare_image_semaphore);

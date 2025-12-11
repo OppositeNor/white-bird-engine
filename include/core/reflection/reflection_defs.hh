@@ -64,6 +64,6 @@ public:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

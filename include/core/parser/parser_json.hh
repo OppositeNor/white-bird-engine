@@ -37,26 +37,32 @@ namespace WhiteBirdEngine {
  *
  */
 class JSONData final : public ParserData<JSONData> {
-    using json = nlohmann::json;
+    using Json = nlohmann::json;
     friend class ParserJSON;
-    friend std::ostream& operator<<(std::ostream& p_ostrem, const JSONData& p_parser);
+    friend std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parser);
 public:
-    JSONData() {}
-    ~JSONData() {}
+    JSONData() = default;
+    ~JSONData() = default;
     JSONData(const JSONData& p_other) : data(p_other.data) {}
-    JSONData(JSONData&& p_other) : data(std::move(p_other.data)) {}
+    JSONData(JSONData&& p_other) noexcept : data(std::move(p_other.data)) {}
     JSONData& operator=(const JSONData& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         data = p_other.data;
         return *this;
     }
-    JSONData& operator=(JSONData&& p_other) {
+    JSONData& operator=(JSONData&& p_other) noexcept {
+        if (&p_other == this) {
+            return *this;
+        }
         data = std::move(p_other.data);
         return *this;
     }
 
-    JSONData(const json& p_data)
+    JSONData(const Json& p_data)
         : data(p_data) {}
-    JSONData(json&& p_data)
+    JSONData(Json&& p_data)
         : data(std::move(p_data)) {}
 
     template <typename T>
@@ -103,7 +109,7 @@ public:
         if constexpr (std::same_as<Type, JSONData>) {
             data = p_value.data;
         } else if constexpr (std::same_as<Type, std::vector<JSONData>>) {
-            data = json();
+            data = Json();
             for (auto& item : p_value) {
                 data.push_back(item.data);
             }
@@ -117,16 +123,16 @@ public:
             }
             data = result;
         } else if constexpr (std::same_as<Type, glm::vec2>) {
-            data = json();
+            data = Json();
             data["x"] = p_value.x;
             data["y"] = p_value.y;
         } else if constexpr (std::same_as<Type, glm::vec3>) {
-            data = json();
+            data = Json();
             data["x"] = p_value.x;
             data["y"] = p_value.y;
             data["z"] = p_value.z;
         } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
-            data = json();
+            data = Json();
             data["x"] = p_value.x;
             data["y"] = p_value.y;
             data["z"] = p_value.z;
@@ -154,8 +160,8 @@ public:
     void get(T& p_value) const {
         if constexpr (std::same_as<T, std::vector<JSONData>>) {
             std::vector<JSONData> result;
-            for (const auto& elem : data.get<json>()) {
-                result.push_back(elem);
+            for (const auto& elem : data.get<Json>()) {
+                result.emplace_back(elem);
             }
             p_value = result;
         } else if constexpr (BufferBaseConcept<T>) {
@@ -184,7 +190,7 @@ public:
                 data.at("z").get<float>(),
                 data.at("w").get<float>());
         } else if constexpr (std::same_as<T, JSONData>) {
-            p_value = JSONData(data.get<json>());
+            p_value = JSONData(data.get<Json>());
         } else {
             p_value = data.get<T>();
         }
@@ -224,7 +230,7 @@ public:
                 data.at(p_key).at("z").get<float>(),
                 data.at(p_key).at("w").get<float>());
         } else if constexpr (std::same_as<T, JSONData>) {
-            p_value = JSONData(data.at(p_key).get<json>());
+            p_value = JSONData(data.at(p_key).get<Json>());
         } else {
             p_value = data.at(p_key).get<T>();
         }
@@ -239,7 +245,7 @@ public:
     std::vector<std::string> get_all_keys() const {
         std::vector<std::string> result;
         result.reserve(data.size());
-        for (json::const_iterator it = data.begin(); it != data.end(); ++it) {
+        for (Json::const_iterator it = data.begin(); it != data.end(); ++it) {
             result.push_back(it.key());
         }
         return result;
@@ -250,7 +256,7 @@ public:
     }
   
 private:
-    json data;
+    Json data;
 };
 
 inline std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parser) {
@@ -263,21 +269,27 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parse
  * @todo Test
  */
 class ParserJSON final : public Parser<ParserJSON> {
-    using json = nlohmann::json;
+    using Json = nlohmann::json;
 public:
     using DataType = JSONData;
 
     ParserJSON() = default;
-    virtual ~ParserJSON() {}
+    virtual ~ParserJSON() = default;
     ParserJSON(const ParserJSON& p_other)
         : data(p_other.data) {}
-    ParserJSON(ParserJSON&& p_other)
+    ParserJSON(ParserJSON&& p_other) noexcept
         : data(std::move(p_other.data)) {}
     ParserJSON& operator=(const ParserJSON& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         data = p_other.data;
         return *this;
     }
-    ParserJSON& operator=(ParserJSON&& p_other) {
+    ParserJSON& operator=(ParserJSON&& p_other) noexcept {
+        if (&p_other == this) {
+            return *this;
+        }
         data = std::move(p_other.data);
         return *this;
     }
@@ -289,7 +301,7 @@ public:
             if (!f.is_open()) {
                 throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
             }
-            data.data = json::parse(f);
+            data.data = Json::parse(f);
         } catch (const std::exception& e) {
             throw std::runtime_error("Failed to parse JSON file at path: " + static_cast<std::string>(p_path) + ". Error: " + e.what());
         }
@@ -297,7 +309,7 @@ public:
 
     void parse_from_buffer(const std::string& p_buffer) {
         try {
-            data.data = json::parse(p_buffer);
+            data.data = Json::parse(p_buffer);
         } catch (const std::exception& e) {
             throw std::runtime_error("Failed to parse JSON from buffer. Error: " + std::string(e.what()));
         }
@@ -310,7 +322,7 @@ public:
 
     template <typename T>
     void get_value(std::string& p_key, T&& p_value) {
-        return data.get_value<T>(std::forward<T>(p_value));
+        return data.get_value<T>(p_key, std::forward<T>(p_value));
     }
 
     template <typename T>
@@ -349,6 +361,6 @@ private:
     JSONData data;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

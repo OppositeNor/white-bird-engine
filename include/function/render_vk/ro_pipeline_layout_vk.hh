@@ -19,6 +19,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "utils/defs.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -50,6 +51,9 @@ public:
     private:
         VkPipelineLayout build(const BaseRenderDataVK* p_render_data) const;
     };
+    ROPipelineLayoutVK() = delete;
+    virtual ~ROPipelineLayoutVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(ROPipelineLayoutVK)
 
     /**
      * @brief Constructor.
@@ -58,7 +62,6 @@ public:
      * @param p_builder Configuration builder.
      */
     ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~ROPipelineLayoutVK() override;
 
     /**
      * @brief Get the vulkan pipeline layout instance.
@@ -74,6 +77,6 @@ private:
     void init(const Builder& p_builder);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

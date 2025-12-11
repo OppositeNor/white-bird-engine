@@ -51,6 +51,7 @@ void RTRunGraphicsPipelineVK::init() {
 }
 
 void RTRunGraphicsPipelineVK::perform(double p_delta) {
+    (void)p_delta;
     // The resources may be loaded in-flight, so we should check if they are valid every single frame.
     check_req_res({TypeUUID<ROFramebufferVK>::UUID, TypeUUID<ROGraphicsPipelineVK>::UUID});
     if (req_rend_res[0]->res == MEM_NULL) {
@@ -77,8 +78,8 @@ void RTRunGraphicsPipelineVK::record_command_buffer() {
     render_pass_info.renderArea.offset.x = 0;
     render_pass_info.renderArea.offset.y = 0;
     auto extent = framebuffer->fields().extent;
-    render_pass_info.renderArea.extent = {extent.x, extent.y};
-    VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    render_pass_info.renderArea.extent = {.width = extent.x, .height = extent.y};
+    VkClearValue clear_color = {.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}};
     render_pass_info.clearValueCount = 1;
     render_pass_info.pClearValues = &clear_color;
 
@@ -87,12 +88,12 @@ void RTRunGraphicsPipelineVK::record_command_buffer() {
     vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
 
     VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = {extent.x, extent.y};
+    scissor.offset = {.x = 0, .y = 0};
+    scissor.extent = {.width = extent.x, .height = extent.y};
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
     vkCmdDraw(command_buffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(command_buffer);
 }
-}
+} // namespace WhiteBirdEngine

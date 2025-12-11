@@ -28,6 +28,10 @@ namespace WhiteBirdEngine {
  *
  */
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
+    RTRunGraphicsPipelineVK() = delete;
+    virtual ~RTRunGraphicsPipelineVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(RTRunGraphicsPipelineVK)
+
     /**
      * @brief Constructor.
      *
@@ -35,14 +39,13 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_signal_in_flight Should signal in flight fence. TODO: remove this and signal the fence every time after running the final task.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence = false);
-    virtual ~RTRunGraphicsPipelineVK() override;
 
     virtual void init() override;
 
     virtual void perform(double p_delta) override;
 
 private:
-    VkCommandBuffer command_buffer;
+    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     bool signal_in_flight_fence = false;
     vector<VkPipelineStageFlags2> wait_stages;
     void record_command_buffer();
@@ -55,6 +58,9 @@ private:
  */
 class RTRunGraphicsPipelineFactoryVK final : public RenderTaskFactoryVK {
 public:
+    RTRunGraphicsPipelineFactoryVK() = delete;
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(RTRunGraphicsPipelineFactoryVK)
+
     /**
      * @brief Constructor.
      *
@@ -63,7 +69,6 @@ public:
      */
     RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
         : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight) {}
-    virtual ~RTRunGraphicsPipelineFactoryVK() override {}
 
     virtual Ref<RenderTask> create() const override {
         return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, signal_in_flight);      
@@ -72,6 +77,6 @@ private:
     bool signal_in_flight;
 
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

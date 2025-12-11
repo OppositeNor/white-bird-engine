@@ -16,6 +16,7 @@
 #define __WBE_SEMAPHORE_VK_HH__
 
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -47,6 +48,8 @@ public:
     ~SemaphoreVK() {
         vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
     }
+
+    WBE_R6_NDCD_DELETE_COPY_MOVE_OVERRIDE(SemaphoreVK);
 
     /**
      * @brief Is this a binary semaphore.
@@ -83,11 +86,11 @@ public:
     }
 
 private:
-    VkSemaphore semaphore;
+    VkSemaphore semaphore = VK_NULL_HANDLE;
     const BaseRenderDataVK* render_data;
     bool is_binary;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

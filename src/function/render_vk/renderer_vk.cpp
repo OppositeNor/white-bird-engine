@@ -101,8 +101,8 @@ void RendererVK::tick(double p_delta) {
     vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
 
     // Aquire swap chain image.
-    uint32_t image_index;
-    auto image_available_semaphore = run_pipeline[frame_counter]->image_available_semaphore->get_semaphore();
+    uint32_t image_index = 0;
+    auto* image_available_semaphore = run_pipeline[frame_counter]->image_available_semaphore->get_semaphore();
     VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX,
                                             image_available_semaphore,
                                             VK_NULL_HANDLE, &image_index);
@@ -149,7 +149,7 @@ void RendererVK::tick(double p_delta) {
 }
 
 void RendererVK::update_static_opaque_triangles() {
-    auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
+    const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
     ROBufferVK::Builder builder;
     auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
     if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
@@ -163,6 +163,7 @@ void RendererVK::update_static_opaque_triangles() {
 }
 
 void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {
+    (void)p_input_manager;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -170,6 +171,8 @@ void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_man
                 p_should_close = true;
                 break;
             // TODO: update input manager.
+            default:
+                break;
         }
     }
 }
@@ -193,7 +196,7 @@ void RendererVK::terminate() {
     pipelines.clear();
     activated_pipeline.clear();
     render_objects.reset();
-    for (auto fence : in_flight_fences) {
+    for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
@@ -210,9 +213,10 @@ void RendererVK::terminate() {
 void RendererVK::init_window() {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Vulkan_LoadLibrary(nullptr);
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     window = SDL_CreateWindow(game_config.game_name.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              game_config.window_width, game_config.window_height, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
+                              static_cast<int>(game_config.window_width),
+                              static_cast<int>(game_config.window_height), SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
 }
 
 void RendererVK::init_vulkan() {
@@ -307,21 +311,21 @@ void RendererVK::init_swap_chain_framebuffers() {
 
 void RendererVK::setup_render_resource() {
     // Setup swap_chain_framebuffer_resource.
-    render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator);
     render_objects->swap_chain_framebuffer_resource->res_type_id = TypeUUID<ROFramebufferVK>::UUID;
     render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK;
     render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
     render_resources.insert(std::pair(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffer_resource));
 
     // Setup base_graphics_pipeline_resource.
-    render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator);
     render_objects->base_graphics_pipeline_resource->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
     render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE_VK;
     render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
     render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE_VK, render_objects->base_graphics_pipeline_resource));
 
     // Setup static_opaque_triangles_vertices_buffer_resource.
-    render_objects->static_opaque_triangles_vertices_buffer_resource = make_ref<RendResVK>(allocator, &base_render_data);
+    render_objects->static_opaque_triangles_vertices_buffer_resource = make_ref<RendResVK>(allocator);
     render_objects->static_opaque_triangles_vertices_buffer_resource->res_type_id = TypeUUID<ROBufferVK>::UUID;
     render_objects->static_opaque_triangles_vertices_buffer_resource->res_id = REND_RES_STATIC_OPAQUE_TRIANGLES_VK;
     render_objects->static_opaque_triangles_vertices_buffer_resource->res = MEM_NULL;
@@ -330,8 +334,8 @@ void RendererVK::setup_render_resource() {
 
 void RendererVK::create_instance() {
     // Get configuration informations.
-    auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
 
     // Setup Application info.
     VkApplicationInfo app_info{};
@@ -348,7 +352,7 @@ void RendererVK::create_instance() {
     create_info.pApplicationInfo = &app_info;
 
     // Enable validation layer for debug build.
-    if constexpr (enable_validation_layer) {
+    if constexpr (ENABLE_VALIDATION_LAYER) {
         create_info.enabledLayerCount = validation_layers.size();
         create_info.ppEnabledLayerNames = validation_layers.data();
     }
@@ -438,7 +442,7 @@ void RendererVK::create_swap_chain() {
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     frames_in_flight = game_config.frames_in_flight;
     if (frames_in_flight < swap_chain_images_count) {
         wbe_console_log(WBE_CHANNEL_RENDER)->warning(
@@ -451,10 +455,10 @@ void RendererVK::create_swap_chain() {
     // Setup viewport and scissor information.
     viewport.x = 0;
     viewport.y = 0;
-    viewport.width = extent.width;
-    viewport.height = extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0F;
+    viewport.maxDepth = 1.0F;
 
     scissor.offset.x = 0;
     scissor.offset.y = 0;
@@ -471,7 +475,7 @@ void RendererVK::clean_up_swap_chain() {
 
 void RendererVK::init_swap_chain_image_views() {
     render_objects->swap_chain_image_views.reserve(swap_chain_images.size());
-    for (size_t i = 0; i < swap_chain_images.size(); ++i) {
+    for (auto& swap_chain_image : swap_chain_images) {
         VkImageSubresourceRange subresource_range;
         // Only use the color information of the image.
         subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -482,7 +486,7 @@ void RendererVK::init_swap_chain_image_views() {
         subresource_range.layerCount = 1;
 
         ROImageViewVK::Builder builder;
-        builder.set_image(swap_chain_images[i])
+        builder.set_image(swap_chain_image)
             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
             .set_format(swap_chain_image_format)
             .set_components(
@@ -492,7 +496,7 @@ void RendererVK::init_swap_chain_image_views() {
                 VK_COMPONENT_SWIZZLE_IDENTITY)
         .set_subresource_range(subresource_range);
 
-        render_objects->swap_chain_image_views.push_back(
+        render_objects->swap_chain_image_views.emplace_back(
             make_ref<ROImageViewVK>(allocator, &base_render_data, builder)
         );
     }
@@ -522,7 +526,7 @@ void RendererVK::create_async_objects() {
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     in_flight_fences.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
-        VkFence fence;
+        VkFence fence = VK_NULL_HANDLE;
         if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create in flight fence");
         }
@@ -598,7 +602,7 @@ void RendererVK::create_logical_device() {
     set<uint32_t> indices = queue_family_indices.get_unique_indices();
     vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
     queues_create_info.reserve(indices.size());
-    for (int elem : indices) {
+    for (uint32_t elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
         queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queue_create_info.queueFamilyIndex = elem;
@@ -615,7 +619,7 @@ void RendererVK::create_logical_device() {
 
     // Setup layers.
     // Enable validation layer for debug builds.
-    if constexpr (enable_validation_layer) {
+    if constexpr (ENABLE_VALIDATION_LAYER) {
         create_info.enabledLayerCount = validation_layers.size();
         create_info.ppEnabledLayerNames = validation_layers.data();
     }
@@ -669,7 +673,7 @@ bool RendererVK::check_validation_layer_support() {
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
     vector<VkLayerProperties> layer_properties(layer_count, allocator);
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
-    for (auto* name : validation_layers) {
+    for (const auto* name : validation_layers) {
         bool layer_found = false;
         for (auto& layer_prop : layer_properties) {
             if (strcmp(layer_prop.layerName, name) == 0) {
@@ -687,7 +691,7 @@ bool RendererVK::check_validation_layer_support() {
 
 void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     int32_t pick_device_index = game_config.render_device_index;
     if (pick_device_index >= 0) {
         // The refered device index is provided, use the index to pick device. If failed to pick, fall back to automatic picking.
@@ -717,7 +721,7 @@ void RendererVK::pick_physical_device(const vector<VkPhysicalDevice>& p_physical
         }
     }
     // Pick a suitable device.
-    for (auto& device : p_physical_devices) {
+    for (const auto& device : p_physical_devices) {
         if (!is_device_suitable(device)) {
             continue;
         }
@@ -750,6 +754,8 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (swap_chain_support_details.formats.empty() || swap_chain_support_details.present_modes.empty()) {
         return false;
     }
+
+    // End of checks, the device is suitable.
     return true;
 }
 
@@ -819,12 +825,26 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     if (p_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return p_capabilities.currentExtent;
     }
-    int extent_width, extent_height;
+    int extent_width = 0, extent_height = 0;
     SDL_GetWindowSizeInPixels(window, &extent_width, &extent_height);
     VkExtent2D result;
     result.width = extent_width;
     result.height = extent_height;
     return result;
+}
+
+void RendererVK::setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent) {
+    // Setup viewport and scissor information.
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = static_cast<float>(p_swap_chain_extent.width);
+    viewport.height = static_cast<float>(p_swap_chain_extent.height);
+    viewport.minDepth = 0.0F;
+    viewport.maxDepth = 1.0F;
+
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent = p_swap_chain_extent;
 }
 
 RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
@@ -841,13 +861,13 @@ RendererVK::vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
         // Copy frames_in_flight amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
         auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
         pipeline_info->pipeline_name = p_pipeline_name;
-        compile_tasks(p_root_task, pipeline_info, i);
-        pipeline_infos.push_back(pipeline_info);
+        compile_tasks(p_root_task, pipeline_info);
+        pipeline_infos.emplace_back(pipeline_info);
     }
     return pipeline_infos;
 }
 
-void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info, uint32_t p_index) {
+void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     // Setup image available semaphores
@@ -898,11 +918,11 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
     while (!to_visit.empty()) {
         Ref<RendTaskInfo> curr = to_visit.front();
         to_visit.pop_front();
-        if (visited.find(curr) != visited.end()) {
+        if (visited.contains(curr)) {
             continue;
         }
         visited.insert(curr);
-        for (auto next : curr->next) {
+        for (const auto& next : curr->next) {
             to_visit.push_back(next);
         }
 
@@ -936,7 +956,7 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
 Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
     auto iter = render_resources.find(p_res);
     if (iter == render_resources.end() || !iter->second.is_valid()) {
-        auto rend_res = make_ref<RendResVK>(allocator, &base_render_data);
+        auto rend_res = make_ref<RendResVK>(allocator);
         rend_res->res_type_id = p_type_id;
         rend_res->res_id = p_res;
         // TODO: initialize resource.
@@ -961,10 +981,10 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
 uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const {
     for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
         // Find the first memory property that could be used.
-        if (p_type_filter & (1 >> i)) {
+        if (p_type_filter & (1 >> i) && (physical_device_memory_properties.memoryTypes[i].propertyFlags & p_properties) == p_properties) {
             return i;
         }
     }
     throw std::runtime_error("Failed to find a suitable physical device.");
 }
-}
+} // namespace WhiteBirdEngine
