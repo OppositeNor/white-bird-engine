@@ -71,7 +71,7 @@ void CLAASTVisitorAssembler::visit(CLAASTNodeOperation* p_node) {
         return;
     }
     size_t input_arg_num = p_node->get_arguments().size();
-    if (input_arg_num < arg_num) {
+    if (arg_num >= 0 && input_arg_num < static_cast<size_t>(arg_num)) {
         throw std::runtime_error("Failed to parse operation: " + operation_name + ", not enough arguments. Expected: "
                                  + std::to_string(arg_num) + ", inputed: " + std::to_string(input_arg_num) + ".");
     }
@@ -109,7 +109,7 @@ void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const st
     for (i = 0; i < p_arg_num; ++i) {
         operation.arguments.push_back(arguments[i]);
     }
-    for (; i < input_arg_num; ++i) {
+    for (; static_cast<size_t>(i) < input_arg_num; ++i) {
         root.operands.push_back(arguments[i]);
     }
     root.operations.push_back(operation);

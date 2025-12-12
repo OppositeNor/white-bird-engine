@@ -58,7 +58,7 @@ public:
 
     RORenderPassVK() = delete;
     virtual ~RORenderPassVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RORenderPassVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RORenderPassVK)
 
     /**
      * @brief Constructor.

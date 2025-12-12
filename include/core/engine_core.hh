@@ -36,7 +36,7 @@ class EngineCore : public Singleton<EngineCore> {
 public:
     EngineCore() = delete;
     virtual ~EngineCore() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineCore);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineCore)
 
     /**
      * @brief Constructor.

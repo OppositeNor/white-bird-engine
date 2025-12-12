@@ -93,7 +93,7 @@ public:
     };
     ROImageVK() = delete;
     virtual ~ROImageVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageVK)
 
     /**
      * @brief Constructor.

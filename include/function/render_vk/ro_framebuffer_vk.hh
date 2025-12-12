@@ -119,7 +119,7 @@ public:
     };
     ROFramebufferVK() = delete;
     virtual ~ROFramebufferVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROFramebufferVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROFramebufferVK)
 
     ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 

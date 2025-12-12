@@ -15,6 +15,7 @@
 #ifndef __WBE_CLA_AST_VISITOR_HH__
 #define __WBE_CLA_AST_VISITOR_HH__
 #include "core/cla/cla_utils.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -29,7 +30,7 @@ namespace WhiteBirdEngine {
 class CLAASTVisitor {
 public:
     CLAASTVisitor() = default;
-    virtual ~CLAASTVisitor() {}
+    virtual ~CLAASTVisitor() = default;
     CLAASTVisitor(const CLAASTVisitor&) = delete;
     CLAASTVisitor(CLAASTVisitor&&) = delete;
     CLAASTVisitor& operator=(const CLAASTVisitor&) = delete;
@@ -66,9 +67,9 @@ public:
  */
 class CLAASTVisitorToString : public CLAASTVisitor {
 public:
-    CLAASTVisitorToString()
-        : indent_depth(0) {}
-    virtual ~CLAASTVisitorToString() override {}
+    CLAASTVisitorToString() = default;
+    virtual ~CLAASTVisitorToString() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTVisitorToString)
 
     virtual void visit(class CLAASTNodeRoot* p_node) override;
     virtual void visit(class CLAASTNodeRootOperand* p_node) override;
@@ -83,7 +84,7 @@ public:
         return ss.str();
     }
 private:
-    uint32_t indent_depth;
+    uint32_t indent_depth = 0;
     std::stringstream ss;
 };
 
@@ -98,18 +99,19 @@ public:
     CLAASTVisitorAssembler()
         : root({}) {
     }
-    virtual ~CLAASTVisitorAssembler() override {}
+    virtual ~CLAASTVisitorAssembler() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTVisitorAssembler)
 
     virtual void visit(class CLAASTNodeRoot* p_node) override;
     virtual void visit(class CLAASTNodeRootOperand* p_node) override;
     virtual void visit(class CLAASTNodeOperation* p_node) override;
 
     void register_option(const std::string& p_option_name, uint32_t p_arg_count) {
-        arg_count_long[p_option_name] = p_arg_count;
+        arg_count_long[p_option_name] = static_cast<int32_t>(p_arg_count);
     }
 
     void register_option(const std::string& p_option_name, char p_option_name_short, uint32_t p_arg_count) {
-        arg_count_long[p_option_name] = p_arg_count;
+        arg_count_long[p_option_name] = static_cast<int32_t>(p_arg_count);
         arg_short_to_long[p_option_name_short] = p_option_name;
     }
 
@@ -126,6 +128,6 @@ private:
     CLARoot root;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

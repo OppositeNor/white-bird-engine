@@ -80,7 +80,7 @@ public:
     };
     ROImageViewVK() = delete;
     virtual ~ROImageViewVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageViewVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageViewVK)
 
     /**
      * @brief Constructor.

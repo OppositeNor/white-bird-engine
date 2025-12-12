@@ -44,7 +44,7 @@ private:
 public:
 
     ~RenderDatabase() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase)
 
     /**
      * @brief Constructor.
