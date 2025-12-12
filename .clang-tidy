@@ -28,6 +28,7 @@ Checks: >
   -readability-function-size,
   -readability-simplify-boolean-expr,
   -readability-use-anyofallof,
+  -readability-math-missing-parentheses,
   -bugprone-easily-swappable-parameters,
   -misc-non-private-member-variables-in-classes,
   -misc-no-recursion,
@@ -65,7 +66,9 @@ Checks: >
   -cppcoreguidelines-rvalue-reference-param-not-moved,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-  -performance-no-int-to-ptr
+  -performance-no-int-to-ptr,
+  -performance-enum-size,
+  -misc-use-anonymous-namespace
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets

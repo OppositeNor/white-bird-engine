@@ -29,18 +29,18 @@
 namespace WBE = WhiteBirdEngine;
 
 constexpr size_t ALLOC_NUM = 1000;
-constexpr size_t POOL_SIZE = WBE_MiB(100);
+constexpr size_t POOL_SIZE = WBE_MiB(100UL);
 constexpr size_t FREE_BATCH = 10000;
 
-void malloc_free_benchmark_with_shuffle(benchmark::State& p_state) {
+static void malloc_free_benchmark_with_shuffle(benchmark::State& p_state) {
     std::vector<int*> allocated;
     allocated.reserve(FREE_BATCH);
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = (int*)malloc(ALLOC_NUM*sizeof(int));
+        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int))); // NOLINT(hicpp-no-malloc)
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result[i] = i;
+            result[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
@@ -52,25 +52,25 @@ void malloc_free_benchmark_with_shuffle(benchmark::State& p_state) {
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
-                for (auto queued_free : allocated) {
-                    free(queued_free);
+                for (auto* queued_free : allocated) {
+                    free(queued_free); // NOLINT(hicpp-no-malloc)
                 }
             }
             else {
-                for (auto queued_free : allocated | std::views::reverse) {
-                    free(queued_free);
+                for (auto* queued_free : allocated | std::views::reverse) {
+                    free(queued_free); // NOLINT(hicpp-no-malloc
                 }
             }
             allocated.clear();
         }
     }
-    for (auto queued_free : allocated) {
-        free(queued_free);
+    for (auto* queued_free : allocated) {
+        free(queued_free); // NOLINT(hicpp-no-malloc)
     }
 }
 BENCHMARK(malloc_free_benchmark_with_shuffle);
 
-void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State& p_state) {
+static void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State& p_state) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorAlignedPool pool(POOL_SIZE);
     std::vector<WBE::MemID> allocated;
@@ -81,7 +81,7 @@ void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State& p_stat
         WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result_ptr[i] = i;
+            result_ptr[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
@@ -111,7 +111,7 @@ void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State& p_stat
 }
 BENCHMARK(heap_allocated_aligned_pool_benchmark_with_shuffle);
 
-void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchmark::State& p_state) {
+static void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchmark::State& p_state) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorAlignedPoolImplicitList pool(POOL_SIZE);
     std::vector<WBE::MemID> allocated;
@@ -122,7 +122,7 @@ void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchmark::Sta
         WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result_ptr[i] = i;
+            result_ptr[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
@@ -152,38 +152,38 @@ void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchmark::Sta
 }
 BENCHMARK(heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle);
 
-void malloc_free_benchmark_without_shuffle(benchmark::State& p_state) {
+static void malloc_free_benchmark_without_shuffle(benchmark::State& p_state) {
     std::vector<int*> allocated;
     allocated.reserve(FREE_BATCH);
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = (int*)malloc(ALLOC_NUM*sizeof(int));
+        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int))); // NOLINT(hicpp-no-malloc)
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result[i] = i;
+            result[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
             if (counter % (2 * FREE_BATCH)) {
-                for (auto queued_free : allocated) {
-                    free(queued_free);
+                for (auto* queued_free : allocated) {
+                    free(queued_free); // NOLINT(hicpp-no-malloc
                 }
             }
             else {
-                for (auto queued_free : allocated | std::views::reverse) {
-                    free(queued_free);
+                for (auto* queued_free : allocated | std::views::reverse) {
+                    free(queued_free); // NOLINT(hicpp-no-malloc
                 }
             }
             allocated.clear();
         }
     }
-    for (auto queued_free : allocated) {
-        free(queued_free);
+    for (auto* queued_free : allocated) {
+        free(queued_free); // NOLINT(hicpp-no-malloc
     }
 }
 BENCHMARK(malloc_free_benchmark_without_shuffle);
 
-void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::State& p_state) {
+static void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::State& p_state) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorAlignedPool pool(POOL_SIZE);
     std::vector<WBE::MemID> allocated;
@@ -194,7 +194,7 @@ void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::State& p_s
         WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result_ptr[i] = i;
+            result_ptr[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {
@@ -217,7 +217,7 @@ void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::State& p_s
 }
 BENCHMARK(heap_allocated_aligned_pool_benchmark_without_shuffle);
 
-void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benchmark::State& p_state) {
+static void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benchmark::State& p_state) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorAlignedPoolImplicitList pool(POOL_SIZE);
     std::vector<WBE::MemID> allocated;
@@ -228,7 +228,7 @@ void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benchmark::
         WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
-            result_ptr[i] = i;
+            result_ptr[i] = static_cast<int>(i);
         }
         allocated.push_back(result);
         if (counter % FREE_BATCH == 0) {

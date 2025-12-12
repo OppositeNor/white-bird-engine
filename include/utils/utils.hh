@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <ios>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -82,6 +83,14 @@ constexpr HashCode dynam_hash(const char* p_str) {
 }
 
 constexpr HashCode dynam_hash(int32_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = (p_val >> 16) ^ p_val;
+    return p_val;
+}
+
+constexpr HashCode dynam_hash(size_t p_val) {
     // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
     p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
     p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
@@ -208,7 +217,7 @@ inline std::string load_text_file(const char* p_path, EncodeType p_encode_type =
     if (!file_stream.is_open()) {
         throw std::runtime_error("Failed to open text file at path: " + std::string(p_path));
     }
-    std::string line = "";
+    std::string line;
     while (!file_stream.eof()) {
         std::getline(file_stream, line);
         content.append(line + "\n");
@@ -232,7 +241,7 @@ inline std::vector<char> load_binary_file(const char* p_path) {
     size_t size = file_stream.tellg();
     file_stream.seekg(0, std::ios::beg);
     std::vector<char> content(size);
-    if (!file_stream.read(content.data(), size)) {
+    if (!file_stream.read(content.data(), static_cast<std::streamsize>(size))) {
         throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
     }
     return content;
@@ -245,13 +254,13 @@ inline std::vector<char> load_binary_file(const char* p_path) {
  * @param str The string to remove comment.
  * @return The string that all the hashtag comments that are all removed.
  */
-inline std::string remove_hashtag_comments(std::string str) {
-    while (str.find('#') != std::string::npos) {
-        size_t pos = str.find('#');
-        size_t end = str.find('\n', pos);
-        str.erase(pos, end - pos);
+inline std::string remove_hashtag_comments(std::string p_str) {
+    while (p_str.find('#') != std::string::npos) {
+        size_t pos = p_str.find('#');
+        size_t end = p_str.find('\n', pos);
+        p_str.erase(pos, end - pos);
     }
-    return str;
+    return p_str;
 }
 
 // Color space
@@ -344,6 +353,6 @@ struct Buffer : public BufferBase<Buffer<SIZE>> {
 
 WBE_DECL_CRTP_CONCEPT(BufferBase);
 
-}
+} // namespace WhiteBirdEngine
 #endif
 
