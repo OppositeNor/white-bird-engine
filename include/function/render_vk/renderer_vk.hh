@@ -212,7 +212,7 @@ private:
 #ifdef WBE_VK_ENABLE_VALIDATION
     constexpr static bool ENABLE_VALIDATION_LAYER = true;
 #else
-    constexpr static bool enable_validation_layer = false;
+    constexpr static bool ENABLE_VALIDATION_LAYER = false;
 #endif
 
     struct QueueFamilyIndices {
