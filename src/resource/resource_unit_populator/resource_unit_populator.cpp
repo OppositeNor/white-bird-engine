@@ -145,7 +145,8 @@ void RUPopulator::resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSch
 }
 
 RefRes<RUMaterial> RUPopulator::resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const {
+    (void)p_res_chunk, (void)p_material;
     return MEM_NULL; // TODO
 }
 
-}
+} // namespace WhiteBirdEngine

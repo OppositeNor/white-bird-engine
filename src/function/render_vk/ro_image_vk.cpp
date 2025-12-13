@@ -66,7 +66,7 @@ ROImageVK::Builder& ROImageVK::Builder::image_2d(glm::uvec2 p_size) {
 
 ROImageVK::Builder& ROImageVK::Builder::image_2d(VkExtent2D p_extent) {
     image_type = VK_IMAGE_TYPE_2D;
-    extent = {p_extent.width, p_extent.height};
+    extent = {.width = p_extent.width, .height = p_extent.height};
     return *this;
 }
 
@@ -157,4 +157,4 @@ void ROImageVK::init(const Builder& p_builder) {
     // TODO: allocate memory for image.
 }
 
-}
+} // namespace WhiteBirdEngine

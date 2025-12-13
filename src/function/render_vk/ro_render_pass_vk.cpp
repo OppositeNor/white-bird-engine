@@ -82,4 +82,4 @@ void RORenderPassVK::init(const Builder& p_builder) {
     render_pass = p_builder.build(render_data);
 }
 
-}
+} // namespace WhiteBirdEngine

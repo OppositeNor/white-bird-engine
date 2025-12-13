@@ -153,11 +153,17 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = delete; \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
-// Rule of six not defined default constructor and default destructor, deleted copy and move operations, with a override for
-// the destructor.
+// Rule of six not defined default constructor and default destructor, deleted copy and move operations.
 #define WBE_R6_NDCD_DELETE_COPY_MOVE(ClassName) \
     ClassName(const ClassName&) = delete; \
     ClassName(ClassName&&) noexcept = delete; \
     ClassName& operator=(const ClassName&) = delete; \
     ClassName& operator=(ClassName&&) noexcept = delete;
+
+// Rule of six not defined default constructor and default destructor, with default copy and move operations.
+#define WBE_R6_NDCD_DEFAULT_COPY_MOVE(ClassName) \
+    ClassName(const ClassName&) = default; \
+    ClassName(ClassName&&) noexcept = default; \
+    ClassName& operator=(const ClassName&) = default; \
+    ClassName& operator=(ClassName&&) noexcept = default;
 #endif

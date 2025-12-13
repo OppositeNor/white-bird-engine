@@ -29,4 +29,4 @@ void CLAASTNodeOperation::accept(CLAASTVisitor* p_cla_ast_visitor) {
     p_cla_ast_visitor->visit(this);
 }
 
-}
+} // namespace WhiteBirdEngine

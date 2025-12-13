@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include "utils/defs.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -45,10 +46,7 @@ public:
     };
 
     ~RODescriptorSetLayoutVK();
-    RODescriptorSetLayoutVK(const RODescriptorSetLayoutVK&) = delete;
-    RODescriptorSetLayoutVK(RODescriptorSetLayoutVK&&) = delete;
-    RODescriptorSetLayoutVK& operator=(const RODescriptorSetLayoutVK&) = delete;
-    RODescriptorSetLayoutVK& operator=(RODescriptorSetLayoutVK&&) = delete;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RODescriptorSetLayoutVK)
 
     /**
      * @brief Constructor.
@@ -68,11 +66,11 @@ public:
     }
 
 private:
-    VkDescriptorSetLayout descriptor_set_layout;
+    VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
 
     void init(const Builder& p_builder);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

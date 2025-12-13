@@ -44,4 +44,4 @@ ROBufferViewVK::ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Buil
 ROBufferViewVK::~ROBufferViewVK() {
     vkDestroyBufferView(render_data->logic_device, buffer_view, render_data->allocation_callbacks);
 }
-}
+} // namespace WhiteBirdEngine

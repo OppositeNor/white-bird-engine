@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    VkRenderPass render_pass;
+    VkRenderPass render_pass = VK_NULL_HANDLE;
 
     void init(const Builder& p_builder);
 };

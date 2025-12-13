@@ -17,7 +17,6 @@
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
-#include "core/core_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -109,6 +108,6 @@ void ROImageViewVK::init(const Builder& p_builder) {
     image_view = p_builder.build(render_data);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 

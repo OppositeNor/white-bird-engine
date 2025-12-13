@@ -17,6 +17,7 @@
 
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
 namespace WhiteBirdEngine {
 /**
  * @class RUPopulatorInterface
@@ -27,7 +28,8 @@ namespace WhiteBirdEngine {
 class RUPopulatorInterface {
 public:
     RUPopulatorInterface() = default;
-    virtual ~RUPopulatorInterface() {}
+    virtual ~RUPopulatorInterface() = default;
+    WBE_R6_NDCD_DEFAULT_COPY_MOVE(RUPopulatorInterface)
 
     /**
      * @brief Populate the audio resource.
@@ -102,7 +104,7 @@ public:
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 
 #endif

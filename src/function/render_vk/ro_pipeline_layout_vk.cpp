@@ -43,7 +43,8 @@ VkPipelineLayout ROPipelineLayoutVK::Builder::build(const BaseRenderDataVK* p_re
     VkPipelineLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     std::vector<VkDescriptorSetLayout> descriptor_set_layouts_vk;
-    for (auto& descriptor_set_layout : descriptor_set_layouts) {
+    descriptor_set_layouts_vk.reserve(descriptor_set_layouts.size());
+    for (const auto& descriptor_set_layout : descriptor_set_layouts) {
         descriptor_set_layouts_vk.push_back(descriptor_set_layout->get_descriptor_set_layout());
     }
     create_info.setLayoutCount = descriptor_set_layouts_vk.size();
@@ -74,4 +75,4 @@ void ROPipelineLayoutVK::init(const Builder& p_builder) {
     pipeline_layout = p_builder.build(render_data);
 }
 
-}
+} // namespace WhiteBirdEngine

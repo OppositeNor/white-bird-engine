@@ -29,13 +29,7 @@ namespace WhiteBirdEngine {
 class RUPopulator final : public RUPopulatorInterface {
 public:
     RUPopulator();
-    virtual ~RUPopulator() override {}
-    RUPopulator(const RUPopulator&)
-        : RUPopulator() {}
-    RUPopulator(RUPopulator&&)
-        : RUPopulator() {}
-    RUPopulator& operator=(const RUPopulator&) { return *this; }
-    RUPopulator& operator=(RUPopulator&&) { return *this; }
+    WBE_R6_NDC_DEFAULT_OVERRIDE(RUPopulator);
 
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_scheme) const override;
@@ -55,6 +49,6 @@ private:
     RefRes<RUMaterial> resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

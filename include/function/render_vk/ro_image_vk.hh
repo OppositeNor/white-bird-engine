@@ -115,7 +115,7 @@ public:
 private:
     VkImage image = VK_NULL_HANDLE;
 
-    void init(const Builder& p_config);
+    void init(const Builder& p_builder);
 };
 
 } // namespace WhiteBirdEngine

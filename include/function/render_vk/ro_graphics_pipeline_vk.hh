@@ -239,8 +239,8 @@ public:
                 VkRect2D scissor{};
                 scissor.offset.x = 0;
                 scissor.offset.y = 0;
-                scissor.extent.width = p_viewport.width;
-                scissor.extent.height = p_viewport.height;
+                scissor.extent.width = static_cast<uint32_t>(p_viewport.width);
+                scissor.extent.height = static_cast<uint32_t>(p_viewport.height);
                 viewports.push_back(p_viewport);
                 scissors.push_back(scissor);
                 return *this;
@@ -587,18 +587,18 @@ public:
 private:
     Config config;
 
-    VkPipeline graphics_pipeline;
+    VkPipeline graphics_pipeline = VK_NULL_HANDLE;
 
     struct PipelineStateCreateInfo {
-        VkPipelineViewportStateCreateInfo viewport_state;
-        VkPipelineVertexInputStateCreateInfo vertex_input_state;
-        VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
+        VkPipelineViewportStateCreateInfo viewport_state{};
+        VkPipelineVertexInputStateCreateInfo vertex_input_state{};
+        VkPipelineInputAssemblyStateCreateInfo input_assembly_state{};
         Required<VkPipelineTessellationStateCreateInfo> tessellation_state;
-        VkPipelineRasterizationStateCreateInfo rasterization_state;
-        VkPipelineMultisampleStateCreateInfo multisample_state;
-        VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
-        VkPipelineColorBlendStateCreateInfo color_blend_state;
-        VkPipelineDynamicStateCreateInfo dynamic_state;
+        VkPipelineRasterizationStateCreateInfo rasterization_state{};
+        VkPipelineMultisampleStateCreateInfo multisample_state{};
+        VkPipelineDepthStencilStateCreateInfo depth_stencil_state{};
+        VkPipelineColorBlendStateCreateInfo color_blend_state{};
+        VkPipelineDynamicStateCreateInfo dynamic_state{};
     };
 
     void init(const Config& p_config);
@@ -623,6 +623,6 @@ private:
                                          PipelineStateCreateInfo& p_pipeline_create_infos);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

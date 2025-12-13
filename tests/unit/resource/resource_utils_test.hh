@@ -39,19 +39,19 @@ protected:
     std::unique_ptr<WBE::Global> global;
 
     // Helper function to create test image data
-    std::unique_ptr<unsigned char[]> create_test_image(uint32_t width, uint32_t height, uint32_t channels) {
-        auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    std::unique_ptr<unsigned char[]> create_test_image(uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+        auto data = std::make_unique<unsigned char[]>(p_width * p_height * p_channels);
         
         // Fill with test pattern: gradient with recognizable corner values
-        for (uint32_t y = 0; y < height; ++y) {
-            for (uint32_t x = 0; x < width; ++x) {
-                uint32_t index = (y * width + x) * channels;
+        for (uint32_t y = 0; y < p_height; ++y) {
+            for (uint32_t x = 0; x < p_width; ++x) {
+                uint32_t index = (y * p_width + x) * p_channels;
                 
                 // Create a pattern where we can easily verify transformations
                 // Avoid divide by zero when width or height is 1
-                for (uint32_t c = 0; c < channels; ++c) {
-                    uint32_t x_component = (width > 1) ? (x * 255 / (width - 1)) : 255;
-                    uint32_t y_component = (height > 1) ? (y * 255 / (height - 1)) : 255;
+                for (uint32_t c = 0; c < p_channels; ++c) {
+                    uint32_t x_component = (p_width > 1) ? (x * 255 / (p_width - 1)) : 255;
+                    uint32_t y_component = (p_height > 1) ? (y * 255 / (p_height - 1)) : 255;
                     data[index + c] = static_cast<unsigned char>(
                         (x_component + y_component + c * 50) % 256
                     );
@@ -63,19 +63,19 @@ protected:
     }
 
     // Helper function to create test HDR image data
-    std::unique_ptr<float[]> create_test_image_hdr(uint32_t width, uint32_t height, uint32_t channels) {
-        auto data = std::make_unique<float[]>(width * height * channels);
+    std::unique_ptr<float[]> create_test_image_hdr(uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+        auto data = std::make_unique<float[]>(p_width * p_height * p_channels);
         
         // Fill with test pattern for HDR data
-        for (uint32_t y = 0; y < height; ++y) {
-            for (uint32_t x = 0; x < width; ++x) {
-                uint32_t index = (y * width + x) * channels;
+        for (uint32_t y = 0; y < p_height; ++y) {
+            for (uint32_t x = 0; x < p_width; ++x) {
+                uint32_t index = (y * p_width + x) * p_channels;
                 
-                for (uint32_t c = 0; c < channels; ++c) {
+                for (uint32_t c = 0; c < p_channels; ++c) {
                     // Avoid divide by zero when width or height is 1
-                    float x_component = (width > 1) ? static_cast<float>(x) / (width - 1) : 1.0f;
-                    float y_component = (height > 1) ? static_cast<float>(y) / (height - 1) : 1.0f;
-                    data[index + c] = x_component + y_component + static_cast<float>(c) * 0.1f;
+                    float x_component = (p_width > 1) ? static_cast<float>(x) / (p_width - 1) : 1.0F;
+                    float y_component = (p_height > 1) ? static_cast<float>(y) / (p_height - 1) : 1.0F;
+                    data[index + c] = x_component + y_component + static_cast<float>(c) * 0.1F;
                 }
             }
         }
@@ -84,13 +84,13 @@ protected:
     }
 
     // Helper to get pixel value
-    unsigned char get_pixel(unsigned char* data, uint32_t x, uint32_t y, uint32_t width, uint32_t channels, uint32_t channel = 0) {
-        return data[(y * width + x) * channels + channel];
+    unsigned char get_pixel(unsigned char* p_data, uint32_t p_x, uint32_t p_y, uint32_t p_width, uint32_t p_channels, uint32_t p_channel = 0) {
+        return p_data[(p_y * p_width + p_x) * p_channels + p_channel];
     }
 
-    // Helper to get HDR pixel value
-    float get_pixel_hdr(float* data, uint32_t x, uint32_t y, uint32_t width, uint32_t channels, uint32_t channel = 0) {
-        return data[(y * width + x) * channels + channel];
+    // Helper to get HDR pip_xel value
+    float get_pixel_hdr(float* p_data, uint32_t p_x, uint32_t p_y, uint32_t p_width, uint32_t p_channels, uint32_t p_channel = 0) {
+        return p_data[(p_y * p_width + p_x) * p_channels + p_channel];
     }
 };
 
@@ -383,7 +383,7 @@ TEST_F(WBEResourceUtilsTest, DifferentChannelCounts) {
     const uint32_t size = 4;
     
     // Test with different channel counts: 1 (grayscale), 3 (RGB), 4 (RGBA)
-    for (uint32_t channels : {1u, 3u, 4u}) {
+    for (uint32_t channels : {1U, 3U, 4U}) {
         auto original = create_test_image(size, size, channels);
         auto data = std::make_unique<unsigned char[]>(size * size * channels);
         std::memcpy(data.get(), original.get(), size * size * channels);

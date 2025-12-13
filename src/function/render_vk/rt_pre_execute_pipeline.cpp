@@ -37,6 +37,7 @@ RTPreExecutePipelineVK::~RTPreExecutePipelineVK() {
 
 
 void RTPreExecutePipelineVK::perform(double p_delta) {
+    (void)p_delta;
     WBE_DEBUG_ASSERT(prepare_image_semaphore != VK_NULL_HANDLE);
     vkResetCommandBuffer(command_buffer, 0);
     record_command_buffer();
@@ -46,7 +47,7 @@ void RTPreExecutePipelineVK::perform(double p_delta) {
 void RTPreExecutePipelineVK::record_command_buffer() {
     RecordCommandBufferGuard record_command_buffer_guard(command_buffer);
     // Execute the pre-execution tasks
-    for (auto& task : render_data->pre_execute_tasks_queue) {
+    for (const auto& task : render_data->pre_execute_tasks_queue) {
         task(command_buffer);
     }
 }
@@ -72,4 +73,4 @@ void RTPreExecutePipelineVK::submit_command_buffer() {
     }
 }
 
-}
+} // namespace WhiteBirdEngine

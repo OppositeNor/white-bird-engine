@@ -108,9 +108,9 @@ public:
     }
 
 private:    
-    VkImageView image_view;
+    VkImageView image_view = VK_NULL_HANDLE;
 
-    ExposedFields exposed_fields;
+    ExposedFields exposed_fields{};
 
     void init(const Builder& p_builder);
 };

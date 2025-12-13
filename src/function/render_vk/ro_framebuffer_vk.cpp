@@ -33,7 +33,7 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
     create_info.width = WBE_REQUIRED(width);
     create_info.height = WBE_REQUIRED(height);
     create_info.layers = layers;
-    VkFramebuffer result = VK_NULL_HANDLE;
+    VkFramebuffer result;
     if (vkCreateFramebuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }
@@ -51,4 +51,4 @@ ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Bu
 ROFramebufferVK::~ROFramebufferVK() {
     vkDestroyFramebuffer(render_data->logic_device, framebuffer, render_data->allocation_callbacks);
 }
-}
+} // namespace WhiteBirdEngine

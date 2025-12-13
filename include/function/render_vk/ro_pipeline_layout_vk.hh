@@ -72,7 +72,7 @@ public:
         return pipeline_layout;
     }
 private:
-    VkPipelineLayout pipeline_layout;
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 
     void init(const Builder& p_builder);
 };

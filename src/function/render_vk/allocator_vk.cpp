@@ -18,6 +18,7 @@
 namespace WhiteBirdEngine {
 
 void* AllocatorVK::allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
+    (void)p_allocation_scope;
     if (p_size == 0) {
         return nullptr;
     }
@@ -26,6 +27,7 @@ void* AllocatorVK::allocation(AllocatorVK* p_this, size_t p_size, size_t p_align
 }
 
 void* AllocatorVK::reallocation(AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope) {
+    (void)p_allocation_scope;
     if (p_size == 0) {
         free(p_this, p_original);
         return nullptr;
@@ -44,4 +46,4 @@ void AllocatorVK::free(AllocatorVK* p_this, void* p_memory) {
     p_this->allocator->deallocate(std::bit_cast<MemID>(p_memory));
 }
 
-}
+} // namespace WhiteBirdEngine

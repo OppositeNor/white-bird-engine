@@ -51,7 +51,7 @@ public:
         friend ROBufferVK;
 
         // The size of the buffer.
-        size_t size = WBE_KiB(4);
+        size_t size = WBE_KiB(4UL);
         // The usage of the buffer.
         Required<VkBufferUsageFlags> usage;
         // Queue families this buffer is going to be used across. Either this size is 1 or is empty will
@@ -129,6 +129,7 @@ public:
      */
     ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferVK)
 
     /**
      * @brief Get the buffer instance.
@@ -198,8 +199,8 @@ private:
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
-    ExposedFields exposed_fields;
+    ExposedFields exposed_fields{};
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

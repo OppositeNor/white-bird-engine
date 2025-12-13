@@ -59,4 +59,4 @@ void RODescriptorSetLayoutVK::init(const Builder& p_builder) {
     descriptor_set_layout = p_builder.build(render_data);
 }
 
-}
+} // namespace WhiteBirdEngine

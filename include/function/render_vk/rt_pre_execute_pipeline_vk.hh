@@ -42,7 +42,7 @@ struct RTPreExecutePipelineVK final: public RenderTaskVK {
 
 private:
     Ref<SemaphoreVK> prepare_image_semaphore;
-    VkCommandBuffer command_buffer;
+    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     void record_command_buffer();
     void submit_command_buffer();
 };

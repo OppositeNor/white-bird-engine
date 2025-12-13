@@ -100,8 +100,8 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size
     );
 }
 
-void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_offset, size_t p_size) {
-    update_buffer(p_data, 0, p_offset, p_size);
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size) {
+    update_buffer(p_data, 0, p_dst_offset, p_size);
 }
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_size) {
@@ -112,4 +112,4 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
     update_buffer(p_data, 0, 0, p_data->exposed_fields.buffer_size);
 }
 
-}
+} // namespace WhiteBirdEngine
