@@ -33,11 +33,14 @@ Checks: >
   -bugprone-implicit-widening-of-multiplication-result,
   -misc-non-private-member-variables-in-classes,
   -misc-no-recursion,
+  -misc-const-correctness,
+  -misc-use-anonymous-namespace,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-avoid-do-while,
   -cppcoreguidelines-narrowing-conversions,
   -cppcoreguidelines-init-variables,
+  -cppcoreguidelines-macro-usage,
   -cert-err58-cpp,
   -google-readability-avoid-underscore-in-googletest-name,
   -google-explicit-constructor,
@@ -72,7 +75,6 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -performance-no-int-to-ptr,
   -performance-enum-size,
-  -misc-use-anonymous-namespace
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets

@@ -39,7 +39,7 @@ void ApplicationGame::run() {
 }
 
 void ApplicationGame::init() {
-    auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     // Initialize the deltas into a very small number.
     render_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);
@@ -81,4 +81,4 @@ void ApplicationGame::run_logic() {
     }
 }
 
-}
+} // namespace WhiteBirdEngine

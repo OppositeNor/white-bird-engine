@@ -59,21 +59,6 @@ VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
     return result;
 }
 
-VkBufferMemoryBarrier2 RenderTaskVK::BufferMemoryBarrierBuilder::build() const {
-    VkBufferMemoryBarrier2 result{};
-    result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-    result.srcAccessMask = src_access_mask;
-    result.srcStageMask = src_stage_mask;
-    result.dstAccessMask = dst_access_mask;
-    result.dstStageMask = dst_stage_mask;
-    result.srcQueueFamilyIndex = src_queue_family_index;
-    result.dstQueueFamilyIndex = dst_queue_family_index;
-    result.buffer = WBE_REQUIRED(buffer).get_buffer();
-    result.offset = offset;
-    result.size = size == 0 ? buffer->fields().buffer_size : size;
-    return result;
-}
-
 void RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_req_res) {
     if (req_rend_res.size() != p_expected_req_res.size()) {
         throw std::runtime_error(std::format(

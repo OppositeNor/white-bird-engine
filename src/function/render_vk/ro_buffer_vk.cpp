@@ -53,6 +53,9 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     VkMemoryRequirements memory_requirements;
     vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
     buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to bind buffer memory.");
+    }
     exposed_fields.buffer_size = p_builder.size;
     vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
 }
@@ -71,10 +74,6 @@ void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p
     // TODO: Prevent data race
     memcpy(mapped_memory, p_data, p_size);
     vkUnmapMemory(render_data->logic_device, buffer_memory);
-}
-
-void ROBufferVK::update_buffer(const void* p_data, size_t p_size) {
-    update_buffer(p_data, 0, p_size);
 }
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
@@ -100,6 +99,10 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size
     );
 }
 
+void ROBufferVK::update_buffer(const void* p_data, size_t p_size) {
+    update_buffer(p_data, 0, p_size);
+}
+
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size) {
     update_buffer(p_data, 0, p_dst_offset, p_size);
 }
@@ -112,4 +115,21 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
     update_buffer(p_data, 0, 0, p_data->exposed_fields.buffer_size);
 }
 
+VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
+    VkBufferMemoryBarrier2 result{};
+    result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    result.srcAccessMask = src_access_mask;
+    result.srcStageMask = src_stage_mask;
+    result.dstAccessMask = dst_access_mask;
+    result.dstStageMask = dst_stage_mask;
+    result.srcQueueFamilyIndex = src_queue_family_index;
+    result.dstQueueFamilyIndex = dst_queue_family_index;
+    result.buffer = WBE_REQUIRED(buffer).get_buffer();
+    result.offset = offset;
+    result.size = size == 0 ? buffer->fields().buffer_size : size;
+    return result;
+}
+
+
 } // namespace WhiteBirdEngine
+

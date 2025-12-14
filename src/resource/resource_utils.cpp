@@ -27,7 +27,7 @@ std::unique_ptr<unsigned char> load_image_data(const Path& p_path, uint32_t p_de
                                                uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels) {
     int width, height, file_channels;
     auto result = std::unique_ptr<unsigned char>(
-        stbi_load(FileSystem::path_to_string(p_path).c_str(), &width, &height, &file_channels, p_desired_channels));
+        stbi_load(FileSystem::path_to_string(p_path).c_str(), &width, &height, &file_channels, static_cast<int>(p_desired_channels)));
     if (p_flip_h) {
         if (p_desired_channels != 0) {
             img_flip_h(result.get(), width, height, p_desired_channels);
@@ -56,7 +56,7 @@ std::unique_ptr<float> load_image_data_hdr(const Path& p_path, uint32_t p_desire
 
     int width, height, file_channels;
     auto result = std::unique_ptr<float>(
-        stbi_loadf(FileSystem::path_to_string(p_path).c_str(), &width, &height, &file_channels, p_desired_channels));
+        stbi_loadf(FileSystem::path_to_string(p_path).c_str(), &width, &height, &file_channels, static_cast<int>(p_desired_channels)));
     if (p_flip_h) {
         if (p_desired_channels != 0) {
             img_flip_h_hdr(result.get(), width, height, p_desired_channels);
@@ -111,14 +111,14 @@ static unsigned char* get_pixel(unsigned char* p_data, uint32_t p_row, uint32_t 
     return p_data + (p_row * p_width + p_col) * p_channel;
 }
 
-static unsigned char* get_pixel(unsigned char* p_data, uint32_t p_index, uint32_t p_width, uint32_t p_channel) {
+static unsigned char* get_pixel(unsigned char* p_data, uint32_t p_index, uint32_t p_channel) {
     return p_data + p_index * p_channel;
 }
 
-void sq_img_transpose(unsigned char* p_data, int p_width, int p_height, int p_channel) {
-    for (int i = 0; i < p_height; ++i) {
-        for (int j = i; j < p_width; ++j) {
-            for (int k = 0; k < p_channel; ++k) {
+static void sq_img_transpose(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel) {
+    for (uint32_t i = 0; i < p_height; ++i) {
+        for (uint32_t j = i; j < p_width; ++j) {
+            for (uint32_t k = 0; k < p_channel; ++k) {
                 std::swap(get_pixel(p_data, i, j, p_width, p_channel)[k], get_pixel(p_data, j, i, p_width, p_channel)[k]);
             }
         }
@@ -146,8 +146,8 @@ void img_rotate_180(unsigned char* p_data, uint32_t p_width, uint32_t p_height, 
     uint32_t half_img_size = image_size >> 1;
     for (uint32_t i = 0; i < half_img_size; ++i) {
         for (uint32_t j = 0; j < p_channel; ++j) {
-            std::swap(get_pixel(p_data, i, p_width, p_channel)[j],
-                      get_pixel(p_data, (image_size - i - 1), p_width, p_channel)[j]);
+            std::swap(get_pixel(p_data, i, p_channel)[j],
+                      get_pixel(p_data, (image_size - i - 1), p_channel)[j]);
         }
     }
 }
@@ -222,4 +222,4 @@ void img_rotate_180_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint
     }
 }
 
-}
+} // namespace WhiteBirdEngine

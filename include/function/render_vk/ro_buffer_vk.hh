@@ -195,6 +195,150 @@ public:
         return exposed_fields;
     }
 
+    /**
+     * @class BufferMemoryBarrierBuilder
+     * @brief Builder for buffer memory barriers.
+     *
+     */
+    struct MemoryBarrierBuilder {
+        friend ROBufferVK;
+        // The source access.
+        VkAccessFlags2 src_access_mask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        // The source stage.
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        // The destination access.
+        VkAccessFlags2 dst_access_mask = VK_ACCESS_2_MEMORY_READ_BIT;
+        // The destination stage.
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
+        // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+        // The destination queue family to tranfer ownership. If all the ownerships in ROBufferVK is
+        // set in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+        // The buffer to set barrier on.
+        Ref<ROBufferVK> buffer;
+        // The offset of the data to apply barrier on in the buffer.
+        VkDeviceSize offset = 0;
+        // The size of the data to apply barrier on in the buffer. If set to 0, the barrier is 
+        // going to be applied from offset to the end of barrier.
+        VkDeviceSize size = 0;
+
+        /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask) {
+            src_access_mask = p_src_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the source access.
+         *
+         * @param p_src_access_mask The access bit mask.
+         * @param p_src_stage The source pipeline stage.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+            src_access_mask = p_src_access_mask;
+            src_stage_mask = p_src_stage_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask) {
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the destination access.
+         *
+         * @param p_dst_access_mask The access bit mask.
+         * @param p_dst_stage_mask The destination pipeline stage.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+            dst_access_mask = p_dst_access_mask;
+            dst_stage_mask = p_dst_stage_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set access.
+         *
+         * @param p_src_access_mask The source access bit mask.
+         * @param p_dst_access_mask The destination access bit mask.
+         * @return 
+         */
+        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+            src_access_mask = p_src_access_mask;
+            dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the buffer to apply the barrier on.
+         *
+         * @param p_buffer The buffer to apply the barrier on.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_buffer(Ref<ROBufferVK> p_buffer) {
+            buffer = p_buffer;
+            return *this;
+        }
+
+        /**
+         * @brief Set the offset of the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_offset The offset.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_offset(VkDeviceSize p_offset) {
+            offset = p_offset;
+            return *this;
+        }
+
+        /**
+         * @brief Set the size of the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_size(VkDeviceSize p_size) {
+            size = p_size;
+            return *this;
+        }
+
+        /**
+         * @brief Set the data region in the buffer that this barrier is going to be applied on.
+         *
+         * @param p_offset The offset.
+         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_data_region(VkDeviceSize p_offset, VkDeviceSize p_size) {
+            offset = p_offset;
+            size = p_size;
+            return *this;
+        }
+
+        /**
+         * @brief Build the barrier.
+         *
+         * @return The barrier instance.
+         */
+        VkBufferMemoryBarrier2 build() const;
+    };
+
 private:
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;

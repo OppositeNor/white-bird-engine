@@ -16,6 +16,7 @@
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <vulkan/vulkan_raii.hpp>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -112,6 +113,33 @@ ROImageVK::Builder& ROImageVK::Builder::rgba_hdr() {
     return *this;
 }
 
+ROImageVK::Builder& ROImageVK::Builder::set_initial_layout(VkImageLayout p_initial_layout) {
+    initial_image_layout = p_initial_layout;
+    return *this;
+}
+
+void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_buffer) {
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = src_stage_mask;
+    barrier.srcAccessMask = src_access_mask;
+    barrier.dstStageMask = dst_stage_mask;
+    barrier.dstAccessMask = dst_access_mask;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = WBE_REQUIRED(new_layout);
+    barrier.srcQueueFamilyIndex = src_queue_family_index;
+    barrier.dstQueueFamilyIndex = dst_queue_family_index;
+    barrier.image = WBE_REQUIRED(image).get_image();
+    barrier.subresourceRange = subresource_range;
+    VkDependencyInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    info.imageMemoryBarrierCount = 1;
+    info.pImageMemoryBarriers = &barrier;
+    vkCmdPipelineBarrier2(p_command_buffer, &info);
+    // Update the image's layout to new layout.
+    image->exposed_fileds.image_layout = *new_layout;
+}
+
 VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -123,6 +151,7 @@ VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = WBE_REQUIRED(usage);
+    create_info.initialLayout = initial_image_layout;
     WBE_DEBUG_ASSERT(queue_family_indices.size() >= 1);
     if (queue_family_indices.size() == 1) {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -149,12 +178,30 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_bui
 }
 
 ROImageVK::~ROImageVK() {
-    vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+    vkDestroyImage(render_data->logic_device, exposed_fileds.image, render_data->allocation_callbacks);
+    deallocate_device_memory(exposed_fileds.image_memory);
 }
 
 void ROImageVK::init(const Builder& p_builder) {
-    image = p_builder.build(render_data);
-    // TODO: allocate memory for image.
+    exposed_fileds.image = p_builder.build(render_data);
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
+    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    exposed_fileds.image_layout = p_builder.initial_image_layout;
+    if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to bind image memory.");
+    }
+}
+
+void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {
+    MemoryBarrierBuilder barrier_builder;
+    VkImageLayout old_layout = exposed_fileds.image_layout;
+    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+        .set_new_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL).apply_barrier(p_command_buffer);
+    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &p_region_info);
+    // After transfering the data, retrieve the original layout.
+    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT)
+        .set_new_layout(old_layout).apply_barrier(p_command_buffer);
 }
 
 } // namespace WhiteBirdEngine
