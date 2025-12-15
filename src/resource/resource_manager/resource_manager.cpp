@@ -41,4 +41,4 @@ Ref<ResourceChunk> ResourceManager::find_resource_chunk_containing_key(const std
     throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_key));
 }
 
-}
+} // namespace WhiteBirdEngine

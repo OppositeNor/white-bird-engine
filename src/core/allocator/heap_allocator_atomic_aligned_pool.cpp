@@ -238,8 +238,8 @@ HeapAllocatorAtomicAlignedPool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
     ss << R"("type":"HeapAllocatorAtomicAlignedPool",)";
-    ss << "\"total_size\":" << get_total_size() << ",";
-    ss << "\"free_chunk_layout\":[";
+    ss << R"("total_size":)" << get_total_size() << ",";
+    ss << R"("free_chunk_layout":[)";
     IdleListNode* node = idle_list_head.get();
     bool first = true;
     while (node != nullptr) {
@@ -248,9 +248,9 @@ HeapAllocatorAtomicAlignedPool::operator std::string() const {
         }
         first = false;
         ss << "{"
-            << "\"begin\":" << (node->mem_start - mem_chunk) << ","
-            << "\"size\":" << node->size
-            << "}";
+            <<R"("begin:")" << (node->mem_start - mem_chunk) << ","
+            <<R"("size:")" << node->size
+            <<"}";
         node = node->next.get();
     }
     ss << "]";

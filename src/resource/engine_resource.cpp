@@ -27,4 +27,4 @@ EngineResource::~EngineResource() {
     resource_manager.reset();
 }
 
-}
+} // namespace WhiteBirdEngine

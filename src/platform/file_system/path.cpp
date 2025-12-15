@@ -17,9 +17,8 @@
 
 namespace WhiteBirdEngine {
 
-
 Path::operator std::string() const {
     return FileSystem::path_to_string(*this);
 }
 
-}
+} // namespace WhiteBirdEngine

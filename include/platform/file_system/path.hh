@@ -28,18 +28,19 @@ namespace WhiteBirdEngine {
  */
 class Path {
 public:
-    Path() : directory(), file_name() {}
-    virtual ~Path() {}
-    Path(const Path& p_other)
-        : directory(p_other.directory), file_name(p_other.file_name) {}
-    Path(Path&& p_other)
-        : directory(std::move(p_other.directory)), file_name(std::move(p_other.file_name)) {}
+    Path() = default;
+    virtual ~Path() = default;
+    Path(const Path& p_other) = default;
+    Path(Path&& p_other) = default;
     Path& operator=(const Path& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         directory = p_other.directory;
         file_name = p_other.file_name;
         return *this;
     }
-    Path& operator=(Path&& p_other) {
+    Path& operator=(Path&& p_other) noexcept {
         directory = std::move(p_other.directory);
         file_name = std::move(p_other.file_name);
         return *this;
@@ -113,6 +114,6 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const Path& p_path) {
     return p_ostream << static_cast<std::string>(p_path);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -196,5 +196,3 @@ if (WBE_MAKE_TEST)
     # Export tests
     add_subdirectory(tests)
 endif()
-
-

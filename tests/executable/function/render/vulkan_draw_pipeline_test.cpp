@@ -29,7 +29,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-void setup_pipeline(WBE::ApplicationGame& game_application);
+static void setup_pipeline(WBE::ApplicationGame& p_game_application);
 
 int main(int p_argc, char* p_argv[]) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
@@ -45,16 +45,16 @@ int main(int p_argc, char* p_argv[]) {
             WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }
-    auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
-    for (auto& profile : global_profiles) {
+    const auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    for (const auto& profile : global_profiles) {
         WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds",
                                                                            profile.message, profile.delta));
     }
     return EXIT_SUCCESS;
 }
 
-void setup_pipeline(WBE::ApplicationGame& game_application) {
-    auto render_allocator = game_application.get_renderer_allocator().get();
+void setup_pipeline(WBE::ApplicationGame& p_game_application) {
+    auto* render_allocator = p_game_application.get_renderer_allocator().get();
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
     rend_task_info->prev.push_back(WBE::RT_PRE_EXECUTE_PIPELINE_VK);
@@ -62,8 +62,8 @@ void setup_pipeline(WBE::ApplicationGame& game_application) {
     rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE_VK, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID});
     rend_task_info->render_task_factory
         = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
-    game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
-    game_application.get_renderer()->activate_pipeline("test_pipeline");
+    p_game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
+    p_game_application.get_renderer()->activate_pipeline("test_pipeline");
 
 }
 

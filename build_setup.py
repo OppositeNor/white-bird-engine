@@ -76,4 +76,3 @@ os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 shutil.copytree(res_chunks_dir, res_chunks_output_dir, dirs_exist_ok=True)
 shutil.copytree(assets_dir, assets_output_dir, dirs_exist_ok=True)
-

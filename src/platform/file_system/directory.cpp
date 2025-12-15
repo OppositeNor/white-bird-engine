@@ -23,12 +23,15 @@ Directory::operator std::string() const {
 }
 
 Directory& Directory::operator=(const Directory& p_other) {
+    if (&p_other == this) {
+        return *this;
+    }
     dir_names = p_other.dir_names;
     is_absolute = p_other.is_absolute;
     return *this;
 }
 
-Directory& Directory::operator=(Directory&& p_other) {
+Directory& Directory::operator=(Directory&& p_other) noexcept {
     dir_names = std::move(p_other.dir_names);
     is_absolute = p_other.is_absolute;
     return *this;
@@ -57,10 +60,10 @@ Directory Directory::combine(const Directory& p_other) const {
     }
     Directory result(*this);
     result.dir_names.reserve(dir_names.size() + p_other.dir_names.size());
-    for (auto& dir_name : p_other.dir_names) {
+    for (const auto& dir_name : p_other.dir_names) {
         result.dir_names.push_back(dir_name);
     }
     return result;
 }
 
-}
+} // namespace WhiteBirdEngine

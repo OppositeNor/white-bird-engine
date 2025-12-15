@@ -28,15 +28,13 @@ class Directory {
 public:
 
     Directory()
-        : dir_names(), is_absolute(false) {
+        : is_absolute(false) {
     }
-    ~Directory() {}
-    Directory(const Directory& p_other)
-        : dir_names(p_other.dir_names), is_absolute(p_other.is_absolute) {}
-    Directory(Directory&& p_other)
-        : dir_names(std::move(p_other.dir_names)), is_absolute(p_other.is_absolute) {}
+    ~Directory() = default;
+    Directory(const Directory& p_other) = default;
+    Directory(Directory&& p_other) noexcept = default;
     Directory& operator=(const Directory& p_other);
-    Directory& operator=(Directory&& p_other);
+    Directory& operator=(Directory&& p_other) noexcept;
 
     bool operator==(const Directory& p_other) const;
 
@@ -97,6 +95,6 @@ inline Directory operator+(const Directory& p_first, const Directory& p_second) 
     return p_first.combine(p_second);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif
