@@ -16,6 +16,7 @@
 #define __WBE_RO_BUFFER_VK_HH__
 
 #include "core/memory/reference_strong.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
@@ -39,7 +40,10 @@ public:
      *
      */
     struct ExposedFields {
+        // The size of the buffer.
         size_t buffer_size;
+        // The domain where the buffer's memory is located.
+        DeviceDomain domain;
     };
 
     /**
@@ -58,6 +62,19 @@ public:
         // make the buffer created in exclusive sharing mode, otherwise it will be created in concurrent
         // sharing mode.
         std::set<uint32_t> queue_family_indices;
+        // The domain where this buffer's memory will be allocated.
+        Required<DeviceDomain> domain;
+
+        /**
+         * @brief The domain where the memory of this buffer will be allocated.
+         *
+         * @param p_domain The domain.
+         * @return *this.
+         */
+        Builder& set_domain(DeviceDomain p_domain) {
+            domain = p_domain;
+            return *this;
+        }
 
         /**
          * @brief Set the size of the buffer.
@@ -141,7 +158,7 @@ public:
     }
 
     /**
-     * @brief Update the buffer.
+     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
      *
      * @param p_data The data to copy from.
      * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to.
@@ -150,7 +167,7 @@ public:
     void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
 
     /**
-     * @brief Update the buffer.
+     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
      *
      * @param p_data The data to be updated to.
      * @param p_size The size of data that will be transmitted.

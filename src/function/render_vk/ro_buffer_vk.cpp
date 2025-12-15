@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -52,28 +53,38 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     buffer = p_builder.build(p_render_data);
     VkMemoryRequirements memory_requirements;
     vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
-    buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    exposed_fields.buffer_size = p_builder.size;
+    exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
+    if (exposed_fields.domain == DeviceDomain::HOST) {
+        buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
+    }
+    else {
+        buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    }
     if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
         throw std::runtime_error("Failed to bind buffer memory.");
     }
-    exposed_fields.buffer_size = p_builder.size;
-    vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
 }
 
 ROBufferVK::~ROBufferVK() {
+    if (exposed_fields.domain == DeviceDomain::HOST) {
+        vkUnmapMemory(render_data->logic_device, buffer_memory);
+    }
     vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
     deallocate_device_memory(buffer_memory);
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
+    if (exposed_fields.domain != DeviceDomain::HOST) {
+        throw std::runtime_error("Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
+    }
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(
             std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
                         p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
     }
-    // TODO: Prevent data race
     memcpy(mapped_memory, p_data, p_size);
-    vkUnmapMemory(render_data->logic_device, buffer_memory);
 }
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
@@ -93,8 +104,8 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size
     copy_region.size = p_size;
     // Register a pre-execute task to copy the buffer.
     RendererVK::get_singleton()->add_pre_execute_task(
-        [src_buffer = p_data->get_buffer(), dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
-            vkCmdCopyBuffer(p_command_buffer, src_buffer, dst_buffer, 1, &copy_region);
+        [src_buffer = p_data, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
+            vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
         }
     );
 }

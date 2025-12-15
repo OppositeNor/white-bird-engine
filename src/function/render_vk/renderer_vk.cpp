@@ -19,6 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
+#include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
 #include "function/render/render_utils.hh"
@@ -149,16 +150,25 @@ void RendererVK::tick(double p_delta) {
 
 void RendererVK::update_static_opaque_triangles() {
     const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
-    ROBufferVK::Builder builder;
-    auto& res = render_objects->static_opaque_triangles_vertices_buffer_resource->res;
-    if (render_objects->static_opaque_triangles_vertices_buffer_resource->res != MEM_NULL &&
-        static_opaque_triangles_vertices.size() > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
-        // If size exceeds buffer capacity, create a new buffer.
-        builder.set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT).set_size(static_opaque_triangles_vertices.size());
+    auto res = render_objects->static_opaque_triangles_vertices_buffer_resource->res.dynamic_cast_ref<ROBufferVK>();
+    size_t size_in_bytes = static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured);
+    if (res == MEM_NULL || size_in_bytes > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
+        // If res not initialized, or size exceeds buffer capacity, create a new buffer.
+        ROBufferVK::Builder builder;
+        builder.set_domain(DeviceDomain::DEVICE)
+            .add_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+            .add_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+            .set_size(size_in_bytes);
         res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
     }
-    res.dynamic_cast_ref<ROBufferVK>()->update_buffer(static_opaque_triangles_vertices.data(),
-                                                      static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured));
+    // Setup a temporary host buffer for copying the data.
+    ROBufferVK::Builder temp_buffer_builder;
+    temp_buffer_builder.set_domain(DeviceDomain::HOST)
+        .add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+        .set_size(size_in_bytes);
+    auto temp_buffer = make_ref<ROBufferVK>(allocator, &base_render_data, temp_buffer_builder);
+    temp_buffer->update_buffer(static_opaque_triangles_vertices.data(), size_in_bytes);
+    res->update_buffer(temp_buffer, size_in_bytes);
 }
 
 void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {

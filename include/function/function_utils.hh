@@ -21,6 +21,16 @@ namespace WhiteBirdEngine {
 using EntityID = HashCode;
 using ComponID = HashCode;
 
-}
+/**
+ * @brief The device domain.
+ */
+enum class DeviceDomain {
+    // The host domain
+    HOST,
+    // The device domain
+    DEVICE
+};
+
+} // namespace WhiteBirdEngine
 
 #endif

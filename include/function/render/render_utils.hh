@@ -34,7 +34,6 @@ struct JobRender : public Job<JobRender> {
     virtual void perform(Ref<Renderer> p_renderer) = 0;
 };
 
-
 } // namespace WhiteBirdEngine
 
 #endif
