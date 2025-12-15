@@ -49,6 +49,9 @@ ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Bu
 }
 
 ROFramebufferVK::~ROFramebufferVK() {
-    vkDestroyFramebuffer(render_data->logic_device, framebuffer, render_data->allocation_callbacks);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, framebuffer = framebuffer]() {
+        vkDestroyFramebuffer(render_data->logic_device, framebuffer, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 } // namespace WhiteBirdEngine

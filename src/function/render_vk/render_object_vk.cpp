@@ -30,8 +30,4 @@ VkDeviceMemory RenderObjectVK::allocate_device_memory(VkMemoryRequirements p_mem
     return result;
 }
 
-void RenderObjectVK::deallocate_device_memory(VkDeviceMemory p_device_memory) const {
-    vkFreeMemory(render_data->logic_device, p_device_memory, render_data->allocation_callbacks);
-}
-
 } // namespace WhiteBirdEngine

@@ -101,7 +101,10 @@ ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builde
 }
 
 ROImageViewVK::~ROImageViewVK() {
-    vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, image_view = image_view]() {
+        vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void ROImageViewVK::init(const Builder& p_builder) {

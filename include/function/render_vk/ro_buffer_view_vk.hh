@@ -21,6 +21,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "ro_buffer_vk.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <vulkan/vulkan_core.h>
 
@@ -104,6 +105,7 @@ public:
      */
     ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferViewVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferViewVK);
 
 
     /**
@@ -139,6 +141,6 @@ private:
     ExposedFields exposed_fields;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

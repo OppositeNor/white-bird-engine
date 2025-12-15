@@ -63,6 +63,8 @@ struct BaseRenderDataVK {
     VkFence in_flight_fence = VK_NULL_HANDLE;
     // The current swap chain index.
     uint32_t current_swap_chain_index = 0;
+    // Frames in flight.
+    uint32_t frames_in_flight = 0;
 
     // The current number of frames.
     uint64_t current_frame = 0;
@@ -78,6 +80,8 @@ struct BaseRenderDataVK {
     // A function that finds a suitable memory type for a certain memory property.
     std::function<uint32_t(uint32_t, VkMemoryPropertyFlags)> find_memory_type;
 
+    // Function to register a delayed call.
+    std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;
 };
 
 } // namespace WhiteBirdEngine

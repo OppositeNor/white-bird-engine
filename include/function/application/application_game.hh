@@ -33,11 +33,8 @@ namespace WhiteBirdEngine {
 class ApplicationGame : public Application {
 public:
     ApplicationGame();
-    virtual ~ApplicationGame() {}
-    ApplicationGame(const ApplicationGame&) = delete;
-    ApplicationGame(ApplicationGame&&) = delete;
-    ApplicationGame& operator=(const ApplicationGame&) = delete;
-    ApplicationGame& operator=(ApplicationGame&&) = delete;
+    virtual ~ApplicationGame() = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ApplicationGame);
 
     virtual void run() override;
 
@@ -92,6 +89,6 @@ protected:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

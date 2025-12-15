@@ -36,9 +36,11 @@
 #include "global/stl_allocator.hh"
 
 #include <SDL.h>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -75,6 +77,7 @@ public:
      * @brief The number of jobs that would be runned per frame.
      */
     static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 10;
+    static constexpr size_t MAX_DELAYED_CALLS = 32;
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;
@@ -149,6 +152,26 @@ public:
         base_render_data.pre_execute_tasks_queue.push_back(std::move(p_task));
     }
 
+    /**
+     * @brief Register a task to be called after a number of frames. This could be used for
+     * resource deallocation to prevent destroying resources that are currently in-flight.
+     * Note that when the renderer terminates, all delayed calls will be called together
+     * at once.
+     *
+     * @param p_task The task to be called.
+     * @param p_delayed_frames The number of frames to be delayed.
+     */
+    void register_delay_call(std::function<void()>&& p_task, uint32_t p_delayed_frames) {
+        for (auto& delayed_call : delayed_calls) {
+            if (delayed_call.second < 0) {
+                delayed_call.first = std::move(p_task);
+                delayed_call.second = static_cast<int32_t>(p_delayed_frames);
+                return;
+            }
+        }
+        throw std::runtime_error("Failed to register delay call: buffer overflow.");
+    }
+
 private:
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
@@ -200,6 +223,7 @@ private:
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
     Vector<VkFence> in_flight_fences;
+    std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
     std::vector<const char*> validation_layers {
         "VK_LAYER_KHRONOS_validation"

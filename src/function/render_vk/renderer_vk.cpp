@@ -61,11 +61,13 @@ RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>>
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
-    in_flight_fences(p_allocator), base_render_data(p_allocator),
-    activated_pipeline(p_allocator) {
+    in_flight_fences(p_allocator), base_render_data(p_allocator), activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     singleton = this;
+    for (auto& delayed_call : delayed_calls) {
+        delayed_call.second = -1;
+    }
     init();
 }
 
@@ -99,6 +101,18 @@ void RendererVK::tick(double p_delta) {
     base_render_data.in_flight_fence = in_flight_fences[frame_counter];
 
     vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
+
+    for (auto& delayed_call : delayed_calls) {
+        if (delayed_call.second < 0) {
+            continue;
+        }
+        --(delayed_call.second);
+        if (delayed_call.second < 0) {
+            // Run delayed calls that should be called in the current frame.
+            delayed_call.first();
+            delayed_call.first = nullptr;
+        }
+    }
 
     // Aquire swap chain image.
     uint32_t image_index = 0;
@@ -205,6 +219,13 @@ void RendererVK::terminate() {
     pipelines.clear();
     activated_pipeline.clear();
     render_objects.reset();
+
+    for (auto& delayed_call : delayed_calls) {
+        // Call all delayed calls before terminating
+        if (delayed_call.second >= 0) {
+            delayed_call.first();
+        }
+    }
     for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
@@ -271,6 +292,10 @@ void RendererVK::setup_base_render_data() {
     base_render_data.find_memory_type = [this](uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) -> uint32_t {
         return this->find_memory_type(p_type_filter, p_properties);
     };
+    base_render_data.register_delayed_call = [this](std::function<void()>&& p_function, uint32_t p_delayed_frames) {
+        register_delay_call(std::move(p_function), p_delayed_frames);
+    };
+    base_render_data.frames_in_flight = frames_in_flight;
 }
 
 void RendererVK::init_graphics_pipeline() {

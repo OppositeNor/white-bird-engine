@@ -71,8 +71,11 @@ ROBufferVK::~ROBufferVK() {
     if (exposed_fields.domain == DeviceDomain::HOST) {
         vkUnmapMemory(render_data->logic_device, buffer_memory);
     }
-    vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-    deallocate_device_memory(buffer_memory);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, buffer = buffer, buffer_memory = buffer_memory]() {
+        vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
+        vkFreeMemory(render_data->logic_device, buffer_memory, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {

@@ -52,7 +52,10 @@ RODescriptorSetLayoutVK::RODescriptorSetLayoutVK(const BaseRenderDataVK* p_rende
 }
 
 RODescriptorSetLayoutVK::~RODescriptorSetLayoutVK() {
-    vkDestroyDescriptorSetLayout(render_data->logic_device, descriptor_set_layout, render_data->allocation_callbacks);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, descriptor_set_layout = descriptor_set_layout]() {
+        vkDestroyDescriptorSetLayout(render_data->logic_device, descriptor_set_layout, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void RODescriptorSetLayoutVK::init(const Builder& p_builder) {

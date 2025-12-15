@@ -178,8 +178,11 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_bui
 }
 
 ROImageVK::~ROImageVK() {
-    vkDestroyImage(render_data->logic_device, exposed_fileds.image, render_data->allocation_callbacks);
-    deallocate_device_memory(exposed_fileds.image_memory);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
+        vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+        vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void ROImageVK::init(const Builder& p_builder) {

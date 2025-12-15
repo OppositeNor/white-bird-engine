@@ -20,16 +20,19 @@
 
 namespace WhiteBirdEngine {
 
-ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
-    vkDestroyPipeline(render_data->logic_device, graphics_pipeline, render_data->allocation_callbacks);
-}
-
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config)
     : RenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
     init(p_config);
+}
+
+ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, graphics_pipeline = graphics_pipeline]() {
+        vkDestroyPipeline(render_data->logic_device, graphics_pipeline, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void ROGraphicsPipelineVK::init(const Config& p_config) {

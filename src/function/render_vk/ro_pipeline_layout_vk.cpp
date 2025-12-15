@@ -68,7 +68,10 @@ ROPipelineLayoutVK::ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, co
 }
 
 ROPipelineLayoutVK::~ROPipelineLayoutVK() {
-    vkDestroyPipelineLayout(render_data->logic_device, pipeline_layout, render_data->allocation_callbacks);
+    render_data->register_delayed_call(
+        [render_data = render_data, pipeline_layout = pipeline_layout] (){
+            vkDestroyPipelineLayout(render_data->logic_device, pipeline_layout, render_data->allocation_callbacks);
+        }, render_data->frames_in_flight);
 }
 
 void ROPipelineLayoutVK::init(const Builder& p_builder) {

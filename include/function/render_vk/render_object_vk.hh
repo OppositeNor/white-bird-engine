@@ -58,13 +58,6 @@ protected:
      * @return The allocated device memory.
      */
     VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, VkMemoryPropertyFlags p_memory_properties) const;
-
-    /**
-     * @brief Deallocate a device memory.
-     *
-     * @param p_device_memory The device memory to deallocate.
-     */
-    void deallocate_device_memory(VkDeviceMemory p_device_memory) const;
 };
 
 /**

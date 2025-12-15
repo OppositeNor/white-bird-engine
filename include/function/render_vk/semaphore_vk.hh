@@ -46,7 +46,11 @@ public:
         }
     }
     ~SemaphoreVK() {
-        vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
+        // Deallocate resource after frames in flight.
+        render_data->register_delayed_call([render_data = render_data, semaphore = semaphore]() {
+            // Semaphores are created one per in-flight frame; however, just in case it is used elsewhere, we are still delaying this.
+            vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
+        }, render_data->frames_in_flight);
     }
 
     WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK);

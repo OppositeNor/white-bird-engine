@@ -75,7 +75,10 @@ RORenderPassVK::RORenderPassVK(const BaseRenderDataVK* p_render_data, const Buil
 }
 
 RORenderPassVK::~RORenderPassVK() {
-    vkDestroyRenderPass(render_data->logic_device, render_pass, render_data->allocation_callbacks);
+    // Deallocate resource after frames in flight.
+    render_data->register_delayed_call([render_data = render_data, render_pass = render_pass]() {
+        vkDestroyRenderPass(render_data->logic_device, render_pass, render_data->allocation_callbacks);
+    }, render_data->frames_in_flight);
 }
 
 void RORenderPassVK::init(const Builder& p_builder) {
