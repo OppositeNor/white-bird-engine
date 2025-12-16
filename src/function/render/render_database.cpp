@@ -40,6 +40,9 @@ RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<MaterialFactory> p
 void RenderDatabase::set_opaque_triangles_linear(
     OpaqueTrianglesInfo& p_triangles_info,
     RUMesh3D* p_mesh) {
+    if (p_mesh == nullptr) {
+        throw std::runtime_error("Failed to set opaque triangles: mesh resource should not be NULL.");
+    }
     // The triangles are arranged by their materials, which triangles with same materials are put together.
     // This is designed this way so that we could use the least amount of draw calls for per-material drawing.
     // Triangles with the same material are drawn together in one render pass.

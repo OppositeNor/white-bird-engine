@@ -38,7 +38,7 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class RenderDatabase : public Singleton<RenderDatabase> {
+class RenderDatabase final : public Singleton<RenderDatabase> {
 private:
     using AllocType = RenderAllocator;
     template <typename T, typename Allocator = AllocType>
@@ -94,7 +94,7 @@ public:
         }
     };
 
-    ~RenderDatabase() {
+    virtual ~RenderDatabase() override {
         singleton = nullptr;
     }
     WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase)
@@ -152,7 +152,7 @@ private:
     inline static RenderDatabase* singleton = nullptr;
     Unique<MaterialFactory> material_factory;
 
-    AllocType* allocator;
+    AllocType* allocator = nullptr;
 
     OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;

@@ -113,7 +113,7 @@ public:
      */
     template <typename T>
     RefRes<T> get_resource(const std::string& p_id) const {
-        return RefRes<T>(reinterpret_cast<T*>(find_resource_chunk_containing_key(p_id)->get_resource(p_id).get()), &stack_allocator);
+        return find_resource_chunk_containing_key(p_id)->get_resource(p_id).reint_cast<T>();
     }
 
     /**

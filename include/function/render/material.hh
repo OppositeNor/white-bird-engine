@@ -17,15 +17,17 @@
 
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include <cstdint>
 namespace WhiteBirdEngine {
 
 class Material {
+public:
+    WBE_R6_DEFAULT_VIRTUAL(Material)
     // TODO
 };
 
 class MaterialFactory {
 public:
+    WBE_R6_DEFAULT_VIRTUAL(MaterialFactory)
     // TODO
     virtual Ref<Material> create(RefRes<RUMaterial> p_material) = 0;
 };

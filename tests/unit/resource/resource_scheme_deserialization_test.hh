@@ -95,9 +95,9 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
     ASSERT_EQ(scheme.id, "test_audio_01");
     ASSERT_EQ(scheme.type, "audio");
     ASSERT_EQ(scheme.sample_rate, 44100);
-    ASSERT_EQ(scheme.channels, 2u);
+    ASSERT_EQ(scheme.channels, 2U);
     ASSERT_EQ(scheme.bit_depth, 16);
-    ASSERT_FLOAT_EQ(scheme.duration, 120.5f);
+    ASSERT_FLOAT_EQ(scheme.duration, 120.5F);
     ASSERT_EQ(scheme.frame_count, 5292000);
     ASSERT_FALSE(scheme.is_stream);
     ASSERT_EQ(scheme.path, "audio/test_audio_01.wav");
@@ -119,9 +119,9 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioDefaults) {
     ASSERT_EQ(scheme.id, "test_audio_02");
     ASSERT_EQ(scheme.type, "audio");
     ASSERT_EQ(scheme.sample_rate, -1); // Default value
-    ASSERT_EQ(scheme.channels, 1u); // Default value
+    ASSERT_EQ(scheme.channels, 1U); // Default value
     ASSERT_EQ(scheme.bit_depth, -1); // Default value
-    ASSERT_FLOAT_EQ(scheme.duration, -1.0f); // Default value
+    ASSERT_FLOAT_EQ(scheme.duration, -1.0F); // Default value
     ASSERT_EQ(scheme.frame_count, -1); // Default value
     ASSERT_TRUE(scheme.is_stream);
     ASSERT_EQ(scheme.path, "audio/test_audio_02.ogg");
@@ -144,7 +144,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
-    ASSERT_EQ(scheme.channel_count, 4u);
+    ASSERT_EQ(scheme.channel_count, 4U);
     ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
@@ -167,7 +167,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
-    ASSERT_EQ(scheme.channel_count, 3u);
+    ASSERT_EQ(scheme.channel_count, 3U);
     ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_TRUE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
@@ -302,14 +302,14 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeMesh scheme;
+    WBE::RUSchemeMesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_mesh_01");
     ASSERT_EQ(scheme.type, "mesh");
-    ASSERT_EQ(scheme.submeshes.size(), 2u);
+    ASSERT_EQ(scheme.submeshes.size(), 2U);
     ASSERT_EQ(scheme.submeshes[0].id, "submesh_01");
     ASSERT_EQ(scheme.submeshes[1].id, "submesh_02");
-    ASSERT_EQ(scheme.submeshes_id.size(), 2u);
+    ASSERT_EQ(scheme.submeshes_id.size(), 2U);
     ASSERT_EQ(scheme.submeshes_id[0], "submesh_ref_01");
     ASSERT_EQ(scheme.submeshes_id[1], "submesh_ref_02");
 }
@@ -323,7 +323,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshEmpty) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeMesh scheme;
+    WBE::RUSchemeMesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_mesh_empty");
     ASSERT_EQ(scheme.type, "mesh");

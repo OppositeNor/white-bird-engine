@@ -93,7 +93,7 @@ public:
     }
 
     virtual bool contains(const std::string& p_res_key) const override {
-        return resource_map.find(p_res_key) != resource_map.end();
+        return resource_map.contains(p_res_key);
     }
 
     virtual void create_ref_to(void** p_ptr, const std::string& p_id) override {
@@ -102,6 +102,7 @@ public:
 
     virtual std::vector<std::string> get_all_keys() const override {
         std::vector<std::string> result;
+        result.reserve(resource_map.size());
         for (const auto& [key, _] : resource_map) {
             result.push_back(key);
         }
@@ -113,7 +114,7 @@ protected:
     using ParserDataType = ParserType::DataType;
 
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
-        if (p_res_key != "" && resource_map.find(p_res_key) != resource_map.end()) {
+        if (p_res_key != "" && resource_map.contains(p_res_key)) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
         total_size += p_size;
@@ -126,7 +127,7 @@ protected:
         return result;
     }
 private:
-    size_t total_size;
+    size_t total_size = 0;
     std::unordered_map<std::string, RefRes<char>> resource_map;
     std::unordered_map<void**, std::string> ref_map;
     StackAllocator* allocator;
@@ -140,9 +141,9 @@ private:
     void populate_scheme(const ParserDataType& p_parser_data);
 
     void resolve_refs() {
-        auto resource_manager = ResourceManager::get_singleton();
+        auto* resource_manager = ResourceManager::get_singleton();
         for (auto& [ptr, key] : ref_map) {
-            *ptr = resource_manager->get_resource<void>(key);
+            *ptr = resource_manager->get_resource<char>(key).get();
         }
     }
 };
@@ -186,7 +187,7 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::stri
                 populate_scheme<RUSchemeMaterial>(res);
                 break;
             case MESH:
-                populate_scheme<RUSchemeMesh>(res);
+                populate_scheme<RUSchemeMesh3D>(res);
                 break;
             case SUBMESH:
                 populate_scheme<RUSchemeSubmesh3D>(res);
@@ -224,6 +225,6 @@ RUType ResourceChunkLoadFile<ParserType>::get_res_type(std::string p_type) {
     return LabelManager::get_singleton()->get_label_from_name(p_type);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

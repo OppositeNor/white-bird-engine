@@ -143,6 +143,14 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = default; \
     ClassName& operator=(ClassName&&) noexcept = default;
 
+#define WBE_R6_DEFAULT_VIRTUAL(ClassName) \
+    ClassName() = default; \
+    virtual ~ClassName() = default; \
+    ClassName(const ClassName&) = default; \
+    ClassName(ClassName&&) noexcept = default; \
+    ClassName& operator=(const ClassName&) = default; \
+    ClassName& operator=(ClassName&&) noexcept = default;
+
 #define WBE_R6_DELETE_COPY_MOVE_OVERRIDE(ClassName) \
     ClassName() = default; \
     virtual ~ClassName() override = default; \

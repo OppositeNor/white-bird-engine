@@ -15,8 +15,10 @@
 #ifndef __WBE_RENDERER_DUMMY_H__
 #define __WBE_RENDERER_DUMMY_H__
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
+#include "function/render_dummy/material_dummy.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -27,9 +29,10 @@ namespace WhiteBirdEngine {
 class RendererDummy final : public Renderer {
 public:
     RendererDummy(RenderAllocator* p_allocator)
-        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {}
+        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryDummy>(p_allocator))) {}
     
-    virtual ~RendererDummy() override {}
+    virtual ~RendererDummy() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy);
 
     virtual void tick(double p_delta) override {}
 
@@ -50,7 +53,7 @@ private:
     Ref<RenderDatabase> dummy_database;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 
 

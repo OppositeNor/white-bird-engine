@@ -35,6 +35,7 @@
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
+#include "function/render_vk/material_vk.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
@@ -59,7 +60,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator),
-    render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
+    render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
     in_flight_fences(p_allocator), base_render_data(p_allocator), activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
@@ -163,7 +164,7 @@ void RendererVK::tick(double p_delta) {
 }
 
 void RendererVK::update_static_opaque_triangles() {
-    const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangle_vertices();
+    const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
     auto res = render_objects->static_opaque_triangles_vertices_buffer_resource->res.dynamic_cast_ref<ROBufferVK>();
     size_t size_in_bytes = static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured);
     if (res == MEM_NULL || size_in_bytes > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
@@ -301,7 +302,7 @@ void RendererVK::setup_base_render_data() {
 void RendererVK::init_graphics_pipeline() {
     // Initialize shaders.
     ROShaderVK::Builder shader_builder;
-    RUBinary* shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_vert");
+    RefRes<RUBinary> shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_vert");
     // TODO: update
     shader_builder.set_code(shader_code->data.get(), shader_code->size);
     Ref<ROShaderVK> vertex_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);

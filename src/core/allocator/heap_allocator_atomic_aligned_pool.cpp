@@ -36,7 +36,7 @@ HeapAllocatorAtomicAlignedPool::HeapAllocatorAtomicAlignedPool(size_t p_size)
     if (p_size > MAX_TOTAL_SIZE) {
         throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) + " exceeds maximum: " + std::to_string(MAX_TOTAL_SIZE) + ".");
     }
-    mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT(hicpp-no-malloc)
+    mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT
     if (mem_chunk == nullptr) {
         throw std::runtime_error("Failed to create pool: malloc failed.");
     }
@@ -51,7 +51,7 @@ HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
     if (!is_empty()) {
         wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
     }
-    free(mem_chunk); // NOLINT(hicpp-no-malloc)
+    free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 
