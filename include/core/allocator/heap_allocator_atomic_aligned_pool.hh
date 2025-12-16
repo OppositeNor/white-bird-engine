@@ -85,7 +85,7 @@ public:
 
     virtual bool is_empty() const override {
         boost::shared_lock lock(mutex);
-        return idle_list_head != nullptr && idle_list_head->size == size;
+        return is_empty_unguarded();
     }
 
     virtual void clear() override {
@@ -129,6 +129,10 @@ public:
     }
 
 private:
+
+    bool is_empty_unguarded() const {
+        return idle_list_head != nullptr && idle_list_head->size == size;
+    }
 
     struct IdleListNode { // NOLINT
         size_t size;
