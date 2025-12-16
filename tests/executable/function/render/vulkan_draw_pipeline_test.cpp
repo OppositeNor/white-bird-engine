@@ -37,6 +37,7 @@ int main(int p_argc, char* p_argv[]) {
         WBE::ApplicationGame game_application;
         {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
+            // TODO
             setup_pipeline(game_application);
             game_application.run();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();

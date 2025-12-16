@@ -33,8 +33,7 @@ using ResourceChunkID = HashCode;
  */
 class ResourceChunk {
 public:
-    ResourceChunk() = default;
-    virtual ~ResourceChunk() {}
+    WBE_R6_DEFAULT_VIRTUAL(ResourceChunk);
 
     /**
      * @brief Get the resource from a key.
@@ -141,6 +140,6 @@ protected:
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

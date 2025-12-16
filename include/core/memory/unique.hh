@@ -43,12 +43,12 @@ public:
     }
     // Unique is not copyable.
     Unique(const Unique&) = delete;
-    Unique(Unique&& p_other)
+    Unique(Unique&& p_other) noexcept
         : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     Unique& operator=(const Unique&) = delete;
-    Unique& operator=(Unique&& p_other) {
+    Unique& operator=(Unique&& p_other) noexcept {
         reset();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
@@ -193,7 +193,8 @@ Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
     return Unique<T>(p_allocator, id);
 }
 
-}
+} // namespace WhiteBirdEngine
+//
 namespace std {
 /**
  * @brief Hash function for unique instance.
@@ -203,7 +204,7 @@ namespace std {
  * @return 
  */
 template <typename T, typename AllocType>
-struct hash<::WhiteBirdEngine::Unique<T, AllocType>> {
+struct hash<::WhiteBirdEngine::Unique<T, AllocType>> { // NOLINT
     size_t operator()(const ::WhiteBirdEngine::Unique<T, AllocType>& p_unique) {
         if (p_unique.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
@@ -213,6 +214,6 @@ struct hash<::WhiteBirdEngine::Unique<T, AllocType>> {
 
 };
 
-}
+} // namespace std
 
 #endif

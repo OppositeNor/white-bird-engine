@@ -251,11 +251,11 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DGeneral) {
     ASSERT_EQ(scheme.material.id, "material_01");
     ASSERT_EQ(scheme.material.type, "material");
     ASSERT_EQ(scheme.material_id, "mat_ref_01");
-    ASSERT_EQ(scheme.vertices_data.size(), 3u);
-    ASSERT_EQ(scheme.indices_data.size(), 3u);
-    ASSERT_EQ(scheme.indices_data[0], 0u);
-    ASSERT_EQ(scheme.indices_data[1], 1u);
-    ASSERT_EQ(scheme.indices_data[2], 2u);
+    ASSERT_EQ(scheme.vertices_data.size(), 3U);
+    ASSERT_EQ(scheme.indices_data.size(), 3U);
+    ASSERT_EQ(scheme.indices_data[0], 0U);
+    ASSERT_EQ(scheme.indices_data[1], 1U);
+    ASSERT_EQ(scheme.indices_data[2], 2U);
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DMinimal) {

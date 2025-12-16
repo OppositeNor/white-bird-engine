@@ -15,12 +15,21 @@
 #ifndef __WBE_MATERIAL_HH__
 #define __WBE_MATERIAL_HH__
 
+#include "core/memory/reference_strong.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 namespace WhiteBirdEngine {
 
-using MaterialID = uint64_t;
-constexpr MaterialID MATERIAL_INVALID = 0;
+class Material {
+    // TODO
+};
 
-}
+class MaterialFactory {
+public:
+    // TODO
+    virtual Ref<Material> create(RefRes<RUMaterial> p_material) = 0;
+};
+
+} // namespace WhiteBirdEngine
 
 #endif

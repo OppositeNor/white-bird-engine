@@ -66,14 +66,14 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p
     resolve_material(p_res_chunk, p_scheme);
 }
 
-void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMesh& p_scheme) const {
+void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMesh3D& p_scheme) const {
     // TODO
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const {
     if (p_scheme.indices_data.size() % 3 != 0) {
         throw std::runtime_error(std::format(
-            "Failed to populate submesh 3D resource unit: indices data size {} is not a multiple of 3.",
+            "Failed to populate submesh resource unit: indices data size {} is not a multiple of 3.",
             p_scheme.indices_data.size()));
     }
     RUSubmesh3D resource_unit;
@@ -85,8 +85,6 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
     }
     auto vertices_data = p_res_chunk.push_data(
         p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
-    auto indices_data = p_res_chunk.push_data(
-        p_scheme.indices_data.size() * sizeof(uint32_t), p_scheme.indices_data.data());
 
     std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
     for (size_t i = 0; i < triangles.size(); ++i) {
@@ -98,6 +96,7 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
 
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
     resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
+    resource_unit.triangles_count = triangles.size();
     wbe_console_log()->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
 }
 

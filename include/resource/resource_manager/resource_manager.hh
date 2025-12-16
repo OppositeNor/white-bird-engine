@@ -19,6 +19,8 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
 #include <cstddef>
 #include <stdexcept>
@@ -34,7 +36,10 @@ namespace WhiteBirdEngine {
 class ResourceManager : public Singleton<ResourceManager> {
 public:
 
+    ResourceManager() = delete;
     virtual ~ResourceManager() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ResourceManager);
+
     /**
      * @brief Constructor.
      *
@@ -107,8 +112,8 @@ public:
      * @return The resource chunk.
      */
     template <typename T>
-    T* get_resource(const std::string& p_id) const {
-        return reinterpret_cast<T*>(find_resource_chunk_containing_key(p_id)->get_resource(p_id).get());
+    RefRes<T> get_resource(const std::string& p_id) const {
+        return RefRes<T>(reinterpret_cast<T*>(find_resource_chunk_containing_key(p_id)->get_resource(p_id).get()), &stack_allocator);
     }
 
     /**
@@ -144,6 +149,6 @@ private:
     inline static ResourceManager* singleton = nullptr;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -39,19 +39,22 @@ class RefRaw {
 public:
     using ObjType = T;
     RefRaw() = default;
-    ~RefRaw() {}
+    ~RefRaw() = default;
     RefRaw(const RefRaw& p_other)
         : mem_id(p_other.mem_id), allocator(p_other.allocator) {}
-    RefRaw(RefRaw&& p_other)
+    RefRaw(RefRaw&& p_other) noexcept
         : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     RefRaw& operator=(const RefRaw& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         return *this;
     }
-    RefRaw& operator=(RefRaw&& p_other) {
+    RefRaw& operator=(RefRaw&& p_other) noexcept {
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
@@ -73,8 +76,7 @@ public:
      * @todo Test
      * @param p_mem_id The memory ID.
      */
-    RefRaw(MemID p_mem_id)
-    : mem_id(MEM_NULL), allocator(nullptr) {
+    RefRaw(MemID p_mem_id) : allocator(nullptr) {
         if (p_mem_id != MEM_NULL) {
             throw std::runtime_error("Allocator not specified.");
         }
@@ -283,7 +285,7 @@ template <typename T>
 void delete_ref_stack(RefRaw<T, StackAllocator>&& p_ref) {
     RefRaw<T, StackAllocator>::delete_ref_stack(std::move(p_ref));
 }
-}
+} // namespace WhiteBirdEngine
 
 namespace std {
 /**
@@ -294,7 +296,7 @@ namespace std {
  * @return 
  */
 template <typename T, typename AllocType>
-struct hash<::WhiteBirdEngine::RefRaw<T, AllocType>> {
+struct hash<::WhiteBirdEngine::RefRaw<T, AllocType>> { // NOLINT
     size_t operator()(const ::WhiteBirdEngine::RefRaw<T, AllocType>& p_ref) {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
@@ -303,6 +305,6 @@ struct hash<::WhiteBirdEngine::RefRaw<T, AllocType>> {
     }
 
 };
-}
+} // namespace std
 
 #endif

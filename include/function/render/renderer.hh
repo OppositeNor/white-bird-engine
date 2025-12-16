@@ -21,6 +21,7 @@
 #include "render_defs.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/render_task.hh"
+#include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
 
@@ -34,7 +35,7 @@ WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
  */
 class Renderer : public Singleton<Renderer> {
 public:
-    WBE_R6_DEFAULT_OVERRIDE(Renderer)
+    WBE_R6_DELETE_COPY_MOVE_OVERRIDE(Renderer)
 
     /**
      * @brief Called every frame.

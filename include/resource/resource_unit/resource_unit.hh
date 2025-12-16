@@ -29,10 +29,10 @@ namespace WhiteBirdEngine {
 struct ResourceUnit {};
 
 template <typename T>
-constexpr bool is_resource_unit = std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
+constexpr bool IS_RESOURCE_UNIT = std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
 
 template <typename T>
-concept ResourceUnitConcept = is_resource_unit<T>;
+concept ResourceUnitConcept = IS_RESOURCE_UNIT<T>;
 
 template <typename T>
 using RefRes = RefRaw<T, Allocator>;
@@ -70,7 +70,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeAudio final : public RUScheme {
     int32_t bit_depth = -1;
     // The duration of the audio. Could be read from file.
     WBE_META(WBE_REFLECT)
-    float duration = -1.0f;
+    float duration = -1.0F;
     // The number of frames of the audio. Could be read from file.
     WBE_META(WBE_REFLECT)
     int32_t frame_count = -1;
@@ -171,7 +171,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
     RUSchemeMaterial material;
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
-    std::string material_id = "";
+    std::string material_id;
     // The vertices data.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<Vertex3DTextured> vertices_data;
@@ -181,11 +181,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
 };
 
 /**
- * @class RUSchemeMesh
- * @brief The scheme of RUMesh.
+ * @class RUSchemeMesh3D
+ * @brief The scheme of RUMesh3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeMesh)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeMesh3D)
     // Submeshes that could be populated in place.
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemeSubmesh3D> submeshes;
@@ -342,18 +342,23 @@ struct RUMaterial : public ResourceUnit {
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.
     RefRes<RUMaterial> material;
+    // The total number of triangles.
+    size_t triangles_count;
+    // The triangles instances.
     RefRes<Triangle3DIndxTextured> triangles;
 };
 
 /**
- * @class RUMesh
+ * @class RUMesh3D
  * @brief 3D mesh resource unit.
  */
-struct RUMesh : public ResourceUnit {
+struct RUMesh3D : public ResourceUnit {
+    // Number of submeshes.
+    size_t submesh_count;
     // The submeshes.
     RefRes<RefRes<RUSubmesh3D>> submeshes;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

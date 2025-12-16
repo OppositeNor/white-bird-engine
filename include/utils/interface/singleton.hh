@@ -15,6 +15,7 @@
 #ifndef __WBE_SINGLETON_HH__
 #define __WBE_SINGLETON_HH__
 
+#include "utils/defs.hh"
 #include <atomic>
 #include <cstdint>
 #include <stdexcept>
@@ -39,10 +40,12 @@ public:
         instance_count.fetch_sub(1, std::memory_order_acq_rel);
     }
 
+    WBE_R6_NDCD_DELETE_COPY_MOVE(Singleton);
+
 private:
     inline static std::atomic<uint8_t> instance_count = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

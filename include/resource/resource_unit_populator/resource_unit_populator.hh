@@ -36,7 +36,7 @@ public:
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_scheme) const override;
-    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMesh& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeMesh3D& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const override;

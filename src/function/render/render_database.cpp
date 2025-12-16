@@ -13,22 +13,24 @@
    limitations under the License.
 */
 #include "function/render/render_database.hh"
-#include "core/surface/3d_primitive.hh"
+#include "core/allocator/allocator.hh"
 #include "function/render/material.hh"
+#include "resource/resource_unit/resource_unit.hh"
 
-#include <algorithm>
+#include <atomic>
+#include <cstdint>
+#include <cstring>
 #include <glm/glm.hpp>
 #include <cstddef>
-#include <cstdint>
-#include <map>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace WhiteBirdEngine {
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : static_opaque_triangle_vertices(p_allocator), static_opaque_triangle_indices(p_allocator), static_opaque_triangle_obj_id(p_allocator),
-    static_opaque_transform_mats(p_allocator),
-    dynamic_opaque_triangle_vertices(p_allocator), dynamic_opaque_triangle_indices(p_allocator), dynamic_opaque_triangle_obj_id(p_allocator) {
+RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<MaterialFactory> p_material_factory)
+    : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+    WBE_DEBUG_ASSERT(p_material_factory != MEM_NULL);
+    singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
@@ -36,81 +38,74 @@ RenderDatabase::RenderDatabase(AllocType* p_allocator)
 }
 
 void RenderDatabase::set_opaque_triangles_linear(
-    std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-    Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-    Vector<uint32_t>& p_opaque_triangle_indices,
-    Vector<uint32_t>& p_opaque_triangle_obj_id,
-    Vector<Vertex3DTextured>&& p_vertices,
-    Vector<std::pair<MaterialID, Triangle3DIndxTextured>>&& p_indices) {
+    OpaqueTrianglesInfo& p_triangles_info,
+    RUMesh3D* p_mesh) {
+    // The triangles are arranged by their materials, which triangles with same materials are put together.
+    // This is designed this way so that we could use the least amount of draw calls for per-material drawing.
+    // Triangles with the same material are drawn together in one render pass.
 
-    p_opaque_triangle_map.clear();
-    p_opaque_triangle_vertices = std::move(p_vertices);
-    p_opaque_triangle_indices = Vector<uint32_t>(allocator);
-    p_opaque_triangle_obj_id = Vector<uint32_t>(allocator);
+    p_triangles_info.reset();
 
-    using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
-    std::sort(p_indices.begin(), p_indices.end(), [](
-        const TriType& p_tri1, const TriType& p_tri2) -> bool {
-              // Sort according to the material first, then sort according to the object ID.
-              // This makes sure that all the triangles with the same materials will be stored together,
-              // and for each material the triangles within the same object will be stored together.
-              return p_tri1.first == p_tri2.first ? p_tri1.second.obj_id < p_tri2.second.obj_id : p_tri1.first < p_tri2.first;
-              });
-    MaterialID current_id = MATERIAL_INVALID;
-    p_opaque_triangle_obj_id.reserve(p_indices.size());
-    for (auto& tri : p_indices) {
-        if (tri.first != current_id) {
-            // Asign the next material ID's indices.
-            p_opaque_triangle_map[tri.first].first = 0;
-            p_opaque_triangle_map[tri.first].second = p_opaque_triangle_indices.size();
-            current_id = tri.first;
+    struct MaterialMeshInfo {
+        Vector<RUSubmesh3D*> submeshes;
+    };
+    
+    // Record the submeshes for each material
+    Vector<MaterialMeshInfo> material_mesh_infos(allocator);
+    std::unordered_map<RUMaterial*, size_t> registered_material_index;
+
+    size_t total_triangles = 0;
+    for (size_t i = 0; i < p_mesh->submesh_count; ++i) {
+        auto& submesh = p_mesh->submeshes.get()[i];
+        auto& material = submesh->material;
+        if (!registered_material_index.contains(material.get())) {
+            // If not registered before, register.
+            p_triangles_info.materials.push_back({.material = material_factory->create(material)});
+            MaterialMeshInfo info = {.submeshes = Vector<RUSubmesh3D*>(allocator)};
+            registered_material_index.insert(std::pair(material.get(), material_mesh_infos.size()));
+            material_mesh_infos.push_back(info);
         }
-        // Asign indices.
-        p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
-                                         tri.second.vertex_indices, tri.second.vertex_indices + 3);
-        p_opaque_triangle_map[tri.first].first += 3;
-        p_opaque_triangle_obj_id.push_back(tri.second.obj_id);
+        // Register the submeshes to the corresponding mesh.
+        size_t material_index = registered_material_index[material.get()];
+        auto& material_mesh_info = material_mesh_infos[material_index];
+        material_mesh_info.submeshes.push_back(submesh.get());
+        total_triangles += submesh->triangles_count;
     }
-    p_indices.clear();
-}
+    p_triangles_info.obj_id.reserve(total_triangles);
+    p_triangles_info.indices.reserve(total_triangles * 3);
 
-void RenderDatabase::set_opaque_triangles_linear(
-    std::map<MaterialID, std::pair<size_t, size_t>>& p_opaque_triangle_map,
-    Vector<Vertex3DTextured>& p_opaque_triangle_vertices,
-    Vector<uint32_t>& p_opaque_triangle_indices,
-    Vector<uint32_t>& p_opaque_triangle_obj_id,
-    const Vector<Vertex3DTextured>& p_vertices,
-    Vector<std::pair<MaterialID, Triangle3DIndxTextured>>& p_indices) {
+    // Process the triangles in the mesh, and record them in the vertices.
+    for (size_t i = 0; i < material_mesh_infos.size(); ++i) {
+        // Assign a unique ID for each submesh so they could be distinguished from other submeshes.
+        // This is useful for object edge detection or some per-object operations.
+        static std::atomic<uint32_t> obj_id_tracker = 0;
+        uint32_t curr_obj_id = obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
 
-    p_opaque_triangle_map.clear();
-    p_opaque_triangle_vertices = p_vertices;
-    p_opaque_triangle_indices = Vector<uint32_t>(allocator);
-    p_opaque_triangle_obj_id = Vector<uint32_t>(allocator);
+        auto& mesh_info = material_mesh_infos[i];
+        size_t material_mesh_start = p_triangles_info.indices.size();
+        for (auto& submesh : mesh_info.submeshes) {
+            uint32_t max_index = 0;
+            size_t curr_index = p_triangles_info.vertices.size();
+            for (size_t i = 0; i < submesh->triangles_count; ++i) {
+                auto& triangle = submesh->triangles.get()[i];
+                // Because we are merging the vertices into one array, the original indices should add the offset where this
+                // submesh's vertices is stored in the vertex array.
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_1);
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_2);
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_3);
+                // We also record the maximum index to determine how much vertices are copied.
+                max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
+            }
+            // Assign an unique ID for each triangle to distinguish from other 
+            p_triangles_info.obj_id.push_back(curr_obj_id);
 
-    using TriType = std::pair<MaterialID, Triangle3DIndxTextured>;
-    std::sort(p_indices.begin(), p_indices.end(), [](
-        const TriType& p_tri1, const TriType& p_tri2) -> bool {
-              // Sort according to the material first, then sort according to the object ID.
-              // This makes sure that all the triangles with the same materials will be stored together,
-              // and for each material the triangles within the same object will be stored together.
-              return p_tri1.first == p_tri2.first ? p_tri1.second.obj_id < p_tri2.second.obj_id : p_tri1.first < p_tri2.first;
-              });
-    MaterialID current_id = MATERIAL_INVALID;
-    p_opaque_triangle_obj_id.reserve(p_indices.size());
-    for (auto& tri : p_indices) {
-        if (tri.first != current_id) {
-            // Asign the next material ID's indices.
-            p_opaque_triangle_map[tri.first].first = 0;
-            p_opaque_triangle_map[tri.first].second = p_opaque_triangle_indices.size();
-            current_id = tri.first;
+            p_triangles_info.vertices.resize(curr_index + max_index);
+            memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), max_index * sizeof(Vertex3DTextured));
         }
-        // Asign indices.
-        p_opaque_triangle_indices.insert(p_opaque_triangle_indices.end(),
-                                         tri.second.vertex_indices, tri.second.vertex_indices + 3);
-        p_opaque_triangle_map[tri.first].first += 3;
-        p_opaque_triangle_obj_id.push_back(tri.second.obj_id);
+        // Setup subregion for the material.
+        p_triangles_info.materials[i].sub_region.starting_index = material_mesh_start;
+        p_triangles_info.materials[i].sub_region.size = p_triangles_info.indices.size() - material_mesh_start;
     }
 }
-
 
 } // namespace WhiteBirdEngine
