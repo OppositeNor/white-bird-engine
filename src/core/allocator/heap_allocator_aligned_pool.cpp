@@ -24,8 +24,10 @@
 #include <format>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #define WBE_GET_CHUNK_SIZE(p_chunk) ((*reinterpret_cast<Header*>(p_chunk)) & MAX_TOTAL_SIZE)
 #define WBE_GET_ALLOCATED_DATA_SIZE(p_mem_id) ((*reinterpret_cast<Header*>((p_mem_id) - HEADER_SIZE)) & MAX_TOTAL_SIZE)
@@ -231,8 +233,8 @@ HeapAllocatorAlignedPool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
     ss << R"("type":"HeapAllocatorAlignedPool",)";
-    ss << "\"total_size\":" << get_total_size() << ",";
-    ss << "\"free_chunk_layout\":[";
+    ss << R"("total_size":)" << get_total_size() << ",";
+    ss << R"("free_chunk_layout":[)";
     IdleListNode* node = idle_list_head.get();
     bool first = true;
     while (node != nullptr) {
@@ -241,8 +243,8 @@ HeapAllocatorAlignedPool::operator std::string() const {
         }
         first = false;
         ss << "{"
-            << "\"begin\":" << (node->mem_start - mem_chunk) << ","
-            << "\"size\":" << node->size
+            << R"("begin":)" << (node->mem_start - mem_chunk) << ","
+            << R"("size":)" << node->size
             << "}";
         node = node->next.get();
     }

@@ -45,14 +45,10 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public Alloc
  */
 class HeapAllocatorAtomicAlignedPool final : public HeapAllocatorAligned {
 public:
-public:
     HeapAllocatorAtomicAlignedPool()
         : HeapAllocatorAtomicAlignedPool(WBE_KiB(64)) {}
     virtual ~HeapAllocatorAtomicAlignedPool() override;
-    HeapAllocatorAtomicAlignedPool(const HeapAllocatorAtomicAlignedPool&) = delete;
-    HeapAllocatorAtomicAlignedPool(HeapAllocatorAtomicAlignedPool&&) = delete;
-    HeapAllocatorAtomicAlignedPool& operator=(const HeapAllocatorAtomicAlignedPool&) = delete;
-    HeapAllocatorAtomicAlignedPool& operator=(HeapAllocatorAtomicAlignedPool&&) = delete;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicAlignedPool);
 
     using Header = uint64_t;
 
@@ -134,7 +130,7 @@ public:
 
 private:
 
-    struct IdleListNode {
+    struct IdleListNode { // NOLINT
         size_t size;
         char* mem_start;
         std::unique_ptr<IdleListNode> next = nullptr;
@@ -156,6 +152,6 @@ private:
     mutable boost::shared_mutex mutex;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

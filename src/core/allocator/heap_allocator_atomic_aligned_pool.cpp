@@ -23,11 +23,13 @@
 #include <cstdint>
 #include <memory>
 #include <format>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #define WBE_GET_CHUNK_SIZE(p_chunk) ((*reinterpret_cast<Header*>(p_chunk)) & MAX_TOTAL_SIZE)
-#define WBE_GET_ALLOCATED_DATA_SIZE(p_mem_id) ((*reinterpret_cast<Header*>(p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE)
+#define WBE_GET_ALLOCATED_DATA_SIZE(p_mem_id) ((*reinterpret_cast<Header*>((p_mem_id) - HEADER_SIZE)) & MAX_TOTAL_SIZE)
 
 namespace WhiteBirdEngine {
 

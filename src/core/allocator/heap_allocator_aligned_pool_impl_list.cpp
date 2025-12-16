@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <format>
 #include <iostream>
 #include <stdexcept>

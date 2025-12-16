@@ -168,7 +168,7 @@ private:
 
     size_t internal_fragmentation_tracker = 0;
 
-    static constexpr Header HEADER_TYPE_MASK = (0b1ull << 60);
+    static constexpr Header HEADER_TYPE_MASK = (0B1ULL << 60);
     enum class HeaderType {
         // Occupied head
         OCCUPIED = 0,
@@ -178,11 +178,11 @@ private:
 
     void unguarded_check_broken() const;
 
-    template <bool COALESCE_ENABLED>
+    template <bool CoalesceEnabled>
     MemID check_posible_free(size_t p_aligned_size, size_t p_alignment);
-    template <bool COALESCE_ENABLED>
+    template <bool CoalesceEnabled>
     MemID find_valid_chunk(size_t p_aligned_size, size_t p_alignment);
-    template <bool CHECK_FIRST, bool COALESCE_ENABLED>
+    template <bool CheckFirst, bool CoalesceEnabled>
     char* get_next_free_memory(char* p_from);
     void* acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(char* p_insert_start, size_t p_insert_size);
@@ -194,7 +194,7 @@ private:
     std::string unguarded_to_string() const;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #undef WBE_HAAAPIL_GET_HEADER_SIZE
 #undef WBE_HAAAPIL_GET_CHUNK_SIZE
