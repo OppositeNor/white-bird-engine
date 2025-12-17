@@ -105,7 +105,7 @@ public:
      */
     ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferViewVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferViewVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferViewVK)
 
 
     /**
