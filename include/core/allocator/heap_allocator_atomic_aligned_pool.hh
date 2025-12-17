@@ -48,7 +48,7 @@ public:
     HeapAllocatorAtomicAlignedPool()
         : HeapAllocatorAtomicAlignedPool(WBE_KiB(64)) {}
     virtual ~HeapAllocatorAtomicAlignedPool() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicAlignedPool);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicAlignedPool)
 
     using Header = uint64_t;
 

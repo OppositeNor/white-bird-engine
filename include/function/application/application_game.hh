@@ -34,7 +34,7 @@ class ApplicationGame : public Application {
 public:
     ApplicationGame();
     virtual ~ApplicationGame() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ApplicationGame);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ApplicationGame)
 
     virtual void run() override;
 

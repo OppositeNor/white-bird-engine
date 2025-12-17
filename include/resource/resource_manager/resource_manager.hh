@@ -38,7 +38,7 @@ public:
 
     ResourceManager() = delete;
     virtual ~ResourceManager() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ResourceManager);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ResourceManager)
 
     /**
      * @brief Constructor.

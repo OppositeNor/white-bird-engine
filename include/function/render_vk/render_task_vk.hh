@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
 struct RenderTaskVK : public RenderTask {
     RenderTaskVK() = delete;
     virtual ~RenderTaskVK() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderTaskVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderTaskVK)
 
     RenderTaskVK(const BaseRenderDataVK* p_render_data)
         : req_rend_res(p_render_data->allocator), depend_semaphores(p_render_data->allocator),
@@ -80,7 +80,7 @@ protected:
     public:
         RecordCommandBufferGuard() = delete;
         ~RecordCommandBufferGuard();
-        WBE_R6_NDCD_DELETE_COPY_MOVE(RecordCommandBufferGuard);
+        WBE_R6_NDCD_DELETE_COPY_MOVE(RecordCommandBufferGuard)
 
         /**
          * @brief Constructor.

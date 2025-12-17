@@ -32,7 +32,7 @@ public:
         : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryDummy>(p_allocator))) {}
     
     virtual ~RendererDummy() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
 
     virtual void tick(double p_delta) override {}
 

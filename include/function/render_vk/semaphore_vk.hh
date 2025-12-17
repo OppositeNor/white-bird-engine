@@ -53,7 +53,7 @@ public:
         }, render_data->frames_in_flight);
     }
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK)
 
     /**
      * @brief Is this a binary semaphore.
