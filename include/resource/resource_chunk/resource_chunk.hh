@@ -33,7 +33,7 @@ using ResourceChunkID = HashCode;
  */
 class ResourceChunk {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(ResourceChunk);
+    WBE_R6_DEFAULT_VIRTUAL(ResourceChunk)
 
     /**
      * @brief Get the resource from a key.
