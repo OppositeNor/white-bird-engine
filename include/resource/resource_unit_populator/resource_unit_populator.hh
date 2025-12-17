@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
 class RUPopulator final : public RUPopulatorInterface {
 public:
     RUPopulator();
-    WBE_R6_NDC_DEFAULT_OVERRIDE(RUPopulator);
+    WBE_R6_NDC_DEFAULT_OVERRIDE(RUPopulator)
 
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeAudio& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeBinary& p_scheme) const override;
