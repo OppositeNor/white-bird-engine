@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<MaterialFactory> p_material_factory)
     : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
-    WBE_DEBUG_ASSERT(p_material_factory != MEM_NULL);
+    WBE_DEBUG_ASSERT(material_factory != MEM_NULL);
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
