@@ -62,7 +62,7 @@ public:
      */
     RTPreExecutePipelineFactoryVK(const BaseRenderDataVK* p_render_data, Ref<SemaphoreVK> p_prepare_image_semaphore)
         : RenderTaskFactoryVK(p_render_data), prepare_image_semaphore(p_prepare_image_semaphore) {}
-    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(RTPreExecutePipelineFactoryVK);
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(RTPreExecutePipelineFactoryVK)
 
     virtual Ref<RenderTask> create() const override {
         return make_ref<RTPreExecutePipelineVK>(render_data->allocator, render_data, prepare_image_semaphore);

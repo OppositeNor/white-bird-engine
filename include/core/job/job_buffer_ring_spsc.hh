@@ -36,7 +36,7 @@ public:
     // The type of the job this buffer is holding.
     using JobType = JobT;
 
-    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(JobBufferRingSPSC);
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(JobBufferRingSPSC)
 
     /**
      * @brief Constructor.
