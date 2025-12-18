@@ -52,7 +52,7 @@ public:
     HeapAllocatorAlignedRAM() {}
     virtual ~HeapAllocatorAlignedRAM() override {
         if (!allocated.empty()) {
-            wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
+            stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
         }
         for (auto data : allocated) {
             free(reinterpret_cast<void*>(data));

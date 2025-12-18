@@ -30,16 +30,16 @@ int main(int p_argc, char* p_argv[]) {
         {
             // Not running the application is also an option.
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
-            WBE::wbe_console_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
+            WBE::stdout_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
-            WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {} bytes", global_alloc_max));
-            WBE::wbe_console_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {} bytes", renderer_alloc_max));
+            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {} bytes", global_alloc_max));
+            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {} bytes", renderer_alloc_max));
         }
     }
     const auto& profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (const auto& profile : profiles) {
-        WBE::wbe_console_log(WBE::WBE_CHANNEL_GLOBAL)
+        WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)
             ->message(std::format("{}: Total: {} seconds", profile.message, profile.start_time + profile.delta));
     }
     return EXIT_SUCCESS;

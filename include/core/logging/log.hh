@@ -29,8 +29,7 @@ WBE_LABEL(WBE_CHANNEL_DEBUG, WBE_CHANNEL)
 class Log {
 public:
 
-    Log() = default;
-    virtual ~Log() {}
+    WBE_R6_DEFAULT_VIRTUAL(Log)
 
     /**
      * @brief Get the channel of the log.
@@ -61,8 +60,8 @@ public:
     virtual void error(const std::string& p_str) = 0;
 };
 
-Log* wbe_console_log(ChannelID p_channel = WBE_CHANNEL_GLOBAL);
+Log* stdout_log(ChannelID p_channel = WBE_CHANNEL_GLOBAL);
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

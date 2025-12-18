@@ -51,7 +51,7 @@ HeapAllocatorAtomicAlignedPool::HeapAllocatorAtomicAlignedPool(size_t p_size)
 
 HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
     if (!is_empty_unguarded()) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
     }
     free(mem_chunk); // NOLINT
     mem_chunk = nullptr;

@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
     if (!is_empty()) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
     free(mem_chunk); // NOLINT
     mem_chunk = nullptr;

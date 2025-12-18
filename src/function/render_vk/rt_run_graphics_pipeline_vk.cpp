@@ -28,7 +28,12 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence)
-    : RenderTaskVK(p_render_data), signal_in_flight_fence(p_signal_in_flight_fence), wait_stages(p_render_data->allocator) {
+    : RTRunGraphicsPipelineVK(p_render_data, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F), p_signal_in_flight_fence) {}
+
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
+                                                 bool p_signal_in_flight_fence)
+    : RenderTaskVK(p_render_data), clear_color(p_clear_color), signal_in_flight_fence(p_signal_in_flight_fence),
+    wait_stages(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -79,9 +84,9 @@ void RTRunGraphicsPipelineVK::record_command_buffer() {
     render_pass_info.renderArea.offset.y = 0;
     auto extent = framebuffer->fields().extent;
     render_pass_info.renderArea.extent = {.width = extent.x, .height = extent.y};
-    VkClearValue clear_color = {.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}};
+    VkClearValue clear_color_tmp = {.color = {.float32 = {clear_color.r, clear_color.g, clear_color.b, clear_color.a}}};
     render_pass_info.clearValueCount = 1;
-    render_pass_info.pClearValues = &clear_color;
+    render_pass_info.pClearValues = &clear_color_tmp;
 
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());

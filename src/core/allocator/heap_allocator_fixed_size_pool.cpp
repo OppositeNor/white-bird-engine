@@ -23,7 +23,7 @@
 namespace WhiteBirdEngine {
 HeapAllocatorFixedSizePool::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
     }
     free(mem_chunk); // NOLINT
 }

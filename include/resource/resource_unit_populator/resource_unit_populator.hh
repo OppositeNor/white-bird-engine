@@ -46,6 +46,7 @@ private:
 
     void resolve_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const;
     void resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const;
+    void resolve_submesh_data(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) const;
     RefRes<RUMaterial> resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const;
 };
 

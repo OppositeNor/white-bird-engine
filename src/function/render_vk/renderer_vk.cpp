@@ -93,7 +93,7 @@ void RendererVK::tick(double p_delta) {
 
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
     if (run_pipeline.size() == 0) {
-        wbe_console_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
+        stdout_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
     }
 
@@ -135,7 +135,7 @@ void RendererVK::tick(double p_delta) {
 
     for (auto& task_info : curr_pipeline->task_infos) {
         if (task_info.render_task == MEM_NULL) {
-            wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+            stdout_log(WBE_CHANNEL_RENDER)->warning(
                 std::format("Render task {} is NULL. Skipped.", LabelManager::get_singleton()->get_label_name(task_info.task_id)));
             continue;
         }
@@ -202,7 +202,7 @@ void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_man
 }
 
 void RendererVK::init() {
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
     init_window();
     init_vulkan();
@@ -212,7 +212,7 @@ void RendererVK::init() {
     init_graphics_pipeline();
     init_swap_chain_framebuffers();
     setup_render_resource();
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
 void RendererVK::terminate() {
@@ -480,7 +480,7 @@ void RendererVK::create_swap_chain() {
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     frames_in_flight = game_config.frames_in_flight;
     if (frames_in_flight < swap_chain_images_count) {
-        wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+        stdout_log(WBE_CHANNEL_RENDER)->warning(
             std::format("frames_in_flight is required to be at least number of swap chain images; but get {} frames_in_flight and {} images. "
                         "Resizing frames_in_flight to {}.", frames_in_flight, swap_chain_images_count, swap_chain_images_count));
     }
@@ -626,7 +626,7 @@ void RendererVK::create_physical_device() {
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
     String device_name(device_properties.deviceName, allocator);
-    wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
     vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
 }
@@ -732,7 +732,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
         // The refered device index is provided, use the index to pick device. If failed to pick, fall back to automatic picking.
         if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
             // Index out of range.
-            wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
+            stdout_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). Picking"
                 " an alternative device.", pick_device_index, p_physical_devices.size()));
         }
@@ -741,7 +741,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             String device_name(device_properties.deviceName, allocator);
-            wbe_console_log(WBE_CHANNEL_DEBUG)->warning(std::format(
+            stdout_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: device \"{}\" is not suitable."
                 " Picking an alternative device.", device_name));
         }
@@ -751,7 +751,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             String device_name(device_properties.deviceName, allocator);
             physical_device = p_physical_devices[pick_device_index];
-            wbe_console_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
+            stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
         }
     }

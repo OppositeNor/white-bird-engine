@@ -66,7 +66,7 @@ HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_
 
 HeapAllocatorAlignedPoolImplicitList::~HeapAllocatorAlignedPoolImplicitList() {
     if (!is_empty()) {
-        wbe_console_log(WBE_CHANNEL_GLOBAL)->warning(std::format("Non-empty allocator destructed. Allocator status: {}",
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning(std::format("Non-empty allocator destructed. Allocator status: {}",
                                                                  static_cast<std::string>(*this)));
     }
     free(mem_chunk); // NOLINT

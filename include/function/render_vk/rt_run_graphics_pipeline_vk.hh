@@ -19,6 +19,7 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"
+#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -40,12 +41,22 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence = false);
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data 
+     * @param p_clear_color 
+     * @param p_signal_in_flight_fence 
+     */
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight_fence = false);
+
     virtual void init() override;
 
     virtual void perform(double p_delta) override;
 
 private:
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+    glm::vec4 clear_color;
     bool signal_in_flight_fence = false;
     Vector<VkPipelineStageFlags2> wait_stages;
     void record_command_buffer();
@@ -68,14 +79,24 @@ public:
      * @param p_signal_in_flight Should signal in flight fence.
      */
     RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
-        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight) {}
+        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight), clear_color(0.0F, 0.0F, 0.0F, 1.0F) {}
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_clear_color The clear color.
+     * @param p_signal_in_flight Should signal in flight fence.
+     */
+    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight = false)
+        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight), clear_color(p_clear_color) {}
 
     virtual Ref<RenderTask> create() const override {
-        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, signal_in_flight);      
+        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, clear_color, signal_in_flight);      
     }
 private:
     bool signal_in_flight;
-
+    glm::vec4 clear_color;
 };
 } // namespace WhiteBirdEngine
 

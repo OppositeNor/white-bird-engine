@@ -19,11 +19,13 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <memory>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -67,7 +69,22 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeMesh3D& p_scheme) const {
-    // TODO
+    RUMesh3D resource_unit;
+    std::vector<RefRes<RUSubmesh3D>> submeshes;
+    submeshes.reserve(p_scheme.submeshes.size() + p_scheme.submeshes_id.size());
+    for (const auto& submesh_scheme : p_scheme.submeshes) {
+        RUSubmesh3D submesh;
+        resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
+        auto saved_resource = p_res_chunk.push_res_unit("", submesh).reint_cast<RUSubmesh3D>();
+        WBE_DEBUG_ASSERT(saved_resource != nullptr);
+        submeshes.push_back(saved_resource);
+    }
+    // TODO: resolve submesh id
+    size_t submesh_index_array_size_bytes = submeshes.size() * sizeof(RefRes<RUSubmesh3D>);
+    auto submesh_array = p_res_chunk.push_data(submesh_index_array_size_bytes, submeshes.data()).reint_cast<RefRes<RUSubmesh3D>>();
+    resource_unit.submeshes = submesh_array;
+    resource_unit.submesh_count = submeshes.size();
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const {
@@ -77,27 +94,8 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
             p_scheme.indices_data.size()));
     }
     RUSubmesh3D resource_unit;
-    if (p_scheme.material_id == "") {
-        p_res_chunk.create_ref_to(reinterpret_cast<void**>(&resource_unit.material), p_scheme.material_id);
-    }
-    else {
-        resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
-    }
-    auto vertices_data = p_res_chunk.push_data(
-        p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
-
-    std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
-    for (size_t i = 0; i < triangles.size(); ++i) {
-        triangles[i].vert_array = vertices_data.reint_cast<Vertex3DTextured>();
-        triangles[i].vertex_indices[0] = p_scheme.indices_data[i * 3];
-        triangles[i].vertex_indices[1] = p_scheme.indices_data[i * 3 + 1];
-        triangles[i].vertex_indices[2] = p_scheme.indices_data[i * 3 + 2];
-    }
-
-    auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
-    resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
-    resource_unit.triangles_count = triangles.size();
-    wbe_console_log()->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
+    resolve_submesh_data(p_res_chunk, p_scheme, resource_unit);
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const {
@@ -141,6 +139,30 @@ void RUPopulator::resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSch
     p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
     auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), image_data.get());
     p_resource_unit.image_data = data;
+}
+
+void RUPopulator::resolve_submesh_data(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) const {
+    if (p_scheme.material_id == "") {
+        p_res_chunk.create_ref_to(reinterpret_cast<void**>(&p_resource_unit.material), p_scheme.material_id);
+    }
+    else {
+        p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
+    }
+    auto vertices_data = p_res_chunk.push_data(
+        p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
+
+    std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        triangles[i].vert_array = vertices_data.reint_cast<Vertex3DTextured>();
+        triangles[i].vertex_indices[0] = p_scheme.indices_data[i * 3];
+        triangles[i].vertex_indices[1] = p_scheme.indices_data[i * 3 + 1];
+        triangles[i].vertex_indices[2] = p_scheme.indices_data[i * 3 + 2];
+    }
+
+    auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
+    p_resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
+    p_resource_unit.triangles_count = triangles.size();
+    stdout_log()->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
 }
 
 RefRes<RUMaterial> RUPopulator::resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const {

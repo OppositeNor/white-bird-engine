@@ -53,7 +53,7 @@ void ApplicationGame::init() {
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }
     else {
-        wbe_console_log(WBE_CHANNEL_RENDER)->warning(
+        stdout_log(WBE_CHANNEL_RENDER)->warning(
             std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }

@@ -45,7 +45,7 @@ RenderTaskVK::RecordCommandBufferGuard::RecordCommandBufferGuard(VkCommandBuffer
 RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
     if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
         // Destructor cannot throw an exception. 
-        wbe_console_log()->error("Failed to record command buffer.");
+        stdout_log()->error("Failed to record command buffer.");
     }
 }
 
