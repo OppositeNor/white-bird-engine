@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_PARSER_YAML_TEST_HH__
-#define __WBE_PARSER_YAML_TEST_HH__
+#ifndef WBE_FILE_PARSER_YAML_TEST_HH
+#define WBE_FILE_PARSER_YAML_TEST_HH
 
 #include "core/parser/parser_yaml.hh"
 #include "parser_test_general.hh"

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_TYPE_METADATA_TEST_HH__
-#define __WBE_TYPE_METADATA_TEST_HH__
+#ifndef WBE_FILE_TYPE_METADATA_TEST_HH
+#define WBE_FILE_TYPE_METADATA_TEST_HH
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>

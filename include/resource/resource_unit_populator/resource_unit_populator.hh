@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RESOURCE_UNIT_POPULATOR_HH__
-#define __WBE_RESOURCE_UNIT_POPULATOR_HH__
+#ifndef WBE_FILE_RESOURCE_UNIT_POPULATOR_HH
+#define WBE_FILE_RESOURCE_UNIT_POPULATOR_HH
 
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"

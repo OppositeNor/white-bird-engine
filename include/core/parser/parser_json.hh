@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_PARSER_JSON_HH__
-#define __WBE_PARSER_JSON_HH__
+#ifndef WBE_FILE_PARSER_JSON_HH
+#define WBE_FILE_PARSER_JSON_HH
 
 #include "parser.hh"
 #include "utils/utils.hh"

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_DEBUG_MUTEX_HH__
-#define __WBE_DEBUG_MUTEX_HH__
+#ifndef WBE_FILE_DEBUG_MUTEX_HH
+#define WBE_FILE_DEBUG_MUTEX_HH
 
 #include <atomic>
 #include <thread>

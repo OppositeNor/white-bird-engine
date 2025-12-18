@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_CLA_AST_VISITOR_HH__
-#define __WBE_CLA_AST_VISITOR_HH__
+#ifndef WBE_FILE_CLA_AST_VISITOR_HH
+#define WBE_FILE_CLA_AST_VISITOR_HH
 #include "core/cla/cla_utils.hh"
 #include "utils/defs.hh"
 #include <cstdint>

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_SERIALIZABLE_HH__
-#define __WBE_SERIALIZABLE_HH__
+#ifndef WBE_FILE_SERIALIZABLE_HH
+#define WBE_FILE_SERIALIZABLE_HH
 
 #include "core/parser/parser_json.hh"
 #include "core/reflection/reflection_defs.hh"

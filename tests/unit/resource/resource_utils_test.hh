@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RESOURCE_UTILS_TEST_HH__
-#define __WBE_RESOURCE_UTILS_TEST_HH__
+#ifndef WBE_FILE_RESOURCE_UTILS_TEST_HH
+#define WBE_FILE_RESOURCE_UTILS_TEST_HH
 
 #include "resource/resource_utils.hh"
 #include "global/global.hh"

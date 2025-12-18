@@ -220,7 +220,7 @@ CheckOptions:
   - key: readability-function-size.ParameterThreshold
     value: 8
   
-  # Header guard format based on observed pattern: __WBE_FILENAME_HH__
+  # Header guard format based on observed pattern: WBE_FILE_{FILENAME}_HH
   - key: llvm-header-guard.HeaderFileExtensions
     value: "h,hh,hpp,hxx"
   

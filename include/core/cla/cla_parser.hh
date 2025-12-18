@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_CLA_PARSER_HH__
-#define __WBE_CLA_PARSER_HH__
+#ifndef WBE_FILE_CLA_PARSER_HH
+#define WBE_FILE_CLA_PARSER_HH
 
 #include "core/allocator/allocator.hh"
 #include "core/cla/cla_ast.hh"

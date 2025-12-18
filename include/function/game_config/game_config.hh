@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_GAME_CONFIG_HH__
-#define __WBE_GAME_CONFIG_HH__
+#ifndef WBE_FILE_GAME_CONFIG_HH
+#define WBE_FILE_GAME_CONFIG_HH
 
 #include "core/parser/parser_yaml.hh"
 #include "platform/file_system/path.hh"

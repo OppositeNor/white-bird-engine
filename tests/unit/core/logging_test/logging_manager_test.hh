@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_LOGGING_MANAGER_TEST_HH__
-#define __WBE_LOGGING_MANAGER_TEST_HH__
+#ifndef WBE_FILE_LOGGING_MANAGER_TEST_HH
+#define WBE_FILE_LOGGING_MANAGER_TEST_HH
 
 #include "core/logging/log.hh"
 #include "core/logging/logging_manager.hh"

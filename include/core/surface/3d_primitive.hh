@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_3D_PRIMITIVE_HH__
-#define __WBE_3D_PRIMITIVE_HH__
+#ifndef WBE_FILE_3D_PRIMITIVE_HH
+#define WBE_FILE_3D_PRIMITIVE_HH
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_raw.hh"

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_COMPONENTS_HH__
-#define __WBE_COMPONENTS_HH__
+#ifndef WBE_FILE_COMPONENTS_HH
+#define WBE_FILE_COMPONENTS_HH
 
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"

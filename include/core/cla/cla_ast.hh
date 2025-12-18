@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_CLA_AST_HH__
-#define __WBE_CLA_AST_HH__
+#ifndef WBE_FILE_CLA_AST_HH
+#define WBE_FILE_CLA_AST_HH
 
 #include "core/memory/reference_strong.hh"
 #include <cstdint>

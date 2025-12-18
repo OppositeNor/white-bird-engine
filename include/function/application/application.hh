@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_APPLICATION_HH__
-#define __WBE_APPLICATION_HH__
+#ifndef WBE_FILE_APPLICATION_HH
+#define WBE_FILE_APPLICATION_HH
 
 #include "utils/defs.hh"
 

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_STL_ALLOCATOR_TEST_HH__
-#define __WBE_STL_ALLOCATOR_TEST_HH__
+#ifndef WBE_FILE_STL_ALLOCATOR_TEST_HH
+#define WBE_FILE_STL_ALLOCATOR_TEST_HH
 
 #include "global/global.hh"
 #include "global/stl_allocator.hh"

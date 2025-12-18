@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH__
-#define __WBE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH__
+#ifndef WBE_FILE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH
+#define WBE_FILE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH
 
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "global/global.hh"

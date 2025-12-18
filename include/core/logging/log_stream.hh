@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_LOG_STREAM_HH__
-#define __WBE_LOG_STREAM_HH__
+#ifndef WBE_FILE_LOG_STREAM_HH
+#define WBE_FILE_LOG_STREAM_HH
 
 #include "log.hh"
 #include <ostream>

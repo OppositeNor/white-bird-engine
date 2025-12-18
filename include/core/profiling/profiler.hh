@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_PROFILLER_HH__
-#define __WBE_PROFILLER_HH__
+#ifndef WBE_FILE_PROFILLER_HH
+#define WBE_FILE_PROFILLER_HH
 
 #include "core/engine_core.hh"
 #include "core/profiling/profiling_manager.hh"

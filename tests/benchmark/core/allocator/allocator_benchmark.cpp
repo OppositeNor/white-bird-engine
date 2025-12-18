@@ -12,9 +12,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_ALLOCATOR_BENCHMARK_HH__
-#define __WBE_ALLOCATOR_BENCHMARK_HH__
-
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
@@ -252,5 +249,3 @@ static void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benc
 BENCHMARK(heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle);
 BENCHMARK_MAIN();
 
-
-#endif

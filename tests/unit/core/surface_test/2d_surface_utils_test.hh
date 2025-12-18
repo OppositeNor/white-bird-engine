@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_2D_SURFACE_UTILS_TEST_HH__
-#define __WBE_2D_SURFACE_UTILS_TEST_HH__
+#ifndef WBE_FILE_2D_SURFACE_UTILS_TEST_HH
+#define WBE_FILE_2D_SURFACE_UTILS_TEST_HH
 
 #include "core/surface/2d_surface_utils.hh"
 #include "core/surface/2d_primitive.hh"

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_JOB_BUFFER_RING_SPSC_TEST_HH__
-#define __WBE_JOB_BUFFER_RING_SPSC_TEST_HH__
+#ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
+#define WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 
 #include "core/job/job.hh"
 #include "core/job/job_buffer_ring_spsc.hh"

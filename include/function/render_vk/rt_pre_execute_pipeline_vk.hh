@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RT_PRE_EXECUTE_PIPELINE_VK_HH__
-#define __WBE_RT_PRE_EXECUTE_PIPELINE_VK_HH__
+#ifndef WBE_FILE_RT_PRE_EXECUTE_PIPELINE_VK_HH
+#define WBE_FILE_RT_PRE_EXECUTE_PIPELINE_VK_HH
 
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_utils.hh"

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_MATERIAL_HH__
-#define __WBE_MATERIAL_HH__
+#ifndef WBE_FILE_MATERIAL_HH
+#define WBE_FILE_MATERIAL_HH
 
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_unit/resource_unit.hh"

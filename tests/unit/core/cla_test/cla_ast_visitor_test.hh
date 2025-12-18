@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_CLA_AST_VISITOR_TEST_HH__
-#define __WBE_CLA_AST_VISITOR_TEST_HH__
+#ifndef WBE_FILE_CLA_AST_VISITOR_TEST_HH
+#define WBE_FILE_CLA_AST_VISITOR_TEST_HH
 
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_ast_visitor.hh"

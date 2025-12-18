@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_SEMAPHORE_VK_HH__
-#define __WBE_SEMAPHORE_VK_HH__
+#ifndef WBE_FILE_SEMAPHORE_VK_HH
+#define WBE_FILE_SEMAPHORE_VK_HH
 
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"

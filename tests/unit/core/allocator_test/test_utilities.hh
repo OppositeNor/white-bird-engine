@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_TEST_UTILITIES_HH__
-#define __WBE_TEST_UTILITIES_HH__
+#ifndef WBE_FILE_TEST_UTILITIES_HH
+#define WBE_FILE_TEST_UTILITIES_HH
 #include <sstream>
 #include <string>
 #include <vector>

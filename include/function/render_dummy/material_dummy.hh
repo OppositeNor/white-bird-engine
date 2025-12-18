@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_MATERIAL_DUMMY_HH__
-#define __WBE_MATERIAL_DUMMY_HH__
+#ifndef WBE_FILE_MATERIAL_DUMMY_HH
+#define WBE_FILE_MATERIAL_DUMMY_HH
 
 #include "function/render/material.hh"
 namespace WhiteBirdEngine {

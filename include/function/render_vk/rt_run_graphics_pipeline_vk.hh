@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RT_RUN_GRAPHICS_PIPELINE_VK_HH__
-#define __WBE_RT_RUN_GRAPHICS_PIPELINE_VK_HH__
+#ifndef WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_VK_HH
+#define WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"

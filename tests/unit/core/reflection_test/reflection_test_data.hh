@@ -13,8 +13,8 @@
    limitations under the License.
 */
 
-#ifndef __WBE_DESERIALIZER_TEST_HH__
-#define __WBE_DESERIALIZER_TEST_HH__
+#ifndef WBE_FILE_DESERIALIZER_TEST_HH
+#define WBE_FILE_DESERIALIZER_TEST_HH
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
 #include "utils/utils.hh"

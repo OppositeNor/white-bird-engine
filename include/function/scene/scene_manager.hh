@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_SCENE_MANAGER_HH__
-#define __WBE_SCENE_MANAGER_HH__
+#ifndef WBE_FILE_SCENE_MANAGER_HH
+#define WBE_FILE_SCENE_MANAGER_HH
 
 #include "utils/interface/singleton.hh"
 

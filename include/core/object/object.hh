@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_OBJECT_HH__
-#define __WBE_OBJECT_HH__
+#ifndef WBE_FILE_OBJECT_HH
+#define WBE_FILE_OBJECT_HH
 
 #include <string_view>
 #include "core/reflection/serializable.hh"

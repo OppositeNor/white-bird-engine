@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_ENGINE_FUNCTION_HH__
-#define __WBE_ENGINE_FUNCTION_HH__
+#ifndef WBE_FILE_ENGINE_FUNCTION_HH
+#define WBE_FILE_ENGINE_FUNCTION_HH
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/unique.hh"

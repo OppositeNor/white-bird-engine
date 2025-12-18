@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_CLOCK_HH__
-#define __WBE_CLOCK_HH__
+#ifndef WBE_FILE_CLOCK_HH
+#define WBE_FILE_CLOCK_HH
 
 #include <chrono>
 namespace WhiteBirdEngine {

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_LOG_STREAM_TEST_HH__
-#define __WBE_LOG_STREAM_TEST_HH__
+#ifndef WBE_FILE_LOG_STREAM_TEST_HH
+#define WBE_FILE_LOG_STREAM_TEST_HH
 
 #include "global/global.hh"
 #include "core/logging/log_stream.hh"

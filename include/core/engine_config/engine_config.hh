@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_ENGINE_CONFIG_HH__
-#define __WBE_ENGINE_CONFIG_HH__
+#ifndef WBE_FILE_ENGINE_CONFIG_HH
+#define WBE_FILE_ENGINE_CONFIG_HH
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"

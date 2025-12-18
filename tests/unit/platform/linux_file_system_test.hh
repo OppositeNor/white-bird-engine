@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_FILE_SYSTEM_TEST_HH__
-#define __WBE_FILE_SYSTEM_TEST_HH__
+#ifndef WBE_FILE_FILE_SYSTEM_TEST_HH
+#define WBE_FILE_FILE_SYSTEM_TEST_HH
 
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"

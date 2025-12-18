@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_SINGLETON_HH__
-#define __WBE_SINGLETON_HH__
+#ifndef WBE_FILE_SINGLETON_HH
+#define WBE_FILE_SINGLETON_HH
 
 #include "utils/defs.hh"
 #include <atomic>

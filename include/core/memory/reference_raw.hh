@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_REFERENCE_RAW_HH__
-#define __WBE_REFERENCE_RAW_HH__
+#ifndef WBE_FILE_REFERENCE_RAW_HH
+#define WBE_FILE_REFERENCE_RAW_HH
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator.hh"

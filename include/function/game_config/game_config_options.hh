@@ -13,8 +13,8 @@
    limitations under the License.
 */
 
-#ifndef __WBE_GAME_CONFIG_OPTIONS_HH__
-#define __WBE_GAME_CONFIG_OPTIONS_HH__
+#ifndef WBE_FILE_GAME_CONFIG_OPTIONS_HH
+#define WBE_FILE_GAME_CONFIG_OPTIONS_HH
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"

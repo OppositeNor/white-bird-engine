@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RESOURCE_CHUNK_LOADER_HH__
-#define __WBE_RESOURCE_CHUNK_LOADER_HH__
+#ifndef WBE_FILE_RESOURCE_CHUNK_LOADER_HH
+#define WBE_FILE_RESOURCE_CHUNK_LOADER_HH
 #include "boost/algorithm/string/case_conv.hpp"
 #include "core/allocator/stack_allocator.hh"
 #include "core/parser/parser.hh"

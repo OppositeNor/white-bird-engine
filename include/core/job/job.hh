@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_JOB_HH__
-#define __WBE_JOB_HH__
+#ifndef WBE_FILE_JOB_HH
+#define WBE_FILE_JOB_HH
 
 namespace WhiteBirdEngine {
 

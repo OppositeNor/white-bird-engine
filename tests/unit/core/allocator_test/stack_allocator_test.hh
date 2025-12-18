@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_STACK_ALLOCATOR_TEST_HH__
-#define __WBE_STACK_ALLOCATOR_TEST_HH__
+#ifndef WBE_FILE_STACK_ALLOCATOR_TEST_HH
+#define WBE_FILE_STACK_ALLOCATOR_TEST_HH
 
 #include "core/allocator/stack_allocator.hh"
 #include <gtest/gtest.h>

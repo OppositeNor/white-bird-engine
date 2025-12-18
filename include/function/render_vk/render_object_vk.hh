@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDER_OBJECT_VK_HH__
-#define __WBE_RENDER_OBJECT_VK_HH__
+#ifndef WBE_FILE_RENDER_OBJECT_VK_HH
+#define WBE_FILE_RENDER_OBJECT_VK_HH
 
 #include "function/render/render_object.hh"
 #include "function/render/render_task.hh"

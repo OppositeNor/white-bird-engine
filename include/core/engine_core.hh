@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_ENGINE_CORE_HH__
-#define __WBE_ENGINE_CORE_HH__
+#ifndef WBE_FILE_ENGINE_CORE_HH
+#define WBE_FILE_ENGINE_CORE_HH
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/engine_config/engine_config.hh"

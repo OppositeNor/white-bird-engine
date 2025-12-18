@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_SCENE_HH__
-#define __WBE_SCENE_HH__
+#ifndef WBE_FILE_SCENE_HH
+#define WBE_FILE_SCENE_HH
 
 #include "core/core_utils.hh"
 namespace WhiteBirdEngine {
