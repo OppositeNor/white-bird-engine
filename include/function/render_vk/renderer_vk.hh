@@ -55,7 +55,9 @@ namespace WhiteBirdEngine {
 
 WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE_VK, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, WBE_RENDER_RESOURCE);
 
 WBE_LABEL(RT_PRE_EXECUTE_PIPELINE_VK, WBE_RENDER_TASK);
 
@@ -318,8 +320,12 @@ private:
         Ref<RendResVK> swap_chain_framebuffer_resource;
         // The base graphics pipeline resource.
         Ref<RendResVK> base_graphics_pipeline_resource;
-        // The buffer that stores data of the scenes' static opaque triangles' status.
-        Ref<RendResVK> static_opaque_triangles_vertices_buffer_resource;
+        // Vertex buffer for static opaque triangles.
+        Ref<RendResVK> static_opaque_triangles_buffer_vertices_resource;
+        // Index buffer for static opaque triangles.
+        Ref<RendResVK> static_opaque_triangles_buffer_indices_resource;
+        // Buffer that stores the object ids.
+        Ref<RendResVK> static_opaque_triangles_buffer_obj_ids_resource;
     };
     Unique<RenderObjects> render_objects;
 
@@ -336,6 +342,7 @@ private:
     void init_swap_chain_framebuffers();
     void setup_render_resource();
 
+    void setup_resource(RendResID p_res_id, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object);
     void recreate_swap_chain();
 
     void create_instance();

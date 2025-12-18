@@ -27,6 +27,7 @@
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/render_vk_utils.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -163,27 +164,49 @@ void RendererVK::tick(double p_delta) {
     ++(base_render_data.current_frame);
 }
 
-void RendererVK::update_static_opaque_triangles() {
-    const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
-    auto res = render_objects->static_opaque_triangles_vertices_buffer_resource->res.dynamic_cast_ref<ROBufferVK>();
-    size_t size_in_bytes = static_opaque_triangles_vertices.size() * sizeof(Vertex3DTextured);
-    if (res == MEM_NULL || size_in_bytes > res.dynamic_cast_ref<ROBufferVK>()->fields().buffer_size) {
+template <typename T>
+static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, DeviceDomain p_domain,
+                          Ref<ROBufferVK>& p_buffer, const Vector<T>& p_from_buffer, VkBufferUsageFlags p_buffer_usage) {
+    size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
+    if (p_buffer == MEM_NULL || size_in_bytes > p_buffer->fields().buffer_size) {
         // If res not initialized, or size exceeds buffer capacity, create a new buffer.
         ROBufferVK::Builder builder;
-        builder.set_domain(DeviceDomain::DEVICE)
-            .add_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-            .add_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+        builder.set_domain(p_domain)
+            .set_usage(p_buffer_usage)
             .set_size(size_in_bytes);
-        res = make_ref<ROBufferVK>(allocator, &base_render_data, builder);
+        p_buffer = make_ref<ROBufferVK>(p_allocator, p_render_data, builder);
     }
-    // Setup a temporary host buffer for copying the data.
-    ROBufferVK::Builder temp_buffer_builder;
-    temp_buffer_builder.set_domain(DeviceDomain::HOST)
-        .add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-        .set_size(size_in_bytes);
-    auto temp_buffer = make_ref<ROBufferVK>(allocator, &base_render_data, temp_buffer_builder);
-    temp_buffer->update_buffer(static_opaque_triangles_vertices.data(), size_in_bytes);
-    res->update_buffer(temp_buffer, size_in_bytes);
+    switch (p_domain) {
+        case DeviceDomain::HOST_DEVICE:
+        case DeviceDomain::HOST:
+            p_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
+            break;
+        case DeviceDomain::DEVICE: {
+            // Setup a temporary host buffer for copying the data.
+            ROBufferVK::Builder temp_buffer_builder;
+            temp_buffer_builder.set_domain(DeviceDomain::HOST)
+                .add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                .set_size(size_in_bytes);
+            auto temp_buffer = make_ref<ROBufferVK>(p_allocator, p_render_data, temp_buffer_builder);
+            temp_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
+            p_buffer->update_buffer(temp_buffer, size_in_bytes);
+        } break;
+    }
+}
+
+void RendererVK::update_static_opaque_triangles() {
+    const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
+    auto vertex_buffer = render_objects->static_opaque_triangles_buffer_vertices_resource->res.dynamic_cast_ref<ROBufferVK>();
+    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, vertex_buffer, static_opaque_triangles_vertices,
+                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    const auto& static_opaque_triangles_indices = render_database->get_static_opaque_triangles_info().indices;
+    auto index_buffer = render_objects->static_opaque_triangles_buffer_indices_resource->res.dynamic_cast_ref<ROBufferVK>();
+    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, index_buffer, static_opaque_triangles_indices,
+                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    const auto& static_opaque_triangles_obj_ids = render_database->get_static_opaque_triangles_info().obj_id;
+    auto obj_ids_buffer = render_objects->static_opaque_triangles_buffer_obj_ids_resource->res.dynamic_cast_ref<ROBufferVK>();
+    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, obj_ids_buffer, static_opaque_triangles_obj_ids,
+                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 }
 
 void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {
@@ -257,6 +280,15 @@ void RendererVK::init_vulkan() {
     create_swap_chain();
     create_command_pools();
     create_async_objects();
+}
+
+void RendererVK::setup_resource(RendResID p_res_id, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object) {
+    WBE_DEBUG_ASSERT(p_res == MEM_NULL);
+    p_res = make_ref<RendResVK>(allocator);
+    p_res->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
+    p_res->res_id = p_res_id;
+    p_res->res = p_default_object;
+    render_resources.insert(std::pair(p_res_id, p_res));
 }
 
 void RendererVK::recreate_swap_chain() {
@@ -346,25 +378,15 @@ void RendererVK::init_swap_chain_framebuffers() {
 
 void RendererVK::setup_render_resource() {
     // Setup swap_chain_framebuffer_resource.
-    render_objects->swap_chain_framebuffer_resource = make_ref<RendResVK>(allocator);
-    render_objects->swap_chain_framebuffer_resource->res_type_id = TypeUUID<ROFramebufferVK>::UUID;
-    render_objects->swap_chain_framebuffer_resource->res_id = REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK;
-    render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
-    render_resources.insert(std::pair(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffer_resource));
-
+    setup_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffer_resource, MEM_NULL);
     // Setup base_graphics_pipeline_resource.
-    render_objects->base_graphics_pipeline_resource = make_ref<RendResVK>(allocator);
-    render_objects->base_graphics_pipeline_resource->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
-    render_objects->base_graphics_pipeline_resource->res_id = REND_RES_BASE_GRAPHICS_PIPELINE_VK;
-    render_objects->base_graphics_pipeline_resource->res = render_objects->graphics_pipeline;
-    render_resources.insert(std::pair(REND_RES_BASE_GRAPHICS_PIPELINE_VK, render_objects->base_graphics_pipeline_resource));
-
-    // Setup static_opaque_triangles_vertices_buffer_resource.
-    render_objects->static_opaque_triangles_vertices_buffer_resource = make_ref<RendResVK>(allocator);
-    render_objects->static_opaque_triangles_vertices_buffer_resource->res_type_id = TypeUUID<ROBufferVK>::UUID;
-    render_objects->static_opaque_triangles_vertices_buffer_resource->res_id = REND_RES_STATIC_OPAQUE_TRIANGLES_VK;
-    render_objects->static_opaque_triangles_vertices_buffer_resource->res = MEM_NULL;
-    render_resources.insert(std::pair(REND_RES_STATIC_OPAQUE_TRIANGLES_VK, render_objects->static_opaque_triangles_vertices_buffer_resource));
+    setup_resource(REND_RES_BASE_GRAPHICS_PIPELINE_VK, render_objects->base_graphics_pipeline_resource, render_objects->graphics_pipeline);
+    // Setup static opaque triangles vertices buffer resource.
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_triangles_buffer_vertices_resource, MEM_NULL);
+    // Setup static opaque triangles indices buffer resource.
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_triangles_buffer_indices_resource, MEM_NULL);
+    // Setup static opaque triangles object ids buffer resource.
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_triangles_buffer_obj_ids_resource, MEM_NULL);
 }
 
 void RendererVK::create_instance() {
@@ -529,7 +551,7 @@ void RendererVK::init_swap_chain_image_views() {
                 VK_COMPONENT_SWIZZLE_IDENTITY,
                 VK_COMPONENT_SWIZZLE_IDENTITY,
                 VK_COMPONENT_SWIZZLE_IDENTITY)
-        .set_subresource_range(subresource_range);
+            .set_subresource_range(subresource_range);
 
         render_objects->swap_chain_image_views.emplace_back(
             make_ref<ROImageViewVK>(allocator, &base_render_data, builder)
@@ -646,7 +668,7 @@ void RendererVK::create_logical_device() {
         queue_create_info.pQueuePriorities = &queue_priority;
         queues_create_info.push_back(queue_create_info);
     }
-    
+
     // Setup logical device create info.
     VkDeviceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1025,7 +1047,7 @@ int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_
                 return 50; // not exclusive for host, but still could be used.
             }
             return 100; // host exclusive, which usually is better than shared.
-        break;
+            break;
         case DeviceDomain::DEVICE:
             if (!(p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
                 return -1; // not a suitable memory property.
@@ -1037,7 +1059,7 @@ int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_
                 return is_physical_device_descrete ? 50 : 100;
             }
             return is_physical_device_descrete ? 100 : 50;
-        break;
+            break;
         case DeviceDomain::HOST_DEVICE:
             if (!(p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
                 && p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
@@ -1045,7 +1067,7 @@ int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_
                 return -1; // not a suitable memory property.
             }
             return 100;
-        break;
+            break;
     };
     throw std::runtime_error("Not recognized device domain.");
 }

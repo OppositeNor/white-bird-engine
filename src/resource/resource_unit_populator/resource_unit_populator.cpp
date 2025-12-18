@@ -14,7 +14,6 @@
 */
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include "core/allocator/allocator.hh"
-#include "core/logging/log.hh"
 #include "core/surface/3d_primitive.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -162,7 +161,6 @@ void RUPopulator::resolve_submesh_data(ResourceChunk& p_res_chunk, const RUSchem
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
     p_resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
     p_resource_unit.triangles_count = triangles.size();
-    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
 }
 
 RefRes<RUMaterial> RUPopulator::resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const {
