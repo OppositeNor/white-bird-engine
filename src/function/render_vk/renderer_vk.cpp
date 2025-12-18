@@ -1016,10 +1016,10 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
 uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const {
     for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
         // Find the first memory property that could be used.
-        if (p_type_filter & (1 >> i) && (physical_device_memory_properties.memoryTypes[i].propertyFlags & p_properties) == p_properties) {
+        if (p_type_filter & (1 << i) && (physical_device_memory_properties.memoryTypes[i].propertyFlags & p_properties) == p_properties) {
             return i;
         }
     }
-    throw std::runtime_error("Failed to find a suitable physical device.");
+    throw std::runtime_error("Failed to find a suitable physical device to allocate memory.");
 }
 } // namespace WhiteBirdEngine

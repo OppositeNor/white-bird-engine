@@ -28,11 +28,9 @@ namespace WhiteBirdEngine {
 class AllocatorVK {
     using AllocType = RenderAllocator;
 public:
-    ~AllocatorVK() {}
-    AllocatorVK(const AllocatorVK&) = delete;
-    AllocatorVK(AllocatorVK&&) = delete;
-    AllocatorVK& operator=(const AllocatorVK&) = delete;
-    AllocatorVK& operator=(AllocatorVK&&) = delete;
+    AllocatorVK() = delete;
+    ~AllocatorVK() = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(AllocatorVK)
 
     /**
      * @brief Constructor.
@@ -42,9 +40,9 @@ public:
     AllocatorVK(AllocType* p_allocator) {
         allocator = p_allocator;
         allocator_callbacks.pUserData = this;
-        allocator_callbacks.pfnAllocation = (PFN_vkAllocationFunction)(AllocatorVK::allocation);
-        allocator_callbacks.pfnReallocation = (PFN_vkReallocationFunction)(AllocatorVK::reallocation);
-        allocator_callbacks.pfnFree = (PFN_vkFreeFunction)(AllocatorVK::free);
+        allocator_callbacks.pfnAllocation = reinterpret_cast<PFN_vkAllocationFunction>(AllocatorVK::allocation);
+        allocator_callbacks.pfnReallocation = reinterpret_cast<PFN_vkReallocationFunction>(AllocatorVK::reallocation);
+        allocator_callbacks.pfnFree = reinterpret_cast<PFN_vkFreeFunction>(AllocatorVK::free);
     }
 
     /**
@@ -64,6 +62,6 @@ private:
     VkAllocationCallbacks allocator_callbacks{};
     AllocType* allocator;
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

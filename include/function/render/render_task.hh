@@ -45,8 +45,7 @@ struct RendResInfo {
  *
  */
 struct RenderTask {
-    RenderTask() = default;
-    virtual ~RenderTask() {};
+    WBE_R6_DEFAULT_VIRTUAL(RenderTask)
 
     /**
      * @brief Initialize the render task (since render task does not follow RAII, meaning
@@ -89,8 +88,8 @@ struct RendTaskInfo {
  */
 class RenderTaskFactory {
 public:
-    RenderTaskFactory() {}
-    virtual ~RenderTaskFactory() {}
+    WBE_R6_DEFAULT_VIRTUAL(RenderTaskFactory)
+
     /**
      * @brief Create the render task instance.
      */
@@ -98,6 +97,6 @@ public:
 };
 
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

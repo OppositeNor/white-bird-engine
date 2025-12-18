@@ -162,7 +162,7 @@ void RUPopulator::resolve_submesh_data(ResourceChunk& p_res_chunk, const RUSchem
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
     p_resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
     p_resource_unit.triangles_count = triangles.size();
-    stdout_log()->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Loaded mesh: {}, {} triangles.", p_scheme.id, triangles.size()));
 }
 
 RefRes<RUMaterial> RUPopulator::resolve_material(ResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) const {

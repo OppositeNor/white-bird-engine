@@ -1,11 +1,7 @@
 // vert
+#include "main_pipeline_utils.hlslh"
 
-struct VSOutput {
-    float4 position : SV_Position;
-    float2 uv       : COLOR0;
-};
-
-VSOutput main(uint vertexID : SV_VertexID) {
+VSOutput main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;
 
     float2 positions[3] = {
@@ -20,8 +16,8 @@ VSOutput main(uint vertexID : SV_VertexID) {
         float2(2.0, 0.0)
     };
 
-    output.position = float4(positions[vertexID], 0.0, 1.0);
-    output.uv       = uvs[vertexID];
+    output.position = float4(positions[p_vertex_id], 0.0, 1.0);
+    output.uv       = uvs[p_vertex_id];
 
     return output;
 }

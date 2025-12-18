@@ -24,6 +24,7 @@
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
 #include <format>
 
@@ -35,6 +36,10 @@ int main(int p_argc, char* p_argv[]) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
     {
         WBE::ApplicationGame game_application;
+        // Setup cube's mesh
+        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
+        WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
+        game_application.get_renderer()->update_static_opaque_triangles();
         {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
             // TODO
