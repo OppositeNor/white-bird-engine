@@ -54,10 +54,10 @@ protected:
      * @brief Allocate a device memory.
      *
      * @param p_memory_requirements The memroy requirements for allocating memory.
-     * @param p_memory_properties The properties that the allocated memory should have.
+     * @param p_domain The domain where this memory will be allocated.
      * @return The allocated device memory.
      */
-    VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, VkMemoryPropertyFlags p_memory_properties) const;
+    VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const;
 };
 
 /**

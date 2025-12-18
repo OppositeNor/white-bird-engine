@@ -15,6 +15,7 @@
 #ifndef __WBE_RENDER_VK_UTILS_HH__
 #define __WBE_RENDER_VK_UTILS_HH__
 
+#include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
 #include <cstdint>
@@ -78,7 +79,7 @@ struct BaseRenderDataVK {
     Vector<std::function<void(VkCommandBuffer)>> pre_execute_tasks_queue;
 
     // A function that finds a suitable memory type for a certain memory property.
-    std::function<uint32_t(uint32_t, VkMemoryPropertyFlags)> find_memory_type;
+    std::function<uint32_t(uint32_t, DeviceDomain)> find_memory_type;
 
     // Function to register a delayed call.
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;

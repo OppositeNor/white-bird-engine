@@ -49,13 +49,13 @@ struct AllocatorTrait<class HeapAllocatorAlignedRAM> {
 class HeapAllocatorAlignedRAM final : public HeapAllocatorAligned {
 public:
 
-    HeapAllocatorAlignedRAM() {}
+    HeapAllocatorAlignedRAM() = default;
     virtual ~HeapAllocatorAlignedRAM() override {
         if (!allocated.empty()) {
             stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
         }
         for (auto data : allocated) {
-            free(reinterpret_cast<void*>(data));
+            free(reinterpret_cast<void*>(data)); // NOLINT
         }
     }
     HeapAllocatorAlignedRAM(const HeapAllocatorAlignedRAM&) = delete;
@@ -79,16 +79,11 @@ public:
         WBE_DEBUG_ASSERT(size_map.contains(p_mem));
         size_map.erase(p_mem);
         allocated.erase(p_mem);
-        free(std::bit_cast<void*>(p_mem));
+        free(std::bit_cast<void*>(p_mem)); // NOLINT
     }
 
-    virtual const void* get(MemID p_id) const override {
-        WBE_DEBUG_ASSERT(allocated.find(p_id) != allocated.end());
-        return reinterpret_cast<void*>(p_id);
-    }
-
-    virtual void* get(MemID p_id) override {
-        WBE_DEBUG_ASSERT(allocated.find(p_id) != allocated.end());
+    virtual void* get(MemID p_id) const override {
+        WBE_DEBUG_ASSERT(allocated.contains(p_id));
         return reinterpret_cast<void*>(p_id);
     }
 
@@ -115,12 +110,14 @@ public:
     virtual operator std::string() const override {
         std::stringstream ss;
         ss << "{";
-        ss << "\"type\":\"HeapAllocatorAlignedRAM\",";
+        ss << R"("type":"HeapAllocatorAlignedRAM",)";
         ss << "\"obj_count\":" << obj_count() << ",";
         ss << "\"allocated\":[";
         bool first = true;
-        for (auto& mem_id : allocated) {
-            if (!first) ss << ",";
+        for (const auto& mem_id : allocated) {
+            if (!first) {
+                ss << ",";
+            }
             first = false;
             ss << "{"
                << "\"mem_id\":" << mem_id << ","
@@ -136,6 +133,6 @@ private:
     std::set<MemID> allocated;
     std::unordered_map<MemID, size_t> size_map;
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -28,7 +28,9 @@ enum class DeviceDomain {
     // The host domain
     HOST,
     // The device domain
-    DEVICE
+    DEVICE,
+    // Both the host and device domain
+    HOST_DEVICE,
 };
 
 } // namespace WhiteBirdEngine

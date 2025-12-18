@@ -14,6 +14,8 @@
 */
 #ifndef __WBE_ALLOCATOR_HH__
 #define __WBE_ALLOCATOR_HH__
+#include "utils/defs.hh"
+
 #include <concepts>
 #include <cstdint>
 namespace WhiteBirdEngine {
@@ -69,8 +71,7 @@ concept AllocatorTraitConcept = requires {
 class Allocator {
 public:
 
-    Allocator() = default;
-    virtual ~Allocator() {}
+    WBE_R6_DEFAULT_VIRTUAL(Allocator)
 
     /**
      * @brief Get the pointer pointing to the resource.
@@ -82,6 +83,6 @@ public:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

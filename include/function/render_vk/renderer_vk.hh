@@ -20,6 +20,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/function_utils.hh"
 #include "function/render/render_task.hh"
 #include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
@@ -200,6 +201,7 @@ private:
     VkInstance vk_instance = VK_NULL_HANDLE;
 
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    bool is_physical_device_descrete = false;
     VkPhysicalDeviceMemoryProperties physical_device_memory_properties{};
     VkDevice logical_device = VK_NULL_HANDLE;
 
@@ -370,7 +372,8 @@ private:
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
 
-    uint32_t find_memory_type(uint32_t p_type_filter, VkMemoryPropertyFlags p_properties) const;
+    int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
+    uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;
 };
 
 } // namespace WhiteBirdEngine

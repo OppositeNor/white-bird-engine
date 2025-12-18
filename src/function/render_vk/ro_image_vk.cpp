@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_vk_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -189,7 +190,8 @@ void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.build(render_data);
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
-    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    // Images are only allowed to be allocated on device.
+    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
     exposed_fileds.image_layout = p_builder.initial_image_layout;
     if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
         throw std::runtime_error("Failed to bind image memory.");

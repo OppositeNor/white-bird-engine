@@ -33,7 +33,8 @@ struct AllocatorTrait<class HeapAllocator> {
 class HeapAllocator : public Allocator {
 public:
     HeapAllocator() = default;
-    virtual ~HeapAllocator() override {}
+    virtual ~HeapAllocator() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocator)
 
     /**
      * @brief Allocate memory of a specific size.
@@ -99,7 +100,7 @@ public:
 
     virtual operator std::string() const {
         std::stringstream ss;
-        ss << "{\"type\":\"HeapAllocator\"}";
+        ss << R"({"type":"HeapAllocator"})";
         return ss.str();
     }
 };
@@ -175,6 +176,6 @@ inline void destroy_array(AllocType& p_allocator, MemID p_id, size_t p_num) {
     p_allocator.deallocate(p_id);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

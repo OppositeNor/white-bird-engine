@@ -38,7 +38,8 @@ struct AllocatorTrait<class HeapAllocatorAligned> {
 class HeapAllocatorAligned : public HeapAllocator {
 public:
     HeapAllocatorAligned() = default;
-    virtual ~HeapAllocatorAligned() override {}
+    virtual ~HeapAllocatorAligned() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAligned)
 
     /**
      * @brief Allocate memory of a specific size.
@@ -87,11 +88,11 @@ public:
 
     virtual operator std::string() const override {
         std::stringstream ss;
-        ss << "{\"type\":\"HeapAllocatorAligned\"}";
+        ss << R"({"type":"HeapAllocatorAligned"})";
         return ss.str();
     }
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

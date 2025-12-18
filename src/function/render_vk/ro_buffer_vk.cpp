@@ -55,12 +55,9 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
     exposed_fields.buffer_size = p_builder.size;
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
+    buffer_memory = allocate_device_memory(memory_requirements, exposed_fields.domain);
     if (exposed_fields.domain == DeviceDomain::HOST) {
-        buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
-    }
-    else {
-        buffer_memory = allocate_device_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     }
     if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
         throw std::runtime_error("Failed to bind buffer memory.");
