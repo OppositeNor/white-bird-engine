@@ -33,6 +33,6 @@ public:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

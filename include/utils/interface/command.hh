@@ -15,6 +15,8 @@
 #ifndef __WBE_COMMAND_HH__
 #define __WBE_COMMAND_HH__
 
+#include "utils/defs.hh"
+
 #include <cstdint>
 #include <string>
 namespace WhiteBirdEngine {
@@ -28,8 +30,7 @@ using CommandID = uint64_t;
  */
 class Command {
 public:
-    Command() = default;
-    virtual ~Command() {}
+    WBE_R6_DEFAULT_VIRTUAL(Command);
 
     /**
      * @brief Invoke an operation.
@@ -54,6 +55,6 @@ public:
     virtual void deserialize(const std::string& p_str) = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

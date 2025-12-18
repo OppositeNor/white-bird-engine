@@ -174,6 +174,6 @@ inline KeyCode f_keycode(uint64_t p_number) {
     return static_cast<KeyCode>(p_number - 1 + KEYCODE_F1);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

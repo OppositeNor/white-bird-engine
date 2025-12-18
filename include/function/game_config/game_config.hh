@@ -23,17 +23,31 @@
 
 namespace WhiteBirdEngine {
 
-
+/**
+ * @class GameConfig
+ * @brief Load and handle the game configs.
+ */
 class GameConfig : public Singleton<GameConfig> {
 public:
+    GameConfig() = delete;
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(GameConfig)
 
+    /**
+     * @brief Constructor
+     *
+     * @param p_config_file_path The path to the config file.
+     */
     GameConfig(const Path& p_config_file_path) {
         auto parser = ParserYAML();
         parser.parse(p_config_file_path);
         SerializableSD<GameConfigOptions>::deserialize(parser.get_data(), config_options);
     }
-    ~GameConfig() {}
 
+    /**
+     * @brief Get the game configurations.
+     *
+     * @return The game configurations.
+     */
     const GameConfigOptions& get_config_options() const {
         return config_options;
     }
@@ -43,6 +57,6 @@ private:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -19,26 +19,47 @@
 #include "core/memory/unique.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
+#include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
 
 namespace WhiteBirdEngine {
 
-class EngineFunction : public Singleton<EngineFunction>{
+/**
+ * @class EngineFunction
+ * @brief The manager for the function layer.
+ *
+ */
+class EngineFunction final : public Singleton<EngineFunction>{
 public:
-    ~EngineFunction();
+    EngineFunction() = delete;
+    virtual ~EngineFunction() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineFunction)
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_game_config_file_path The path to the game configurations.
+     */
     EngineFunction(const Path& p_game_config_file_path);
 
+    /**
+     * @brief Get the singleton instance.
+     *
+     * @return The singleton instance.
+     */
     static EngineFunction* get_singleton() {
         return singleton;
     }
 
+    /**
+     * @brief The game configuration.
+     */
     Unique<GameConfig> game_config = MEM_NULL;
 private:
 
     inline static EngineFunction* singleton;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

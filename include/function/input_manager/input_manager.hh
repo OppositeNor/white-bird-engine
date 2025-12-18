@@ -95,8 +95,7 @@ struct InputStatus {
  */
 class InputManager {
 public:
-    InputManager() = default;
-    virtual ~InputManager() {}
+    WBE_R6_DEFAULT_VIRTUAL(InputManager)
 
     /**
      * @brief Get the input status of a key.
@@ -105,11 +104,8 @@ public:
      * @return The input status.
      */
     virtual InputStatus get_input_status(KeyCode p_key_code) const = 0;
-
-
-
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

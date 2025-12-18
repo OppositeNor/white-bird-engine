@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @brief Path class.
  * @todo Test
  */
-class Path {
+class Path final {
 public:
     Path() = default;
     virtual ~Path() = default;

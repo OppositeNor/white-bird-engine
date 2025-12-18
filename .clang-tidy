@@ -35,6 +35,7 @@ Checks: >
   -misc-no-recursion,
   -misc-const-correctness,
   -misc-use-anonymous-namespace,
+  -misc-confusable-identifiers,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-avoid-do-while,

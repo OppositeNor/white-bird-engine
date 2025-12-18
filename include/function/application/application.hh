@@ -15,6 +15,8 @@
 #ifndef __WBE_APPLICATION_HH__
 #define __WBE_APPLICATION_HH__
 
+#include "utils/defs.hh"
+
 namespace WhiteBirdEngine {
 
 /**
@@ -24,8 +26,7 @@ namespace WhiteBirdEngine {
  */
 class Application {
 public:
-    Application() = default;
-    virtual ~Application() {}
+    WBE_R6_DEFAULT_VIRTUAL(Application)
 
     /**
      * @brief Run the application.
@@ -47,6 +48,6 @@ public:
     virtual double get_logic_delta() const = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

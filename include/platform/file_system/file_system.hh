@@ -17,6 +17,7 @@
 
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
+#include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
 #include <string>
 namespace WhiteBirdEngine {
@@ -26,10 +27,11 @@ namespace WhiteBirdEngine {
  * @brief Platform API for file systems.
  *
  */
-class FileSystem : public Singleton<FileSystem> {
+class FileSystem final : public Singleton<FileSystem> {
 public:
     FileSystem();
-    ~FileSystem() {}
+    ~FileSystem() = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(FileSystem);
 
     /**
      * @brief Constructor.
@@ -154,6 +156,6 @@ inline Directory combine(const Directory& p_dir1, const Directory& p_dir2) {
     return p_dir1.combine(p_dir2);
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

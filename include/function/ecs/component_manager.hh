@@ -31,11 +31,11 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the component.
  * @return The maximum number of components.
  */
-template <typename T, size_t MAX_COMPONENTS>
+template <typename T, size_t MaxComponents>
 class ComponentManager {
 public:
     ComponentManager()
-        : allocator(sizeof(T), MAX_COMPONENTS), num_wait_for_free(0) {}
+        : allocator(sizeof(T), MaxComponents) {}
 
     /**
      * @brief The number of components waiting for freeing that will trigger a flush.
@@ -68,20 +68,20 @@ private:
     HeapAllocatorFixedSizePool allocator;
     std::bitset<HeapAllocatorFixedSizePool::MAX_OBJ> wait_for_free;
     std::bitset<HeapAllocatorFixedSizePool::MAX_OBJ> disabled;
-    uint32_t num_wait_for_free;
+    uint32_t num_wait_for_free = 0;
     mutable std::shared_mutex mutex;
 };
 
-template <typename T, size_t MAX_COMPONENTS>
-inline void ComponentManager<T, MAX_COMPONENTS>::update() {
+template <typename T, size_t MaxComponents>
+inline void ComponentManager<T, MaxComponents>::update() {
     // flushing
     if (num_wait_for_free > FLUSH_AFTER_FREE) {
         flush();
     }
 }
 
-template <typename T, size_t MAX_COMPONENTS>
-void ComponentManager<T, MAX_COMPONENTS>::flush() {
+template <typename T, size_t MaxComponents>
+void ComponentManager<T, MaxComponents>::flush() {
     std::unique_lock lock(mutex);
     std::vector<MemID> objs = allocator.get_allocated();
     for (auto& obj : objs) {
@@ -93,6 +93,6 @@ void ComponentManager<T, MAX_COMPONENTS>::flush() {
     num_wait_for_free = 0;
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

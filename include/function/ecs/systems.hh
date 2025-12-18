@@ -31,8 +31,8 @@ namespace WhiteBirdEngine {
  * @param p_num The number of transforms to be updated.
  * @param p_enabled_components The enabled components.
  */
-template <size_t MAX_COMPONENTS>
-inline void update_local_transform(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_disabled_components) {
+template <size_t MaxComponents>
+inline void update_local_transform(ComponentTransform* p_transforms, size_t p_num, std::bitset<MaxComponents> p_disabled_components) {
     for (size_t i = 0; i < p_num; ++i) {
         if (!p_disabled_components.test(i)) {
             auto& transform = p_transforms[i];
@@ -51,13 +51,13 @@ inline void update_local_transform(ComponentTransform* p_transforms, size_t p_nu
  * @param p_num The upper bound of transfrom components.
  * @param p_disabled_components The disabled components.
  */
-template <size_t MAX_COMPONENTS>
+template <size_t MaxComponents>
 struct UpdateGlobalTransform {
     /**
      * @brief Used for keeping track if a component has been updated or not altered every time when called.
      */
     bool tick_tock = true;
-    void operator()(ComponentTransform* p_transforms, size_t p_num, std::bitset<MAX_COMPONENTS> p_disabled_components) {
+    void operator()(ComponentTransform* p_transforms, size_t p_num, std::bitset<MaxComponents> p_disabled_components) {
         for (size_t i = 0; i < p_num; ++i) {
             if (!p_disabled_components.test(i)) {
                 auto& transform = p_transforms[i];
@@ -86,18 +86,7 @@ struct UpdateGlobalTransform {
     }
 };
 
-/**
- * @brief Update the glboal transform of componetns.
- *
- * @todo Test.
- * @param p_transforms The tnrasform components.
- * @param p_num The upper bound of transfrom components.
- * @param p_disabled_components The disabled components.
- */
-template <size_t MAX_COMPONENTS>
-inline UpdateGlobalTransform<MAX_COMPONENTS> update_global_transform;
-
-}
+} // namespace WhiteBirdEngine
 
 
 #endif
