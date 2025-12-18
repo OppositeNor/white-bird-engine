@@ -33,7 +33,7 @@ class Global final : public Singleton<Global> {
 public:
     Global() = delete;
     virtual ~Global() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(Global);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(Global)
 
 
     /**

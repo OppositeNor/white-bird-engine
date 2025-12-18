@@ -31,7 +31,7 @@ class FileSystem final : public Singleton<FileSystem> {
 public:
     FileSystem();
     ~FileSystem() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(FileSystem);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(FileSystem)
 
     /**
      * @brief Constructor.
