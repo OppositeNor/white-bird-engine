@@ -22,6 +22,7 @@
     /**\
      * @brief The uv value.\
      */\
+    WBE_META(WBE_REFLECT)\
     glm::vec2 uv;
 
 // Slot for colored surfaces' vertices.
@@ -29,6 +30,7 @@
     /**\
      * @brief The color value.\
      */\
+    WBE_META(WBE_REFLECT)\
     glm::vec4 color;
 
 // Slot for vertices bound to a bone.
@@ -36,14 +38,17 @@
     /**\
      * @brief The UV value.\
      */\
+    WBE_META(WBE_REFLECT)\
     glm::vec2 uv;\
     /**\
      * @brief The bone ids.\
      */\
+    WBE_META(WBE_REFLECT)\
     glm::ivec4 bone_id;\
     /**\
      * @brief The weight of the bones.\
      */\
+    WBE_META(WBE_REFLECT)\
     glm::vec4 weight;
 
 #endif

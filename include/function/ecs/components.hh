@@ -40,7 +40,7 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel final : public Serializable {
     WBE_META(WBE_REFLECT)
     Buffer<MAX_NAME_SIZE + 1> name_buffer;
     // The name of the component.
-    const std::string_view name;
+    std::string_view name;
 
     ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
     }
@@ -76,5 +76,5 @@ struct WBE_META(WBE_COMPONENT) ComponentTransform final : public Serializable {
     bool tick_tock = false;
 };
 
-}
+} // namespace WhiteBirdEngine
 #endif
