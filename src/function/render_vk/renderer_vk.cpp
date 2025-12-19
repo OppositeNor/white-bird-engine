@@ -926,6 +926,8 @@ RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
 }
 
 void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
+    WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_pipeline_info != MEM_NULL);
     // Using bfs, as the order where the render task will be pushed to the queue.
     std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
     // Setup image available semaphores
@@ -967,6 +969,8 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
 
 void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
                                       std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map) {
+    WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_pipeline_info != MEM_NULL);
     // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
     // Performing BFS should be the most optimal way for optimizing synchronozation, since the nodes with the same
     // depth has no dependencies among them.
@@ -1029,6 +1033,8 @@ void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p
     WBE_DEBUG_ASSERT(p_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_task_info.render_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_task_info.render_task->req_rend_res.empty());
+    p_task_info.render_task->req_rend_res.reserve(p_task->req_res.size());
     for (auto& res : p_task->req_res) {
         Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
         p_pipeline->rend_res.push_back(rend_res);
@@ -1090,7 +1096,7 @@ uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, DeviceDomain p_dom
             best_type_score = type_score;
         }
     }
-    if (best_type == -1) {
+    if (best_type < 0) {
         throw std::runtime_error("Failed to find a suitable physical device to allocate memory.");
     }
     return best_type;
