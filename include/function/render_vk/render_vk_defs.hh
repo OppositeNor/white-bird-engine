@@ -12,12 +12,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_VK_UTILS_HH
-#define WBE_FILE_RENDER_VK_UTILS_HH
+#ifndef WBE_FILE_RENDER_VK_DEFS_HH
+#define WBE_FILE_RENDER_VK_DEFS_HH
 
+#include "core/surface/3d_primitive.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <vulkan/vulkan_core.h>
@@ -83,6 +85,56 @@ struct BaseRenderDataVK {
 
     // Function to register a delayed call.
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;
+};
+
+/**
+ * @brief The bindpoint for vertex buffer.
+ */
+constexpr uint32_t VERTEX_BUFFER_BINDPOINT = 0;
+
+/**
+ * @brief The binding description for Vertex3DTextured.
+ */
+constexpr VkVertexInputBindingDescription VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION = {
+    .binding = VERTEX_BUFFER_BINDPOINT,
+    .stride = sizeof(Vertex3DTextured),
+    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+};
+
+/**
+ * @brief The vertex input attribute description of Vertex3DTextured.
+ */
+constexpr std::array<VkVertexInputAttributeDescription, 5> VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION = {
+    VkVertexInputAttributeDescription {                 // position
+        .location = 0,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, position)
+    },
+    {                                                   // normal
+        .location = 1,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, normal)
+    },
+    {                                                   // tangent
+        .location = 2,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, tangent)
+    },
+    {                                                   // bitangent
+        .location = 3,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, bitangent)
+    },
+    {                                                   // uv
+        .location = 4,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, uv)
+    }
 };
 
 } // namespace WhiteBirdEngine

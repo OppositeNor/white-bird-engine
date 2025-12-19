@@ -14,7 +14,7 @@
 */
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <stdexcept>

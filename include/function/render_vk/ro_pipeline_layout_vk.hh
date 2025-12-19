@@ -17,7 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "utils/defs.hh"
 #include <vector>

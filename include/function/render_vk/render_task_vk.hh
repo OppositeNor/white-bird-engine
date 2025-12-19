@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"

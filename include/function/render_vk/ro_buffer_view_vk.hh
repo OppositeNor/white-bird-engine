@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "ro_buffer_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"

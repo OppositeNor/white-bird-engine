@@ -18,7 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "glm/fwd.hpp"

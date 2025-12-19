@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SEMAPHORE_VK_HH
 #define WBE_FILE_SEMAPHORE_VK_HH
 
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>

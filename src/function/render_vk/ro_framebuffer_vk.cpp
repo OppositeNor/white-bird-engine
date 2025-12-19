@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_framebuffer_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
 #include <vector>

@@ -16,7 +16,6 @@
 #define WBE_FILE_2D_PRIMITIVES_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "primitive_slots.hh"
 #include <glm/glm.hpp>
 
 namespace WhiteBirdEngine {
@@ -31,18 +30,34 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2D {
     /**
      * @brief The position of the vertex.
      */
+    WBE_META(WBE_REFLECT)
     glm::vec2 position;
     /**
      * @brief The depth of the vertex.
      */
+    WBE_META(WBE_REFLECT)
     float depth;
 };
 
 /**
  * @brief Textured vertex.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2DTextured : public Vertex2D {
-    WBE_VERT_SLOT_TEXTURED
+struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2DTextured {
+    /**
+     * @brief The position of the vertex.
+     */
+    WBE_META(WBE_REFLECT)
+    glm::vec2 position;
+    /**
+     * @brief The depth of the vertex.
+     */
+    WBE_META(WBE_REFLECT)
+    float depth;
+    /**
+     * @brief The uv value.
+     */
+    WBE_META(WBE_REFLECT)
+    glm::vec2 uv;
 };
 
 /**
@@ -66,6 +81,6 @@ struct Triangle2D {
      */
     TVertType vert3;
 };
-};
+} // namespace WhiteBirdEngine
 
 #endif

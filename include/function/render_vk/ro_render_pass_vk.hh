@@ -17,7 +17,7 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
