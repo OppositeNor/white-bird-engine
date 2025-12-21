@@ -14,9 +14,13 @@
 
 from argparse import ArgumentParser
 import os
+from pathlib import Path
 import sys
 import shutil
 import build_config
+from build_script.resource.acp.acp import WBEACP
+from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
+from build_script.resource.acp.asp_compiler_discard import WBEACPCompilerDiscard
 from build_script.utils import list_files
 
 # SETUP
@@ -74,5 +78,9 @@ os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(shaders_output_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
-shutil.copytree(res_chunks_dir, res_chunks_output_dir, dirs_exist_ok=True)
-shutil.copytree(assets_dir, assets_output_dir, dirs_exist_ok=True)
+
+# Setup ACP
+acp = WBEACP()
+acp.add_compiler(WBEACPCompilerShader(Path(shaders_dir)))
+acp.add_compiler(WBEACPCompilerDiscard([".hlslh"]))
+

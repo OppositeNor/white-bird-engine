@@ -10,7 +10,7 @@
             "id": "main_shader_frag",
             "type": "binary",
             "path": "assets/shaders/main_pipeline/main_pipeline_frag.spv"
-        },
+        }
     ]
 }
 

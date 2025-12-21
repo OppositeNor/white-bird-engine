@@ -85,36 +85,36 @@ def _gather_license():
                     print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
-def _compile_shaders():
-    shaders_dir_path = Path(build_setup.shaders_dir)
-    for hlsl_file in shaders_dir_path.rglob("*.hlsl"):
-        with open(hlsl_file, "r", encoding="utf-8") as f:
-            first_line = f.readline().strip()
-        if first_line.startswith("//"):
-            shader_stage = first_line[2:].strip()
-            if shader_stage not in ["vertex", "vert", "fragment", "frag", "tesscontrol",
-                    "tesc", "tesseval", "tese", "geometry", "geom", "compute", "comp"]:
-                print(f"Unsupported shader stage for {hlsl_file} : {shader_stage}, skipped.")
-                continue
-        else:
-            # Files without a profile header are considered to be header files, skipped.
-            continue
-
-        output_file = os.path.join(build_setup.shaders_output_dir, (hlsl_file.stem + ".spv"))
-        cmd = [
-            "glslc",
-            f"-fshader-stage={shader_stage}",
-            "-I", build_setup.shaders_dir,
-            "-fentry-point=main",
-            "-o", str(output_file),
-            str(hlsl_file)
-        ]
-        print("Compiling:", hlsl_file)
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print("Failed to compile", hlsl_file)
-            print(result.stderr)
-            raise RuntimeError("Failed to compile shader.")
+# def _compile_shaders():
+#     shaders_dir_path = Path(build_setup.shaders_dir)
+#     for hlsl_file in shaders_dir_path.rglob("*.hlsl"):
+#         with open(hlsl_file, "r", encoding="utf-8") as f:
+#             first_line = f.readline().strip()
+#         if first_line.startswith("//"):
+#             shader_stage = first_line[2:].strip()
+#             if shader_stage not in ["vertex", "vert", "fragment", "frag", "tesscontrol",
+#                     "tesc", "tesseval", "tese", "geometry", "geom", "compute", "comp"]:
+#                 print(f"Unsupported shader stage for {hlsl_file} : {shader_stage}, skipped.")
+#                 continue
+#         else:
+#             # Files without a profile header are considered to be header files, skipped.
+#             continue
+#
+#         output_file = os.path.join(build_setup.shaders_output_dir, (hlsl_file.stem + ".spv"))
+#         cmd = [
+#             "glslc",
+#             f"-fshader-stage={shader_stage}",
+#             "-I", build_setup.shaders_dir,
+#             "-fentry-point=main",
+#             "-o", str(output_file),
+#             str(hlsl_file)
+#         ]
+#         print("Compiling:", hlsl_file)
+#         result = subprocess.run(cmd, capture_output=True, text=True)
+#         if result.returncode != 0:
+#             print("Failed to compile", hlsl_file)
+#             print(result.stderr)
+#             raise RuntimeError("Failed to compile shader.")
 
 def _gather_gen_infos():
     gen_infos = []
@@ -132,8 +132,8 @@ if __name__ == "__main__":
     # Gather sources for reflection
     try:
         print(f"WBEBuilder: Building target: {build_setup.args.target}.")
-        print("WBEBuilder: Compiling shaders...")
-        _compile_shaders()
+        print("WBEBuilder: Running asset conditioning pipeline...")
+        build_setup.acp.process_resources()
         print("WBEBuilder: Gathering licenses...")
         _gather_license()
         print("WBEBuilder: Gathering sources...")

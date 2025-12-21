@@ -15,6 +15,7 @@
 import os
 from pathlib import Path
 import subprocess
+from typing import override
 from build_script.resource.acp.acp_compiler import WBEACPCompiler
 import build_setup
 
@@ -33,18 +34,17 @@ class WBEACPCompilerShader(WBEACPCompiler):
         """
         self.shader_include_dir = os.path.join(build_setup.resource_dir, shader_include_dir)
 
-    def get_output_file_res_path(self, res_path: str) -> str:
-        return res_path[:res_path.rfind('.')] + ".spv"
-
+    @override
     def get_supported_file_extensions(self) -> list[str]:
-        return ["hlsl"]
+        return [".hlsl"]
 
+    @override
     def compile(self, res_path : str):
         input_file_path = Path.joinpath(Path(build_setup.resource_dir), Path(res_path))
         output_file_path = Path.joinpath(Path(build_setup.resource_output_dir),
-                                         Path(self.get_output_file_res_path(res_path)))
-
-        if input_file_path.suffix == "hlsl":
+                                         Path(res_path[:res_path.rfind('.')] + ".spv"))
+        os.makedirs(output_file_path.parent, exist_ok=True)
+        if input_file_path.suffix == ".hlsl":
             self._compile_hlsl(input_file_path, output_file_path)
 
     def _compile_hlsl(self, hlsl_file : Path, output_file):
@@ -73,5 +73,4 @@ class WBEACPCompilerShader(WBEACPCompiler):
             print("Failed to compile", hlsl_file)
             print(result.stderr)
             raise RuntimeError("Failed to compile shader.")
-
 

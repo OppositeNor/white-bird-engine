@@ -17,22 +17,12 @@ class WBEACPCompiler(abc.ABC):
     """The compiler interface for the ACP."""
     @abc.abstractmethod
     def get_supported_file_extensions(self) -> list[str]:
-        """Get the file extensions that this compiler is able to compile.
+        """Get the file extensions that this compiler is able to compile. Note that the '.'
+        is included, i.e., for PNG files it should be [".png"]
 
         Returns:
             A list of strings of the file extensions that this compiler is able to compile.
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_output_file_res_path(self, res_path: str) -> str:
-        """Get the output file's resource path after compiling.
-
-        Args:
-            res_path: The resource path of the input file that is going to be compiled.
-
-        Returns:
-            The output file's resource path.
+            The '.' is included.
         """
         pass
 
