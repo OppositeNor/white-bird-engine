@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "generated/type_uuid.gen.hh"
+#include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -33,7 +34,7 @@ namespace WBE = WhiteBirdEngine;
 static void setup_pipeline(WBE::ApplicationGame& p_game_application);
 
 int main(int p_argc, char* p_argv[]) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         WBE::ApplicationGame game_application;
         // Setup cube's mesh
@@ -64,8 +65,11 @@ static void setup_test_pipeline(WBE::ApplicationGame& p_game_application) {
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
     rend_task_info->prev.push_back(WBE::RT_PRE_EXECUTE_PIPELINE_VK);
-    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, .type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID});
-    rend_task_info->req_res.push_back({.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE_VK, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID});
+    rend_task_info->req_res = {
+        {.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, .type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID},
+        {.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE_VK, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID},
+        {.res_id = WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, .type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID},
+        {.res_id = WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, .type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID}};
     rend_task_info->render_task_factory
         = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
     p_game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);

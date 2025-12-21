@@ -11,5 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# TODO
+
+class WBEACP:
+    """The asset conditioning pipeline.
+    The ASP will gather all the resource chunks in res/res_chunk, and find all the dependent json
+    files, and all the resources the reference to. It will then process each of the resources
+    """
+    def __init__(self):
+        self._compilers = []
+
+    def add_compiler(self, compiler):
+        """Add a compiler that could compile resource.
+
+        Args:
+            compiler (): 
+        """
+        self._compilers.append(compiler)
 

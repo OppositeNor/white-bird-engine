@@ -44,8 +44,8 @@ using RefRes = RefRaw<T, Allocator>;
  */
 struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
     WBE_DECL_SERIALIZABLE(RUScheme)
-    // The id of the resource.
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    // The id of the resource. Default to empty string, which is an ananymous resource.
+    WBE_META(WBE_REFLECT)
     std::string id;
     // The type of the resource.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)

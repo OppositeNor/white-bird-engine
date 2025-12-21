@@ -1,18 +1,9 @@
 {
     "include": [
-        "assets/meshes/cube.json"
+        "assets/meshes/cube.json",
+        "assets/shaders/main_pipeline/main_pipeline_shader.json"
     ],
     "resources": [
-        {
-            "id": "main_shader_vert",
-            "type": "binary",
-            "path": "assets/shaders/main_pipeline_vert.spv"
-        },
-        {
-            "id": "main_shader_frag",
-            "type": "binary",
-            "path": "assets/shaders/main_pipeline_frag.spv"
-        },
         {
             "id": "default_material",
             "type": "material",
