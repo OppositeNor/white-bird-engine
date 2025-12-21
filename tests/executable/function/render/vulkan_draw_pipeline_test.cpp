@@ -59,7 +59,7 @@ int main(int p_argc, char* p_argv[]) {
     return EXIT_SUCCESS;
 }
 
-void setup_pipeline(WBE::ApplicationGame& p_game_application) {
+static void setup_test_pipeline(WBE::ApplicationGame& p_game_application) {
     auto* render_allocator = p_game_application.get_renderer_allocator().get();
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
@@ -70,6 +70,9 @@ void setup_pipeline(WBE::ApplicationGame& p_game_application) {
         = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
     p_game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
     p_game_application.get_renderer()->activate_pipeline("test_pipeline");
+}
 
+static void setup_pipeline(WBE::ApplicationGame& p_game_application) {
+    setup_test_pipeline(p_game_application);
 }
 

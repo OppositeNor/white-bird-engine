@@ -19,11 +19,9 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "generated/label_manager.gen.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
-#include <format>
 #include <initializer_list>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -59,18 +57,16 @@ VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
     return result;
 }
 
-void RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_req_res) {
+bool RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_req_res) const {
     if (req_rend_res.size() != p_expected_req_res.size()) {
-        throw std::runtime_error(std::format(
-            "Number of required resources doesn't match: expected: {}, actual: {}.", p_expected_req_res.size(), req_rend_res.size()));
+        return false;
     }
     for (size_t i = 0; i < p_expected_req_res.size(); ++i) {
         if (req_rend_res[i] == MEM_NULL) {
-            throw std::runtime_error(std::format(
-                "Render task's required resource type mismatch: expected: {}, actual: NULL.",
-                LabelManager::get_singleton()->get_label_name(p_expected_req_res.begin()[i])));
+            return false;
         }
     }
+    return true;
 }
 
 const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const Vector<VkPipelineStageFlags2>& p_wait_stages) {
@@ -105,6 +101,24 @@ void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQue
                        render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer to queue.");
     }
+}
+
+VkRenderPassBeginInfo RenderTaskVK::get_render_pass_begin_info(Ref<const RORenderPassVK> p_render_pass,
+                                                               Ref<const ROFramebufferVK> p_framebuffer,
+                                                               const glm::vec4& p_clear_color) const {
+    VkRenderPassBeginInfo render_pass_info{};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_info.renderPass = p_render_pass->get_render_pass();
+    render_pass_info.framebuffer = p_framebuffer->get_framebuffer();
+    render_pass_info.renderArea.offset.x = 0;
+    render_pass_info.renderArea.offset.y = 0;
+    // Draw on the entire framebuffer.
+    auto extent = p_framebuffer->fields().extent;
+    render_pass_info.renderArea.extent = {.width = extent.x, .height = extent.y};
+    VkClearValue clear_color = {.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}};
+    render_pass_info.clearValueCount = 1;
+    render_pass_info.pClearValues = &clear_color;
+    return render_pass_info;
 }
 
 } // namespace WhiteBirdEngine

@@ -17,6 +17,7 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -95,7 +96,6 @@ public:
      */
     virtual Ref<RenderTask> create() const = 0;
 };
-
 
 } // namespace WhiteBirdEngine
 

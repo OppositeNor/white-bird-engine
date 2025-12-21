@@ -20,7 +20,9 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "glm/fwd.hpp"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
@@ -201,8 +203,9 @@ protected:
      * @brief Check if the types of required resources matches the resources in req_rend_res.
      *
      * @param p_expected_req_res The expected resources types.
+     * @return True if required resources matches the resources in req_rend_res. False otherwise.
      */
-    void check_req_res(std::initializer_list<RendResTID> p_expected_req_res);
+    [[nodiscard]] bool check_req_res(std::initializer_list<RendResTID> p_expected_req_res) const;
 
     /**
      * @brief Get the dependent semaphores vulkan semaphore instances.
@@ -224,6 +227,16 @@ protected:
                                VkPipelineStageFlags2 p_signal_stage,
                                bool p_signal_in_flight_fence);
 
+    /**
+     * @brief Get the default render pass begin info from framebuffer.
+     *
+     * @param p_render_pass The render pass to begin.
+     * @param p_framebuffer The framebuffer to get render pass begin info from.
+     * @return The render pass begin info.
+     */
+    VkRenderPassBeginInfo get_render_pass_begin_info(Ref<const RORenderPassVK> p_render_pass,
+                                                     Ref<const ROFramebufferVK> p_framebuffer,
+                                                     const glm::vec4& p_clear_color = glm::vec4(0.0, 0.0, 0.0, 1.0)) const;
 };
 
 /**

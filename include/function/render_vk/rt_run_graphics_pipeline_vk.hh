@@ -59,7 +59,8 @@ private:
     glm::vec4 clear_color;
     bool signal_in_flight_fence = false;
     Vector<VkPipelineStageFlags2> wait_stages;
-    void record_command_buffer();
+    void record_command_buffer_without_vertex_binding();
+    void record_command_buffer_with_vertex_binding();
 };
 
 /**

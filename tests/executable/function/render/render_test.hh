@@ -18,6 +18,7 @@
 
 namespace WhiteBirdEngine {
 WBE_LABEL(RT_RUN_PIPELINE, WBE_RENDER_TASK);
-}
+
+} // namespace WhiteBirdEngine
 
 #endif
