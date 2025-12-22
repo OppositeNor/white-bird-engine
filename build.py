@@ -163,6 +163,7 @@ if __name__ == "__main__":
         # Set up test environment
         if build_setup.build_target["generate-tests"]:
             print("WBEBuilder: Setting up test environemnt...")
+            shutil.copytree(build_setup.assets_output_dir, build_setup.test_env_assets_dir, dirs_exist_ok=True)
             shutil.copy(os.path.join(build_setup.resource_output_dir, "metadata.json"), os.path.join(build_setup.test_env_resource_dir, "metadata.json"))
 
         # For some reason my LSP only looks into build directory for compile_commands.json.

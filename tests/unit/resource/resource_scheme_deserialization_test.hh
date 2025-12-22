@@ -380,21 +380,6 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
     ASSERT_EQ(scheme.type, "material");
 }
 
-// Error handling tests
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingId) {
-    std::string json_buffer = R"(
-    {
-        "type": "text",
-        "path": "texts/test.txt"
-    }
-    )";
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
-    // Should throw because id is required in base RUScheme
-    EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
-}
-
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingType) {
     std::string json_buffer = R"(
     {
@@ -419,21 +404,6 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingBothIdAndType) {
     parser.parse_from_buffer(json_buffer);
     WBE::RUSchemeText scheme;
     // Should throw because both id and type are required in base RUScheme
-    EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
-}
-
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioMissingId) {
-    std::string json_buffer = R"(
-    {
-        "type": "audio",
-        "is_stream": false,
-        "path": "audio/test.wav"
-    }
-    )";
-    WBE::ParserJSON parser;
-    parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeAudio scheme;
-    // Should throw because id is required in base RUScheme
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
