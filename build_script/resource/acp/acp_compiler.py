@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+from pathlib import Path
 
 class WBEACPCompiler(abc.ABC):
     """The compiler interface for the ACP."""
@@ -27,11 +28,11 @@ class WBEACPCompiler(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def compile(self, res_path: str) -> None:
+    def compile(self, res_path: Path, output_dir: Path) -> None:
         """Compile a file.
 
         Args:
-            res_path: The res path of the file to be compiled. The result file will be compiled and the extension will
-            be replaced with the file type extension that this compiler will compile
+            res_path: The res path of the file to be compiled.
+            output_dir: The directory that the compiled resource will be export to.
         """
         pass

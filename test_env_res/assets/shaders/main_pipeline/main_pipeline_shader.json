@@ -1,0 +1,16 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "main_shader_vert",
+            "type": "binary",
+            "path": "assets/shaders/main_pipeline/main_pipeline_vert.spv"
+        },
+        {
+            "id": "main_shader_frag",
+            "type": "binary",
+            "path": "assets/shaders/main_pipeline/main_pipeline_frag.spv"
+        }
+    ]
+}
+

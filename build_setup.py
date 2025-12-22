@@ -48,18 +48,18 @@ dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
+test_env_res_dir = os.path.join(root_dir, build_config.test_env_res_dir)
 resource_output_dir = os.path.join(binary_dir, "res")
-test_env_resource_dir = os.path.join(test_env_dir, "res")
-test_env_assets_dir = os.path.join(test_env_resource_dir, "assets")
+test_env_res_output_dir = os.path.join(test_env_dir, "res")
 config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
-shaders_dir = os.path.join(resource_dir, "assets/shaders")
-shaders_output_dir = os.path.join(resource_output_dir, "assets/shaders")
+shaders_incl_dir = os.path.join(resource_dir, "assets/shaders")
+test_env_shaders_incl_dir = os.path.join(test_env_res_dir, "assets/shaders")
 res_chunks_dir = os.path.join(resource_dir, "res_chunks")
 res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 assets_dir = os.path.join(resource_dir, "assets")
 assets_output_dir = os.path.join(resource_output_dir, "assets")
-metadata_path = os.path.join(resource_output_dir, "metadata.json")
+metadata_path = os.path.join(test_env_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
 
@@ -76,12 +76,15 @@ project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "depend
 # Create directories
 os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
-os.makedirs(shaders_output_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
-acp = WBEACP()
-acp.add_compiler(WBEACPCompilerShader(Path(shaders_dir)))
+acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
+acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
 acp.add_compiler(WBEACPCompilerDiscard([".hlslh"]))
+
+test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
+test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
+test_env_acp.add_compiler(WBEACPCompilerDiscard([".hlslh"]))
 

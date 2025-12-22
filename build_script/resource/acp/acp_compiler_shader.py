@@ -17,37 +17,34 @@ from pathlib import Path
 import subprocess
 from typing import override
 from build_script.resource.acp.acp_compiler import WBEACPCompiler
-import build_setup
 
 
 class WBEACPCompilerShader(WBEACPCompiler):
     """The shader compiler.
-
-    Attributes: 
-        shader_include_dir: The include directory for the shaders.
     """
-    def __init__(self, shader_include_dir : Path) -> None:
+    def __init__(self, shader_include_dir: Path) -> None:
         """Constructor.
 
         Args:
             shader_include_dir: The include directory for the shaders.
         """
-        self.shader_include_dir = os.path.join(build_setup.resource_dir, shader_include_dir)
+        self._shader_include_dir = shader_include_dir
 
     @override
     def get_supported_file_extensions(self) -> list[str]:
         return [".hlsl"]
 
     @override
-    def compile(self, res_path : str):
-        input_file_path = Path.joinpath(Path(build_setup.resource_dir), Path(res_path))
-        output_file_path = Path.joinpath(Path(build_setup.resource_output_dir),
-                                         Path(res_path[:res_path.rfind('.')] + ".spv"))
+    def compile(self, res_path: Path, output_dir: Path):
+        output_file_path = Path.joinpath(output_dir, Path(res_path.stem + ".spv"))
         os.makedirs(output_file_path.parent, exist_ok=True)
-        if input_file_path.suffix == ".hlsl":
-            self._compile_hlsl(input_file_path, output_file_path)
+        if res_path.suffix == ".hlsl":
+            # Compile HLSL shader
+            self._compile_hlsl(res_path, output_file_path)
+        else:
+            raise RuntimeError(f"Unsupported shader file type: {res_path.suffix}.")
 
-    def _compile_hlsl(self, hlsl_file : Path, output_file):
+    def _compile_hlsl(self, hlsl_file: Path, output_file: Path):
         with open(hlsl_file, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
         # The shader stage is marked at the beginning of the file starting with a "//"
@@ -62,7 +59,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
         cmd = [
             "glslc",
             f"-fshader-stage={shader_stage}",
-            "-I", self.shader_include_dir,
+            "-I", self._shader_include_dir,
             "-fentry-point=main",
             "-o", str(output_file),
             str(hlsl_file)

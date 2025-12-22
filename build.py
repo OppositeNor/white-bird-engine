@@ -85,37 +85,6 @@ def _gather_license():
                     print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
-# def _compile_shaders():
-#     shaders_dir_path = Path(build_setup.shaders_dir)
-#     for hlsl_file in shaders_dir_path.rglob("*.hlsl"):
-#         with open(hlsl_file, "r", encoding="utf-8") as f:
-#             first_line = f.readline().strip()
-#         if first_line.startswith("//"):
-#             shader_stage = first_line[2:].strip()
-#             if shader_stage not in ["vertex", "vert", "fragment", "frag", "tesscontrol",
-#                     "tesc", "tesseval", "tese", "geometry", "geom", "compute", "comp"]:
-#                 print(f"Unsupported shader stage for {hlsl_file} : {shader_stage}, skipped.")
-#                 continue
-#         else:
-#             # Files without a profile header are considered to be header files, skipped.
-#             continue
-#
-#         output_file = os.path.join(build_setup.shaders_output_dir, (hlsl_file.stem + ".spv"))
-#         cmd = [
-#             "glslc",
-#             f"-fshader-stage={shader_stage}",
-#             "-I", build_setup.shaders_dir,
-#             "-fentry-point=main",
-#             "-o", str(output_file),
-#             str(hlsl_file)
-#         ]
-#         print("Compiling:", hlsl_file)
-#         result = subprocess.run(cmd, capture_output=True, text=True)
-#         if result.returncode != 0:
-#             print("Failed to compile", hlsl_file)
-#             print(result.stderr)
-#             raise RuntimeError("Failed to compile shader.")
-
 def _gather_gen_infos():
     gen_infos = []
     for gen_info_file in build_setup.gen_info_files:
@@ -134,6 +103,10 @@ if __name__ == "__main__":
         print(f"WBEBuilder: Building target: {build_setup.args.target}.")
         print("WBEBuilder: Running asset conditioning pipeline...")
         build_setup.acp.process_resources()
+        if build_setup.build_target["generate-tests"]:
+            print("WBEBuilder: Running asset conditioning pipeline for test environment...")
+            # Setup test env if generate tests.
+            build_setup.test_env_acp.process_resources()
         print("WBEBuilder: Gathering licenses...")
         _gather_license()
         print("WBEBuilder: Gathering sources...")
@@ -159,12 +132,6 @@ if __name__ == "__main__":
         result = subprocess.run(build_command)
         if result.returncode != 0:
             raise RuntimeError("Failed to build with CMake.")
-
-        # Set up test environment
-        if build_setup.build_target["generate-tests"]:
-            print("WBEBuilder: Setting up test environemnt...")
-            shutil.copytree(build_setup.assets_output_dir, build_setup.test_env_assets_dir, dirs_exist_ok=True)
-            shutil.copy(os.path.join(build_setup.resource_output_dir, "metadata.json"), os.path.join(build_setup.test_env_resource_dir, "metadata.json"))
 
         # For some reason my LSP only looks into build directory for compile_commands.json.
         shutil.copy(os.path.join(build_setup.build_dir, "compile_commands.json"), "build")

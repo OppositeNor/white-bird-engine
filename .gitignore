@@ -3,6 +3,7 @@
 .vscode
 
 build
+test_env
 
 __pycache__
 vgcore*

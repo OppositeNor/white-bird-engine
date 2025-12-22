@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import override
 from build_script.resource.acp.acp_compiler import WBEACPCompiler
 
@@ -21,7 +22,8 @@ class WBEACPCompilerDiscard(WBEACPCompiler):
         return self.discarded
 
     @override
-    def compile(self, res_path: str) -> None:
+    def compile(self, res_path: Path, output_dir: Path) -> None:
         _ = res_path
+        _ = output_dir
         pass
 

@@ -18,6 +18,7 @@ from build_script.reflection.code_gen import WBECodeGenerator, WBEGenFileInfo
 from build_script.reflection.metadata_types import WBEMetadata
 from build_config import gen_info
 from build_script.utils import hash_str
+import build_setup
 
 class WBEReflector:
     """Reflector. Used for managing all the reflections.
@@ -64,7 +65,9 @@ class WBEReflector:
     def dump(self) -> None:
         """Dump the metadata to the metadata file."""
         print("WBEReflect: Exporting metadata...")
-        self._write_to_file(self.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
+        if build_setup.build_target["generate-tests"]:
+            # Output metadata for debug purpose.
+            self._write_to_file(build_setup.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
         # Generate code
         generator = WBECodeGenerator(gen_info | {"metadata" : self.metadata}, self._gen_file_infos)
         generator.generate()
