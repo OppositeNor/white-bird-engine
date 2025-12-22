@@ -52,7 +52,6 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeFont& p_sch
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) const {
     auto file_path = get_resource_path(p_scheme.path);
-    std::unique_ptr<unsigned char> image_data;
     RUImage resource_unit;
     if (p_scheme.is_hdr) {
         resolve_hdr_image_data(p_res_chunk, p_scheme, resource_unit);
