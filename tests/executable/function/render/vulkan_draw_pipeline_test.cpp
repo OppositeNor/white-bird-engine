@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "generated/type_uuid.gen.hh"
+#include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -33,7 +34,7 @@ namespace WBE = WhiteBirdEngine;
 static void setup_pipeline(WBE::ApplicationGame& p_game_application);
 
 int main(int p_argc, char* p_argv[]) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv);
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         WBE::ApplicationGame game_application;
         // Setup cube's mesh

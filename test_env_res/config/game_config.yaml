@@ -9,4 +9,4 @@ render_device_index : -1
 limit_render_fps: 0
 limit_logic_fps: 60
 resizable: false
-render_api : "dummy"
+render_api : "vulkan"

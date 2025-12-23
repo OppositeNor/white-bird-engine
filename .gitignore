@@ -7,7 +7,4 @@ test_env
 
 __pycache__
 vgcore*
-
-test_env/res/metadata.json
-test_env/res/assets
 *.gen*
