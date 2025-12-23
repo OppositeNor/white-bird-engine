@@ -30,19 +30,13 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
-#include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
 #include "function/render_vk/material_vk.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
-#include "resource/resource_manager/resource_manager.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include <SDL_vulkan.h>
 #include <algorithm>
@@ -232,7 +226,6 @@ void RendererVK::init() {
     setup_base_render_data();
     init_swap_chain_image_views();
     init_render_pass();
-    init_graphics_pipeline();
     init_swap_chain_framebuffers();
     setup_render_resource();
     stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
@@ -282,10 +275,10 @@ void RendererVK::init_vulkan() {
     create_async_objects();
 }
 
-void RendererVK::setup_resource(RendResID p_res_id, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object) {
+void RendererVK::setup_resource(RendResID p_res_id, RendResTID p_res_type, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object) {
     WBE_DEBUG_ASSERT(p_res == MEM_NULL);
     p_res = make_ref<RendResVK>(allocator);
-    p_res->res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID;
+    p_res->res_type_id = p_res_type;
     p_res->res_id = p_res_id;
     p_res->res = p_default_object;
     render_resources.insert(std::pair(p_res_id, p_res));
@@ -331,38 +324,6 @@ void RendererVK::setup_base_render_data() {
     base_render_data.frames_in_flight = frames_in_flight;
 }
 
-void RendererVK::init_graphics_pipeline() {
-    // Initialize shaders.
-    ROShaderVK::Builder shader_builder;
-    RefRes<RUBinary> shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_vert");
-    // TODO: update
-    shader_builder.set_code(shader_code->data.get(), shader_code->size);
-    Ref<ROShaderVK> vertex_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
-    shader_code = ResourceManager::get_singleton()->get_resource<RUBinary>("main_shader_frag");
-    shader_builder.set_code(shader_code->data.get(), shader_code->size);
-    Ref<ROShaderVK> pixel_shader = make_ref<ROShaderVK>(allocator, &base_render_data, shader_builder);
-
-    // Initialize shader configurations.
-    ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
-    shader_config
-        .push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader)
-        .push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, pixel_shader);
-
-    // Initialize vertex inputs.
-    ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config{};
-    // TODO: vertex input config
-
-    // Initialize graphics pipeline layout.
-    ROPipelineLayoutVK::Builder pipeline_layout_builder;
-    render_objects->graphics_pipeline_layout = make_ref<ROPipelineLayoutVK>(allocator, &base_render_data, pipeline_layout_builder);
-
-    // Initialize graphics pipeline.
-    auto graphics_pipeline_config = ROGraphicsPipelineVK::get_default_render_opaque_configuration(
-        &base_render_data, shader_config, vertex_input_config, render_objects->graphics_pipeline_layout, render_objects->result_render_pass
-    );
-    render_objects->graphics_pipeline = make_ref<ROGraphicsPipelineVK>(allocator, &base_render_data, graphics_pipeline_config);
-}
-
 void RendererVK::init_swap_chain_framebuffers() {
     render_objects->swap_chain_framebuffers.resize(swap_chain_images_count);
     // Setup the framebuffer for each swap chain image view.
@@ -378,15 +339,17 @@ void RendererVK::init_swap_chain_framebuffers() {
 
 void RendererVK::setup_render_resource() {
     // Setup swap_chain_framebuffer_resource.
-    setup_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffer_resource, MEM_NULL);
-    // Setup base_graphics_pipeline_resource.
-    setup_resource(REND_RES_BASE_GRAPHICS_PIPELINE_VK, render_objects->base_graphics_pipeline_resource, render_objects->graphics_pipeline);
+    setup_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, TypeUUID<ROFramebufferVK>::UUID,
+                   render_objects->swap_chain_framebuffer_resource, MEM_NULL);
     // Setup static opaque triangles vertices buffer resource.
-    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_triangles_buffer_vertices_resource, MEM_NULL);
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, TypeUUID<ROBufferVK>::UUID,
+                   render_objects->static_opaque_triangles_buffer_vertices_resource, MEM_NULL);
     // Setup static opaque triangles indices buffer resource.
-    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_triangles_buffer_indices_resource, MEM_NULL);
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, TypeUUID<ROBufferVK>::UUID,
+                   render_objects->static_opaque_triangles_buffer_indices_resource, MEM_NULL);
     // Setup static opaque triangles object ids buffer resource.
-    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_triangles_buffer_obj_ids_resource, MEM_NULL);
+    setup_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, TypeUUID<ROBufferVK>::UUID,
+                   render_objects->static_opaque_triangles_buffer_obj_ids_resource, MEM_NULL);
 }
 
 void RendererVK::create_instance() {

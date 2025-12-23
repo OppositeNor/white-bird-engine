@@ -145,6 +145,17 @@ public:
             }
 
             /**
+             * @brief Add a range of bindings to the vertex input bindings.
+             *
+             * @param p_bindings The bindings to add to the vertex input bindings.
+             * @return *this
+             */
+            VertexInputConfig& add_bindings(std::span<const VkVertexInputBindingDescription> p_bindings) {
+                bindings.append_range(p_bindings);
+                return *this;
+            }
+
+            /**
              * @brief Add an atribute to the vertex input attributes.
              *
              * @param p_attribute The attribute to add to the vertex input attributes.
@@ -152,6 +163,17 @@ public:
              */
             VertexInputConfig& add_attribute(VkVertexInputAttributeDescription p_attribute) {
                 attributes.push_back(p_attribute);
+                return *this;
+            }
+
+            /**
+             * @brief Add a range of atributes to the vertex input attributes.
+             *
+             * @param p_attributes The attributes to add to the vertex input attributes.
+             * @return *this
+             */
+            VertexInputConfig& add_attributes(std::span<const VkVertexInputAttributeDescription> p_attributes) {
+                attributes.append_range(p_attributes);
                 return *this;
             }
         };

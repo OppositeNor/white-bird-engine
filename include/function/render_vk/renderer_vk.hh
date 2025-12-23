@@ -30,7 +30,6 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -54,7 +53,6 @@
 namespace WhiteBirdEngine {
 
 WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, WBE_RENDER_RESOURCE);
@@ -308,8 +306,6 @@ private:
             : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
-        // Graphics pipeline.
-        Ref<ROGraphicsPipelineVK> graphics_pipeline;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain image views.
@@ -338,11 +334,10 @@ private:
     void init_swap_chain_images();
     void init_swap_chain_image_views();
     void init_render_pass();
-    void init_graphics_pipeline();
     void init_swap_chain_framebuffers();
     void setup_render_resource();
 
-    void setup_resource(RendResID p_res_id, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object);
+    void setup_resource(RendResID p_res_id, RendResTID p_res_type, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object);
     void recreate_swap_chain();
 
     void create_instance();
