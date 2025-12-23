@@ -47,40 +47,40 @@ public:
         struct ShaderConfig {
             // Shader stage configurations.
             struct ShaderStage {
-                // Shader stages bits.
-                VkShaderStageFlagBits stage;
                 // The entry function name of the shader.
                 std::string entry_function = "main";
                 // Shader instance.
                 Ref<ROShaderVK> shader;
             };
+            // The vertex shader stage.
+            Required<ShaderStage> vertex_shader;
+            // The fragment shader stage.
+            Required<ShaderStage> fragment_shader;
+            // TODO: Geometry shader and tessellation shader stage.
+
             /**
-             * @brief Push a shader stage.
+             * @brief Set vertex shader stage.
              *
-             * @param p_stage The shader stage.
-             * @param p_entry_function The entry function of the shader.
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& push_shader_stage(VkShaderStageFlagBits p_stage, const std::string& p_entry_function, Ref<ROShaderVK> p_shader) {
-                shader_stages.push_back({.stage = p_stage, .entry_function = p_entry_function, .shader = p_shader});
+            ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
+                (*vertex_shader).shader = p_shader;
+                (*vertex_shader).entry_function = p_entry_function;
                 return *this;
             }
 
             /**
-             * @brief Push a shader stage.
+             * @brief Set fragment shader stage.
              *
-             * @param p_stage The shader stage.
-             * @param p_entry_function The entry function of the shader.
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& push_shader_stage(VkShaderStageFlagBits p_stage, Ref<ROShaderVK> p_shader) {
-                shader_stages.push_back({.stage = p_stage, .shader = p_shader});
+            ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
+                (*fragment_shader).shader = p_shader;
+                (*fragment_shader).entry_function = p_entry_function;
                 return *this;
             }
-            // Shader stages.
-            std::vector<ShaderStage> shader_stages;
         };
         // Vertex input configurations.
         struct VertexInputConfig {
@@ -606,9 +606,21 @@ public:
         return config;
     }
 
+    struct ExposedFields {
+        Ref<const ROShaderVK> vertex_shader;
+        Ref<const ROShaderVK> fragment_shader;
+        // TODO: TSC TSE geometry shaders
+        Ref<const ROPipelineLayoutVK> pipeline_layout;
+        Ref<const RORenderPassVK> render_pass;
+    };
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
+
 private:
     Config config;
-
+    ExposedFields exposed_fields;
     VkPipeline graphics_pipeline = VK_NULL_HANDLE;
 
     struct PipelineStateCreateInfo {
@@ -643,6 +655,8 @@ private:
                                                PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_dynamic_state_create_info(const Config& p_config,
                                          PipelineStateCreateInfo& p_pipeline_create_infos);
+
+    static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);
 };
 
 } // namespace WhiteBirdEngine

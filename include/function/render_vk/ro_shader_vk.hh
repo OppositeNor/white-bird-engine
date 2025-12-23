@@ -19,6 +19,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/utils.hh"
+#include <string>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -39,6 +40,9 @@ public:
 
         // Set the shader source code.
         Builder& set_code(const char* p_code, size_t p_code_size);
+
+        // Set from a resource ID.
+        Builder& set_code(const std::string& p_resource_id);
 
     private:
         VkShaderModule build(const BaseRenderDataVK* p_render_data) const;

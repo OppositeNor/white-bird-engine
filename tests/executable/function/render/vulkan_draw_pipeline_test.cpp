@@ -71,17 +71,19 @@ int main(int p_argc, char* p_argv[]) {
 static void setup_graphics_pipeline(WBE::ApplicationGame& p_game_application) {
     auto* render_allocator = p_game_application.get_renderer_allocator().get();
     const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
+
     WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
-    auto vert_shader_code = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUBinary>("draw_triangle_vert");
     WBE::ROShaderVK::Builder shader_builder;
-    shader_builder.set_code(vert_shader_code->data.get(), vert_shader_code->size);
+
+    shader_builder.set_code("draw_triangle_vert");
     auto vert_shader = WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, shader_builder);
-    auto frag_shader_code = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUBinary>("draw_triangle_frag");
-    shader_builder.set_code(frag_shader_code->data.get(), frag_shader_code->size);
+    shader_builder.set_code("draw_triangle_frag");
     auto frag_shader = WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, shader_builder);
+
     shader_config
-        .push_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, vert_shader)
-        .push_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, frag_shader);
+        .set_vertex_shader(vert_shader)
+        .set_fragment_shader(frag_shader);
+
     WBE::ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
     vertex_input_config
         .add_binding(WBE::VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)

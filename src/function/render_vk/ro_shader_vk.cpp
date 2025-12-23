@@ -15,6 +15,8 @@
 
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
@@ -26,6 +28,11 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_
     code = p_code;
     code_size = p_code_size;
     return *this;
+}
+
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::string& p_resource_id) {
+    auto resource = ResourceManager::get_singleton()->get_resource<RUBinary>(p_resource_id);
+    return set_code(resource->data.get(), resource->size);
 }
 
 VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data) const {

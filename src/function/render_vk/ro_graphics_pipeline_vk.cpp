@@ -35,18 +35,25 @@ ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
     }, render_data->frames_in_flight);
 }
 
+VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage) {
+    VkPipelineShaderStageCreateInfo shader_stage_create_info{};
+    shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stage_create_info.stage = p_stage_flag;
+    shader_stage_create_info.module = p_stage.shader->get_shader_module();
+    shader_stage_create_info.pName = p_stage.entry_function.c_str();
+    return shader_stage_create_info;
+}
+
 void ROGraphicsPipelineVK::init(const Config& p_config) {
     // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
-    shader_stages.reserve(p_config.shader.shader_stages.size());
-    for (const auto& shader : p_config.shader.shader_stages) {
-        VkPipelineShaderStageCreateInfo shader_stage_create_info{};
-        shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shader_stage_create_info.stage = shader.stage;
-        shader_stage_create_info.module = shader.shader->get_shader_module();
-        shader_stage_create_info.pName = shader.entry_function.c_str();
-        shader_stages.push_back(shader_stage_create_info);
-    }
+    shader_stages.reserve(4); // We can have a maximum of 4 shader stages (vertex, TSC, TSE, geometry, fragment)
+    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, WBE_REQUIRED(p_config.shader.vertex_shader)));
+    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, WBE_REQUIRED(p_config.shader.fragment_shader)));
+    // TODO: TSC, TSE and geometry shader
+    exposed_fields.vertex_shader = WBE_REQUIRED(p_config.shader.vertex_shader).shader;
+    exposed_fields.fragment_shader = WBE_REQUIRED(p_config.shader.fragment_shader).shader;
+
     // Setup create information for states.
     PipelineStateCreateInfo state_create_info;
     setup_vertex_input_state_create_info(p_config, state_create_info);
@@ -74,9 +81,12 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
     create_info.pColorBlendState = &(state_create_info.color_blend_state);
     create_info.pDynamicState = &(state_create_info.dynamic_state);
-    create_info.layout = p_config.pipeline_layout->get_pipeline_layout();
+    create_info.layout = WBE_REQUIRED(p_config.pipeline_layout).get_pipeline_layout();
     create_info.renderPass = WBE_REQUIRED(p_config.render_pass).get_render_pass();
     create_info.subpass = p_config.subpass_index;
+
+    exposed_fields.pipeline_layout = p_config.pipeline_layout;
+    exposed_fields.render_pass = p_config.render_pass;
 
     if (vkCreateGraphicsPipelines(
         render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline) != VK_SUCCESS) {
