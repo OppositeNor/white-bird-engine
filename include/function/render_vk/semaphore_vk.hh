@@ -29,6 +29,23 @@ namespace WhiteBirdEngine {
  */
 class SemaphoreVK {
 public:
+    ~SemaphoreVK() {
+        // Deallocate resource after frames in flight.
+        render_data->register_delayed_call([render_data = render_data, semaphore = semaphore]() {
+            // Semaphores are created one per in-flight frame; however, just in case it is used elsewhere, we are still delaying this.
+            vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
+        }, render_data->frames_in_flight);
+    }
+
+    WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK)
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_binary Should the semaphore be a binary semaphore or timeline semaphore. True then it will
+     * be binary, false then it will be timeline.
+     */
     SemaphoreVK(const BaseRenderDataVK* p_render_data, bool p_binary = false)
         : render_data(p_render_data), is_binary(p_binary) {
         VkSemaphoreCreateInfo create_info{};
@@ -45,15 +62,6 @@ public:
             throw std::runtime_error("Failed to create semaphore.");
         }
     }
-    ~SemaphoreVK() {
-        // Deallocate resource after frames in flight.
-        render_data->register_delayed_call([render_data = render_data, semaphore = semaphore]() {
-            // Semaphores are created one per in-flight frame; however, just in case it is used elsewhere, we are still delaying this.
-            vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
-        }, render_data->frames_in_flight);
-    }
-
-    WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK)
 
     /**
      * @brief Is this a binary semaphore.

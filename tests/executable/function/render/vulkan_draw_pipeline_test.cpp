@@ -38,7 +38,7 @@ int main(int p_argc, char* p_argv[]) {
     {
         WBE::ApplicationGame game_application;
         // Setup cube's mesh
-        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
+        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
         WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
         game_application.get_renderer()->update_static_opaque_triangles();
         {

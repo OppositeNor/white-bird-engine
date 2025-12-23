@@ -1,6 +1,7 @@
 {
     "include": [
         "assets/meshes/cube.json",
+        "assets/meshes/triangle.json",
         "assets/shaders/main_pipeline/main_pipeline_shader.json"
     ],
     "resources": [
