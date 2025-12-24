@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/function_utils.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -172,18 +173,26 @@ VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    if (p_render_data == nullptr) {
-        throw std::runtime_error("Render data is nullptr.");
-    }
     init(p_builder);
+}
+
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
+    : RenderObjectVK(p_render_data) {
+    exposed_fileds.image = p_image;
+    p_image = VK_NULL_HANDLE;
+    exposed_fileds.image_memory = VK_NULL_HANDLE;
+    exposed_fileds.image_layout = p_initial_image_layout;
+    exposed_fileds.is_swap_chain_image = true;
 }
 
 ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
-    render_data->register_delayed_call([render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
-        vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
-        vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
-    }, render_data->frames_in_flight);
+    if (!exposed_fileds.is_swap_chain_image) {
+        render_data->register_delayed_call([render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
+            vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+            vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
+        }, render_data->frames_in_flight);
+    }
 }
 
 void ROImageVK::init(const Builder& p_builder) {
@@ -193,9 +202,6 @@ void ROImageVK::init(const Builder& p_builder) {
     // Images are only allowed to be allocated on device.
     exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
     exposed_fileds.image_layout = p_builder.initial_image_layout;
-    if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind image memory.");
-    }
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {

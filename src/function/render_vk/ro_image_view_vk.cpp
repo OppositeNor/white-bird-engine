@@ -23,12 +23,6 @@
 namespace WhiteBirdEngine {
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
-    image_obj = p_image;
-    image = WBE_REQUIRES_VALID(p_image)->get_image();
-    return *this;
-}
-
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(VkImage p_image) {
     image = p_image;
     return *this;
 }
@@ -79,7 +73,7 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROIm
 VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    create_info.image = WBE_REQUIRED(image);
+    create_info.image = WBE_REQUIRED(image).get_image();
     create_info.viewType = WBE_REQUIRED(view_type);
     create_info.format = WBE_REQUIRED(format);
     create_info.components = components;
@@ -109,6 +103,7 @@ ROImageViewVK::~ROImageViewVK() {
 
 void ROImageViewVK::init(const Builder& p_builder) {
     image_view = p_builder.build(render_data);
+    exposed_fields.image = p_builder.image;
 }
 
 } // namespace WhiteBirdEngine

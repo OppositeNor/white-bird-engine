@@ -57,8 +57,8 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
-    allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), swap_chain_images(p_allocator),
-    in_flight_fences(p_allocator), base_render_data(p_allocator), activated_pipeline(p_allocator) {
+    allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), in_flight_fences(p_allocator),
+    base_render_data(p_allocator), activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     singleton = this;
@@ -470,8 +470,15 @@ void RendererVK::create_swap_chain() {
 
     // Create swap chain images.
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
+    Vector<VkImage> swap_chain_images(allocator);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
+    WBE_DEBUG_ASSERT(render_objects->swap_chain_images.empty());
+    render_objects->swap_chain_images.reserve(swap_chain_images_count);
+    for (auto& swap_chain_image : swap_chain_images) {
+        render_objects->swap_chain_images.emplace_back(
+            make_ref<ROImageVK>(allocator, &base_render_data, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
+    }
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     frames_in_flight = game_config.frames_in_flight;
     if (frames_in_flight < swap_chain_images_count) {
@@ -499,13 +506,13 @@ void RendererVK::clean_up_swap_chain() {
     render_objects->swap_chain_framebuffer_resource->res = MEM_NULL;
     render_objects->swap_chain_framebuffers.clear();
     render_objects->swap_chain_image_views.clear();
-    swap_chain_images.clear();
+    render_objects->swap_chain_images.clear();
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
 }
 
 void RendererVK::init_swap_chain_image_views() {
-    render_objects->swap_chain_image_views.reserve(swap_chain_images.size());
-    for (auto& swap_chain_image : swap_chain_images) {
+    render_objects->swap_chain_image_views.reserve(render_objects->swap_chain_images.size());
+    for (auto& swap_chain_image : render_objects->swap_chain_images) {
         VkImageSubresourceRange subresource_range;
         // Only use the color information of the image.
         subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1084,7 +1091,7 @@ int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_
             return 100;
             break;
     };
-    throw std::runtime_error("Not recognized device domain.");
+    throw std::runtime_error("Unrecognized device domain.");
 }
 
 uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const {

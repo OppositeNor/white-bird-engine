@@ -35,10 +35,8 @@ public:
     // Builder for ROImageViewVK
     struct Builder {
         friend ROImageViewVK;
-        // The image object, MEM_NULL if not provided.
-        Ref<ROImageVK> image_obj;
-        // Source image.
-        Required<VkImage> image;
+        // The image.
+        Ref<ROImageVK> image;
         // Image view type.
         Required<VkImageViewType> view_type;
         // Image format.
@@ -60,8 +58,6 @@ public:
 
         // Set the source image.
         Builder& set_image(Ref<ROImageVK> p_image);
-        // Set the source image.
-        Builder& set_image(VkImage p_image);
         // Set the image view type.
         Builder& set_view_type(VkImageViewType p_view_type);
         // Set the image format.

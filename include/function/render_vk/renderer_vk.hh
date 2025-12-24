@@ -223,7 +223,6 @@ private:
     VkQueue compute_queue = VK_NULL_HANDLE;
     VkQueue present_queue = VK_NULL_HANDLE;
 
-    Vector<VkImage> swap_chain_images;
     VkFormat swap_chain_image_format = VK_FORMAT_UNDEFINED;
     VkExtent2D swap_chain_extent{};
 
@@ -312,11 +311,13 @@ private:
     // Render objects for the renderer.
     struct RenderObjects {
         RenderObjects(AllocType* p_allocator)
-            : swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
+            : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {}
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
+        // Swap chain images
+        Vector<Ref<ROImageVK>> swap_chain_images;
         // Swap chain image views.
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // Framebuffers in the swap chain.

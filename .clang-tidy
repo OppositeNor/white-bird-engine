@@ -55,6 +55,7 @@ Checks: >
   -hicpp-no-array-decay,
   -hicpp-signed-bitwise,
   -hicpp-use-auto,
+  -hicpp-move-const-arg,
   -modernize-use-trailing-return-type,
   -modernize-use-nodiscard,
   -modernize-use-override,

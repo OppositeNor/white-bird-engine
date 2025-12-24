@@ -36,6 +36,7 @@ namespace WhiteBirdEngine {
  */
 class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK, ThisRef<ROImageVK> {
     friend struct MemoryBarrierBuilder;
+    friend class RendererVK;
 public:
     // Builder for ROImageVK
     struct Builder {
@@ -113,6 +114,16 @@ public:
     ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
+     * @brief Constructor for swap chain images. This image will not manually allocate memory, and will not
+     * deallocate memory when destroyed.
+     *
+     * @param p_render_data The base render data.
+     * @param p_image The vulkan image instance.
+     * @param p_initial_image_layout THe initial image layout.
+     */
+    ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
+
+    /**
      * @brief Get image instance.
      *
      * @return The image instance.
@@ -136,6 +147,10 @@ public:
          * @brief The image instance.
          */
         VkImage image = VK_NULL_HANDLE;
+        /**
+         * @brief Is this a image for the swap chain.
+         */
+        bool is_swap_chain_image = false;
         /**
          * @brief The image's memory.
          */
