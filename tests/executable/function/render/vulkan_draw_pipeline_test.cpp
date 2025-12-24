@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
@@ -50,7 +49,7 @@ int main(int p_argc, char* p_argv[]) {
         WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
         game_application.get_renderer()->update_static_opaque_triangles();
         {
-            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             // TODO
             setup_graphics_pipeline(game_application);
             game_application.run();

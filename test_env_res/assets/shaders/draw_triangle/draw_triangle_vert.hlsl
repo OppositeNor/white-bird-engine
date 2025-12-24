@@ -16,10 +16,10 @@
 #include "draw_triangle/draw_triangle_utils.hlslh"
 #include "defs.hlslh"
 
-VSOutput main(Vertex3DTexturedInput p_input : SV_VertexID) {
+VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
 
-    output.position = float4(p_input.position, 1.0);
+    output.position = float4(p_input.position.x, -1.0 * p_input.position.y, 0.0, 1.0);
     output.uv       = p_input.uv;
 
     return output;

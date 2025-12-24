@@ -17,6 +17,7 @@ from pathlib import Path
 import subprocess
 from typing import override
 from build_script.resource.acp.acp_compiler import WBEACPCompiler
+import build_setup
 
 
 class WBEACPCompilerShader(WBEACPCompiler):
@@ -64,6 +65,8 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "-o", str(output_file),
             str(hlsl_file)
         ]
+        if build_setup.build_target["generate-tests"]:
+            cmd.append("-g")
         print("Compiling:", hlsl_file)
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:

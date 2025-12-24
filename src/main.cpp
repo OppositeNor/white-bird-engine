@@ -29,7 +29,7 @@ int main(int p_argc, char* p_argv[]) {
         WBE::ApplicationGame const game_application;
         {
             // Not running the application is also an option.
-            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             WBE::stdout_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();

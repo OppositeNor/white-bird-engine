@@ -35,7 +35,8 @@ ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
     }, render_data->frames_in_flight);
 }
 
-VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage) {
+VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag,
+                                                                                   const Config::ShaderConfig::ShaderStage& p_stage) {
     VkPipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shader_stage_create_info.stage = p_stage_flag;
