@@ -149,7 +149,7 @@ public:
              * @return *this
              */
             VertexInputConfig& add_bindings(std::span<const VkVertexInputBindingDescription> p_bindings) {
-                bindings.append_range(p_bindings);
+                bindings.insert(bindings.end(), p_bindings.begin(), p_bindings.end());
                 return *this;
             }
 
