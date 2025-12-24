@@ -22,23 +22,23 @@ struct Vertex3DTexturedInput {
     /**
      * @brief The position of the vertex.
      */
-    vec3 position;
+    [[vk::location(0)]] float3 position;
     /**
      * @brief The normal of the vertex.
      */
-    vec3 normal;
+    [[vk::location(1)]] float3 normal;
     /**
      * @brief The tanglent vector of the vertex.
      */
-    vec3 tangent;
+    [[vk::location(2)]] float3 tangent;
     /**
      * @brief The bitangent vector of the vertex.
      */
-    vec3 bitangent;
+    [[vk::location(3)]] float3 bitangent;
     /**
      * @brief The uv value.
      */
-    vec2 uv;
+    [[vk::location(4)]] float2 uv;
 };
 
 #endif

@@ -14,7 +14,9 @@
 */
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "core/logging/log.hh"
@@ -33,11 +35,10 @@
 
 namespace WBE = WhiteBirdEngine;
 
-static void setup_pipeline(WBE::ApplicationGame& p_game_application);
 static void setup_graphics_pipeline(WBE::ApplicationGame& p_game_application);
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_BASE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
 }
 
 int main(int p_argc, char* p_argv[]) {
@@ -52,7 +53,6 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiller");
             // TODO
             setup_graphics_pipeline(game_application);
-            setup_pipeline(game_application);
             game_application.run();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
@@ -70,43 +70,49 @@ int main(int p_argc, char* p_argv[]) {
 
 static void setup_graphics_pipeline(WBE::ApplicationGame& p_game_application) {
     auto* render_allocator = p_game_application.get_renderer_allocator().get();
-    const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
+    auto* renderer = WBE::RendererVK::get_singleton();
+    const auto* base_render_data = renderer->get_base_render_data();
 
     WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
     WBE::ROShaderVK::Builder shader_builder;
-
+    // Setup shaders
     shader_builder.set_code("draw_triangle_vert");
     auto vert_shader = WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, shader_builder);
     shader_builder.set_code("draw_triangle_frag");
     auto frag_shader = WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, shader_builder);
-
     shader_config
         .set_vertex_shader(vert_shader)
         .set_fragment_shader(frag_shader);
 
-    WBE::ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
-    vertex_input_config
-        .add_binding(WBE::VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)
-        .add_attributes(WBE::VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
+    // Setup graphics pipeline layout.
     WBE::ROPipelineLayoutVK::Builder pipeline_layout_builder;
-    // TODO: Setup graphics pipeline.
-}
+    WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout
+        = WBE::make_ref<WBE::ROPipelineLayoutVK>(render_allocator, base_render_data, pipeline_layout_builder);
+    auto render_pass = renderer->get_swap_chain_render_pass();
+    auto graphics_pipeline_builder = WBE::ROGraphicsPipelineVK::get_default_render_opaque_configuration(
+        base_render_data, shader_config, graphics_pipeline_layout, render_pass);
+    auto graphics_pipeline = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data, graphics_pipeline_builder);
 
-static void setup_test_pipeline(WBE::ApplicationGame& p_game_application) {
-    auto* render_allocator = p_game_application.get_renderer_allocator().get();
+    // Setup render task
     WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::make_ref<WBE::RendTaskInfo>(render_allocator);
     rend_task_info->task_id = WBE::RT_RUN_PIPELINE;
     rend_task_info->prev.push_back(WBE::RT_PRE_EXECUTE_PIPELINE_VK);
     rend_task_info->req_res = {
         {.res_id = WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, .type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID},
-        {.res_id = WBE::REND_RES_BASE_GRAPHICS_PIPELINE, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID}};
+        {.res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID},
+        {.res_id = WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, .type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID},
+        {.res_id = WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, .type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID},
+    };
     rend_task_info->render_task_factory
-        = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, WBE::RendererVK::get_singleton()->get_base_render_data(), true);
-    p_game_application.get_renderer()->register_pipeline("test_pipeline", rend_task_info);
+        = WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(render_allocator, renderer->get_base_render_data(), true);
+    WBE::RendPipelineInfo rend_pipeline_info;
+    rend_pipeline_info.root_task = rend_task_info;
+    rend_pipeline_info.resources = {
+        {.res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
+         .type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+         .is_weak = false,
+         .res = graphics_pipeline},
+    };
+    p_game_application.get_renderer()->register_pipeline("test_pipeline", rend_pipeline_info);
     p_game_application.get_renderer()->activate_pipeline("test_pipeline");
 }
-
-static void setup_pipeline(WBE::ApplicationGame& p_game_application) {
-    setup_test_pipeline(p_game_application);
-}
-

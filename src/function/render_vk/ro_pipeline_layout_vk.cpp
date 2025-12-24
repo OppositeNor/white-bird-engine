@@ -60,7 +60,7 @@ VkPipelineLayout ROPipelineLayoutVK::Builder::build(const BaseRenderDataVK* p_re
 }
 
 ROPipelineLayoutVK::ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : RenderObjectVK(p_render_data), exposed_fields(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
@@ -76,6 +76,10 @@ ROPipelineLayoutVK::~ROPipelineLayoutVK() {
 
 void ROPipelineLayoutVK::init(const Builder& p_builder) {
     pipeline_layout = p_builder.build(render_data);
+    exposed_fields.descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
+    for (const auto& descriptor_set_layout : p_builder.descriptor_set_layouts) {
+        exposed_fields.descriptor_set_layouts.push_back(descriptor_set_layout);
+    }
 }
 
 } // namespace WhiteBirdEngine

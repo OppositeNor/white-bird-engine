@@ -138,15 +138,16 @@ void RTRunGraphicsPipelineVK::record_command_buffer_with_vertex_binding() {
 
     // Setup vertex and index buffer.
     VkBuffer vertex_buffer_inst = vertex_buffer->get_buffer();
-    VkBuffer index_buffer_inst = vertex_buffer->get_buffer();
+    VkBuffer index_buffer_inst = index_buffer->get_buffer();
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_inst, &offset);
     vkCmdBindIndexBuffer(command_buffer, index_buffer_inst, 0, VK_INDEX_TYPE_UINT32);
     vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
 
 
+    size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
     // Draw the entire index buffer.
-    vkCmdDrawIndexed(command_buffer, index_buffer->fields().buffer_size / sizeof(uint32_t), 1, 0, 0, 0);
+    vkCmdDrawIndexed(command_buffer, index_count, 1, 0, 0, 0);
 
     vkCmdEndRenderPass(command_buffer);
 }

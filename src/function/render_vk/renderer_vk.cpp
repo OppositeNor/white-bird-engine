@@ -45,6 +45,7 @@
 #include <format>
 #include <functional>
 #include <map>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <unistd.h>
@@ -189,18 +190,26 @@ static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* 
 }
 
 void RendererVK::update_static_opaque_triangles() {
+    // Vertices
     const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
     auto vertex_buffer = render_objects->static_opaque_triangles_buffer_vertices_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, vertex_buffer, static_opaque_triangles_vertices,
                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    render_objects->static_opaque_triangles_buffer_vertices_resource->res = vertex_buffer;
+
+    // Indices
     const auto& static_opaque_triangles_indices = render_database->get_static_opaque_triangles_info().indices;
     auto index_buffer = render_objects->static_opaque_triangles_buffer_indices_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, index_buffer, static_opaque_triangles_indices,
                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    render_objects->static_opaque_triangles_buffer_indices_resource->res = index_buffer;
+
+    // Object IDs
     const auto& static_opaque_triangles_obj_ids = render_database->get_static_opaque_triangles_info().obj_id;
     auto obj_ids_buffer = render_objects->static_opaque_triangles_buffer_obj_ids_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, obj_ids_buffer, static_opaque_triangles_obj_ids,
                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    render_objects->static_opaque_triangles_buffer_obj_ids_resource->res = obj_ids_buffer;
 }
 
 void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {
@@ -868,11 +877,11 @@ void RendererVK::setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent)
     scissor.extent = p_swap_chain_extent;
 }
 
-RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) {
-    if (p_root_task == MEM_NULL) {
+RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) {
+    if (p_pipeline_info.root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
-    if (p_root_task->prev.size() != 1 || p_root_task->prev[0] != RT_PRE_EXECUTE_PIPELINE_VK) {
+    if (p_pipeline_info.root_task->prev.size() != 1 || p_pipeline_info.root_task->prev[0] != RT_PRE_EXECUTE_PIPELINE_VK) {
         throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
     }
     Vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
@@ -880,15 +889,15 @@ RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
     pipeline_infos.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         // Copy frames_in_flight amount of pipelines for each swap chain image to draw without waiting for the previous one to finish.
-        auto pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
-        pipeline_info->pipeline_name = p_pipeline_name;
-        compile_tasks(p_root_task, pipeline_info);
-        pipeline_infos.emplace_back(pipeline_info);
+        auto result_pipeline_info = make_ref<PipelineInfo>(allocator, allocator);
+        result_pipeline_info->pipeline_name = p_pipeline_name;
+        compile_tasks(p_pipeline_info.root_task, p_pipeline_info, result_pipeline_info);
+        pipeline_infos.emplace_back(result_pipeline_info);
     }
     return pipeline_infos;
 }
 
-void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info) {
+void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipelineInfo& p_entered_pipeline_info, Ref<PipelineInfo> p_pipeline_info) {
     WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline_info != MEM_NULL);
     // Using bfs, as the order where the render task will be pushed to the queue.
@@ -896,7 +905,8 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     // Setup image available semaphores
     auto image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
     p_pipeline_info->image_available_semaphore = image_available_semaphore;
-
+    // Register pipeline resources.
+    register_pipeline_resources(p_pipeline_info, p_entered_pipeline_info.resources);
     // Setup start task.
     Ref<RTPreExecutePipelineFactoryVK> start_task_factory
         = make_ref<RTPreExecutePipelineFactoryVK>(allocator, &base_render_data, image_available_semaphore);
@@ -905,7 +915,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> 
     p_pipeline_info->task_infos.push_back({.task_id = RT_PRE_EXECUTE_PIPELINE_VK, .render_task = start_task});
     std::vector<RendTaskID> dummy;
     render_task_map.insert(std::pair(RT_PRE_EXECUTE_PIPELINE_VK, std::pair(start_task, &dummy)));
-
+    // Compile the render graph starting from the root task.
     compile_render_graph(p_root_task, p_pipeline_info, render_task_map);
 
     // Setup other properties according to the constructed graph.
@@ -963,7 +973,7 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
         // Set task ID.
         task_info.task_id = curr->task_id;
         // Register associated resources.
-        register_render_resources(curr, task_info, p_pipeline_info);
+        fill_task_render_resource(curr, task_info, p_pipeline_info);
         // Push the node to the pipeline.
         p_pipeline_info->task_infos.push_back(task_info);
 
@@ -992,16 +1002,51 @@ Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
     return iter->second.lock();
 }
 
-void RendererVK::register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline) {
+void RendererVK::fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline) {
     WBE_DEBUG_ASSERT(p_task != MEM_NULL);
-    WBE_DEBUG_ASSERT(p_task_info.render_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
     WBE_DEBUG_ASSERT(p_task_info.render_task->req_rend_res.empty());
     p_task_info.render_task->req_rend_res.reserve(p_task->req_res.size());
     for (auto& res : p_task->req_res) {
-        Ref<RendResVK> rend_res = get_rend_res(res.res_id, res.type_id);
-        p_pipeline->rend_res.push_back(rend_res);
+        auto iter = render_resources.find(res.res_id);
+        if (iter == render_resources.end() || !iter->second.is_valid()) {
+            throw std::runtime_error(std::format(
+                "Render resource {} required by task {} is not registered.",
+                LabelManager::get_singleton()->get_label_name(res.res_id),
+                LabelManager::get_singleton()->get_label_name(p_task->task_id)));
+        }
+        Ref<RendResVK> rend_res = iter->second.lock();
         p_task_info.render_task->req_rend_res.push_back(rend_res);
+    }
+}
+
+void RendererVK::register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::Resource> p_pipeline_resources) {
+    WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_pipeline->rend_res.empty());
+    p_pipeline->rend_res.reserve(p_pipeline_resources.size());
+    for (const auto& pipeline_resource : p_pipeline_resources) {
+        Ref<RendResVK> rend_res = get_rend_res(pipeline_resource.res_id, pipeline_resource.type_id);
+        if (pipeline_resource.is_weak) {
+            // Weak reference, only set if the resource is not initialized yet.
+            if (rend_res->res == MEM_NULL && pipeline_resource.res == MEM_NULL) {
+                throw std::runtime_error(std::format(
+                    "Render resource {} is a weak reference that is MEM_NULL, and there was no corresponding registered resource.",
+                    LabelManager::get_singleton()->get_label_name(pipeline_resource.res_id)));
+            }
+            rend_res->res = pipeline_resource.res.dynamic_cast_ref<RenderObjectVK>();
+            WBE_DEBUG_ASSERT(rend_res->res != MEM_NULL);
+        }
+        else {
+            // Strong reference, always overwrite the resource.
+            if (pipeline_resource.res == MEM_NULL) {
+                throw std::runtime_error(std::format(
+                    "Render resource {} is a strong reference that is MEM_NULL.",
+                    LabelManager::get_singleton()->get_label_name(pipeline_resource.res_id)));
+            }
+            rend_res->res = pipeline_resource.res.dynamic_cast_ref<RenderObjectVK>();
+            WBE_DEBUG_ASSERT(rend_res->res != MEM_NULL);
+        }
+        p_pipeline->rend_res.push_back(rend_res);
     }
 }
 

@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_OBJECT_HH
 #define WBE_FILE_RENDER_OBJECT_HH
 
+#include "utils/defs.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -25,11 +26,10 @@ namespace WhiteBirdEngine {
 class RenderObject {
 public:
 
-    RenderObject() = default;
-    virtual ~RenderObject() {}
+    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(RenderObject)
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -17,6 +17,7 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_object.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <vector>
@@ -59,6 +60,38 @@ struct RenderTask {
      * @brief Perform the render task.
      */
     virtual void perform(double p_delta) = 0;
+};
+
+/**
+ * @class RendPipelineInfo
+ * @brief The information of a render pipeline.
+ *
+ */
+struct RendPipelineInfo {
+    // The root task of the pipeline.
+    Ref<struct RendTaskInfo> root_task;
+    /**
+     * @class Resource
+     * @brief Represents a resource.
+     *
+     */
+    struct Resource {
+        // The ID of the resource.
+        RendResID res_id;
+        // The type ID of the resource.
+        RendResTID type_id;
+        // Is the resource a weak binding.
+        bool is_weak = false;
+        // The resource instance. If is_weak is false, the previously registered resource with
+        // the same res_id will be replaced by this instance. If is_weak is true, it
+        // will try to find resources that was registered before by other pipelines, and
+        // use those as the resource here. If none reference was found, it will be replaced
+        // with this one. When is_weak is true, or when is_weak is false and there is no previously
+        // registered resource with the same res_id, res should not be MEM_NULL.
+        Ref<RenderObject> res = MEM_NULL;
+    };
+    // All the resources used in the render pipeline.
+    std::vector<Resource> resources;
 };
 
 /**

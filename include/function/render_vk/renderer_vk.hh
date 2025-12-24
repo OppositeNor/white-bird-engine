@@ -97,8 +97,8 @@ public:
 
     virtual void tick(double p_delta) override;
 
-    virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) override {
-        pipelines.insert(std::pair(p_pipeline_name, compile_pipeline(p_pipeline_name, p_root_task)));
+    virtual void register_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) override {
+        pipelines.insert(std::pair(p_pipeline_name, compile_pipeline(p_pipeline_name, p_pipeline_info)));
     }
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {
@@ -171,6 +171,15 @@ public:
             }
         }
         throw std::runtime_error("Failed to register delay call: buffer overflow.");
+    }
+
+    /**
+     * @brief Get the render pass for rendering to the result swap chain.
+     *
+     * @return The render pass for rendering to the result swap chain.
+     */
+    Ref<RORenderPassVK> get_swap_chain_render_pass() {
+        return render_objects->result_render_pass;
     }
 
 private:
@@ -367,12 +376,13 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    Vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task);
-    void compile_tasks(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info);
+    Vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info);
+    void compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipelineInfo& p_entered_pipeline_info, Ref<PipelineInfo> p_pipeline_info);
     void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
                            std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
-    void register_render_resources(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
+    void fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
+    void register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::Resource> p_pipeline_resources);
 
     int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
     uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;

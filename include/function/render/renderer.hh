@@ -56,7 +56,7 @@ public:
      * @param p_pipeline_name The name of the pipeline to register.
      * @param p_root_task The root render task of the pipeline.
      */
-    virtual void register_pipeline(const std::string& p_pipeline_name, Ref<RendTaskInfo> p_root_task) = 0;
+    virtual void register_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) = 0;
 
     /**
      * @brief Activate a pipeline.

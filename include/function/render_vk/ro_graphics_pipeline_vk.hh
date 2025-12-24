@@ -56,7 +56,7 @@ public:
             Required<ShaderStage> vertex_shader;
             // The fragment shader stage.
             Required<ShaderStage> fragment_shader;
-            // TODO: Geometry shader and tessellation shader stage.
+            // TODO: TSC TSE and Geometry shader setup
 
             /**
              * @brief Set vertex shader stage.
@@ -65,8 +65,7 @@ public:
              * @return *this
              */
             ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                (*vertex_shader).shader = p_shader;
-                (*vertex_shader).entry_function = p_entry_function;
+                vertex_shader = { .entry_function = p_entry_function, .shader = p_shader };
                 return *this;
             }
 
@@ -77,8 +76,7 @@ public:
              * @return *this
              */
             ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                (*fragment_shader).shader = p_shader;
-                (*fragment_shader).entry_function = p_entry_function;
+                fragment_shader = { .entry_function = p_entry_function, .shader = p_shader };
                 return *this;
             }
         };
@@ -572,13 +570,16 @@ public:
     static Config get_default_render_opaque_configuration(
         const BaseRenderDataVK* p_render_data,
         const Config::ShaderConfig& p_shader_config,
-        const Config::VertexInputConfig& p_vertex_input_config,
         Ref<ROPipelineLayoutVK> p_pipeline_layout,
         Ref<RORenderPassVK> p_render_pass) {
 
+        ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
+        vertex_input_config
+            .add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)
+            .add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
         auto result = Config();
         result.shader = p_shader_config;
-        result.vertex_input = p_vertex_input_config;
+        result.vertex_input = vertex_input_config;
         result.viewport.viewports = { p_render_data->viewport };
         result.viewport.scissors = { p_render_data->scissor };
         result.pipeline_layout = p_pipeline_layout;

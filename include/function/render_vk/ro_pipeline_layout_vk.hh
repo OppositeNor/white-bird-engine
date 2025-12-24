@@ -71,8 +71,24 @@ public:
     VkPipelineLayout get_pipeline_layout() const {
         return pipeline_layout;
     }
+
+    /**
+     * @class ExposedFields
+     * @brief The exposed fields of this render objects.
+     *
+     */
+    struct ExposedFields {
+        ExposedFields(const BaseRenderDataVK* p_render_data)
+            : descriptor_set_layouts(p_render_data->allocator) {}
+        Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
+    };
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 private:
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    ExposedFields exposed_fields;
 
     void init(const Builder& p_builder);
 };
