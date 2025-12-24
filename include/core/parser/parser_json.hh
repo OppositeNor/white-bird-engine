@@ -175,9 +175,16 @@ public:
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
             p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<T, glm::vec2>) {
-            p_value = glm::vec2(
-                data.at("x").get<float>(),
-                data.at("y").get<float>());
+            if (data.contains("u")) {
+                p_value = glm::vec2(
+                    data.at("u").get<float>(),
+                    data.at("v").get<float>());
+            }
+            else {
+                p_value = glm::vec2(
+                    data.at("x").get<float>(),
+                    data.at("y").get<float>());
+            }
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(
                 data.at("x").get<float>(),
@@ -215,9 +222,16 @@ public:
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
             p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<T, glm::vec2>) {
-            p_value = glm::vec2(
-                data.at(p_key).at("x").get<float>(),
-                data.at(p_key).at("y").get<float>());
+            if (data.at(p_key).contains("u")) {
+                p_value = glm::vec2(
+                    data.at(p_key).at("u").get<float>(),
+                    data.at(p_key).at("v").get<float>());
+            }
+            else {
+                p_value = glm::vec2(
+                    data.at(p_key).at("x").get<float>(),
+                    data.at(p_key).at("y").get<float>());
+            }
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(
                 data.at(p_key).at("x").get<float>(),

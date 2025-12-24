@@ -4,12 +4,12 @@
         {
             "id": "draw_triangle_vert",
             "type": "binary",
-            "path": "assets/shaders/main_pipeline/main_pipeline_vert.spv"
+            "path": "assets/shaders/draw_triangle/draw_triangle_vert.spv"
         },
         {
             "id": "draw_triangle_frag",
             "type": "binary",
-            "path": "assets/shaders/main_pipeline/main_pipeline_frag.spv"
+            "path": "assets/shaders/draw_triangle/draw_triangle_frag.spv"
         }
     ]
 }

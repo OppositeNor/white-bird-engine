@@ -102,8 +102,8 @@ void RenderDatabase::set_opaque_triangles_linear(
             // Assign an unique ID for each triangle to distinguish from other 
             p_triangles_info.obj_id.push_back(curr_obj_id);
 
-            p_triangles_info.vertices.resize(curr_index + max_index);
-            memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), max_index * sizeof(Vertex3DTextured));
+            p_triangles_info.vertices.resize(curr_index + max_index + 1);
+            memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
         }
         // Setup subregion for the material.
         p_triangles_info.materials[i].sub_region.starting_index = material_mesh_start;

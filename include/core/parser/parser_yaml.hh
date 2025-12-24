@@ -31,28 +31,34 @@ namespace WhiteBirdEngine {
  *
  */
 class YAMLData : public ParserData<YAMLData> {
-    using yaml = YAML::Node;
+    using Yaml = YAML::Node;
     friend class ParserYAML;
-    friend std::ostream& operator<<(std::ostream& p_ostrem, const YAMLData& p_parser);
+    friend std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parser);
 public:
-    YAMLData(): node(yaml()) {}
-    ~YAMLData() {}
+    YAMLData() = default;
+    ~YAMLData() = default;
     YAMLData(const YAMLData& p_other)
         : node(p_other.node) {}
-    YAMLData(YAMLData&& p_other)
-        : node(std::move(p_other.node)) {}
+    YAMLData(YAMLData&& p_other) noexcept
+        : node(p_other.node) {}
     YAMLData& operator=(const YAMLData& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         node = p_other.node;
         return *this;
     }
-    YAMLData& operator=(YAMLData&& p_other) {
-        node = std::move(p_other.node);
+    YAMLData& operator=(YAMLData&& p_other) noexcept {
+        if (&p_other == this) {
+            return *this;
+        }
+        node = p_other.node;
         return *this;
     }
-    YAMLData(const yaml& p_node)
+    YAMLData(const Yaml& p_node)
         : node(p_node) {}
     YAMLData(YAML::Node&& p_node)
-        : node(std::move(p_node)) {}
+        : node(p_node) {}
 
     template <typename T>
     void set_value(const std::string& p_key, T&& p_value) {
@@ -69,8 +75,15 @@ public:
             }
             node[p_key] = result;
         } else if constexpr (std::same_as<Type, glm::vec2>) {
-            node[p_key]["x"] = p_value.x;
-            node[p_key]["y"] = p_value.y;
+            if (node[p_key]["u"].IsDefined()) {
+                // Support for UV notation.
+                node[p_key]["u"] = p_value.x;
+                node[p_key]["v"] = p_value.y;
+            }
+            else {
+                node[p_key]["x"] = p_value.x;
+                node[p_key]["y"] = p_value.y;
+            }
         } else if constexpr (std::same_as<Type, glm::vec3>) {
             node[p_key]["x"] = p_value.x;
             node[p_key]["y"] = p_value.y;
@@ -97,7 +110,7 @@ public:
         if constexpr (std::same_as<Type, YAMLData>) {
             node = p_value.node;
         } else if constexpr (std::same_as<Type, std::vector<YAMLData>>) {
-            node = yaml();
+            node = Yaml();
             for (auto& item : p_value) {
                 node.push_back(item.node);
             }
@@ -111,16 +124,23 @@ public:
             }
             node = result;
         } else if constexpr (std::same_as<Type, glm::vec2>) {
-            node = yaml();
-            node["x"] = p_value.x;
-            node["y"] = p_value.y;
+            node = Yaml();
+            if (node["u"].IsDefined()) {
+                // Support for UV notation.
+                node["u"] = p_value.x;
+                node["v"] = p_value.y;
+            }
+            else {
+                node["x"] = p_value.x;
+                node["y"] = p_value.y;
+            }
         } else if constexpr (std::same_as<Type, glm::vec3>) {
-            node = yaml();
+            node = Yaml();
             node["x"] = p_value.x;
             node["y"] = p_value.y;
             node["z"] = p_value.z;
         } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
-            node = yaml();
+            node = Yaml();
             node["x"] = p_value.x;
             node["y"] = p_value.y;
             node["z"] = p_value.z;
@@ -184,7 +204,7 @@ public:
                 node["z"].as<float>(),
                 node["w"].as<float>());
         } else if constexpr (std::same_as<T, YAMLData>) {
-            p_value = YAMLData(node.as<yaml>());
+            p_value = YAMLData(node.as<Yaml>());
         } else {
             p_value = node.as<T>();
         }
@@ -224,7 +244,7 @@ public:
                 node[p_key]["z"].as<float>(),
                 node[p_key]["w"].as<float>());
         } else if constexpr (std::same_as<T, YAMLData>) {
-            p_value = YAMLData(node[p_key].as<yaml>());
+            p_value = YAMLData(node[p_key].as<Yaml>());
         } else {
             p_value = node[p_key].as<T>();
         }
@@ -233,7 +253,7 @@ public:
     std::vector<std::string> get_all_keys() const {
         std::vector<std::string> result;
         result.reserve(node.size());
-        for (yaml::const_iterator it = node.begin(); it != node.end(); ++it) {
+        for (Yaml::const_iterator it = node.begin(); it != node.end(); ++it) {
             result.push_back(it->first.as<std::string>());
         }
         return result;
@@ -244,7 +264,7 @@ public:
     }
 
 private:
-    yaml node;
+    Yaml node;
 };
 
 inline std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parser) {
@@ -257,22 +277,28 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parse
  * @todo Test
  */
 class ParserYAML : public Parser<ParserYAML> {
-    using yaml = YAML::Node;
+    using Yaml = YAML::Node;
 public:
 
     using DataType = YAMLData;
 
     ParserYAML() = default;
-    virtual ~ParserYAML() {}
+    virtual ~ParserYAML() = default;
     ParserYAML(const ParserYAML& p_other)
         : data(p_other.data) {}
-    ParserYAML(ParserYAML&& p_other)
+    ParserYAML(ParserYAML&& p_other) noexcept
         : data(std::move(p_other.data) ){}
     ParserYAML& operator=(const ParserYAML& p_other) {
+        if (&p_other == this) {
+            return *this;
+        }
         data = p_other.data;
         return *this;
     }
-    ParserYAML& operator=(ParserYAML&& p_other) {
+    ParserYAML& operator=(ParserYAML&& p_other) noexcept {
+        if (&p_other == this) {
+            return *this;
+        }
         data = std::move(p_other.data);
         return *this;
     }
@@ -322,13 +348,13 @@ public:
 
     template <typename T>
     void get_value(std::string& p_key, T&& p_value) {
-        return data.get_value<T>(std::forward<T>(p_value));
+        return data.get_value<T>(p_key, std::forward<T>(p_value));
     }
 
 private:
     YAMLData data;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif
