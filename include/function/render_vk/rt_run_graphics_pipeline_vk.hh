@@ -56,7 +56,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 
 private:
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    glm::vec4 clear_color;
+    VkClearValue clear_value;
     bool signal_in_flight_fence = false;
     Vector<VkPipelineStageFlags2> wait_stages;
     void record_command_buffer_without_vertex_binding();

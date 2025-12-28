@@ -32,7 +32,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
                                                  bool p_signal_in_flight_fence)
-    : RenderTaskVK(p_render_data), clear_color(p_clear_color), signal_in_flight_fence(p_signal_in_flight_fence),
+    : RenderTaskVK(p_render_data), clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
+    signal_in_flight_fence(p_signal_in_flight_fence),
     wait_stages(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -89,7 +90,7 @@ void RTRunGraphicsPipelineVK::record_command_buffer_without_vertex_binding() {
     Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
 
     // Setup render pass.
-    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_color);
+    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_value);
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
     vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
@@ -127,7 +128,7 @@ void RTRunGraphicsPipelineVK::record_command_buffer_with_vertex_binding() {
     Ref<ROBufferVK> index_buffer = WBE_REQUIRES_VALID(req_rend_res[3]->res.dynamic_cast_ref<ROBufferVK>());
 
     // Setup render pass.
-    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_color);
+    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_value);
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
     VkRect2D scissor{};

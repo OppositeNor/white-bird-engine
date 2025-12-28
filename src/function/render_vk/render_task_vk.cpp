@@ -105,7 +105,7 @@ void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQue
 
 VkRenderPassBeginInfo RenderTaskVK::get_render_pass_begin_info(Ref<const RORenderPassVK> p_render_pass,
                                                                Ref<const ROFramebufferVK> p_framebuffer,
-                                                               const glm::vec4& p_clear_color) const {
+                                                               VkClearValue& p_clear_value) const {
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_info.renderPass = p_render_pass->get_render_pass();
@@ -115,9 +115,8 @@ VkRenderPassBeginInfo RenderTaskVK::get_render_pass_begin_info(Ref<const RORende
     // Draw on the entire framebuffer.
     auto extent = p_framebuffer->fields().extent;
     render_pass_info.renderArea.extent = {.width = extent.x, .height = extent.y};
-    VkClearValue clear_color = {.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}};
     render_pass_info.clearValueCount = 1;
-    render_pass_info.pClearValues = &clear_color;
+    render_pass_info.pClearValues = &p_clear_value;
     return render_pass_info;
 }
 

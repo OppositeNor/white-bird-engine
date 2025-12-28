@@ -67,7 +67,7 @@ void CLAParser::parse_get_root_operand(const CLAToken& p_token, std::string& p_u
             break;
         case CLAToken::Type::OPERAND: {
             Ref<CLAASTNodeRootOperand> operand = make_ref<CLAASTNodeRootOperand>(global_allocator(), p_token.value);
-            p_operations.push_back(operand);
+            p_operations.emplace_back(operand);
             break;
         }
         default:
@@ -79,18 +79,18 @@ void CLAParser::parse_get_option(const CLAToken& p_token, std::string& p_utility
     switch (p_token.type) {
         case CLAToken::Type::OPTION_SHORT: {
             WBE_DEBUG_ASSERT(p_token.value.size() >= 1);
-            WBE_DEBUG_ASSERT(p_token.value.rfind("-", 0) == 0);
+            WBE_DEBUG_ASSERT(p_token.value.rfind('-', 0) == 0);
             std::string options = p_token.value.substr(1);
             if (options.size() > 1) {
                 for (auto operation : options) {
                     curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), std::string(1, operation), true);
-                    p_operations.push_back(curr_option);
+                    p_operations.emplace_back(curr_option);
                 }
                 parse_state = ParseState::GET_ROOT_OPERAND;
             }
             else {
                 curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value, true);
-                p_operations.push_back(curr_option);
+                p_operations.emplace_back(curr_option);
                 parse_state = ParseState::GET_OPERAND;
             }
             break;
@@ -99,7 +99,7 @@ void CLAParser::parse_get_option(const CLAToken& p_token, std::string& p_utility
             WBE_DEBUG_ASSERT(p_token.value.size() >= 2);
             WBE_DEBUG_ASSERT(p_token.value.rfind("--", 0) == 0);
             curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value.substr(2), false);
-            p_operations.push_back(curr_option);
+            p_operations.emplace_back(curr_option);
             parse_state = ParseState::GET_OPERAND;
             break;
         default:
@@ -125,4 +125,4 @@ void CLAParser::parse_get_operand(const CLAToken& p_token, std::string& p_utilit
     }
 }
 
-}
+} // namespace WhiteBirdEngine

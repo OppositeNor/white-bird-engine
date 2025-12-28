@@ -22,7 +22,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "glm/fwd.hpp"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
@@ -232,11 +231,12 @@ protected:
      *
      * @param p_render_pass The render pass to begin.
      * @param p_framebuffer The framebuffer to get render pass begin info from.
+     * @param p_clear_value The clear value to use.
      * @return The render pass begin info.
      */
     VkRenderPassBeginInfo get_render_pass_begin_info(Ref<const RORenderPassVK> p_render_pass,
                                                      Ref<const ROFramebufferVK> p_framebuffer,
-                                                     const glm::vec4& p_clear_color = glm::vec4(0.0, 0.0, 0.0, 1.0)) const;
+                                                     VkClearValue& p_clear_value) const;
 };
 
 /**

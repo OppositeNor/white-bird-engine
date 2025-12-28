@@ -34,7 +34,7 @@ class EngineConfig;
 class CLAParser {
 public:
     CLAParser() = default;
-    ~CLAParser() {}
+    ~CLAParser() = default;
     CLAParser(const CLAParser&) = default;
     CLAParser(CLAParser&&) = default;
     CLAParser& operator=(const CLAParser&) = default;
@@ -55,7 +55,7 @@ private:
         GET_ROOT_OPERAND,
         GET_OPTION,
         GET_OPERAND
-    } parse_state;
+    } parse_state = ParseState::START;
 
     Ref<CLAASTNodeOperation> curr_option = MEM_NULL;
 
@@ -66,6 +66,6 @@ private:
     void parse_get_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif
