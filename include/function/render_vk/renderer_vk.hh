@@ -184,7 +184,7 @@ public:
     }
 
 private:
-    static constexpr size_t STAGING_BUFFER_SIZE = WBE_KiB(4);
+    static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
     template <typename T>

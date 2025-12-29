@@ -45,7 +45,7 @@ void ApplicationGame::init() {
     logic_delta.store(0.0001, std::memory_order_seq_cst);
 
     render_job_buffer = make_ref<JobBufferRingSPSC<JobRender>>(global_allocator(), global_allocator(), 64);
-    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(0.6));
+    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(1));
     if (game_config.render_api == "vulkan") {
         renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), render_job_buffer);
     }

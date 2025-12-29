@@ -127,10 +127,10 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
 }
 
 void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size) { // NOLINT
-    size_t dst_offset = reinterpret_cast<uintptr_t>(p_data) - reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
+    size_t src_offset = reinterpret_cast<uintptr_t>(p_data) - reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
     VkBufferCopy copy_region{};
-    copy_region.srcOffset = 0;
-    copy_region.dstOffset = dst_offset;
+    copy_region.srcOffset = src_offset;
+    copy_region.dstOffset = 0;
     copy_region.size = p_size;
     RendererVK::get_singleton()->add_pre_execute_task(
         [src_buffer = p_buffer, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
