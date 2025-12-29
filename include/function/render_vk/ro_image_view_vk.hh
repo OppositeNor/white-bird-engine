@@ -110,7 +110,6 @@ private:
 
     void init(const Builder& p_builder);
 };
-
 } // namespace WhiteBirdEngine
 
 #endif

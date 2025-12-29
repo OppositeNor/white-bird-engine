@@ -659,7 +659,6 @@ private:
 
     static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);
 };
-
 } // namespace WhiteBirdEngine
 
 #endif

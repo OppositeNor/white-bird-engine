@@ -41,4 +41,22 @@ struct Vertex3DTexturedInput {
     [[vk::location(4)]] float2 uv;
 };
 
+/**
+ * @brief Model, view, projection buffer structure.
+ */
+struct MVPMatrices {
+    /**
+     * @brief The model matrix.
+     */
+    float4x4 model;
+    /**
+     * @brief The view matrix.
+     */
+    float4x4 view;
+    /**
+     * @brief The projection matrix.
+     */
+    float4x4 proj;
+};
+
 #endif

@@ -19,6 +19,7 @@
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/renderer.hh"
+#include "glm/fwd.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -137,6 +138,24 @@ constexpr std::array<VkVertexInputAttributeDescription, 5> VERTEX_3D_TEXTURED_IN
     }
 };
 
+/**
+ * @class MVPMatrices
+ * @brief Model, view, projection buffer structure.
+ */
+struct MVPMatrices {
+    /**
+     * @brief The model matrix.
+     */
+    glm::mat4 model;
+    /**
+     * @brief The view matrix.
+     */
+    glm::mat4 view;
+    /**
+     * @brief The projection matrix.
+     */
+    glm::mat4 proj;
+};
 } // namespace WhiteBirdEngine
 
 #endif

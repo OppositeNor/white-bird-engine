@@ -102,7 +102,6 @@ private:
     const BaseRenderDataVK* render_data;
     bool is_binary;
 };
-
 } // namespace WhiteBirdEngine
 
 #endif

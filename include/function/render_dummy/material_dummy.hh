@@ -31,7 +31,6 @@ public:
         return MEM_NULL;
     }
 };
-
 } // namespace WhiteBirdEngine
 
 #endif

@@ -157,7 +157,6 @@ private:
     VkFramebuffer framebuffer;
     ExposedFields exposed_fields;
 };
-
 } // namespace WhiteBirdEngine
 
 #endif

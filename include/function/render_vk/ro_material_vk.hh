@@ -20,9 +20,9 @@ namespace WhiteBirdEngine {
 
 class WBE_META(WBE_RENDER_OBJECT) ROMaterialVK : public RenderObjectVK {
 public:
-    // TODO: implement ROMaterialVK
-};
 
+    void bind();
+};
 }
 
 #endif

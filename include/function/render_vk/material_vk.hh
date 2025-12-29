@@ -33,8 +33,6 @@ public:
         return MEM_NULL; // TODO
     }
 };
-
-
 } // namespace WhiteBirdEngine
 
 #endif
