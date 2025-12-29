@@ -126,6 +126,19 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
     update_buffer(p_data, 0, 0, p_data->exposed_fields.buffer_size);
 }
 
+void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size) { // NOLINT
+    size_t dst_offset = reinterpret_cast<uintptr_t>(p_data) - reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
+    VkBufferCopy copy_region{};
+    copy_region.srcOffset = 0;
+    copy_region.dstOffset = dst_offset;
+    copy_region.size = p_size;
+    RendererVK::get_singleton()->add_pre_execute_task(
+        [src_buffer = p_buffer, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
+            vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
+        }
+    );
+}
+
 VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
     VkBufferMemoryBarrier2 result{};
     result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;

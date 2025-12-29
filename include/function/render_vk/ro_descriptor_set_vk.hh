@@ -12,17 +12,23 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RO_MATERIAL_VK_HH
-#define WBE_FILE_RO_MATERIAL_VK_HH
+#ifndef WBE_RO_DESCRIPTOR_SET_HH
+#define WBE_RO_DESCRIPTOR_SET_HH
 
 #include "function/render_vk/render_object_vk.hh"
+#include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-class WBE_META(WBE_RENDER_OBJECT) ROMaterialVK : public RenderObjectVK {
+/**
+ * @class RODescriptorSetVK
+ * @brief Descriptor set
+ *
+ */
+class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetVK final : public RenderObjectVK {
 public:
 
-    void bind();
 };
-}
+
+} // namespace WhiteBirdEngine
 
 #endif

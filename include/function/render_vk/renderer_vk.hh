@@ -34,6 +34,7 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "global/stl_allocator.hh"
+#include "utils/defs.hh"
 
 #include <SDL.h>
 #include <array>
@@ -183,6 +184,7 @@ public:
     }
 
 private:
+    static constexpr size_t STAGING_BUFFER_SIZE = WBE_KiB(4);
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
     template <typename T>
@@ -322,6 +324,8 @@ private:
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // Framebuffers in the swap chain.
         Vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
+        // The staging buffer for data transfer.
+        Ref<ROStagingBufferVK> staging_buffer;
         // The swap chain image resource.
         Ref<RendResVK> swap_chain_framebuffer_resource;
         // The base graphics pipeline resource.

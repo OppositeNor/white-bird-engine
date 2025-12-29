@@ -19,6 +19,7 @@
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -207,6 +208,14 @@ public:
      * @param p_data The buffer object to copy data from.
      */
     void update_buffer(Ref<ROBufferVK> p_data);
+
+    /**
+     * @brief Update the buffer from a staging buffer.
+     *
+     * @param p_buffer The staging buffer to retrieve data.
+     * @param p_data The data to fill in.
+     */
+    void update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
 
     const ExposedFields& fields() const {
         return exposed_fields;

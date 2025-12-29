@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <functional>
 #include <map>
@@ -162,7 +163,8 @@ void RendererVK::tick(double p_delta) {
 
 template <typename T>
 static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, DeviceDomain p_domain,
-                          Ref<ROBufferVK>& p_buffer, const Vector<T>& p_from_buffer, VkBufferUsageFlags p_buffer_usage) {
+                          Ref<ROBufferVK>& p_buffer, const Vector<T>& p_from_buffer, VkBufferUsageFlags p_buffer_usage,
+                          Ref<ROStagingBufferVK> p_staging_buffer) {
     size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
     if (p_buffer == MEM_NULL || size_in_bytes > p_buffer->fields().buffer_size) {
         // If res not initialized, or size exceeds buffer capacity, create a new buffer.
@@ -183,9 +185,9 @@ static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* 
             temp_buffer_builder.set_domain(DeviceDomain::HOST)
                 .add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
                 .set_size(size_in_bytes);
-            auto temp_buffer = make_ref<ROBufferVK>(p_allocator, p_render_data, temp_buffer_builder);
-            temp_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
-            p_buffer->update_buffer(temp_buffer, size_in_bytes);
+            void* data = p_staging_buffer->allocate(size_in_bytes);
+            memcpy(data, p_from_buffer.data(), size_in_bytes);
+            p_buffer->update_buffer(p_staging_buffer, data, size_in_bytes);
         } break;
     }
 }
@@ -195,21 +197,21 @@ void RendererVK::update_static_opaque_triangles() {
     const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
     auto vertex_buffer = render_objects->static_opaque_triangles_buffer_vertices_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, vertex_buffer, static_opaque_triangles_vertices,
-                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_vertices_resource->res = vertex_buffer;
 
     // Indices
     const auto& static_opaque_triangles_indices = render_database->get_static_opaque_triangles_info().indices;
     auto index_buffer = render_objects->static_opaque_triangles_buffer_indices_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, index_buffer, static_opaque_triangles_indices,
-                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_indices_resource->res = index_buffer;
 
     // Object IDs
     const auto& static_opaque_triangles_obj_ids = render_database->get_static_opaque_triangles_info().obj_id;
     auto obj_ids_buffer = render_objects->static_opaque_triangles_buffer_obj_ids_resource->res.dynamic_cast_ref<ROBufferVK>();
     update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, obj_ids_buffer, static_opaque_triangles_obj_ids,
-                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_obj_ids_resource->res = obj_ids_buffer;
 }
 
@@ -348,6 +350,9 @@ void RendererVK::init_swap_chain_framebuffers() {
 }
 
 void RendererVK::setup_render_resource() {
+    ROStagingBufferVK::Builder staging_buffer_builder;
+    staging_buffer_builder.set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT).set_size(STAGING_BUFFER_SIZE);
+    render_objects->staging_buffer = make_ref<ROStagingBufferVK>(allocator, &base_render_data, staging_buffer_builder);
     // Setup swap_chain_framebuffer_resource.
     setup_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, TypeUUID<ROFramebufferVK>::UUID,
                    render_objects->swap_chain_framebuffer_resource, MEM_NULL);
