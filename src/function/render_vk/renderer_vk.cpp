@@ -258,6 +258,7 @@ void RendererVK::terminate() {
     for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
+    vkDestroyDescriptorPool(logical_device, descriptor_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -284,6 +285,7 @@ void RendererVK::init_vulkan() {
     create_device();
     create_swap_chain();
     create_command_pools();
+    create_descriptor_pool();
     create_async_objects();
 }
 
@@ -318,6 +320,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
+    base_render_data.descriptor_pool = descriptor_pool;
     base_render_data.current_frame = 1;
     if (in_flight_fences.size() > 0) {
         base_render_data.in_flight_fence = in_flight_fences[0];
@@ -558,6 +561,23 @@ void RendererVK::create_command_pools() {
     compute_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
     if (vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute command pool.");
+    }
+}
+
+void RendererVK::create_descriptor_pool() {
+    // uniform buffer descriptor pool
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount = MAX_UNIFORM_DESCRIPTOR_COUNT;
+
+    VkDescriptorPoolCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    create_info.maxSets = MAX_DESCRIPTOR_SET_COUNT;
+    create_info.poolSizeCount = 1;
+    create_info.pPoolSizes = &pool_size;
+    if (vkCreateDescriptorPool(logical_device, &create_info, get_allocation_callbacks(), &descriptor_pool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor pool.");
     }
 }
 

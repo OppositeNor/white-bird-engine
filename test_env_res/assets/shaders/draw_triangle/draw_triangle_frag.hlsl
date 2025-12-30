@@ -16,6 +16,6 @@
 #include "draw_triangle/draw_triangle_utils.hlslh"
 
 float4 main(VSOutput p_input) : SV_Target {
-    return float4(1.0, 0.0, 0.0, 1.0);
+    return float4(p_input.uv, 0.0, 1.0);
 }
 

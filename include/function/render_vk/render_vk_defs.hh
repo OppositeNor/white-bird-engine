@@ -62,6 +62,8 @@ struct BaseRenderDataVK {
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
     // Compute command pool.
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
+    // Descriptor pool.
+    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence = VK_NULL_HANDLE;

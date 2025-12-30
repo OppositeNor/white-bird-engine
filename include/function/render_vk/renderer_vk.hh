@@ -185,6 +185,8 @@ public:
 
 private:
     static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
+    static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
+    static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
     Ref<JobBufferRingSPSC<JobRender>> job_buffer;
 
     template <typename T>
@@ -233,6 +235,8 @@ private:
 
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
+
+    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
@@ -360,6 +364,7 @@ private:
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
+    void create_descriptor_pool();
     void create_async_objects();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
