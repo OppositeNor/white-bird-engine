@@ -17,9 +17,12 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/reflection/reflection_defs.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_object.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <set>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -28,6 +31,8 @@ namespace WhiteBirdEngine {
 using RendResID = HashCode;
 using RendResTID = HashCode;
 using RendTaskID = HashCode;
+
+WBE_LABEL(RT_UNDEFINED, WBE_RENDER_TASK);
 
 /**
  * @class RendResInfo
@@ -68,6 +73,16 @@ struct RenderTask {
  *
  */
 struct RendPipelineInfo {
+
+    /**
+     * @class Builder
+     * @brief The builder for RendPipelineInfo.
+     *
+     */
+    struct Builder {
+
+    };
+
     // The root task of the pipeline.
     Ref<struct RendTaskInfo> root_task;
     /**
@@ -100,19 +115,125 @@ struct RendPipelineInfo {
  *
  */
 struct RendTaskInfo {
-    // The ID of this render task. Each render task should have a unique task_id.
-    RendTaskID task_id;
 
+    /**
+     * @class Builder
+     * @brief Builder for RendTaskInfo
+     *
+     */
+    struct Builder {
+        // The ID of this render task. Each render task should have a unique task_id.
+        Required<RendTaskID> task_id;
+        // Previous render task.
+        std::set<Ref<RendTaskInfo>> prev;
+        // Next render tasks.
+        std::set<Ref<RendTaskInfo>> next;
+        // Required resources.
+        std::vector<RendResInfo> req_res;
+        // The render task instance.
+        Ref<class RenderTaskFactory> render_task_factory = MEM_NULL;
+
+        /**
+         * @brief Set the task ID.
+         *
+         * @param p_task_id The task ID to set to.
+         * @return *this.
+         */
+        Builder& set_task_id(RendTaskID p_task_id) {
+            task_id = p_task_id;
+            return *this;
+        }
+        
+        /**
+         * @brief Add a previous task.
+         *
+         * @param p_prev_task The previous task.
+         * @return *this.
+         */
+        Builder& add_prev(Ref<RendTaskInfo> p_prev_task) {
+            prev.insert(p_prev_task);
+            return *this;
+        }
+
+        /**
+         * @brief Add a next task.
+         *
+         * @param p_next_task The next task.
+         * @return *this.
+         */
+        Builder& add_next(Ref<RendTaskInfo> p_next_task) {
+            next.insert(p_next_task);
+            return *this;
+        }
+
+        /**
+         * @brief Add a required resource of the task.
+         *
+         * @param p_res_info The resource information.
+         * @return *this.
+         */
+        Builder& add_req_res(RendResInfo p_res_info) {
+            req_res.push_back(p_res_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add a required resource of the task.
+         *
+         * @param p_res_id The resource ID.
+         * @param p_type_id The resource type ID.
+         * @return *this.
+         */
+        Builder& add_req_res(RendResID p_res_id, RendResTID p_type_id) {
+            req_res.push_back({p_res_id, p_type_id});
+            return *this;
+        }
+
+        /**
+         * @brief Set the render task factory.
+         *
+         * @param p_factory The render task factory.
+         * @return *this.
+         */
+        Builder& set_render_task_factory(Ref<RenderTaskFactory> p_factory) {
+            render_task_factory = p_factory;
+            return *this;
+        }
+
+        Ref<RendTaskInfo> build(RenderAllocator* p_allocator) const {
+            auto result = make_ref<RendTaskInfo>(p_allocator);
+            result->task_id = WBE_REQUIRED(task_id);
+
+            // Resolve previous tasks
+            result->prev.reserve(prev.size());
+            for (auto prev_task : prev) {
+                result->prev.push_back(prev_task->task_id);
+                prev_task->next.emplace_back(result);
+            }
+
+            // Resolve next tasks
+            result->next.reserve(next.size());
+            for (auto next_task : next) {
+                result->next.push_back(next_task);
+                next_task->prev.push_back(result->task_id);
+            }
+
+            result->req_res = req_res; // Considering this builder might be reused, we are not moving the data but copying instead.
+            result->render_task_factory = WBE_REQUIRES_VALID(render_task_factory);
+            return result;
+        }
+    };
+
+    // The ID of this render task. Each render task should have a unique task_id.
+    RendTaskID task_id = RT_UNDEFINED;
     // Previous render task.
     std::vector<RendTaskID> prev;
     // Next render tasks.
     std::vector<Ref<RendTaskInfo>> next;
-
     // Required resources.
     std::vector<RendResInfo> req_res;
-
     // The render task instance.
-    Ref<class RenderTaskFactory> render_task_factory = MEM_NULL;
+    Ref<RenderTaskFactory> render_task_factory = MEM_NULL;
 };
 
 /**

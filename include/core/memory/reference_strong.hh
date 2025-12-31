@@ -171,30 +171,6 @@ public:
         return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
-    T* operator->() {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
-    }
-
-    const T* operator->() const {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
-    }
-
-    T& operator*() {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<T*>(control_block->allocator->get(control_block->mem_id));
-    }
-
-    const T& operator*() const {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
-    }
-
     /**
      * @brief Get the resource pointer.
      *
@@ -240,6 +216,38 @@ public:
         return Ref<T1, AllocType>(reinterpret_cast<typename Ref<T1, AllocType>::ControlBlock*>(control_block));
     }
 
+    /**
+     * @brief Is the reference NULL.
+     *
+     * @return true if the reference is NULL, false otherwise.
+     */
+    bool is_null() const {
+        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+    }
+
+    T* operator->() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
+    const T* operator->() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
+    T& operator*() {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return *static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+    }
+
+    const T& operator*() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
+    }
 
     template <typename T1, typename AllocType1>
     bool operator==(const Ref<T1, AllocType1>& p_other) const {
@@ -269,13 +277,18 @@ public:
         return !(*this == p_obj);
     }
 
-    /**
-     * @brief Is the reference NULL.
-     *
-     * @return true if the reference is NULL, false otherwise.
-     */
-    bool is_null() const {
-        return control_block == nullptr || control_block->mem_id == MEM_NULL;
+    int operator<=>(Ref<T> p_obj) const {
+        if (is_null()) {
+            if (p_obj.is_null()) {
+                return 0;
+            }
+            return -1;
+        }
+        if (p_obj.is_null()) {
+            return 1;
+        }
+        // Compare based on the control block.
+        return static_cast<int>(std::hash<ControlBlock*>{}(control_block)) - std::hash<ControlBlock*>{}(p_obj.control_block);
     }
 
 private:

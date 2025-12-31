@@ -389,7 +389,7 @@ private:
     Vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info);
     void compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipelineInfo& p_entered_pipeline_info, Ref<PipelineInfo> p_pipeline_info);
     void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
-                           std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map);
+                           std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, const std::vector<RendTaskID>*>>& p_render_task_map);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
     void fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
     void register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::Resource> p_pipeline_resources);

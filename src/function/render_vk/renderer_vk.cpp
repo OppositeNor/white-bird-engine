@@ -914,8 +914,8 @@ RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
     if (p_pipeline_info.root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
-    if (p_pipeline_info.root_task->prev.size() != 1 || p_pipeline_info.root_task->prev[0] != RT_PRE_EXECUTE_PIPELINE_VK) {
-        throw std::runtime_error("The first task of the render pipeline must have only RT_PREPARE_SWAP_CHAIN_IMAGE as it's previous task.");
+    if (p_pipeline_info.root_task->prev.size() != 0) {
+        throw std::runtime_error("The first task of the render pipeline must not have any previous tasks.");
     }
     Vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);
 
@@ -934,7 +934,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipeline
     WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline_info != MEM_NULL);
     // Using bfs, as the order where the render task will be pushed to the queue.
-    std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>> render_task_map;
+    std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, const std::vector<RendTaskID>*>> render_task_map;
     // Setup image available semaphores
     auto image_available_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
     p_pipeline_info->image_available_semaphore = image_available_semaphore;
@@ -954,7 +954,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipeline
     // Setup other properties according to the constructed graph.
     uint64_t max_depth = 0;
     for (auto rend_task : p_pipeline_info->task_infos) {
-        auto* dep_tasks = render_task_map[rend_task.task_id].second;
+        const auto* dep_tasks = render_task_map[rend_task.task_id].second;
         for (auto dep_task_id : *dep_tasks) {
             // Setup tasks semaphore dependencies.
             auto dep_task = render_task_map[dep_task_id].first;
@@ -974,7 +974,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipeline
 }
 
 void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
-                                      std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, std::vector<RendTaskID>*>>& p_render_task_map) {
+                                      std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, const std::vector<RendTaskID>*>>& p_render_task_map) {
     WBE_DEBUG_ASSERT(p_root_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline_info != MEM_NULL);
     // Process the tasks with bfs, which will also be the order of the tasks that will be sumitted to the queue.
@@ -1010,8 +1010,15 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
         // Push the node to the pipeline.
         p_pipeline_info->task_infos.push_back(task_info);
 
-        // Keep track on the tasks' dependencies.
-        p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+        static const std::vector<RendTaskID> root_prev_task = {RT_PRE_EXECUTE_PIPELINE_VK};
+        if (curr == p_root_task) {
+            // If it is the root task, the previous task should be RT_PRE_EXECUTE_PIPELINE_VK.
+            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &root_prev_task);
+        }
+        else {
+            // Keep track on the tasks' dependencies.
+            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+        }
         // Initializes semaphore. If more than one task depend on this task, create a timeline semaphore. Otherwise use a binary semaphore.
         task_info.render_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, curr->next.size() <= 1);
         if (curr->next.empty()) {

@@ -26,7 +26,9 @@ namespace WhiteBirdEngine {
  */
 class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetVK final : public RenderObjectVK {
 public:
+    struct Builder {
 
+    };
 };
 
 } // namespace WhiteBirdEngine

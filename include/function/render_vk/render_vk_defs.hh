@@ -163,6 +163,7 @@ struct MVPMatrices {
      */
     glm::mat4 proj;
 };
+
 } // namespace WhiteBirdEngine
 
 #endif
