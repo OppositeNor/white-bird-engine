@@ -62,6 +62,13 @@ public:
      * @param p_builder Configuration builder.
      */
     ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
+    /**
+     * @brief Constructor from resource ID.
+     *
+     * @param p_base_render_data The base render data.
+     * @param p_resource_id The resource ID.
+     */
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id);
 
     /**
      * @brief Get the shader module.

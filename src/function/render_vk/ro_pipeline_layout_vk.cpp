@@ -67,6 +67,16 @@ ROPipelineLayoutVK::ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, co
     init(p_builder);
 }
 
+ROPipelineLayoutVK::ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data)
+    : RenderObjectVK(p_render_data), exposed_fields(p_render_data) {
+    if (p_render_data == nullptr) {
+        throw std::runtime_error("Render data is nullptr.");
+    }
+    // Use default builder
+    Builder builder;
+    init(builder);
+}
+
 ROPipelineLayoutVK::~ROPipelineLayoutVK() {
     render_data->register_delayed_call(
         [render_data = render_data, pipeline_layout = pipeline_layout] (){

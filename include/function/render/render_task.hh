@@ -73,18 +73,6 @@ struct RenderTask {
  *
  */
 struct RendPipelineInfo {
-
-    /**
-     * @class Builder
-     * @brief The builder for RendPipelineInfo.
-     *
-     */
-    struct Builder {
-
-    };
-
-    // The root task of the pipeline.
-    Ref<struct RendTaskInfo> root_task;
     /**
      * @class Resource
      * @brief Represents a resource.
@@ -105,8 +93,47 @@ struct RendPipelineInfo {
         // registered resource with the same res_id, res should not be MEM_NULL.
         Ref<RenderObject> res = MEM_NULL;
     };
+
+    // The root task of the pipeline.
+    Ref<struct RendTaskInfo> root_task;
     // All the resources used in the render pipeline.
     std::vector<Resource> resources;
+
+    /**
+     * @brief Set the root task of the pipeline.
+     *
+     * @param p_root_task The root task.
+     * @return *this.
+     */
+    RendPipelineInfo& set_root_task(Ref<RendTaskInfo> p_root_task) {
+        root_task = p_root_task;
+        return *this;
+    }
+
+    /**
+     * @brief Add a resource used in the render pipeline.
+     *
+     * @param p_resource The resource to add.
+     * @return *this.
+     */
+    RendPipelineInfo& add_resource(Resource p_resource) {
+        resources.push_back(p_resource);
+        return *this;
+    }
+
+    /**
+     * @brief Add a resource used in the render pipeline.
+     *
+     * @param p_res_id The resource ID.
+     * @param p_type_id The resource type ID.
+     * @param p_res The resource instance.
+     * @param p_is_weak Is the resource a weak binding.
+     * @return *this.
+     */
+    RendPipelineInfo& add_resource(RendResID p_res_id, RendResTID p_type_id, Ref<RenderObject> p_res, bool p_is_weak = false) {
+        resources.push_back({p_res_id, p_type_id, p_is_weak, p_res});
+        return *this;
+    }
 };
 
 /**

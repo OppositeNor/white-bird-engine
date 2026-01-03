@@ -79,6 +79,15 @@ public:
                 fragment_shader = { .entry_function = p_entry_function, .shader = p_shader };
                 return *this;
             }
+
+            ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
+                                       Ref<ROShaderVK> p_fragment_shader,
+                                       const std::string& p_vertex_entry_function = "main",
+                                       const std::string& p_fragment_entry_function = "main") {
+                set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
+                set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
+                return *this;
+            }
         };
         // Vertex input configurations.
         struct VertexInputConfig {

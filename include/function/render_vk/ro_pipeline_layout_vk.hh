@@ -64,6 +64,11 @@ public:
     ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
+     * @brief Constructor with default empty layout.
+     */
+    ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data);
+
+    /**
      * @brief Get the vulkan pipeline layout instance.
      *
      * @return The vulkan pipeline layout instance.

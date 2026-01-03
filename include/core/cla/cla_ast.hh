@@ -16,6 +16,7 @@
 #define WBE_FILE_CLA_AST_HH
 
 #include "core/memory/reference_strong.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -31,7 +32,7 @@ class CLAASTVisitor;
 class CLAASTNode {
 public:
     CLAASTNode() = default;
-    virtual ~CLAASTNode() {}
+    virtual ~CLAASTNode() = default;
     CLAASTNode(const CLAASTNode&) = delete;
     CLAASTNode(CLAASTNode&&) = delete;
     CLAASTNode operator=(const CLAASTNode&) = delete;
@@ -59,7 +60,8 @@ public:
      */
     CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
         : utility_name(p_utility_name), operations(std::move(p_operations)) {}
-    virtual ~CLAASTNodeRoot() override {}
+    virtual ~CLAASTNodeRoot() override = default;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRoot);
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -112,7 +114,9 @@ public:
     CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
         : is_short(p_is_short), operation_name(p_operation_name), arguments(std::move(p_arguments)) {}
 
-    virtual ~CLAASTNodeOperation() override {}
+    virtual ~CLAASTNodeOperation() override = default;
+
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeOperation);
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -186,7 +190,9 @@ public:
     CLAASTNodeRootOperand(const std::string& p_operand_name)
         : operand_name(p_operand_name) {}
 
-    virtual ~CLAASTNodeRootOperand() override {}
+    virtual ~CLAASTNodeRootOperand() override = default;
+
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRootOperand);
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -203,6 +209,6 @@ private:
     std::string operand_name;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif
