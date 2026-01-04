@@ -38,8 +38,7 @@ VkDescriptorSet RODescriptorSetVK::Builder::build(const BaseRenderDataVK* p_rend
 }
 
 RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data), descriptor_set_layouts(p_render_data->allocator), bound_buffers(p_render_data->allocator),
-      bound_image_views(p_render_data->allocator) {
+    : RenderObjectVK(p_render_data), descriptor_set_layouts(p_render_data->allocator), bound_objects(p_render_data->allocator) {
     descriptor_set = p_builder.build(p_render_data);
     descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
     for (const auto& layout : p_builder.descriptor_set_layouts) {
@@ -57,19 +56,39 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.dstSet = descriptor_set;
     write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
     write_info.dstArrayElement = 0;
-    write_info.descriptorCount = 1;
-    VkDescriptorBufferInfo buffer_info{};
-    if (p_writer.buffer_info.buffer != MEM_NULL) {
-        buffer_info.buffer = p_writer.buffer_info.buffer->get_buffer();
-        buffer_info.offset = p_writer.buffer_info.offset;
-        buffer_info.range = p_writer.buffer_info.range;
-        write_info.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write_info.pBufferInfo = &buffer_info;
-        bound_buffers[WBE_REQUIRED(p_writer.binding)] = p_writer.buffer_info.buffer;
-        bound_image_views.erase(WBE_REQUIRED(p_writer.binding));
+    Vector<VkDescriptorBufferInfo> buffer_infos(render_data->allocator);
+    prepare_binding(WBE_REQUIRED(p_writer.binding));
+    if (!p_writer.buffer_infos.empty()) {
+        write_info.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        for (const auto& buffer_info : p_writer.buffer_infos) {
+            VkDescriptorBufferInfo vk_buffer_info{};
+            vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
+            vk_buffer_info.offset = buffer_info.offset;
+            vk_buffer_info.range = buffer_info.range;
+            buffer_infos.push_back(vk_buffer_info);
+            // Keep a reference to the buffer to prevent it from being destroyed.
+            auto bound_object_it = bound_objects.find(WBE_REQUIRED(p_writer.binding));
+            bound_object_it->second.emplace_back(buffer_info.buffer);
+        }
+        write_info.descriptorCount = buffer_infos.size();
+        write_info.pBufferInfo = buffer_infos.data();
     }
     // TODO: Image view
-    vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
+    // TODO: Texel buffer view
+}
+
+void RODescriptorSetVK::prepare_binding(uint32_t p_binding) {
+    // Find the descriptor type that was originally bound on this binding point.
+    auto bound_object_it = bound_objects.find(p_binding);
+    if (bound_object_it == bound_objects.end()) {
+        // If none was bound, create a new entry.
+        bound_objects.insert({p_binding, Vector<Ref<RenderObjectVK>>(render_data->allocator)});
+        bound_object_it = bound_objects.find(p_binding);
+    }
+    else {
+        // Clear previously bound objects.
+        bound_object_it->second.clear();
+    }
 }
 
 } // namespace WhiteBirdEngine

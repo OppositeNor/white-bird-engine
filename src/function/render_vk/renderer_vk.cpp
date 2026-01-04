@@ -295,7 +295,7 @@ void RendererVK::setup_resource(RendResID p_res_id, RendResTID p_res_type, Ref<R
     p_res->res_type_id = p_res_type;
     p_res->res_id = p_res_id;
     p_res->res = p_default_object;
-    render_resources.insert(std::pair(p_res_id, p_res));
+    render_resources.insert({p_res_id, p_res});
 }
 
 void RendererVK::recreate_swap_chain() {
@@ -947,7 +947,7 @@ void RendererVK::compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipeline
     start_task->task_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
     p_pipeline_info->task_infos.push_back({.task_id = RT_PRE_EXECUTE_PIPELINE_VK, .render_task = start_task});
     std::vector<RendTaskID> dummy;
-    render_task_map.insert(std::pair(RT_PRE_EXECUTE_PIPELINE_VK, std::pair(start_task, &dummy)));
+    render_task_map.insert({RT_PRE_EXECUTE_PIPELINE_VK, {start_task, &dummy}});
     // Compile the render graph starting from the root task.
     compile_render_graph(p_root_task, p_pipeline_info, render_task_map);
 
@@ -1013,11 +1013,11 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
         static const std::vector<RendTaskID> root_prev_task = {RT_PRE_EXECUTE_PIPELINE_VK};
         if (curr == p_root_task) {
             // If it is the root task, the previous task should be RT_PRE_EXECUTE_PIPELINE_VK.
-            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &root_prev_task);
+            p_render_task_map.insert({task_info.task_id, {task_info.render_task, &root_prev_task}});
         }
         else {
             // Keep track on the tasks' dependencies.
-            p_render_task_map[task_info.task_id] = std::pair(task_info.render_task, &(curr->prev));
+            p_render_task_map.insert({task_info.task_id, {task_info.render_task, &(curr->prev)}});
         }
         // Initializes semaphore. If more than one task depend on this task, create a timeline semaphore. Otherwise use a binary semaphore.
         task_info.render_task->task_semaphore = make_ref<SemaphoreVK>(base_render_data.allocator, &base_render_data, curr->next.size() <= 1);

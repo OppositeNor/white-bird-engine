@@ -52,8 +52,8 @@ public:
         {% for label in metadata.labels %}
         {% if label.attribute | select("in", dynamic_labels) | list | length > 0  %}
         dynamic_labels.push_back("{{ label.name }}");
-        label_to_name.insert(std::pair(static_hash("{{ label.name }}"), std::string("{{ label.name }}")));
-        name_to_label.insert(std::pair(std::string("{{ label.name }}"), static_hash("{{ label.name }}")));
+        label_to_name.insert({static_hash("{{ label.name }}"), std::string("{{ label.name }}")});
+        name_to_label.insert({std::string("{{ label.name }}"), static_hash("{{ label.name }}")});
         {% endif %}
         {% endfor %}
     }
@@ -88,7 +88,7 @@ public:
      */
     void register_label(const std::string& p_name) {
         dynamic_labels.push_back(p_name);
-        label_to_name.insert(std::pair(dynam_hash(p_name), p_name));
+        label_to_name.insert({dynam_hash(p_name), p_name});
     }
 
     /**

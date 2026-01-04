@@ -65,7 +65,7 @@ void RenderDatabase::set_opaque_triangles_linear(
             // If not registered before, register.
             p_triangles_info.materials.push_back({.material = material_factory->create(material)});
             MaterialMeshInfo info = {.submeshes = Vector<RUSubmesh3D*>(allocator)};
-            registered_material_index.insert(std::pair(material.get(), material_mesh_infos.size()));
+            registered_material_index.insert({material.get(), material_mesh_infos.size()});
             material_mesh_infos.push_back(info);
         }
         // Register the submeshes to the corresponding mesh.
