@@ -18,6 +18,7 @@
 #include "core/allocator/allocator.hh"
 #include "core/core_utils.hh"
 #include <deque>
+#include <map>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -157,13 +158,8 @@ using String = std::basic_string<char, std::char_traits<char>, STLAllocator<char
 template <typename T, typename AllocType = HeapAllocatorDefault>
 using Deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
 
-/**
- * @brief Short name for stl allocator that uses HeapAllocatorDefault.
- *
- * @tparam T 
- */
-template <typename T>
-using STLAllocatorPool = STLAllocator<T, HeapAllocatorDefault, false, true, false>;
+template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
+using Map = std::map<TKey, TVal, std::less<TKey>, STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
 
 } // namespace WhiteBirdEngine
 

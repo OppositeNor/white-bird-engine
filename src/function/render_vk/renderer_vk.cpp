@@ -59,7 +59,7 @@ RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>>
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), in_flight_fences(p_allocator),
-    base_render_data(p_allocator), activated_pipeline(p_allocator) {
+    base_render_data(p_allocator), pipelines(p_allocator), render_resources(p_allocator), activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     singleton = this;

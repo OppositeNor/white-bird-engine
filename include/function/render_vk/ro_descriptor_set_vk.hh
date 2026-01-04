@@ -15,9 +15,15 @@
 #ifndef WBE_RO_DESCRIPTOR_SET_HH
 #define WBE_RO_DESCRIPTOR_SET_HH
 
+#include "core/allocator/allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "global/stl_allocator.hh"
+#include "utils/utils.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -56,6 +62,45 @@ public:
         VkDescriptorSet build(const BaseRenderDataVK* p_render_data) const;
     };
 
+    /**
+     * @class Writer
+     * @brief Descriptor set writer.
+     *
+     */
+    struct Writer {
+        /**
+         * @class BufferInfo
+         * @brief Information about a buffer to write to the descriptor set.
+         *
+         */
+        struct BufferInfo {
+            /**
+             * @brief The buffer instance.
+             */
+            Ref<ROBufferVK> buffer = MEM_NULL;
+            /**
+             * @brief The offset in the buffer.
+             */
+            VkDeviceSize offset = 0;
+            /**
+             * @brief The range of the buffer.
+             */
+            VkDeviceSize range = VK_WHOLE_SIZE;
+        };
+
+        // TODO: Image info
+
+        /**
+         * @brief The buffer info to write.
+         */
+        BufferInfo buffer_info;
+        
+        /**
+         * @brief The binding to write to.
+         */
+        Required<uint32_t> binding;
+    };
+
     RODescriptorSetVK() = delete;
     virtual ~RODescriptorSetVK() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RODescriptorSetVK)
@@ -68,9 +113,14 @@ public:
      */
     RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
+    void write_descriptor_set(const Writer& p_writer);
+
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
     Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
+    // Keep references to bound resources to prevent them from being destroyed.
+    Map<uint32_t, Ref<ROBufferVK>> bound_buffers;
+    Map<uint32_t, Ref<ROImageViewVK>> bound_image_views;
 };
 
 } // namespace WhiteBirdEngine

@@ -46,7 +46,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -197,6 +196,8 @@ private:
     using HashSet = ::WhiteBirdEngine::HashSet<T, AllocType>;
     template <typename T>
     using Deque = ::WhiteBirdEngine::Deque<T, AllocType>;
+    template <typename TKey, typename TVal>
+    using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
     using String = ::WhiteBirdEngine::String<AllocType>;
 
     inline static RendererVK* singleton = nullptr;
@@ -308,10 +309,8 @@ private:
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
-    std::map<std::string, Vector<Ref<PipelineInfo>>> pipelines;
-    std::unordered_map<RendResID, RefWeak<RendResVK>> rend_res;
-    std::map<RendResID, RefWeak<RendResVK>> render_resources;
-
+    Map<std::string, Vector<Ref<PipelineInfo>>> pipelines;
+    Map<RendResID, RefWeak<RendResVK>> render_resources;
     Vector<Ref<PipelineInfo>> activated_pipeline;
 
     // Render objects for the renderer.

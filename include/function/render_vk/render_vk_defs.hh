@@ -164,6 +164,11 @@ struct MVPMatrices {
     glm::mat4 proj;
 };
 
+/**
+ * @brief The maximum number of descriptors per descriptor set.
+ */
+constexpr uint32_t MAX_DESCRIPTORS_PER_SET = 16;
+
 } // namespace WhiteBirdEngine
 
 #endif

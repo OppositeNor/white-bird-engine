@@ -95,7 +95,15 @@ public:
         return image_view;
     }
 
+    /**
+     * @class ExposedFields
+     * @brief Exposed fields of ROImageViewVK.
+     *
+     */
     struct ExposedFields {
+        /**
+         * @brief The source image.
+         */
         Ref<ROImageVK> image = MEM_NULL;
     };
 
