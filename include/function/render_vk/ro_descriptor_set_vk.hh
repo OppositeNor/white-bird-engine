@@ -87,18 +87,6 @@ public:
             VkDeviceSize range = VK_WHOLE_SIZE;
         };
 
-        /**
-         * @brief The type of the descriptor.
-         */
-        enum class Type {
-            // A buffer descriptor.
-            BUFFER,
-            // An image descriptor.
-            IMAGE,
-            // A texel buffer descriptor.
-            TEXEL_BUFFER,
-        };
-
         // TODO: Image info
 
         /**
