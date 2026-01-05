@@ -75,6 +75,7 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     }
     // TODO: Image view
     // TODO: Texel buffer view
+	vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
 }
 
 void RODescriptorSetVK::prepare_binding(uint32_t p_binding) {
