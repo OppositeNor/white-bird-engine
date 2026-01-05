@@ -118,7 +118,7 @@ public:
 
     ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROStagingBufferVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROStagingBufferVK);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROStagingBufferVK)
 
     /**
      * @brief Get the exposed fields.

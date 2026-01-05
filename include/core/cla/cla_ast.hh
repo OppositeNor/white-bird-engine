@@ -61,7 +61,7 @@ public:
     CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
         : utility_name(p_utility_name), operations(std::move(p_operations)) {}
     virtual ~CLAASTNodeRoot() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRoot);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRoot)
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -116,7 +116,7 @@ public:
 
     virtual ~CLAASTNodeOperation() override = default;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeOperation);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeOperation)
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -192,7 +192,7 @@ public:
 
     virtual ~CLAASTNodeRootOperand() override = default;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRootOperand);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRootOperand)
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
