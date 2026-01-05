@@ -141,6 +141,15 @@ public:
      */
     void write_descriptor_set(const Writer& p_writer);
 
+    /**
+     * @brief Get the descriptor set.
+     *
+     * @return The VkDescriptorSet instance.
+     */
+    VkDescriptorSet get_descriptor_set() const {
+        return descriptor_set;
+    }
+
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
     Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;

@@ -26,20 +26,10 @@ option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
 set(WBE_BINARY_DIR ${CMAKE_BINARY_DIR}/bin CACHE STRING "The binary output directory.")
 option(WBE_BUILD_SHARED "Should build shared library" ON)
 
-
-# Define output paths
+# Output pathes
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${WBE_BINARY_DIR}/libs)
 
-set(WBE_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/res)
-set(WBE_RESOURCE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res)
-
-set(WBE_CONFIG_DIR ${WBE_RESOURCE_DIR}/config)
-set(WBE_CONFIG_OUTPUT_DIR ${WBE_RESOURCE_OUTPUT_DIR}/config)
-
-set(WBE_METADATA_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/metadata_cache)
-
-set(WBE_TEST_ENV_DIR ${PROJECT_SOURCE_DIR}/test_env)
 set(WBE_BUILD_PLATFORM ${CMAKE_SYSTEM_NAME} CACHE STRING "Build platform.")
 
 if(WBE_BUILD_SHARED)
