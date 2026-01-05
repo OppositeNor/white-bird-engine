@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __CORE_UTILS_HH__
-#define __CORE_UTILS_HH__
+#ifndef WBE_FILE_CORE_UTILS_HH
+#define WBE_FILE_CORE_UTILS_HH
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
