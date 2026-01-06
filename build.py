@@ -55,7 +55,6 @@ def _get_cmake_command_from_info(build_info):
 def _gather_license():
     # Get white bird engine license
     shutil.copyfile(os.path.join(build_setup.root_dir, "LICENSE"), os.path.join(build_setup.licenses_output_dir, "white-bird-engine_LICENSE"))
-    shutil.copyfile(os.path.join(build_setup.root_dir, "NOTICE"), os.path.join(build_setup.licenses_output_dir, "white-bird-engine_NOTICE"))
     # Get licenses from dependencies
     deps_dir = Path(build_setup.dependencies_dir).resolve()
     output_dir = Path(build_setup.licenses_output_dir).resolve()
