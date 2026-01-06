@@ -180,7 +180,7 @@ public:
              * @return *this
              */
             VertexInputConfig& add_attributes(std::span<const VkVertexInputAttributeDescription> p_attributes) {
-                attributes.insert(attributes.end(), p_attributes.begin(), p_attributes.end());
+                attributes.append_range(p_attributes);
                 return *this;
             }
         };

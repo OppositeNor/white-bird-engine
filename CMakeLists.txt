@@ -13,7 +13,7 @@
 # limitations under the License.
 cmake_minimum_required(VERSION 3.20)
 
-project(WhiteBirdEngine)
+project(WhiteBirdEngine LANGUAGES C CXX)
 
 # Use C++ 23 standard
 set(CMAKE_CXX_STANDARD 23)
