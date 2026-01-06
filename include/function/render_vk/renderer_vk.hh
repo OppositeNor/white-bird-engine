@@ -311,6 +311,7 @@ private:
     QueueFamilyIndices queue_family_indices;
     Map<std::string, Vector<Ref<PipelineInfo>>> pipelines;
     Map<RendResID, RefWeak<RendResVK>> render_resources;
+    Map<RendResID, Vector<RefWeak<RendResVK>>> per_frame_in_flight_resource;
     Vector<Ref<PipelineInfo>> activated_pipeline;
 
     // Render objects for the renderer.
@@ -390,8 +391,10 @@ private:
     void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
                            std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, const std::vector<RendTaskID>*>>& p_render_task_map);
     Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
+    Vector<Ref<RendResVK>> get_per_frame_in_flight_rend_res(RendResID p_res, RendResTID p_type_id);
     void fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
     void register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::Resource> p_pipeline_resources);
+    void register_pfif_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::PFIFResource> p_pipeline_resources);
 
     int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
     uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;

@@ -46,6 +46,7 @@
 #include <format>
 #include <functional>
 #include <map>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -59,7 +60,8 @@ RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>>
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), in_flight_fences(p_allocator),
-    base_render_data(p_allocator), pipelines(p_allocator), render_resources(p_allocator), activated_pipeline(p_allocator) {
+    base_render_data(p_allocator), pipelines(p_allocator), render_resources(p_allocator), per_frame_in_flight_resource(p_allocator),
+    activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     singleton = this;
@@ -1034,12 +1036,37 @@ Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
         auto rend_res = make_ref<RendResVK>(allocator);
         rend_res->res_type_id = p_type_id;
         rend_res->res_id = p_res;
-        // TODO: initialize resource.
         rend_res->res = MEM_NULL;
         render_resources.insert({p_res, rend_res});
         return rend_res;
     }
+    WBE_DEBUG_ASSERT(iter->second.lock()->res_type_id == p_type_id);
     return iter->second.lock();
+}
+
+Vector<Ref<RendResVK>> RendererVK::get_per_frame_in_flight_rend_res(RendResID p_res, RendResTID p_type_id) {
+    auto iter = per_frame_in_flight_resource.find(p_res);
+    if (iter == per_frame_in_flight_resource.end()) {
+        // If not found, create a new array of resources.
+        Vector<RefWeak<RendResVK>> frame_resources(allocator);
+        frame_resources.reserve(frames_in_flight);
+        for (size_t i = 0; i < frames_in_flight; ++i) {
+            // For each frame in flight, create a resource reference.
+            auto rend_res = make_ref<RendResVK>(allocator);
+            rend_res->res_type_id = p_type_id;
+            rend_res->res_id = p_res;
+            rend_res->res = MEM_NULL;
+            frame_resources.emplace_back(rend_res);
+        }
+        per_frame_in_flight_resource.insert({p_res, std::move(frame_resources)});
+        iter = per_frame_in_flight_resource.find(p_res);
+    }
+    Vector<Ref<RendResVK>> result(allocator);
+    result.reserve(frames_in_flight);
+    for (auto& res : iter->second) {
+        result.push_back(res.lock());
+    }
+    return result;
 }
 
 void RendererVK::fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline) {
@@ -1079,8 +1106,7 @@ void RendererVK::register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::
         else {
             // Strong reference, always overwrite the resource.
             if (pipeline_resource.res == MEM_NULL) {
-                throw std::runtime_error(std::format(
-                    "Render resource {} is a strong reference that is MEM_NULL.",
+                throw std::runtime_error(std::format("Render resource {} is a strong reference that is MEM_NULL.",
                     LabelManager::get_singleton()->get_label_name(pipeline_resource.res_id)));
             }
             rend_res->res = pipeline_resource.res.dynamic_cast_ref<RenderObjectVK>();
@@ -1089,6 +1115,68 @@ void RendererVK::register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::
         p_pipeline->rend_res.push_back(rend_res);
     }
 }
+
+void RendererVK::register_pfif_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::PFIFResource> p_pipeline_resources) {
+    WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
+    p_pipeline->rend_res.reserve(p_pipeline_resources.size());
+    for (const auto& pipeline_pfif_res : p_pipeline_resources) {
+        // For each per frame resource, register them into the corresponding entry from get_per_frame_in_flight_rend_res.
+        Vector<RefWeak<RendResVK>> frame_resource(allocator);
+        frame_resource.reserve(pipeline_pfif_res.res.size());
+        auto rend_res = get_per_frame_in_flight_rend_res(pipeline_pfif_res.res_id, pipeline_pfif_res.type_id);
+        frame_resource.append_range(rend_res);
+        if (pipeline_pfif_res.is_weak) {
+            // Weak reference, only set if the resource is not initialized yet.
+            if (pipeline_pfif_res.res.empty()) {
+                // PFIFResource with empty res are considered NULL.
+                if (rend_res[0]->res == MEM_NULL) {
+                    // Not registered before, and there is no new instance passed in, throw an error.
+                    throw std::runtime_error(std::format(
+                        "Render resource {} is a weak reference that is MEM_NULL, and there was no corresponding registered resource.",
+                        LabelManager::get_singleton()->get_label_name(pipeline_pfif_res.res_id)));
+                }
+                continue;
+            }
+            if (pipeline_pfif_res.res.size() != frames_in_flight) {
+                // We passed in instances for weak references, but the number of instance does not match frame_in_flight. Throw an error.
+                throw std::runtime_error(std::format(
+                    "Failed to register per-frame-in-flight resource: there should be frames_in_flight: {} resource instance registered for each resource,"
+                    "But got {} resource instances.",
+                    frames_in_flight, pipeline_pfif_res.res.size()));
+            }
+            for (auto [index, res_to_fill] : std::views::enumerate(rend_res)) {
+                // Fill in the resources.
+                res_to_fill->res = pipeline_pfif_res.res[index].dynamic_cast_ref<RenderObjectVK>();
+                WBE_DEBUG_ASSERT(!res_to_fill->res.is_null());
+            }
+        }
+        else {
+            // Strong reference, replace directly.
+            if (pipeline_pfif_res.res.empty()) {
+                // Strong reference should not be NULL.
+                throw std::runtime_error(std::format("Render resource {} is a strong reference that is MEM_NULL.",
+                    LabelManager::get_singleton()->get_label_name(pipeline_pfif_res.res_id)));
+            }
+            if (pipeline_pfif_res.res.size() != frames_in_flight) {
+                // The number of resources does not match frames_in_flight. Throw an error.
+                throw std::runtime_error(std::format(
+                    "Failed to register per-frame-in-flight resource: there should be frames_in_flight: {} resource instance registered for each resource,"
+                    "But got {} resource instances.",
+                    frames_in_flight, pipeline_pfif_res.res.size()));
+            }
+            for (auto [index, res_to_fill] : std::views::enumerate(rend_res)) {
+                // Fill in the resources.
+                res_to_fill->res = pipeline_pfif_res.res[index].dynamic_cast_ref<RenderObjectVK>();
+                WBE_DEBUG_ASSERT(res_to_fill->res != MEM_NULL);
+            }
+        }
+        for (auto& pfif_res : rend_res) {
+            // Fill all the resources in the pipeline's rend_res.
+            p_pipeline->rend_res.push_back(pfif_res);
+        }
+    }
+}
+
 
 int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const {
     switch (p_domain) {

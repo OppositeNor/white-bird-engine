@@ -94,6 +94,28 @@ struct RendPipelineInfo {
         Ref<RenderObject> res = MEM_NULL;
     };
 
+    /**
+     * @class PFIFResource
+     * @brief Per frame in flight resource.
+     *
+     */
+    struct PFIFResource {
+        // The ID of the resource.
+        RendResID res_id;
+        // The type ID of the resource.
+        RendResTID type_id;
+        // Is the resource a weak binding.
+        bool is_weak = false;
+        // The resource instance. If is_weak is false, the previously registered resource with
+        // the same res_id will be replaced by this instance. If is_weak is true, it
+        // will try to find resources that was registered before by other pipelines, and
+        // use those as the resource here. If none reference was found, it will be replaced
+        // with this one. When is_weak is true, or when is_weak is false and there is no previously
+        // registered resource with the same res_id, res should not be empty.
+        // A PFIFResource is considered NULL when its res field is empty.
+        Vector<Ref<RenderObject>> res;
+    };
+
     // The root task of the pipeline.
     Ref<struct RendTaskInfo> root_task;
     // All the resources used in the render pipeline.
