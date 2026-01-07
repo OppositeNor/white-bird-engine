@@ -211,7 +211,7 @@ protected:
      *
      * @return The dependent semaphores vulkan semaphore instances.
      */
-    const Vector<VkSemaphoreSubmitInfo>& get_dependent_semaphores_submit_infos(const Vector<VkPipelineStageFlags2>& p_wait_stages);
+    const Vector<VkSemaphoreSubmitInfo>& get_dependent_semaphores_submit_infos(const std::span<VkPipelineStageFlags2>& p_wait_stages);
 
     /**
      * @brief Submit the command buffer to the queue.
@@ -222,7 +222,7 @@ protected:
      * @param p_signal_in_flight_fence Should this command buffer signal the in-flight fence.
      */
     void submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                               const Vector<VkPipelineStageFlags2>& p_wait_stages,
+                               const std::span<VkPipelineStageFlags2>& p_wait_stages,
                                VkPipelineStageFlags2 p_signal_stage,
                                bool p_signal_in_flight_fence);
 

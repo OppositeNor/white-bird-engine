@@ -69,9 +69,8 @@ bool RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_re
     return true;
 }
 
-const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const Vector<VkPipelineStageFlags2>& p_wait_stages) {
+const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const std::span<VkPipelineStageFlags2>& p_wait_stages) {
     WBE_DEBUG_ASSERT(depend_semaphores.size() == depend_semaphores_submit_infos.size());
-    WBE_DEBUG_ASSERT(p_wait_stages.size() == depend_semaphores_submit_infos.size());
     size_t n = depend_semaphores_submit_infos.size();
     for (size_t i = 0; i < n; ++i) {
         depend_semaphores_submit_infos[i] = depend_semaphores[i]->get_submit_info(p_wait_stages[i], render_data->current_frame);
@@ -80,7 +79,7 @@ const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_subm
 }
 
 void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                                         const Vector<VkPipelineStageFlags2>& p_wait_stages,
+                                         const std::span<VkPipelineStageFlags2>& p_wait_stages,
                                          VkPipelineStageFlags2 p_signal_stage,
                                          bool p_signal_in_flight_fence) {
     VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage, render_data->current_frame);

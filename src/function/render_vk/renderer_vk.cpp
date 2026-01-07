@@ -164,10 +164,10 @@ void RendererVK::tick(double p_delta) {
 }
 
 Ref<RendResVK> RendererVK::get_resource(RendResID p_res_id, RendResTID p_res_type_id) {
-    if (!LabelManager::get_singleton()->label_exists(p_res_id)) {
+    if (!LabelManager::get_singleton()->is_registered(p_res_id)) {
         throw std::runtime_error(std::format("Render resource ID {} does not exist.", p_res_id));
     }
-    if (!LabelManager::get_singleton()->label_exists(p_res_type_id)) {
+    if (!LabelManager::get_singleton()->is_registered(p_res_type_id)) {
         throw std::runtime_error(std::format("Render resource type ID {} does not exist.", p_res_type_id));
     }
     auto iter = render_resources.find(p_res_id);
@@ -317,7 +317,7 @@ void RendererVK::init_vulkan() {
 
 void RendererVK::setup_resource(RendResID p_res_id, RendResTID p_res_type, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object) {
     WBE_DEBUG_ASSERT(p_res == MEM_NULL);
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_res_id));
+    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->is_registered(p_res_id));
     WBE_DEBUG_ASSERT(TypeUUIDManager::get_singleton()->is_registered(p_res_type));
     p_res = make_ref<RendResVK>(allocator);
     p_res->res_type_id = p_res_type;
@@ -1057,8 +1057,8 @@ void RendererVK::compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<Pipelin
 }
 
 Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_res));
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_type_id));
+    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->is_registered(p_res));
+    WBE_DEBUG_ASSERT(TypeUUIDManager::get_singleton()->is_registered(p_type_id));
 
     // Remove the per frame in flight resource if exists.
     per_frame_in_flight_resource.erase(p_res);
@@ -1077,8 +1077,8 @@ Ref<RendResVK> RendererVK::get_rend_res(RendResID p_res, RendResTID p_type_id) {
 }
 
 Vector<Ref<RendResVK>> RendererVK::get_per_frame_in_flight_rend_res(RendResID p_res, RendResTID p_type_id) {
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_res));
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_type_id));
+    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->is_registered(p_res));
+    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->is_registered(p_type_id));
 
     // Remove the regular render resource if exists.
     render_resources.erase(p_res);
@@ -1111,7 +1111,7 @@ void RendererVK::fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p
     WBE_DEBUG_ASSERT(p_task != MEM_NULL);
     WBE_DEBUG_ASSERT(p_pipeline != MEM_NULL);
     WBE_DEBUG_ASSERT(p_task_info.render_task->req_rend_res.empty());
-    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->label_exists(p_task->task_id));
+    WBE_DEBUG_ASSERT(LabelManager::get_singleton()->is_registered(p_task->task_id));
     p_task_info.render_task->req_rend_res.reserve(p_task->req_res.size());
     for (auto& res : p_task->req_res) {
         auto iter = render_resources.find(res.res_id);

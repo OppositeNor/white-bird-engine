@@ -67,7 +67,7 @@ public:
      * @param p_label The label to check.
      * @return True if the label exists, false otherwise.
      */
-    bool label_exists(HashCode p_label) const {
+    bool is_registered(HashCode p_label) const {
         std::shared_lock lock(label_mutex);
         return label_to_name.find(p_label) != label_to_name.end();
     }

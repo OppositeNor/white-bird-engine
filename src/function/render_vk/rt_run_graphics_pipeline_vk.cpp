@@ -27,14 +27,10 @@
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence)
-    : RTRunGraphicsPipelineVK(p_render_data, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F), p_signal_in_flight_fence) {}
-
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
                                                  bool p_signal_in_flight_fence)
     : RenderTaskVK(p_render_data), clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
-    signal_in_flight_fence(p_signal_in_flight_fence),
-    wait_stages(p_render_data->allocator) {
+    signal_in_flight_fence(p_signal_in_flight_fence) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -50,6 +46,10 @@ RTRunGraphicsPipelineVK::~RTRunGraphicsPipelineVK() {
 }
 
 void RTRunGraphicsPipelineVK::init() {
+    if (wait_stages.size() < depend_semaphores.size()) {
+        wait_stages.append_range(std::vector<VkPipelineStageFlags2>(
+            depend_semaphores.size() - wait_stages.size(), VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT));
+    }
     wait_stages.reserve(depend_semaphores.size());
     for (size_t i = 0; i < depend_semaphores.size(); ++i) {
         wait_stages.push_back(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);

@@ -36,19 +36,11 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     /**
      * @brief Constructor.
      *
-     * @param p_render_data The render data.
-     * @param p_signal_in_flight Should signal in flight fence. TODO: remove this and signal the fence every time after running the final task.
-     */
-    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight_fence = false);
-
-    /**
-     * @brief Constructor.
-     *
      * @param p_render_data 
      * @param p_clear_color 
      * @param p_signal_in_flight_fence 
      */
-    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight_fence = false);
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight_fence);
 
     virtual void init() override;
 
@@ -58,7 +50,7 @@ private:
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     VkClearValue clear_value;
     bool signal_in_flight_fence = false;
-    Vector<VkPipelineStageFlags2> wait_stages;
+    inline static std::vector<VkPipelineStageFlags2> wait_stages { VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT };
     void record_command_buffer_without_vertex_binding();
     void record_command_buffer_with_vertex_binding();
 };
