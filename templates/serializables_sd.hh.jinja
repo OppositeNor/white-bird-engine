@@ -14,8 +14,8 @@
 #}
 // {{ _prefix }}
 
-#ifndef __WBE_SERIALIZABLES_SD_HH__
-#define __WBE_SERIALIZABLES_SD_HH__
+#ifndef WBE_FILE_SERIALIZABLES_SD_HH
+#define WBE_FILE_SERIALIZABLES_SD_HH
 
 {% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}

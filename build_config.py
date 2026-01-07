@@ -84,7 +84,7 @@ gen_info = {
     ],
     "dynamic_labels" : [
         "WBE_CHANNEL",
-        "WBE_RENDER_OBJECT_TYPE",
+        "WBE_RENDER_RESOURCE",
         "WBE_RENDER_TASK",
         "WBE_RESOURCE_UNIT",
     ],

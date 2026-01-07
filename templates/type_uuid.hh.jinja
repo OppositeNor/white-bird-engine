@@ -13,8 +13,8 @@
    limitations under the License.
 #}
 // {{ _prefix }}
-#ifndef __WBE_Type_UUID_HH__
-#define __WBE_Type_UUID_HH__
+#ifndef WBE_FILE_TYPE_UUID_HH
+#define WBE_FILE_TYPE_UUID_HH
 
 #include "utils/utils.hh"
 {% for type in metadata.classes %}
@@ -50,11 +50,13 @@ struct TypeUUID<{{ type.name }}> {
 class TypeUUIDManager : public Singleton<TypeUUIDManager> {
 public:
     TypeUUIDManager() : Singleton<TypeUUIDManager>() {
+        singleton = this;
         {% for type in metadata.classes %}
         type_name_map[TypeUUID<{{ type.name }}>::UUID] = "{{ type.name }}";
         {% endfor %}
     }
     virtual ~TypeUUIDManager() override {
+        singleton = nullptr;
     }
 
     /**
@@ -71,9 +73,26 @@ public:
         return found->second;
     }
 
-private:
-    std::unordered_map<TypeID, std::string> type_name_map;
+    /**
+     * @brief Check if a type is registered.
+     *
+     * @param p_type_uuid The UUID of the type to check.
+     * @return True if the type is registered, false otherwise.
+     */
+    bool is_registered(TypeID p_type_uuid) const {
+        return type_name_map.find(p_type_uuid) != type_name_map.end();
+    }
 
+    /**
+     * @brief Get the singleton instance.
+     */
+    static TypeUUIDManager* get_singleton() {
+        return singleton;
+    }
+
+private:
+    inline static TypeUUIDManager* singleton = nullptr;
+    std::unordered_map<TypeID, std::string> type_name_map;
 };
 
 }

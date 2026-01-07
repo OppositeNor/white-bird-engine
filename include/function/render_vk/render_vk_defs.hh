@@ -67,7 +67,7 @@ struct BaseRenderDataVK {
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence = VK_NULL_HANDLE;
-    // The current swap chain index.
+    // The current swap chain index. This is useful to trach which frame in flight it is right now.
     uint32_t current_swap_chain_index = 0;
     // Frames in flight.
     uint32_t frames_in_flight = 0;

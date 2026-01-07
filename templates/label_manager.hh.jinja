@@ -13,15 +13,16 @@
    limitations under the License.
 #}
 // {{ _prefix }}
-#ifndef __WBE_LABEL_MANAGER_HH__
-#define __WBE_LABEL_MANAGER_HH__
+#ifndef WBE_FILE_LABEL_MANAGER_HH
+#define WBE_FILE_LABEL_MANAGER_HH
 
 #include "utils/utils.hh"
 #include "utils/interface/singleton.hh"
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
+#include <shared_mutex>
 
 namespace WhiteBirdEngine {
 
@@ -51,14 +52,24 @@ public:
         singleton = this;
         {% for label in metadata.labels %}
         {% if label.attribute | select("in", dynamic_labels) | list | length > 0  %}
-        dynamic_labels.push_back("{{ label.name }}");
         label_to_name.insert({static_hash("{{ label.name }}"), std::string("{{ label.name }}")});
         name_to_label.insert({std::string("{{ label.name }}"), static_hash("{{ label.name }}")});
         {% endif %}
         {% endfor %}
     }
-    ~LabelManager() {
+    virtual ~LabelManager() override {
         singleton = nullptr;
+    }
+
+    /**
+     * @brief Check if the label exists.
+     *
+     * @param p_label The label to check.
+     * @return True if the label exists, false otherwise.
+     */
+    bool label_exists(HashCode p_label) const {
+        std::shared_lock lock(label_mutex);
+        return label_to_name.find(p_label) != label_to_name.end();
     }
 
     /**
@@ -68,6 +79,7 @@ public:
      * @return The name of the label
      */
     const std::string& get_label_name(HashCode p_label) const {
+        std::shared_lock lock(label_mutex);
         return label_to_name.at(p_label);
     }
 
@@ -78,6 +90,7 @@ public:
      * @return The label.
      */
     HashCode get_label_from_name(const std::string& p_name) const {
+        std::shared_lock lock(label_mutex);
         return name_to_label.at(p_name);
     }
 
@@ -87,7 +100,7 @@ public:
      * @param p_name The name of the label to register.
      */
     void register_label(const std::string& p_name) {
-        dynamic_labels.push_back(p_name);
+        std::unique_lock lock(label_mutex);
         label_to_name.insert({dynam_hash(p_name), p_name});
     }
 
@@ -100,9 +113,9 @@ public:
 
 private:
     inline static LabelManager* singleton = nullptr;
-    std::vector<std::string> dynamic_labels;
-    std::map<HashCode, std::string> label_to_name;
-    std::map<std::string, HashCode> name_to_label;
+    std::unordered_map<HashCode, std::string> label_to_name;
+    std::unordered_map<std::string, HashCode> name_to_label;
+    mutable std::shared_mutex label_mutex;
 };
 
 }

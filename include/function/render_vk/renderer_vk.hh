@@ -182,6 +182,14 @@ public:
         return render_objects->result_render_pass;
     }
 
+    /**
+     * @brief Get a render resource.
+     *
+     * @param p_res_id The ID of the resource to get.
+     * @param p_res_type_id The type of the resource.
+     */
+    Ref<RendResVK> get_resource(RendResID p_res_id, RendResTID p_res_type_id);
+
 private:
     static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
@@ -305,7 +313,6 @@ private:
             : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator),
             result_semaphores(p_allocator) {}
     };
-
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
