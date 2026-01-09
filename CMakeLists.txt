@@ -105,6 +105,9 @@ if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWBE_BUILD_TEST=OFF")
 endif()
 
+# Use default aligned gentypes in glm
+add_definitions(-DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+
 # Set include directories
 set(include_dirs 
     ${Vulkan_INCLUDE_DIR}

@@ -20,8 +20,21 @@
 
 namespace WhiteBirdEngine {
 
-// Keycodes white bird engine uses.
+// Keycodes white bird engine uses. The corresponding keycode enum name reflects the character
+// on a US QWERTY keyboard layout.
 enum KeyCode {
+    // Numbers.
+    KEYCODE_0,
+    KEYCODE_1,
+    KEYCODE_2,
+    KEYCODE_3,
+    KEYCODE_4,
+    KEYCODE_5,
+    KEYCODE_6,
+    KEYCODE_7,
+    KEYCODE_8,
+    KEYCODE_9,
+
     // Alphabet.
     KEYCODE_A,
     KEYCODE_B,
@@ -50,21 +63,22 @@ enum KeyCode {
     KEYCODE_Y,
     KEYCODE_Z,
 
-    // Numbers.
-    KEYCODE_0,
-    KEYCODE_1,
-    KEYCODE_2,
-    KEYCODE_3,
-    KEYCODE_4,
-    KEYCODE_5,
-    KEYCODE_6,
-    KEYCODE_7,
-    KEYCODE_8,
-    KEYCODE_9,
-    KEYCODE_UNDERSCORE,
+    // Other common symbols.
+    KEYCODE_BACKSPACE,
+    KEYCODE_TAB,
+    KEYCODE_ENTER,
+    KEYCODE_SPACE,
+    KEYCODE_DELETE,
     KEYCODE_EQUAL,
+    KEYCODE_BACKSLASH,
+    KEYCODE_UNDERSCORE,
+    KEYCODE_QUOTE,
+    KEYCODE_BACKQUOTE,
+    KEYCODE_LEFT_BRACKET,
+    KEYCODE_RIGHT_BRACKET,
+    KEYCODE_SEMICOLON,
 
-    // Special.
+    // Control keys.
     KEYCODE_F1,
     KEYCODE_F2,
     KEYCODE_F3,
@@ -78,27 +92,28 @@ enum KeyCode {
     KEYCODE_F11,
     KEYCODE_F12,
 
-    KEYCODE_SPACE,
-    KEYCODE_ESCAPE,
-    KEYCODE_BACKQUOTE,
-    KEYCODE_TAB,
-    KEYCODE_CAPSLOCK,
     KEYCODE_LEFT_SHIFT,
     KEYCODE_LEFT_CONTROL,
     KEYCODE_LEFT_ALT,
-    KEYCODE_RIGHT_ALT,
-    KEYCODE_RIGHT_CONTROL,
-
-    KEYCODE_DELETE,
-    KEYCODE_BACKSPACE,
-    KEYCODE_BACKSLASH,
-    KEYCODE_ENTER,
     KEYCODE_RIGHT_SHIFT,
+    KEYCODE_RIGHT_CONTROL,
+    KEYCODE_RIGHT_ALT,
+    KEYCODE_CAPSLOCK,
+
+    KEYCODE_HOME,
+    KEYCODE_END,
+    KEYCODE_PAGE_UP,
+    KEYCODE_PAGE_DOWN,
+    KEYCODE_INSERT,
 
     KEYCODE_UP,
     KEYCODE_DOWN,
     KEYCODE_LEFT,
     KEYCODE_RIGHT,
+    KEYCODE_ESCAPE,
+
+    // A tracker to track the total number of keycodes.
+    TOTAL_KEYCODES
 };
 
 static_assert(KEYCODE_1 - KEYCODE_0 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");

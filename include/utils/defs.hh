@@ -119,14 +119,8 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
 // Avoiding two atomic variables be allocated into the same cacheline, causing memory sharing.
 #define WBE_NO_FALSE_SHARING alignas(64)
 
-#define WBE_R6_DEFAULT_VIRTUAL(ClassName) \
-    ClassName() = default; \
-    virtual ~ClassName() = default; \
-    ClassName(const ClassName&) = default; \
-    ClassName(ClassName&&) noexcept = default; \
-    ClassName& operator=(const ClassName&) = default; \
-    ClassName& operator=(ClassName&&) noexcept = default;
-
+// Definitions for rule of six macros.
+// Rule of six with default constructor, destructor, copy and move operations.
 #define WBE_R6_DEFAULT(ClassName) \
     ClassName() = default; \
     ~ClassName() = default; \
@@ -135,14 +129,7 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = default; \
     ClassName& operator=(ClassName&&) noexcept = default;
 
-#define WBE_R6_DEFAULT_OVERRIDE(ClassName) \
-    ClassName() = default; \
-    virtual ~ClassName() override = default; \
-    ClassName(const ClassName&) = default; \
-    ClassName(ClassName&&) noexcept = default; \
-    ClassName& operator=(const ClassName&) = default; \
-    ClassName& operator=(ClassName&&) noexcept = default;
-
+// Rule of six with default constructor, default virtual destructor, default copy and move operations.
 #define WBE_R6_DEFAULT_VIRTUAL(ClassName) \
     ClassName() = default; \
     virtual ~ClassName() = default; \
@@ -151,6 +138,25 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = default; \
     ClassName& operator=(ClassName&&) noexcept = default;
 
+// Rule of six with default constructor, default overrided destructor, default copy and move operations.
+#define WBE_R6_DEFAULT_OVERRIDE(ClassName) \
+    ClassName() = default; \
+    virtual ~ClassName() override = default; \
+    ClassName(const ClassName&) = default; \
+    ClassName(ClassName&&) noexcept = default; \
+    ClassName& operator=(const ClassName&) = default; \
+    ClassName& operator=(ClassName&&) noexcept = default;
+
+// Rule of six with default constructor, default virtual destructor, default copy and move operations.
+#define WBE_R6_DEFAULT_VIRTUAL(ClassName) \
+    ClassName() = default; \
+    virtual ~ClassName() = default; \
+    ClassName(const ClassName&) = default; \
+    ClassName(ClassName&&) noexcept = default; \
+    ClassName& operator=(const ClassName&) = default; \
+    ClassName& operator=(ClassName&&) noexcept = default;
+
+// Rule of six with default constructor, default virtual destructor, deleted copy and move operations.
 #define WBE_R6_DELETE_COPY_MOVE_VIRTUAL(ClassName) \
     ClassName() = default; \
     virtual ~ClassName() = default; \
@@ -159,6 +165,7 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = delete; \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
+// Rule of six with default constructor, default overrided destructor, deleted copy and move operations.
 #define WBE_R6_DELETE_COPY_MOVE_OVERRIDE(ClassName) \
     ClassName() = default; \
     virtual ~ClassName() override = default; \

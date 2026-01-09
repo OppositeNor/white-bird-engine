@@ -16,7 +16,21 @@
 #define WBE_FILE_INPUT_MANAGER_HH
 
 #include "key_codes.hh"
+#include "utils/defs.hh"
+#include "utils/interface/singleton.hh"
 namespace WhiteBirdEngine {
+
+using KeyStatus = uint8_t;
+
+// The key is released.
+constexpr KeyStatus KEY_UP = 0b00;
+// The key is pressed.
+constexpr KeyStatus KEY_DOWN = 0b01;
+// The key is just released.
+constexpr KeyStatus KEY_JUST_UP = 0b10;
+// The key is just pressed.
+constexpr KeyStatus KEY_JUST_DOWN = 0b11;
+
 
 /**
  * @class InputStatus
@@ -25,22 +39,9 @@ namespace WhiteBirdEngine {
  */
 struct InputStatus {
     /**
-     * @brief Code describing input status.
+     * @brief The key's status code.
      */
-    enum InputStatusCode {
-        // Unknown key status.
-        KEY_UNKNOWN = 0b0000,
-        // The key is up.
-        KEY_UP      = 0b0001,
-        // The key is down.
-        KEY_DOWN    = 0b0010,
-        // The action just happened.
-        KEY_JUST    = 0b0100,
-        // The key is just up.
-        KEY_JUST_UP     = 0b0101,
-        // The key is just down.
-        KEY_JUST_DOWN   = 0b0110,
-    } status_code;
+    KeyStatus status_code;
 
     /**
      * @brief Is the key action just happened.
@@ -48,7 +49,7 @@ struct InputStatus {
      * @return True if the key action just happened. False otherwise.
      */
     bool is_just() const {
-        return status_code & KEY_JUST;
+        return status_code & 0b10;
     }
 
     /**
@@ -93,9 +94,9 @@ struct InputStatus {
  * @brief Manages user inputs.
  *
  */
-class InputManager {
+class InputManager : public Singleton<InputManager> {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(InputManager)
+    WBE_R6_DELETE_COPY_MOVE_OVERRIDE(InputManager)
 
     /**
      * @brief Get the input status of a key.
@@ -104,6 +105,11 @@ public:
      * @return The input status.
      */
     virtual InputStatus get_input_status(KeyCode p_key_code) const = 0;
+
+    /**
+     * @brief Update the input manager.
+     */
+    virtual void update() = 0;
 };
 
 } // namespace WhiteBirdEngine

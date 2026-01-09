@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
                                                  bool p_signal_in_flight_fence)
     : RenderTaskVK(p_render_data), clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
-    signal_in_flight_fence(p_signal_in_flight_fence) {
+    signal_in_flight_fence(p_signal_in_flight_fence), descriptor_sets(p_render_data->allocator), descriptor_sets_instances(p_render_data->allocator) {
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;
@@ -143,8 +143,19 @@ void RTRunGraphicsPipelineVK::record_command_buffer_with_vertex_binding() {
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_inst, &offset);
     vkCmdBindIndexBuffer(command_buffer, index_buffer_inst, 0, VK_INDEX_TYPE_UINT32);
+    if (!descriptor_sets.empty()) {
+        // Bind descriptors if any.
+        vkCmdBindDescriptorSets(
+            command_buffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphics_pipeline->fields().pipeline_layout->get_pipeline_layout(),
+            0,
+            descriptor_sets_instances.size(),
+            descriptor_sets_instances.data(),
+            0,
+            nullptr);
+    }
     vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
-
 
     size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
     // Draw the entire index buffer.

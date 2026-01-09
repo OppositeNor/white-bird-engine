@@ -19,6 +19,7 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -46,6 +47,19 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 
     virtual void perform(double p_delta) override;
 
+    /**
+     * @brief Add a descriptor set to the pipeline.
+     * The set index is determined by the order of addition.
+     *
+     * @param p_descriptor_set The descriptor set to add.
+     * @return *this.
+     */
+    RTRunGraphicsPipelineVK& add_descriptor_set(Ref<RODescriptorSetVK> p_descriptor_set) {
+        descriptor_sets.push_back(p_descriptor_set);
+        descriptor_sets_instances.push_back(p_descriptor_set->get_descriptor_set());
+        return *this;
+    }
+
 private:
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     VkClearValue clear_value;
@@ -53,6 +67,8 @@ private:
     inline static std::vector<VkPipelineStageFlags2> wait_stages { VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT };
     void record_command_buffer_without_vertex_binding();
     void record_command_buffer_with_vertex_binding();
+    Vector<Ref<RODescriptorSetVK>> descriptor_sets;
+    Vector<VkDescriptorSet> descriptor_sets_instances;
 };
 
 /**
