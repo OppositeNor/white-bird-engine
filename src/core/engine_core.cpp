@@ -14,6 +14,7 @@
 */
 #include "core/engine_core.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
 #include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
 #include "core/profiling/profiling_manager.hh"
@@ -50,6 +51,7 @@ EngineCore::EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir) 
 void EngineCore::initialize(int p_argc, char* p_argv[]) {
     engine_config = new EngineConfig(Path(file_system->get_config_directory(), "engine_config.yaml"), p_argc, p_argv);
     pool_allocator = new HeapAllocatorAlignedPoolImplicitList(engine_config->get_config_options().global_mem_pool_size);
+    atomic_pool_allocator = new HeapAllocatorAtomicAlignedPoolImplicitList(engine_config->get_config_options().global_atomic_mem_pool_size);
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
     label_manager = new LabelManager();

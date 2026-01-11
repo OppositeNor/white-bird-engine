@@ -29,6 +29,7 @@ namespace WhiteBirdEngine {
  */
 class SemaphoreVK {
 public:
+    SemaphoreVK() = delete;
     ~SemaphoreVK() {
         // Deallocate resource after frames in flight.
         render_data->register_delayed_call([render_data = render_data, semaphore = semaphore]() {

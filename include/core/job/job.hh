@@ -24,10 +24,23 @@ namespace WhiteBirdEngine {
  */
 template <typename ChildT>
 struct Job {
-    Job() {}
-    virtual ~Job() {}
+    Job() = default;
+    virtual ~Job() = default;
+    Job(const Job&) = default;
+    Job(Job&&) = default;
+    Job& operator=(const Job&) = default;
+    Job& operator=(Job&&) = default;
+
+    /**
+     * @brief Get this job instance with the child type.
+     *
+     * @return The instance with the child type.
+     */
+    ChildT* get() {
+        return static_cast<ChildT*>(this);
+    }
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

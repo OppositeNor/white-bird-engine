@@ -31,11 +31,11 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the component.
  * @return The maximum number of components.
  */
-template <typename T, size_t MaxComponents>
 class ComponentManager {
 public:
-    ComponentManager()
-        : allocator(sizeof(T), MaxComponents) {}
+    template <typename T>
+    ComponentManager(size_t p_max_components)
+        : allocator(sizeof(T), p_max_components) {}
 
     /**
      * @brief The number of components waiting for freeing that will trigger a flush.
@@ -72,16 +72,14 @@ private:
     mutable std::shared_mutex mutex;
 };
 
-template <typename T, size_t MaxComponents>
-inline void ComponentManager<T, MaxComponents>::update() {
+inline void ComponentManager::update() {
     // flushing
     if (num_wait_for_free > FLUSH_AFTER_FREE) {
         flush();
     }
 }
 
-template <typename T, size_t MaxComponents>
-void ComponentManager<T, MaxComponents>::flush() {
+inline void ComponentManager::flush() {
     std::unique_lock lock(mutex);
     std::vector<MemID> objs = allocator.get_allocated();
     for (auto& obj : objs) {

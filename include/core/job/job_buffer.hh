@@ -16,6 +16,8 @@
 #define WBE_FILE_JOB_BUFFER_HH
 
 #include "core/memory/reference_strong.hh"
+#include "utils/defs.hh"
+#include <semaphore>
 namespace WhiteBirdEngine {
 
 /**
@@ -25,16 +27,17 @@ namespace WhiteBirdEngine {
 template <typename ChildT, typename JobT>
 class JobBuffer {
 public:
-    JobBuffer() = default;
-    virtual ~JobBuffer() {}
-
+    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(JobBuffer)
     using JobType = JobT;
 
     /**
-     * @brief Retrieve a job from a buffer. If the buffer is empty, return MEM_NULL.
+     * @brief Retrieve a job.
+     *
+     * @param p_block Block and wait for a new job if the buffer is empty.
+     * @return THe instance of a job. Or MEM_NULL if p_block is false, and the buffer is empty.
      */
-    Ref<JobType> retrieve_job() {
-        return static_cast<ChildT*>(this)->retrieve_job();
+    Ref<JobType> retrieve_job(bool p_block = false) {
+        return static_cast<ChildT*>(this)->retrieve_job(p_block);
     }
 
     /**
@@ -44,10 +47,19 @@ public:
      * @param p_job The job to add to the buffer.
      */
     void add_job(Ref<JobType> p_job) {
-        return static_cast<ChildT*>(this)->add_job();
+        return static_cast<ChildT*>(this)->add_job(p_job);
+    }
+
+    /**
+     * @brief Get the semaphore.
+     *
+     * @return The semaphore.
+     */
+    std::counting_semaphore<32>& get_semaphore() {
+        return static_cast<ChildT*>(this)->get_semaphore();
     }
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

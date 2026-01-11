@@ -88,8 +88,7 @@ public:
         if (p_id == MEM_NULL) {
             return nullptr;
         }
-        // Get is not locked, potential data race with dealloc should be handled by the user.
-        WBE_DEBUG_ASSERT(unguarded_is_in_pool(p_id));
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
         return reinterpret_cast<void*>(p_id);
     }
 

@@ -19,6 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "global/stl_allocator.hh"
 #include "job_buffer.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 
 namespace WhiteBirdEngine {
@@ -46,18 +47,23 @@ public:
      */
     JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size);
 
-    Ref<JobType> retrieve_job();
+    Ref<JobType> retrieve_job(bool p_block = false);
     void add_job(Ref<JobType> p_job);
 
+    std::counting_semaphore<32>& get_semaphore() {
+        return semaphore;
+    }
+
+    void add_to_deref(Ref<JobType> p_job);
+
+    void clear_to_deref();
+
 private:
+    std::counting_semaphore<32> semaphore{0};
     Vector<Ref<JobType>> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };
-
-constexpr size_t ring_increment(size_t p_i, size_t p_buffer_size) {
-    return ((p_i) + 1) % p_buffer_size;
-} 
 
 template <typename JobType>
 JobBufferRingSPSC<JobType>::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
@@ -69,13 +75,20 @@ JobBufferRingSPSC<JobType>::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator,
 }
 
 template <typename JobType>
-Ref<JobType> JobBufferRingSPSC<JobType>::retrieve_job() {
-    size_t tail_l = tail.load(std::memory_order_acquire);
-
-    if (tail_l == head.load(std::memory_order_acquire)) {
+Ref<JobType> JobBufferRingSPSC<JobType>::retrieve_job(bool p_block) {
+    if (p_block) {
+        semaphore.acquire();
+    }
+    else if (!semaphore.try_acquire()) {
         return MEM_NULL;
     }
+    size_t tail_l = tail.load(std::memory_order_acquire);
     Ref<JobType> result = buffer[tail_l];
+    // We don't dereference buffer[tail_l] here because it might cause the object to be destroyed.
+    // And since the object would be allocated in the producer thread, destroying it at the consumer thread
+    // requires an atomic pool, which desatisfies the lock-free requirement. So the job will be referenced
+    // until the producer thread adds a new job, which overwrites the old reference and dereferences it safely.
+    // This is not ideal, so a lock-free deallocation design would be better in the future.
     tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
     return result;
 }
@@ -90,10 +103,8 @@ void JobBufferRingSPSC<JobType>::add_job(Ref<JobType> p_job) {
 
     buffer[head_l] = p_job;
     head.store(next, std::memory_order_release);
+    semaphore.release();
 }
-
-#undef WBE_RING_INCREMENT
-
 } // namespace WhiteBirdEngine
 
 #endif

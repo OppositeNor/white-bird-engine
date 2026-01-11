@@ -409,7 +409,7 @@ void RendererVK::create_instance() {
     app_info.pApplicationName = game_config.game_name.c_str();
     app_info.applicationVersion = VK_MAKE_VERSION(game_config.version_major, game_config.version_minor, game_config.version_patch);
     app_info.pEngineName = engine_config.engine_name;
-    app_info.engineVersion = VK_MAKE_VERSION(engine_config.version_major, engine_config.version_minor, engine_config.version_patch);
+    app_info.engineVersion = VK_MAKE_VERSION(engine_config.VERSION_MAJOR, engine_config.VERSION_MINOR, engine_config.VERSION_PATCH);
     app_info.apiVersion = VULKAN_API_VERSION;
 
     // Setup instance create info.

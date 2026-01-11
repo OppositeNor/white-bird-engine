@@ -39,15 +39,15 @@ struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializab
     /**
      * @brief Engine version major.
      */
-    const uint32_t version_major = 0;
+    static constexpr uint32_t VERSION_MAJOR = 0;
     /**
      * @brief Engine version minor.
      */
-    const uint32_t version_minor = 0;
+    static constexpr uint32_t VERSION_MINOR = 0;
     /**
      * @brief Engine version patch.
      */
-    const uint32_t version_patch = 1;
+    static constexpr uint32_t VERSION_PATCH = 1;
 
     /**
      * @brief The size of the tick stack.
@@ -59,6 +59,11 @@ struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializab
      */
     WBE_META(WBE_REFLECT)
     size_t global_mem_pool_size = WBE_KiB(128);
+    /**
+     * @brief The size of the atomic global memory pool.
+     */
+    WBE_META(WBE_REFLECT)
+    size_t global_atomic_mem_pool_size = WBE_KiB(128);
     /**
      * @brief The size of the thread memory pool.
      */
@@ -93,7 +98,7 @@ public:
             parse_cla(p_argc, p_argv);
         }
     }
-    virtual ~EngineConfig() {}
+    virtual ~EngineConfig() = default;
     EngineConfig(const EngineConfig&) = delete;
     EngineConfig(EngineConfig&&) = delete;
     EngineConfig& operator=(const EngineConfig&) = delete;
@@ -120,6 +125,6 @@ private:
     }
 
 };
-}
+} // namespace WhiteBirdEngine
 
 #endif

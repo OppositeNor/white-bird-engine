@@ -50,6 +50,6 @@ private:
     HeapAllocatorDefault* allocator;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

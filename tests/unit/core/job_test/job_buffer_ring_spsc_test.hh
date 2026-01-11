@@ -15,31 +15,16 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 
-#include "core/job/job.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include "mock_job.hh"
 #include <gtest/gtest.h>
 #include <thread>
 #include <atomic>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
-
-// Mock job for testing
-class MockJob : public WBE::Job<MockJob> {
-public:
-    MockJob(int id = 0) : job_id(id), performed(false) {}
-    
-    void perform() {
-        performed = true;
-        perform_count.fetch_add(1);
-    }
-    
-    int job_id;
-    bool performed;
-    inline static std::atomic<int> perform_count;
-};
 
 class WBEJobBufferRingSPSCTest : public ::testing::Test {
 protected:
@@ -109,10 +94,9 @@ TEST_F(WBEJobBufferRingSPSCTest, AddAndRetrieveSingleJob) {
     EXPECT_NE(retrieved, WBE::MEM_NULL);
     
     // Should be the same job - cast back to MockJob to verify
-    auto retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_NE(retrieved_mock, WBE::MEM_NULL);
-    EXPECT_EQ(retrieved_mock->job_id, 1);
-    EXPECT_FALSE(retrieved_mock->performed);
+    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    EXPECT_EQ(retrieved->job_id, 1);
+    EXPECT_FALSE(retrieved->performed);
     
     // Buffer should be empty again
     WBE::Ref<MockJob> empty = buffer.retrieve_job();
@@ -126,7 +110,7 @@ TEST_F(WBEJobBufferRingSPSCTest, AddAndRetrieveMultipleJobs) {
     std::vector<WBE::Ref<MockJob>> jobs;
     for (int i = 0; i < 3; ++i) {
         auto job = WBE::make_ref<MockJob>(get_allocator(), i);
-        jobs.push_back(job);
+        jobs.emplace_back(job);
         buffer.add_job(job);
     }
     
@@ -135,9 +119,8 @@ TEST_F(WBEJobBufferRingSPSCTest, AddAndRetrieveMultipleJobs) {
         WBE::Ref<MockJob> retrieved = buffer.retrieve_job();
         EXPECT_NE(retrieved, WBE::MEM_NULL);
         
-        auto retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-        EXPECT_NE(retrieved_mock, WBE::MEM_NULL);
-        EXPECT_EQ(retrieved_mock->job_id, i);
+        EXPECT_NE(retrieved, WBE::MEM_NULL);
+        EXPECT_EQ(retrieved->job_id, i);
     }
     
     // Buffer should be empty
@@ -174,8 +157,7 @@ TEST_F(WBEJobBufferRingSPSCTest, RingBufferWrapAround) {
     
     // Retrieve one job to make space
     WBE::Ref<MockJob> retrieved = buffer.retrieve_job();
-    auto retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 1);
+    EXPECT_EQ(retrieved->job_id, 1);
     
     // Now we should be able to add another job (wrap around)
     auto job4 = WBE::make_ref<MockJob>(get_allocator(), 4);
@@ -183,16 +165,13 @@ TEST_F(WBEJobBufferRingSPSCTest, RingBufferWrapAround) {
     
     // Verify order is maintained
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 2);
+    EXPECT_EQ(retrieved->job_id, 2);
     
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 3);
+    EXPECT_EQ(retrieved->job_id, 3);
     
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 4);
+    EXPECT_EQ(retrieved->job_id, 4);
 }
 
 TEST_F(WBEJobBufferRingSPSCTest, FIFOOrdering) {
@@ -209,8 +188,7 @@ TEST_F(WBEJobBufferRingSPSCTest, FIFOOrdering) {
         WBE::Ref<MockJob> retrieved = buffer.retrieve_job();
         EXPECT_NE(retrieved, WBE::MEM_NULL);
         
-        auto retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-        EXPECT_EQ(retrieved_mock->job_id, i);
+        EXPECT_EQ(retrieved->job_id, i);
     }
 }
 
@@ -223,8 +201,7 @@ TEST_F(WBEJobBufferRingSPSCTest, MixedAddRetrieveOperations) {
     
     // Retrieve it
     WBE::Ref<MockJob> retrieved = buffer.retrieve_job();
-    auto retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 1);
+    EXPECT_EQ(retrieved->job_id, 1);
     
     // Add more jobs
     auto job2 = WBE::make_ref<MockJob>(get_allocator(), 2);
@@ -234,8 +211,7 @@ TEST_F(WBEJobBufferRingSPSCTest, MixedAddRetrieveOperations) {
     
     // Retrieve one
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 2);
+    EXPECT_EQ(retrieved->job_id, 2);
     
     // Add another
     auto job4 = WBE::make_ref<MockJob>(get_allocator(), 4);
@@ -243,12 +219,10 @@ TEST_F(WBEJobBufferRingSPSCTest, MixedAddRetrieveOperations) {
     
     // Retrieve remaining
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 3);
+    EXPECT_EQ(retrieved->job_id, 3);
     
     retrieved = buffer.retrieve_job();
-    retrieved_mock = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_EQ(retrieved_mock->job_id, 4);
+    EXPECT_EQ(retrieved->job_id, 4);
     
     // Should be empty
     EXPECT_EQ(buffer.retrieve_job(), WBE::MEM_NULL);
@@ -263,12 +237,11 @@ TEST_F(WBEJobBufferRingSPSCTest, JobExecution) {
     WBE::Ref<MockJob> retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, WBE::MEM_NULL);
     
-    auto mock_job = retrieved.dynamic_cast_ref<MockJob>();
-    EXPECT_FALSE(mock_job->performed);
+    EXPECT_FALSE(job->performed);
     
     // Execute the job
     retrieved->perform();
-    EXPECT_TRUE(mock_job->performed);
+    EXPECT_TRUE(job->performed);
 }
 
 // SPSC (Single Producer Single Consumer) concurrent tests
@@ -307,11 +280,9 @@ TEST_F(WBEJobBufferRingSPSCTest, ConcurrentProducerConsumer) {
         while (!producer_done || consumed.load() < produced.load()) {
             WBE::Ref<MockJob> job = buffer.retrieve_job();
             if (job != WBE::MEM_NULL) {
-                auto mock_job = job.dynamic_cast_ref<MockJob>();
-                
                 // Verify ordering (jobs should come in sequence)
-                EXPECT_GT(mock_job->job_id, last_job_id);
-                last_job_id = mock_job->job_id;
+                EXPECT_GT(job->job_id, last_job_id);
+                last_job_id = job->job_id;
                 
                 job->perform();
                 consumed.fetch_add(1);
@@ -406,8 +377,7 @@ TEST_F(WBEJobBufferRingSPSCTest, StressTestManyOperations) {
         while (!producer_done || consumed_job_ids.size() < NUM_JOBS) {
             WBE::Ref<MockJob> job = buffer.retrieve_job();
             if (job != WBE::MEM_NULL) {
-                auto mock_job = job.dynamic_cast_ref<MockJob>();
-                consumed_job_ids.push_back(mock_job->job_id);
+                consumed_job_ids.push_back(job->job_id);
                 job->perform();
                 
                 if (consumed_job_ids.size() >= NUM_JOBS) {

@@ -41,6 +41,11 @@ struct AllocatorTrait<class HeapAllocatorFixedSizePool> final : public Allocator
     WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
+/**
+ * @class HeapAllocatorFixedSizePool
+ * @brief Pooled heap allocator with fixed object size.
+ *
+ */
 class HeapAllocatorFixedSizePool final : public HeapAllocator {
 public:
     using DataIndex = uint16_t;
@@ -63,7 +68,7 @@ public:
      * @param p_max_obj The maximum objects this allocator could hold. Up to MAX_OBJ maximum.
      */
     HeapAllocatorFixedSizePool(size_t p_element_size, uint32_t p_max_obj)
-        : max_obj(p_max_obj), alloc_obj_count(0), element_size(p_element_size) {
+        : max_obj(p_max_obj), element_size(p_element_size) {
         if (p_max_obj > MAX_OBJ) {
             throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }
@@ -75,7 +80,7 @@ public:
         // data space stores the data.
         // Notice that when DataIndex or InternalID is 0 it maps to MEM_NULL,
         // so for offseting, the true offset for the reverse data is internal id - 1.
-        mem_chunk = (char*)malloc(element_size * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj);
+        mem_chunk = static_cast<char*>(malloc(element_size * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj)); // NOLINT
         clear_indices();
     }
 
@@ -127,10 +132,6 @@ public:
         return alloc_obj_count == 0;
     }
 
-    size_t get_allocated_data_size(MemID p_mem_id) const {
-        return element_size;
-    }
-
     // TODO: Test
     virtual void clear() override {
         clear_indices();
@@ -144,21 +145,21 @@ public:
 private:
     DataIndex max_obj;
     char* mem_chunk;
-    DataIndex alloc_obj_count;
+    DataIndex alloc_obj_count = 0;
     const size_t element_size;
 
     DataIndex get_data_index(InternalID p_id) const {
         if (p_id > max_obj) {
             return MEM_NULL;
         }
-        return *((DataIndex*)index_chunk_start() + p_id - 1);
+        return *(index_chunk_start() + p_id - 1); // NOLINT
     }
 
     InternalID get_internal_id(DataIndex p_data_index) const {
         if (p_data_index > max_obj) {
             return MEM_NULL;
         }
-        return *((InternalID*)index_chunk_rev_start() + p_data_index - 1);
+        return *(index_chunk_rev_start() + p_data_index - 1);
     }
 
     void* get_mem_loc_at_id(InternalID p_id) {
@@ -205,11 +206,11 @@ private:
     }
 
     DataIndex* index_chunk_start() const {
-        return (DataIndex*)(mem_chunk + element_size * max_obj);
+        return reinterpret_cast<DataIndex*>(mem_chunk + element_size * max_obj);
     }
 
     InternalID* index_chunk_rev_start() const {
-        return (InternalID*)(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
+        return reinterpret_cast<InternalID*>(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
     }
 
     char* data_chunk_start() const {
@@ -219,6 +220,6 @@ private:
 };
 
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -15,7 +15,7 @@
 #include "core/core_utils.hh"
 
 namespace WhiteBirdEngine {
-using RenderAllocator = HeapAllocatorDefault;
+using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
 
 }
 

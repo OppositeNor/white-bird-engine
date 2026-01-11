@@ -1,3 +1,4 @@
 single_tick_stack_size: 1024
 global_mem_pool_size: 1024
+global_atomic_mem_pool_size: 1024
 thread_mem_pool_size: 1024

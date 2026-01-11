@@ -30,7 +30,7 @@ using CommandID = uint64_t;
  */
 class Command {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(Command);
+    WBE_R6_DEFAULT_VIRTUAL(Command)
 
     /**
      * @brief Invoke an operation.
