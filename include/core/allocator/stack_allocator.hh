@@ -22,7 +22,6 @@
 #include <cstddef>
 #include <memory>
 #include <sstream>
-#include <stddef.h>
 
 namespace WhiteBirdEngine {
 
@@ -49,7 +48,7 @@ struct AllocatorTrait<class StackAllocator> {
 class StackAllocator final : public Allocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
-    virtual ~StackAllocator() override {}
+    virtual ~StackAllocator() override = default;
     StackAllocator(const StackAllocator&) = delete;
     StackAllocator(StackAllocator&&) = delete;
     StackAllocator& operator=(const StackAllocator&) = delete;
@@ -151,9 +150,9 @@ public:
 
     operator std::string() const {
         std::stringstream ss;
-        ss << "{\"type\":\"StackAllocator\",\"total_size\":" << total_size
-           << ",\"stack_pointer\":" << stack_pointer
-           << ",\"available\":" << (total_size - stack_pointer) << "}";
+        ss << R"({"type":"StackAllocator","total_size":)" << total_size
+           << R"(,"stack_pointer":)" << stack_pointer
+           << R"(,"available":)" << (total_size - stack_pointer) << "}";
         return ss.str();
     }
 
@@ -184,6 +183,6 @@ void pop_stack_obj_array(StackAllocator& p_allocator, size_t p_num) {
     p_allocator.pop_stack(p_num * sizeof(T));
 }
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -131,6 +131,6 @@ private:
     size_t max_data_loc_tracker = 0;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

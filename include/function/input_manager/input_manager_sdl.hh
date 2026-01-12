@@ -19,7 +19,7 @@
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
-#include <bitset>
+#include <type_traits>
 namespace WhiteBirdEngine {
 /**
  * @class InputManagerSDL
@@ -55,7 +55,9 @@ public:
     virtual void update() override;
 
 private:
-    std::bitset<KeyCode::TOTAL_KEYCODES * 2> key_status_map; 
+    // Use an atomic keyset to store the key statuses.
+    std::atomic<uint8_t> key_status_map[KeyCode::TOTAL_KEYCODES % 8 == 0 ? KeyCode::TOTAL_KEYCODES / 8 : KeyCode::TOTAL_KEYCODES / 8 + 1] = {};
+    static_assert(std::remove_cvref_t<decltype(key_status_map[0])>::is_always_lock_free, "Key status map must be lock free");
     inline static InputManagerSDL* singleton = nullptr;
     SDL_Event sdl_event = {};
 };

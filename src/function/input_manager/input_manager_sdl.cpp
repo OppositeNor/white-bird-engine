@@ -14,6 +14,9 @@
 */
 
 #include "function/input_manager/input_manager_sdl.hh"
+#include <SDL_events.h>
+#include <SDL_keyboard.h>
+#include <atomic>
 
 namespace WhiteBirdEngine {
 InputManagerSDL::InputManagerSDL() {
@@ -26,15 +29,264 @@ InputManagerSDL::~InputManagerSDL() {
 
 InputStatus InputManagerSDL::get_input_status(KeyCode p_key_code) const {
     return InputStatus{
-        .status_code = static_cast<KeyStatus>(
-            (key_status_map[p_key_code * 2 + 1] << 1) |
-            (key_status_map[p_key_code * 2])
-        )
+        .status_code = static_cast<uint8_t>(key_status_map[p_key_code / 8].load(std::memory_order_acquire) >> (p_key_code % 8) & 0b1)
     };
 }
 
 void InputManagerSDL::update() {
-    // TODO
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            // Map the SDL keycode to our KeyCode
+            KeyCode key_code;
+            switch (event.key.keysym.sym) {
+                case SDLK_0:
+                    key_code = KEYCODE_0;
+                    break;
+                case SDLK_1:
+                    key_code = KEYCODE_1;
+                    break;
+                case SDLK_2:
+                    key_code = KEYCODE_2;
+                    break;
+                case SDLK_3:
+                    key_code = KEYCODE_3;
+                    break;
+                case SDLK_4:
+                    key_code = KEYCODE_4;
+                    break;
+                case SDLK_5:
+                    key_code = KEYCODE_5;
+                    break;
+                case SDLK_6:
+                    key_code = KEYCODE_6;
+                    break;
+                case SDLK_7:
+                    key_code = KEYCODE_7;
+                    break;
+                case SDLK_8:
+                    key_code = KEYCODE_8;
+                    break;
+                case SDLK_9:
+                    key_code = KEYCODE_9;
+                    break;
+                case SDLK_a:
+                    key_code = KEYCODE_A;
+                    break;
+                case SDLK_b:
+                    key_code = KEYCODE_B;
+                    break;
+                case SDLK_c:
+                    key_code = KEYCODE_C;
+                    break;
+                case SDLK_d:
+                    key_code = KEYCODE_D;
+                    break;
+                case SDLK_e:
+                    key_code = KEYCODE_E;
+                    break;
+                case SDLK_f:
+                    key_code = KEYCODE_F;
+                    break;
+                case SDLK_g:
+                    key_code = KEYCODE_G;
+                    break;
+                case SDLK_h:
+                    key_code = KEYCODE_H;
+                    break;
+                case SDLK_i:
+                    key_code = KEYCODE_I;
+                    break;
+                case SDLK_j:
+                    key_code = KEYCODE_J;
+                    break;
+                case SDLK_k:
+                    key_code = KEYCODE_K;
+                    break;
+                case SDLK_l:
+                    key_code = KEYCODE_L;
+                    break;
+                case SDLK_m:
+                    key_code = KEYCODE_M;
+                    break;
+                case SDLK_n:
+                    key_code = KEYCODE_N;
+                    break;
+                case SDLK_o:
+                    key_code = KEYCODE_O;
+                    break;
+                case SDLK_p:
+                    key_code = KEYCODE_P;
+                    break;
+                case SDLK_q:
+                    key_code = KEYCODE_Q;
+                    break;
+                case SDLK_r:
+                    key_code = KEYCODE_R;
+                    break;
+                case SDLK_s:
+                    key_code = KEYCODE_S;
+                    break;
+                case SDLK_t:
+                    key_code = KEYCODE_T;
+                    break;
+                case SDLK_u:
+                    key_code = KEYCODE_U;
+                    break;
+                case SDLK_v:
+                    key_code = KEYCODE_V;
+                    break;
+                case SDLK_w:
+                    key_code = KEYCODE_W;
+                    break;
+                case SDLK_x:
+                    key_code = KEYCODE_X;
+                    break;
+                case SDLK_y:
+                    key_code = KEYCODE_Y;
+                    break;
+                case SDLK_z:
+                    key_code = KEYCODE_Z;
+                    break;
+                case SDLK_BACKSPACE:
+                    key_code = KEYCODE_BACKSPACE;
+                    break;
+                case SDLK_TAB:
+                    key_code = KEYCODE_TAB;
+                    break;
+                case SDLK_RETURN:
+                    key_code = KEYCODE_ENTER;
+                    break;
+                case SDLK_SPACE:
+                    key_code = KEYCODE_SPACE;
+                    break;
+                case SDLK_DELETE:
+                    key_code = KEYCODE_DELETE;
+                    break;
+                case SDLK_EQUALS:
+                    key_code = KEYCODE_EQUAL;
+                    break;
+                case SDLK_BACKSLASH:
+                    key_code = KEYCODE_BACKSLASH;
+                    break;
+                case SDLK_UNDERSCORE:
+                    key_code = KEYCODE_UNDERSCORE;
+                    break;
+                case SDLK_QUOTE:
+                    key_code = KEYCODE_QUOTE;
+                    break;
+                case SDLK_BACKQUOTE:
+                    key_code = KEYCODE_BACKQUOTE;
+                    break;
+                case SDLK_LEFTBRACKET:
+                    key_code = KEYCODE_LEFT_BRACKET;
+                    break;
+                case SDLK_RIGHTBRACKET:
+                    key_code = KEYCODE_RIGHT_BRACKET;
+                    break;
+                case SDLK_SEMICOLON:
+                    key_code = KEYCODE_SEMICOLON;
+                    break;
+                case SDLK_F1:
+                    key_code = KEYCODE_F1;
+                    break;
+                case SDLK_F2:
+                    key_code = KEYCODE_F2;
+                    break;
+                case SDLK_F3:
+                    key_code = KEYCODE_F3;
+                    break;
+                case SDLK_F4:
+                    key_code = KEYCODE_F4;
+                    break;
+                case SDLK_F5:
+                    key_code = KEYCODE_F5;
+                    break;
+                case SDLK_F6:
+                    key_code = KEYCODE_F6;
+                    break;
+                case SDLK_F7:
+                    key_code = KEYCODE_F7;
+                    break;
+                case SDLK_F8:
+                    key_code = KEYCODE_F8;
+                    break;
+                case SDLK_F9:
+                    key_code = KEYCODE_F9;
+                    break;
+                case SDLK_F10:
+                    key_code = KEYCODE_F10;
+                    break;
+                case SDLK_F11:
+                    key_code = KEYCODE_F11;
+                    break;
+                case SDLK_F12:
+                    key_code = KEYCODE_F12;
+                    break;
+                case SDLK_LSHIFT:
+                    key_code = KEYCODE_LEFT_SHIFT;
+                    break;
+                case SDLK_LCTRL:
+                    key_code = KEYCODE_LEFT_CONTROL;
+                    break;
+                case SDLK_LALT:
+                    key_code = KEYCODE_LEFT_ALT;
+                    break;
+                case SDLK_RSHIFT:
+                    key_code = KEYCODE_RIGHT_SHIFT;
+                    break;
+                case SDLK_RCTRL:
+                    key_code = KEYCODE_RIGHT_CONTROL;
+                    break;
+                case SDLK_RALT:
+                    key_code = KEYCODE_RIGHT_ALT;
+                    break;
+                case SDLK_CAPSLOCK:
+                    key_code = KEYCODE_CAPSLOCK;
+                    break;
+                case SDLK_HOME:
+                    key_code = KEYCODE_HOME;
+                    break;
+                case SDLK_END:
+                    key_code = KEYCODE_END;
+                    break;
+                case SDLK_PAGEUP:
+                    key_code = KEYCODE_PAGE_UP;
+                    break;
+                case SDLK_PAGEDOWN:
+                    key_code = KEYCODE_PAGE_DOWN;
+                    break;
+                case SDLK_INSERT:
+                    key_code = KEYCODE_INSERT;
+                    break;
+                case SDLK_UP:
+                    key_code = KEYCODE_UP;
+                    break;
+                case SDLK_DOWN:
+                    key_code = KEYCODE_DOWN;
+                    break;
+                case SDLK_LEFT:
+                    key_code = KEYCODE_LEFT;
+                    break;
+                case SDLK_RIGHT:
+                    key_code = KEYCODE_RIGHT;
+                    break;
+                case SDLK_ESCAPE:
+                    key_code = KEYCODE_ESCAPE;
+                    break;
+                default:
+                    continue;
+            }
+            if (event.type == SDL_KEYDOWN) {
+                // If key is pressed, set the corresponding bit to 1.
+                key_status_map[key_code / 8].fetch_or(static_cast<uint8_t>(0b1 << (key_code % 8)), std::memory_order_release);
+            } else if (event.type == SDL_KEYUP) {
+                // If key is released, set the corresponding bit to 0.
+                key_status_map[key_code / 8].fetch_and(static_cast<uint8_t>(~(0b1 << (key_code % 8))), std::memory_order_release);
+            }
+
+        }
+    }
 }
 
 } // namespace WhiteBirdEngine

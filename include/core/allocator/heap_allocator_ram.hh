@@ -36,11 +36,16 @@ struct AllocatorTrait<class HeapAllocatorRAM> final : public AllocatorTrait<Heap
     WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
 
+/**
+ * @class HeapAllocatorRAM
+ * @brief Allocator that uses standard RAM allocation (malloc/free).
+ *
+ */
 class HeapAllocatorRAM final : public HeapAllocator {
 public:
-
-    HeapAllocatorRAM() {}
+    HeapAllocatorRAM() = default;
     virtual ~HeapAllocatorRAM() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorRAM)
 
     virtual MemID allocate(size_t p_size) override;
 
@@ -72,18 +77,18 @@ public:
 
     virtual operator std::string() const override {
         std::stringstream ss;
-        ss << "{";
-        ss << "\"type\":\"HeapAllocatorRAM\",";
-        ss << "\"obj_count\":" << obj_count() << ",";
-        ss << "\"allocated\":[";
+        ss << R"({"type":"HeapAllocatorRAM",)";
+        ss << R"("obj_count":)" << obj_count() << ",";
+        ss << R"("allocated":[)";
         bool first = true;
-        for (auto& mem_id : allocated) {
-            if (!first) ss << ",";
+        for (const auto& mem_id : allocated) {
+            if (!first) {
+                ss << ",";
+            }
             first = false;
             ss << mem_id;
         }
-        ss << "]";
-        ss << "}";
+        ss << "]}";
         return ss.str();
     }
 
@@ -92,6 +97,6 @@ private:
 
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

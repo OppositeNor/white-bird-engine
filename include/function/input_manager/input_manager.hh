@@ -26,11 +26,6 @@ using KeyStatus = uint8_t;
 constexpr KeyStatus KEY_UP = 0b00;
 // The key is pressed.
 constexpr KeyStatus KEY_DOWN = 0b01;
-// The key is just released.
-constexpr KeyStatus KEY_JUST_UP = 0b10;
-// The key is just pressed.
-constexpr KeyStatus KEY_JUST_DOWN = 0b11;
-
 
 /**
  * @class InputStatus
@@ -44,15 +39,6 @@ struct InputStatus {
     KeyStatus status_code;
 
     /**
-     * @brief Is the key action just happened.
-     *
-     * @return True if the key action just happened. False otherwise.
-     */
-    bool is_just() const {
-        return status_code & 0b10;
-    }
-
-    /**
      * @brief Is key up.
      *
      * @return True if the key is up. False otherwise.
@@ -62,30 +48,12 @@ struct InputStatus {
     }
 
     /**
-     * @brief Is the key just up.
-     *
-     * @return True if the key just up. False otherwise.
-     */
-    bool is_just_up() const {
-        return status_code == KEY_JUST_UP;
-    }
-
-    /**
      * @brief Is key up.
      *
      * @return True if the key is up. False otherwise.
      */
     bool is_down() const {
         return status_code & KEY_DOWN;
-    }
-
-    /**
-     * @brief Is the key just up.
-     *
-     * @return True if the key just up. False otherwise.
-     */
-    bool is_just_down() const {
-        return status_code == KEY_JUST_DOWN;
     }
 };
 
