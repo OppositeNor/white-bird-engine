@@ -341,6 +341,8 @@ void RendererVK::setup_base_render_data() {
     base_render_data.logic_device = logical_device;
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;
+    base_render_data.swap_chain_aspect_ratio
+        = static_cast<float>(swap_chain_extent.width) / static_cast<float>(swap_chain_extent.height);
     base_render_data.allocation_callbacks = get_allocation_callbacks();
     base_render_data.graphics_queue = graphics_queue;
     base_render_data.compute_queue = compute_queue;

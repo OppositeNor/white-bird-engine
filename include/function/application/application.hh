@@ -46,6 +46,20 @@ public:
      * @return The difference between pair of logic frames.
      */
     virtual double get_logic_delta() const = 0;
+
+    /**
+     * @brief The function called every render frame.
+     *
+     * @param p_delta The delta time since last render frame.
+     */
+    virtual void render_update(double p_delta) {};
+
+    /**
+     * @brief The function called every logic frame.
+     *
+     * @param p_delta The delta time since last render frame.
+     */
+    virtual void logic_update(double p_delta) {};
 };
 
 } // namespace WhiteBirdEngine

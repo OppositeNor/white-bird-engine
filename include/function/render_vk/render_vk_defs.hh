@@ -47,6 +47,8 @@ struct BaseRenderDataVK {
     VkFormat swap_chain_format = VK_FORMAT_UNDEFINED;
     // The size of the swap chain.
     VkExtent2D swap_chain_extent{};
+    // The aspect ratio of the swap chain.
+    float swap_chain_aspect_ratio = 1.0F;
     // Callback for allocator.
     VkAllocationCallbacks* allocation_callbacks = nullptr;
     // Graphics queue family.
@@ -140,15 +142,7 @@ constexpr std::array<VkVertexInputAttributeDescription, 5> VERTEX_3D_TEXTURED_IN
     }
 };
 
-/**
- * @class MVPMatrices
- * @brief Model, view, projection buffer structure.
- */
-struct MVPMatricesVKUBO {
-    /**
-     * @brief The model matrix.
-     */
-    glm::mat4 model;
+struct CameraInfoVKUBO {
     /**
      * @brief The view matrix.
      */

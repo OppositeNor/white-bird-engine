@@ -6,8 +6,12 @@
             "name" : "wbe_render_test",
             "exes" : [
                 {
-                    "name" : "vulkan_draw_pipeline_test",
-                    "sources" : ["vulkan_draw_pipeline_test.cpp"]
+                    "name" : "vulkan_draw_cube_test",
+                    "sources" : ["vulkan_draw_cube_test.cpp"]
+                },
+                {
+                    "name" : "vulkan_draw_triangle_test",
+                    "sources" : ["vulkan_draw_triangle_test.cpp"]
                 }
             ]
         }

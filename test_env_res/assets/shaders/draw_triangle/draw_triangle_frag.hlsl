@@ -19,6 +19,6 @@
 cbuffer time : register(b0, space0) { Time time; }
 
 float4 main(VSOutput p_input) : SV_Target {
-    return float4(0.0, time.duration_sec, 0.0, 1.0);
+    return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }
 

@@ -1,0 +1,16 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "draw_cube_vert",
+            "type": "binary",
+            "path": "assets/shaders/draw_cube/draw_cube_vert.spv"
+        },
+        {
+            "id": "draw_cube_frag",
+            "type": "binary",
+            "path": "assets/shaders/draw_cube/draw_cube_frag.spv"
+        }
+    ]
+}
+

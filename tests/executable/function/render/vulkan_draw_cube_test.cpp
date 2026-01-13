@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "core/reflection/reflection_defs.hh"
-#include "function/function_utils.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -34,32 +33,60 @@
 #include <exception>
 #include <format>
 #include <print>
+#include <glm/glm.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
-// WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_SHADER_VERT, WBE_RENDER_RESOURCE);
-// WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_SHADER_FRAG, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+// WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_SHADER_VERT, WBE_RENDER_RESOURCE);
+// WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_SHADER_FRAG, WBE_RENDER_RESOURCE);
 }
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
+
+    virtual void logic_update(double p_delta) override {
+        // TODO
+    }
+
+    virtual void render_update(double p_delta) override {
+        time_accumulator += p_delta;
+        WBE::CameraInfoVKUBO camera_info{
+            // Look at the origin from (2,2,2)
+            .view = glm::rotate(glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F),
+                                            glm::vec3(0.0F, 0.0F, 0.0F),
+                                            glm::vec3(0.0F, 0.0F, 1.0F)),
+                                static_cast<float>(time_accumulator), glm::vec3(0.0F, 0.0F, 1.0F)),
+            .proj = glm::perspective(glm::radians(45.0F),
+                                     aspect_ratio,
+                                     0.1F, 10.0F),
+        };
+        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+    }
+
+
     void setup_graphics_pipeline() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
+        auto* render_database = WBE::RenderDatabase::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
+
+        // Setup cube's mesh
+        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
+        render_database->set_static_opaque_triangles(cube_mesh.get());
+        renderer->update_static_opaque_triangles();
 
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
         shader_config.set_shaders(
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_triangle_vert"),
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_triangle_frag"));
+            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_cube_vert"),
+            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_cube_frag"));
 
         // Setup graphics pipeline layout.
-        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout
-            = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(render_allocator, base_render_data,
+        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(render_allocator, base_render_data,
                                                           WBE::RODescriptorSetLayoutVK::Builder()
                                                           .add_ubo(0, 1));
         WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout
@@ -67,20 +94,29 @@ public:
                                                      WBE::ROPipelineLayoutVK::Builder()
                                                      .add_descriptor_set_layout(descriptor_set_layout));
         auto render_pass = renderer->get_swap_chain_render_pass();
-        auto graphics_pipeline
-            = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data,
+        auto graphics_pipeline = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data,
                                                        WBE::ROGraphicsPipelineVK::get_default_render_opaque_configuration(
                                                        base_render_data, shader_config, graphics_pipeline_layout, render_pass));
-        WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
+        aspect_ratio = base_render_data->swap_chain_aspect_ratio;
+        WBE::CameraInfoVKUBO camera_info{
+            // Look at the origin from (2,2,2)
+            .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F),
+                                glm::vec3(0.0F, 0.0F, 0.0F),
+                                glm::vec3(0.0F, 0.0F, 1.0F)),
+            .proj = glm::perspective(glm::radians(45.0F),
+                                     aspect_ratio,
+                                     0.1F, 10.0F),
+        };
+        camera_info.proj[1][1] *= -1;
         // Setup time UBO
-        time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data, WBE::ROBufferVK::Builder()
-                                                  .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                  .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                                  .set_size(sizeof(WBE::TimeVKUBO)));
-        time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
+        camera_info_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data,
+                                                WBE::ROBufferVK::Builder()
+                                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                                                .set_size(sizeof(WBE::CameraInfoVKUBO)));
+        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
         // Setup descriptor sets.
-        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set
-            = WBE::make_ref<WBE::RODescriptorSetVK>(render_allocator, base_render_data,
+        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set = WBE::make_ref<WBE::RODescriptorSetVK>(render_allocator, base_render_data,
                                                     WBE::RODescriptorSetVK::Builder()
                                                     .add_descriptor_set_layout(descriptor_set_layout));
         descriptor_set->write_descriptor_set(
@@ -88,7 +124,7 @@ public:
             .set_binding(0)
             .add_uniform_buffer_info(
                 WBE::RODescriptorSetVK::Writer::BufferInfo{
-                    .buffer = time_ubo,
+                    .buffer = camera_info_ubo,
                     .offset = 0
                 })
         );
@@ -97,7 +133,7 @@ public:
         WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::RendTaskInfo::Builder()
             .set_task_id(WBE::RT_RUN_PIPELINE)
             .add_req_res(WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE::TypeUUID<WBE::ROFramebufferVK>::UUID)
-            .add_req_res(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID)
+            .add_req_res(WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID)
             .add_req_res(WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, WBE::TypeUUID<WBE::ROBufferVK>::UUID)
             .add_req_res(WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE::TypeUUID<WBE::ROBufferVK>::UUID)
             .set_render_task_factory(WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(
@@ -106,7 +142,7 @@ public:
         WBE::RendPipelineInfo pipeline_info;
         pipeline_info
             .set_root_task(rend_task_info)
-            .add_resource(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
+            .add_resource(WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
                           WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
                           graphics_pipeline);
         get_renderer()->register_pipeline("test_pipeline", pipeline_info);
@@ -114,7 +150,9 @@ public:
     }
 
 private:
-    WBE::Ref<WBE::ROBufferVK> time_ubo;
+    WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
+    double time_accumulator = 0.0;
+    float aspect_ratio = 1.0F;
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -122,10 +160,6 @@ int main(int p_argc, char* p_argv[]) {
         std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
         {
             ApplicationVulkanDrawPipelineTest game_application;
-            // Setup cube's mesh
-            auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
-            WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
-            game_application.get_renderer()->update_static_opaque_triangles();
             {
                 WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
                 game_application.setup_graphics_pipeline();

@@ -42,13 +42,9 @@ struct Vertex3DTexturedInput {
 };
 
 /**
- * @brief Model, view, projection buffer structure.
+ * @brief The information of the camera.
  */
-struct MVPMatrices {
-    /**
-     * @brief The model matrix.
-     */
-    float4x4 model;
+struct CameraInfo {
     /**
      * @brief The view matrix.
      */

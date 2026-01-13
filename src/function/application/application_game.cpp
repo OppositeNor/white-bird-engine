@@ -36,6 +36,9 @@ void ApplicationGame::run() {
     std::jthread render_thread([this]() {
         run_render();
     });
+    std::jthread logic_thread([this]() {
+        run_logic();
+    });
 }
 
 void ApplicationGame::init() {
@@ -67,6 +70,7 @@ void ApplicationGame::run_render() {
         start_time = global_clock->get_duration();
         renderer->pool_events(local_should_close, input_manager);
         should_close.store(local_should_close, std::memory_order_release);
+        render_update(render_delta.load(std::memory_order_relaxed));
         renderer->tick(render_delta.load(std::memory_order_relaxed));
         end_time =  global_clock->get_duration();
         render_delta.store(end_time - start_time, std::memory_order_release);
@@ -75,8 +79,13 @@ void ApplicationGame::run_render() {
 
 void ApplicationGame::run_logic() {
     bool local_should_close = false;
+    auto* global_clock = EngineCore::get_singleton()->global_clock;
+    double start_time, end_time;
     while (!local_should_close) {
-        // TODO
+        start_time = global_clock->get_duration();
+        logic_update(logic_delta.load(std::memory_order_relaxed));
+        end_time = global_clock->get_duration();
+        logic_delta.store(end_time - start_time, std::memory_order_release);
         local_should_close = should_close.load(std::memory_order_acquire);
     }
 }
