@@ -96,11 +96,6 @@ struct BaseRenderDataVK {
 constexpr uint32_t VERTEX_BUFFER_BINDPOINT = 0;
 
 /**
- * @brief The bindpoint for material uniform buffer.
- */
-constexpr uint32_t UBUFFER_MATERIAL_BINDPOINT = 0;
-
-/**
  * @brief The binding description for Vertex3DTextured.
  */
 constexpr VkVertexInputBindingDescription VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION = {
@@ -149,7 +144,7 @@ constexpr std::array<VkVertexInputAttributeDescription, 5> VERTEX_3D_TEXTURED_IN
  * @class MVPMatrices
  * @brief Model, view, projection buffer structure.
  */
-struct MVPMatrices {
+struct MVPMatricesVKUBO {
     /**
      * @brief The model matrix.
      */
@@ -162,6 +157,16 @@ struct MVPMatrices {
      * @brief The projection matrix.
      */
     glm::mat4 proj;
+};
+
+/**
+ * @brief Time information.
+ */
+struct TimeVKUBO {
+    /**
+     * @brief The duration from the start of the application until now.
+     */
+    float duration_sec = 0.0F;
 };
 
 /**

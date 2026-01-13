@@ -19,6 +19,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
+#include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -36,10 +37,30 @@ public:
         // The descriptor set bindings.
         std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-        // Set the descriptor set bindings.
-        Builder& set_bindings(const std::vector<VkDescriptorSetLayoutBinding>& p_bindings);
-        // Add a single binding.
+        /**
+         * @brief Set the bindings.
+         *
+         * @param p_bindings The bindings to set to.
+         * @return *this.
+         */
+        Builder& set_bindings(const std::span<VkDescriptorSetLayoutBinding>& p_bindings);
+        /**
+         * @brief Add a binding.
+         *
+         * @param p_binding The binding to add.
+         * @return *this.
+         */
         Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding);
+
+        /**
+         * @brief Add a UBO binding.
+         *
+         * @param p_binding The binding number of this entry.
+         * @param p_descriptor_count The number of descriptors contained in this binding.
+         * @param p_shader_stages The shader stages that could access this binding.
+         * @return *this.
+         */
+        Builder& add_ubo(uint32_t p_binding, uint32_t p_descriptor_count, VkShaderStageFlags p_shader_stages = VK_SHADER_STAGE_ALL);
 
     private:
         VkDescriptorSetLayout build(const BaseRenderDataVK* p_render_data) const;

@@ -56,7 +56,7 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     exposed_fields.buffer_size = p_builder.size;
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
     buffer_memory = allocate_device_memory(memory_requirements, exposed_fields.domain);
-    if (exposed_fields.domain == DeviceDomain::HOST) {
+    if (exposed_fields.domain == DeviceDomain::HOST || exposed_fields.domain == DeviceDomain::HOST_DEVICE) {
         vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
     }
     if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
@@ -76,7 +76,7 @@ ROBufferVK::~ROBufferVK() {
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
-    if (exposed_fields.domain != DeviceDomain::HOST) {
+    if (exposed_fields.domain != DeviceDomain::HOST && exposed_fields.domain != DeviceDomain::HOST_DEVICE) {
         throw std::runtime_error("Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
     }
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
@@ -84,7 +84,7 @@ void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p
             std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
                         p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
     }
-    memcpy(mapped_memory, p_data, p_size);
+    memcpy(static_cast<uint8_t*>(mapped_memory) + p_dst_offset, p_data, p_size);
 }
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {

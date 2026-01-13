@@ -28,9 +28,14 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
-                                                 bool p_signal_in_flight_fence)
+                                                 const std::span<const Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight_fence)
     : RenderTaskVK(p_render_data), clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
-    signal_in_flight_fence(p_signal_in_flight_fence), descriptor_sets(p_render_data->allocator), descriptor_sets_instances(p_render_data->allocator) {
+    signal_in_flight_fence(p_signal_in_flight_fence), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
+    descriptor_sets_instances(p_render_data->allocator) {
+    descriptor_sets_instances.reserve(descriptor_sets.size());
+    for (const auto& descriptor_set : descriptor_sets) {
+        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
+    }
     VkCommandBufferAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = render_data->graphics_command_pool;

@@ -90,9 +90,14 @@ public:
         // TODO: Image info
 
         /**
-         * @brief The buffer info to write.
+         * @brief The storage buffer info to write.
          */
-        std::vector<BufferInfo> buffer_infos;
+        std::vector<BufferInfo> storage_buffer_infos;
+
+        /**
+         * @brief The uniform buffer info to write.
+         */
+        std::vector<BufferInfo> uniform_buffer_infos;
         
         /**
          * @brief The binding to write to.
@@ -111,15 +116,27 @@ public:
         }
 
         /**
-         * @brief Add a buffer info.
+         * @brief Add a storage_buffer info.
          *
          * @param p_buffer_info The buffer info to add.
          * @return *this.
          */
-        Writer& add_buffer_info(const BufferInfo& p_buffer_info) {
-            buffer_infos.push_back(p_buffer_info);
+        Writer& add_storage_buffer_info(const BufferInfo& p_buffer_info) {
+            storage_buffer_infos.push_back(p_buffer_info);
             return *this;
         }
+
+        /**
+         * @brief Add a uniform_buffer info.
+         *
+         * @param p_buffer_info The buffer info to add.
+         * @return *this.
+         */
+        Writer& add_uniform_buffer_info(const BufferInfo& p_buffer_info) {
+            uniform_buffer_infos.push_back(p_buffer_info);
+            return *this;
+        }
+
     };
 
     RODescriptorSetVK() = delete;
@@ -155,8 +172,6 @@ private:
     Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
     // Keep references to bound resources to prevent them from being destroyed.
     Map<uint32_t, Vector<Ref<RenderObjectVK>>> bound_objects;
-
-    void prepare_binding(uint32_t p_binding);
 };
 
 } // namespace WhiteBirdEngine

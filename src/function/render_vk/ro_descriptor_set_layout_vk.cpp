@@ -15,18 +15,30 @@
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include <span>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::set_bindings(const std::vector<VkDescriptorSetLayoutBinding>& p_bindings) {
-    bindings = p_bindings;
+RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::set_bindings(const std::span<VkDescriptorSetLayoutBinding>& p_bindings) {
+    bindings = std::vector<VkDescriptorSetLayoutBinding>(p_bindings.begin(), p_bindings.end());
     return *this;
 }
 
 RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_binding(const VkDescriptorSetLayoutBinding& p_binding) {
     bindings.push_back(p_binding);
+    return *this;
+}
+
+RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_ubo(uint32_t p_binding, uint32_t p_descriptor_count,
+                                                                            VkShaderStageFlags p_shader_stages) {
+    bindings.push_back({
+        .binding = p_binding,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = p_descriptor_count,
+        .stageFlags = p_shader_stages,
+    });
     return *this;
 }
 

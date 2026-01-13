@@ -21,6 +21,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include <glm/glm.hpp>
+#include <span>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -37,11 +38,14 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     /**
      * @brief Constructor.
      *
-     * @param p_render_data 
-     * @param p_clear_color 
-     * @param p_signal_in_flight_fence 
+     * @param p_render_data The base render data.
+     * @param p_clear_color The clear color.
+     * @param p_signal_in_flight_fence If set to true, the in_flight_fence will be signaled after the task is finished.
+     * @param p_descriptor_sets The descriptor sets to be bound.
      */
-    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight_fence);
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
+                            const std::span<const Ref<RODescriptorSetVK>>& p_descriptor_sets,
+                            bool p_signal_in_flight_fence);
 
     virtual void init() override;
 
@@ -68,6 +72,7 @@ private:
     void record_command_buffer_without_vertex_binding();
     void record_command_buffer_with_vertex_binding();
     Vector<Ref<RODescriptorSetVK>> descriptor_sets;
+    // Keeping an easy access to the VkDescriptorSet instances.
     Vector<VkDescriptorSet> descriptor_sets_instances;
 };
 
@@ -100,12 +105,38 @@ public:
     RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight = false)
         : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight), clear_color(p_clear_color) {}
 
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_clear_color The clear color.
+     * @param p_signal_in_flight Should signal in flight fence.
+     * @param p_descriptor_sets The descriptor sets to be bound.
+     */
+    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
+                                   const std::span<Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight = false)
+        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight),
+        clear_color(p_clear_color), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end()) {}
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The render data.
+     * @param p_signal_in_flight Should signal in flight fence.
+     * @param p_descriptor_sets The descriptor sets to be bound.
+     */
+    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data,
+                                   const std::span<Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight = false)
+        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight),
+        clear_color(0.0F, 0.0F, 0.0F, 1.0F), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end()) {}
+
     virtual Ref<RenderTask> create() const override {
-        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, clear_color, signal_in_flight);      
+        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, clear_color, descriptor_sets, signal_in_flight);
     }
 private:
     bool signal_in_flight;
     glm::vec4 clear_color;
+    std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
 };
 } // namespace WhiteBirdEngine
 

@@ -59,4 +59,14 @@ struct MVPMatrices {
     float4x4 proj;
 };
 
+/**
+ * @brief Time information.
+ */
+struct Time {
+    /**
+     * @brief The duration from the start of the application until now.
+     */
+    float duration_sec;
+};
+
 #endif

@@ -141,87 +141,6 @@ public:
     };
 
     /**
-     * @brief Constructor.
-     *
-     * @param p_builder The builder instance.
-     */
-    ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
-    virtual ~ROBufferVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferVK)
-
-    /**
-     * @brief Get the buffer instance.
-     *
-     * @return The buffer instance.
-     */
-    VkBuffer get_buffer() const {
-        return buffer;
-    }
-
-    /**
-     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
-     *
-     * @param p_data The data to copy from.
-     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to.
-     * @param p_size The size of the data in bytes that would be copied to the buffer.
-     */
-    void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
-
-    /**
-     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
-     *
-     * @param p_data The data to be updated to.
-     * @param p_size The size of data that will be transmitted.
-     */
-    void update_buffer(const void* p_data, size_t p_size);
-
-    /**
-     * @brief Update the buffer from another buffer object.
-     *
-     * @param p_data The buffer object to copy data from.
-     * @param p_src_offset The offset to copy data from in p_data.
-     * @param p_dst_offset The offset to copy data to in the buffer.
-     * @param p_size The size to copy (in bytes).
-     */
-    void update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size);
-
-    /**
-     * @brief Update the buffer from another buffer object.
-     *
-     * @param p_data The buffer object to copy data from.
-     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to. This has to be a multiple of 4.
-     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
-     */
-    void update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
-
-    /**
-     * @brief Update the buffer from another buffer object.
-     *
-     * @param p_data The buffer object to copy data from.
-     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
-     */
-    void update_buffer(Ref<ROBufferVK> p_data, size_t p_size);
-
-    /**
-     * @brief Update the buffer from another buffer object.
-     *
-     * @param p_data The buffer object to copy data from.
-     */
-    void update_buffer(Ref<ROBufferVK> p_data);
-
-    /**
-     * @brief Update the buffer from a staging buffer.
-     *
-     * @param p_buffer The staging buffer to retrieve data.
-     * @param p_data The data to fill in.
-     */
-    void update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
-
-    const ExposedFields& fields() const {
-        return exposed_fields;
-    }
-
-    /**
      * @class BufferMemoryBarrierBuilder
      * @brief Builder for buffer memory barriers.
      *
@@ -364,6 +283,87 @@ public:
          */
         VkBufferMemoryBarrier2 build() const;
     };
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_builder The builder instance.
+     */
+    ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    virtual ~ROBufferVK() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferVK)
+
+    /**
+     * @brief Get the buffer instance.
+     *
+     * @return The buffer instance.
+     */
+    VkBuffer get_buffer() const {
+        return buffer;
+    }
+
+    /**
+     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
+     *
+     * @param p_data The data to copy from.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to.
+     * @param p_size The size of the data in bytes that would be copied to the buffer.
+     */
+    void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
+
+    /**
+     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
+     *
+     * @param p_data The data to be updated to.
+     * @param p_size The size of data that will be transmitted.
+     */
+    void update_buffer(const void* p_data, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_src_offset The offset to copy data from in p_data.
+     * @param p_dst_offset The offset to copy data to in the buffer.
+     * @param p_size The size to copy (in bytes).
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to. This has to be a multiple of 4.
+     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_size);
+
+    /**
+     * @brief Update the buffer from another buffer object.
+     *
+     * @param p_data The buffer object to copy data from.
+     */
+    void update_buffer(Ref<ROBufferVK> p_data);
+
+    /**
+     * @brief Update the buffer from a staging buffer.
+     *
+     * @param p_buffer The staging buffer to retrieve data.
+     * @param p_data The data to fill in.
+     */
+    void update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     void* mapped_memory = nullptr;

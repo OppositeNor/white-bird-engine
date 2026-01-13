@@ -50,46 +50,69 @@ RODescriptorSetVK::~RODescriptorSetVK() {
     vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
 }
 
+static void write_buffer_info(VkDescriptorType p_descriptor_type,
+                              VkWriteDescriptorSet& p_write_info,
+                              const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
+                              Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+                              std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos);
+
 void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
+    // Make sure only one type of resource is being written.
+    size_t resource_type_count = 0;
+    if (!p_writer.storage_buffer_infos.empty()) {
+        resource_type_count++;
+    }
+    if (!p_writer.uniform_buffer_infos.empty()) {
+        resource_type_count++;
+    }
+    // TODO: Image view and texel buffer view
+    if (resource_type_count != 1) {
+        throw std::runtime_error("Failed to write descriptor set: only one type of resource can be written at a time.");
+    }
     VkWriteDescriptorSet write_info{};
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_info.dstSet = descriptor_set;
     write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
     write_info.dstArrayElement = 0;
-    Vector<VkDescriptorBufferInfo> buffer_infos(render_data->allocator);
-    prepare_binding(WBE_REQUIRED(p_writer.binding));
-    if (!p_writer.buffer_infos.empty()) {
-        write_info.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        for (const auto& buffer_info : p_writer.buffer_infos) {
-            VkDescriptorBufferInfo vk_buffer_info{};
-            vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
-            vk_buffer_info.offset = buffer_info.offset;
-            vk_buffer_info.range = buffer_info.range;
-            buffer_infos.push_back(vk_buffer_info);
-            // Keep a reference to the buffer to prevent it from being destroyed.
-            auto bound_object_it = bound_objects.find(WBE_REQUIRED(p_writer.binding));
-            bound_object_it->second.emplace_back(buffer_info.buffer);
-        }
-        write_info.descriptorCount = buffer_infos.size();
-        write_info.pBufferInfo = buffer_infos.data();
+    std::vector<VkDescriptorBufferInfo> buffer_infos;
+    // Prepare buffer infos
+    auto emplace_result = bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>>(render_data->allocator));
+    auto bound_object_it = emplace_result.first;
+    if (!emplace_result.second) {
+        // If previously existed, clear the bound objects.
+        bound_object_it->second.clear();
+    }
+
+    if (!p_writer.storage_buffer_infos.empty()) {
+        write_buffer_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, p_writer.storage_buffer_infos, bound_object_it, buffer_infos);
+    }
+    if (!p_writer.uniform_buffer_infos.empty()) {
+        write_buffer_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, bound_object_it, buffer_infos);
     }
     // TODO: Image view
     // TODO: Texel buffer view
 	vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
 }
 
-void RODescriptorSetVK::prepare_binding(uint32_t p_binding) {
-    // Find the descriptor type that was originally bound on this binding point.
-    auto bound_object_it = bound_objects.find(p_binding);
-    if (bound_object_it == bound_objects.end()) {
-        // If none was bound, create a new entry.
-        bound_objects.insert({p_binding, Vector<Ref<RenderObjectVK>>(render_data->allocator)});
-        bound_object_it = bound_objects.find(p_binding);
+static void write_buffer_info(VkDescriptorType p_descriptor_type,
+                              VkWriteDescriptorSet& p_write_info,
+                              const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
+                              Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+                              std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
+    p_write_info.descriptorType = p_descriptor_type;
+    p_result_buffer_infos.reserve(p_buffer_infos.size());
+    p_bound_object_it->second.reserve(p_buffer_infos.size());
+    for (const auto& buffer_info : p_buffer_infos) {
+        VkDescriptorBufferInfo vk_buffer_info{};
+        vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
+        vk_buffer_info.offset = buffer_info.offset;
+        vk_buffer_info.range = buffer_info.range;
+        p_result_buffer_infos.push_back(vk_buffer_info);
+        // Keep a reference to the buffer to prevent it from being destroyed.
+        p_bound_object_it->second.emplace_back(buffer_info.buffer);
     }
-    else {
-        // Clear previously bound objects.
-        bound_object_it->second.clear();
-    }
+    p_write_info.descriptorCount = p_result_buffer_infos.size();
+    p_write_info.pBufferInfo = p_result_buffer_infos.data();
 }
 
 } // namespace WhiteBirdEngine
