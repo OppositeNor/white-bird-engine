@@ -21,8 +21,7 @@ cbuffer camera_info : register(b0, space0) { CameraInfo camera_info; }
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
 
-    float4 viewPos  = mul(float4(p_input.position.xyz, 1.0), camera_info.view);
-    output.position = mul(viewPos, camera_info.proj);
+    output.position  = camera_info.proj * camera_info.view * float4(p_input.position.xyz, 1.0);
     output.normal = p_input.normal;
     output.uv = p_input.uv;
 

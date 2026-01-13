@@ -53,20 +53,19 @@ public:
     }
 
     virtual void render_update(double p_delta) override {
-        time_accumulator += p_delta;
-        WBE::CameraInfoVKUBO camera_info{
-            // Look at the origin from (2,2,2)
-            .view = glm::rotate(glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F),
-                                            glm::vec3(0.0F, 0.0F, 0.0F),
-                                            glm::vec3(0.0F, 0.0F, 1.0F)),
-                                static_cast<float>(time_accumulator), glm::vec3(0.0F, 0.0F, 1.0F)),
-            .proj = glm::perspective(glm::radians(45.0F),
-                                     aspect_ratio,
-                                     0.1F, 10.0F),
-        };
-        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+        // time_accumulator += p_delta;
+        // WBE::CameraInfoVKUBO camera_info{
+        //     // Look at the origin from (2,2,2)
+        //     .view = glm::inverse(glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F),
+        //                                      glm::vec3(0.0F, 0.0F, 0.0F),
+        //                                      glm::vec3(0.0F, 1.0F, 0.0F))),
+        //     .proj = glm::perspective(glm::radians(45.0F),
+        //                              aspect_ratio,
+        //                              0.1F, 10.0F),
+        // };
+        // camera_info.proj[1][1] *= -1;
+        // camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     }
-
 
     void setup_graphics_pipeline() {
         auto* render_allocator = get_renderer_allocator().get();
@@ -102,11 +101,12 @@ public:
             // Look at the origin from (2,2,2)
             .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F),
                                 glm::vec3(0.0F, 0.0F, 0.0F),
-                                glm::vec3(0.0F, 0.0F, 1.0F)),
+                                glm::vec3(0.0F, 1.0F, 0.0F)),
             .proj = glm::perspective(glm::radians(45.0F),
                                      aspect_ratio,
                                      0.1F, 10.0F),
         };
+        // Inverse the y value since Vulkan makes y axis points downwards (I always don't understand why. This is so confusing).
         camera_info.proj[1][1] *= -1;
         // Setup time UBO
         camera_info_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data,
@@ -151,7 +151,7 @@ public:
 
 private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    double time_accumulator = 0.0;
+    // double time_accumulator = 0.0;
     float aspect_ratio = 1.0F;
 };
 
