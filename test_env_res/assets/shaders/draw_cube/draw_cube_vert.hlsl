@@ -20,8 +20,8 @@ cbuffer camera_info : register(b0, space0) { CameraInfo camera_info; }
 
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
-
-    output.position  = camera_info.proj * camera_info.view * float4(p_input.position.xyz, 1.0);
+    // HLSL uses column major
+    output.position  = float4(p_input.position.xyz, 1.0) * camera_info.view * camera_info.proj;
     output.normal = p_input.normal;
     output.uv = p_input.uv;
 

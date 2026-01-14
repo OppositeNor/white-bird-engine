@@ -312,8 +312,8 @@ public:
              * @param p_depth_clamp_enabled VK_TRUE to enable depth clamp, VK_FALSE otherwise.
              * @return 
              */
-            RasterizationConfig& set_depth_clamp(VkBool32 p_depth_clamp_enabled) {
-                depth_clamp_enabled = p_depth_clamp_enabled;
+            RasterizationConfig& set_depth_clamp(bool p_depth_clamp_enabled) {
+                depth_clamp_enabled = p_depth_clamp_enabled ? VK_TRUE : VK_FALSE;
                 return *this;
             }
 
