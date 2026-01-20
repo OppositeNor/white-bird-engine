@@ -64,6 +64,10 @@ if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
     add_subdirectory(dependencies/google-benchmark)
 endif()
+# Setup miniaudio
+add_library(WBE_MINIAUDIO_BUILD_LIB
+    dependencies/miniaudio/miniaudio.c
+)
 
 
 # Set C++ build flags
@@ -120,6 +124,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/stb
     ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
     ${PROJECT_SOURCE_DIR}/dependencies/SPIRV-Reflect/include
+    ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
 )
 if (WBE_MAKE_TEST)
     set(include_dirs
@@ -145,6 +150,7 @@ set(libs ${libs}
     yaml-cpp::yaml-cpp
     boost_thread
     spirv-reflect-static
+    WBE_MINIAUDIO_BUILD_LIB
 )
 
 # Add engine source

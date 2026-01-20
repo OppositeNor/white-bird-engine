@@ -25,6 +25,8 @@ namespace WhiteBirdEngine {
  *
  */
 class AudioRendererMiniaudio final : public AudioRenderer {
+public:
+
 
 };
 
