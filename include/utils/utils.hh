@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
-#include <ios>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -82,6 +81,26 @@ constexpr HashCode dynam_hash(const char* p_str) {
     return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
 }
 
+/**
+ * @brief Hash a int32_t in compile time.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+consteval HashCode static_hash(int32_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = (p_val >> 16) ^ p_val;
+    return p_val;
+}
+
+/**
+ * @brief Hash a int32_t.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
 constexpr HashCode dynam_hash(int32_t p_val) {
     // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
     p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
@@ -90,11 +109,87 @@ constexpr HashCode dynam_hash(int32_t p_val) {
     return p_val;
 }
 
-constexpr HashCode dynam_hash(size_t p_val) {
+/**
+ * @brief Hash a uint32_t in compile time.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+consteval HashCode static_hash(uint32_t p_val) {
     // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
-    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
-    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3bU;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3bU;
     p_val = (p_val >> 16) ^ p_val;
+    return p_val;
+}
+
+/**
+ * @brief Hash a uint32_t.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+constexpr HashCode dynam_hash(uint32_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3bU;
+    p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3bU;
+    p_val = (p_val >> 16) ^ p_val;
+    return p_val;
+}
+
+/**
+ * @brief Hash a int64_t in compile time.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+consteval HashCode static_hash(int64_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = (p_val ^ (p_val >> 30)) * 0xbf58476d1ce4e5b9LL; // NOLINT
+    p_val = (p_val ^ (p_val >> 27)) * 0x94d049bb133111ebLL; // NOLINT
+    p_val = p_val ^ (p_val >> 31);
+    return p_val;
+}
+
+/**
+ * @brief Hash a int64_t.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+constexpr HashCode dynam_hash(int64_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = (p_val ^ (p_val >> 30)) * 0xbf58476d1ce4e5b9LL; // NOLINT
+    p_val = (p_val ^ (p_val >> 27)) * 0x94d049bb133111ebLL; // NOLINT
+    p_val = p_val ^ (p_val >> 31);
+    return p_val;
+}
+
+/**
+ * @brief Hash a uint64_t in compile time.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+consteval HashCode static_hash(uint64_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = (p_val ^ (p_val >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    p_val = (p_val ^ (p_val >> 27)) * 0x94d049bb133111ebULL;
+    p_val = p_val ^ (p_val >> 31);
+    return p_val;
+}
+
+/**
+ * @brief Hash a uint64_t.
+ *
+ * @param p_val The value to hash.
+ * @return The hash code of the value.
+ */
+constexpr HashCode dynam_hash(uint64_t p_val) {
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    p_val = (p_val ^ (p_val >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    p_val = (p_val ^ (p_val >> 27)) * 0x94d049bb133111ebULL;
+    p_val = p_val ^ (p_val >> 31);
     return p_val;
 }
 

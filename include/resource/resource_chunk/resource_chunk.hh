@@ -51,20 +51,6 @@ public:
     virtual size_t get_size() const = 0;
 
     /**
-     * @brief Push a resource unit to the chunk.
-     *
-     * @tparam T The type of the resource unit.
-     * @param p_id The identifier of the resource unit.
-     * @param p_allocator The allocator to allocate memory.
-     * @param p_res The resource unit instance.
-     * @return The memory id of the pushed resource unit.
-     */
-    template <ResourceUnitConcept T>
-    RefRes<char> push_res_unit(const std::string& p_id, const T& p_res) {
-        return push_res_unit_ptr(p_id, &p_res, sizeof(T));
-    }
-
-    /**
      * @brief Push a chunk of data into the chunk. The data will be copied to the allocator.
      *
      * @param p_res_size The size of the resource to push to.
@@ -73,30 +59,6 @@ public:
      * @return The result memory id.
      */
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;
-
-    /**
-     * @brief Get the data at ID.
-     *
-     * @tparam T the type of the data to get.
-     * @param p_mem_id The ID to get the data from.
-     * @return The pointer to the data to get.
-     */
-    template <typename T>
-    T* get_data(MemID p_mem_id) {
-        return static_cast<T*>(get_data(p_mem_id));
-    }
-
-    /**
-     * @brief Get the data at ID.
-     *
-     * @tparam T the type of the data to get.
-     * @param p_mem_id The ID to get the data from.
-     * @return The pointer to the data to get.
-     */
-    template <typename T>
-    const T* get_data(MemID p_mem_id) const {
-        return static_cast<const T*>(get_data(p_mem_id));
-    }
 
     /**
      * @brief Get the data at ID.
@@ -136,7 +98,52 @@ public:
      */
     virtual void create_ref_to(void** p_ptr, const std::string& p_key) = 0;
 
+    /**
+     * @brief Push a resource unit to the chunk.
+     *
+     * @tparam T The type of the resource unit.
+     * @param p_id The identifier of the resource unit.
+     * @param p_allocator The allocator to allocate memory.
+     * @param p_res The resource unit instance.
+     * @return The memory id of the pushed resource unit.
+     */
+    template <ResourceUnitConcept T>
+    RefRes<char> push_res_unit(const std::string& p_id, const T& p_res) {
+        return push_res_unit_ptr(p_id, &p_res, sizeof(T));
+    }
+
+    /**
+     * @brief Get the data at ID.
+     *
+     * @tparam T the type of the data to get.
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    template <typename T>
+    T* get_data(MemID p_mem_id) {
+        return static_cast<T*>(get_data(p_mem_id));
+    }
+
+    /**
+     * @brief Get the data at ID.
+     *
+     * @tparam T the type of the data to get.
+     * @param p_mem_id The ID to get the data from.
+     * @return The pointer to the data to get.
+     */
+    template <typename T>
+    const T* get_data(MemID p_mem_id) const {
+        return static_cast<const T*>(get_data(p_mem_id));
+    }
+
 protected:
+    /**
+     * @brief Push the resource unit pointer to the chunk.
+     *
+     * @param p_res_key The key of the resource unit.
+     * @param p_res The pointer to the resource unit.
+     * @param p_size The size of the resource unit.
+     */
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 

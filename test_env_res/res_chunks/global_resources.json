@@ -34,6 +34,11 @@
                     "channel_count": 3
                 }
             }
+        },
+        {
+            "id": "test_text",
+            "type": "text",
+            "path": "test_text_files/test_file_utf8.txt"
         }
     ]
 }
