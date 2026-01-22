@@ -17,7 +17,7 @@
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/engine_function.hh"
+#include "function/game_config/game_config.hh"
 #include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -42,7 +42,7 @@ void ApplicationGame::run() {
 }
 
 void ApplicationGame::init() {
-    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = GameConfig::get_singleton()->get_config_options();
     // Initialize the deltas into a very small number.
     render_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);

@@ -18,6 +18,7 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 /**
@@ -86,6 +87,13 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
      */
     WBE_META(WBE_REFLECT)
     int32_t limit_logic_fps = 60;
+
+    /**
+     * @brief The name of the prefered audio device. This field should be "" if not
+     * specified, and the default audio device will be used.
+     */
+    WBE_META(WBE_REFLECT)
+    std::string audio_device;
 };
 
 } // namespace WhiteBirdEngine

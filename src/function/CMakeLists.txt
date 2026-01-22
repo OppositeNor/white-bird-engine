@@ -14,6 +14,7 @@
 file(GLOB wbe_function_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(application)
+add_subdirectory(audio_ma)
 add_subdirectory(render)
 add_subdirectory(render_vk)
 add_subdirectory(scene)

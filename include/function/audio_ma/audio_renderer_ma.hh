@@ -12,21 +12,32 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_AUDIO_RENDERER_MINIAUDIO_HH
-#define WBE_FILE_AUDIO_RENDERER_MINIAUDIO_HH
+#ifndef WBE_FILE_AUDIO_RENDERER_MA_HH
+#define WBE_FILE_AUDIO_RENDERER_MA_HH
 
 #include "function/audio/audio_renderer.hh"
+#include "utils/defs.hh"
+#include <miniaudio.h>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class AudioRendererMiniaudio
- * @brief Miniaudio audio renderer.
+ * @class AudioRendererMA
+ * @brief MA audio renderer.
  *
  */
-class AudioRendererMiniaudio final : public AudioRenderer {
+class AudioRendererMA final : public AudioRenderer {
 public:
+    AudioRendererMA();
+    virtual ~AudioRendererMA() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(AudioRendererMA)
 
+private:
+    ma_context context{};
+    // ma_device device{};
+
+    void init();
+    void terminate();
 
 };
 
