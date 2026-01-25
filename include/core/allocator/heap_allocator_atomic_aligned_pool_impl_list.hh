@@ -17,7 +17,9 @@
 
 #include "core/allocator/allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#ifdef _DEBUG
 #include "core/debug_utils/debug_mutex.hh"
+#endif
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
