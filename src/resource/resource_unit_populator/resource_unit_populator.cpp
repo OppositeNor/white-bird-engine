@@ -24,6 +24,7 @@
 #include <cstring>
 #include <format>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -117,6 +118,9 @@ void RUPopulator::resolve_image_data(ResourceChunk& p_res_chunk, const RUSchemeI
     auto image_data = load_image_data(
         file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v,
         width, height, file_channels);
+    if (image_data == nullptr) {
+        throw std::runtime_error(std::format("Failed to load image data from file: {}", static_cast<std::string>(file_path)));
+    }
     p_resource_unit.width = width;
     p_resource_unit.height = height;
     p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
@@ -131,6 +135,9 @@ void RUPopulator::resolve_hdr_image_data(ResourceChunk& p_res_chunk, const RUSch
     auto image_data = load_image_data_hdr(
         file_path, p_scheme.channel_count,  p_scheme.flip_h, p_scheme.flip_v,
         width, height, file_channels);
+    if (image_data == nullptr) {
+        throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
+    }
     p_resource_unit.width = width;
     p_resource_unit.height = height;
     p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;

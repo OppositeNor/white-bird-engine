@@ -39,8 +39,8 @@ protected:
     std::unique_ptr<WBE::Global> global;
 
     // Helper function to create test image data
-    std::unique_ptr<unsigned char[]> create_test_image(uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
-        auto data = std::make_unique<unsigned char[]>(p_width * p_height * p_channels);
+    std::unique_ptr<uint8_t[]> create_test_image(uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+        auto data = std::make_unique<uint8_t[]>(p_width * p_height * p_channels);
         
         // Fill with test pattern: gradient with recognizable corner values
         for (uint32_t y = 0; y < p_height; ++y) {
@@ -52,7 +52,7 @@ protected:
                 for (uint32_t c = 0; c < p_channels; ++c) {
                     uint32_t x_component = (p_width > 1) ? (x * 255 / (p_width - 1)) : 255;
                     uint32_t y_component = (p_height > 1) ? (y * 255 / (p_height - 1)) : 255;
-                    data[index + c] = static_cast<unsigned char>(
+                    data[index + c] = static_cast<uint8_t>(
                         (x_component + y_component + c * 50) % 256
                     );
                 }
@@ -73,8 +73,8 @@ protected:
                 
                 for (uint32_t c = 0; c < p_channels; ++c) {
                     // Avoid divide by zero when width or height is 1
-                    float x_component = (p_width > 1) ? static_cast<float>(x) / (p_width - 1) : 1.0F;
-                    float y_component = (p_height > 1) ? static_cast<float>(y) / (p_height - 1) : 1.0F;
+                    float x_component = (p_width > 1) ? static_cast<float>(x) / static_cast<float>(p_width - 1) : 1.0F;
+                    float y_component = (p_height > 1) ? static_cast<float>(y) / static_cast<float>(p_height - 1) : 1.0F;
                     data[index + c] = x_component + y_component + static_cast<float>(c) * 0.1F;
                 }
             }
@@ -84,7 +84,7 @@ protected:
     }
 
     // Helper to get pixel value
-    unsigned char get_pixel(unsigned char* p_data, uint32_t p_x, uint32_t p_y, uint32_t p_width, uint32_t p_channels, uint32_t p_channel = 0) {
+    uint8_t get_pixel(uint8_t* p_data, uint32_t p_x, uint32_t p_y, uint32_t p_width, uint32_t p_channels, uint32_t p_channel = 0) {
         return p_data[(p_y * p_width + p_x) * p_channels + p_channel];
     }
 
@@ -101,7 +101,7 @@ TEST_F(WBEResourceUtilsTest, ImageFlipHorizontal) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(width, height, channels);
-    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    auto data = std::make_unique<uint8_t[]>(width * height * channels);
     std::memcpy(data.get(), original.get(), width * height * channels);
     
     // Store original corner values for verification
@@ -126,7 +126,7 @@ TEST_F(WBEResourceUtilsTest, ImageFlipVertical) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(width, height, channels);
-    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    auto data = std::make_unique<uint8_t[]>(width * height * channels);
     std::memcpy(data.get(), original.get(), width * height * channels);
     
     // Store original corner values for verification
@@ -150,7 +150,7 @@ TEST_F(WBEResourceUtilsTest, ImageRotateClockwise) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(size, size, channels);
-    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    auto data = std::make_unique<uint8_t[]>(size * size * channels);
     std::memcpy(data.get(), original.get(), size * size * channels);
     
     // Store original corner values
@@ -176,7 +176,7 @@ TEST_F(WBEResourceUtilsTest, ImageRotateCounterClockwise) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(size, size, channels);
-    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    auto data = std::make_unique<uint8_t[]>(size * size * channels);
     std::memcpy(data.get(), original.get(), size * size * channels);
     
     // Store original corner values
@@ -202,7 +202,7 @@ TEST_F(WBEResourceUtilsTest, ImageRotate180) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(size, size, channels);
-    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    auto data = std::make_unique<uint8_t[]>(size * size * channels);
     std::memcpy(data.get(), original.get(), size * size * channels);
     
     // Store original corner values
@@ -361,14 +361,14 @@ TEST_F(WBEResourceUtilsTest, CombinedTransformations) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(width, height, channels);
-    auto data = std::make_unique<unsigned char[]>(width * height * channels);
+    auto data = std::make_unique<uint8_t[]>(width * height * channels);
     
     // Test: horizontal flip + vertical flip should equal 180° rotation
     std::memcpy(data.get(), original.get(), width * height * channels);
     WBE::img_flip_h(data.get(), width, height, channels);
     WBE::img_flip_v(data.get(), width, height, channels);
     
-    auto rotation_data = std::make_unique<unsigned char[]>(width * height * channels);
+    auto rotation_data = std::make_unique<uint8_t[]>(width * height * channels);
     std::memcpy(rotation_data.get(), original.get(), width * height * channels);
     WBE::img_rotate_180(rotation_data.get(), width, height, channels);
     
@@ -385,7 +385,7 @@ TEST_F(WBEResourceUtilsTest, DifferentChannelCounts) {
     // Test with different channel counts: 1 (grayscale), 3 (RGB), 4 (RGBA)
     for (uint32_t channels : {1U, 3U, 4U}) {
         auto original = create_test_image(size, size, channels);
-        auto data = std::make_unique<unsigned char[]>(size * size * channels);
+        auto data = std::make_unique<uint8_t[]>(size * size * channels);
         std::memcpy(data.get(), original.get(), size * size * channels);
         
         // Test that transformations don't crash with different channel counts
@@ -407,7 +407,7 @@ TEST_F(WBEResourceUtilsTest, SmallImages) {
     const uint32_t channels = 3;
     
     auto original = create_test_image(size, size, channels);
-    auto data = std::make_unique<unsigned char[]>(size * size * channels);
+    auto data = std::make_unique<uint8_t[]>(size * size * channels);
     std::memcpy(data.get(), original.get(), size * size * channels);
     
     auto original_value = get_pixel(original.get(), 0, 0, size, channels);

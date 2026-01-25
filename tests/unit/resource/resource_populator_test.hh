@@ -86,4 +86,44 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     // TODO
 }
 
+TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
+    WBE::RUPopulator populator;
+    std::stringstream ss;
+    std::vector<char> image_data_storage;
+    WBE::RUImage captured_ru_image;
+    WBE::RUSchemeImage image_scheme;
+    image_scheme.path = "assets/images/test_ppm3.ppm";
+    image_scheme.color_space = "srgb";
+    auto res_chunk = MockResourceChunk::Builder()
+        .set_push_data_callback(std::function<WBE::RefRes<char> (size_t, const void *)> (
+            [&image_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                image_data_storage.resize(p_res_size);
+                std::memcpy(image_data_storage.data(), p_res, p_res_size);
+                return WBE::MEM_NULL;
+            }
+        ))
+        .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char> (const std::string&, const void*, size_t)> (
+            [&captured_ru_image](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                EXPECT_EQ(p_size, sizeof(WBE::RUImage));
+                std::memcpy(static_cast<void*>(&captured_ru_image), p_res, p_size);
+                return WBE::MEM_NULL;
+            }
+        ))
+        .build(ss);
+    populator.populate(*res_chunk, image_scheme);
+    EXPECT_EQ(captured_ru_image.width, 16);
+    EXPECT_EQ(captured_ru_image.height, 16);
+    EXPECT_EQ(captured_ru_image.channel_count, 3);
+    EXPECT_EQ(captured_ru_image.color_space, WBE::ColorSpace::SRGB);
+    EXPECT_EQ(image_data_storage.size(), 16 * 16 * 3);
+    // Check first pixel: should be red (255, 0, 0)
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[0]), 255);
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[1]), 0);
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[2]), 0);
+    // Check second pixel: should be red (255, 0, 0)
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[3]), 255);
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[4]), 0);
+    EXPECT_EQ(static_cast<unsigned char>(image_data_storage[5]), 0);
+}
+
 #endif

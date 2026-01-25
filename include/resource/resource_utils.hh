@@ -68,7 +68,7 @@ inline Path get_resource_path(const std::string& p_res_path) {
  * @param p_height The height of the image.
  * @param p_channels The channel count of the image.
  */
-void img_flip_h(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+void img_flip_h(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
 
 /**
  * @brief Flip an image vertically.
@@ -78,7 +78,7 @@ void img_flip_h(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint
  * @param p_height The height of the image.
  * @param p_channels The channel count of the image.
  */
-void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
+void img_flip_v(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
 
 /**
  * @brief Rotate the image clockwise.
@@ -88,7 +88,7 @@ void img_flip_v(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_cw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+void img_rotate_cw(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Rotate the image counter-clockwise.
@@ -98,7 +98,7 @@ void img_rotate_cw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, u
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_ccw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+void img_rotate_ccw(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Rotate the image 180 degrees.
@@ -108,7 +108,7 @@ void img_rotate_ccw(unsigned char* p_data, uint32_t p_width, uint32_t p_height, 
  * @param p_height The height of the image.
  * @param p_channel The channel count of the image.
  */
-void img_rotate_180(unsigned char* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
+void img_rotate_180(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
 /**
  * @brief Load image data from a image file.
@@ -124,7 +124,7 @@ void img_rotate_180(unsigned char* p_data, uint32_t p_width, uint32_t p_height, 
  * @param p_file_channels Output: The channel count of the image in its original file.
  * @return The image data.
  */
-std::unique_ptr<unsigned char> load_image_data(const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v,
+std::unique_ptr<uint8_t> load_image_data(const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v,
                                                uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
 
 /**

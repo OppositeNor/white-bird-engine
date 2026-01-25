@@ -91,6 +91,20 @@ public:
     }
 
     /**
+     * @brief Get the extension of the file.
+     *
+     * @todo: Test
+     * @return The extension of the file. Empty string if no extension.
+     */
+    std::string get_extension() const {
+        size_t dot_pos = file_name.rfind('.');
+        if (dot_pos == std::string::npos || dot_pos == file_name.length() - 1) {
+            return "";
+        }
+        return file_name.substr(dot_pos + 1);
+    }
+
+    /**
      * @brief Is the path absolute.
      *
      * @return True if the path is absolute. False otherwise.
