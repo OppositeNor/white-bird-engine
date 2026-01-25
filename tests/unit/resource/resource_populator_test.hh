@@ -39,6 +39,29 @@ protected:
 
     std::unique_ptr<WBE::Global> global;
     WBE::RUSchemeText text_scheme;
+    std::string test_file_content = R"txt(这是一个测试文本。
+English text is also supported.
+日本語テキストもサポート。
+한국어 텍스트도 지원됩니다.
+Текст на русском тоже поддерживается.
+Le texte français est également pris en charge.
+El texto en español también está soportado.
+Der deutsche Text wird ebenfalls unterstützt.
+Il testo in italiano è supportato.
+Português também é suportado.
+النص العربي مدعوم أيضًا.
+טקסט בעברית נתמך גם כן.
+हिंदी पाठ भी समर्थित है।
+ภาษาไทยก็รองรับเช่นกัน。
+ქართული ტექსტიც მხარდაჭერილია.
+Ελληνικό κείμενο υποστηρίζεται επίσης.
+Türkçe metin de desteklenmektedir.
+Український текст також підтримується.
+Tiếng Việt cũng được hỗ trợ.
+Emoji 测试: 😃🚀✨🌍
+数学字符: ∀x∈ℝ, x² ≥ 0
+组合字符: á é í ó ú
+)txt";
 };
 
 TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
@@ -48,14 +71,15 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     auto res_chunk = MockResourceChunk::Builder()
         .set_push_data_callback(std::function<WBE::RefRes<char> (size_t, const void *)> (
             [&text_content_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-                text_content_storage.resize(p_res_size);
-                std::memcpy(text_content_storage.data(), p_res, p_res_size);
+                text_content_storage.resize(p_res_size - 1);
+                std::memcpy(text_content_storage.data(), p_res, p_res_size - 1);
+                EXPECT_EQ(text_content_storage[p_res_size - 1], '\0');
                 return WBE::MEM_NULL;
             }
         ))
         .build(ss);
     populator.populate(*res_chunk, text_scheme);
-    EXPECT_STREQ(text_content_storage.c_str(), "这是一个测试文本。English text is also supported. 日本語テキストもサポート。\n");
+    EXPECT_EQ(text_content_storage, test_file_content);
 }
 
 TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {

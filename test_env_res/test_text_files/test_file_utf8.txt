@@ -1,1 +1,22 @@
-这是一个测试文本。English text is also supported. 日本語テキストもサポート。
+这是一个测试文本。
+English text is also supported.
+日本語テキストもサポート。
+한국어 텍스트도 지원됩니다.
+Текст на русском тоже поддерживается.
+Le texte français est également pris en charge.
+El texto en español también está soportado.
+Der deutsche Text wird ebenfalls unterstützt.
+Il testo in italiano è supportato.
+Português também é suportado.
+النص العربي مدعوم أيضًا.
+טקסט בעברית נתמך גם כן.
+हिंदी पाठ भी समर्थित है।
+ภาษาไทยก็รองรับเช่นกัน。
+ქართული ტექსტიც მხარდაჭერილია.
+Ελληνικό κείμενο υποστηρίζεται επίσης.
+Türkçe metin de desteklenmektedir.
+Український текст також підтримується.
+Tiếng Việt cũng được hỗ trợ.
+Emoji 测试: 😃🚀✨🌍
+数学字符: ∀x∈ℝ, x² ≥ 0
+组合字符: á é í ó ú

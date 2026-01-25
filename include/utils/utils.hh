@@ -312,10 +312,12 @@ inline std::string load_text_file(const char* p_path, EncodeType p_encode_type =
     if (!file_stream.is_open()) {
         throw std::runtime_error("Failed to open text file at path: " + std::string(p_path));
     }
-    std::string line;
-    while (!file_stream.eof()) {
-        std::getline(file_stream, line);
-        content.append(line + "\n");
+    file_stream.seekg(0, std::ios::end);
+    size_t size = file_stream.tellg();
+    file_stream.seekg(0, std::ios::beg);
+    content.resize(size);
+    if (!file_stream.read(content.data(), static_cast<std::streamsize>(size))) {
+        throw std::runtime_error("Failed to read text file at path: " + std::string(p_path));
     }
     return content;
 }

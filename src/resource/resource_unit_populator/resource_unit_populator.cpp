@@ -99,10 +99,10 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const {
     auto file_path = get_resource_path(p_scheme.path);
     std::string file_content = load_text_file(static_cast<std::string>(file_path).c_str());
-    auto data = p_res_chunk.push_data(file_content.size(), file_content.c_str());
+    auto data = p_res_chunk.push_data(file_content.size() + 1, file_content.c_str());
     RUText resource_unit;
     resource_unit.text_data = data;
-    resource_unit.size = file_content.size();
+    resource_unit.size = file_content.size() + 1;
     resource_unit.encode_type = get_encode_type_from_str(p_scheme.encode_type);
     p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
