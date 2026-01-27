@@ -17,6 +17,7 @@
 
 #include "core/job/job.hh"
 #include "function/render/renderer.hh"
+#include "utils/defs.hh"
 
 namespace WhiteBirdEngine {
 
@@ -25,13 +26,41 @@ namespace WhiteBirdEngine {
  * @brief A render job.
  *
  */
-struct JobRender : public Job<JobRender> {
+class JobRender : public Job<JobRender> {
+public:
+    WBE_R6_DEFAULT_OVERRIDE(JobRender)
     /**
      * @brief Perform the job.
      *
      * @param p_renderer The renderer instance.
      */
     virtual void perform(Ref<Renderer> p_renderer) = 0;
+};
+
+/**
+ * @class JobRenderWrapper
+ * @brief A job render wrapper for std::function.
+ *
+ */
+class JobRenderWrapper final : public JobRender {
+public:
+    WBE_R6_DEFAULT_OVERRIDE(JobRenderWrapper)
+    /**
+     * @brief Constructor.
+     *
+     * @param p_job The job function.
+     */
+    JobRenderWrapper(const std::function<void(Ref<Renderer>)>& p_job)
+    : job(p_job) {}
+
+    JobRenderWrapper(std::function<void(Ref<Renderer>)>&& p_job)
+    : job(std::move(p_job)) {}
+
+    virtual void perform(Ref<Renderer> p_renderer) override {
+        job(p_renderer);
+    }
+private:
+    std::function<void(Ref<Renderer>)> job;
 };
 
 } // namespace WhiteBirdEngine

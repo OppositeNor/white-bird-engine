@@ -34,7 +34,8 @@ public:
 
 private:
     ma_context context{};
-    // ma_device device{};
+    ma_device device{};
+    ma_engine engine{};
 
     void init();
     void terminate();

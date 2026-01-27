@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_JOB_HH
 #define WBE_FILE_JOB_HH
 
+#include "utils/defs.hh"
+
 namespace WhiteBirdEngine {
 
 /**
@@ -23,13 +25,9 @@ namespace WhiteBirdEngine {
  *
  */
 template <typename ChildT>
-struct Job {
-    Job() = default;
-    virtual ~Job() = default;
-    Job(const Job&) = default;
-    Job(Job&&) = default;
-    Job& operator=(const Job&) = default;
-    Job& operator=(Job&&) = default;
+class Job {
+public:
+    WBE_R6_DEFAULT_VIRTUAL(Job)
 
     /**
      * @brief Get this job instance with the child type.

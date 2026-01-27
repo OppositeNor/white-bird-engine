@@ -55,12 +55,29 @@ void AudioRendererMA::init() {
     
     // Initialize minaudio device
     ma_device_config device_config = ma_device_config_init(ma_device_type_playback);
-    device_config.playback.pDeviceID = &(playback_infos[prefered_device_index].id);
-    // TODO
+    if (prefered_device_index != -1) {
+        device_config.playback.pDeviceID = &playback_infos[prefered_device_index].id;
+    }
+    device_config.playback.format = ma_format_f32;
+    device_config.playback.channels = 2;
+    device_config.sampleRate = 44100;
+    device_config.dataCallback = nullptr;
+    device_config.pUserData = nullptr;
+    if (ma_device_init(&context, &device_config, &device) != MA_SUCCESS) {
+        throw std::runtime_error("Failed to initialize miniaudio device.");
+    }
+
+    // Initialize miniaudio engine
+    ma_engine_config engine_config = ma_engine_config_init();
+    engine_config.pDevice = &device;
+    engine_config.pContext = &context;
+    if (ma_engine_init(&engine_config, &engine) != MA_SUCCESS) {
+        throw std::runtime_error("Failed to initialize miniaudio engine.");
+    }
 }
 
 void AudioRendererMA::terminate() {
-    ma_context_uninit(&context);
+    ma_engine_uninit(&engine);
 }
 
 } // namespace WhiteBirdEngine

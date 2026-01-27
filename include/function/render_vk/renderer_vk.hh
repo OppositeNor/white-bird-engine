@@ -117,6 +117,18 @@ public:
 
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override;
 
+    virtual void add_job(Ref<JobRender> p_job) override {
+        job_buffer->add_job(std::move(p_job));
+    }
+
+    virtual void add_job(const std::function<void(Ref<Renderer>)>& p_job) override {
+        job_buffer->add_job(make_ref<JobRenderWrapper>(allocator, p_job));
+    }
+
+    virtual void add_job(std::function<void(Ref<Renderer>)>&& p_job) override {
+        job_buffer->add_job(make_ref<JobRenderWrapper>(allocator, std::move(p_job)));
+    }
+
     /**
      * @brief Get the singleton instance.
      *
