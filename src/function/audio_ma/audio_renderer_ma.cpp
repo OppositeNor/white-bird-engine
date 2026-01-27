@@ -45,10 +45,10 @@ void AudioRendererMA::init() {
     // Get the prefered device from game config, if does not present, then use default instead.
     int32_t prefered_device_index = -1;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
-    for (int32_t i = 0; i < playback_count; ++i) {
+    for (uint32_t i = 0; i < playback_count; ++i) {
         if ((game_config.audio_device == "" && playback_infos[i].isDefault)
             || game_config.audio_device == playback_infos[i].name) {
-            prefered_device_index = i;
+            prefered_device_index = static_cast<int32_t>(i);
             break;
         }
     }

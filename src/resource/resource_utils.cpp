@@ -71,7 +71,7 @@ static std::unique_ptr<uint8_t> load_ppm_data(const Path& p_path, uint32_t& p_wi
         uint8_t* temp_data = new uint8_t[width * height * 3];
         std::unique_ptr<uint8_t> result(temp_data);
         // texture should go in reverse order
-        for (int i = 0; i < width * height; ++i) {
+        for (uint32_t i = 0; i < width * height; ++i) {
             int r, g, b;
             content >> r >> g >> b;
             temp_data[i * 3 + 0] = static_cast<uint8_t>(static_cast<double>(r) * scaler);
