@@ -41,8 +41,6 @@ namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
 WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
-// WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_SHADER_VERT, WBE_RENDER_RESOURCE);
-// WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_SHADER_FRAG, WBE_RENDER_RESOURCE);
 }
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
@@ -72,21 +70,18 @@ public:
 
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
-        shader_config.set_shaders(
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_cube_vert"),
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_cube_frag"));
+        shader_config.set_shaders(base_render_data, "draw_cube_vert", "draw_cube_frag");
 
         // Setup graphics pipeline layout.
-        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(render_allocator, base_render_data,
-                                                          WBE::RODescriptorSetLayoutVK::Builder()
-                                                          .add_ubo(0, 1));
-        WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout
-            = WBE::make_ref<WBE::ROPipelineLayoutVK>(render_allocator, base_render_data,
-                                                     WBE::ROPipelineLayoutVK::Builder()
-                                                     .add_descriptor_set_layout(descriptor_set_layout));
+        auto descriptor_set_layout = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(render_allocator, base_render_data,
+                                                                                 WBE::RODescriptorSetLayoutVK::Builder()
+                                                                                 .add_ubo(0, 1));
+        auto graphics_pipeline_layout = WBE::make_ref<WBE::ROPipelineLayoutVK>(render_allocator, base_render_data,
+                                                                               WBE::ROPipelineLayoutVK::Builder()
+                                                                               .add_descriptor_set_layout(descriptor_set_layout));
         auto render_pass = renderer->get_swap_chain_render_pass();
         auto pipeline_configuration = WBE::ROGraphicsPipelineVK::get_default_render_opaque_configuration(
-                                                       base_render_data, shader_config, graphics_pipeline_layout, render_pass);
+            base_render_data, shader_config, graphics_pipeline_layout, render_pass);
         auto graphics_pipeline = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data, pipeline_configuration);
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
         camera_info = WBE::CameraInfoVKUBO {
@@ -98,19 +93,19 @@ public:
                                      aspect_ratio,
                                      0.1F, 10.0F),
         };
-        // Inverse the y value since Vulkan makes y axis points downwards (I always don't understand why. This is so confusing).
+        // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
         // Setup time UBO
         camera_info_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data,
-                                                WBE::ROBufferVK::Builder()
-                                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                                .set_size(sizeof(WBE::CameraInfoVKUBO)));
+                                                         WBE::ROBufferVK::Builder()
+                                                         .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                         .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                                                         .set_size(sizeof(WBE::CameraInfoVKUBO)));
         camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
         // Setup descriptor sets.
-        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set = WBE::make_ref<WBE::RODescriptorSetVK>(render_allocator, base_render_data,
-                                                    WBE::RODescriptorSetVK::Builder()
-                                                    .add_descriptor_set_layout(descriptor_set_layout));
+        auto descriptor_set = WBE::make_ref<WBE::RODescriptorSetVK>(render_allocator, base_render_data,
+                                                                    WBE::RODescriptorSetVK::Builder()
+                                                                    .add_descriptor_set_layout(descriptor_set_layout));
         descriptor_set->write_descriptor_set(
             WBE::RODescriptorSetVK::Writer()
             .set_binding(0)
@@ -122,7 +117,7 @@ public:
         );
         // Setup render task
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets {descriptor_set};
-        WBE::Ref<WBE::RendTaskInfo> rend_task_info = WBE::RendTaskInfo::Builder()
+        auto rend_task_info = WBE::RendTaskInfo::Builder()
             .set_task_id(WBE::RT_RUN_PIPELINE)
             .add_req_res(WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE::TypeUUID<WBE::ROFramebufferVK>::UUID)
             .add_req_res(WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID)

@@ -80,12 +80,45 @@ public:
                 return *this;
             }
 
+            /**
+             * @brief Set shaders.
+             *
+             * @param p_vertex_shader The vertex shader instance.
+             * @param p_fragment_shader The fragment shader instance.
+             * @param p_vertex_entry_function The vertex shader entry function.
+             * @param p_fragment_entry_function The fragment shader entry function.
+             * @return *this.
+             */
             ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
                                        Ref<ROShaderVK> p_fragment_shader,
                                        const std::string& p_vertex_entry_function = "main",
                                        const std::string& p_fragment_entry_function = "main") {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
                 set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
+                return *this;
+            }
+
+            /**
+             * @brief Set shaders from resource IDs.
+             *
+             * @param p_render_data The global render data.
+             * @param p_vertex_shader_res_id The vertex shader resource ID.
+             * @param p_fragment_shader_res_id The fragment shader resource ID.
+             * @param p_vertex_entry_function The vertex shader entry function.
+             * @param p_fragment_entry_function The fragment shader entry function.
+             * @return *this.
+             */
+            ShaderConfig& set_shaders(const BaseRenderDataVK* p_render_data,
+                                      const std::string& p_vertex_shader_res_id,
+                                      const std::string& p_fragment_shader_res_id,
+                                      const std::string& p_vertex_entry_function = "main",
+                                      const std::string& p_fragment_entry_function = "main") {
+                set_vertex_shader(
+                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_vertex_shader_res_id),
+                    p_vertex_entry_function);
+                set_fragment_shader(
+                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_fragment_shader_res_id),
+                    p_fragment_entry_function);
                 return *this;
             }
         };
