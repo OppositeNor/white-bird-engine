@@ -18,7 +18,7 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "core/reflection/serializable.hh"
+#include "function/function_utils.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <glm/glm.hpp>
@@ -33,8 +33,7 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
  * @class ComponentLabel
  * @brief Label of the entity.
  */
-struct WBE_META(WBE_COMPONENT) ComponentLabel final : public Serializable {
-    WBE_DECL_SERIALIZABLE(ComponentLabel)
+struct WBE_META(WBE_COMPONENT) ComponentLabel {
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
     WBE_META(WBE_REFLECT)
@@ -42,16 +41,14 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel final : public Serializable {
     // The name of the component.
     std::string_view name;
 
-    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
-    }
+    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {}
 };
 
 /**
- * @class ComponentTransform
- * @brief Transform component.
+ * @class ComponentLocalTransform
+ * @brief Local transform component.
  */
-struct WBE_META(WBE_COMPONENT) ComponentTransform final : public Serializable {
-    WBE_DECL_SERIALIZABLE(ComponentTransform)
+struct WBE_META(WBE_COMPONENT) ComponentLocalTransform {
     // The position value, ordered x, y, z
     WBE_META(WBE_REFLECT)
     glm::vec3 position;
@@ -61,19 +58,21 @@ struct WBE_META(WBE_COMPONENT) ComponentTransform final : public Serializable {
     // The scale value in quaternion, ordered x, y, z
     WBE_META(WBE_REFLECT)
     glm::vec3 scale;
+};
 
+/**
+ * @class ComponentTransform
+ * @brief Transform component.
+ */
+struct WBE_META(WBE_COMPONENT) ComponentTransform {
     // The local transform matrix.
     glm::mat4 local_transform;
-    // The local inverse transform matrix.
-    glm::mat4 local_inverse;
     // The global transform matrix.
     glm::mat4 global_transform;
-    // The global inverse transform matrix.
-    glm::mat4 global_inverse;
-    // Parent.
-    RefComp<ComponentTransform> parent;
-    // Tick tock checker for checking if the component is updated or not.
-    bool tick_tock = false;
+    // The parent entity ID.
+    EntityID parent_entity;
+    // The number of children.
+    EntityID children_count;
 };
 
 } // namespace WhiteBirdEngine

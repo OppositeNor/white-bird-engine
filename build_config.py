@@ -90,11 +90,11 @@ gen_info = {
     ],
     "static_serializables" : [
         "WBE_SERIALIZABLE_STATIC",
+        "WBE_COMPONENT",
     ],
     "serializables" : [
         "WBE_SERIALIZABLE",
-        "WBE_COMPONENT",
-        "WBE_CONFIG_OPTION"
+        "WBE_CONFIG_OPTION",
     ],
 }
 
