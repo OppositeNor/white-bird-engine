@@ -14,6 +14,7 @@
 */
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/logging/log.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -32,8 +33,8 @@ inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {
     if (p_size == 0) {
         p_size = element_size;
     }
-    if (p_size != element_size) {
-        throw std::runtime_error(std::format("Failed to allocate memory: size must be: ", element_size));
+    if (get_align_size(p_size, WBE_DEFAULT_ALIGNMENT) != element_size) {
+        throw std::runtime_error(std::format("Failed to allocate memory: size must be: {} after alignment.", element_size));
     }
     if (alloc_obj_count >= max_obj) {
         throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.");
@@ -63,7 +64,7 @@ inline HeapAllocatorFixedSizePool::operator std::string() const {
     std::stringstream ss;
     ss << "{";
     ss << R"("type":"HeapAllocatorFixedSizePool",)";
-    ss << "\"size\":" << element_size << ",";
+    ss << "\"element_size\":" << element_size << ",";
     ss << "\"obj_count\":" << obj_count() << ",";
     ss << "\"max_obj\":" << static_cast<uint32_t>(max_obj) << ",";
     ss << "\"allocated\":[";

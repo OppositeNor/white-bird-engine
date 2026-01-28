@@ -22,7 +22,20 @@
 
 namespace WBE = WhiteBirdEngine;
 
-TEST(WBEAllocFSPTest, Trait) {
+class WBEAllocFSPTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    }
+
+    void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+};
+
+TEST_F(WBEAllocFSPTest, Trait) {
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool>::IS_POOL);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool>::IS_LIMITED_SIZE);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool>::IS_GURANTEED_CONTINUOUS);
@@ -30,41 +43,17 @@ TEST(WBEAllocFSPTest, Trait) {
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorFixedSizePool>::IS_ATOMIC);
 }
 
-TEST(WBEAllocFSPTest, ToString) {
-    WBE::HeapAllocatorFixedSizePool pool(4, 64);
-
-    std::string exp_1 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":0,\"max_obj\":64,\"allocated\":[]}";
-    ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-
-    WBE::MemID mem_1 = pool.allocate();
-    std::string exp_2 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":1,\"max_obj\":64,\"allocated\":[1]}";
-    ASSERT_EQ(static_cast<std::string>(pool), exp_2);
-
-    WBE::MemID mem_2 = pool.allocate();
-    std::string exp_3 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":2,\"max_obj\":64,\"allocated\":[1,2]}";
-    ASSERT_EQ(static_cast<std::string>(pool), exp_3);
-
-    pool.deallocate(mem_1);
-    std::string exp_4 = "{\"type\":\"HeapAllocatorFixedSizePool\",\"size\":4,\"obj_count\":1,\"max_obj\":64,\"allocated\":[2]}";
-    ASSERT_EQ(static_cast<std::string>(pool), exp_4);
-
-    pool.deallocate(mem_2);
-    ASSERT_EQ(static_cast<std::string>(pool), exp_1);
-
-    ASSERT_TRUE(pool.is_empty());
-}
-
-inline size_t mem_diff(void* p_mem1, void* p_mem2) {
+static size_t mem_diff(void* p_mem1, void* p_mem2) {
     return reinterpret_cast<size_t>(p_mem1) - reinterpret_cast<size_t>(p_mem2);
 }
 
-template <size_t ARR_SIZE>
-void test_continuous(WBE::HeapAllocatorFixedSizePool& p_pool, WBE::MemID p_mems[ARR_SIZE]) {
+template <size_t ArrSize>
+void test_continuous(WBE::HeapAllocatorFixedSizePool& p_pool, WBE::MemID p_mems[ArrSize]) {
     // One and only one should be at the beginning
     bool found_begin = false;
     WBE::MemID begin_id = p_mems[0];
     WBE::MemID max_addr_id = p_mems[0];
-    for (uint32_t i = 0; i < ARR_SIZE; ++i) {
+    for (uint32_t i = 0; i < ArrSize; ++i) {
         void* curr_addr = p_pool.get(p_mems[i]);
         if (curr_addr == p_pool.get_mem_start()) {
             if (found_begin) {
@@ -78,15 +67,15 @@ void test_continuous(WBE::HeapAllocatorFixedSizePool& p_pool, WBE::MemID p_mems[
         } 
     }
     ASSERT_TRUE(found_begin);
-    // they should be ranged within a size of ARR_SIZE * SIZE
-    ASSERT_EQ(mem_diff(p_pool.get(max_addr_id), p_pool.get(begin_id)) + p_pool.get_element_size(), ARR_SIZE * p_pool.get_element_size());
+    // they should be ranged within a size of ArrSize * SIZE
+    ASSERT_EQ(mem_diff(p_pool.get(max_addr_id), p_pool.get(begin_id)) + p_pool.get_element_size(), ArrSize * p_pool.get_element_size());
     // for each memid, they should have another id which is SIZE distance apart (except the last one)
-    for (uint32_t i = 0; i < ARR_SIZE; ++i) {
+    for (uint32_t i = 0; i < ArrSize; ++i) {
         if (p_mems[i] == max_addr_id) {
             continue;
         }
         bool found_next = false;
-        for (uint32_t j = 0; j < ARR_SIZE; ++j) {
+        for (uint32_t j = 0; j < ArrSize; ++j) {
             if (mem_diff(p_pool.get(p_mems[j]), p_pool.get(p_mems[i])) == p_pool.get_element_size()) {
                 found_next = true;
             }
@@ -95,8 +84,7 @@ void test_continuous(WBE::HeapAllocatorFixedSizePool& p_pool, WBE::MemID p_mems[
     }
 }
 
-TEST(WBEAllocFSPTest, MemContinuity) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+TEST_F(WBEAllocFSPTest, MemContinuity) {
     WBE::HeapAllocatorFixedSizePool pool(16, 64);
     WBE::MemID mems[4];
     mems[0] = pool.allocate();

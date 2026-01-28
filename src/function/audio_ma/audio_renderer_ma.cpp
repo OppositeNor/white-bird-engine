@@ -78,7 +78,7 @@ void AudioRendererMA::init() {
     if (ma_engine_init(&engine_config, &engine) != MA_SUCCESS) {
         throw std::runtime_error("Failed to initialize miniaudio engine.");
     }
-    stdout_log(WBE_CHANNEL_DEBUG)->message("Miniaudio audio renderer enabled.");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Miniaudio audio renderer initialized.");
 }
 
 void AudioRendererMA::terminate() {

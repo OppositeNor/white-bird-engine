@@ -87,42 +87,39 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ZeroSizeAllocation) {
 TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, AlignmentTest) {
     WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList allocator
         = WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList(WBE_MiB(0.5));
-    constexpr size_t ALIGN_REQ = alignof(WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList::Header);
-    WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
-    ASSERT_EQ(mem1 % ALIGN_REQ, 0);
-    WBE::MemID mem2 = allocator.allocate(1, ALIGN_REQ * 2);
-    ASSERT_EQ(mem2 % 2 * ALIGN_REQ, 0);
-    WBE::MemID mem3 = allocator.allocate(1, ALIGN_REQ * 3);
-    ASSERT_EQ(mem3 % 3 * ALIGN_REQ, 0);
-    WBE::MemID mem4 = allocator.allocate(1, ALIGN_REQ * 4);
-    ASSERT_EQ(mem4 % 4 * ALIGN_REQ, 0);
-    WBE::MemID mem5 = allocator.allocate(1, ALIGN_REQ * 5);
-    ASSERT_EQ(mem5 % 5 * ALIGN_REQ, 0);
-    WBE::MemID mem6 = allocator.allocate(1, ALIGN_REQ * 6);
-    ASSERT_EQ(mem6 % 6 * ALIGN_REQ, 0);
-    WBE::MemID mem7 = allocator.allocate(1, ALIGN_REQ * 7);
-    ASSERT_EQ(mem7 % 7 * ALIGN_REQ, 0);
-    WBE::MemID mem8 = allocator.allocate(1, ALIGN_REQ * 8);
-    ASSERT_EQ(mem8 % 8 * ALIGN_REQ, 0);
-    WBE::MemID mem9 = allocator.allocate(1, ALIGN_REQ * 9);
-    ASSERT_EQ(mem9 % 9 * ALIGN_REQ, 0);
-    WBE::MemID mem10 = allocator.allocate(1, ALIGN_REQ * 10);
-    ASSERT_EQ(mem10 % 10 * ALIGN_REQ, 0);
+    constexpr size_t ALIGN_REQ = WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList::HEADER_SIZE;
+    std::vector<WhiteBirdEngine::MemID> allocated;
+    for (size_t i = 0; i < 1024; ++i) {
+        WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
+        ASSERT_EQ(mem1 % ALIGN_REQ, 0);
+        WBE::MemID mem2 = allocator.allocate(1, ALIGN_REQ * 2);
+        ASSERT_EQ(mem2 % 2 * ALIGN_REQ, 0);
+        WBE::MemID mem3 = allocator.allocate(1, ALIGN_REQ * 3);
+        ASSERT_EQ(mem3 % 3 * ALIGN_REQ, 0);
+        WBE::MemID mem4 = allocator.allocate(1, ALIGN_REQ * 4);
+        ASSERT_EQ(mem4 % 4 * ALIGN_REQ, 0);
+        WBE::MemID mem5 = allocator.allocate(1, ALIGN_REQ * 5);
+        ASSERT_EQ(mem5 % 5 * ALIGN_REQ, 0);
+        WBE::MemID mem6 = allocator.allocate(1, ALIGN_REQ * 6);
+        ASSERT_EQ(mem6 % 6 * ALIGN_REQ, 0);
+        WBE::MemID mem7 = allocator.allocate(1, ALIGN_REQ * 7);
+        ASSERT_EQ(mem7 % 7 * ALIGN_REQ, 0);
+        WBE::MemID mem8 = allocator.allocate(1, ALIGN_REQ * 8);
+        ASSERT_EQ(mem8 % 8 * ALIGN_REQ, 0);
+        WBE::MemID mem9 = allocator.allocate(1, ALIGN_REQ * 9);
+        ASSERT_EQ(mem9 % 9 * ALIGN_REQ, 0);
+        WBE::MemID mem10 = allocator.allocate(1, ALIGN_REQ * 10);
+        ASSERT_EQ(mem10 % 10 * ALIGN_REQ, 0);
+        allocated.append_range(std::vector<WBE::MemID>{mem1, mem2, mem3, mem4, mem5, mem6, mem7, mem8, mem9, mem10});
+    }
 
     // False alignments
     ASSERT_THROW(allocator.allocate(3, 0), std::runtime_error);
     ASSERT_THROW(allocator.allocate(3, ALIGN_REQ * 2 + 1), std::runtime_error);
 
-    allocator.deallocate(mem1);
-    allocator.deallocate(mem2);
-    allocator.deallocate(mem3);
-    allocator.deallocate(mem4);
-    allocator.deallocate(mem5);
-    allocator.deallocate(mem6);
-    allocator.deallocate(mem7);
-    allocator.deallocate(mem8);
-    allocator.deallocate(mem9);
-    allocator.deallocate(mem10);
+    for (auto& mem : allocated) {
+        allocator.deallocate(mem);
+    }
 
     ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
 }
@@ -205,16 +202,18 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, FragmentationAndCoalescing
 TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(1));
     std::vector<WBE::MemID> mems;
-    std::mt19937 rng(42);
+    std::mt19937 rng(42); // NOLINT
     std::uniform_int_distribution<int> dist(8, 64);
     for (int i = 0; i < 32; ++i) {
         int sz = dist(rng);
         WBE::MemID mem = pool.allocate(sz);
-        if (mem != WBE::MEM_NULL) mems.push_back(mem);
+        if (mem != WBE::MEM_NULL) {
+            mems.push_back(mem);
+        }
     }
     std::shuffle(mems.begin(), mems.end(), rng);
-    for (size_t i = 0; i < mems.size(); ++i) {
-        pool.deallocate(mems[i]);
+    for (auto& mem : mems) {
+        pool.deallocate(mem);
     }
     ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
 }
@@ -298,7 +297,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleEnd) {
 TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int STRESS_ITERATIONS = 800;
-    std::mt19937 rng(300);
+    std::mt19937 rng(300); // NOLINT
     std::uniform_int_distribution<int> size_dist(8, 256);
     std::vector<size_t> alignments = {1, 2, 4, 8, 16, 32, 64};
     std::uniform_int_distribution<size_t> align_dist(0, alignments.size() - 1);
@@ -326,7 +325,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressAllocateWithAlignTes
             std::uniform_int_distribution<size_t> idx_dist(0, mems.size() - 1);
             size_t idx = idx_dist(rng);
             pool.deallocate(mems[idx]);
-            mems.erase(mems.begin() + idx);
+            mems.erase(mems.begin() + static_cast<ssize_t>(idx));
         }
     }
 
@@ -348,6 +347,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentAllocations) {
     // Barrier to synchronize thread start
     std::barrier sync_point(NUM_THREADS);
     
+    threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
             sync_point.arrive_and_wait();
@@ -416,6 +416,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
     std::vector<std::thread> threads;
     std::barrier sync_point(NUM_THREADS);
     
+    threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
             sync_point.arrive_and_wait();
@@ -451,15 +452,16 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
     
     std::barrier sync_point(NUM_THREADS);
     
+    threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 200);
             std::uniform_int_distribution<int> size_dist(16, 256);
-            std::uniform_real_distribution<float> op_dist(0.0f, 1.0f);
+            std::uniform_real_distribution<float> op_dist(0.0F, 1.0F);
             
             for (int j = 0; j < OPERATIONS_PER_THREAD; ++j) {
-                bool should_allocate = active_mems[i].empty() || op_dist(rng) < 0.6f;
+                bool should_allocate = active_mems[i].empty() || op_dist(rng) < 0.6F;
                 
                 if (should_allocate) {
                     // Allocate
@@ -477,7 +479,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
                         size_t idx = idx_dist(rng);
                         WBE::MemID mem = active_mems[i][idx];
                         pool.deallocate(mem);
-                        active_mems[i].erase(active_mems[i].begin() + idx);
+                        active_mems[i].erase(active_mems[i].begin() + static_cast<ssize_t>(idx));
                     }
                 }
                 total_operations.fetch_add(1);
@@ -517,6 +519,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
     
     std::barrier sync_point(NUM_THREADS);
     
+    threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
 
@@ -556,7 +559,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
                     std::uniform_int_distribution<size_t> idx_dist(0, mems.size() - 1);
                     size_t idx = idx_dist(rng);
                     pool.deallocate(mems[idx]);
-                    mems.erase(mems.begin() + idx);
+                    mems.erase(mems.begin() + static_cast<ssize_t>(idx));
                 }
             }
             

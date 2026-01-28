@@ -16,8 +16,10 @@
 #define WBE_FILE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_HH
 
 #include "core/allocator/allocator.hh"
+#include "core/logging/log.hh"
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -69,6 +71,11 @@ public:
      */
     HeapAllocatorFixedSizePool(size_t p_element_size, uint32_t p_max_obj)
         : max_obj(p_max_obj), element_size(p_element_size) {
+        if (get_align_size(p_element_size, WBE_DEFAULT_ALIGNMENT) != p_element_size) {
+            stdout_log(WBE_CHANNEL_GLOBAL)->warning(std::format(
+                "Creating HeapAllocatorFixedSizePool with element size {} which is not aligned to default alignment {}."
+                " Consider using aligned size for better performance.", p_element_size, WBE_DEFAULT_ALIGNMENT));
+        }
         if (p_max_obj > MAX_OBJ) {
             throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }

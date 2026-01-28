@@ -54,6 +54,8 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final : 
  * @brief Heap allocator atomic pool with memory alignment support, with an implicit list.
  */
 class HeapAllocatorAtomicAlignedPoolImplicitList final : public HeapAllocatorAligned {
+private:
+    using Header = uint64_t;
 public:
     HeapAllocatorAtomicAlignedPoolImplicitList()
     : HeapAllocatorAtomicAlignedPoolImplicitList(WBE_KiB(64)) {}
@@ -62,8 +64,6 @@ public:
     HeapAllocatorAtomicAlignedPoolImplicitList(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
     HeapAllocatorAtomicAlignedPoolImplicitList& operator=(const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
     HeapAllocatorAtomicAlignedPoolImplicitList& operator=(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
-
-    using Header = uint64_t;
 
     /**
      * @brief The size of the allocated memory header.
