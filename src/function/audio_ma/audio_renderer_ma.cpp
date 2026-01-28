@@ -13,9 +13,11 @@
    limitations under the License.
 */
 #include "function/audio_ma/audio_renderer_ma.hh"
+#include "core/logging/log.hh"
 #include "function/engine_function.hh"
 #include "function/game_config/game_config.hh"
 #include "function/game_config/game_config_options.hh"
+#include <format>
 
 namespace WhiteBirdEngine {
 
@@ -28,6 +30,7 @@ AudioRendererMA::~AudioRendererMA() {
 }
 
 void AudioRendererMA::init() {
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing miniaudio audio renderer.");
     // Initialize ma context
     if (ma_context_init(nullptr, 0, nullptr, &context) != MA_SUCCESS) {
         throw std::runtime_error("Failed to initialize miniaudio context");
@@ -52,10 +55,11 @@ void AudioRendererMA::init() {
             break;
         }
     }
-    
+
     // Initialize minaudio device
     ma_device_config device_config = ma_device_config_init(ma_device_type_playback);
     if (prefered_device_index != -1) {
+        stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked audio device: {}.", playback_infos[prefered_device_index].name));
         device_config.playback.pDeviceID = &playback_infos[prefered_device_index].id;
     }
     device_config.playback.format = ma_format_f32;
@@ -74,10 +78,13 @@ void AudioRendererMA::init() {
     if (ma_engine_init(&engine_config, &engine) != MA_SUCCESS) {
         throw std::runtime_error("Failed to initialize miniaudio engine.");
     }
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Miniaudio audio renderer enabled.");
 }
 
 void AudioRendererMA::terminate() {
     ma_engine_uninit(&engine);
+    ma_device_uninit(&device);
+    ma_context_uninit(&context);
 }
 
 } // namespace WhiteBirdEngine

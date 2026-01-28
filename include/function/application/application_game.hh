@@ -16,6 +16,7 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/audio/audio_renderer.hh"
 #include "function/render/render_utils.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "function/application/application.hh"
@@ -86,6 +87,7 @@ private:
 protected:
     Ref<JobBufferRingSPSC<JobRender>> render_job_buffer;
     Ref<Renderer> renderer;
+    Ref<AudioRenderer> audio_renderer;
 
 };
 

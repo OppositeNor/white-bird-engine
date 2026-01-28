@@ -684,7 +684,7 @@ void RendererVK::create_physical_device() {
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
     is_physical_device_descrete = device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
     String device_name(device_properties.deviceName, allocator);
-    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked video device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
     vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
 }

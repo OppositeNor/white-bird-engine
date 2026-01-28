@@ -17,6 +17,7 @@
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/audio_ma/audio_renderer_ma.hh"
 #include "function/game_config/game_config.hh"
 #include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
@@ -60,6 +61,7 @@ void ApplicationGame::init() {
             std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }
+    audio_renderer = make_ref<AudioRendererMA>(global_allocator());
 }
 
 void ApplicationGame::run_render() {
