@@ -15,11 +15,10 @@
 #ifndef WBE_FILE_FUNTION_UTILS_HH
 #define WBE_FILE_FUNTION_UTILS_HH
 
-#include "utils/utils.hh"
+#include <entt/entt.hpp>
 namespace WhiteBirdEngine {
 
-using EntityID = HashCode;
-using ComponID = HashCode;
+using EntityID = entt::entity;
 
 /**
  * @brief The device domain.

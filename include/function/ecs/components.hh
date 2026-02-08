@@ -36,7 +36,7 @@ using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 struct WBE_META(WBE_COMPONENT) ComponentLabel {
     static constexpr size_t MAX_NAME_SIZE = 15;
     // The buffer for the name.
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     Buffer<MAX_NAME_SIZE + 1> name_buffer;
     // The name of the component.
     std::string_view name;
@@ -45,34 +45,43 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel {
 };
 
 /**
- * @class ComponentLocalTransform
- * @brief Local transform component.
+ * @class ComponentTransform
+ * @brief Component that stores a transform based on scale, rotation and translation data.
+ * The transform will be performed in the order of: scale, rotate and then translation
+ * (i.e. translation * rotation * scale).
  */
-struct WBE_META(WBE_COMPONENT) ComponentLocalTransform {
-    // The position value, ordered x, y, z
-    WBE_META(WBE_REFLECT)
-    glm::vec3 position;
-    // The rotation value in quaternion, ordered r, x, y, z
-    WBE_META(WBE_REFLECT)
-    glm::quat rotation;
-    // The scale value in quaternion, ordered x, y, z
-    WBE_META(WBE_REFLECT)
+struct WBE_META(WBE_COMPONENT) ComponentTransform {
+    // The scale value: x, y, z
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     glm::vec3 scale;
+    // The rotation value in quaternion: r, x, y, z
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::quat rotation;
+    // The translation value: x, y, z
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 translation;
 };
 
 /**
  * @class ComponentTransform
  * @brief Transform component.
  */
-struct WBE_META(WBE_COMPONENT) ComponentTransform {
+struct WBE_META(WBE_COMPONENT) ComponentTransformMats {
     // The local transform matrix.
-    glm::mat4 local_transform;
+    glm::mat4 local_transform = glm::mat4(1);
     // The global transform matrix.
-    glm::mat4 global_transform;
-    // The parent entity ID.
-    EntityID parent_entity;
-    // The number of children.
-    EntityID children_count;
+    glm::mat4 global_transform = glm::mat4(1);
+    // A counter to check if this transform is up to date.
+    int64_t version = -1;
+};
+
+/**
+ * @class ComponentSceneTreeNode
+ * @brief Contains information of a component inside a tree node.
+ */
+struct WBE_META(WBE_COMPONENT) ComponentSceneTreeNode {
+    // The parent of this entity.
+    EntityID parent = entt::null;
 };
 
 } // namespace WhiteBirdEngine

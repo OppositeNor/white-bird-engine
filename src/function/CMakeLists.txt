@@ -18,6 +18,7 @@ add_subdirectory(audio_ma)
 add_subdirectory(render)
 add_subdirectory(render_vk)
 add_subdirectory(scene)
+add_subdirectory(ecs)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}
