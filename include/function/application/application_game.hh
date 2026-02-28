@@ -17,7 +17,6 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/audio/audio_renderer.hh"
-#include "function/render/render_utils.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "function/application/application.hh"
 #include "function/input_manager/input_manager.hh"
@@ -68,7 +67,7 @@ public:
     /**
      * @brief Add a job for the renderer.
      */
-    void add_render_job(Ref<JobRender> p_job) {
+    void add_render_job(Ref<Job> p_job) {
         render_job_buffer->add_job(p_job);
     }
 
@@ -85,7 +84,7 @@ private:
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
 protected:
-    Ref<JobBufferRingSPSC<JobRender>> render_job_buffer;
+    Ref<JobBufferRingSPSC> render_job_buffer;
     Ref<Renderer> renderer;
     Ref<AudioRenderer> audio_renderer;
 

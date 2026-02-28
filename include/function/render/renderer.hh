@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDERER_HH
 #define WBE_FILE_RENDERER_HH
 
+#include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
@@ -23,7 +24,6 @@
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include "utils/interface/singleton.hh"
-#include <functional>
 namespace WhiteBirdEngine {
 
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
@@ -34,7 +34,7 @@ WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
  * to the rendering API.
  *
  */
-class Renderer : public Singleton<Renderer> {
+class Renderer : public Singleton<Renderer>, public JobHandler {
 public:
     WBE_R6_DELETE_COPY_MOVE_OVERRIDE(Renderer)
 
@@ -79,27 +79,6 @@ public:
      * @param p_input_manager The input manager instance to be updated.
      */
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) = 0;
-
-    /**
-     * @brief Add a render job to the job buffer.
-     *
-     * @param p_job The job to be added.
-     */
-    virtual void add_job(Ref<class JobRender> p_job) = 0;
-
-    /**
-     * @brief Add a render job to the job buffer.
-     *
-     * @param p_job The job to be added.
-     */
-    virtual void add_job(const std::function<void(Ref<Renderer>)>& p_job) = 0;
-
-    /**
-     * @brief Add a render job to the job buffer.
-     *
-     * @param p_job The job to be added.
-     */
-    virtual void add_job(std::function<void(Ref<Renderer>)>&& p_job) = 0;
 
 private:
     void initialize_render_pass();

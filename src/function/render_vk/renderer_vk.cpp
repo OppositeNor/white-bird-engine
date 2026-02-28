@@ -22,7 +22,6 @@
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
-#include "function/render/render_utils.hh"
 #include "function/render/renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -56,7 +55,7 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer)
+RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), in_flight_fences(p_allocator),
@@ -81,11 +80,11 @@ void RendererVK::tick(double p_delta) {
 
     // Run some jobs stored in the job buffer.
     for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
-        Ref<JobRender> job = job_buffer->retrieve_job();
+        Ref<Job> job = job_buffer->retrieve_job();
         if (job == MEM_NULL) {
             break;
         }
-        job->perform(this_ref.lock());
+        job->perform();
     }
 
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;

@@ -156,6 +156,14 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = default; \
     ClassName& operator=(ClassName&&) noexcept = default;
 
+#define WBE_R6_DELETE_COPY_MOVE(ClassName) \
+    ClassName() = default; \
+    ~ClassName() = default; \
+    ClassName(const ClassName&) = delete; \
+    ClassName(ClassName&&) noexcept = delete; \
+    ClassName& operator=(const ClassName&) = delete; \
+    ClassName& operator=(ClassName&&) noexcept = delete;
+
 // Rule of six with default constructor, default virtual destructor, deleted copy and move operations.
 #define WBE_R6_DELETE_COPY_MOVE_VIRTUAL(ClassName) \
     ClassName() = default; \
@@ -183,10 +191,35 @@ concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::rem
     ClassName& operator=(const ClassName&) = default; \
     ClassName& operator=(ClassName&&) noexcept = default;
 
+// Rule of six not defined default constructor, with default destructor, copy and move operations, with a override for
+// the destructor.
+#define WBE_R6_NDC_DEFAULT_VIRTUAL(ClassName) \
+    virtual ~ClassName() = default; \
+    ClassName(const ClassName&) = default; \
+    ClassName(ClassName&&) noexcept = default; \
+    ClassName& operator=(const ClassName&) = default; \
+    ClassName& operator=(ClassName&&) noexcept = default;
+
+#define WBE_R6_NDC_DELETE_COPY_MOVE(ClassName) \
+    virtual ~ClassName() = default; \
+    ClassName(const ClassName&) = delete; \
+    ClassName(ClassName&&) noexcept = delete; \
+    ClassName& operator=(const ClassName&) = delete; \
+    ClassName& operator=(ClassName&&) noexcept = delete;
+
 // Rule of six not defined default constructor, with default destructor, deleted copy and move operations, with a override for
 // the destructor.
 #define WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(ClassName) \
     virtual ~ClassName() override = default; \
+    ClassName(const ClassName&) = delete; \
+    ClassName(ClassName&&) noexcept = delete; \
+    ClassName& operator=(const ClassName&) = delete; \
+    ClassName& operator=(ClassName&&) noexcept = delete;
+
+// Rule of six not defined default constructor, with default destructor, deleted copy and move operations, with a override for
+// the destructor.
+#define WBE_R6_NDC_DELETE_COPY_MOVE_VIRTUAL(ClassName) \
+    virtual ~ClassName() = default; \
     ClassName(const ClassName&) = delete; \
     ClassName(ClassName&&) noexcept = delete; \
     ClassName& operator=(const ClassName&) = delete; \

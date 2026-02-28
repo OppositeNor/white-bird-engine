@@ -19,6 +19,7 @@ add_subdirectory(engine_config)
 add_subdirectory(logging)
 add_subdirectory(profiling)
 add_subdirectory(utils)
+add_subdirectory(job)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

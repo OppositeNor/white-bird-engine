@@ -50,11 +50,11 @@ public:
 
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override {}
 
-    virtual void add_job(Ref<class JobRender> p_job) override {}
+    virtual void add_job(Ref<Job> p_job) override {}
 
-    virtual void add_job(const std::function<void(Ref<Renderer>)>& p_job) override {}
+    virtual void add_job(const std::function<void()>& p_job) override {}
 
-    virtual void add_job(std::function<void(Ref<Renderer>)>&& p_job) override {}
+    virtual void add_job(std::function<void()>&& p_job) override {}
 private:
     Ref<RenderDatabase> dummy_database;
 };

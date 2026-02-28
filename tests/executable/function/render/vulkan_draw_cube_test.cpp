@@ -64,8 +64,8 @@ public:
         // Setup cube's mesh
         auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
         render_database->set_static_opaque_triangles(cube_mesh.get());
-        renderer->add_job([](WBE::Ref<WBE::Renderer> p_renderer) {
-            p_renderer->update_static_opaque_triangles();
+        renderer->add_job([renderer]() {
+            renderer->update_static_opaque_triangles();
         });
 
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;

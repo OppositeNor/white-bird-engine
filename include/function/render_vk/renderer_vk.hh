@@ -22,7 +22,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_task.hh"
-#include "function/render/render_utils.hh"
+#include "core/job/job.hh"
 #include "function/render/renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
@@ -93,7 +93,7 @@ public:
      * for Vulkan.
      * @param p_job_buffer The render job buffer. Used for committing jobs for the renderer to perform.
      */
-    RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC<JobRender>> p_job_buffer);
+    RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC> p_job_buffer);
 
     virtual void tick(double p_delta) override;
 
@@ -117,17 +117,18 @@ public:
 
     virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override;
 
-    virtual void add_job(Ref<JobRender> p_job) override {
+    virtual void add_job(Ref<Job> p_job) override {
         job_buffer->add_job(std::move(p_job));
     }
 
-    virtual void add_job(const std::function<void(Ref<Renderer>)>& p_job) override {
-        job_buffer->add_job(make_ref<JobRenderWrapper>(allocator, p_job));
+    virtual void add_job(const std::function<void()>& p_job) override {
+        add_job(make_ref<Job>(allocator, p_job));
     }
 
-    virtual void add_job(std::function<void(Ref<Renderer>)>&& p_job) override {
-        job_buffer->add_job(make_ref<JobRenderWrapper>(allocator, std::move(p_job)));
+    virtual void add_job(std::function<void()>&& p_job) override {
+        add_job(make_ref<Job>(allocator, std::move(p_job)));
     }
+
 
     /**
      * @brief Get the singleton instance.
@@ -206,7 +207,7 @@ private:
     static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
     static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
-    Ref<JobBufferRingSPSC<JobRender>> job_buffer;
+    Ref<JobBufferRingSPSC> job_buffer;
 
     template <typename T>
     using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
