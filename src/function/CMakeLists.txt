@@ -20,6 +20,7 @@ add_subdirectory(input_manager)
 add_subdirectory(render)
 add_subdirectory(render_vk)
 add_subdirectory(scene)
+add_subdirectory(window)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

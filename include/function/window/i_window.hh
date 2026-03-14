@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_I_WINDOW_HH
 #define WBE_FILE_I_WINDOW_HH
 
-#include "core/memory/reference_strong.hh"
-#include "function/input_manager/i_input_manager.hh"
 #include "utils/defs.hh"
 #include <cstdint>
+#include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -28,6 +28,10 @@ namespace WhiteBirdEngine {
  *
  */
 struct WindowProperties {
+    /**
+     * @brief The title of the window.
+     */
+    std::string_view title;
     /**
      * @brief The width of the window.
      */
@@ -43,6 +47,14 @@ struct WindowProperties {
 };
 
 /**
+ * @brief Types of windows.
+ */
+enum class WindowType {
+    UNKNOWN,
+    VULKAN,
+};
+
+/**
  * @class IWindow
  * @brief Window interface.
  *
@@ -54,26 +66,43 @@ public:
     WBE_R6_NDCD_DELETE_COPY_MOVE(IWindow)
 
     /**
+     * @brief Get the type of the window.
+     *
+     * @return The type of the window.
+     */
+    virtual WindowType get_window_type() const = 0;
+
+    /**
      * @brief Called every render tick.
      */
-    virtual void update_render() const = 0;
+    virtual void tick_render() = 0;
 
     /**
      * @brief Called every logic tick.
      */
-    virtual void update_logic() const = 0;
+    virtual void tick_logic() = 0;
 
     /**
-     * @brief Get the input manager.
-     */
-    virtual Ref<IInputManager> get_input_manager() const = 0;
-
-    /**
-     * @brief Get window properties.
+     * @brief Should close the window.
      *
-     * @return The window properties.
+     * @return True if the window should be closed. False otherwise.
      */
-    virtual const WindowProperties& get_window_properties() const = 0;
+    virtual bool should_close() const = 0;
+
+    /**
+     * @brief Get the window size in pixels.
+     *
+     * @param p_width The width of the window.
+     * @param p_height The height of the window.
+     */
+    virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) = 0;
+
+    /**
+     * @brief Initialize Vulkan window.
+     *
+     * @param p_instance The Vulkan instance.
+     */
+    virtual void init_vulkan(VkInstance p_instance) = 0;
 
     /**
      * @brief Get the Vulkan surface instance of this window.
@@ -83,11 +112,12 @@ public:
     virtual VkSurfaceKHR get_vulkan_surface() const = 0;
 
     /**
-     * @brief Should close the window.
+     * @brief Get the required Vulkan extensions.
      *
-     * @return True if the window should be closed. False otherwise.
+     * @return The required Vulkan
      */
-    virtual bool should_close() const = 0;
+    virtual std::vector<const char*> get_required_vulkan_instance_extensions() const = 0;
+
 };
 
 } // namespace WhiteBirdEngine

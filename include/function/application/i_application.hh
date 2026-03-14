@@ -60,6 +60,9 @@ public:
      * @param p_delta The delta time since last render frame.
      */
     virtual void logic_update(double p_delta) {};
+
+protected:
+
 };
 
 } // namespace WhiteBirdEngine

@@ -18,9 +18,11 @@
 #include "core/memory/reference_strong.hh"
 #include "function/audio/audio_renderer.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
-#include "function/application/application.hh"
+#include "function/application/i_application.hh"
+#include "function/game_config/game_config_options.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
+#include "function/window/i_window.hh"
 #include "utils/defs.hh"
 #include <atomic>
 namespace WhiteBirdEngine {
@@ -73,8 +75,8 @@ public:
 
 private:
     Ref<RenderAllocator> renderer_allocator;
-
     Ref<InputManager> input_manager;
+    Ref<IWindow> window;
 
     void init();
     void run_render();
@@ -87,7 +89,7 @@ protected:
     Ref<JobBufferRingSPSC> render_job_buffer;
     Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
-
+    WindowProperties get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options);
 };
 
 } // namespace WhiteBirdEngine

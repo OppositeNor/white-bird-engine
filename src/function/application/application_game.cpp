@@ -18,9 +18,11 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/game_config/game_config.hh"
+#include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
+#include "function/window/window_sdl.hh"
 #include <atomic>
 #include <format>
 #include <thread>
@@ -48,8 +50,10 @@ void ApplicationGame::init() {
 
     render_job_buffer = make_ref<JobBufferRingSPSC>(global_allocator(), global_allocator(), 64);
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(1));
+    input_manager = make_ref<InputManager>(global_allocator());
+    window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
     if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), render_job_buffer);
+        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer);
     }
     else if (game_config.render_api == "dummy") {
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
@@ -68,11 +72,12 @@ void ApplicationGame::run_render() {
     double start_time, end_time;
     while (!local_should_close) {
         start_time = global_clock->get_duration();
-        should_close.store(local_should_close, std::memory_order_release);
         render_update(render_delta.load(std::memory_order_relaxed));
+        window->tick_render();
         renderer->tick(render_delta.load(std::memory_order_relaxed));
         end_time =  global_clock->get_duration();
         render_delta.store(end_time - start_time, std::memory_order_release);
+        local_should_close = should_close.load(std::memory_order_acquire);
     }
 }
 
@@ -82,11 +87,23 @@ void ApplicationGame::run_logic() {
     double start_time, end_time;
     while (!local_should_close) {
         start_time = global_clock->get_duration();
+        local_should_close = window->should_close();
+        should_close.store(local_should_close, std::memory_order_release);
+        window->tick_logic();
         logic_update(logic_delta.load(std::memory_order_relaxed));
         end_time = global_clock->get_duration();
         logic_delta.store(end_time - start_time, std::memory_order_release);
-        local_should_close = should_close.load(std::memory_order_acquire);
     }
+}
+
+WindowProperties ApplicationGame::get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options) {
+    WindowProperties properties {
+        .title = p_game_config_options.game_name,
+        .width = p_game_config_options.window_width,
+        .height = p_game_config_options.window_height,
+        .is_full_screen = false // TODO
+    };
+    return properties;
 }
 
 } // namespace WhiteBirdEngine

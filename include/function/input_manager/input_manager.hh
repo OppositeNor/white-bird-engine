@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_INPUT_MANAGER_HH
 #define WBE_FILE_INPUT_MANAGER_HH
 
-#include "SDL_events.h"
 #include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
@@ -89,9 +88,14 @@ public:
     InputStatus get_input_status(KeyCode p_key_code) const;
 
     /**
-     * @brief Update a key status.
+     * @brief Set the keycode to key down.
      */
-    void update_key_status(KeyCode p_key_code, KeyStatus p_key_status);
+    void set_keydown(KeyCode p_key_code);
+
+    /**
+     * @brief Set the keycode to key up.
+     */
+    void set_keyup(KeyCode p_key_code);
 
 private:
     // Use an atomic keyset to store the key statuses.

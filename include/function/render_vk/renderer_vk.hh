@@ -33,10 +33,10 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
+#include "function/window/i_window.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 
-#include <SDL.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -93,7 +93,7 @@ public:
      * for Vulkan.
      * @param p_job_buffer The render job buffer. Used for committing jobs for the renderer to perform.
      */
-    RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC> p_job_buffer);
+    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer);
 
     virtual void tick(double p_delta) override;
 
@@ -229,8 +229,9 @@ private:
     Ref<RenderDatabase> render_database;
     Ref<AllocatorVK> allocator_vk;
 
+    Ref<IWindow> window;
+
     // Vulkan properties
-    SDL_Window* window = nullptr;
     VkInstance vk_instance = VK_NULL_HANDLE;
 
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
@@ -261,9 +262,13 @@ private:
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
-    std::vector<const char*> validation_layers {
+    std::vector<const char*> enabled_layers {
+#ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
+#endif
     };
+
+    const std::vector<const char*> enabled_instance_extensions;
 
     const std::vector<const char*> enabled_device_extensions {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -364,7 +369,6 @@ private:
     void init();
     void terminate();
 
-    void init_window();
     void init_vulkan();
     void setup_base_render_data();
     void init_swap_chain_images();
@@ -377,7 +381,6 @@ private:
     void recreate_swap_chain();
 
     void create_instance();
-    void create_window_surface();
     void create_device();
     void create_swap_chain();
     void clean_up_swap_chain();
@@ -386,7 +389,7 @@ private:
     void create_async_objects();
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
-    bool check_validation_layer_support();
+    bool check_layer_support();
     void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();

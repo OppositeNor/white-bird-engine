@@ -15,9 +15,13 @@
 #ifndef WBE_FILE_WINDOW_SDL
 #define WBE_FILE_WINDOW_SDL
 
-#include "function/input_manager/i_input_manager.hh"
+#include "SDL_video.h"
 #include "core/memory/reference_strong.hh"
+#include "function/input_manager/input_manager.hh"
 #include "i_window.hh"
+#include "utils/defs.hh"
+#include <atomic>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -28,19 +32,32 @@ namespace WhiteBirdEngine {
  */
 class WindowSDL final : public IWindow {
 public:
-    virtual ~WindowSDL() = default;
+    virtual ~WindowSDL() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(WindowSDL)
 
-    WindowSDL(Ref<IInputManager> p_input_manager);
+    WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties);
 
-    virtual void update() const override;
-    virtual Ref<IInputManager> get_input_manager() const override;
-    virtual const WindowProperties& get_window_properties() const override;
-    virtual VkSurfaceKHR get_vulkan_surface() const override;
+    virtual WindowType get_window_type() const override {
+        return window_type;
+    }
+    virtual void tick_render() override;
+    virtual void tick_logic() override;
+    virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) override;
     virtual bool should_close() const override;
 
+    virtual void init_vulkan(VkInstance p_instance) override;
+    virtual VkSurfaceKHR get_vulkan_surface() const override;
+    virtual std::vector<const char*> get_required_vulkan_instance_extensions() const override;
+
 private:
-    Ref<IInputManager> input_manager;
+    WindowType window_type = WindowType::UNKNOWN;
+    WindowProperties window_properties;
+    Ref<InputManager> input_manager;
+
+    SDL_Window* window = nullptr;
+    std::atomic<bool> window_should_close = false;
+
+    VkSurfaceKHR vulkan_surface = VK_NULL_HANDLE;
 };
 
 } // namespace WhiteBirdEngine

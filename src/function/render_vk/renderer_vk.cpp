@@ -37,8 +37,6 @@
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
-#include <SDL_vulkan.h>
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -46,6 +44,7 @@
 #include <functional>
 #include <map>
 #include <ranges>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -55,13 +54,14 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(AllocType* p_allocator, Ref<JobBufferRingSPSC> p_job_buffer)
+RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator),
     render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
-    allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), in_flight_fences(p_allocator),
+    allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
     base_render_data(p_allocator), pipelines(p_allocator), render_resources(p_allocator), per_frame_in_flight_resource(p_allocator),
     activated_pipeline(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
+    WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
     singleton = this;
     for (auto& delayed_call : delayed_calls) {
@@ -243,7 +243,6 @@ void RendererVK::update_static_opaque_triangles() {
 void RendererVK::init() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
-    init_window();
     init_vulkan();
     setup_base_render_data();
     init_swap_chain_image_views();
@@ -275,23 +274,10 @@ void RendererVK::terminate() {
     vkDestroySurfaceKHR(vk_instance, surface, nullptr);
     vkDestroyDevice(logical_device, get_allocation_callbacks());
     vkDestroyInstance(vk_instance, get_allocation_callbacks());
-    SDL_DestroyWindow(window);
-    SDL_Vulkan_UnloadLibrary();
-    SDL_Quit();
-}
-
-void RendererVK::init_window() {
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_Vulkan_LoadLibrary(nullptr);
-    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
-    window = SDL_CreateWindow(game_config.game_name.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              static_cast<int>(game_config.window_width),
-                              static_cast<int>(game_config.window_height), SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
 }
 
 void RendererVK::init_vulkan() {
     create_instance();
-    create_window_surface();
     create_device();
     create_swap_chain();
     create_command_pools();
@@ -403,34 +389,66 @@ void RendererVK::create_instance() {
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
 
-    // Enable validation layer for debug build.
-    if constexpr (ENABLE_VALIDATION_LAYER) {
-        create_info.enabledLayerCount = validation_layers.size();
-        create_info.ppEnabledLayerNames = validation_layers.data();
-    }
-    else {
-        create_info.enabledLayerCount = 0;
-        create_info.ppEnabledLayerNames = nullptr;
+    check_layer_support();
+    create_info.enabledLayerCount = enabled_layers.size();
+    create_info.ppEnabledLayerNames = enabled_layers.data();
+
+    std::set<std::string> available_extensions;
+    uint32_t available_extension_count = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &available_extension_count, nullptr);
+    std::vector<VkExtensionProperties> available_extension_properties(available_extension_count);
+    vkEnumerateInstanceExtensionProperties(nullptr, &available_extension_count, available_extension_properties.data());
+    for (const auto& extension : available_extension_properties) {
+        available_extensions.insert(extension.extensionName);
     }
 
-    // Setup instance extensions.
-    uint32_t extensions_count = 0;
-    SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
-    Vector<const char*> extension_names(extensions_count, allocator);
-    SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
-    create_info.enabledExtensionCount = extensions_count;
-    create_info.ppEnabledExtensionNames = extension_names.data();
+    for (const char* layer_name : enabled_layers) {
+        uint32_t layer_extension_count = 0;
+        VkResult layer_ext_result = vkEnumerateInstanceExtensionProperties(layer_name, &layer_extension_count, nullptr);
+        if (layer_ext_result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to enumerate instance extensions for layer {}.", layer_name));
+        }
+        std::vector<VkExtensionProperties> layer_extension_properties(layer_extension_count);
+        layer_ext_result = vkEnumerateInstanceExtensionProperties(layer_name, &layer_extension_count, layer_extension_properties.data());
+        if (layer_ext_result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to enumerate instance extensions for layer {}.", layer_name));
+        }
+        for (const auto& extension : layer_extension_properties) {
+            available_extensions.insert(extension.extensionName);
+        }
+    }
+
+    // Setup and validate instance extensions.
+    std::vector<const char*> required_extensions = window->get_required_vulkan_instance_extensions();
+    required_extensions.reserve(required_extensions.size() + enabled_instance_extensions.size());
+    required_extensions.insert(required_extensions.end(), enabled_instance_extensions.begin(), enabled_instance_extensions.end());
+
+    std::set<std::string> missing_extensions;
+    for (const char* extension_name : required_extensions) {
+        if (!available_extensions.contains(extension_name)) {
+            missing_extensions.insert(extension_name);
+        }
+    }
+    if (!missing_extensions.empty()) {
+        std::string missing_extensions_message;
+        for (const auto& missing_extension : missing_extensions) {
+            if (!missing_extensions_message.empty()) {
+                missing_extensions_message += ", ";
+            }
+            missing_extensions_message += missing_extension;
+        }
+        throw std::runtime_error(std::format("Missing required Vulkan instance extension(s): {}.", missing_extensions_message));
+    }
+
+    create_info.enabledExtensionCount = required_extensions.size();
+    create_info.ppEnabledExtensionNames = required_extensions.data();
 
     // Create instance.
     if (vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan instance.");
     }
-}
 
-void RendererVK::create_window_surface() {
-    if (!SDL_Vulkan_CreateSurface(window, vk_instance, &surface)) {
-        throw std::runtime_error("Failed to create window surface.");
-    }
+    surface = window->get_vulkan_surface();
 }
 
 void RendererVK::create_device() {
@@ -695,15 +713,9 @@ void RendererVK::create_logical_device() {
     create_info.pQueueCreateInfos = queues_create_info.data();
 
     // Setup layers.
-    // Enable validation layer for debug builds.
-    if constexpr (ENABLE_VALIDATION_LAYER) {
-        create_info.enabledLayerCount = validation_layers.size();
-        create_info.ppEnabledLayerNames = validation_layers.data();
-    }
-    else {
-        create_info.enabledLayerCount = 0;
-        create_info.ppEnabledLayerNames = nullptr;
-    }
+    create_info.enabledLayerCount = enabled_layers.size();
+    create_info.ppEnabledLayerNames = enabled_layers.data();
+
     // Setup logical device extensions.
     create_info.enabledExtensionCount = enabled_device_extensions.size();
     create_info.ppEnabledExtensionNames = enabled_device_extensions.data();
@@ -745,12 +757,12 @@ bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
     return enabled_extensions.empty();
 }
 
-bool RendererVK::check_validation_layer_support() {
+bool RendererVK::check_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
     Vector<VkLayerProperties> layer_properties(layer_count, allocator);
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
-    for (const auto* name : validation_layers) {
+    for (const auto* name : enabled_layers) {
         bool layer_found = false;
         for (auto& layer_prop : layer_properties) {
             if (strcmp(layer_prop.layerName, name) == 0) {
@@ -902,11 +914,12 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     if (p_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return p_capabilities.currentExtent;
     }
-    int extent_width = 0, extent_height = 0;
-    SDL_GetWindowSizeInPixels(window, &extent_width, &extent_height);
-    VkExtent2D result;
-    result.width = extent_width;
-    result.height = extent_height;
+    uint32_t extent_width = 0, extent_height = 0;
+    window->get_size_in_pixels(extent_width, extent_height);
+    VkExtent2D result {
+        .width = extent_width,
+        .height = extent_height
+    };
     return result;
 }
 

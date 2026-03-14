@@ -15,6 +15,9 @@
 
 #include "function/input_manager/input_manager.hh"
 
+#define WBE_SET_ATOMIC_BITSET_TRUE(bitset, index) (bitset[index / 8].fetch_or(static_cast<uint8_t>(0b1 << (index % 8)), std::memory_order_release))
+#define WBE_SET_ATOMIC_BITSET_FALSE(bitset, index) (bitset[index / 8].fetch_and(static_cast<uint8_t>(~(0b1 << (index % 8))), std::memory_order_release))
+
 namespace WhiteBirdEngine {
 
 InputManager::InputManager() {
@@ -31,8 +34,12 @@ InputStatus InputManager::get_input_status(KeyCode p_key_code) const {
     };
 }
 
-void InputManager::update_key_status(KeyCode p_key_code, KeyStatus p_key_status) {
-    // TOOD
+void InputManager::set_keydown(KeyCode p_key_code) {
+    WBE_SET_ATOMIC_BITSET_TRUE(key_status_map, p_key_code);
+}
+
+void InputManager::set_keyup(KeyCode p_key_code) {
+    WBE_SET_ATOMIC_BITSET_FALSE(key_status_map, p_key_code);
 }
 
 } // namespace WhiteBirdEngine
