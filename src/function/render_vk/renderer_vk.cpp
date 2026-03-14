@@ -447,7 +447,7 @@ void RendererVK::create_instance() {
     if (vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan instance.");
     }
-
+    window->init_vulkan(vk_instance);
     surface = window->get_vulkan_surface();
 }
 

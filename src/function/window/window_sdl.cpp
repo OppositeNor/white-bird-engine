@@ -57,13 +57,13 @@ void WindowSDL::tick_render() {
 void WindowSDL::tick_logic() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+            window_should_close.store(true, std::memory_order_release);
+        }
         if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
             // Map the SDL keycode to our KeyCode
             KeyCode key_code;
             switch (event.key.keysym.sym) {
-                case SDL_QUIT:
-                    window_should_close.store(true, std::memory_order_release);
-                    continue;
                 case SDLK_0:
                     key_code = KEYCODE_0;
                     break;
@@ -303,7 +303,7 @@ void WindowSDL::tick_logic() {
             }
             if (event.type == SDL_KEYDOWN) {
                 input_manager->set_keydown(key_code);
-            } else if (event.type == SDL_KEYUP) {
+            } else {
                 input_manager->set_keyup(key_code);
             }
 
