@@ -23,7 +23,7 @@
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "platform/file_system/file_system.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
 
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  * @brief Core singleton of the engine. Contains all singletons of the core layer.
  *
  */
-class EngineCore : public Singleton<EngineCore> {
+class EngineCore : public ISingleton<EngineCore> {
 public:
     EngineCore() = delete;
     virtual ~EngineCore() override;

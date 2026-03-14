@@ -30,12 +30,6 @@ InputManagerSDL::~InputManagerSDL() {
     singleton = nullptr;
 }
 
-InputStatus InputManagerSDL::get_input_status(KeyCode p_key_code) const {
-    return InputStatus{
-        .status_code = static_cast<uint8_t>(key_status_map[p_key_code / 8].load(std::memory_order_acquire) >> (p_key_code % 8) & 0b1)
-    };
-}
-
 void InputManagerSDL::update() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {

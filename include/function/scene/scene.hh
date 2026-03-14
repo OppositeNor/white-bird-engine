@@ -16,6 +16,8 @@
 #define WBE_FILE_SCENE_HH
 
 #include "core/core_utils.hh"
+#include <entt/entt.hpp>
+
 namespace WhiteBirdEngine {
 
 /**
@@ -48,6 +50,7 @@ public:
 
 private:
     HeapAllocatorDefault* allocator;
+    entt::registry entities;
 };
 
 } // namespace WhiteBirdEngine

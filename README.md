@@ -26,7 +26,7 @@ git submodule update --init --recursive
 Install build dependencies:
 
 ```sh
-sudo pacman -S cmake clang ninja shaderc
+sudo pacman -S cmake clang ninja
 ```
 
 It is suggested to use Anaconda for setting up the build environment.

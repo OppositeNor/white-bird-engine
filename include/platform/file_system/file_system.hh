@@ -18,7 +18,7 @@
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @brief Platform API for file systems.
  *
  */
-class FileSystem final : public Singleton<FileSystem> {
+class FileSystem final : public ISingleton<FileSystem> {
 public:
     FileSystem();
     ~FileSystem() = default;

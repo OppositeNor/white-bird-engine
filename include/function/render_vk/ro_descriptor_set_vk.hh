@@ -15,7 +15,7 @@
 #ifndef WBE_RO_DESCRIPTOR_SET_HH
 #define WBE_RO_DESCRIPTOR_SET_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"

@@ -15,9 +15,13 @@
 #ifndef WBE_FILE_INPUT_MANAGER_HH
 #define WBE_FILE_INPUT_MANAGER_HH
 
-#include "key_codes.hh"
+#include "SDL_events.h"
+#include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
+#include <X11/X.h>
+#include <type_traits>
+
 namespace WhiteBirdEngine {
 
 using KeyStatus = uint8_t;
@@ -56,30 +60,45 @@ struct InputStatus {
         return status_code & KEY_DOWN;
     }
 };
-
 /**
  * @class InputManager
- * @brief Manages user inputs.
+ * @brief Input manager for SDL backend.
  *
  */
-class InputManager : public Singleton<InputManager> {
+class InputManager final : public ISingleton<InputManager> {
 public:
-    WBE_R6_DELETE_COPY_MOVE_OVERRIDE(InputManager)
+    InputManager();
+    ~InputManager();
+    WBE_R6_NDCD_DELETE_COPY_MOVE(InputManager)
+
+    /**
+     * @brief Get the singleton instance.
+     *
+     * @return The singleton instance.
+     */
+    static InputManager* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief Get the input status of a key.
      *
-     * @param p_key_code The key code to get input status from.
+     * @param p_key_code The key code.
      * @return The input status.
      */
-    virtual InputStatus get_input_status(KeyCode p_key_code) const = 0;
+    InputStatus get_input_status(KeyCode p_key_code) const;
 
     /**
-     * @brief Update the input manager.
+     * @brief Update a key status.
      */
-    virtual void update() = 0;
-};
+    void update_key_status(KeyCode p_key_code, KeyStatus p_key_status);
 
+private:
+    // Use an atomic keyset to store the key statuses.
+    std::atomic<uint8_t> key_status_map[KeyCode::TOTAL_KEYCODES % 8 == 0 ? KeyCode::TOTAL_KEYCODES / 8 : KeyCode::TOTAL_KEYCODES / 8 + 1] = {};
+    static_assert(std::remove_cvref_t<decltype(key_status_map[0])>::is_always_lock_free, "Key status map must be lock free");
+    inline static InputManager* singleton = nullptr;
+};
 } // namespace WhiteBirdEngine
 
 #endif

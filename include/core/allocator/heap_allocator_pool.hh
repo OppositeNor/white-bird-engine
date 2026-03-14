@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_POOL_HH
 #define WBE_FILE_HEAP_ALLOCATOR_POOL_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>

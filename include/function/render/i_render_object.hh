@@ -12,6 +12,24 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/scene/scene_manager_default.hh"
+#ifndef WBE_FILE_I_RENDER_OBJECT_HH
+#define WBE_FILE_I_RENDER_OBJECT_HH
 
-// TODO
+#include "utils/defs.hh"
+namespace WhiteBirdEngine {
+
+/**
+ * @class IRenderObject
+ * @brief Interface for all the render objects, such as pipelines, shaders, etc.
+ *
+ */
+class IRenderObject {
+public:
+
+    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(IRenderObject)
+
+};
+
+} // namespace WhiteBirdEngine
+
+#endif

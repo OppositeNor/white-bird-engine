@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_IMPL_LIST_TEST_HH
 #define WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_IMPL_LIST_TEST_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "global/global.hh"
 #include <algorithm>

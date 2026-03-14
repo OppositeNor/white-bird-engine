@@ -13,8 +13,8 @@
    limitations under the License.
 #}
 // {{ _prefix }}
-#ifndef WBE_FILE_TYPE_UUID_HH
-#define WBE_FILE_TYPE_UUID_HH
+#ifndef WBE_FILE_TYPE_UUID_GEN_HH
+#define WBE_FILE_TYPE_UUID_GEN_HH
 
 #include "utils/utils.hh"
 {% for type in metadata.classes %}
@@ -47,9 +47,9 @@ struct TypeUUID<{{ type.name }}> {
  * @class TypeUUIDManager
  * @brief Manager class for types' ID.
  */
-class TypeUUIDManager : public Singleton<TypeUUIDManager> {
+class TypeUUIDManager : public ISingleton<TypeUUIDManager> {
 public:
-    TypeUUIDManager() : Singleton<TypeUUIDManager>() {
+    TypeUUIDManager() : ISingleton<TypeUUIDManager>() {
         singleton = this;
         {% for type in metadata.classes %}
         type_name_map[TypeUUID<{{ type.name }}>::UUID] = "{{ type.name }}";

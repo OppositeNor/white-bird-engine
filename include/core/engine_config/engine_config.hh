@@ -19,7 +19,7 @@
 #include "core/reflection/serializable.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
 
@@ -82,7 +82,7 @@ struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializab
  * @brief Engine configuration class.
  *
  */
-class EngineConfig : public Singleton<EngineConfig> {
+class EngineConfig : public ISingleton<EngineConfig> {
 public:
 
     /**

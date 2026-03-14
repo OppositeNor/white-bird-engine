@@ -17,9 +17,8 @@
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/audio_ma/audio_renderer_ma.hh"
 #include "function/game_config/game_config.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
 #include <atomic>
@@ -60,7 +59,7 @@ void ApplicationGame::init() {
             std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }
-    audio_renderer = make_ref<AudioRendererMA>(global_allocator());
+    // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
 }
 
 void ApplicationGame::run_render() {
@@ -69,7 +68,6 @@ void ApplicationGame::run_render() {
     double start_time, end_time;
     while (!local_should_close) {
         start_time = global_clock->get_duration();
-        renderer->pool_events(local_should_close, input_manager);
         should_close.store(local_should_close, std::memory_order_release);
         render_update(render_delta.load(std::memory_order_relaxed));
         renderer->tick(render_delta.load(std::memory_order_relaxed));

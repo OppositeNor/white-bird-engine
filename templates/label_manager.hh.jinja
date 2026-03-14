@@ -13,11 +13,11 @@
    limitations under the License.
 #}
 // {{ _prefix }}
-#ifndef WBE_FILE_LABEL_MANAGER_HH
-#define WBE_FILE_LABEL_MANAGER_HH
+#ifndef WBE_FILE_LABEL_MANAGER_GEN_HH
+#define WBE_FILE_LABEL_MANAGER_GEN_HH
 
 #include "utils/utils.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 #include <unordered_map>
 #include <string>
@@ -46,7 +46,7 @@ struct LabelName<static_hash("{{ label.name }}")> {
  * @class LabelManager
  * @brief The manager for all the dynamic labels.
  */
-class LabelManager : public Singleton<LabelManager> {
+class LabelManager : public ISingleton<LabelManager> {
 public:
     LabelManager() {
         singleton = this;

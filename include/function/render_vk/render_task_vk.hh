@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RENDER_TASK_VK_HH
 #define WBE_FILE_RENDER_TASK_VK_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -244,7 +244,7 @@ protected:
  * @brief Factory for RenderTaskVK.
  *
  */
-struct RenderTaskFactoryVK : public RenderTaskFactory {
+struct RenderTaskFactoryVK : public IRenderTaskFactory {
 public:
     WBE_R6_DEFAULT_OVERRIDE(RenderTaskFactoryVK)
 

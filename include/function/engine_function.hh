@@ -15,12 +15,12 @@
 #ifndef WBE_FILE_ENGINE_FUNCTION_HH
 #define WBE_FILE_ENGINE_FUNCTION_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/unique.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
 
@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief The manager for the function layer.
  *
  */
-class EngineFunction final : public Singleton<EngineFunction>{
+class EngineFunction final : public ISingleton<EngineFunction>{
 public:
     EngineFunction() = delete;
     virtual ~EngineFunction() override;

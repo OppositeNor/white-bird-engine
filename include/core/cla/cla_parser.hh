@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_CLA_PARSER_HH
 #define WBE_FILE_CLA_PARSER_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_utils.hh"
 #include "core/memory/reference_strong.hh"

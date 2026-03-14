@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_MATERIAL_VK_HH
 #define WBE_FILE_MATERIAL_VK_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "function/render/material.hh"
 namespace WhiteBirdEngine {
 
@@ -24,7 +24,7 @@ public:
     // TODO
 };
 
-class MaterialFactoryVK final : public MaterialFactory {
+class MaterialFactoryVK final : public IMaterialFactory {
 public:
     WBE_R6_DEFAULT_OVERRIDE(MaterialFactoryVK)
     // TODO

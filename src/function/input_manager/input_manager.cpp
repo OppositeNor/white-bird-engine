@@ -12,24 +12,27 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_OBJECT_HH
-#define WBE_FILE_RENDER_OBJECT_HH
 
-#include "utils/defs.hh"
+#include "function/input_manager/input_manager.hh"
+
 namespace WhiteBirdEngine {
 
-/**
- * @class RenderObject
- * @brief Class for all the render objects, such as pipelines, shaders, etc.
- *
- */
-class RenderObject {
-public:
+InputManager::InputManager() {
+    singleton = this;
+}
 
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(RenderObject)
+InputManager::~InputManager() {
+    singleton = nullptr;
+}
 
-};
+InputStatus InputManager::get_input_status(KeyCode p_key_code) const {
+    return InputStatus{
+        .status_code = static_cast<uint8_t>(key_status_map[p_key_code / 8].load(std::memory_order_acquire) >> (p_key_code % 8) & 0b1)
+    };
+}
+
+void InputManager::update_key_status(KeyCode p_key_code, KeyStatus p_key_status) {
+    // TOOD
+}
 
 } // namespace WhiteBirdEngine
-
-#endif

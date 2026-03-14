@@ -30,7 +30,7 @@ WBE_LABEL(WBE_TEST_LABEL_2, WBE_CHANNEL)
 WBE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
 }
 
-class LogTestMock : public WBE::Log {
+class LogTestMock : public WBE::ILog {
 public:
     const std::string& get_channel_name(WBE::HashCode p_label) {
         return WBE::EngineCore::get_singleton()->label_manager->get_label_name(p_label);
@@ -71,10 +71,10 @@ TEST(WBELoggingManagerTest, GetLogConstructDestruct) {
     std::stringstream ss;
     {
         WBE::LoggingManager<LogTestMock, std::ostream> logging_manager(ss);
-        WBE::Log* log1 = logging_manager.get_log(WBE::WBE_TEST_LABEL_1);
+        WBE::ILog* log1 = logging_manager.get_log(WBE::WBE_TEST_LABEL_1);
         ASSERT_NE(log1, nullptr);
         ASSERT_EQ(log1, logging_manager.get_log(WBE::WBE_TEST_LABEL_1));
-        WBE::Log* log2 = logging_manager.get_log(WBE::WBE_TEST_LABEL_2);
+        WBE::ILog* log2 = logging_manager.get_log(WBE::WBE_TEST_LABEL_2);
         ASSERT_NE(log2, nullptr);
         ASSERT_NE(log2, log1);
     }

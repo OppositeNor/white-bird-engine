@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_ALLOCATOR_VK_HH
 #define WBE_FILE_ALLOCATOR_VK_HH
 
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {

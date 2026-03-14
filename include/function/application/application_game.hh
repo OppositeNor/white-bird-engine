@@ -20,17 +20,17 @@
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "function/application/application.hh"
 #include "function/input_manager/input_manager.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "utils/defs.hh"
 #include <atomic>
 namespace WhiteBirdEngine {
 
 /**
  * @class ApplicationGame
- * @brief Application class to run the game.
+ * @brief IApplication class to run the game.
  *
  */
-class ApplicationGame : public Application {
+class ApplicationGame : public IApplication {
 public:
     ApplicationGame();
     virtual ~ApplicationGame() = default;
@@ -60,7 +60,7 @@ public:
      *
      * @return The renderer instance.
      */
-    Ref<Renderer> get_renderer() const {
+    Ref<IRenderer> get_renderer() const {
         return renderer;
     }
 
@@ -85,7 +85,7 @@ private:
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
 protected:
     Ref<JobBufferRingSPSC> render_job_buffer;
-    Ref<Renderer> renderer;
+    Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
 
 };

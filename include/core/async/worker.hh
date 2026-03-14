@@ -22,7 +22,7 @@
 #include "global/stl_allocator.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 #include <cstdint>
 #include <string>
 
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  * @brief For handling tasks that are expensive, such as an IO task.
  *
  */
-class Worker : public Singleton<Worker>, public JobHandler {
+class Worker : public ISingleton<Worker>, public JobHandler {
 public:
 
     static constexpr size_t WORKER_MAX_TASK = 32;

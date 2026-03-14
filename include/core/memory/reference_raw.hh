@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_REFERENCE_RAW_HH
 #define WBE_FILE_REFERENCE_RAW_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include <concepts>

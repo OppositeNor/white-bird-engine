@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_UNIQUE_HH
 #define WBE_FILE_UNIQUE_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
 #include "utils/defs.hh"
 #include <concepts>

@@ -66,7 +66,7 @@ def hash_str_sha256(str_input : str) -> str:
     hasher.update(str_input.encode("utf-8"))
     return hasher.hexdigest()
 
-def list_files(dir, ignore_dirs=None):
+def list_files(dir, ignore_dirs=None) -> list[str]:
     """List all the file in a directory (recursivly).
 
     Args:

@@ -18,7 +18,7 @@
 #include "core/surface/3d_primitive.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "glm/fwd.hpp"
 #include <cstddef>
 #include <cstdint>

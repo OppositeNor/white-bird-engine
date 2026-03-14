@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"

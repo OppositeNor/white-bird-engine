@@ -23,7 +23,7 @@
 #include "function/function_utils.hh"
 #include "function/render/render_task.hh"
 #include "core/job/job.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -64,7 +64,7 @@ WBE_LABEL(RT_PRE_EXECUTE_PIPELINE_VK, WBE_RENDER_TASK);
  * @brief Vulkan renderer.
  *
  */
-class RendererVK final : public Renderer, public ThisRef<RendererVK> {
+class RendererVK final : public IRenderer, public ThisRef<RendererVK> {
 public:
 
     using AllocType = RenderAllocator;
@@ -114,8 +114,6 @@ public:
     }
 
     virtual void update_static_opaque_triangles() override;
-
-    virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override;
 
     virtual void add_job(Ref<Job> p_job) override {
         job_buffer->add_job(std::move(p_job));

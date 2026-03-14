@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
 #include "utils/defs.hh"
 #include <vulkan/vulkan_core.h>

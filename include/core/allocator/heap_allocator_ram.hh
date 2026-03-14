@@ -17,7 +17,6 @@
 
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
-#include <bit>
 #include <set>
 #include <sstream>
 namespace WhiteBirdEngine {
@@ -55,7 +54,7 @@ public:
         if (p_id == 0) {
             return nullptr;
         }
-        return std::bit_cast<void*>(p_id);
+        return reinterpret_cast<void*>(p_id);
     }
 
     uint32_t obj_count() const {

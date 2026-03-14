@@ -23,7 +23,7 @@
 #include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 #include <glm/glm.hpp>
 #include <cstddef>
@@ -38,7 +38,7 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class RenderDatabase final : public Singleton<RenderDatabase> {
+class RenderDatabase final : public ISingleton<RenderDatabase> {
 private:
     using AllocType = RenderAllocator;
     template <typename T, typename Allocator = AllocType>
@@ -104,7 +104,7 @@ public:
      *
      * @param p_allocator The allocator for resource allocations.
      */
-    RenderDatabase(AllocType* p_allocator, Unique<MaterialFactory> p_material_factory);
+    RenderDatabase(AllocType* p_allocator, Unique<IMaterialFactory> p_material_factory);
 
 
     /**
@@ -150,7 +150,7 @@ public:
 private:
 
     inline static RenderDatabase* singleton = nullptr;
-    Unique<MaterialFactory> material_factory;
+    Unique<IMaterialFactory> material_factory;
 
     AllocType* allocator = nullptr;
 

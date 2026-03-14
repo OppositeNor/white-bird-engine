@@ -1,5 +1,5 @@
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include <functional>
 #include <iostream>

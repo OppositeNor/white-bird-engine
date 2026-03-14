@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/renderer_vk.hh"
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -22,7 +22,7 @@
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -240,21 +240,6 @@ void RendererVK::update_static_opaque_triangles() {
     render_objects->static_opaque_triangles_buffer_obj_ids_resource->res = obj_ids_buffer;
 }
 
-void RendererVK::pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) {
-    (void)p_input_manager;
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_QUIT:
-                p_should_close = true;
-                break;
-            // TODO: update input manager.
-            default:
-                break;
-        }
-    }
-}
-
 void RendererVK::init() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
@@ -404,7 +389,7 @@ void RendererVK::create_instance() {
     const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
 
-    // Setup Application info.
+    // Setup IApplication info.
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = game_config.game_name.c_str();

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render/render_database.hh"
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "function/render/material.hh"
 #include "resource/resource_unit/resource_unit.hh"
 
@@ -27,7 +27,7 @@
 
 namespace WhiteBirdEngine {
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<MaterialFactory> p_material_factory)
+RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<IMaterialFactory> p_material_factory)
     : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
     WBE_DEBUG_ASSERT(material_factory != MEM_NULL);
     singleton = this;

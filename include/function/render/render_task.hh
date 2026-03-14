@@ -15,11 +15,11 @@
 #ifndef WBE_FILE_RENDER_TASK_HH
 #define WBE_FILE_RENDER_TASK_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_object.hh"
+#include "function/render/i_render_object.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <set>
@@ -91,7 +91,7 @@ struct RendPipelineInfo {
         // use those as the resource here. If none reference was found, it will be replaced
         // with this one. When is_weak is true, or when is_weak is false and there is no previously
         // registered resource with the same res_id, res should not be MEM_NULL.
-        Ref<RenderObject> res = MEM_NULL;
+        Ref<IRenderObject> res = MEM_NULL;
     };
 
     /**
@@ -113,7 +113,7 @@ struct RendPipelineInfo {
         // with this one. When is_weak is true, or when is_weak is false and there is no previously
         // registered resource with the same res_id, res should not be empty.
         // A PFIFResource is considered NULL when its res field is empty.
-        Vector<Ref<RenderObject>> res;
+        Vector<Ref<IRenderObject>> res;
     };
 
     // The root task of the pipeline.
@@ -152,7 +152,7 @@ struct RendPipelineInfo {
      * @param p_is_weak Is the resource a weak binding.
      * @return *this.
      */
-    RendPipelineInfo& add_resource(RendResID p_res_id, RendResTID p_type_id, Ref<RenderObject> p_res, bool p_is_weak = false) {
+    RendPipelineInfo& add_resource(RendResID p_res_id, RendResTID p_type_id, Ref<IRenderObject> p_res, bool p_is_weak = false) {
         resources.push_back({p_res_id, p_type_id, p_is_weak, p_res});
         return *this;
     }
@@ -180,7 +180,7 @@ struct RendTaskInfo {
         // Required resources.
         std::vector<RendResInfo> req_res;
         // The render task instance.
-        Ref<class RenderTaskFactory> render_task_factory = MEM_NULL;
+        Ref<class IRenderTaskFactory> render_task_factory = MEM_NULL;
 
         /**
          * @brief Set the task ID.
@@ -244,7 +244,7 @@ struct RendTaskInfo {
          * @param p_factory The render task factory.
          * @return *this.
          */
-        Builder& set_render_task_factory(Ref<RenderTaskFactory> p_factory) {
+        Builder& set_render_task_factory(Ref<IRenderTaskFactory> p_factory) {
             render_task_factory = p_factory;
             return *this;
         }
@@ -282,17 +282,17 @@ struct RendTaskInfo {
     // Required resources.
     std::vector<RendResInfo> req_res;
     // The render task instance.
-    Ref<RenderTaskFactory> render_task_factory = MEM_NULL;
+    Ref<IRenderTaskFactory> render_task_factory = MEM_NULL;
 };
 
 /**
- * @class RenderTaskFactory
+ * @class IRenderTaskFactory
  * @brief The factory to create RenderTask.
  *
  */
-class RenderTaskFactory {
+class IRenderTaskFactory {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(RenderTaskFactory)
+    WBE_R6_DEFAULT_VIRTUAL(IRenderTaskFactory)
 
     /**
      * @brief Create the render task instance.

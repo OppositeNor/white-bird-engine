@@ -23,9 +23,9 @@ namespace WhiteBirdEngine {
 /**
  * @class LogStream
  *
- * @brief Log the message to a std::ostream
+ * @brief ILog the message to a std::ostream
  */
-class LogStream : public Log {
+class LogStream : public ILog {
 public:
 
     /**
@@ -35,14 +35,14 @@ public:
      * @param p_ostream The output stream.
      */
     LogStream(ChannelID p_channel_id, std::ostream& p_ostream)
-        : Log(), ostream(&p_ostream), channel_id(p_channel_id) {}
+        : ILog(), ostream(&p_ostream), channel_id(p_channel_id) {}
     /**
      * @brief Constructor. The channel ID will be WBE_CHANNEL_UNKNOWN.
      *
      * @param p_ostream The output stream.
      */
     LogStream(std::ostream& p_ostream)
-        : Log(), ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
+        : ILog(), ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
     virtual ~LogStream() override {}
     LogStream(const LogStream &) = delete;
     LogStream(LogStream &&) = delete;

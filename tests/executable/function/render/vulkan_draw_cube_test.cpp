@@ -24,7 +24,7 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_task.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"

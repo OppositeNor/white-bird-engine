@@ -17,7 +17,7 @@
 
 #include "core/parser/parser_yaml.hh"
 #include "platform/file_system/path.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "game_config_options.hh"
 
@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @class GameConfig
  * @brief Load and handle the game configs.
  */
-class GameConfig : public Singleton<GameConfig> {
+class GameConfig : public ISingleton<GameConfig> {
 public:
     GameConfig() = delete;
     virtual ~GameConfig() override {

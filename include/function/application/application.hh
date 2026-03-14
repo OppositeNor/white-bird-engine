@@ -20,13 +20,13 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class Application
- * @brief Application class.
+ * @class IApplication
+ * @brief IApplication class.
  *
  */
-class Application {
+class IApplication {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(Application)
+    WBE_R6_DEFAULT_VIRTUAL(IApplication)
 
     /**
      * @brief Run the application.

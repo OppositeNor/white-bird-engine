@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_HH
 #define WBE_FILE_HEAP_ALLOCATOR_HH
 
-#include "allocator.hh"
+#include "i_allocator.hh"
 #include <sstream>
 
 namespace WhiteBirdEngine {
@@ -30,7 +30,7 @@ struct AllocatorTrait<class HeapAllocator> {
  * @brief Heap allocator.
  *
  */
-class HeapAllocator : public Allocator {
+class HeapAllocator : public IAllocator {
 public:
     HeapAllocator() = default;
     virtual ~HeapAllocator() override = default;

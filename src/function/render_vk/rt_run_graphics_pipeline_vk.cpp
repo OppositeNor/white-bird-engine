@@ -14,7 +14,7 @@
 */
 
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "generated/type_uuid.gen.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"

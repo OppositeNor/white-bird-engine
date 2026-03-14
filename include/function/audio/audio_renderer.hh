@@ -16,7 +16,7 @@
 #define WBE_FILE_AUDIO_RENDERER_HH
 
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 namespace WhiteBirdEngine {
 
 /**
@@ -24,7 +24,7 @@ namespace WhiteBirdEngine {
  * @brief Audio renderer.
  *
  */
-class AudioRenderer : public Singleton<AudioRenderer> {
+class AudioRenderer : public ISingleton<AudioRenderer> {
 public:
     WBE_R6_DELETE_COPY_MOVE_VIRTUAL(AudioRenderer)
 

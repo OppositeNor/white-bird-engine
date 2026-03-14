@@ -17,7 +17,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render_dummy/material_dummy.hh"
 namespace WhiteBirdEngine {
 
@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @brief A dummy renderer that omits all operations.
  *
  */
-class RendererDummy final : public Renderer {
+class RendererDummy final : public IRenderer {
 public:
     RendererDummy(RenderAllocator* p_allocator)
         : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryDummy>(p_allocator))) {}
@@ -47,8 +47,6 @@ public:
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {}
 
     virtual void update_static_opaque_triangles() override {}
-
-    virtual void pool_events(bool& p_should_close, Ref<InputManager> p_input_manager) override {}
 
     virtual void add_job(Ref<Job> p_job) override {}
 

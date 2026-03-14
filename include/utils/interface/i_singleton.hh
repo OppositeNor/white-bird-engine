@@ -22,25 +22,25 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class Singleton
- * @brief Singleton class. This class ensures a class has only one instance.
+ * @class ISingleton
+ * @brief Singleton interface. This interface ensures a class that inherits it has only one instance.
  *
  * @tparam T The type of the singleton.
  */
 template <typename T>
-class Singleton {
+class ISingleton {
 public:
-    Singleton() {
+    ISingleton() {
         if (instance_count.fetch_add(1, std::memory_order_acq_rel) != 0) {
             throw std::runtime_error("Failed to construct object: trying to construct multiple singletons.");
         }
     }
 
-    virtual ~Singleton() {
+    virtual ~ISingleton() {
         instance_count.fetch_sub(1, std::memory_order_acq_rel);
     }
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(Singleton)
+    WBE_R6_NDCD_DELETE_COPY_MOVE(ISingleton)
 
 private:
     inline static std::atomic<uint8_t> instance_count = 0;

@@ -21,7 +21,7 @@
 #include "platform/file_system/directory.hh"
 #include "resource/engine_resource.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
 /**
@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief Global class. Stores all the global objects.
  * Terminate and then reinitialize it should result in restarting the game/engine.
  */
-class Global final : public Singleton<Global> {
+class Global final : public ISingleton<Global> {
 public:
     Global() = delete;
     virtual ~Global() override;

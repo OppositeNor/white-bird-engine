@@ -15,13 +15,13 @@
 #ifndef WBE_FILE_RESOURCE_MANAGER_HH
 #define WBE_FILE_RESOURCE_MANAGER_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
-#include "utils/interface/singleton.hh"
+#include "utils/interface/i_singleton.hh"
 #include <cstddef>
 #include <stdexcept>
 #include <string>
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  *
  * @todo Doc, Test
  */
-class ResourceManager : public Singleton<ResourceManager> {
+class ResourceManager : public ISingleton<ResourceManager> {
 public:
 
     ResourceManager() = delete;

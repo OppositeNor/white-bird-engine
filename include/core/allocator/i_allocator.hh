@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_ALLOCATOR_HH
-#define WBE_FILE_ALLOCATOR_HH
+#ifndef WBE_FILE_I_ALLOCATOR_HH
+#define WBE_FILE_I_ALLOCATOR_HH
 #include "utils/defs.hh"
 
 #include <concepts>
@@ -68,10 +68,10 @@ concept AllocatorTraitConcept = requires {
  * @brief The allocator class.
  *
  */
-class Allocator {
+class IAllocator {
 public:
 
-    WBE_R6_DEFAULT_VIRTUAL(Allocator)
+    WBE_R6_DEFAULT_VIRTUAL(IAllocator)
 
     /**
      * @brief Get the pointer pointing to the resource.

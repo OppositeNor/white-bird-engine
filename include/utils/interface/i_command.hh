@@ -24,13 +24,13 @@ namespace WhiteBirdEngine {
 using CommandID = uint64_t;
 
 /**
- * @class Command
- * @brief Command class.
+ * @class ICommand
+ * @brief ICommand class.
  *
  */
-class Command {
+class ICommand {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(Command)
+    WBE_R6_DEFAULT_VIRTUAL(ICommand)
 
     /**
      * @brief Invoke an operation.

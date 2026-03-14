@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RESOURCE_CHUNK_HH
 #define WBE_FILE_RESOURCE_CHUNK_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <string>

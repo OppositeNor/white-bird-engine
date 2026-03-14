@@ -16,7 +16,7 @@
 #include "core/engine_core.hh"
 
 namespace WhiteBirdEngine {
-Log* stdout_log(ChannelID p_channel) {
+ILog* stdout_log(ChannelID p_channel) {
     return EngineCore::get_singleton()->stdio_logging_manager->get_log(p_channel);
 }
 

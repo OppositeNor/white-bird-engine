@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_STL_ALLOCATOR_HH
 #define WBE_FILE_STL_ALLOCATOR_HH
 
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include <deque>
 #include <map>
@@ -101,7 +101,7 @@ struct STLAllocator {
      * @return The allocated memory.
      */
     T* allocate(size_t p_num) {
-        return std::bit_cast<T*>(allocator->allocate(p_num * sizeof(T)));
+        return reinterpret_cast<T*>(allocator->allocate(p_num * sizeof(T)));
     }
     /**
      * @brief Deallocate memory

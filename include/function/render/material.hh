@@ -25,9 +25,9 @@ public:
     // TODO
 };
 
-class MaterialFactory {
+class IMaterialFactory {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(MaterialFactory)
+    WBE_R6_DEFAULT_VIRTUAL(IMaterialFactory)
     // TODO
     virtual Ref<Material> create(RefRes<RUMaterial> p_material) = 0;
 };

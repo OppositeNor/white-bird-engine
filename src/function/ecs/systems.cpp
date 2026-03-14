@@ -41,7 +41,7 @@ static void update_global_transform(entt::registry& p_registry,
     p_transform_mats.global_transform = ptransform_mats.global_transform * p_transform_mats.local_transform;
     // Update the version to newest.
     p_transform_mats.version = p_version;
-};
+}
 
 void update_transform_mats(entt::registry& p_registry, int64_t p_version) {
     // Update local transforms.

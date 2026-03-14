@@ -15,10 +15,9 @@
 #ifndef WBE_FILE_STACK_ALLOCATOR_HH
 #define WBE_FILE_STACK_ALLOCATOR_HH
 
-#include "allocator.hh"
+#include "i_allocator.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
-#include <bit>
 #include <cstddef>
 #include <memory>
 #include <sstream>
@@ -45,7 +44,7 @@ struct AllocatorTrait<class StackAllocator> {
  * @brief Stack style allocation. Can only allocate and deallocate from the top of the stack.
  * @todo Test
  */
-class StackAllocator final : public Allocator {
+class StackAllocator final : public IAllocator {
 public:
     StackAllocator() : StackAllocator(1024) {}
     virtual ~StackAllocator() override = default;
@@ -73,7 +72,7 @@ public:
     MemID allocate(size_t p_size) {
         void* result = mem_chunk.get() + stack_pointer;
         stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
-        return std::bit_cast<MemID>(result);
+        return reinterpret_cast<MemID>(result);
     }
 
     /**
@@ -85,9 +84,9 @@ public:
         if (p_id == MEM_NULL) {
             return nullptr;
         }
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) >= mem_chunk.get());
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) <= (mem_chunk.get() + stack_pointer));
-        return std::bit_cast<void*>(p_id);
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) >= mem_chunk.get());
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) <= (mem_chunk.get() + stack_pointer));
+        return reinterpret_cast<void*>(p_id);
     }
 
     /**
@@ -96,8 +95,8 @@ public:
      * @param p_id The ID of the memory to get.
      */
     virtual void* get(MemID p_id) const override {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
-        return std::bit_cast<void*>(p_id);
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
+        return reinterpret_cast<void*>(p_id);
     }
 
     /**
@@ -109,8 +108,8 @@ public:
      */
     template <typename T>
     T* get_obj(MemID p_id) const {
-        WBE_DEBUG_ASSERT(std::bit_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
-        return std::bit_cast<T*>(p_id);
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
+        return reinterpret_cast<T*>(p_id);
     }
 
     /**

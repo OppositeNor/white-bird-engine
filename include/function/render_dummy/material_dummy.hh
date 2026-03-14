@@ -23,7 +23,7 @@ public:
     // TODO
 };
 
-class MaterialFactoryDummy final : public MaterialFactory {
+class MaterialFactoryDummy final : public IMaterialFactory {
 public:
 
     virtual Ref<Material> create(RefRes<RUMaterial> p_material) override {

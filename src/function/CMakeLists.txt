@@ -15,10 +15,11 @@ file(GLOB wbe_function_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(application)
 add_subdirectory(audio_ma)
+add_subdirectory(ecs)
+add_subdirectory(input_manager)
 add_subdirectory(render)
 add_subdirectory(render_vk)
 add_subdirectory(scene)
-add_subdirectory(ecs)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

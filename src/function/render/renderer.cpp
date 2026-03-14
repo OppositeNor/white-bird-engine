@@ -12,11 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render/renderer.hh"
+#include "function/render/i_renderer.hh"
 
 namespace WhiteBirdEngine {
 
-void Renderer::initialize_render_pass() {
+void IRenderer::initialize_render_pass() {
     // TODO
 }
 

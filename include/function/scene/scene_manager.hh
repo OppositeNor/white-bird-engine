@@ -15,22 +15,33 @@
 #ifndef WBE_FILE_SCENE_MANAGER_HH
 #define WBE_FILE_SCENE_MANAGER_HH
 
-#include "utils/interface/singleton.hh"
-
+#include "global/stl_allocator.hh"
+#include "i_scene_manager.hh"
+#include "scene.hh"
+#include "utils/defs.hh"
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
  * @class SceneManager
- * @brief Manages scene create, change and destroy.
+ * @brief scene manager.
  *
  */
-class SceneManager : public Singleton<SceneManager> {
+class SceneManager final : public ISceneManager {
 public:
-    SceneManager() = default;
-    virtual ~SceneManager() {}
+    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(SceneManager)
+    SceneManager(Map<std::string, Ref<Scene>> p_scene_map);
 
+    virtual Ref<Scene> get_current_scene() override;
+
+    virtual Ref<const Scene> get_current_scene() const override;
+
+    virtual void change_scene(const std::string& p_scene_id) override;
+
+private:
+    Map<std::string, Ref<Scene>> scene_map;
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

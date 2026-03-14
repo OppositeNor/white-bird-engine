@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RENDER_OBJECT_VK_HH
 #define WBE_FILE_RENDER_OBJECT_VK_HH
 
-#include "function/render/render_object.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
  * @brief Vulkan render object.
  *
  */
-class RenderObjectVK : public RenderObject {
+class RenderObjectVK : public IRenderObject {
 public:
     RenderObjectVK() = delete;
     virtual ~RenderObjectVK() override = default;

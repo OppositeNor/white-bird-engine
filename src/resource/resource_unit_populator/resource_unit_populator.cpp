@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
-#include "core/allocator/allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/surface/3d_primitive.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
