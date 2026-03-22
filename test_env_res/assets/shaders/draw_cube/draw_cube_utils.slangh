@@ -17,8 +17,8 @@
 #define WBE_FILE_DRAW_CUBE_UTILS_SLANGH
 struct VSOutput {
     float4 position : SV_Position;
-    float3 normal   : COLOR0;
-    float2 uv       : COLOR1;
+    float3 normal   : TEXCOORD0;
+    float2 uv       : TEXCOORD1;
 };
 
 #endif

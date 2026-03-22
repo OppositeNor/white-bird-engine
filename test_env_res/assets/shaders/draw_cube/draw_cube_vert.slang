@@ -1,4 +1,4 @@
-// vert
+// vertex
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +16,13 @@
 #include "draw_cube/draw_cube_utils.slangh"
 #include "defs.slangh"
 
-cbuffer camera_info : register(b0, space0) { CameraInfo camera_info; }
+[[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
 
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
-    // HLSL uses column major
-    output.position  = float4(p_input.position.xyz, 1.0) * camera_info.view * camera_info.proj;
+    float4 pos = float4(p_input.position.xyz, 1.0);
+    // output.position = mul(camera_info.proj, mul(camera_info.view, pos));
+    output.position = mul(pos, mul(camera_info.view, camera_info.proj));
     output.normal = p_input.normal;
     output.uv = p_input.uv;
 

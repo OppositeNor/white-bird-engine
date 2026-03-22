@@ -1,4 +1,4 @@
-// frag
+// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,7 @@
 #include "draw_cube/draw_cube_utils.slangh"
 #include "defs.slangh"
 
-float4 main(VSOutput p_input) : SV_Target {
+float4 main(VSOutput p_input) : SV_Target0 {
     return float4(p_input.normal * 0.5 + 0.5, 1.0);
 }
 

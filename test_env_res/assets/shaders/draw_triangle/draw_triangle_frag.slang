@@ -1,4 +1,4 @@
-// frag
+// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,9 @@
 #include "draw_triangle/draw_triangle_utils.slangh"
 #include "defs.slangh"
 
-cbuffer time : register(b0, space0) { Time time; }
+[[vk::binding(0, 0)]] ConstantBuffer<Time> time;
 
-float4 main(VSOutput p_input) : SV_Target {
+float4 main(VSOutput p_input) : SV_Target0 {
     return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }
 
