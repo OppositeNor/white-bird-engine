@@ -21,8 +21,7 @@
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
     float4 pos = float4(p_input.position.xyz, 1.0);
-    // output.position = mul(camera_info.proj, mul(camera_info.view, pos));
-    output.position = mul(pos, mul(camera_info.view, camera_info.proj));
+    output.position = mul(camera_info.proj, mul(camera_info.view, pos));
     output.normal = p_input.normal;
     output.uv = p_input.uv;
 
