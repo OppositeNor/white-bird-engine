@@ -13,8 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_cube/draw_cube_utils.hlslh"
-#include "defs.hlslh"
+#include "draw_cube/draw_cube_utils.slangh"
+#include "defs.slangh"
 
 float4 main(VSOutput p_input) : SV_Target {
     return float4(p_input.normal * 0.5 + 0.5, 1.0);

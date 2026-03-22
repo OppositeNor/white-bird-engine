@@ -13,16 +13,26 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_triangle/draw_triangle_utils.hlslh"
-#include "defs.hlslh"
+#include "main_pipeline/main_pipeline_utils.slangh"
 
-VSOutput main(Vertex3DTexturedInput p_input) {
+VSOutput main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;
 
-    output.position = float4(p_input.position.x, -1.0 * p_input.position.y, 0.0, 1.0);
-    output.uv       = p_input.uv;
+    float2 positions[3] = {
+        float2(-1.0, -1.0),
+        float2(-1.0,  3.0),
+        float2( 3.0, -1.0)
+    };
+
+    float2 uvs[3] = {
+        float2(0.0, 0.0),
+        float2(0.0, 2.0),
+        float2(2.0, 0.0)
+    };
+
+    output.position = float4(positions[p_vertex_id], 0.0, 1.0);
+    output.uv       = uvs[p_vertex_id];
 
     return output;
 }
-
 

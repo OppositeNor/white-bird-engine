@@ -13,26 +13,19 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.hlslh"
+#include "draw_cube/draw_cube_utils.slangh"
+#include "defs.slangh"
 
-VSOutput main(uint p_vertex_id : SV_VertexID) {
+cbuffer camera_info : register(b0, space0) { CameraInfo camera_info; }
+
+VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
-
-    float2 positions[3] = {
-        float2(-1.0, -1.0),
-        float2(-1.0,  3.0),
-        float2( 3.0, -1.0)
-    };
-
-    float2 uvs[3] = {
-        float2(0.0, 0.0),
-        float2(0.0, 2.0),
-        float2(2.0, 0.0)
-    };
-
-    output.position = float4(positions[p_vertex_id], 0.0, 1.0);
-    output.uv       = uvs[p_vertex_id];
+    // HLSL uses column major
+    output.position  = float4(p_input.position.xyz, 1.0) * camera_info.view * camera_info.proj;
+    output.normal = p_input.normal;
+    output.uv = p_input.uv;
 
     return output;
 }
+
 

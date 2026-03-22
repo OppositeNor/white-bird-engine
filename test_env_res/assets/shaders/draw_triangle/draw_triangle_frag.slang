@@ -1,4 +1,4 @@
-// vert
+// frag
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,26 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.hlslh"
+#include "draw_triangle/draw_triangle_utils.slangh"
+#include "defs.slangh"
 
-VSOutput main(uint p_vertex_id : SV_VertexID) {
-    VSOutput output;
+cbuffer time : register(b0, space0) { Time time; }
 
-    float2 positions[3] = {
-        float2(-1.0, -1.0),
-        float2(-1.0,  3.0),
-        float2( 3.0, -1.0)
-    };
-
-    float2 uvs[3] = {
-        float2(0.0, 0.0),
-        float2(0.0, 2.0),
-        float2(2.0, 0.0)
-    };
-
-    output.position = float4(positions[p_vertex_id], 0.0, 1.0);
-    output.uv       = uvs[p_vertex_id];
-
-    return output;
+float4 main(VSOutput p_input) : SV_Target {
+    return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }
 

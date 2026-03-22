@@ -1,3 +1,4 @@
+// vert
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +13,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "draw_triangle/draw_triangle_utils.slangh"
+#include "defs.slangh"
 
-#ifndef WBE_FILE_DRAW_TRIANGLE_UTILS_HLSLH
-#define WBE_FILE_DRAW_TRIANGLE_UTILS_HLSLH
-struct VSOutput {
-    float4 position : SV_Position;
-    float2 uv       : COLOR0;
-};
+VSOutput main(Vertex3DTexturedInput p_input) {
+    VSOutput output;
 
-#endif
+    output.position = float4(p_input.position.x, -1.0 * p_input.position.y, 0.0, 1.0);
+    output.uv       = p_input.uv;
+
+    return output;
+}
+
+

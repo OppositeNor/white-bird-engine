@@ -83,9 +83,9 @@ shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 # Setup ACP
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
 acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
-acp.add_compiler(WBEACPCompilerDiscard([".hlslh"]))
+acp.add_compiler(WBEACPCompilerDiscard([".slangh", ".hlslh"]))
 
 test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
 test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
-test_env_acp.add_compiler(WBEACPCompilerDiscard([".hlslh"]))
+test_env_acp.add_compiler(WBEACPCompilerDiscard([".slangh", ".hlslh"]))
 

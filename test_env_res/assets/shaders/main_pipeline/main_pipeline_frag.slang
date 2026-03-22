@@ -1,4 +1,4 @@
-// vert
+// frag
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +13,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_cube/draw_cube_utils.hlslh"
-#include "defs.hlslh"
+#include "main_pipeline/main_pipeline_utils.slangh"
 
-cbuffer camera_info : register(b0, space0) { CameraInfo camera_info; }
-
-VSOutput main(Vertex3DTexturedInput p_input) {
-    VSOutput output;
-    // HLSL uses column major
-    output.position  = float4(p_input.position.xyz, 1.0) * camera_info.view * camera_info.proj;
-    output.normal = p_input.normal;
-    output.uv = p_input.uv;
-
-    return output;
+float4 main(VSOutput p_input) : SV_Target {
+    return float4(p_input.uv, 0.0, 1.0);
 }
-
 
