@@ -22,8 +22,11 @@
 #include "core/surface/3d_primitive.hh"
 #include "utils/utils.hh"
 #include <bitset>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <type_traits>
+#include <vector>
 namespace WhiteBirdEngine {
 
 struct ResourceUnit {};
@@ -105,6 +108,38 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
     // The path to the shader's metadata file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string metadata;
+};
+
+/**
+ * @class RUSchemePipeline
+ * @brief The scheme of RUPipeline.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemePipeline : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemePipeline)
+    // The resource ID of the vertex shader.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_stage_id;
+    // The vertex shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader vertex_stage;
+    // The resource ID of the tessellation shader.
+    WBE_META(WBE_REFLECT)
+    std::string tessellation_stage_id;
+    // The tessellation shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader tessellation_stage;
+    // The resource ID of the geometry shader.
+    WBE_META(WBE_REFLECT)
+    std::string geometry_stage_id;
+    // The geometry shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader geometry_stage;
+    // The resource ID of the fragment shader.
+    WBE_META(WBE_REFLECT)
+    std::string fragment_stage_id;
+    // The fragment shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader fragment_stage;
 };
 
 /**
@@ -281,6 +316,22 @@ struct RUShader : public ResourceUnit {
     // The size of the binary data.
     size_t size;
     // TODO: Shader metadata.
+};
+
+/**
+ * @class RUPipeline
+ * @brief Pipeline.
+ *
+ */
+struct RUPipeline : public ResourceUnit {
+    // The vertex shader.
+    RefRes<RUShader> vertex_stage;
+    // The tessellation shader.
+    RefRes<RUShader> tessellation_stage;
+    // The geometry shader.
+    RefRes<RUShader> geometry_stage;
+    // The fragment shader.
+    RefRes<RUShader> fragment_stage;
 };
 
 /**

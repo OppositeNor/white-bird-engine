@@ -62,6 +62,43 @@ const SchemeType& get_typed_scheme(const RUScheme& p_scheme, const std::string& 
     return *typed_scheme;
 }
 
+RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) {
+    ParserJSON parser;
+    parser.parse(get_resource_path(p_scheme.metadata));
+    ShaderMetadata shader_metadata;
+    shader_metadata.deserialize(parser.get_data());
+    // TODO: record metadata.
+    auto file_path = get_resource_path(p_scheme.path);
+    auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
+    auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
+    RUShader resource_unit;
+    resource_unit.data = data;
+    resource_unit.size = file_content.size();
+    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUShader>();
+}
+
+void resolve_pipeline_stage(
+    IResourceChunk& p_res_chunk,
+    RefRes<RUShader>& p_stage,
+    const std::string& p_stage_id,
+    const RUSchemeShader& p_stage_scheme,
+    const std::string& p_stage_name,
+    bool p_is_required = true) {
+    if (!p_stage_id.empty()) {
+        p_res_chunk.create_ref_to(reinterpret_cast<void**>(&p_stage), p_stage_id);
+        return;
+    }
+    if (p_stage_scheme.path.empty()) {
+        if (!p_is_required) {
+            return;
+        }
+        throw std::runtime_error(std::format(
+            "Failed to populate pipeline resource: {} stage requires either stage id or inline shader path.",
+            p_stage_name));
+    }
+    p_stage = populate_shader_resource(p_res_chunk, p_stage_scheme);
+}
+
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) {
     (void)p_res_chunk;
     (void)p_material;
@@ -175,22 +212,51 @@ bool ResourceUnitLoaderShader::is_resource_supported(const RUScheme& p_scheme) c
 
 void ResourceUnitLoaderShader::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeShader>(p_scheme, "SHADER");
-    ParserJSON parser;
-    parser.parse(get_resource_path(typed_scheme.metadata));
-    ShaderMetadata shader_metadata;
-    shader_metadata.deserialize(parser.get_data());
-    // TODO: record metadata.
-    auto file_path = get_resource_path(typed_scheme.path);
-    auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
-    auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
-    RUShader resource_unit;
-    resource_unit.data = data;
-    resource_unit.size = file_content.size();
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    populate_shader_resource(p_res_chunk, typed_scheme);
 }
 
 void ResourceUnitLoaderShader::populate_scheme(IResourceChunk& p_res_chunk, const std::any& p_scheme_data) const {
     populate_from_parser_data<ResourceUnitLoaderShader, RUSchemeShader>(*this, p_res_chunk, p_scheme_data, "SHADER");
+}
+
+bool ResourceUnitLoaderPipeline::is_resource_supported(const RUScheme& p_scheme) const {
+    return normalize_res_type(p_scheme.type) == "PIPELINE";
+}
+
+void ResourceUnitLoaderPipeline::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemePipeline>(p_scheme, "PIPELINE");
+    RUPipeline resource_unit;
+    resolve_pipeline_stage(
+        p_res_chunk,
+        resource_unit.vertex_stage,
+        typed_scheme.vertex_stage_id,
+        typed_scheme.vertex_stage,
+        "vertex");
+    resolve_pipeline_stage(
+        p_res_chunk,
+        resource_unit.tessellation_stage,
+        typed_scheme.tessellation_stage_id,
+        typed_scheme.tessellation_stage,
+        "tessellation",
+        false);
+    resolve_pipeline_stage(
+        p_res_chunk,
+        resource_unit.geometry_stage,
+        typed_scheme.geometry_stage_id,
+        typed_scheme.geometry_stage,
+        "geometry",
+        false);
+    resolve_pipeline_stage(
+        p_res_chunk,
+        resource_unit.fragment_stage,
+        typed_scheme.fragment_stage_id,
+        typed_scheme.fragment_stage,
+        "fragment");
+    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+}
+
+void ResourceUnitLoaderPipeline::populate_scheme(IResourceChunk& p_res_chunk, const std::any& p_scheme_data) const {
+    populate_from_parser_data<ResourceUnitLoaderPipeline, RUSchemePipeline>(*this, p_res_chunk, p_scheme_data, "PIPELINE");
 }
 
 bool ResourceUnitLoaderMaterial::is_resource_supported(const RUScheme& p_scheme) const {

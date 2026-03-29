@@ -12,6 +12,12 @@
             "type": "shader",
             "path": "assets/shaders/main_pipeline/main_pipeline_frag.spv",
             "metadata": "assets/shaders/main_pipeline/main_pipeline_frag.json"
+        },
+        {
+            "id": "main_pipeline",
+            "type": "pipeline",
+            "vertex_stage_id": "main_shader_vert",
+            "fragment_stage_id": "main_shader_frag"
         }
     ]
 }

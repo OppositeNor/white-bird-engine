@@ -32,6 +32,7 @@ ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_globa
     add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderPipeline>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
