@@ -102,6 +102,14 @@ public:
      * @param p_scheme The resource scheme.
      */
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const = 0;
+
+    /**
+     * @brief Populate the shader resource.
+     *
+     * @param p_res_chunk The resource chunk to insert resource data.
+     * @param p_scheme The resource scheme.
+     */
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) const = 0;
 };
 
 } // namespace WhiteBirdEngine

@@ -12,6 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/parser/parser_json.hh"
+#include "resource/resource_defs.hh"
 #include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/surface/3d_primitive.hh"
@@ -110,6 +112,21 @@ void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_sch
 
 void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const {
     // TODO
+}
+
+void RUPopulator::populate(ResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) const {
+    ParserJSON parser;
+    parser.parse(get_resource_path(p_scheme.metadata));
+    ShaderMetadata shader_metadata;
+    shader_metadata.deserialize(parser.get_data());
+    // TODO: record metadata.
+    auto file_path = get_resource_path(p_scheme.path);
+    auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
+    auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
+    RUShader resource_unit;
+    resource_unit.data = data;
+    resource_unit.size = file_content.size();
+    p_res_chunk.push_res_unit(p_scheme.id, resource_unit);
 }
 
 void RUPopulator::resolve_image_data(ResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) const {

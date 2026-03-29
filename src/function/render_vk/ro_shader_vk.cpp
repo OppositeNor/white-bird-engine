@@ -32,7 +32,7 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_
 }
 
 ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::string& p_resource_id) {
-    auto resource = ResourceManager::get_singleton()->get_resource<RUBinary>(p_resource_id);
+    auto resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
     return set_code(resource->data.get(), resource->size);
 }
 

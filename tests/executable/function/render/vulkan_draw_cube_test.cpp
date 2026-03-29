@@ -144,8 +144,8 @@ private:
 };
 
 int main(int p_argc, char* p_argv[]) {
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     try {
-        std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
         {
             ApplicationVulkanDrawPipelineTest game_application;
             {

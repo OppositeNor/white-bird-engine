@@ -8,6 +8,8 @@ Types of assets are:
 
 - RUBinary
 
+- RUShader
+
 - RUFont
 
 - RUImage

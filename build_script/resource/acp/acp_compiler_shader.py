@@ -39,11 +39,10 @@ class WBEACPCompilerShader(WBEACPCompiler):
     @override
     def compile(self, res_path: Path, output_dir: Path):
         output_file_path = Path.joinpath(output_dir, Path(res_path.stem + ".spv"))
+        shader_metadata_file_path = Path.joinpath(output_dir, Path(res_path.stem + ".json"))
         os.makedirs(output_file_path.parent, exist_ok=True)
         if res_path.suffix == ".slang":
-            self._compile_slang(res_path, output_file_path)
-        elif res_path.suffix == ".hlsl":
-            self._compile_glslc_hlsl(res_path, output_file_path)
+            self._compile_slang(res_path, output_file_path, shader_metadata_file_path)
         else:
             raise RuntimeError(f"Unsupported shader file type: {res_path.suffix}.")
 
@@ -60,22 +59,17 @@ class WBEACPCompilerShader(WBEACPCompiler):
             raise RuntimeError(f"File {shader_file} missing a stage header.")
         return shader_stage
 
-    def _compile_slang(self, shader_file: Path, output_file: Path):
+    def _compile_slang(self, shader_file: Path, output_file: Path, shader_metadata_file_path: Path) -> None:
         shader_stage = self._read_shader_stage(shader_file)
 
         slangc_path = shutil.which("slangc")
         if slangc_path is not None:
-            self._compile_slangc_slang(slangc_path, shader_file, output_file, shader_stage)
+            self._compile_slangc_slang(slangc_path, shader_file, output_file, shader_metadata_file_path, shader_stage)
             return
-        glslang_validator_path = shutil.which("glslangValidator")
-        if glslang_validator_path is not None:
-            self._compile_glslang_slang(glslang_validator_path, shader_file, output_file, shader_stage)
-            return
-
         raise RuntimeError("Failed to find valid slang compiler.")
 
     def _compile_slangc_slang(self, slangc_path: str, shader_file: Path,
-                              output_file: Path, shader_stage: str):
+                              output_file: Path, shader_metadata_file: Path, shader_stage: str):
         shader_stage = self._read_shader_stage(shader_file)
         cmd = [
             slangc_path,
@@ -84,32 +78,11 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "-stage", shader_stage,
             "-I", str(self._shader_include_dir),
             "-o", str(output_file),
-            str(shader_file)
-        ]
-        if build_setup.build_target["generate-tests"]:
-            cmd.extend(["-g3"])
-        print("Compiling:", shader_file)
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print("Failed to compile", shader_file)
-            print(result.stderr)
-            raise RuntimeError("Failed to compile shader.")
-
-    def _compile_glslang_slang(self, glslang_validator_path: str, shader_file: Path,
-                               output_file: Path, shader_stage: str):
-        shader_stage = self._normalize_stage_for_glslang(shader_stage)
-        cmd = [
-            glslang_validator_path,
-            "-V",
-            "-D",
-            "-S", shader_stage,
-            "-I" + str(self._shader_include_dir),
-            "-e", "main",
-            "-o", str(output_file),
+            "-reflection-json", str(shader_metadata_file),
             str(shader_file),
         ]
         if build_setup.build_target["generate-tests"]:
-            cmd.append("-g")
+            cmd.extend(["-g3"])
         print("Compiling:", shader_file)
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -133,25 +106,4 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "comp": "comp",
         }
         return stage_alias_map[shader_stage]
-
-    def _compile_glslc_hlsl(self, shader_file: Path, output_file: Path):
-        shader_stage = self._read_shader_stage(shader_file)
-
-        cmd = [
-            "glslc",
-            "-x", "hlsl",
-            f"-fshader-stage={shader_stage}",
-            "-I", self._shader_include_dir,
-            "-fentry-point=main",
-            "-o", str(output_file),
-            str(shader_file)
-        ]
-        if build_setup.build_target["generate-tests"]:
-            cmd.append("-g")
-        print("Compiling:", shader_file)
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print("Failed to compile", shader_file)
-            print(result.stderr)
-            raise RuntimeError("Failed to compile shader.")
 

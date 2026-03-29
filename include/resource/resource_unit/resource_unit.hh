@@ -94,6 +94,20 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeBinary : public RUScheme {
 };
 
 /**
+ * @class RUSchemeShader
+ * @brief The scheme of RUShader.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeShader)
+    // The path to the shader file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+    // The path to the shader's metadata file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string metadata;
+};
+
+/**
  * @class RUSchemeFont
  * @brief The scheme of RUFont.
  */
@@ -248,6 +262,25 @@ struct RUBinary : public ResourceUnit {
     RefRes<char> data;
     // The size of the binary data.
     size_t size;
+};
+
+/**
+ * @class RUShader
+ * @brief Shader resource unit. contains a size (in bytes) and a MemID pointing to
+ * the data chunk that stores the data of the binary data.
+ *
+ * The data should always be pushed before pushing this resource unit, and the
+ * release process should always be backwards (first release the resource unit, and
+ * then release the data) It is recommended to store the image data right before the
+ * text resource unit in a stack allocator.
+ *
+ */
+struct RUShader : public ResourceUnit {
+    // The binary data.
+    RefRes<char> data;
+    // The size of the binary data.
+    size_t size;
+    // TODO: Shader metadata.
 };
 
 /**

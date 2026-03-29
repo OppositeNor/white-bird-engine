@@ -3,13 +3,15 @@
     "resources": [
         {
             "id": "draw_cube_vert",
-            "type": "binary",
-            "path": "assets/shaders/draw_cube/draw_cube_vert.spv"
+            "type": "shader",
+            "path": "assets/shaders/draw_cube/draw_cube_vert.spv",
+            "metadata": "assets/shaders/draw_cube/draw_cube_vert.json"
         },
         {
             "id": "draw_cube_frag",
-            "type": "binary",
-            "path": "assets/shaders/draw_cube/draw_cube_frag.spv"
+            "type": "shader",
+            "path": "assets/shaders/draw_cube/draw_cube_frag.spv",
+            "metadata": "assets/shaders/draw_cube/draw_cube_frag.json"
         }
     ]
 }

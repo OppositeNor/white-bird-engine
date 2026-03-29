@@ -35,6 +35,7 @@ namespace WhiteBirdEngine {
 // Resource unit labels.
 WBE_LABEL(AUDIO, WBE_RESOURCE_UNIT);
 WBE_LABEL(BINARY, WBE_RESOURCE_UNIT);
+WBE_LABEL(SHADER, WBE_RESOURCE_UNIT);
 WBE_LABEL(MATERIAL, WBE_RESOURCE_UNIT);
 WBE_LABEL(FONT, WBE_RESOURCE_UNIT);
 WBE_LABEL(IMAGE, WBE_RESOURCE_UNIT);
@@ -177,6 +178,9 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::stri
             case BINARY:
                 populate_scheme<RUSchemeBinary>(res);
                 break;
+            case SHADER:
+                populate_scheme<RUSchemeShader>(res);
+                break;
             case FONT:
                 populate_scheme<RUSchemeFont>(res);
                 break;
@@ -198,6 +202,9 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::stri
             case VIDEO:
                 populate_scheme<RUSchemeVideo>(res);
                 break;
+            default:
+                throw std::runtime_error(std::format(
+                    "Unrecognized resource type: {}.", LabelManager::get_singleton()->get_label_name(res_type)));
         }
     }
     resolve_refs();

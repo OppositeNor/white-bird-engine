@@ -80,6 +80,9 @@ public:
      */
     const std::string& get_label_name(HashCode p_label) const {
         std::shared_lock lock(label_mutex);
+        if (!label_to_name.contains(p_label)) {
+            throw std::runtime_error(std::format("Failed to get name from label {}: Label not registered.", p_label));
+        }
         return label_to_name.at(p_label);
     }
 
@@ -91,6 +94,9 @@ public:
      */
     HashCode get_label_from_name(const std::string& p_name) const {
         std::shared_lock lock(label_mutex);
+        if (!name_to_label.contains(p_name)) {
+            throw std::runtime_error(std::format("Failed to get label from name {}: Label not registered.", p_name));
+        }
         return name_to_label.at(p_name);
     }
 

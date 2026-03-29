@@ -40,6 +40,7 @@ public:
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeText& p_scheme) const override;
     virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeVideo& p_scheme) const override;
+    virtual void populate(ResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) const override;
 
 private:
     ResourceManager* resource_manager;

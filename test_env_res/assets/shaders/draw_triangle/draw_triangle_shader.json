@@ -3,13 +3,15 @@
     "resources": [
         {
             "id": "draw_triangle_vert",
-            "type": "binary",
-            "path": "assets/shaders/draw_triangle/draw_triangle_vert.spv"
+            "type": "shader",
+            "path": "assets/shaders/draw_triangle/draw_triangle_vert.spv",
+            "metadata": "assets/shaders/draw_triangle/draw_triangle_vert.json"
         },
         {
             "id": "draw_triangle_frag",
-            "type": "binary",
-            "path": "assets/shaders/draw_triangle/draw_triangle_frag.spv"
+            "type": "shader",
+            "path": "assets/shaders/draw_triangle/draw_triangle_frag.spv",
+            "metadata": "assets/shaders/draw_triangle/draw_triangle_frag.json"
         }
     ]
 }

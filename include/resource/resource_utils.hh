@@ -209,7 +209,6 @@ inline ColorSpace get_color_space_from_str(const std::string& p_color_space) {
     throw std::runtime_error("Failed to get color space. Color space: \"" + p_color_space + "\" is not supported.");
 }
 
-
-}
+} // namespace WhiteBirdEngine
 
 #endif
