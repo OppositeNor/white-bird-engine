@@ -14,7 +14,7 @@
 file(GLOB wbe_resource_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_subdirectory(resource_manager)
-add_subdirectory(resource_unit_populator)
+add_subdirectory(resource_unit_loader)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

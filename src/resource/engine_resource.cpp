@@ -15,7 +15,7 @@
 #include "resource/engine_resource.hh"
 #include "core/engine_core.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/i_resource_chunk.hh"
 
 namespace WhiteBirdEngine {
 

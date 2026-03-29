@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RESOURCE_CHUNK_HH
-#define WBE_FILE_RESOURCE_CHUNK_HH
+#ifndef WBE_FILE_I_RESOURCE_CHUNK_HH
+#define WBE_FILE_I_RESOURCE_CHUNK_HH
 
 #include "core/allocator/i_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -27,13 +27,13 @@ class ResourceManager;
 using ResourceChunkID = HashCode;
 
 /**
- * @class ResourceChunk
- * @brief Chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
+ * @class IResourceChunk
+ * @brief Interface for chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
  * @todo Test
  */
-class ResourceChunk {
+class IResourceChunk {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(ResourceChunk)
+    WBE_R6_DEFAULT_VIRTUAL(IResourceChunk)
 
     /**
      * @brief Get the resource from a key.

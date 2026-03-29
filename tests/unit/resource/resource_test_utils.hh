@@ -1,6 +1,8 @@
 
 #include "core/allocator/i_allocator.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/i_resource_chunk.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include <cstddef>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -9,7 +11,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-class MockResourceChunk final : public WBE::ResourceChunk {
+class MockResourceChunk final : public WBE::IResourceChunk {
 public:
 
     struct Builder {

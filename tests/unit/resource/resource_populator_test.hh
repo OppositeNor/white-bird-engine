@@ -16,9 +16,10 @@
 #define WBE_FILE_RESOURCE_POPULATOR_TEST_HH
 
 #include "global/global.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "resource/resource_unit_populator/resource_unit_populator.hh"
 #include "resource_test_utils.hh"
+#include "resource/resource_utils.hh"
 
 #include <gtest/gtest.h>
 #include <sstream>
@@ -65,7 +66,7 @@ Emoji 测试: 😃🚀✨🌍
 };
 
 TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
-    WBE::RUPopulator populator;
+    WBE::ResourceUnitLoaderText loader;
     std::stringstream ss;
     std::string text_content_storage;
     auto res_chunk = MockResourceChunk::Builder()
@@ -78,7 +79,7 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
             }
         ))
         .build(ss);
-    populator.populate(*res_chunk, text_scheme);
+    loader.populate_scheme(*res_chunk, text_scheme);
     EXPECT_EQ(text_content_storage, test_file_content);
 }
 
@@ -87,7 +88,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
 }
 
 TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
-    WBE::RUPopulator populator;
+    WBE::ResourceUnitLoaderImage loader;
     std::stringstream ss;
     std::vector<char> image_data_storage;
     WBE::RUImage captured_ru_image;
@@ -110,11 +111,11 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
             }
         ))
         .build(ss);
-    populator.populate(*res_chunk, image_scheme);
+    loader.populate_scheme(*res_chunk, image_scheme);
     EXPECT_EQ(captured_ru_image.width, 16);
     EXPECT_EQ(captured_ru_image.height, 16);
     EXPECT_EQ(captured_ru_image.channel_count, 3);
-    EXPECT_EQ(captured_ru_image.color_space, WBE::ColorSpace::SRGB);
+    EXPECT_EQ(captured_ru_image.color_space, WBE::get_color_space_from_str("srgb"));
     EXPECT_EQ(image_data_storage.size(), 16 * 16 * 3);
     // Check first pixel: should be red (255, 0, 0)
     EXPECT_EQ(static_cast<unsigned char>(image_data_storage[0]), 255);

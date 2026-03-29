@@ -15,13 +15,30 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/parser/parser_json.hh"
+#include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
+#include <cstddef>
+#include <format>
+#include <stdexcept>
+#include <string>
 
 namespace WhiteBirdEngine {
 
 ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
     : stack_allocator(p_alloc_size) {
     singleton = this;
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
     global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
         global_allocator(), p_global_res_path, stack_allocator));
 }
@@ -32,8 +49,8 @@ ResourceManager::~ResourceManager() {
     stack_allocator.clear();
 }
 
-Ref<ResourceChunk> ResourceManager::find_resource_chunk_containing_key(const std::string& p_key) const {
-    for (const Ref<ResourceChunk>& chunk : resource_chunks) {
+Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_key(const std::string& p_key) const {
+    for (const Ref<IResourceChunk>& chunk : resource_chunks) {
         if (chunk->contains(p_key)) {
             return chunk;
         }

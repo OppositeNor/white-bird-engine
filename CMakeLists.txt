@@ -56,8 +56,6 @@ set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
 add_subdirectory(dependencies/boost)
-set(SPIRV_REFLECT_STATIC_LIB ON)
-add_subdirectory(dependencies/SPIRV-Reflect)
 if (WBE_MAKE_TEST)
     set(BENCHMARK_ENABLE_TESTING OFF)
     add_compile_options(-Wno-c2y-extensions)
@@ -125,7 +123,6 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
     ${PROJECT_SOURCE_DIR}/dependencies/stb
     ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
-    ${PROJECT_SOURCE_DIR}/dependencies/SPIRV-Reflect/include
     ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
 )
 if (WBE_MAKE_TEST)
@@ -151,7 +148,6 @@ set(libs ${libs}
     SDL2::SDL2
     yaml-cpp::yaml-cpp
     boost_thread
-    spirv-reflect-static
     WBE_MINIAUDIO_BUILD_LIB
 )
 

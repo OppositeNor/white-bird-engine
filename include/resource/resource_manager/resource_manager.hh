@@ -18,13 +18,15 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "resource/resource_chunk/resource_chunk.hh"
+#include "resource/resource_chunk/i_resource_chunk.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <vector>
 namespace WhiteBirdEngine {
 
 /**
@@ -55,7 +57,7 @@ public:
      * resources.
      * @param p_resource_chunk The resource chunk to register.
      */
-    ResourceChunkID register_chunk(Ref<ResourceChunk> p_resource_chunk) {
+    ResourceChunkID register_chunk(Ref<IResourceChunk> p_resource_chunk) {
         ResourceChunkID chunk_id = resource_chunks.size();
         resource_chunks.push_back(p_resource_chunk);
         return chunk_id;
@@ -85,7 +87,7 @@ public:
      * @param p_chunk_id The ID of the chunk/
      * @return The resource chunk.
      */
-    Ref<ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
+    Ref<IResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
         }
@@ -98,7 +100,7 @@ public:
      * @param p_chunk_id The ID of the chunk/
      * @return The resource chunk.
      */
-    Ref<const ResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
+    Ref<const IResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
         if (p_chunk_id >= resource_chunks.size()) {
             throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
         }
@@ -139,12 +141,21 @@ public:
         return global_res_chunk_id;
     }
 
+    void add_resource_unit_loader(Ref<IResourceUnitLoader> p_resource_unit_loader) {
+        resource_unit_loaders.push_back(p_resource_unit_loader);
+    }
+
+    const std::vector<Ref<IResourceUnitLoader>>& get_resource_unit_loaders() const {
+        return resource_unit_loaders;
+    }
+
 private:
     ResourceChunkID global_res_chunk_id;
-    std::vector<Ref<ResourceChunk>> resource_chunks;
+    std::vector<Ref<IResourceChunk>> resource_chunks;
+    std::vector<Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
-    Ref<ResourceChunk> find_resource_chunk_containing_key(const std::string& p_key) const;
+    Ref<IResourceChunk> find_resource_chunk_containing_key(const std::string& p_key) const;
 
     inline static ResourceManager* singleton = nullptr;
 };
