@@ -31,9 +31,6 @@
 [submodule "dependencies/google-benchmark"]
 	path = dependencies/google-benchmark
 	url = https://github.com/google/benchmark.git
-[submodule "dependencies/SPIRV-Reflect"]
-	path = dependencies/SPIRV-Reflect
-	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
 [submodule "dependencies/entt"]
 	path = dependencies/entt
 	url = https://github.com/skypjack/entt.git
