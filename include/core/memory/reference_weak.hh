@@ -37,7 +37,7 @@ public:
         p_other.ref();
         control_block = p_other.control_block;
     }
-    RefWeak(RefWeak<T, AllocType>&& p_other) {
+    RefWeak(RefWeak<T, AllocType>&& p_other) noexcept {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         control_block = p_other.control_block;
         p_other.control_block = nullptr;
@@ -52,7 +52,7 @@ public:
         control_block = p_other.control_block;
         return *this;
     }
-    RefWeak& operator=(RefWeak<T, AllocType>&& p_other) {
+    RefWeak& operator=(RefWeak<T, AllocType>&& p_other) noexcept {
         WBE_DEBUG_ASSERT(p_other.control_block != nullptr);
         if (*this == p_other) {
             return *this;
@@ -194,7 +194,7 @@ private:
     }
 };
 
-}
+} // namespace WhiteBirdEngine
 
 namespace std {
 /**
@@ -214,6 +214,6 @@ struct hash<::WhiteBirdEngine::RefWeak<T, AllocType>> {
     }
 
 };
-}
+} // namespace std
 
 #endif

@@ -345,6 +345,58 @@ inline std::vector<char> load_binary_file(const char* p_path) {
 }
 
 /**
+ * @brief Load a binary file from a path.
+ *
+ * @todo Test
+ * @param p_path The path tot he binary file.
+ * @param p_result The result data. Set to nullptr if only interested with file size.
+ * @param p_size The size of the file. Ignored if p_result is not nullptr.
+ */
+inline void load_binary_file(const char* p_path, void* p_result, size_t* p_size) {
+    if (p_path == nullptr) {
+        throw std::invalid_argument("Path to binary file cannot be null.");
+    }
+    if (p_result == nullptr && p_size == nullptr) {
+        throw std::invalid_argument("Either p_result or p_size must be provided.");
+    }
+
+    std::ifstream file_stream(p_path, std::ios::binary | std::ios::ate);
+    if (!file_stream.is_open()) {
+        throw std::runtime_error("Failed to open file at path: " + std::string(p_path));
+    }
+
+    const std::ifstream::pos_type end_pos = file_stream.tellg();
+    if (end_pos < 0) {
+        throw std::runtime_error("Failed to get file size at path: " + std::string(p_path));
+    }
+
+    const size_t size = static_cast<size_t>(end_pos);
+
+    // Query mode: caller only needs file size.
+    if (p_result == nullptr) {
+        *p_size = size;
+        return;
+    }
+
+    if (size > static_cast<size_t>(std::numeric_limits<std::streamsize>::max())) {
+        throw std::runtime_error("File is too large to read at path: " + std::string(p_path));
+    }
+
+    file_stream.seekg(0, std::ios::beg);
+    if (!file_stream.good()) {
+        throw std::runtime_error("Failed to seek file at path: " + std::string(p_path));
+    }
+
+    if (size == 0) {
+        return;
+    }
+
+    if (!file_stream.read(static_cast<char*>(p_result), static_cast<std::streamsize>(size))) {
+        throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
+    }
+}
+
+/**
  * @brief Remove hashtag comments.
  * @todo Test
  *
@@ -360,6 +412,28 @@ inline std::string remove_hashtag_comments(std::string p_str) {
     return p_str;
 }
 
+/**
+ * @brief Hash a pointer in compile time. (Usually won't be used, since pointers are usually dynamic).
+ *
+ * @param p_ptr The pointer to be hashed.
+ * @return The hash code of the pointer.
+ */
+consteval HashCode static_hash_ptr(const void* p_ptr) {
+    return static_hash(reinterpret_cast<uintptr_t>(p_ptr));
+}
+
+/**
+ * @brief Hash a pointer in run time.
+ *
+ * @param p_ptr The pointer to be hashed.
+ * @return The hash code of the pointer.
+ */
+inline HashCode dynam_hash_ptr(const void* p_ptr) {
+    return dynam_hash(reinterpret_cast<uintptr_t>(p_ptr));
+}
+
+using ChannelID = HashCode;
+
 // Color space
 enum class ColorSpace {
     // RGB space
@@ -367,8 +441,6 @@ enum class ColorSpace {
     // SRGB space
     SRGB
 };
-
-using ChannelID = HashCode;
 
 /**
  * @brief A better name for the required field.

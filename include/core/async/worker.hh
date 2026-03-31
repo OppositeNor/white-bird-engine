@@ -17,13 +17,12 @@
 
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/job/job_handler.hh"
-#include "promise.hh"
 #include "core/core_utils.hh"
-#include "global/stl_allocator.hh"
+#include "core/memory/unique.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <cstdint>
+#include <future>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -33,47 +32,86 @@ namespace WhiteBirdEngine {
  * @brief For handling tasks that are expensive, such as an IO task.
  *
  */
-class Worker : public ISingleton<Worker>, public JobHandler {
+class Worker final : public ISingleton<Worker>, public JobHandler {
 public:
 
-    static constexpr size_t WORKER_MAX_TASK = 32;
+    /**
+     * @brief Maximum number of tasks that the worker could handle.
+     */
+    static constexpr size_t WORKER_MAX_TASK = 128;
 
-    WBE_R6_NDC_DELETE_COPY_MOVE(Worker);
+    WBE_R6_NDCD_DELETE_COPY_MOVE(Worker);
 
     /**
      * @brief Constructor.
      *
      * @param p_allocator The allocator to allocate 
      */
-    Worker(HeapAllocatorDefault* p_allocator)
-        : allocator(p_allocator), job_buffer(p_allocator, WORKER_MAX_TASK) {}
+    Worker()
+        : allocator(WBE_MiB(0.5)) {
+        singleton = this;
+        job_buffer = make_unique<JobBufferRingMPSC>(&allocator, &allocator, WORKER_MAX_TASK);
+    }
+
+    virtual ~Worker() override {
+        // Ensures the job buffer destructs before the allocator.
+        job_buffer.reset();
+        singleton = nullptr;
+    }
+
+    virtual void add_job(Ref<Job> p_job) override;
+    virtual void add_job(const std::function<void()>& p_job) override;
+    virtual void add_job(std::function<void()>&& p_job) override;
+
+    static Worker* get_singleton() {
+        return singleton;
+    }
+
+    /**
+     * @brief Execute the worker thread.
+     */
+    void run();
 
     /**
      * @brief Read data from a file.
      *
-     * @param p_path 
+     * @param p_promise The promise to retrieve result.
+     * @param p_path The path to the file to read.
      */
-    Promise<Vector<uint8_t>> read_file(const Path& p_path) {
-        return read_binary_file(p_path);
+    void read_file(std::promise<std::vector<char>>& p_promise, const Path& p_path) {
+        read_binary_file(p_promise, p_path);
     }
 
     /**
      * @brief Read a text file.
      *
+     * @param p_promise The promise to retrieve result.
      * @param p_path The path to the text file.
      */
-    Promise<std::string> read_text_file(const Path& p_path);
+    void read_text_file(std::promise<std::string>& p_promise, const Path& p_path);
 
     /**
      * @brief Read a binary file.
      *
+     * @param p_promise The promise to retrieve result.
      * @param p_path The path to the file.
      */
-    Promise<Vector<uint8_t>> read_binary_file(const Path& p_path);
+    void read_binary_file(std::promise<std::vector<char>>& p_promise, const Path& p_path);
+
+    /**
+     * @brief Stop.
+     */
+    void stop() {
+        add_job([&]() {
+            should_exit = true;
+        });
+    }
 
 private:
-    HeapAllocatorDefault* allocator;
-    JobBufferRingMPSC job_buffer;
+    inline static Worker* singleton = nullptr;
+    HeapAllocatorDefault allocator;
+    Unique<JobBufferRingMPSC> job_buffer;
+    bool should_exit = false;
 };
 
 } // namespace WhiteBirdEngine

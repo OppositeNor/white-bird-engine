@@ -14,6 +14,7 @@
 */
 #include "function/render/render_database.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/async/worker.hh"
 #include "function/render/material.hh"
 #include "resource/resource_unit/resource_unit.hh"
 
@@ -22,19 +23,46 @@
 #include <cstring>
 #include <glm/glm.hpp>
 #include <cstddef>
+#include <mutex>
+#include <shared_mutex>
 #include <stdexcept>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<IMaterialFactory> p_material_factory)
-    : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+    : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator),
+    render_objects_resources(p_allocator) {
     WBE_DEBUG_ASSERT(material_factory != MEM_NULL);
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
     allocator = p_allocator;
+}
+
+bool RenderDatabase::contains_resource(HashCode p_key) {
+    std::shared_lock lock(render_objects_resources_mutex);
+    return render_objects_resources.contains(p_key);
+}
+
+void RenderDatabase::register_render_object_resource(HashCode p_key, Ref<IRenderObject> p_render_object) {
+    // TODO: For render objects that could be reused, register them into the database, and during render object
+    // creation try to retrieve them instead of re-creating them.
+    std::unique_lock lock(render_objects_resources_mutex);
+    if (render_objects_resources.contains(p_key)) {
+        throw std::runtime_error("Failed to register render object resource: hashing collision detected!");
+    }
+    render_objects_resources.insert(std::pair(p_key, p_render_object));
+    // If render_objects_resources's size are greater than a threashold, clean up the dead weak references.
+    if (render_objects_resources.size() > CLEAN_DEAD_RO_WEAK_REFS_THREASHOLD) {
+        Worker::get_singleton()->add_job([&](){
+            std::unique_lock lock(render_objects_resources_mutex);
+            std::erase_if(render_objects_resources, [](const auto& p_entry) {
+                return p_entry.second.is_valid();
+            });
+        });
+    }
 }
 
 void RenderDatabase::set_opaque_triangles_linear(

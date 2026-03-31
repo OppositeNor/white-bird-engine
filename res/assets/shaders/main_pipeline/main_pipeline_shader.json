@@ -15,9 +15,12 @@
         },
         {
             "id": "main_pipeline",
-            "type": "pipeline",
+            "type": "graphics_pipeline",
             "vertex_stage_id": "main_shader_vert",
-            "fragment_stage_id": "main_shader_frag"
+            "fragment_stage_id": "main_shader_frag",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false
         }
     ]
 }

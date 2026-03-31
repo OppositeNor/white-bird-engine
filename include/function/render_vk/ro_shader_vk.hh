@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <string>
 #include <vulkan/vulkan_core.h>
@@ -44,6 +45,8 @@ public:
         // Set from a resource ID.
         Builder& set_code(const std::string& p_resource_id);
 
+        // Set from a resource.
+        Builder& set_code(RefRes<RUShader> p_resource);
     private:
         VkShaderModule build(const BaseRenderDataVK* p_render_data) const;
     };
@@ -69,6 +72,13 @@ public:
      * @param p_resource_id The resource ID.
      */
     ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id);
+    /**
+     * @brief Constructor from a shader resource.
+     *
+     * @param p_base_render_data The base render data.
+     * @param p_resource_id The shader's resource.
+     */
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource);
 
     /**
      * @brief Get the shader module.

@@ -111,35 +111,53 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
 };
 
 /**
- * @class RUSchemePipeline
- * @brief The scheme of RUPipeline.
+ * @class RUSchemeGraphicsPipeline
+ * @brief The scheme of RUGraphicsPipeline.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemePipeline : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemePipeline)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeGraphicsPipeline)
     // The resource ID of the vertex shader.
     WBE_META(WBE_REFLECT)
     std::string vertex_stage_id;
+    // Entry function for the vertex stage.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_stage_entry = "main";
     // The vertex shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader vertex_stage;
     // The resource ID of the tessellation shader.
     WBE_META(WBE_REFLECT)
     std::string tessellation_stage_id;
+    // Entry function for the tessellation stage.
+    WBE_META(WBE_REFLECT)
+    std::string tessellation_stage_entry = "main";
     // The tessellation shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader tessellation_stage;
     // The resource ID of the geometry shader.
     WBE_META(WBE_REFLECT)
     std::string geometry_stage_id;
+    // Entry function for the geometry stage.
+    WBE_META(WBE_REFLECT)
+    std::string geometry_stage_entry = "main";
     // The geometry shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader geometry_stage;
     // The resource ID of the fragment shader.
     WBE_META(WBE_REFLECT)
     std::string fragment_stage_id;
+    // Entry function for the fragment stage.
+    WBE_META(WBE_REFLECT)
+    std::string fragment_stage_entry = "main";
     // The fragment shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader fragment_stage;
+    // Should enable depth test.
+    WBE_META(WBE_REFLECT)
+    bool depth_test = true;
+    // Should enable depth write.
+    WBE_META(WBE_REFLECT)
+    bool depth_write = true;
 };
 
 /**
@@ -319,19 +337,31 @@ struct RUShader : public ResourceUnit {
 };
 
 /**
- * @class RUPipeline
- * @brief Pipeline.
+ * @class RUGraphicsPipeline
+ * @brief Graphics pipeline.
  *
  */
-struct RUPipeline : public ResourceUnit {
+struct RUGraphicsPipeline : public ResourceUnit {
     // The vertex shader.
     RefRes<RUShader> vertex_stage;
+    // Entry function for the vertex stage.
+    RefRes<char> vertex_stage_entry;
     // The tessellation shader.
     RefRes<RUShader> tessellation_stage;
+    // Entry function for the tessellation stage.
+    RefRes<char> tessellation_stage_entry;
     // The geometry shader.
     RefRes<RUShader> geometry_stage;
+    // Entry function for the geometry stage.
+    RefRes<char> geometry_stage_entry;
     // The fragment shader.
     RefRes<RUShader> fragment_stage;
+    // Entry function for the fragment stage.
+    RefRes<char> fragment_stage_entry;
+    // Should enable depth test.
+    bool depth_test = true;
+    // Should enable depth write.
+    bool depth_write = true;
 };
 
 /**

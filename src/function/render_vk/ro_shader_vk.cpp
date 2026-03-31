@@ -33,7 +33,11 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_
 
 ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::string& p_resource_id) {
     auto resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
-    return set_code(resource->data.get(), resource->size);
+    return set_code(resource);
+}
+
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) {
+    return set_code(p_resource->data.get(), p_resource->size);
 }
 
 VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
@@ -58,6 +62,13 @@ ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::st
     : RenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource_id);
+    init(builder);
+}
+
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource)
+    : RenderObjectVK(p_base_render_data) {
+    Builder builder;
+    builder.set_code(p_resource);
     init(builder);
 }
 

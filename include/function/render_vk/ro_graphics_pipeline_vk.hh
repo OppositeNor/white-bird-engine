@@ -90,9 +90,9 @@ public:
              * @return *this.
              */
             ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
-                                       Ref<ROShaderVK> p_fragment_shader,
-                                       const std::string& p_vertex_entry_function = "main",
-                                       const std::string& p_fragment_entry_function = "main") {
+                                      Ref<ROShaderVK> p_fragment_shader,
+                                      const std::string& p_vertex_entry_function = "main",
+                                      const std::string& p_fragment_entry_function = "main") {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
                 set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
                 return *this;
@@ -118,6 +118,19 @@ public:
                     p_vertex_entry_function);
                 set_fragment_shader(
                     make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_fragment_shader_res_id),
+                    p_fragment_entry_function);
+                return *this;
+            }
+            ShaderConfig& set_shaders(const BaseRenderDataVK* p_render_data,
+                                      RefRes<RUShader> p_vertex_shader_res,
+                                      RefRes<RUShader> p_fragment_shader_res,
+                                      const std::string& p_vertex_entry_function = "main",
+                                      const std::string& p_fragment_entry_function = "main") {
+                set_vertex_shader(
+                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_vertex_shader_res),
+                    p_vertex_entry_function);
+                set_fragment_shader(
+                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_fragment_shader_res),
                     p_fragment_entry_function);
                 return *this;
             }
@@ -559,6 +572,15 @@ public:
                 return *this;
             }
         };
+
+        /**
+         * @brief Build the pipeline from a resource.
+         *
+         * @param p_res_key The key to the resource for building the pipeline.
+         * @return *this
+         */
+        Config& build_pipeline(const BaseRenderDataVK* p_render_data, const std::string& p_res_key, Ref<RORenderPassVK> p_render_pass);
+
         // The input shaders. Manual setup needed!
         ShaderConfig shader{};
         // Vertex input stage configurations.
@@ -566,7 +588,7 @@ public:
         // Input assembly stage configurations.
         InputAssemblyConfig input_assembly{};
         // Teselation stage configurations.
-        Required<TesselationConfig> tesselation;
+        std::optional<TesselationConfig> tesselation;
         // Viewport state configuration.
         ViewportStateConfig viewport{};
         // Rasterization stage configurations.

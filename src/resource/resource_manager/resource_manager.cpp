@@ -29,10 +29,11 @@ namespace WhiteBirdEngine {
 ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
     : stack_allocator(p_alloc_size) {
     singleton = this;
+    // Default resources that are supported by the engine.
     add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderPipeline>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderGraphicsPipeline>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
@@ -50,13 +51,13 @@ ResourceManager::~ResourceManager() {
     stack_allocator.clear();
 }
 
-Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_key(const std::string& p_key) const {
+Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_resource(const std::string& p_id) const {
     for (const Ref<IResourceChunk>& chunk : resource_chunks) {
-        if (chunk->contains(p_key)) {
+        if (chunk->contains(p_id)) {
             return chunk;
         }
     }
-    throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_key));
+    throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_id));
 }
 
 } // namespace WhiteBirdEngine

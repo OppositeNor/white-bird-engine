@@ -26,7 +26,6 @@ target_info = {
         "export-directory" : "release",
         "cmake-build-type" : "Release",
         "build-shared" : True,
-        # "generator" : "Ninja",
         "generate-tests" : True,
     },
     "deploy" : {

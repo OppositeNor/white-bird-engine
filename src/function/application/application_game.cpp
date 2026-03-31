@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/application/application_game.hh"
+#include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/logging/log.hh"
@@ -40,6 +41,10 @@ void ApplicationGame::run() {
     std::jthread logic_thread([this]() {
         run_logic();
     });
+    std::jthread worker_thread([this]() {
+        // The logic thread is responsible for ending the worker thread.
+        worker->run();
+    });
 }
 
 void ApplicationGame::init() {
@@ -63,6 +68,7 @@ void ApplicationGame::init() {
             std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
     }
+    worker = make_ref<Worker>(global_allocator());
     // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
 }
 
@@ -94,6 +100,8 @@ void ApplicationGame::run_logic() {
         end_time = global_clock->get_duration();
         logic_delta.store(end_time - start_time, std::memory_order_release);
     }
+    // The logic thread is responsible for ending the worker thread.
+    worker->stop();
 }
 
 WindowProperties ApplicationGame::get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options) {

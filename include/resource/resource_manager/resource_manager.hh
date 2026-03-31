@@ -115,7 +115,7 @@ public:
      */
     template <typename T>
     RefRes<T> get_resource(const std::string& p_id) const {
-        return find_resource_chunk_containing_key(p_id)->get_resource(p_id).reint_cast<T>();
+        return find_resource_chunk_containing_resource(p_id)->get_resource(p_id).reint_cast<T>();
     }
 
     /**
@@ -155,7 +155,7 @@ private:
     std::vector<Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
-    Ref<IResourceChunk> find_resource_chunk_containing_key(const std::string& p_key) const;
+    Ref<IResourceChunk> find_resource_chunk_containing_resource(const std::string& p_id) const;
 
     inline static ResourceManager* singleton = nullptr;
 };

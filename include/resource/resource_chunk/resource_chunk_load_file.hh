@@ -21,10 +21,10 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
+#include <algorithm>
 #include <cstring>
 #include <format>
 #include <functional>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -120,39 +120,44 @@ private:
     std::unordered_map<void**, std::string> ref_map;
     StackAllocator* allocator;
 
-    void resolve_load_resource(std::set<std::string>& p_included_pathes, const std::string& p_res_chunk_path);
+    void resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path);
 
     void resolve_refs() {
         auto* resource_manager = ResourceManager::get_singleton();
         for (auto& [ptr, key] : ref_map) {
-            *ptr = resource_manager->get_resource<char>(key).get();
+            auto entry = resource_map.find(key);
+            if (entry == resource_map.end()) {
+                // Not found in the current chunk, look for it in the next chunk.
+                *ptr = resource_manager->get_resource<char>(key).get();
+            }
+            else {
+                *ptr = entry->second.get();
+            }
         }
     }
 };
 
 template <ParserConcept ParserType>
-void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
-    if (p_included_pathes.contains(p_res_chunk_path)) {
+void ResourceChunkLoadFile<ParserType>::resolve_load_resource(
+    std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
+    if (std::any_of(p_included_pathes.begin(), p_included_pathes.end(), [&](const auto& p_str) { return p_str == p_res_chunk_path; })) {
         throw std::runtime_error(std::format("Include recursion found: {}", p_res_chunk_path));
     }
-    p_included_pathes.insert(p_res_chunk_path);
+    p_included_pathes.push_back(p_res_chunk_path);
 
     auto rc_file_path = get_resource_path(p_res_chunk_path);
     ParserType parser;
     parser.parse(rc_file_path);
 
-    if (parser.contains("include")) {
-        // Resolve includes
-        auto included_resource_chunks = parser.template get_value<std::vector<std::string>>("include");
-        for (auto& include_path : included_resource_chunks) {
-            resolve_load_resource(p_included_pathes, include_path);
-        }
-    }
-
     std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
     for (auto& res : resources) {
         RUScheme resource_scheme;
         resource_scheme.deserialize(res);
+        if (resource_map.contains(resource_scheme.id)) {
+            // Already resolved before, ignore.
+            continue; // This might be a bit unsafe, but considered that C++ also kind of handles its inline function like this, so
+                      // I think this is fine. -- OppositeNor
+        }
         const auto& resource_unit_loaders = ResourceManager::get_singleton()->get_resource_unit_loaders();
         bool is_resource_supported = false;
         for (const auto& resource_unit_loader : resource_unit_loaders) {
@@ -167,13 +172,21 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(std::set<std::stri
             throw std::runtime_error(std::format("Unrecognized resource type: {}.", resource_scheme.type));
         }
     }
-    resolve_refs();
+
+    if (parser.contains("include")) {
+        // Resolve includes
+        auto included_resource_chunks = parser.template get_value<std::vector<std::string>>("include");
+        for (auto& include_path : included_resource_chunks) {
+            resolve_load_resource(p_included_pathes, include_path);
+        }
+    }
+    p_included_pathes.pop_back();
 }
 
 template <ParserConcept ParserType>
 ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
     allocator = &p_allocator;
-    std::set<std::string> included_pathes;
+    std::vector<std::string> included_pathes;
     resolve_load_resource(included_pathes, p_path);
     resolve_refs();
 }

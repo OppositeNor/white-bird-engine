@@ -75,7 +75,7 @@ public:
     virtual void populate_scheme(IResourceChunk& p_res_chunk, const std::any& p_scheme_data) const override;
 };
 
-class ResourceUnitLoaderPipeline final : public IResourceUnitLoader {
+class ResourceUnitLoaderGraphicsPipeline final : public IResourceUnitLoader {
 public:
     virtual bool is_resource_supported(const RUScheme& p_scheme) const override;
     virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;

@@ -17,7 +17,6 @@ from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
 from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata
-import build_setup
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
@@ -56,9 +55,12 @@ class WBEMetaparser:
 
     def export(self):
         """Export"""
-        if build_setup.build_target["generate-tests"]:
-            # Used for testing.
-            self._export_metadata_file()
+        result_metadata = WBEMetadata()
+        sorted_metadata = self._sorted_metadata_by_dependency()
+        for metadata in sorted_metadata:
+            result_metadata.labels.extend(metadata.labels)
+            result_metadata.classes.extend(metadata.classes)
+        self.reflector.register_metadata(result_metadata)
 
     def _get_metadata(self, cpp_file_path, cache_path):
         preloaded = self._metadata.get(cpp_file_path)
@@ -96,14 +98,6 @@ class WBEMetaparser:
             result.append(metadata)
         sorted(result, key=lambda v: v[0], reverse=True)
         return [item[1] for item in result]
-
-    def _export_metadata_file(self):
-        result_metadata = WBEMetadata()
-        sorted_metadata = self._sorted_metadata_by_dependency()
-        for metadata in sorted_metadata:
-            result_metadata.labels.extend(metadata.labels)
-            result_metadata.classes.extend(metadata.classes)
-        self.reflector.register_metadata(result_metadata)
 
     def _register_from_clang(self, cpp_file_path, cache_path):
         print(f"WBEMetaparser: parsing {cpp_file_path}")
