@@ -12,6 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include "deserializer_test_json.hh"
 #include "deserializer_test_yaml.hh"
 #include "serializer_test.hh"
+// NOLINTEND

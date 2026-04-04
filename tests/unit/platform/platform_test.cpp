@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #if defined(WBE_TARGET_PLATFORM_LINUX)
 #include "linux_file_system_test.hh"
 #elif defined(WBE_TARGET_PLATFORM_MACOS)
@@ -19,3 +20,4 @@
 #elif defined(WBE_TARGET_PLATFORM_WINDOWS)
 #include "windows_file_system_test.hh"
 #endif
+// NOLINTEND

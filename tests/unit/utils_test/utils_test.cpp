@@ -12,5 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include "type_metadata_test.hh"
+// NOLINTEND
 

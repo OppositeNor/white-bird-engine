@@ -12,8 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include "ref_raw_test.hh"
 #include "ref_strong_exceptions_test.hh"
 #include "ref_strong_test.hh"
 #include "ref_weak_test.hh"
 #include "unique_test.hh"
+// NOLINTEND

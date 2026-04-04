@@ -12,8 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include <gtest/gtest.h>
 #include "cla_ast_visitor_test.hh"
 #include "cla_ast_visitor_assembler_test.hh"
 #include "cla_lexer_test.hh"
 #include "cla_parser_test.hh"
+// NOLINTEND

@@ -12,5 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include "parser_json_test.hh"
 #include "parser_yaml_test.hh"
+// NOLINTEND

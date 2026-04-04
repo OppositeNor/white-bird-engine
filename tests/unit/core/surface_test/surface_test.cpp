@@ -12,4 +12,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// NOLINTBEGIN
 #include "2d_surface_utils_test.hh"
+// NOLINTEND
