@@ -16,6 +16,7 @@
 #define WBE_FILE_LOG_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <string>
 namespace WhiteBirdEngine {

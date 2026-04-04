@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <string>
 
 namespace WhiteBirdEngine {
 

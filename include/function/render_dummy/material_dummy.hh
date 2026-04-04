@@ -15,7 +15,10 @@
 #ifndef WBE_FILE_MATERIAL_DUMMY_HH
 #define WBE_FILE_MATERIAL_DUMMY_HH
 
+#include "core/memory/reference_strong.hh"
+#include "core/allocator/i_allocator.hh"
 #include "function/render/material.hh"
+#include "resource/resource_unit/resource_unit.hh"
 namespace WhiteBirdEngine {
 
 class MaterialDummy final : public Material {

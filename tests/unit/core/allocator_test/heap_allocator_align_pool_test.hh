@@ -15,14 +15,18 @@
 #ifndef WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_TEST_HH
 #define WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_TEST_HH
 
+#include "core/allocator/heap_allocator.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include "test_utilities.hh"
+#include "utils/defs.hh"
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -252,18 +256,18 @@ TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024 + AAPT_HEADER_SIZE * num_allocs);
     WBEAllocPoolBehavTestClass behv_test("HeapAllocatorAlignedPool", 1024 + AAPT_HEADER_SIZE * num_allocs, AAPT_HEADER_SIZE);
     WBE::MemID mems[num_allocs];
-    for (int i = 0; i < num_allocs; ++i) {
-        mems[i] = allocator.allocate(16);
-        ASSERT_NE(mems[i], WBE::MEM_NULL);
-        ASSERT_EQ(mems[i] % 8, 0);
+    for (unsigned long & mem : mems) {
+        mem = allocator.allocate(16);
+        ASSERT_NE(mem, WBE::MEM_NULL);
+        ASSERT_EQ(mem % 8, 0);
     }
     ASSERT_EQ(allocator.get_remain_size(), 0);
     std::string exp = behv_test({
         {true, -1},
     });
     ASSERT_EQ(static_cast<std::string>(allocator), exp);
-    for (int i = 0; i < num_allocs; ++i) {
-        allocator.deallocate(mems[i]);
+    for (unsigned long mem : mems) {
+        allocator.deallocate(mem);
     }
     ASSERT_EQ(allocator.get_remain_size(), 1024 + AAPT_HEADER_SIZE * num_allocs);
 }

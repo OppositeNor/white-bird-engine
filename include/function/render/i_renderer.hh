@@ -23,6 +23,7 @@
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <string>
 namespace WhiteBirdEngine {
 
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);

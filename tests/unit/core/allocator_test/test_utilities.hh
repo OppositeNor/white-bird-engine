@@ -14,8 +14,11 @@
 */
 #ifndef WBE_FILE_TEST_UTILITIES_HH
 #define WBE_FILE_TEST_UTILITIES_HH
+#include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 class WBEAllocPoolBehavTestClass {
@@ -23,12 +26,12 @@ public:
     WBEAllocPoolBehavTestClass(const std::string& p_pool_name, size_t p_total_size, size_t p_header_size)
         : pool_name(p_pool_name), total_size(p_total_size), header_size(p_header_size) {}
 
-    std::string operator()(const std::vector<std::pair<bool, int64_t>>& p_chunk_status) {
+    std::string operator()(const std::vector<std::pair<bool, int64_t>>& p_chunk_status) const {
         std::stringstream result;
         result << R"({"type":")" << pool_name << R"(","total_size":)" << total_size << R"(,"free_chunk_layout":[)";
         size_t tracker = 0;
         bool is_first = true;
-        for (auto& status : p_chunk_status) {
+        for (const auto& status : p_chunk_status) {
             if (status.first) {
                 if (status.second < 0) {
                     tracker = header_size;

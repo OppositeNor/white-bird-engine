@@ -14,6 +14,7 @@
 */
 #include "core/logging/log.hh"
 #include "core/engine_core.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 ILog* stdout_log(ChannelID p_channel) {

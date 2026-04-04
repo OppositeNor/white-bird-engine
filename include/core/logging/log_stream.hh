@@ -16,7 +16,9 @@
 #define WBE_FILE_LOG_STREAM_HH
 
 #include "log.hh"
+#include "utils/utils.hh"
 #include <ostream>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -35,15 +37,15 @@ public:
      * @param p_ostream The output stream.
      */
     LogStream(ChannelID p_channel_id, std::ostream& p_ostream)
-        : ILog(), ostream(&p_ostream), channel_id(p_channel_id) {}
+        :  ostream(&p_ostream), channel_id(p_channel_id) {}
     /**
      * @brief Constructor. The channel ID will be WBE_CHANNEL_UNKNOWN.
      *
      * @param p_ostream The output stream.
      */
     LogStream(std::ostream& p_ostream)
-        : ILog(), ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
-    virtual ~LogStream() override {}
+        :  ostream(&p_ostream), channel_id(WBE_CHANNEL_UNKNOWN) {}
+    virtual ~LogStream() override = default;
     LogStream(const LogStream &) = delete;
     LogStream(LogStream &&) = delete;
     LogStream &operator=(const LogStream &) = delete;
@@ -64,6 +66,6 @@ private:
     ChannelID channel_id;
 };
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

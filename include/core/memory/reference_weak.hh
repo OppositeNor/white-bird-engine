@@ -16,9 +16,14 @@
 #define WBE_FILE_REFERENCE_WEAK_HH
 
 #include "core/allocator/heap_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "reference_strong.hh"
+#include "utils/defs.hh"
 #include <atomic>
 #include <concepts>
+#include <cstdint>
+#include <functional>
+#include <cstddef>
 
 namespace WhiteBirdEngine {
 

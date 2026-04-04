@@ -21,10 +21,11 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "glm/ext/vector_uint2.hpp"
+#include "glm/ext/vector_uint3.hpp"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
-#include <glm/glm.hpp>
 #include <set>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {

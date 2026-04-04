@@ -14,6 +14,9 @@
 */
 #include "function/ecs/systems.hh"
 #include "function/ecs/components.hh"
+#include <cstdint>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace WhiteBirdEngine {
 

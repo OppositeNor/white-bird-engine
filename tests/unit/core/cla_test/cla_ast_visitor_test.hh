@@ -17,9 +17,13 @@
 
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_ast_visitor.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
+#include <memory>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -40,7 +44,7 @@ TEST(CLAASTVisitorToString, EmptyUtility) {
 TEST(CLAASTVisitorToString, UtilityWithSingleOperand) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "input_file"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "input_file"));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "test_utility", std::move(operations));
 
@@ -56,7 +60,7 @@ TEST(CLAASTVisitorToString, UtilityWithSingleOperand) {
 TEST(CLAASTVisitorToString, UtilityWithSingleOperation) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "help", false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "help", false));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "test_utility", std::move(operations));
 
@@ -73,7 +77,7 @@ TEST(CLAASTVisitorToString, UtilityWithOperationAndArguments) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<std::string> arguments = {"output.txt", "verbose"};
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "output", std::move(arguments), false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "output", std::move(arguments), false));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "test_utility", std::move(operations));
 
@@ -93,10 +97,10 @@ TEST(CLAASTVisitorToString, UtilityWithMultipleOperations) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
 
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "input.txt"));
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "verbose", false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "input.txt"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "verbose", false));
     std::vector<std::string> arguments = {"json", "2"};
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "format", std::move(arguments), false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "format", std::move(arguments), false));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "converter", std::move(operations));
 
@@ -118,7 +122,7 @@ TEST(CLAASTVisitorToString, OperationWithSingleArgument) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<std::string> arguments = {"debug"};
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "level", std::move(arguments), false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "level", std::move(arguments), false));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "logger", std::move(operations));
 
@@ -137,14 +141,14 @@ TEST(CLAASTVisitorToString, ComplexUtilityExample) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
 
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "source.cpp"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "source.cpp"));
     std::vector<std::string> output_args = {"compiled.exe"};
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "output", std::move(output_args), false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "output", std::move(output_args), false));
     std::vector<std::string> opt_args = {"3"};
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "O", std::move(opt_args), true));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "O", std::move(opt_args), true));
     std::vector<std::string> include_args = {"/usr/include", "/opt/include"};
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "include", std::move(include_args), false));
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "debug", false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "include", std::move(include_args), false));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "debug", false));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "gcc", std::move(operations));
     WBE::CLAASTVisitorToString visitor;
@@ -169,9 +173,9 @@ TEST(CLAASTVisitorToString, ComplexUtilityExample) {
 TEST(CLAASTVisitorToString, MultipleOperands) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file1.txt"));
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file2.txt"));
-    operations.push_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file3.txt"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file1.txt"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file2.txt"));
+    operations.emplace_back(WBE::make_ref<WBE::CLAASTNodeRootOperand>(WBE::global_allocator(), "file3.txt"));
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "concat", std::move(operations));
 
@@ -193,7 +197,7 @@ TEST(CLAASTVisitorToString, OperationArgumentManipulation) {
     operation->push_argument("/opt/local/include");
 
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(operation);
+    operations.emplace_back(operation);
 
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "compiler", std::move(operations));
 
@@ -217,9 +221,9 @@ TEST(CLAASTVisitor, MultipleShortOptionsYAMLFormat) {
     auto op_c = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "c", true);
     
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(op_a);
-    operations.push_back(op_b);
-    operations.push_back(op_c);
+    operations.emplace_back(op_a);
+    operations.emplace_back(op_b);
+    operations.emplace_back(op_c);
     
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "tool", std::move(operations));
     
@@ -247,10 +251,10 @@ TEST(CLAASTVisitor, MixedSingleAndMultipleShortOptionsYAMLFormat) {
     op_o->push_argument("output.txt");
     
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
-    operations.push_back(op_f);
-    operations.push_back(op_v);
-    operations.push_back(op_d);
-    operations.push_back(op_o);
+    operations.emplace_back(op_f);
+    operations.emplace_back(op_v);
+    operations.emplace_back(op_d);
+    operations.emplace_back(op_o);
     
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "tool", std::move(operations));
     

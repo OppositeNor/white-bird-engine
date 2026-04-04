@@ -30,7 +30,7 @@ class RenderPipeline {
 public:
 
     RenderPipeline() = default;
-    ~RenderPipeline() {}
+    ~RenderPipeline() = default;
     RenderPipeline(const RenderPipeline&) = delete;
     RenderPipeline(RenderPipeline&&) = delete;
     RenderPipeline& operator=(const RenderPipeline&) = delete;
@@ -62,6 +62,6 @@ private:
     std::vector<Ref<RenderTask>> render_tasks;
 };
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

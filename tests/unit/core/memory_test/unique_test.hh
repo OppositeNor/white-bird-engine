@@ -15,17 +15,22 @@
 #ifndef WBE_FILE_UNIQUE_TEST_HH
 #define WBE_FILE_UNIQUE_TEST_HH
 
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/heap_allocator.hh"
 #include "core/memory/unique.hh"
 #include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
+#include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
+#include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace WBE = WhiteBirdEngine;
 
 struct Dummy {
     int x;
-    Dummy(int v) : x(v) {}
+    Dummy(int p_v) : x(p_v) {}
     ~Dummy() { x = -1; }
 };
 
@@ -215,7 +220,7 @@ TEST_F(WBEUniqueTest, MemIDConstructorValidation) {
     // Test constructor with non-null MemID but no allocator - should throw
     bool threw_exception = false;
     try {
-        WBE::Unique<Dummy> u2(WBE::MemID(42));
+        WBE::Unique<Dummy> u2(static_cast<WBE::MemID>(42));
     } catch (const std::runtime_error&) {
         threw_exception = true;
     }
@@ -225,13 +230,13 @@ TEST_F(WBEUniqueTest, MemIDConstructorValidation) {
 // Helper classes for template conversion testing
 struct Base {
     int value;
-    Base(int v) : value(v) {}
+    Base(int p_v) : value(p_v) {}
     virtual ~Base() = default;
 };
 
 struct Derived : public Base {
     int extra;
-    Derived(int v, int e) : Base(v), extra(e) {}
+    Derived(int p_v, int p_e) : Base(p_v), extra(p_e) {}
 };
 
 TEST_F(WBEUniqueTest, TemplateConversionConstructor) {

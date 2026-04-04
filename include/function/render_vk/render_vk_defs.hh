@@ -19,10 +19,12 @@
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/i_renderer.hh"
-#include "glm/fwd.hpp"
+
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

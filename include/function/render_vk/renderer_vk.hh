@@ -31,8 +31,11 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
+#include "function/render_vk/semaphore_vk.hh"
+#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/window/i_window.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
@@ -44,10 +47,11 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
-#include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

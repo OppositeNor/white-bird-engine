@@ -14,6 +14,7 @@
 */
 #include "core/profiling/profiling_manager.hh"
 #include <mutex>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

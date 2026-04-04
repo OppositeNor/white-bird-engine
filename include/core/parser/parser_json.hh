@@ -16,18 +16,21 @@
 #define WBE_FILE_PARSER_JSON_HH
 
 #include "parser.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <concepts>
 #include <cstring>
+#include <exception>
 #include <format>
 #include <fstream>
+#include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <utility>
+#include <vector>
 
 namespace WhiteBirdEngine {
 

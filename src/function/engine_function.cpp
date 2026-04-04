@@ -14,7 +14,9 @@
 */
 #include "function/engine_function.hh"
 #include "core/engine_core.hh"
+#include "core/memory/unique.hh"
 #include "function/game_config/game_config.hh"
+#include "platform/file_system/path.hh"
 
 namespace WhiteBirdEngine {
 
@@ -26,4 +28,4 @@ EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
 EngineFunction::~EngineFunction() {
     singleton = nullptr;
 }
-}
+}  // namespace WhiteBirdEngine

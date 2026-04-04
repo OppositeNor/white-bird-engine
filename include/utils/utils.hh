@@ -16,10 +16,12 @@
 #define WBE_FILE_UTILS_HH
 
 #include "utils/defs.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <ios>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -242,7 +244,7 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
  * @return The index of the token that is first found.
  */
 inline size_t find_first_pos(const std::string& p_str, const std::string& p_tokens) {
-    if (p_tokens.size() == 0) {
+    if (p_tokens.empty()) {
         return std::string::npos;
     }
     size_t min_pos = std::numeric_limits<size_t>::infinity();
@@ -404,7 +406,7 @@ inline void load_binary_file(const char* p_path, void* p_result, size_t* p_size)
  * @return The string that all the hashtag comments that are all removed.
  */
 inline std::string remove_hashtag_comments(std::string p_str) {
-    while (p_str.find('#') != std::string::npos) {
+    while (p_str.contains('#')) {
         size_t pos = p_str.find('#');
         size_t end = p_str.find('\n', pos);
         p_str.erase(pos, end - pos);
@@ -528,7 +530,7 @@ struct Buffer : public BufferBase<Buffer<SIZE>> {
  * @return The incremented index.
  */
 constexpr size_t ring_increment(size_t p_i, size_t p_ring_size) {
-    return ((p_i) + 1) % p_ring_size;
+    return (p_i + 1) % p_ring_size;
 }
 
 /**

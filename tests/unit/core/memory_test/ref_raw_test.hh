@@ -15,10 +15,12 @@
 #ifndef WBE_FILE_REF_RAW_TEST_HH
 #define WBE_FILE_REF_RAW_TEST_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <utility>
 
 namespace WBE = WhiteBirdEngine;
 

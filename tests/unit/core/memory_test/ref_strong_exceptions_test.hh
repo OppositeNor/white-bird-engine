@@ -15,10 +15,15 @@
 #ifndef WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 #define WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/heap_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
+#include <memory>
+#include <stdexcept>
 
 namespace WBE = WhiteBirdEngine;
 

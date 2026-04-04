@@ -18,6 +18,7 @@
 #include "core/engine_core.hh"
 #include "utils/interface/i_singleton.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 #include <shared_mutex>
 #include <sstream>
 #include <string>

@@ -16,8 +16,6 @@
 #define WBE_FILE_OS_HH
 
 #ifdef __unix__
-#include <sys/types.h>
-#include <sched.h>
 #endif
 
 namespace WhiteBirdEngine {

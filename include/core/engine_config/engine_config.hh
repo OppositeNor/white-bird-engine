@@ -20,6 +20,9 @@
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <cstdint>
+#include <cstddef>
+#include <string>
 
 namespace WhiteBirdEngine {
 

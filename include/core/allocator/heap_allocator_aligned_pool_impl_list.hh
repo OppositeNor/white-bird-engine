@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 
 #define WBE_HAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
 #define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))

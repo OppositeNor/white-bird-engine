@@ -15,11 +15,13 @@
 #ifndef WBE_FILE_LOG_STREAM_TEST_HH
 #define WBE_FILE_LOG_STREAM_TEST_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
 #include "core/logging/log_stream.hh"
 #include "platform/file_system/directory.hh"
 
 #include <gtest/gtest.h>
+#include <memory>
 #include <sstream>
 
 namespace WBE = WhiteBirdEngine;
@@ -58,10 +60,10 @@ TEST(WBELogStreamTest, UserDefinedLabel) {
                                     "[WBE_TEST_CHANNEL] <Error>: Test error\n"));
 }
 
-#define TEST_LABEL_NAME_MACRO WBE_TEST_LABEL_MACRO
+#define WBE_TEST_LABEL_NAME_MACRO WBE_TEST_LABEL_MACRO
 
 namespace WhiteBirdEngine {
-WBE_LABEL(TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
+WBE_LABEL(WBE_TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {

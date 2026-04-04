@@ -18,8 +18,10 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "utils/defs.hh"
 #include <concepts>
 #include <cstddef>
+#include <functional>
 #include <stdexcept>
 namespace WhiteBirdEngine {
 

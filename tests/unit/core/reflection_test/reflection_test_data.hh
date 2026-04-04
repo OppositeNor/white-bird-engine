@@ -19,7 +19,9 @@
 #include "core/reflection/serializable.hh"
 #include "utils/utils.hh"
 #include <glm/glm.hpp>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 struct WBE_META(WBE_SERIALIZABLE) TestEmptySerializable final : public Serializable {

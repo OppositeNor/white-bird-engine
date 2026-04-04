@@ -15,18 +15,25 @@
 #include "function/render/render_database.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
+#include "core/memory/unique.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
+#include "core/surface/3d_primitive.hh"
 #include "function/render/material.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstring>
-#include <glm/glm.hpp>
 #include <cstddef>
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

@@ -20,7 +20,10 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <cstdint>
 #include <set>
+#include <sstream>
 #include <unordered_map>
 namespace WhiteBirdEngine {
 

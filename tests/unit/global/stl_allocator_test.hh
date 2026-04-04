@@ -15,12 +15,6 @@
 #ifndef WBE_FILE_STL_ALLOCATOR_TEST_HH
 #define WBE_FILE_STL_ALLOCATOR_TEST_HH
 
-#include "global/global.hh"
-#include "global/stl_allocator.hh"
-#include <gtest/gtest.h>
-#include <memory>
-#include <string>
 
-namespace WBE = WhiteBirdEngine;
 
 #endif

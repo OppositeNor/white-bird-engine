@@ -23,7 +23,9 @@
 #include "function/render/i_renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
+#include "function/window/i_window.hh"
 #include "function/window/window_sdl.hh"
+#include "utils/defs.hh"
 #include <atomic>
 #include <format>
 #include <thread>

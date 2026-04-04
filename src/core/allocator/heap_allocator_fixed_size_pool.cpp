@@ -15,11 +15,13 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <sstream>
 #include <stdexcept>
 
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))

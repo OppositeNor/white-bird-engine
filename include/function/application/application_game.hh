@@ -16,6 +16,7 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
+#include "core/job/job.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/audio/audio_renderer.hh"
 #include "core/job/job_buffer_ring_spsc.hh"

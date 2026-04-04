@@ -18,7 +18,8 @@
 #include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <X11/X.h>
+#include <cstdint>
+#include <atomic>
 #include <type_traits>
 
 namespace WhiteBirdEngine {

@@ -25,6 +25,7 @@
 #include <cstring>
 #include <format>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 

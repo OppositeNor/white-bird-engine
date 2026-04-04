@@ -20,8 +20,10 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include <glm/glm.hpp>
+#include "utils/defs.hh"
+#include "glm/ext/vector_float4.hpp"
 #include <span>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 

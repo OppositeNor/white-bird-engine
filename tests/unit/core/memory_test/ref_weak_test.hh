@@ -19,15 +19,21 @@
 #include "mock_heap_allocator_aligned.hh"
 #include "core/memory/reference_weak.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
+#include <cstdint>
+#include <cstdlib>
 #include <gtest/gtest.h>
+#include <memory>
 #include <sstream>
+#include <vector>
+#include <thread>
 
 namespace WBE = WhiteBirdEngine;
 
 class TestClassWeak {
 public:
     TestClassWeak(std::stringstream& p_ss)
-    : ss(&p_ss), test_val(0) {
+    : ss(&p_ss) {
         (*ss) << "Construct.\n";
     }
 
@@ -45,7 +51,7 @@ public:
     }
 
     std::stringstream* ss;
-    int test_val;
+    int test_val{0};
 };
 
 TEST(WBERefWeakTest, General) {
@@ -177,10 +183,10 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
     ref_weaks.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
-            ref_weaks.push_back(p_ref1);
+            ref_weaks.emplace_back(p_ref1);
         }
         else {
-            ref_weaks.push_back(p_ref2);
+            ref_weaks.emplace_back(p_ref2);
         }
     }
     for (uint32_t i = 0; i < p_iteration_count; ++i) {
@@ -253,16 +259,16 @@ inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1,
     ref_weaks.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
-            ref_weaks.push_back(p_ref1);
+            ref_weaks.emplace_back(p_ref1);
         }
         else {
-            ref_weaks.push_back(p_ref2);
+            ref_weaks.emplace_back(p_ref2);
         }
         if (rand() & 0x1) {
             ref_strongs.push_back(p_ref1);
         }
         else {
-            ref_strongs.push_back(p_ref2);
+            ref_strongs.emplace_back(p_ref2);
         }
     }
     for (uint32_t i = 0; i < p_iteration_count; ++i) {

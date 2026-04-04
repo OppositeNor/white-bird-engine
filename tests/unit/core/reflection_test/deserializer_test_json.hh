@@ -16,16 +16,22 @@
 #define __DESERIALIZER_TEST_JSON_HH__
 
 #include "core/parser/parser_json.hh"
+#include "core/reflection/serializable.hh"
 #include "reflection_test_data.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/utils.hh"
-#include <glm/glm.hpp>
+#include <cstring>
+#include <exception>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
 #include <limits>
 #include <stdexcept>
 #include <gtest/gtest.h>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -91,7 +97,7 @@ TEST_F(WBEDeserializerJSONTest, Empty) {
     WBE::TestEmptySerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer("{}");
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestEmptySerializable>::deserialize(parser.get_data(), test_obj);
 }
 
 TEST_F(WBEDeserializerJSONTest, General) {
@@ -99,7 +105,7 @@ TEST_F(WBEDeserializerJSONTest, General) {
     WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_general);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     EXPECT_EQ(test_obj.si32_test, 3);
     EXPECT_EQ(test_obj.si64_test, -62);
     EXPECT_EQ(test_obj.ui32_test, 42);
@@ -117,13 +123,13 @@ TEST_F(WBEDeserializerJSONTest, ZerosAndStrings) {
     WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_zeros);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
 
     EXPECT_EQ(test_obj.si32_test, 0);
     EXPECT_EQ(test_obj.si64_test, 0);
-    EXPECT_EQ(test_obj.ui32_test, 0u);
-    EXPECT_EQ(test_obj.ui64_test, 0u);
-    EXPECT_FLOAT_EQ(test_obj.f32_test, 0.0f);
+    EXPECT_EQ(test_obj.ui32_test, 0U);
+    EXPECT_EQ(test_obj.ui64_test, 0U);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 0.0F);
     EXPECT_FLOAT_EQ(test_obj.f64_test, 0.0);
     EXPECT_EQ(test_obj.vec3_test, glm::vec3(0,0,0));
     EXPECT_EQ(test_obj.vec4_test, glm::vec4(0,0,0,0));
@@ -136,7 +142,7 @@ TEST_F(WBEDeserializerJSONTest, StringsAndBufferContent) {
     WBE::TestSerializable test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_general);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
 
     EXPECT_EQ(test_obj.str_test, std::string("Hello!"));
     EXPECT_STREQ(test_obj.buffer_test.buffer, "how are you?");
@@ -168,13 +174,13 @@ TEST_F(WBEDeserializerJSONTest, PartialUpdateOnlyOneField) {
     WBE::ParserJSON parser;
     // JSON contains only si32_test
     parser.parse_from_buffer(R"({ "si32_test": -7 })");
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
 
     // Updated
     EXPECT_EQ(test_obj.si32_test, -7);
     // Others unchanged
     EXPECT_EQ(test_obj.si64_test, 200);
-    EXPECT_EQ(test_obj.ui32_test, 300u);
+    EXPECT_EQ(test_obj.ui32_test, 300U);
     EXPECT_EQ(test_obj.str_test, std::string("orig"));
 }
 
@@ -183,7 +189,7 @@ TEST_F(WBEDeserializerJSONTest, NestingGeneral) {
     WBE::TestSerializableNesting test_obj;
     WBE::ParserJSON parser;
     parser.parse_from_buffer(test_serialize_json_nesting);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializableNesting>::deserialize(parser.get_data(), test_obj);
 
     EXPECT_EQ(test_obj.nesting_id, 7);
     EXPECT_EQ(test_obj.name, std::string("parent"));
@@ -192,9 +198,9 @@ TEST_F(WBEDeserializerJSONTest, NestingGeneral) {
     // Check nested_test values (matches test_serialize_json_general)
     EXPECT_EQ(test_obj.nested_test.si32_test, 3);
     EXPECT_EQ(test_obj.nested_test.si64_test, -62);
-    EXPECT_EQ(test_obj.nested_test.ui32_test, 42u);
-    EXPECT_EQ(test_obj.nested_test.ui64_test, 59u);
-    EXPECT_FLOAT_EQ(test_obj.nested_test.f32_test, 3.14f);
+    EXPECT_EQ(test_obj.nested_test.ui32_test, 42U);
+    EXPECT_EQ(test_obj.nested_test.ui64_test, 59U);
+    EXPECT_FLOAT_EQ(test_obj.nested_test.f32_test, 3.14F);
     EXPECT_FLOAT_EQ(test_obj.nested_test.f64_test, 2.718);
     EXPECT_EQ(test_obj.nested_test.str_test, "Hello!");
     EXPECT_STREQ(test_obj.nested_test.buffer_test.buffer, "how are you?");
@@ -221,7 +227,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_EmptyJSON) {
     test_obj.str_test = "unchanged";
     
     parser.parse_from_buffer("{}");
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     // Values should remain unchanged when not present in JSON
     EXPECT_EQ(test_obj.si32_test, 999);
@@ -318,7 +324,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_ExtremeValues) {
     })";
     
     parser.parse_from_buffer(extreme_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.si32_test, std::numeric_limits<int32_t>::max());
     EXPECT_EQ(test_obj.si64_test, std::numeric_limits<int64_t>::min());
@@ -336,7 +342,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_UnicodeStrings) {
     })";
     
     parser.parse_from_buffer(unicode_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.str_test, "Hello 世界 🌍 ñáéíóú");
 }
@@ -351,7 +357,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_LongStringsAndBuffers) {
     std::string long_string_json = R"({ "str_test": ")" + long_string + R"(" })";
     
     parser.parse_from_buffer(long_string_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.str_test, long_string);
 }
@@ -367,7 +373,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_EmptyStringAndBuffer) {
     })";
     
     parser.parse_from_buffer(empty_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.str_test, "");
     EXPECT_STREQ(test_obj.buffer_test.buffer, "");
@@ -386,7 +392,7 @@ TEST_F(WBEDeserializerJSONTest, VectorContainer_EmptyVectors) {
     })";
     
     parser.parse_from_buffer(empty_vectors_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestVectorContainer>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_TRUE(test_obj.ints.empty());
     EXPECT_TRUE(test_obj.strs.empty());
@@ -414,7 +420,7 @@ TEST_F(WBEDeserializerJSONTest, VectorContainer_PopulatedVectors) {
     })";
     
     parser.parse_from_buffer(vectors_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestVectorContainer>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.ints.size(), 5);
     EXPECT_EQ(test_obj.ints[0], 1);
@@ -441,12 +447,13 @@ TEST_F(WBEDeserializerJSONTest, VectorContainer_LargeVector) {
     std::string large_vector_json = R"({ "ints": [)";
     for (int i = 0; i < 1000; ++i) {
         large_vector_json += std::to_string(i);
-        if (i < 999) large_vector_json += ",";
+        if (i < 999) { large_vector_json += ",";
+}
     }
     large_vector_json += "]}";
     
     parser.parse_from_buffer(large_vector_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestVectorContainer>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.ints.size(), 1000);
     EXPECT_EQ(test_obj.ints[0], 0);
@@ -470,13 +477,13 @@ TEST_F(WBEDeserializerJSONTest, DeepNesting_Depth2) {
     })";
     
     parser.parse_from_buffer(depth2_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestDepth2>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.depth2_id, 100);
     EXPECT_EQ(test_obj.depth2_name, "depth2_test");
     EXPECT_EQ(test_obj.nested.si32_test, 42);
     EXPECT_EQ(test_obj.nested.str_test, "nested_string");
-    EXPECT_EQ(test_obj.nested.vec3_test, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(test_obj.nested.vec3_test, glm::vec3(1.0F, 2.0F, 3.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, DeepNesting_Depth3) {
@@ -498,7 +505,7 @@ TEST_F(WBEDeserializerJSONTest, DeepNesting_Depth3) {
     })";
     
     parser.parse_from_buffer(depth3_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestDepth3>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.depth3_id, 200);
     EXPECT_EQ(test_obj.depth3_name, "depth3_test");
@@ -517,7 +524,7 @@ TEST_F(WBEDeserializerJSONTest, PartialDeserialization_MissingFields) {
     test_obj.si32_test = 999;
     test_obj.si64_test = 888;
     test_obj.str_test = "original";
-    test_obj.f32_test = 123.45f;
+    test_obj.f32_test = 123.45F;
     
     WBE::ParserJSON parser;
     
@@ -528,7 +535,7 @@ TEST_F(WBEDeserializerJSONTest, PartialDeserialization_MissingFields) {
     })";
     
     parser.parse_from_buffer(partial_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
     // Updated fields
     EXPECT_EQ(test_obj.si32_test, 42);
@@ -536,7 +543,7 @@ TEST_F(WBEDeserializerJSONTest, PartialDeserialization_MissingFields) {
     
     // Unchanged fields (should retain original values)
     EXPECT_EQ(test_obj.si64_test, 888);
-    EXPECT_FLOAT_EQ(test_obj.f32_test, 123.45f);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 123.45F);
 }
 
 TEST_F(WBEDeserializerJSONTest, PartialDeserialization_ExtraFields) {
@@ -572,16 +579,16 @@ TEST_F(WBEDeserializerJSONTest, GLMVectors_EdgeCases) {
     })";
     
     parser.parse_from_buffer(vector_edge_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.x, -0.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.y, 1e-10f);
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.z, 1e10f);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.x, -0.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.y, 1e-10F);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.z, 1e10F);
     
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.x, 0.000001f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.y, -999999.999999f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.z, 3.14159265359f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.w, -3.14159265359f);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.x, 0.000001F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.y, -999999.999999F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.z, 3.14159265359F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.w, -3.14159265359F);
 }
 
 TEST_F(WBEDeserializerJSONTest, GLMVectors_CompleteSpecification) {
@@ -596,16 +603,16 @@ TEST_F(WBEDeserializerJSONTest, GLMVectors_CompleteSpecification) {
     })";
     
     parser.parse_from_buffer(complete_vector_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.x, 1.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.y, 2.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec3_test.z, 3.0f);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.x, 1.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.y, 2.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec3_test.z, 3.0F);
     
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.x, 1.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.y, 2.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.z, 3.0f);
-    EXPECT_FLOAT_EQ(test_obj.vec4_test.w, 4.0f);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.x, 1.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.y, 2.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.z, 3.0F);
+    EXPECT_FLOAT_EQ(test_obj.vec4_test.w, 4.0F);
 }
 
 TEST_F(WBEDeserializerJSONTest, GLMVectors_ZeroVectors) {
@@ -620,10 +627,10 @@ TEST_F(WBEDeserializerJSONTest, GLMVectors_ZeroVectors) {
     })";
     
     parser.parse_from_buffer(zero_vector_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
-    EXPECT_EQ(test_obj.vec3_test, glm::vec3(0.0f, 0.0f, 0.0f));
-    EXPECT_EQ(test_obj.vec4_test, glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(test_obj.vec3_test, glm::vec3(0.0F, 0.0F, 0.0F));
+    EXPECT_EQ(test_obj.vec4_test, glm::vec4(0.0F, 0.0F, 0.0F, 0.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, GLMVectors_NegativeValues) {
@@ -638,10 +645,10 @@ TEST_F(WBEDeserializerJSONTest, GLMVectors_NegativeValues) {
     })";
     
     parser.parse_from_buffer(negative_vector_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
     
-    EXPECT_EQ(test_obj.vec3_test, glm::vec3(-1.5f, -2.5f, -3.5f));
-    EXPECT_EQ(test_obj.vec4_test, glm::vec4(-10.0f, -20.0f, -30.0f, -40.0f));
+    EXPECT_EQ(test_obj.vec3_test, glm::vec3(-1.5F, -2.5F, -3.5F));
+    EXPECT_EQ(test_obj.vec4_test, glm::vec4(-10.0F, -20.0F, -30.0F, -40.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, GLMVectors_MissingComponentsError) {
@@ -678,7 +685,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_Basic) {
     EXPECT_EQ(test_obj.si64_test, -62);
     EXPECT_EQ(test_obj.ui32_test, 42);
     EXPECT_EQ(test_obj.ui64_test, 59);
-    EXPECT_FLOAT_EQ(test_obj.f32_test, 3.14f);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 3.14F);
     EXPECT_FLOAT_EQ(test_obj.f64_test, 2.718);
     EXPECT_EQ(test_obj.vec3_test, glm::vec3(1, -2, 3));
     EXPECT_EQ(test_obj.vec4_test, glm::vec4(1, -2, 3, -4));
@@ -708,7 +715,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_Nesting) {
     // Check nested object was properly deserialized
     EXPECT_EQ(test_obj.nested_test.si32_test, 3);
     EXPECT_EQ(test_obj.nested_test.str_test, "Hello!");
-    EXPECT_FLOAT_EQ(test_obj.nested_test.f32_test, 3.14f);
+    EXPECT_FLOAT_EQ(test_obj.nested_test.f32_test, 3.14F);
 }
 
 TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_VectorContainer) {
@@ -775,7 +782,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_DeepNesting) {
     EXPECT_EQ(test_obj.nested2.depth2_name, "depth2_nested");
     EXPECT_EQ(test_obj.nested2.nested.si32_test, 42);
     EXPECT_EQ(test_obj.nested2.nested.str_test, "deeply_nested");
-    EXPECT_EQ(test_obj.nested2.nested.vec3_test, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(test_obj.nested2.nested.vec3_test, glm::vec3(1.0F, 2.0F, 3.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_PartialUpdate) {
@@ -786,7 +793,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_PartialUpdate) {
     test_obj.si32_test = 999;
     test_obj.si64_test = 888;
     test_obj.str_test = "original";
-    test_obj.f32_test = 123.45f;
+    test_obj.f32_test = 123.45F;
     
     // JSON only contains some fields
     std::string partial_json = R"({
@@ -803,7 +810,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_PartialUpdate) {
     
     // Unchanged fields (should retain original values)
     EXPECT_EQ(test_obj.si64_test, 888);
-    EXPECT_FLOAT_EQ(test_obj.f32_test, 123.45f);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 123.45F);
 }
 
 TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ErrorHandling_NullValues) {
@@ -914,9 +921,9 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ZeroValues) {
     
     EXPECT_EQ(test_obj.si32_test, 0);
     EXPECT_EQ(test_obj.si64_test, 0);
-    EXPECT_EQ(test_obj.ui32_test, 0u);
-    EXPECT_EQ(test_obj.ui64_test, 0u);
-    EXPECT_FLOAT_EQ(test_obj.f32_test, 0.0f);
+    EXPECT_EQ(test_obj.ui32_test, 0U);
+    EXPECT_EQ(test_obj.ui64_test, 0U);
+    EXPECT_FLOAT_EQ(test_obj.f32_test, 0.0F);
     EXPECT_FLOAT_EQ(test_obj.f64_test, 0.0);
     EXPECT_EQ(test_obj.vec3_test, glm::vec3(0,0,0));
     EXPECT_EQ(test_obj.vec4_test, glm::vec4(0,0,0,0));
@@ -949,7 +956,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_SingleInheritance_BasePointer) {
     // Check base class fields
     EXPECT_EQ(child_ptr->base_id, 100);
     EXPECT_EQ(child_ptr->base_name, "base_object");
-    EXPECT_FLOAT_EQ(child_ptr->base_value, 3.14f);
+    EXPECT_FLOAT_EQ(child_ptr->base_value, 3.14F);
     
     // Check child class fields
     EXPECT_EQ(child_ptr->child_id, 200);
@@ -984,13 +991,13 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_MultilevelInheritance_BasePointe
     // Check all levels of inheritance
     EXPECT_EQ(grandchild_ptr->base_id, 100);
     EXPECT_EQ(grandchild_ptr->base_name, "base_level");
-    EXPECT_FLOAT_EQ(grandchild_ptr->base_value, 1.0f);
+    EXPECT_FLOAT_EQ(grandchild_ptr->base_value, 1.0F);
     EXPECT_EQ(grandchild_ptr->child_id, 200);
     EXPECT_EQ(grandchild_ptr->child_name, "child_level");
     EXPECT_DOUBLE_EQ(grandchild_ptr->child_value, 2.0);
     EXPECT_EQ(grandchild_ptr->grandchild_id, 300);
     EXPECT_EQ(grandchild_ptr->grandchild_name, "grandchild_level");
-    EXPECT_EQ(grandchild_ptr->grandchild_vector, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(grandchild_ptr->grandchild_vector, glm::vec3(1.0F, 2.0F, 3.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, DynamicDispatch_MultipleInheritance_BasePointer) {
@@ -1009,26 +1016,26 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_MultipleInheritance_BasePointer)
         "child_vector": {"x": 10.0, "y": 20.0}
     })";
 
-    auto test_func = [&multiple_inheritance_json](WBE::Serializable* test_obj) {
+    auto test_func = [&multiple_inheritance_json](WBE::Serializable* p_test_obj) {
         WBE::ParserJSON parser;
         parser.parse_from_buffer(multiple_inheritance_json);
         // Dynamic dispatch - should call TestMultipleInheritanceChild::deserialize
-        test_obj->deserialize(parser.get_data());
+        p_test_obj->deserialize(parser.get_data());
 
         // Cast back to verify proper deserialization
-        WBE::TestMultipleInheritanceChild* child_ptr = dynamic_cast<WBE::TestMultipleInheritanceChild*>(test_obj);
+        WBE::TestMultipleInheritanceChild* child_ptr = dynamic_cast<WBE::TestMultipleInheritanceChild*>(p_test_obj);
         ASSERT_NE(child_ptr, nullptr);
 
         // Check fields from both base classes and child
         EXPECT_EQ(child_ptr->a_id, 100);
         EXPECT_EQ(child_ptr->a_name, "from_a");
-        EXPECT_FLOAT_EQ(child_ptr->a_value, 1.5f);
+        EXPECT_FLOAT_EQ(child_ptr->a_value, 1.5F);
         EXPECT_EQ(child_ptr->b_id, 200);
         EXPECT_EQ(child_ptr->b_name, "from_b");
         EXPECT_DOUBLE_EQ(child_ptr->b_value, 2.5);
         EXPECT_EQ(child_ptr->child_id, 300);
         EXPECT_EQ(child_ptr->child_name, "multiple_child");
-        EXPECT_EQ(child_ptr->child_vector, glm::vec2(10.0f, 20.0f));
+        EXPECT_EQ(child_ptr->child_vector, glm::vec2(10.0F, 20.0F));
     };
     test_func(test_obj_a.get());
     test_func(test_obj_b.get());
@@ -1061,7 +1068,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_DiamondInheritance_BasePointer) 
     EXPECT_EQ(diamond_ptr->diamond_base_id, 50);
     EXPECT_EQ(diamond_ptr->diamond_base_name, "diamond_base");
     EXPECT_EQ(diamond_ptr->left_id, 100);
-    EXPECT_FLOAT_EQ(diamond_ptr->left_value, 3.14f);
+    EXPECT_FLOAT_EQ(diamond_ptr->left_value, 3.14F);
     EXPECT_EQ(diamond_ptr->right_id, 200);
     EXPECT_DOUBLE_EQ(diamond_ptr->right_value, 2.718);
     EXPECT_EQ(diamond_ptr->diamond_child_id, 300);
@@ -1143,7 +1150,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
     auto create_object = [](const std::string& type_name) -> std::unique_ptr<WBE::Serializable> {
         if (type_name == "TestSerializable") {
             return std::make_unique<WBE::TestSerializable>();
-        } else if (type_name == "TestInheritedChild") {
+        } if (type_name == "TestInheritedChild") {
             return std::make_unique<WBE::TestInheritedChild>();
         } else if (type_name == "TestInheritedGrandchild") {
             return std::make_unique<WBE::TestInheritedGrandchild>();
@@ -1161,30 +1168,30 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
     
     std::vector<TestCase> test_cases = {
         {
-            "TestSerializable",
-            R"({"si32_test": 123, "str_test": "runtime_test"})",
-            [](WBE::Serializable* obj) {
-                auto* ptr = dynamic_cast<WBE::TestSerializable*>(obj);
+            .type_name="TestSerializable",
+            .json_data=R"({"si32_test": 123, "str_test": "runtime_test"})",
+            .validator=[](WBE::Serializable* p_obj) {
+                auto* ptr = dynamic_cast<WBE::TestSerializable*>(p_obj);
                 ASSERT_NE(ptr, nullptr);
                 EXPECT_EQ(ptr->si32_test, 123);
                 EXPECT_EQ(ptr->str_test, "runtime_test");
             }
         },
         {
-            "TestInheritedChild",
-            R"({"base_id": 456, "child_id": 789})",
-            [](WBE::Serializable* obj) {
-                auto* ptr = dynamic_cast<WBE::TestInheritedChild*>(obj);
+            .type_name="TestInheritedChild",
+            .json_data=R"({"base_id": 456, "child_id": 789})",
+            .validator=[](WBE::Serializable* p_obj) {
+                auto* ptr = dynamic_cast<WBE::TestInheritedChild*>(p_obj);
                 ASSERT_NE(ptr, nullptr);
                 EXPECT_EQ(ptr->base_id, 456);
                 EXPECT_EQ(ptr->child_id, 789);
             }
         },
         {
-            "TestVectorContainer",
-            R"({"ints": [10, 20, 30]})",
-            [](WBE::Serializable* obj) {
-                auto* ptr = dynamic_cast<WBE::TestVectorContainer*>(obj);
+            .type_name="TestVectorContainer",
+            .json_data=R"({"ints": [10, 20, 30]})",
+            .validator=[](WBE::Serializable* p_obj) {
+                auto* ptr = dynamic_cast<WBE::TestVectorContainer*>(p_obj);
                 ASSERT_NE(ptr, nullptr);
                 EXPECT_EQ(ptr->ints.size(), 3);
                 EXPECT_EQ(ptr->ints[1], 20);
@@ -1262,11 +1269,11 @@ TEST_F(WBEDeserializerJSONTest, RequiredFields_BaseClass) {
     })";
     
     parser.parse_from_buffer(required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestRequiredFieldsBase>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_id, 123);
     EXPECT_EQ(test_obj.required_name, "test_base");
-    EXPECT_FLOAT_EQ(test_obj.optional_value, 2.5f);
+    EXPECT_FLOAT_EQ(test_obj.optional_value, 2.5F);
 }
 
 TEST_F(WBEDeserializerJSONTest, RequiredFields_BaseClass_MissingRequired) {
@@ -1297,14 +1304,14 @@ TEST_F(WBEDeserializerJSONTest, RequiredFields_ChildInheritance) {
     })";
     
     parser.parse_from_buffer(child_required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestRequiredFieldsChild>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_id, 456);
     EXPECT_EQ(test_obj.required_name, "test_child");
-    EXPECT_FLOAT_EQ(test_obj.optional_value, 3.14f);
+    EXPECT_FLOAT_EQ(test_obj.optional_value, 3.14F);
     EXPECT_EQ(test_obj.required_child_field, "child_data");
     EXPECT_DOUBLE_EQ(test_obj.optional_child_value, 5.5);
-    EXPECT_EQ(test_obj.required_vector, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(test_obj.required_vector, glm::vec3(1.0F, 2.0F, 3.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, RequiredFields_ChildInheritance_MissingChildRequired) {
@@ -1337,11 +1344,11 @@ TEST_F(WBEDeserializerJSONTest, RequiredFields_MultipleInheritance) {
     })";
     
     parser.parse_from_buffer(multiple_required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestMultipleRequiredChild>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_a_id, 100);
     EXPECT_EQ(test_obj.optional_a_name, "a_name");
-    EXPECT_FLOAT_EQ(test_obj.required_b_value, 2.71f);
+    EXPECT_FLOAT_EQ(test_obj.required_b_value, 2.71F);
     EXPECT_EQ(test_obj.optional_b_desc, "b_description");
     EXPECT_EQ(test_obj.required_child_info, "child_info");
     EXPECT_EQ(test_obj.optional_child_count, 42);
@@ -1362,12 +1369,12 @@ TEST_F(WBEDeserializerJSONTest, RequiredFields_DiamondInheritance) {
     })";
     
     parser.parse_from_buffer(diamond_required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestDiamondRequiredChild>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_diamond_base, "diamond_base_value");
     EXPECT_EQ(test_obj.optional_diamond_id, 999);
     EXPECT_DOUBLE_EQ(test_obj.required_left_data, 123.456);
-    EXPECT_EQ(test_obj.required_right_vector, glm::vec2(5.0f, 6.0f));
+    EXPECT_EQ(test_obj.required_right_vector, glm::vec2(5.0F, 6.0F));
     EXPECT_EQ(test_obj.required_final_field, "final_value");
     EXPECT_TRUE(test_obj.optional_final_flag);
 }
@@ -1385,11 +1392,11 @@ TEST_F(WBEDeserializerJSONTest, StaticSerializable_Basic) {
     })";
     
     parser.parse_from_buffer(static_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestStaticSerializable>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.static_id, 789);
     EXPECT_EQ(test_obj.static_name, "static_test");
-    EXPECT_FLOAT_EQ(test_obj.static_value, 9.87f);
+    EXPECT_FLOAT_EQ(test_obj.static_value, 9.87F);
 }
 
 TEST_F(WBEDeserializerJSONTest, StaticSerializable_WithRequired) {
@@ -1404,11 +1411,11 @@ TEST_F(WBEDeserializerJSONTest, StaticSerializable_WithRequired) {
     })";
     
     parser.parse_from_buffer(static_required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestStaticWithRequired>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_static_field, "static_required");
     EXPECT_EQ(test_obj.optional_static_number, 100);
-    EXPECT_EQ(test_obj.required_static_vector, glm::vec3(7.0f, 8.0f, 9.0f));
+    EXPECT_EQ(test_obj.required_static_vector, glm::vec3(7.0F, 8.0F, 9.0F));
 }
 
 TEST_F(WBEDeserializerJSONTest, StaticSerializable_WithRequired_MissingRequired) {
@@ -1441,7 +1448,7 @@ TEST_F(WBEDeserializerJSONTest, StaticSerializable_Complex) {
     })";
     
     parser.parse_from_buffer(static_complex_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestStaticComplex>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.static_numbers.size(), 5);
     EXPECT_EQ(test_obj.static_numbers[0], 1);
@@ -1452,7 +1459,7 @@ TEST_F(WBEDeserializerJSONTest, StaticSerializable_Complex) {
     EXPECT_STREQ(test_obj.required_static_buffer.buffer, "static_buffer_data");
     EXPECT_EQ(test_obj.nested_static.static_id, 555);
     EXPECT_EQ(test_obj.nested_static.static_name, "nested_static");
-    EXPECT_FLOAT_EQ(test_obj.nested_static.static_value, 1.23f);
+    EXPECT_FLOAT_EQ(test_obj.nested_static.static_value, 1.23F);
 }
 
 TEST_F(WBEDeserializerJSONTest, StaticSerializable_Empty) {
@@ -1477,11 +1484,11 @@ TEST_F(WBEDeserializerJSONTest, StaticSerializable_VectorTypes) {
     })";
     
     parser.parse_from_buffer(static_vector_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestStaticVectorTypes>::deserialize(parser.get_data(), test_obj);
     
-    EXPECT_EQ(test_obj.vec2_field, glm::vec2(10.0f, 11.0f));
-    EXPECT_EQ(test_obj.vec3_field, glm::vec3(12.0f, 13.0f, 14.0f));
-    EXPECT_EQ(test_obj.vec4_field, glm::vec4(15.0f, 16.0f, 17.0f, 18.0f));
+    EXPECT_EQ(test_obj.vec2_field, glm::vec2(10.0F, 11.0F));
+    EXPECT_EQ(test_obj.vec3_field, glm::vec3(12.0F, 13.0F, 14.0F));
+    EXPECT_EQ(test_obj.vec4_field, glm::vec4(15.0F, 16.0F, 17.0F, 18.0F));
     EXPECT_EQ(test_obj.required_identifier, "vector_test");
 }
 
@@ -1522,12 +1529,12 @@ TEST_F(WBEDeserializerJSONTest, MixedContainer_RequiredAndStatic) {
     })";
     
     parser.parse_from_buffer(mixed_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestMixedContainer>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.required_objects.size(), 2);
     EXPECT_EQ(test_obj.required_objects[0].required_id, 1);
     EXPECT_EQ(test_obj.required_objects[0].required_name, "obj1");
-    EXPECT_FLOAT_EQ(test_obj.required_objects[0].optional_value, 1.1f);
+    EXPECT_FLOAT_EQ(test_obj.required_objects[0].optional_value, 1.1F);
     
     EXPECT_EQ(test_obj.static_objects.size(), 1);
     EXPECT_EQ(test_obj.static_objects[0].static_id, 10);
@@ -1569,21 +1576,21 @@ TEST_F(WBEDeserializerJSONTest, NestedRequired_ComplexStructure) {
     })";
     
     parser.parse_from_buffer(nested_required_json);
-    sd.deserialize(parser.get_data(), test_obj);
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestNestedRequired>::deserialize(parser.get_data(), test_obj);
     
     EXPECT_EQ(test_obj.nested_required.required_id, 777);
     EXPECT_EQ(test_obj.nested_required.required_name, "nested_test");
     EXPECT_EQ(test_obj.nested_required.required_child_field, "nested_child");
-    EXPECT_EQ(test_obj.nested_required.required_vector, glm::vec3(4.0f, 5.0f, 6.0f));
+    EXPECT_EQ(test_obj.nested_required.required_vector, glm::vec3(4.0F, 5.0F, 6.0F));
     
     EXPECT_EQ(test_obj.optional_id, 888);
     
     EXPECT_EQ(test_obj.required_static_vector.size(), 2);
     EXPECT_EQ(test_obj.required_static_vector[0].required_static_field, "static1");
-    EXPECT_EQ(test_obj.required_static_vector[0].required_static_vector, glm::vec3(7.0f, 8.0f, 9.0f));
+    EXPECT_EQ(test_obj.required_static_vector[0].required_static_vector, glm::vec3(7.0F, 8.0F, 9.0F));
     EXPECT_EQ(test_obj.required_static_vector[1].required_static_field, "static2");
     EXPECT_EQ(test_obj.required_static_vector[1].optional_static_number, 999);
-    EXPECT_EQ(test_obj.required_static_vector[1].required_static_vector, glm::vec3(10.0f, 11.0f, 12.0f));
+    EXPECT_EQ(test_obj.required_static_vector[1].required_static_vector, glm::vec3(10.0F, 11.0F, 12.0F));
 }
 
 #endif

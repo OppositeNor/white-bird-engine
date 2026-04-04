@@ -21,6 +21,8 @@
 #include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 

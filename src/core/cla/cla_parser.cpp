@@ -15,10 +15,14 @@
 #include "core/cla/cla_parser.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/cla/cla_ast.hh"
+#include "core/cla/cla_utils.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "utils/defs.hh"
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include <utility>
 
 namespace WhiteBirdEngine {
 
@@ -50,7 +54,7 @@ void CLAParser::process_token(const CLAToken& p_token, std::string& p_utility_na
     }
 }
 
-void CLAParser::parse_start(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::parse_start(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&  /*p_operations*/) {
     if (p_token.type != CLAToken::Type::UTILITY_NAME) {
         throw std::runtime_error("Failed to parse CLA: the first token of the input tokens must be the utility name.");
     }
@@ -75,10 +79,10 @@ void CLAParser::parse_get_root_operand(const CLAToken& p_token, std::string& p_u
     }
 }
 
-void CLAParser::parse_get_option(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::parse_get_option(const CLAToken& p_token, std::string&  /*p_utility_name*/, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (p_token.type) {
         case CLAToken::Type::OPTION_SHORT: {
-            WBE_DEBUG_ASSERT(p_token.value.size() >= 1);
+            WBE_DEBUG_ASSERT(!p_token.value.empty());
             WBE_DEBUG_ASSERT(p_token.value.rfind('-', 0) == 0);
             std::string options = p_token.value.substr(1);
             if (options.size() > 1) {

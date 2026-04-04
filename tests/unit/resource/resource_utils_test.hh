@@ -15,9 +15,11 @@
 #ifndef WBE_FILE_RESOURCE_UTILS_TEST_HH
 #define WBE_FILE_RESOURCE_UTILS_TEST_HH
 
+#include "platform/file_system/directory.hh"
 #include "resource/resource_utils.hh"
 #include "global/global.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>

@@ -21,6 +21,7 @@
 #include "function/function_utils.hh"
 #include "utils/utils.hh"
 #include <cstddef>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string_view>

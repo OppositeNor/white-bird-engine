@@ -14,7 +14,9 @@
 */
 
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
+#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 

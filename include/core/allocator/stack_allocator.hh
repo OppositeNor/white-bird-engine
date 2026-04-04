@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <memory>
 #include <sstream>
+#include <string>
 
 namespace WhiteBirdEngine {
 

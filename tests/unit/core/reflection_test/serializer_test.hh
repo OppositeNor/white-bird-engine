@@ -17,13 +17,21 @@
 
 #include "core/parser/parser_json.hh"
 #include "core/parser/parser_yaml.hh"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
+#include "core/reflection/serializable.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include "reflection_test_data.hh"
 #include "generated/serializables_sd.gen.hh"
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <gtest/gtest.h>
-#include <glm/glm.hpp>
+#include <memory>
+#include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -60,7 +68,7 @@ inline void serializer_test_default_construct(ParserDataType p_data) {
     EXPECT_EQ(p_data.template get_value<int64_t>("si64_test"), 0);
     EXPECT_EQ(p_data.template get_value<uint32_t>("ui32_test"), 0);
     EXPECT_EQ(p_data.template get_value<uint64_t>("ui64_test"), 0);
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("f32_test"), 0.0f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("f32_test"), 0.0F);
     EXPECT_DOUBLE_EQ(p_data.template get_value<double>("f64_test"), 0.0);
     EXPECT_EQ(p_data.template get_value<glm::vec3>("vec3_test"), glm::vec3());
     EXPECT_EQ(p_data.template get_value<glm::vec4>("vec4_test"), glm::vec4());
@@ -75,8 +83,8 @@ inline void serializer_test_general(ParserDataType p_data) {
     serializable.si64_test = -62;
     serializable.ui32_test = 42;
     serializable.ui64_test = 59;
-    serializable.f32_test = 3.14f;
-    serializable.f64_test = 2.718;
+    serializable.f32_test = 3.14F;
+    serializable.f64_test = std::numbers::e;
     serializable.vec3_test = glm::vec3(1, -2, 3);
     serializable.vec4_test = glm::vec4(1, -2, 3, -4);
     serializable.str_test = "Hello!";
@@ -99,10 +107,10 @@ inline void serializer_test_general(ParserDataType p_data) {
 
     EXPECT_EQ(p_data.template get_value<int32_t>("si32_test"), 3);
     EXPECT_EQ(p_data.template get_value<int64_t>("si64_test"), -62);
-    EXPECT_EQ(p_data.template get_value<uint32_t>("ui32_test"), 42u);
-    EXPECT_EQ(p_data.template get_value<uint64_t>("ui64_test"), 59u);
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("f32_test"), 3.14f);
-    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("f64_test"), 2.718);
+    EXPECT_EQ(p_data.template get_value<uint32_t>("ui32_test"), 42U);
+    EXPECT_EQ(p_data.template get_value<uint64_t>("ui64_test"), 59U);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("f32_test"), 3.14F);
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("f64_test"), std::numbers::e);
     EXPECT_EQ(p_data.template get_value<glm::vec3>("vec3_test"), glm::vec3(1, -2, 3));
     EXPECT_EQ(p_data.template get_value<glm::vec4>("vec4_test"), glm::vec4(1, -2, 3, -4));
     EXPECT_EQ(p_data.template get_value<std::string>("str_test"), std::string("Hello!"));
@@ -120,8 +128,8 @@ inline void serializer_test_nesting(ParserDataType p_data) {
     serializable.nested_test.si64_test = -62;
     serializable.nested_test.ui32_test = 42;
     serializable.nested_test.ui64_test = 59;
-    serializable.nested_test.f32_test = 3.14f;
-    serializable.nested_test.f64_test = 2.718;
+    serializable.nested_test.f32_test = 3.14F;
+    serializable.nested_test.f64_test = std::numbers::e;
     serializable.nested_test.vec3_test = glm::vec3(1, -2, 3);
     serializable.nested_test.vec4_test = glm::vec4(1, -2, 3, -4);
     serializable.nested_test.str_test = "Hello!";
@@ -144,10 +152,10 @@ inline void serializer_test_nesting(ParserDataType p_data) {
     auto nested = p_data.template get_value<ParserDataType>("nested_test");
     EXPECT_EQ(nested.template get_value<int32_t>("si32_test"), 3);
     EXPECT_EQ(nested.template get_value<int64_t>("si64_test"), -62);
-    EXPECT_EQ(nested.template get_value<uint32_t>("ui32_test"), 42u);
-    EXPECT_EQ(nested.template get_value<uint64_t>("ui64_test"), 59u);
-    EXPECT_FLOAT_EQ(nested.template get_value<float>("f32_test"), 3.14f);
-    EXPECT_DOUBLE_EQ(nested.template get_value<double>("f64_test"), 2.718);
+    EXPECT_EQ(nested.template get_value<uint32_t>("ui32_test"), 42U);
+    EXPECT_EQ(nested.template get_value<uint64_t>("ui64_test"), 59U);
+    EXPECT_FLOAT_EQ(nested.template get_value<float>("f32_test"), 3.14F);
+    EXPECT_DOUBLE_EQ(nested.template get_value<double>("f64_test"), std::numbers::e);
     EXPECT_EQ(nested.template get_value<glm::vec3>("vec3_test"), glm::vec3(1, -2, 3));
     EXPECT_EQ(nested.template get_value<glm::vec4>("vec4_test"), glm::vec4(1, -2, 3, -4));
     EXPECT_EQ(nested.template get_value<std::string>("str_test"), std::string("Hello!"));
@@ -186,7 +194,8 @@ inline void serializer_test_vector_primitives(ParserDataType p_data_ints, Parser
 
     auto out_ints = p_data_ints.template get<std::vector<int>>();
     ASSERT_EQ(out_ints.size(), ints.size());
-    for (size_t i = 0; i < ints.size(); ++i) EXPECT_EQ(out_ints[i], ints[i]);
+    for (size_t i = 0; i < ints.size(); ++i) { EXPECT_EQ(out_ints[i], ints[i]);
+}
 
     // Test vector<string>
     std::vector<std::string> strs = {"one", "two", "three"};
@@ -195,7 +204,8 @@ inline void serializer_test_vector_primitives(ParserDataType p_data_ints, Parser
 
     auto out_strs = p_data_strs.template get<std::vector<std::string>>();
     ASSERT_EQ(out_strs.size(), strs.size());
-    for (size_t i = 0; i < strs.size(); ++i) EXPECT_EQ(out_strs[i], strs[i]);
+    for (size_t i = 0; i < strs.size(); ++i) { EXPECT_EQ(out_strs[i], strs[i]);
+}
 }
 
 template <typename ParserDataType>
@@ -241,20 +251,20 @@ inline void serializer_test_struct_with_vector_serializables(ParserDataType p_da
 
     // Inspect ints
     auto ints_out = p_data.template get_value<ParserDataType>("ints").template get<std::vector<int>>();
-    ASSERT_EQ(ints_out.size(), 3u);
+    ASSERT_EQ(ints_out.size(), 3U);
     EXPECT_EQ(ints_out[0], 10);
     EXPECT_EQ(ints_out[1], 20);
     EXPECT_EQ(ints_out[2], 30);
 
     // Inspect strs
     auto strs_out = p_data.template get_value<ParserDataType>("strs").template get<std::vector<std::string>>();
-    ASSERT_EQ(strs_out.size(), 2u);
+    ASSERT_EQ(strs_out.size(), 2U);
     EXPECT_EQ(strs_out[0], std::string("aa"));
     EXPECT_EQ(strs_out[1], std::string("bb"));
 
     // Inspect children
     auto children_arr = p_data.template get_value<ParserDataType>("children").template get<std::vector<ParserDataType>>();
-    ASSERT_EQ(children_arr.size(), 2u);
+    ASSERT_EQ(children_arr.size(), 2U);
     EXPECT_EQ(children_arr[0].template get_value<int32_t>("si32_test"), 5);
     EXPECT_EQ(children_arr[0].template get_value<std::string>("str_test"), std::string("aa"));
     EXPECT_EQ(children_arr[1].template get_value<int32_t>("si32_test"), 6);
@@ -322,12 +332,12 @@ inline void serializer_vector_with_deep_nesting(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("vec3"));
 
     auto out_vec2 = p_data.template get_value<ParserDataType>("vec2").template get<std::vector<ParserDataType>>();
-    ASSERT_EQ(out_vec2.size(), 2u);
+    ASSERT_EQ(out_vec2.size(), 2U);
     EXPECT_EQ(out_vec2[0].template get_value<int32_t>("depth2_id"), 1);
     EXPECT_EQ(out_vec2[1].template get_value<int32_t>("depth2_id"), 2);
 
     auto out_vec3 = p_data.template get_value<ParserDataType>("vec3").template get<std::vector<ParserDataType>>();
-    ASSERT_EQ(out_vec3.size(), 2u);
+    ASSERT_EQ(out_vec3.size(), 2U);
     EXPECT_EQ(out_vec3[0].template get_value<int32_t>("depth3_id"), 3);
     EXPECT_EQ(out_vec3[1].template get_value<int32_t>("depth3_id"), 4);
 }
@@ -338,7 +348,7 @@ inline void serializer_test_inheritance_base(ParserDataType p_data) {
     WBE::TestInheritedBase base{};
     base.base_id = 42;
     base.base_name = "base_test";
-    base.base_value = 3.14f;
+    base.base_value = 3.14F;
 
     WBE::SerializableSD<WBE::TestInheritedBase> sd;
     sd.serialize(p_data, base);
@@ -349,7 +359,7 @@ inline void serializer_test_inheritance_base(ParserDataType p_data) {
 
     EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 42);
     EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("base_test"));
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 3.14f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 3.14F);
 }
 
 template <typename ParserDataType>
@@ -358,11 +368,11 @@ inline void serializer_test_inheritance_child(ParserDataType p_data) {
     // Set inherited fields
     child.base_id = 100;
     child.base_name = "inherited_base";
-    child.base_value = 2.71f;
+    child.base_value = 2.71F;
     // Set child fields
     child.child_id = 200;
     child.child_name = "child_test";
-    child.child_value = 1.414;
+    child.child_value = std::numbers::sqrt2;
 
     WBE::SerializableSD<WBE::TestInheritedChild> sd;
     sd.serialize(p_data, child);
@@ -378,12 +388,12 @@ inline void serializer_test_inheritance_child(ParserDataType p_data) {
     // Verify inherited fields
     EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 100);
     EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("inherited_base"));
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 2.71f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 2.71F);
 
     // Verify child fields
     EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 200);
     EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("child_test"));
-    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("child_value"), 1.414);
+    EXPECT_DOUBLE_EQ(p_data.template get_value<double>("child_value"), std::numbers::sqrt2);
 }
 
 template <typename ParserDataType>
@@ -392,7 +402,7 @@ inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
     // Set base fields
     grandchild.base_id = 10;
     grandchild.base_name = "grandparent";
-    grandchild.base_value = 1.0f;
+    grandchild.base_value = 1.0F;
     // Set child fields
     grandchild.child_id = 20;
     grandchild.child_name = "parent";
@@ -400,7 +410,7 @@ inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
     // Set grandchild fields
     grandchild.grandchild_id = 30;
     grandchild.grandchild_name = "grandchild";
-    grandchild.grandchild_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+    grandchild.grandchild_vector = glm::vec3(1.0F, 2.0F, 3.0F);
 
     WBE::SerializableSD<WBE::TestInheritedGrandchild> sd;
     sd.serialize(p_data, grandchild);
@@ -419,13 +429,13 @@ inline void serializer_test_inheritance_multilevel(ParserDataType p_data) {
     // Verify all fields
     EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 10);
     EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("grandparent"));
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 1.0f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 1.0F);
     EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 20);
     EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("parent"));
     EXPECT_DOUBLE_EQ(p_data.template get_value<double>("child_value"), 2.0);
     EXPECT_EQ(p_data.template get_value<int32_t>("grandchild_id"), 30);
     EXPECT_EQ(p_data.template get_value<std::string>("grandchild_name"), std::string("grandchild"));
-    EXPECT_EQ(p_data.template get_value<glm::vec3>("grandchild_vector"), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(p_data.template get_value<glm::vec3>("grandchild_vector"), glm::vec3(1.0F, 2.0F, 3.0F));
 }
 
 template <typename ParserDataType>
@@ -434,7 +444,7 @@ inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
     // Set inherited base fields
     obj.base_id = 555;
     obj.base_name = "nested_base";
-    obj.base_value = 9.99f;
+    obj.base_value = 9.99F;
     // Set child fields
     obj.child_numbers = {1, 2, 3, 4, 5};
     obj.nested_object.si32_test = 777;
@@ -450,14 +460,14 @@ inline void serializer_test_inheritance_with_nested(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("base_value"));
     EXPECT_EQ(p_data.template get_value<int32_t>("base_id"), 555);
     EXPECT_EQ(p_data.template get_value<std::string>("base_name"), std::string("nested_base"));
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 9.99f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("base_value"), 9.99F);
 
     // Check child fields
     EXPECT_TRUE(p_data.contains("child_numbers"));
     EXPECT_TRUE(p_data.contains("nested_object"));
 
     auto numbers = p_data.template get_value<ParserDataType>("child_numbers").template get<std::vector<int>>();
-    ASSERT_EQ(numbers.size(), 5u);
+    ASSERT_EQ(numbers.size(), 5U);
     for (size_t i = 0; i < numbers.size(); ++i) {
         EXPECT_EQ(numbers[i], static_cast<int>(i + 1));
     }
@@ -474,11 +484,11 @@ inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     std::vector<WBE::TestInheritedChild> children;
     
     WBE::TestInheritedChild child1{};
-    child1.base_id = 1; child1.base_name = "base1"; child1.base_value = 1.1f;
+    child1.base_id = 1; child1.base_name = "base1"; child1.base_value = 1.1F;
     child1.child_id = 11; child1.child_name = "child1"; child1.child_value = 11.1;
     
     WBE::TestInheritedChild child2{};
-    child2.base_id = 2; child2.base_name = "base2"; child2.base_value = 2.2f;
+    child2.base_id = 2; child2.base_name = "base2"; child2.base_value = 2.2F;
     child2.child_id = 22; child2.child_name = "child2"; child2.child_value = 22.2;
     
     children.push_back(child1);
@@ -488,12 +498,12 @@ inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     sd.serialize(p_data, children);
 
     auto arr = p_data.template get<std::vector<ParserDataType>>();
-    ASSERT_EQ(arr.size(), 2u);
+    ASSERT_EQ(arr.size(), 2U);
 
     // Check first child
     EXPECT_EQ(arr[0].template get_value<int32_t>("base_id"), 1);
     EXPECT_EQ(arr[0].template get_value<std::string>("base_name"), std::string("base1"));
-    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("base_value"), 1.1f);
+    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("base_value"), 1.1F);
     EXPECT_EQ(arr[0].template get_value<int32_t>("child_id"), 11);
     EXPECT_EQ(arr[0].template get_value<std::string>("child_name"), std::string("child1"));
     EXPECT_DOUBLE_EQ(arr[0].template get_value<double>("child_value"), 11.1);
@@ -501,7 +511,7 @@ inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     // Check second child
     EXPECT_EQ(arr[1].template get_value<int32_t>("base_id"), 2);
     EXPECT_EQ(arr[1].template get_value<std::string>("base_name"), std::string("base2"));
-    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("base_value"), 2.2f);
+    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("base_value"), 2.2F);
     EXPECT_EQ(arr[1].template get_value<int32_t>("child_id"), 22);
     EXPECT_EQ(arr[1].template get_value<std::string>("child_name"), std::string("child2"));
     EXPECT_DOUBLE_EQ(arr[1].template get_value<double>("child_value"), 22.2);
@@ -514,7 +524,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
     // Set fields from first parent (A)
     child.a_id = 100;
     child.a_name = "parent_a";
-    child.a_value = 1.23f;
+    child.a_value = 1.23F;
     // Set fields from second parent (B)
     child.b_id = 200;
     child.b_name = "parent_b";
@@ -522,7 +532,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
     // Set child's own fields
     child.child_id = 300;
     child.child_name = "multi_child";
-    child.child_vector = glm::vec2(7.7f, 8.8f);
+    child.child_vector = glm::vec2(7.7F, 8.8F);
 
     WBE::SerializableSD<WBE::TestMultipleInheritanceChild> sd;
     sd.serialize(p_data, child);
@@ -534,7 +544,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("a_value"));
     EXPECT_EQ(p_data.template get_value<int32_t>("a_id"), 100);
     EXPECT_EQ(p_data.template get_value<std::string>("a_name"), std::string("parent_a"));
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("a_value"), 1.23f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("a_value"), 1.23F);
 
     // Fields from parent B
     EXPECT_TRUE(p_data.contains("b_id"));
@@ -550,7 +560,7 @@ inline void serializer_test_multiple_inheritance(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("child_vector"));
     EXPECT_EQ(p_data.template get_value<int32_t>("child_id"), 300);
     EXPECT_EQ(p_data.template get_value<std::string>("child_name"), std::string("multi_child"));
-    EXPECT_EQ(p_data.template get_value<glm::vec2>("child_vector"), glm::vec2(7.7f, 8.8f));
+    EXPECT_EQ(p_data.template get_value<glm::vec2>("child_vector"), glm::vec2(7.7F, 8.8F));
 }
 
 template <typename ParserDataType>
@@ -561,7 +571,7 @@ inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
     diamond.diamond_base_name = "diamond_base";
     // Set fields from left parent
     diamond.left_id = 10;
-    diamond.left_value = 1.5f;
+    diamond.left_value = 1.5F;
     // Set fields from right parent
     diamond.right_id = 20;
     diamond.right_value = 2.5;
@@ -583,7 +593,7 @@ inline void serializer_test_diamond_inheritance(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("left_id"));
     EXPECT_TRUE(p_data.contains("left_value"));
     EXPECT_EQ(p_data.template get_value<int32_t>("left_id"), 10);
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("left_value"), 1.5f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("left_value"), 1.5F);
 
     // Right parent fields
     EXPECT_TRUE(p_data.contains("right_id"));
@@ -604,14 +614,14 @@ inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     std::vector<WBE::TestMultipleInheritanceChild> children;
     
     WBE::TestMultipleInheritanceChild child1{};
-    child1.a_id = 1; child1.a_name = "a1"; child1.a_value = 1.1f;
+    child1.a_id = 1; child1.a_name = "a1"; child1.a_value = 1.1F;
     child1.b_id = 2; child1.b_name = "b1"; child1.b_value = 2.2;
-    child1.child_id = 3; child1.child_name = "c1"; child1.child_vector = glm::vec2(1.0f, 2.0f);
+    child1.child_id = 3; child1.child_name = "c1"; child1.child_vector = glm::vec2(1.0F, 2.0F);
     
     WBE::TestMultipleInheritanceChild child2{};
-    child2.a_id = 11; child2.a_name = "a2"; child2.a_value = 11.1f;
+    child2.a_id = 11; child2.a_name = "a2"; child2.a_value = 11.1F;
     child2.b_id = 22; child2.b_name = "b2"; child2.b_value = 22.2;
-    child2.child_id = 33; child2.child_name = "c2"; child2.child_vector = glm::vec2(3.0f, 4.0f);
+    child2.child_id = 33; child2.child_name = "c2"; child2.child_vector = glm::vec2(3.0F, 4.0F);
     
     children.push_back(child1);
     children.push_back(child2);
@@ -620,29 +630,29 @@ inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     sd.serialize(p_data, children);
 
     auto arr = p_data.template get<std::vector<ParserDataType>>();
-    ASSERT_EQ(arr.size(), 2u);
+    ASSERT_EQ(arr.size(), 2U);
 
     // Check first child - all inheritance levels
     EXPECT_EQ(arr[0].template get_value<int32_t>("a_id"), 1);
     EXPECT_EQ(arr[0].template get_value<std::string>("a_name"), std::string("a1"));
-    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("a_value"), 1.1f);
+    EXPECT_FLOAT_EQ(arr[0].template get_value<float>("a_value"), 1.1F);
     EXPECT_EQ(arr[0].template get_value<int32_t>("b_id"), 2);
     EXPECT_EQ(arr[0].template get_value<std::string>("b_name"), std::string("b1"));
     EXPECT_DOUBLE_EQ(arr[0].template get_value<double>("b_value"), 2.2);
     EXPECT_EQ(arr[0].template get_value<int32_t>("child_id"), 3);
     EXPECT_EQ(arr[0].template get_value<std::string>("child_name"), std::string("c1"));
-    EXPECT_EQ(arr[0].template get_value<glm::vec2>("child_vector"), glm::vec2(1.0f, 2.0f));
+    EXPECT_EQ(arr[0].template get_value<glm::vec2>("child_vector"), glm::vec2(1.0F, 2.0F));
 
     // Check second child
     EXPECT_EQ(arr[1].template get_value<int32_t>("a_id"), 11);
     EXPECT_EQ(arr[1].template get_value<std::string>("a_name"), std::string("a2"));
-    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("a_value"), 11.1f);
+    EXPECT_FLOAT_EQ(arr[1].template get_value<float>("a_value"), 11.1F);
     EXPECT_EQ(arr[1].template get_value<int32_t>("b_id"), 22);
     EXPECT_EQ(arr[1].template get_value<std::string>("b_name"), std::string("b2"));
     EXPECT_DOUBLE_EQ(arr[1].template get_value<double>("b_value"), 22.2);
     EXPECT_EQ(arr[1].template get_value<int32_t>("child_id"), 33);
     EXPECT_EQ(arr[1].template get_value<std::string>("child_name"), std::string("c2"));
-    EXPECT_EQ(arr[1].template get_value<glm::vec2>("child_vector"), glm::vec2(3.0f, 4.0f));
+    EXPECT_EQ(arr[1].template get_value<glm::vec2>("child_vector"), glm::vec2(3.0F, 4.0F));
 }
 
 // Dynamic serialization test functions (JSON only since dynamic serialization is JSON-specific)
@@ -655,10 +665,10 @@ inline void dynamic_serializer_test_basic() {
     serializable.si64_test = -1337;
     serializable.ui32_test = 256;
     serializable.ui64_test = 512;
-    serializable.f32_test = 3.14159f;
-    serializable.f64_test = 2.71828;
-    serializable.vec3_test = glm::vec3(1.0f, 2.0f, 3.0f);
-    serializable.vec4_test = glm::vec4(4.0f, 5.0f, 6.0f, 7.0f);
+    serializable.f32_test = std::numbers::pi_v<float>;
+    serializable.f64_test = std::numbers::e;
+    serializable.vec3_test = glm::vec3(1.0F, 2.0F, 3.0F);
+    serializable.vec4_test = glm::vec4(4.0F, 5.0F, 6.0F, 7.0F);
     serializable.str_test = "dynamic_test";
     strcpy(serializable.buffer_test.buffer, "dyn_buffer");
 
@@ -679,12 +689,12 @@ inline void dynamic_serializer_test_basic() {
 
     EXPECT_EQ(json_data.get_value<int32_t>("si32_test"), 42);
     EXPECT_EQ(json_data.get_value<int64_t>("si64_test"), -1337);
-    EXPECT_EQ(json_data.get_value<uint32_t>("ui32_test"), 256u);
-    EXPECT_EQ(json_data.get_value<uint64_t>("ui64_test"), 512u);
-    EXPECT_FLOAT_EQ(json_data.get_value<float>("f32_test"), 3.14159f);
-    EXPECT_DOUBLE_EQ(json_data.get_value<double>("f64_test"), 2.71828);
-    EXPECT_EQ(json_data.get_value<glm::vec3>("vec3_test"), glm::vec3(1.0f, 2.0f, 3.0f));
-    EXPECT_EQ(json_data.get_value<glm::vec4>("vec4_test"), glm::vec4(4.0f, 5.0f, 6.0f, 7.0f));
+    EXPECT_EQ(json_data.get_value<uint32_t>("ui32_test"), 256U);
+    EXPECT_EQ(json_data.get_value<uint64_t>("ui64_test"), 512U);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("f32_test"), std::numbers::pi_v<float>);
+    EXPECT_DOUBLE_EQ(json_data.get_value<double>("f64_test"), std::numbers::e);
+    EXPECT_EQ(json_data.get_value<glm::vec3>("vec3_test"), glm::vec3(1.0F, 2.0F, 3.0F));
+    EXPECT_EQ(json_data.get_value<glm::vec4>("vec4_test"), glm::vec4(4.0F, 5.0F, 6.0F, 7.0F));
     EXPECT_EQ(json_data.get_value<std::string>("str_test"), std::string("dynamic_test"));
     EXPECT_EQ(json_data.get_value<std::string>("buffer_test"), std::string("dyn_buffer"));
 }
@@ -696,7 +706,7 @@ inline void dynamic_serializer_test_inheritance() {
     // Set inherited base fields
     child.base_id = 100;
     child.base_name = "dynamic_base";
-    child.base_value = 1.23f;
+    child.base_value = 1.23F;
     
     // Set child fields
     child.child_id = 200;
@@ -716,7 +726,7 @@ inline void dynamic_serializer_test_inheritance() {
 
     EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 100);
     EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("dynamic_base"));
-    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 1.23f);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 1.23F);
     EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 200);
     EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("dynamic_child"));
     EXPECT_DOUBLE_EQ(json_data.get_value<double>("child_value"), 4.56);
@@ -729,7 +739,7 @@ inline void dynamic_serializer_test_multiple_inheritance() {
     // Set fields from first parent (A)
     child.a_id = 111;
     child.a_name = "dynamic_a";
-    child.a_value = 1.11f;
+    child.a_value = 1.11F;
     
     // Set fields from second parent (B)
     child.b_id = 222;
@@ -739,7 +749,7 @@ inline void dynamic_serializer_test_multiple_inheritance() {
     // Set child's own fields
     child.child_id = 333;
     child.child_name = "dynamic_multi_child";
-    child.child_vector = glm::vec2(9.9f, 8.8f);
+    child.child_vector = glm::vec2(9.9F, 8.8F);
 
     // Use dynamic serialization
     child.serialize(json_data);
@@ -757,13 +767,13 @@ inline void dynamic_serializer_test_multiple_inheritance() {
 
     EXPECT_EQ(json_data.get_value<int32_t>("a_id"), 111);
     EXPECT_EQ(json_data.get_value<std::string>("a_name"), std::string("dynamic_a"));
-    EXPECT_FLOAT_EQ(json_data.get_value<float>("a_value"), 1.11f);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("a_value"), 1.11F);
     EXPECT_EQ(json_data.get_value<int32_t>("b_id"), 222);
     EXPECT_EQ(json_data.get_value<std::string>("b_name"), std::string("dynamic_b"));
     EXPECT_DOUBLE_EQ(json_data.get_value<double>("b_value"), 2.22);
     EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 333);
     EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("dynamic_multi_child"));
-    EXPECT_EQ(json_data.get_value<glm::vec2>("child_vector"), glm::vec2(9.9f, 8.8f));
+    EXPECT_EQ(json_data.get_value<glm::vec2>("child_vector"), glm::vec2(9.9F, 8.8F));
 }
 
 inline void dynamic_serializer_test_polymorphism() {
@@ -774,12 +784,12 @@ inline void dynamic_serializer_test_polymorphism() {
     WBE::TestInheritedBase base{};
     base.base_id = 42;
     base.base_name = "poly_base";
-    base.base_value = 1.0f;
+    base.base_value = 1.0F;
     
     WBE::TestInheritedChild child{};
     child.base_id = 84;
     child.base_name = "poly_child_base";
-    child.base_value = 2.0f;
+    child.base_value = 2.0F;
     child.child_id = 168;
     child.child_name = "poly_child";
     child.child_value = 3.0;
@@ -806,7 +816,7 @@ inline void dynamic_serializer_test_polymorphism() {
 
     EXPECT_EQ(json_data_child.get_value<int32_t>("base_id"), 84);
     EXPECT_EQ(json_data_child.get_value<std::string>("base_name"), std::string("poly_child_base"));
-    EXPECT_FLOAT_EQ(json_data_child.get_value<float>("base_value"), 2.0f);
+    EXPECT_FLOAT_EQ(json_data_child.get_value<float>("base_value"), 2.0F);
     EXPECT_EQ(json_data_child.get_value<int32_t>("child_id"), 168);
     EXPECT_EQ(json_data_child.get_value<std::string>("child_name"), std::string("poly_child"));
     EXPECT_DOUBLE_EQ(json_data_child.get_value<double>("child_value"), 3.0);
@@ -819,7 +829,7 @@ inline void dynamic_serializer_test_nested_objects() {
     // Set inherited base fields
     obj.base_id = 999;
     obj.base_name = "dynamic_nested_base";
-    obj.base_value = 7.77f;
+    obj.base_value = 7.77F;
     
     // Set child fields
     obj.child_numbers = {10, 20, 30, 40};
@@ -836,14 +846,14 @@ inline void dynamic_serializer_test_nested_objects() {
     EXPECT_TRUE(json_data.contains("base_value"));
     EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 999);
     EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("dynamic_nested_base"));
-    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 7.77f);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 7.77F);
 
     // Check child fields
     EXPECT_TRUE(json_data.contains("child_numbers"));
     EXPECT_TRUE(json_data.contains("nested_object"));
 
     auto numbers = json_data.get_value<WBE::JSONData>("child_numbers").get<std::vector<int>>();
-    ASSERT_EQ(numbers.size(), 4u);
+    ASSERT_EQ(numbers.size(), 4U);
     EXPECT_EQ(numbers[0], 10);
     EXPECT_EQ(numbers[1], 20);
     EXPECT_EQ(numbers[2], 30);
@@ -863,7 +873,7 @@ inline void dynamic_dispatch_test_single_inheritance() {
     auto child = std::make_unique<WBE::TestInheritedChild>();
     child->base_id = 500;
     child->base_name = "dispatch_base";
-    child->base_value = 5.5f;
+    child->base_value = 5.5F;
     child->child_id = 600;
     child->child_name = "dispatch_child";
     child->child_value = 6.6;
@@ -886,7 +896,7 @@ inline void dynamic_dispatch_test_single_inheritance() {
     // Verify values match
     EXPECT_EQ(json_data_base.get_value<int32_t>("base_id"), 500);
     EXPECT_EQ(json_data_base.get_value<std::string>("base_name"), std::string("dispatch_base"));
-    EXPECT_FLOAT_EQ(json_data_base.get_value<float>("base_value"), 5.5f);
+    EXPECT_FLOAT_EQ(json_data_base.get_value<float>("base_value"), 5.5F);
     EXPECT_EQ(json_data_base.get_value<int32_t>("child_id"), 600);
     EXPECT_EQ(json_data_base.get_value<std::string>("child_name"), std::string("dispatch_child"));
     EXPECT_DOUBLE_EQ(json_data_base.get_value<double>("child_value"), 6.6);
@@ -907,13 +917,13 @@ inline void dynamic_dispatch_test_multilevel_inheritance() {
     auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
     grandchild->base_id = 100;
     grandchild->base_name = "dispatch_grandparent";
-    grandchild->base_value = 1.0f;
+    grandchild->base_value = 1.0F;
     grandchild->child_id = 200;
     grandchild->child_name = "dispatch_parent";
     grandchild->child_value = 2.0;
     grandchild->grandchild_id = 300;
     grandchild->grandchild_name = "dispatch_grandchild";
-    grandchild->grandchild_vector = glm::vec3(7.0f, 8.0f, 9.0f);
+    grandchild->grandchild_vector = glm::vec3(7.0F, 8.0F, 9.0F);
 
     // Test dynamic dispatch through different inheritance levels
     WBE::Serializable* base_ptr = grandchild.get();
@@ -925,26 +935,26 @@ inline void dynamic_dispatch_test_multilevel_inheritance() {
     child_ptr->serialize(json_data_grandchild);
 
     // All should serialize the complete grandchild object due to dynamic dispatch
-    auto verify_complete_serialization = [&](const WBE::JSONData& data, const std::string& test_name) {
-        EXPECT_TRUE(data.contains("base_id")) << "Missing base_id in " << test_name;
-        EXPECT_TRUE(data.contains("base_name")) << "Missing base_name in " << test_name;
-        EXPECT_TRUE(data.contains("base_value")) << "Missing base_value in " << test_name;
-        EXPECT_TRUE(data.contains("child_id")) << "Missing child_id in " << test_name;
-        EXPECT_TRUE(data.contains("child_name")) << "Missing child_name in " << test_name;
-        EXPECT_TRUE(data.contains("child_value")) << "Missing child_value in " << test_name;
-        EXPECT_TRUE(data.contains("grandchild_id")) << "Missing grandchild_id in " << test_name;
-        EXPECT_TRUE(data.contains("grandchild_name")) << "Missing grandchild_name in " << test_name;
-        EXPECT_TRUE(data.contains("grandchild_vector")) << "Missing grandchild_vector in " << test_name;
+    auto verify_complete_serialization = [&](const WBE::JSONData& p_data, const std::string& p_test_name) {
+        EXPECT_TRUE(p_data.contains("base_id")) << "Missing base_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("base_name")) << "Missing base_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("base_value")) << "Missing base_value in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_id")) << "Missing child_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_name")) << "Missing child_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_value")) << "Missing child_value in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("grandchild_id")) << "Missing grandchild_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("grandchild_name")) << "Missing grandchild_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("grandchild_vector")) << "Missing grandchild_vector in " << p_test_name;
 
-        EXPECT_EQ(data.get_value<int32_t>("base_id"), 100);
-        EXPECT_EQ(data.get_value<std::string>("base_name"), std::string("dispatch_grandparent"));
-        EXPECT_FLOAT_EQ(data.get_value<float>("base_value"), 1.0f);
-        EXPECT_EQ(data.get_value<int32_t>("child_id"), 200);
-        EXPECT_EQ(data.get_value<std::string>("child_name"), std::string("dispatch_parent"));
-        EXPECT_DOUBLE_EQ(data.get_value<double>("child_value"), 2.0);
-        EXPECT_EQ(data.get_value<int32_t>("grandchild_id"), 300);
-        EXPECT_EQ(data.get_value<std::string>("grandchild_name"), std::string("dispatch_grandchild"));
-        EXPECT_EQ(data.get_value<glm::vec3>("grandchild_vector"), glm::vec3(7.0f, 8.0f, 9.0f));
+        EXPECT_EQ(p_data.get_value<int32_t>("base_id"), 100);
+        EXPECT_EQ(p_data.get_value<std::string>("base_name"), std::string("dispatch_grandparent"));
+        EXPECT_FLOAT_EQ(p_data.get_value<float>("base_value"), 1.0F);
+        EXPECT_EQ(p_data.get_value<int32_t>("child_id"), 200);
+        EXPECT_EQ(p_data.get_value<std::string>("child_name"), std::string("dispatch_parent"));
+        EXPECT_DOUBLE_EQ(p_data.get_value<double>("child_value"), 2.0);
+        EXPECT_EQ(p_data.get_value<int32_t>("grandchild_id"), 300);
+        EXPECT_EQ(p_data.get_value<std::string>("grandchild_name"), std::string("dispatch_grandchild"));
+        EXPECT_EQ(p_data.get_value<glm::vec3>("grandchild_vector"), glm::vec3(7.0F, 8.0F, 9.0F));
     };
 
     verify_complete_serialization(json_data_base, "base_ptr");
@@ -959,13 +969,13 @@ inline void dynamic_dispatch_test_multiple_inheritance() {
     auto child = std::make_unique<WBE::TestMultipleInheritanceChild>();
     child->a_id = 777;
     child->a_name = "dispatch_a";
-    child->a_value = 7.77f;
+    child->a_value = 7.77F;
     child->b_id = 888;
     child->b_name = "dispatch_b";
     child->b_value = 8.88;
     child->child_id = 999;
     child->child_name = "dispatch_multi_child";
-    child->child_vector = glm::vec2(10.0f, 11.0f);
+    child->child_vector = glm::vec2(10.0F, 11.0F);
 
     // Test dynamic dispatch through different parent pointers
     WBE::TestMultipleInheritanceA* a_ptr = child.get();
@@ -975,26 +985,26 @@ inline void dynamic_dispatch_test_multiple_inheritance() {
     b_ptr->serialize(json_data_b);
 
     // All should serialize the complete child object
-    auto verify_complete_multi_serialization = [&](const WBE::JSONData& data, const std::string& test_name) {
-        EXPECT_TRUE(data.contains("a_id")) << "Missing a_id in " << test_name;
-        EXPECT_TRUE(data.contains("a_name")) << "Missing a_name in " << test_name;
-        EXPECT_TRUE(data.contains("a_value")) << "Missing a_value in " << test_name;
-        EXPECT_TRUE(data.contains("b_id")) << "Missing b_id in " << test_name;
-        EXPECT_TRUE(data.contains("b_name")) << "Missing b_name in " << test_name;
-        EXPECT_TRUE(data.contains("b_value")) << "Missing b_value in " << test_name;
-        EXPECT_TRUE(data.contains("child_id")) << "Missing child_id in " << test_name;
-        EXPECT_TRUE(data.contains("child_name")) << "Missing child_name in " << test_name;
-        EXPECT_TRUE(data.contains("child_vector")) << "Missing child_vector in " << test_name;
+    auto verify_complete_multi_serialization = [&](const WBE::JSONData& p_data, const std::string& p_test_name) {
+        EXPECT_TRUE(p_data.contains("a_id")) << "Missing a_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("a_name")) << "Missing a_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("a_value")) << "Missing a_value in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("b_id")) << "Missing b_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("b_name")) << "Missing b_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("b_value")) << "Missing b_value in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_id")) << "Missing child_id in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_name")) << "Missing child_name in " << p_test_name;
+        EXPECT_TRUE(p_data.contains("child_vector")) << "Missing child_vector in " << p_test_name;
 
-        EXPECT_EQ(data.get_value<int32_t>("a_id"), 777);
-        EXPECT_EQ(data.get_value<std::string>("a_name"), std::string("dispatch_a"));
-        EXPECT_FLOAT_EQ(data.get_value<float>("a_value"), 7.77f);
-        EXPECT_EQ(data.get_value<int32_t>("b_id"), 888);
-        EXPECT_EQ(data.get_value<std::string>("b_name"), std::string("dispatch_b"));
-        EXPECT_DOUBLE_EQ(data.get_value<double>("b_value"), 8.88);
-        EXPECT_EQ(data.get_value<int32_t>("child_id"), 999);
-        EXPECT_EQ(data.get_value<std::string>("child_name"), std::string("dispatch_multi_child"));
-        EXPECT_EQ(data.get_value<glm::vec2>("child_vector"), glm::vec2(10.0f, 11.0f));
+        EXPECT_EQ(p_data.get_value<int32_t>("a_id"), 777);
+        EXPECT_EQ(p_data.get_value<std::string>("a_name"), std::string("dispatch_a"));
+        EXPECT_FLOAT_EQ(p_data.get_value<float>("a_value"), 7.77F);
+        EXPECT_EQ(p_data.get_value<int32_t>("b_id"), 888);
+        EXPECT_EQ(p_data.get_value<std::string>("b_name"), std::string("dispatch_b"));
+        EXPECT_DOUBLE_EQ(p_data.get_value<double>("b_value"), 8.88);
+        EXPECT_EQ(p_data.get_value<int32_t>("child_id"), 999);
+        EXPECT_EQ(p_data.get_value<std::string>("child_name"), std::string("dispatch_multi_child"));
+        EXPECT_EQ(p_data.get_value<glm::vec2>("child_vector"), glm::vec2(10.0F, 11.0F));
     };
 
     verify_complete_multi_serialization(json_data_a, "a_ptr");
@@ -1009,12 +1019,12 @@ inline void dynamic_dispatch_test_polymorphic_container() {
     auto base = std::make_unique<WBE::TestInheritedBase>();
     base->base_id = 1;
     base->base_name = "container_base";
-    base->base_value = 1.1f;
+    base->base_value = 1.1F;
     
     auto child = std::make_unique<WBE::TestInheritedChild>();
     child->base_id = 2;
     child->base_name = "container_child_base";
-    child->base_value = 2.2f;
+    child->base_value = 2.2F;
     child->child_id = 22;
     child->child_name = "container_child";
     child->child_value = 2.22;
@@ -1022,13 +1032,13 @@ inline void dynamic_dispatch_test_polymorphic_container() {
     auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
     grandchild->base_id = 3;
     grandchild->base_name = "container_grandchild_base";
-    grandchild->base_value = 3.3f;
+    grandchild->base_value = 3.3F;
     grandchild->child_id = 33;
     grandchild->child_name = "container_grandchild_child";
     grandchild->child_value = 3.33;
     grandchild->grandchild_id = 333;
     grandchild->grandchild_name = "container_grandchild";
-    grandchild->grandchild_vector = glm::vec3(3.0f, 3.0f, 3.0f);
+    grandchild->grandchild_vector = glm::vec3(3.0F, 3.0F, 3.0F);
 
     // Store in polymorphic container
     objects.push_back(std::move(base));
@@ -1081,7 +1091,7 @@ inline void dynamic_dispatch_test_reference_semantics() {
     WBE::TestInheritedChild child{};
     child.base_id = 42;
     child.base_name = "ref_base";
-    child.base_value = 4.2f;
+    child.base_value = 4.2F;
     child.child_id = 84;
     child.child_name = "ref_child";
     child.child_value = 8.4;
@@ -1100,7 +1110,7 @@ inline void dynamic_dispatch_test_reference_semantics() {
 
     EXPECT_EQ(json_data.get_value<int32_t>("base_id"), 42);
     EXPECT_EQ(json_data.get_value<std::string>("base_name"), std::string("ref_base"));
-    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 4.2f);
+    EXPECT_FLOAT_EQ(json_data.get_value<float>("base_value"), 4.2F);
     EXPECT_EQ(json_data.get_value<int32_t>("child_id"), 84);
     EXPECT_EQ(json_data.get_value<std::string>("child_name"), std::string("ref_child"));
     EXPECT_DOUBLE_EQ(json_data.get_value<double>("child_value"), 8.4);
@@ -1282,7 +1292,7 @@ inline void test_required_fields_serialization(ParserDataType p_data) {
     WBE::TestRequiredFieldsBase base_obj;
     base_obj.required_id = 123;
     base_obj.required_name = "test_base";
-    base_obj.optional_value = 2.5f;
+    base_obj.optional_value = 2.5F;
     
     WBE::SerializableSD<WBE::TestRequiredFieldsBase> base_sd;
     base_sd.serialize(p_data, base_obj);
@@ -1292,7 +1302,7 @@ inline void test_required_fields_serialization(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("optional_value"));
     EXPECT_EQ(p_data.template get_value<int32_t>("required_id"), 123);
     EXPECT_EQ(p_data.template get_value<std::string>("required_name"), "test_base");
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("optional_value"), 2.5f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("optional_value"), 2.5F);
 }
 
 template <typename ParserDataType>
@@ -1300,10 +1310,10 @@ inline void test_required_fields_child_serialization(ParserDataType p_data) {
     WBE::TestRequiredFieldsChild child_obj;
     child_obj.required_id = 456;
     child_obj.required_name = "test_child";
-    child_obj.optional_value = 3.14f;
+    child_obj.optional_value = 3.14F;
     child_obj.required_child_field = "child_data";
     child_obj.optional_child_value = 5.5;
-    child_obj.required_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+    child_obj.required_vector = glm::vec3(1.0F, 2.0F, 3.0F);
     
     WBE::SerializableSD<WBE::TestRequiredFieldsChild> child_sd;
     child_sd.serialize(p_data, child_obj);
@@ -1329,7 +1339,7 @@ inline void test_multiple_required_inheritance_serialization(ParserDataType p_da
     WBE::TestMultipleRequiredChild multi_obj;
     multi_obj.required_a_id = 100;
     multi_obj.optional_a_name = "a_name";
-    multi_obj.required_b_value = 2.71f;
+    multi_obj.required_b_value = 2.71F;
     multi_obj.optional_b_desc = "b_description";
     multi_obj.required_child_info = "child_info";
     multi_obj.optional_child_count = 42;
@@ -1346,7 +1356,7 @@ inline void test_multiple_required_inheritance_serialization(ParserDataType p_da
     
     EXPECT_EQ(p_data.template get_value<int32_t>("required_a_id"), 100);
     EXPECT_EQ(p_data.template get_value<std::string>("optional_a_name"), "a_name");
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("required_b_value"), 2.71f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("required_b_value"), 2.71F);
     EXPECT_EQ(p_data.template get_value<std::string>("optional_b_desc"), "b_description");
     EXPECT_EQ(p_data.template get_value<std::string>("required_child_info"), "child_info");
     EXPECT_EQ(p_data.template get_value<int32_t>("optional_child_count"), 42);
@@ -1357,7 +1367,7 @@ inline void test_static_serializable_serialization(ParserDataType p_data) {
     WBE::TestStaticSerializable static_obj;
     static_obj.static_id = 789;
     static_obj.static_name = "static_test";
-    static_obj.static_value = 9.87f;
+    static_obj.static_value = 9.87F;
     
     WBE::SerializableSD<WBE::TestStaticSerializable> static_sd;
     static_sd.serialize(p_data, static_obj);
@@ -1368,7 +1378,7 @@ inline void test_static_serializable_serialization(ParserDataType p_data) {
     
     EXPECT_EQ(p_data.template get_value<int32_t>("static_id"), 789);
     EXPECT_EQ(p_data.template get_value<std::string>("static_name"), "static_test");
-    EXPECT_FLOAT_EQ(p_data.template get_value<float>("static_value"), 9.87f);
+    EXPECT_FLOAT_EQ(p_data.template get_value<float>("static_value"), 9.87F);
 }
 
 template <typename ParserDataType>
@@ -1376,7 +1386,7 @@ inline void test_static_with_required_serialization(ParserDataType p_data) {
     WBE::TestStaticWithRequired static_req_obj;
     static_req_obj.required_static_field = "static_required";
     static_req_obj.optional_static_number = 100;
-    static_req_obj.required_static_vector = glm::vec3(7.0f, 8.0f, 9.0f);
+    static_req_obj.required_static_vector = glm::vec3(7.0F, 8.0F, 9.0F);
     
     WBE::SerializableSD<WBE::TestStaticWithRequired> static_req_sd;
     static_req_sd.serialize(p_data, static_req_obj);
@@ -1397,7 +1407,7 @@ inline void test_static_complex_serialization(ParserDataType p_data) {
     strcpy(static_complex_obj.required_static_buffer.buffer, "static_buffer_data");
     static_complex_obj.nested_static.static_id = 555;
     static_complex_obj.nested_static.static_name = "nested_static";
-    static_complex_obj.nested_static.static_value = 1.23f;
+    static_complex_obj.nested_static.static_value = 1.23F;
     
     WBE::SerializableSD<WBE::TestStaticComplex> static_complex_sd;
     static_complex_sd.serialize(p_data, static_complex_obj);
@@ -1433,12 +1443,12 @@ inline void test_mixed_container_serialization(ParserDataType p_data) {
     WBE::TestRequiredFieldsBase req_obj1;
     req_obj1.required_id = 1;
     req_obj1.required_name = "obj1";
-    req_obj1.optional_value = 1.1f;
+    req_obj1.optional_value = 1.1F;
     
     WBE::TestRequiredFieldsBase req_obj2;
     req_obj2.required_id = 2;
     req_obj2.required_name = "obj2";
-    req_obj2.optional_value = 1.0f; // default
+    req_obj2.optional_value = 1.0F; // default
     
     mixed_obj.required_objects = {req_obj1, req_obj2};
     
@@ -1446,7 +1456,7 @@ inline void test_mixed_container_serialization(ParserDataType p_data) {
     WBE::TestStaticSerializable static_obj;
     static_obj.static_id = 10;
     static_obj.static_name = "static1";
-    static_obj.static_value = 2.2f;
+    static_obj.static_value = 2.2F;
     
     mixed_obj.static_objects = {static_obj};
     
@@ -1454,7 +1464,7 @@ inline void test_mixed_container_serialization(ParserDataType p_data) {
     mixed_obj.required_child.required_id = 999;
     mixed_obj.required_child.required_name = "child_test";
     mixed_obj.required_child.required_child_field = "child_value";
-    mixed_obj.required_child.required_vector = glm::vec3(1.0f, 2.0f, 3.0f);
+    mixed_obj.required_child.required_vector = glm::vec3(1.0F, 2.0F, 3.0F);
     
     // Set optional static
     mixed_obj.optional_static.static_numbers = {100, 200};
@@ -1490,71 +1500,71 @@ inline void test_mixed_container_serialization(ParserDataType p_data) {
 
 TEST_F(WBESerializerTest, RequiredFieldsBaseSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_required_fields_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_required_fields_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, RequiredFieldsChildSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_required_fields_child_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_required_fields_child_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, MultipleRequiredInheritanceSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_multiple_required_inheritance_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_multiple_required_inheritance_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, StaticSerializableSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_static_serializable_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_static_serializable_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, StaticWithRequiredSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_static_with_required_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_static_with_required_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, StaticComplexSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_static_complex_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_static_complex_serialization(yaml_data);
 }
 
 TEST_F(WBESerializerTest, MixedContainerSerialization) {
     WBE::ParserJSON json_parser;
-    auto json_data = json_parser.get_data();
+    const auto& json_data = json_parser.get_data();
     test_mixed_container_serialization(json_data);
     
     WBE::ParserYAML yaml_parser;
-    auto yaml_data = yaml_parser.get_data();
+    const auto& yaml_data = yaml_parser.get_data();
     test_mixed_container_serialization(yaml_data);
 }
 

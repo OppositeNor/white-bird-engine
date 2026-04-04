@@ -20,6 +20,7 @@
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
+#include "utils/defs.hh"
 #include <stdexcept>
 #include <string>
 namespace WhiteBirdEngine {

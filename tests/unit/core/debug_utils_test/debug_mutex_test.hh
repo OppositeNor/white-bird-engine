@@ -15,13 +15,18 @@
 #ifndef WBE_FILE_DEBUG_MUTEX_TEST_HH
 #define WBE_FILE_DEBUG_MUTEX_TEST_HH
 
+#include "boost/thread/lock_types.hpp"
 #include "core/debug_utils/debug_mutex.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
-#include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <memory>
 #include <thread>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -45,8 +50,9 @@ TEST_F(WBEDebugMutexTest, IsCurrentTheadUniqueLocked) {
     constexpr size_t THREAD_COUNT = 8;
     constexpr size_t ITERATION_COUNT = 1000;
     std::vector<std::thread> threads;
-    for (size_t i = 0; i < THREAD_COUNT; ++i) {
-        threads.push_back(std::thread([&]() {
+    threads.reserve(THREAD_COUNT);
+for (size_t i = 0; i < THREAD_COUNT; ++i) {
+        threads.emplace_back([&]() {
             for (size_t j = 0; j < ITERATION_COUNT; ++j) {
                 // Should not be true when current thread does not hold the unique lock.
                 EXPECT_FALSE(mutex.is_unique_locked_by_current_thread());
@@ -65,7 +71,7 @@ TEST_F(WBEDebugMutexTest, IsCurrentTheadUniqueLocked) {
                 // Should not be true when shared lock is released.
                 EXPECT_FALSE(mutex.is_unique_locked_by_current_thread());
             }
-        }));
+        });
     }
     for (auto& thread : threads) {
         thread.join();
@@ -151,7 +157,8 @@ TEST_F(WBEDebugMutexTest, MultipleSharedLocks) {
     std::atomic<int> active_readers{0};
     std::atomic<int> max_concurrent_readers{0};
     
-    for (int i = 0; i < NUM_READERS; ++i) {
+    threads.reserve(NUM_READERS);
+for (int i = 0; i < NUM_READERS; ++i) {
         threads.emplace_back([&]() {
             mutex.lock_shared();
             
@@ -350,7 +357,8 @@ TEST_F(WBEDebugMutexTest, StressTestOwnershipTracking) {
     std::atomic<int> false_positive_count{0};
     
     std::vector<std::thread> threads;
-    for (int i = 0; i < NUM_THREADS; ++i) {
+    threads.reserve(NUM_THREADS);
+for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&]() {
             for (int j = 0; j < ITERATIONS; ++j) {
                 // Test unique lock ownership

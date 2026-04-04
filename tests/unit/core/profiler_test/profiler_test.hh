@@ -15,12 +15,14 @@
 #ifndef WBE_FILE_PROFILER_TEST_HH
 #define WBE_FILE_PROFILER_TEST_HH
 
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <memory>
 #include <chrono>
 #include <thread>
 
 #include "core/profiling/profiler.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "platform/file_system/directory.hh"
 #include "global/global.hh"
 

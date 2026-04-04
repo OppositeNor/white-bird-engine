@@ -14,14 +14,20 @@
 */
 #ifndef WBE_FILE_PARSER_YAML_HH
 #define WBE_FILE_PARSER_YAML_HH
-
 #include "parser.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
+#include <concepts>
 #include <format>
-#include <iostream>
-#include <yaml-cpp/yaml.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <iostream>
+#include <string>
+#include <type_traits>
+#include <stdexcept>
+#include <vector>
+#include <utility>
+#include <yaml-cpp/yaml.h>
 
 namespace WhiteBirdEngine {
 

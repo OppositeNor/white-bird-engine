@@ -15,10 +15,14 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_RAM_HH
 #define WBE_FILE_HEAP_ALLOCATOR_RAM_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "heap_allocator.hh"
 #include "utils/defs.hh"
+#include <cstddef>
+#include <cstdint>
 #include <set>
 #include <sstream>
+#include <string>
 namespace WhiteBirdEngine {
 
 template <>

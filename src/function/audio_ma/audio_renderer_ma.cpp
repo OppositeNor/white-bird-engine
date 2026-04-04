@@ -17,7 +17,9 @@
 #include "function/engine_function.hh"
 #include "function/game_config/game_config.hh"
 #include "function/game_config/game_config_options.hh"
+#include <cstdint>
 #include <format>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
@@ -49,7 +51,7 @@ void AudioRendererMA::init() {
     int32_t prefered_device_index = -1;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     for (uint32_t i = 0; i < playback_count; ++i) {
-        if ((game_config.audio_device == "" && playback_infos[i].isDefault)
+        if ((game_config.audio_device.empty() && playback_infos[i].isDefault)
             || game_config.audio_device == playback_infos[i].name) {
             prefered_device_index = static_cast<int32_t>(i);
             break;

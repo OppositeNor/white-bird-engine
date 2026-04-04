@@ -22,6 +22,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "glm/fwd.hpp"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <optional>

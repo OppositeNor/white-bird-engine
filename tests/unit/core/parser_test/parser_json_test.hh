@@ -15,9 +15,18 @@
 #ifndef WBE_FILE_PARSER_JSON_TEST_HH
 #define WBE_FILE_PARSER_JSON_TEST_HH
 
-#include <gtest/gtest.h>
 #include "core/parser/parser_json.hh"
 #include "parser_test_general.hh"
+#include "utils/utils.hh"
+
+#include <cstddef>
+#include <exception>
+#include <algorithm>
+#include <cstring>
+#include <gtest/gtest.h>
+#include <glm/glm.hpp>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -30,7 +39,7 @@ TEST(ParserJSONTest, ParseFromBuffer) {
                         R"({ "test_pair" : {
                                 "test_key1" : "test_val1",
                                 "test_key2" : 123,
-                                "test_key3" : 3.1415926
+                                "test_key3" : 3.14
                             }, "numbers" : [123, -200, 5, 60, -123] })");
 }
 
@@ -232,9 +241,9 @@ TEST(ParserJSONTest, BufferRetrieval) {
     parser.parse_from_buffer(json_data);
     
     // Test retrieving into different buffer sizes
-    WBE::Buffer<16> small_buffer;
-    WBE::Buffer<64> medium_buffer;
-    WBE::Buffer<128> large_buffer;
+    WBE::Buffer<16> small_buffer{};
+    WBE::Buffer<64> medium_buffer{};
+    WBE::Buffer<128> large_buffer{};
     
     // Test short text fits in all buffers
     std::string key = "short_text";
@@ -276,12 +285,12 @@ TEST(ParserJSONTest, BufferBoundsChecking) {
     parser.parse_from_buffer(json_data);
     
     // Test that attempting to retrieve long text into small buffer throws exception
-    WBE::Buffer<16> small_buffer;
+    WBE::Buffer<16> small_buffer{};
     std::string key = "long_text";
     ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
     
     // Test that it works with appropriately sized buffer
-    WBE::Buffer<128> large_buffer;
+    WBE::Buffer<128> large_buffer{};
     ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
     ASSERT_STREQ(large_buffer.buffer, "This is a very long text that exceeds small buffer capacity");
 }
@@ -296,7 +305,7 @@ TEST(ParserJSONTest, BufferMaxCapacityRetrieval) {
     
     parser.parse_from_buffer(json_data);
     
-    WBE::Buffer<16> buffer;
+    WBE::Buffer<16> buffer{};
     std::string key = "max_text";
     parser.get_data().get_value(key, buffer);
     ASSERT_STREQ(buffer.buffer, "123456789012345");
@@ -555,19 +564,19 @@ TEST(ParserJSONTest, ParseGLMVectors) {
     parser.parse_from_buffer(glm_json);
 
     glm::vec2 v2 = parser.get_value<glm::vec2>("v2");
-    ASSERT_FLOAT_EQ(v2.x, 1.5f);
-    ASSERT_FLOAT_EQ(v2.y, 2.5f);
+    ASSERT_FLOAT_EQ(v2.x, 1.5F);
+    ASSERT_FLOAT_EQ(v2.y, 2.5F);
 
     glm::vec3 v3 = parser.get_value<glm::vec3>("v3");
-    ASSERT_FLOAT_EQ(v3.x, 1.0f);
-    ASSERT_FLOAT_EQ(v3.y, 2.0f);
-    ASSERT_FLOAT_EQ(v3.z, 3.0f);
+    ASSERT_FLOAT_EQ(v3.x, 1.0F);
+    ASSERT_FLOAT_EQ(v3.y, 2.0F);
+    ASSERT_FLOAT_EQ(v3.z, 3.0F);
 
     glm::vec4 v4 = parser.get_value<glm::vec4>("v4");
-    ASSERT_FLOAT_EQ(v4.x, -1.25f);
-    ASSERT_FLOAT_EQ(v4.y, 0.0f);
-    ASSERT_FLOAT_EQ(v4.z, 4.5f);
-    ASSERT_FLOAT_EQ(v4.w, 8.75f);
+    ASSERT_FLOAT_EQ(v4.x, -1.25F);
+    ASSERT_FLOAT_EQ(v4.y, 0.0F);
+    ASSERT_FLOAT_EQ(v4.z, 4.5F);
+    ASSERT_FLOAT_EQ(v4.w, 8.75F);
 }
 
 TEST(ParserJSONTest, ParseGLMVectorsMissingFields) {
@@ -651,18 +660,18 @@ TEST(ParserJSONTest, JSONDataSetAssignMethod) {
     ASSERT_EQ(nums[2], 30);
 
     // Buffer
-    WBE::Buffer<16> buf;
+    WBE::Buffer<16> buf{};
     strcpy(buf.buffer, "bufval");
     root.set(buf);
     ASSERT_EQ(root.get<std::string>(), "bufval");
 
     // glm vector
-    glm::vec3 v{1.0f, 2.0f, 3.0f};
+    glm::vec3 v{1.0F, 2.0F, 3.0F};
     root.set(v);
     auto v_out = root.get<glm::vec3>();
-    ASSERT_FLOAT_EQ(v_out.x, 1.0f);
-    ASSERT_FLOAT_EQ(v_out.y, 2.0f);
-    ASSERT_FLOAT_EQ(v_out.z, 3.0f);
+    ASSERT_FLOAT_EQ(v_out.x, 1.0F);
+    ASSERT_FLOAT_EQ(v_out.y, 2.0F);
+    ASSERT_FLOAT_EQ(v_out.z, 3.0F);
 
     // Nested JSONData by copy
     WBE::JSONData child;

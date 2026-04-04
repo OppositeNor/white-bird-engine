@@ -16,9 +16,14 @@
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_HH
 
 #include "core/core_utils.hh"
+#include "core/job/job.hh"
 #include "core/job/job_buffer.hh"
+#include "core/memory/reference_strong.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
+#include <cstddef>
+#include <semaphore>
+#include <atomic>
 namespace WhiteBirdEngine {
 
 /**

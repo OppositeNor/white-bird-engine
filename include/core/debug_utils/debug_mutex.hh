@@ -17,8 +17,8 @@
 
 #include <atomic>
 #include <thread>
-#include <boost/thread/tss.hpp>
-#include <boost/thread/shared_mutex.hpp>
+
+#include "boost/thread/pthread/shared_mutex.hpp"
 
 namespace WhiteBirdEngine {
 
@@ -31,8 +31,7 @@ namespace WhiteBirdEngine {
  */
 class DebugSharedMutex {
 public:
-    DebugSharedMutex() {
-    }
+    DebugSharedMutex() = default;
 
     /**
      * @brief Unique lock.
@@ -101,10 +100,10 @@ public:
 private:
     boost::shared_mutex mtx;
 
-    std::atomic<std::thread::id> unique_owner{};
+    std::atomic<std::thread::id> unique_owner;
 };
 
 #endif
-}
+}  // namespace WhiteBirdEngine
 
 #endif

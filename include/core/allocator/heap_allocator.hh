@@ -16,7 +16,10 @@
 #define WBE_FILE_HEAP_ALLOCATOR_HH
 
 #include "i_allocator.hh"
+#include "utils/defs.hh"
+#include <cstddef>
 #include <sstream>
+#include <string>
 
 namespace WhiteBirdEngine {
 

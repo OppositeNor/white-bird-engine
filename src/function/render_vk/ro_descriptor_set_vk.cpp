@@ -13,8 +13,14 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
+#include <vector>
+#include <cstdint>
+#include <stdexcept>
+#include <cstddef>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

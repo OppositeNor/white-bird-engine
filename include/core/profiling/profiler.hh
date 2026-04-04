@@ -17,6 +17,10 @@
 
 #include "core/engine_core.hh"
 #include "core/profiling/profiling_manager.hh"
+#include "utils/utils.hh"
+#include <string>
+#include <cstdint>
+#include <utility>
 namespace WhiteBirdEngine {
 
 #define WBE_START_PROFILE(CHANNEL, p_message) auto profiler_##__LINE__ = WhiteBirdEngine::Profiler(CHANNEL, p_message, std::string(__FILE__), __LINE__)

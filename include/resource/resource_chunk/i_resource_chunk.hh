@@ -17,8 +17,11 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 

@@ -13,7 +13,13 @@
    limitations under the License.
 */
 #include "core/job/job_buffer_ring_mpsc.hh"
+#include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/job/job.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <atomic>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {

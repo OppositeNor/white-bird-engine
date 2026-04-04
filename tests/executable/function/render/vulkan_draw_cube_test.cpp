@@ -13,10 +13,18 @@
    limitations under the License.
 */
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/render_database.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/trigonometric.hpp"
+#include "generated/type_uuid.gen.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "core/logging/log.hh"
@@ -32,9 +40,10 @@
 #include <cstdlib>
 #include <exception>
 #include <format>
+#include <memory>
 #include <print>
-#include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;

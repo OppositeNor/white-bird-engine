@@ -15,8 +15,13 @@
 #include "core/async/worker.hh"
 #include "core/job/job.hh"
 #include "core/memory/reference_strong.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
+#include <functional>
+#include <future>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace WhiteBirdEngine {
 

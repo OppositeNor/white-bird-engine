@@ -21,11 +21,13 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <initializer_list>
+#include <span>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {

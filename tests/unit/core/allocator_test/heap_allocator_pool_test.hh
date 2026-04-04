@@ -15,10 +15,17 @@
 #ifndef WBE_FILE_HEAP_ALOCATOR_POOL_TEST_HH
 #define WBE_FILE_HEAP_ALOCATOR_POOL_TEST_HH
 
+#include "core/allocator/heap_allocator.hh"
 #include "core/allocator/heap_allocator_pool.hh"
+#include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include "test_utilities.hh"
+#include <cstddef>
+#include <cstdint>
+#include <bit>
 #include <gtest/gtest.h>
+#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -274,14 +281,14 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
         TestBase() {
             (void)placeholder;
         }
-        uint32_t placeholder;
+        uint32_t placeholder{};
     };
     class TestChild1 : public TestBase {
     public:
         TestChild1() {
             (void)child_placeholder;
         }
-        uint32_t child_placeholder;
+        uint32_t child_placeholder{};
     };
     class TestChild2 : public TestBase {
     public:
@@ -289,8 +296,8 @@ TEST(WBEAllocPoolTest, WithDiffInstances) {
             (void)child_placeholder1;
             (void)child_placeholder2;
         }
-        uint32_t child_placeholder1;
-        uint32_t child_placeholder2;
+        uint32_t child_placeholder1{};
+        uint32_t child_placeholder2{};
     };
 
     WhiteBirdEngine::HeapAllocatorPool allocator = WhiteBirdEngine::HeapAllocatorPool(1024);

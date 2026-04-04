@@ -16,9 +16,13 @@
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
+#include "core/logging/logging_manager.hh"
+#include "core/logging/log_stream.hh"
 #include "core/profiling/profiling_manager.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
+#include "platform/file_system/file_system.hh"
+#include "platform/file_system/directory.hh"
 #include <iostream>
 
 namespace WhiteBirdEngine {

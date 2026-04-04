@@ -16,6 +16,7 @@
 #include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <cstdlib>
 
@@ -23,33 +24,35 @@ namespace WhiteBirdEngine {
 
 class MockHeapAllocatorAligned final : public HeapAllocatorAligned {
 public:
-    MockHeapAllocatorAligned(size_t max_size = 4096)
-        : max_size(max_size), used_size(0) {}
+    MockHeapAllocatorAligned(size_t p_max_size = 4096)
+        : max_size(p_max_size) {}
 
-    MemID allocate(size_t size, size_t alignment = WBE_DEFAULT_ALIGNMENT) override {
-        call_log << "allocate(" << size << ", " << alignment << "); ";
-        if (size == 0 || used_size + size > max_size) return MEM_NULL;
-        void* ptr = malloc(size);
-        if (!ptr) return MEM_NULL;
+    MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
+        call_log << "allocate(" << p_size << ", " << p_alignment << "); ";
+        if (p_size == 0 || used_size + p_size > max_size) { return MEM_NULL;
+}
+        void* ptr = malloc(p_size);
+        if (!ptr) { return MEM_NULL;
+}
         MemID id = reinterpret_cast<MemID>(ptr);
-        allocations[id] = size;
-        used_size += size;
+        allocations[id] = p_size;
+        used_size += p_size;
         return id;
     }
 
-    void deallocate(MemID mem_id) override {
-        call_log << "deallocate(" << mem_id << "); ";
-        auto it = allocations.find(mem_id);
+    void deallocate(MemID p_mem_id) override {
+        call_log << "deallocate(" << p_mem_id << "); ";
+        auto it = allocations.find(p_mem_id);
         if (it != allocations.end()) {
             used_size -= it->second;
-            free(reinterpret_cast<void*>(mem_id));
+            free(reinterpret_cast<void*>(p_mem_id));
             allocations.erase(it);
         }
     }
 
     void* get(MemID mem_id) const override {
         call_log << "get(" << mem_id << "); ";
-        if (allocations.count(mem_id)) {
+        if (allocations.contains(mem_id)) {
             return reinterpret_cast<void*>(mem_id);
         }
         return nullptr;
@@ -74,9 +77,9 @@ public:
         return allocations.empty();
     }
 
-    size_t get_allocated_data_size(MemID mem_id) const override {
-        call_log << "get_allocated_data_size(" << mem_id << "); ";
-        auto it = allocations.find(mem_id);
+    size_t get_allocated_data_size(MemID p_mem_id) const override {
+        call_log << "get_allocated_data_size(" << p_mem_id << "); ";
+        auto it = allocations.find(p_mem_id);
         if (it != allocations.end()) {
             return it->second;
         }
@@ -94,11 +97,11 @@ public:
 
 private:
     size_t max_size;
-    size_t used_size;
+    size_t used_size{0};
     std::unordered_map<MemID, size_t> allocations;
     mutable std::stringstream call_log;
 };
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

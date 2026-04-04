@@ -18,11 +18,14 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
+#include "utils/defs.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 #include <random>
@@ -202,11 +205,12 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
     for (int i = 0; i < 32; ++i) {
         int sz = dist(rng);
         WBE::MemID mem = pool.allocate(sz);
-        if (mem != WBE::MEM_NULL) mems.push_back(mem);
+        if (mem != WBE::MEM_NULL) { mems.push_back(mem);
+}
     }
     std::shuffle(mems.begin(), mems.end(), rng);
-    for (size_t i = 0; i < mems.size(); ++i) {
-        pool.deallocate(mems[i]);
+    for (unsigned long mem : mems) {
+        pool.deallocate(mem);
     }
     ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
 }

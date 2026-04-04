@@ -15,6 +15,8 @@
 from __future__ import annotations
 
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 from pathlib import Path
 import re
 import shutil
@@ -92,6 +94,12 @@ def has_remaining_lints(file_path: str, compile_commands_dir: Path) -> bool:
     return re.search(r"\b(warning|error):", output) is not None
 
 
+def fix_and_check_file(file_path: str, compile_commands_dir: Path) -> tuple[str, bool, bool]:
+    fix_result = run_clang_tidy_fix(file_path, compile_commands_dir)
+    has_unfixed_lints = has_remaining_lints(file_path, compile_commands_dir)
+    return file_path, fix_result.returncode != 0, has_unfixed_lints
+
+
 def main() -> int:
     parser = ArgumentParser(
         prog="fix_lint.py",
@@ -107,6 +115,13 @@ def main() -> int:
         type=str,
         default=None,
         help="Directory containing compile_commands.json. Auto-detected by default.",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=max(1, os.cpu_count() or 1),
+        help="Number of parallel workers used to run clang-tidy.",
     )
     args = parser.parse_args()
 
@@ -136,19 +151,28 @@ def main() -> int:
         return 0
 
     print(f"WBEFixLint: Using compile_commands from {compile_commands_dir}")
-    print(f"WBEFixLint: Lint-fixing {len(sources)} files...")
+    print(f"WBEFixLint: Lint-fixing {len(sources)} files with {args.jobs} workers...")
 
     failed_runs: list[str] = []
     unfixed_files: list[str] = []
 
-    for index, source in enumerate(sources, start=1):
-        print(f"[{index}/{len(sources)}] clang-tidy --fix {source}")
-        fix_result = run_clang_tidy_fix(source, compile_commands_dir)
-        if fix_result.returncode != 0:
-            failed_runs.append(source)
+    total_sources = len(sources)
+    completed_count = 0
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as executor:
+        future_to_source = {
+            executor.submit(fix_and_check_file, source, compile_commands_dir): source
+            for source in sources
+        }
 
-        if has_remaining_lints(source, compile_commands_dir):
-            unfixed_files.append(source)
+        for future in as_completed(future_to_source):
+            completed_count += 1
+            source = future_to_source[future]
+            print(f"[{completed_count}/{total_sources}] clang-tidy --fix {source}")
+            file_path, fix_failed, has_unfixed_lints = future.result()
+            if fix_failed:
+                failed_runs.append(file_path)
+            if has_unfixed_lints:
+                unfixed_files.append(file_path)
 
     print("WBEFixLint: Finished running clang-tidy.")
 

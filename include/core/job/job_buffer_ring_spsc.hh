@@ -20,7 +20,10 @@
 #include "core/memory/reference_strong.hh"
 #include "global/stl_allocator.hh"
 #include "job_buffer.hh"
+#include "utils/defs.hh"
+#include <atomic>
 #include <cstddef>
+#include <semaphore>
 
 namespace WhiteBirdEngine {
 

@@ -17,6 +17,7 @@
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <benchmark/benchmark.h>
 #include <cstddef>

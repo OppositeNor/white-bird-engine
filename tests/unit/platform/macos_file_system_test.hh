@@ -17,7 +17,9 @@
 
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
+#include "platform/file_system/path.hh"
 #include <gtest/gtest.h>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 

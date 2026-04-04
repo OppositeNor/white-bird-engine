@@ -17,10 +17,15 @@
 
 #include "core/logging/log.hh"
 #include "core/logging/logging_manager.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
+#include <memory>
 #include <ostream>
+#include <string>
+#include <sstream>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -38,11 +43,11 @@ public:
 
     LogTestMock(WBE::ChannelID p_channel_id, std::ostream& p_ostream)
         : channel_id(p_channel_id), ostream(&p_ostream) {
-        *ostream << "Construct " << get_channel_name(channel_id) << std::endl;
+        *ostream << "Construct " << get_channel_name(channel_id) << '\n';
     }
 
     virtual ~LogTestMock() override {
-        *ostream << "Destruct " << get_channel_name(channel_id) << std::endl;
+        *ostream << "Destruct " << get_channel_name(channel_id) << '\n';
     }
 
     WBE::ChannelID channel_id;
@@ -53,16 +58,16 @@ public:
     }
 
     virtual void message(const std::string& p_str) override {
-        *ostream << "Message " << get_channel_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Message " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 
 
     virtual void warning(const std::string& p_str) override {
-        *ostream << "Warning " << get_channel_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Warning " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 
     virtual void error(const std::string& p_str) override {
-        *ostream << "Error " << get_channel_name(channel_id) << " " << p_str << std::endl;
+        *ostream << "Error " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 };
 

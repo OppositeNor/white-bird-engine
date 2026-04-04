@@ -27,7 +27,6 @@
 #include "utils/interface/i_singleton.hh"
 #include "utils/utils.hh"
 
-#include <glm/glm.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <shared_mutex>

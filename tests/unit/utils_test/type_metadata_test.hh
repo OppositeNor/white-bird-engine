@@ -16,7 +16,9 @@
 #define WBE_FILE_TYPE_METADATA_TEST_HH
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <type_traits>
 
 struct TypeA {};
 
@@ -29,11 +31,11 @@ WBE_TYPE_METADATA(TypeB);
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBETypeMetadataTest, Hashing) {
-    constexpr uint32_t hash_hello = WBE::static_hash("Hello!");
-    constexpr uint32_t hash_hello2 = WBE::static_hash("Hello!");
-    constexpr uint32_t hash_goodbye = WBE::static_hash("Goodbye!");
-    ASSERT_EQ(hash_hello, hash_hello2);
-    ASSERT_NE(hash_hello, hash_goodbye);
+    constexpr uint32_t HASH_HELLO = WBE::static_hash("Hello!");
+    constexpr uint32_t HASH_HELLO2 = WBE::static_hash("Hello!");
+    constexpr uint32_t HASH_GOODBYE = WBE::static_hash("Goodbye!");
+    ASSERT_EQ(HASH_HELLO, HASH_HELLO2);
+    ASSERT_NE(HASH_HELLO, HASH_GOODBYE);
 }
 
 TEST(WBETypeMetadataTest, Metadata) {

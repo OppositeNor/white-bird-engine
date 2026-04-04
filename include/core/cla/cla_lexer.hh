@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -32,7 +33,7 @@ namespace WhiteBirdEngine {
 class CLALexer {
 public:
     CLALexer() = default;
-    ~CLALexer() {}
+    ~CLALexer() = default;
     CLALexer(const CLALexer&) = default;
     CLALexer(CLALexer&&) = default;
     CLALexer& operator=(const CLALexer&) = default;
@@ -72,6 +73,6 @@ private:
     }
 };
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

@@ -16,7 +16,7 @@
 #define WBE_FILE_2D_PRIMITIVES_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include <glm/glm.hpp>
+#include "glm/ext/vector_float2.hpp"
 
 namespace WhiteBirdEngine {
 

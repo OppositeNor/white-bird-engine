@@ -17,6 +17,7 @@
 
 #include "utils/defs.hh"
 #include <functional>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

@@ -20,11 +20,11 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
 #include "function/render/i_render_object.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <set>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -153,7 +153,7 @@ struct RendPipelineInfo {
      * @return *this.
      */
     RendPipelineInfo& add_resource(RendResID p_res_id, RendResTID p_type_id, Ref<IRenderObject> p_res, bool p_is_weak = false) {
-        resources.push_back({p_res_id, p_type_id, p_is_weak, p_res});
+        resources.push_back({.res_id=p_res_id, .type_id=p_type_id, .is_weak=p_is_weak, .res=p_res});
         return *this;
     }
 };
@@ -234,7 +234,7 @@ struct RendTaskInfo {
          * @return *this.
          */
         Builder& add_req_res(RendResID p_res_id, RendResTID p_type_id) {
-            req_res.push_back({p_res_id, p_type_id});
+            req_res.push_back({.res_id=p_res_id, .type_id=p_type_id});
             return *this;
         }
 

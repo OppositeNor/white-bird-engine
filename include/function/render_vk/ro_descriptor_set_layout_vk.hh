@@ -20,6 +20,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include <cstdint>
+#include <span>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {

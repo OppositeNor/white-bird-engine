@@ -18,8 +18,14 @@
 #include "core/cla/cla_parser.hh"
 #include "core/cla/cla_ast.hh"
 #include "core/cla/cla_ast_visitor.hh"
+#include "core/cla/cla_utils.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/engine_core.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
+#include <memory>
+#include <stdexcept>
 #include <vector>
 #include <string>
 
@@ -29,7 +35,7 @@ TEST(CLAParser, BasicUtilityOnly) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"test_utility", WBE::CLAToken::Type::UTILITY_NAME}
+        {.value="test_utility", .type=WBE::CLAToken::Type::UTILITY_NAME}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -47,8 +53,8 @@ TEST(CLAParser, UtilityWithSingleRootOperand) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"test_utility", WBE::CLAToken::Type::UTILITY_NAME},
-        {"input.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="test_utility", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="input.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -68,8 +74,8 @@ TEST(CLAParser, UtilityWithLongOptionOnly) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"test_utility", WBE::CLAToken::Type::UTILITY_NAME},
-        {"--help", WBE::CLAToken::Type::OPTION_LONG}
+        {.value="test_utility", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="--help", .type=WBE::CLAToken::Type::OPTION_LONG}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -89,8 +95,8 @@ TEST(CLAParser, UtilityWithShortOptionOnly) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"test_utility", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-v", WBE::CLAToken::Type::OPTION_SHORT}
+        {.value="test_utility", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-v", .type=WBE::CLAToken::Type::OPTION_SHORT}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -110,9 +116,9 @@ TEST(CLAParser, LongOptionWithArgument) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"compiler", WBE::CLAToken::Type::UTILITY_NAME},
-        {"--output", WBE::CLAToken::Type::OPTION_LONG},
-        {"program.exe", WBE::CLAToken::Type::OPERAND}
+        {.value="compiler", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="--output", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="program.exe", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -134,9 +140,9 @@ TEST(CLAParser, ShortOptionWithArgument) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"logger", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-l", WBE::CLAToken::Type::OPTION_SHORT},
-        {"debug", WBE::CLAToken::Type::OPERAND}
+        {.value="logger", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-l", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="debug", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -158,10 +164,10 @@ TEST(CLAParser, OptionWithMultipleArguments) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"compiler", WBE::CLAToken::Type::UTILITY_NAME},
-        {"--include", WBE::CLAToken::Type::OPTION_LONG},
-        {"/usr/include", WBE::CLAToken::Type::OPERAND},
-        {"/opt/include", WBE::CLAToken::Type::OPERAND}
+        {.value="compiler", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="--include", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="/usr/include", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="/opt/include", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -184,13 +190,13 @@ TEST(CLAParser, MultipleOperationsAndOperands) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"gcc", WBE::CLAToken::Type::UTILITY_NAME},
-        {"main.cpp", WBE::CLAToken::Type::OPERAND},
-        {"--output", WBE::CLAToken::Type::OPTION_LONG},
-        {"program", WBE::CLAToken::Type::OPERAND},
-        {"-O", WBE::CLAToken::Type::OPTION_SHORT},
-        {"3", WBE::CLAToken::Type::OPERAND},
-        {"--verbose", WBE::CLAToken::Type::OPTION_LONG}
+        {.value="gcc", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="main.cpp", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--output", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="program", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="-O", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="3", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--verbose", .type=WBE::CLAToken::Type::OPTION_LONG}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -217,12 +223,12 @@ TEST(CLAParser, MixedRootOperandsAndOptions) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"processor", WBE::CLAToken::Type::UTILITY_NAME},
-        {"file1.txt", WBE::CLAToken::Type::OPERAND},
-        {"file2.txt", WBE::CLAToken::Type::OPERAND},
-        {"--format", WBE::CLAToken::Type::OPTION_LONG},
-        {"json", WBE::CLAToken::Type::OPERAND},
-        {"-v", WBE::CLAToken::Type::OPTION_SHORT}
+        {.value="processor", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="file1.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="file2.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--format", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="json", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="-v", .type=WBE::CLAToken::Type::OPTION_SHORT}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -247,19 +253,19 @@ TEST(CLAParser, ComplexRealWorldExample) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"g++", WBE::CLAToken::Type::UTILITY_NAME},
-        {"main.cpp", WBE::CLAToken::Type::OPERAND},
-        {"utils.cpp", WBE::CLAToken::Type::OPERAND},
-        {"--std", WBE::CLAToken::Type::OPTION_LONG},
-        {"c++17", WBE::CLAToken::Type::OPERAND},
-        {"-O", WBE::CLAToken::Type::OPTION_SHORT},
-        {"3", WBE::CLAToken::Type::OPERAND},
-        {"--output", WBE::CLAToken::Type::OPTION_LONG},
-        {"program", WBE::CLAToken::Type::OPERAND},
-        {"--include", WBE::CLAToken::Type::OPTION_LONG},
-        {"/usr/include", WBE::CLAToken::Type::OPERAND},
-        {"/opt/include", WBE::CLAToken::Type::OPERAND},
-        {"--debug", WBE::CLAToken::Type::OPTION_LONG}
+        {.value="g++", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="main.cpp", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="utils.cpp", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--std", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="c++17", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="-O", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="3", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--output", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="program", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--include", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="/usr/include", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="/opt/include", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="--debug", .type=WBE::CLAToken::Type::OPTION_LONG}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -294,11 +300,11 @@ TEST(CLAParser, ConsecutiveOptions) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"utility", WBE::CLAToken::Type::UTILITY_NAME},
-        {"--verbose", WBE::CLAToken::Type::OPTION_LONG},
-        {"--debug", WBE::CLAToken::Type::OPTION_LONG},
-        {"-h", WBE::CLAToken::Type::OPTION_SHORT},
-        {"--help", WBE::CLAToken::Type::OPTION_LONG}
+        {.value="utility", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="--verbose", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="--debug", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="-h", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="--help", .type=WBE::CLAToken::Type::OPTION_LONG}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -321,7 +327,7 @@ TEST(CLAParser, ErrorInvalidFirstToken) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"--invalid", WBE::CLAToken::Type::OPTION_LONG}
+        {.value="--invalid", .type=WBE::CLAToken::Type::OPTION_LONG}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -332,8 +338,8 @@ TEST(CLAParser, ErrorInvalidTokenInRootOperand) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"utility", WBE::CLAToken::Type::UTILITY_NAME},
-        {"invalid_utility", WBE::CLAToken::Type::UTILITY_NAME}
+        {.value="utility", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="invalid_utility", .type=WBE::CLAToken::Type::UTILITY_NAME}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -344,11 +350,11 @@ TEST(CLAParser, OptionsWithNoArgumentsFollowedByMoreOptions) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"test", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-v", WBE::CLAToken::Type::OPTION_SHORT},
-        {"--debug", WBE::CLAToken::Type::OPTION_LONG},
-        {"--output", WBE::CLAToken::Type::OPTION_LONG},
-        {"file.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="test", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-v", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="--debug", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="--output", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="file.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -372,8 +378,8 @@ TEST(CLAParser, SingleRootOperandOnly) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"cat", WBE::CLAToken::Type::UTILITY_NAME},
-        {"file.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="cat", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="file.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -393,10 +399,10 @@ TEST(CLAParser, MultipleRootOperands) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
 
     std::vector<WBE::CLAToken> tokens = {
-        {"concat", WBE::CLAToken::Type::UTILITY_NAME},
-        {"file1.txt", WBE::CLAToken::Type::OPERAND},
-        {"file2.txt", WBE::CLAToken::Type::OPERAND},
-        {"file3.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="concat", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="file1.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="file2.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="file3.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
 
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -419,8 +425,8 @@ TEST(CLAParser, MultipleShortOptionsInOnePrefix) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
     std::vector<WBE::CLAToken> tokens = {
-        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-abc", WBE::CLAToken::Type::OPTION_SHORT}
+        {.value="tool", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-abc", .type=WBE::CLAToken::Type::OPTION_SHORT}
     };
     
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -443,9 +449,9 @@ TEST(CLAParser, SingleShortOptionWithArgument) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
     std::vector<WBE::CLAToken> tokens = {
-        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-o", WBE::CLAToken::Type::OPTION_SHORT},
-        {"output.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="tool", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-o", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="output.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
     
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -468,10 +474,10 @@ TEST(CLAParser, MultipleShortOptionsFollowedByLongOption) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
     std::vector<WBE::CLAToken> tokens = {
-        {"compiler", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-gO", WBE::CLAToken::Type::OPTION_SHORT},
-        {"--std", WBE::CLAToken::Type::OPTION_LONG},
-        {"c++17", WBE::CLAToken::Type::OPERAND}
+        {.value="compiler", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-gO", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="--std", .type=WBE::CLAToken::Type::OPTION_LONG},
+        {.value="c++17", .type=WBE::CLAToken::Type::OPERAND}
     };
     
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -496,12 +502,12 @@ TEST(CLAParser, MixedSingleAndMultipleShortOptions) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
     std::vector<WBE::CLAToken> tokens = {
-        {"tool", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-f", WBE::CLAToken::Type::OPTION_SHORT},
-        {"file.txt", WBE::CLAToken::Type::OPERAND},
-        {"-vdx", WBE::CLAToken::Type::OPTION_SHORT},
-        {"-o", WBE::CLAToken::Type::OPTION_SHORT},
-        {"output.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="tool", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-f", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="file.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="-vdx", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="-o", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="output.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
     
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());
@@ -530,10 +536,10 @@ TEST(CLAParser, MultipleShortOptionsWithOperands) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     
     std::vector<WBE::CLAToken> tokens = {
-        {"ls", WBE::CLAToken::Type::UTILITY_NAME},
-        {"-la", WBE::CLAToken::Type::OPTION_SHORT},
-        {"file1.txt", WBE::CLAToken::Type::OPERAND},
-        {"file2.txt", WBE::CLAToken::Type::OPERAND}
+        {.value="ls", .type=WBE::CLAToken::Type::UTILITY_NAME},
+        {.value="-la", .type=WBE::CLAToken::Type::OPTION_SHORT},
+        {.value="file1.txt", .type=WBE::CLAToken::Type::OPERAND},
+        {.value="file2.txt", .type=WBE::CLAToken::Type::OPERAND}
     };
     
     auto parser = WBE::make_ref<WBE::CLAParser>(WBE::global_allocator());

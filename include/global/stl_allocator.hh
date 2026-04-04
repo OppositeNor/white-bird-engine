@@ -17,12 +17,15 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
+#include <cstddef>
 #include <deque>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
 #include <type_traits>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 namespace WhiteBirdEngine {
 

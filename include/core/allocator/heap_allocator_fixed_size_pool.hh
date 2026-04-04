@@ -23,8 +23,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))

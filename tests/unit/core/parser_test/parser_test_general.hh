@@ -16,6 +16,10 @@
 #define WBE_FILE_PARSER_TEST_GENERAL_HH
 
 #include "core/parser/parser.hh"
+#include <gtest/gtest.h>
+#include <string>
+#include <cstdint>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -49,10 +53,10 @@ void test_parser_general(WBE::Parser<T>& p_parser,
     p_parser.parse_from_buffer(p_test_buff3);
     ASSERT_STREQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<std::string>("test_key1").c_str(), "test_val1");
     ASSERT_EQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<int32_t>("test_key2"), 123);
-    ASSERT_DOUBLE_EQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<double>("test_key3"), 3.1415926);
+    ASSERT_DOUBLE_EQ(p_parser.template get_value<typename T::DataType>("test_pair").template get_value<double>("test_key3"), 3.14);
     ASSERT_STREQ(p_parser.get_data().template get_value<typename T::DataType>("test_pair").template get_value<std::string>("test_key1").c_str(), "test_val1");
     ASSERT_EQ(p_parser.get_data().template get_value<typename T::DataType>("test_pair").template get_value<int32_t>("test_key2"), 123);
-    ASSERT_DOUBLE_EQ(p_parser.get_data().template get_value<typename T::DataType>("test_pair").template get_value<double>("test_key3"), 3.1415926);
+    ASSERT_DOUBLE_EQ(p_parser.get_data().template get_value<typename T::DataType>("test_pair").template get_value<double>("test_key3"), 3.14);
 }
 
 

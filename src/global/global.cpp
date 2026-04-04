@@ -14,7 +14,9 @@
 */
 #include "global/global.hh"
 #include "core/engine_core.hh"
+#include "core/memory/unique.hh"
 #include "function/engine_function.hh"
+#include "platform/file_system/directory.hh"
 #include "resource/engine_resource.hh"
 
 namespace WhiteBirdEngine {

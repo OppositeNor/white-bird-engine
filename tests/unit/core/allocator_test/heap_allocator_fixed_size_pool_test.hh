@@ -16,9 +16,13 @@
 #define WBE_FILE_HEAP_ALLOCATOR_FIXED_SIZE_POOL_TEST_HH
 
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
+#include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <cstddef>
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 

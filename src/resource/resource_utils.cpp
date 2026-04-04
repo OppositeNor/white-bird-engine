@@ -14,20 +14,24 @@
 */
 #include "resource/resource_utils.hh"
 #include "platform/file_system/file_system.hh"
+#include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <ios>
 #include <memory>
+#include <sstream>
 #include <stb_image.h>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
 namespace WhiteBirdEngine {
 
 static std::string remove_ppm_comments(std::string p_file_content) {
-    while (p_file_content.find('#') != std::string::npos) {
+    while (p_file_content.contains('#')) {
         size_t pos = p_file_content.find('#');
         size_t end = p_file_content.find('\n', pos);
         p_file_content.erase(pos, end - pos);

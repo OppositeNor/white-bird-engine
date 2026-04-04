@@ -25,7 +25,6 @@
 #include <cstdint>
 #include <limits>
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/shared_mutex.hpp>
 #include <string>
 
 #define WBE_HAAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK

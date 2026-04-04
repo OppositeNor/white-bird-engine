@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_BUFFER_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -25,6 +26,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <set>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 

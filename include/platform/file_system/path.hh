@@ -17,7 +17,10 @@
 
 #include "platform/file_system/directory.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <ostream>
 #include <string>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

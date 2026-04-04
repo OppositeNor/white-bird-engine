@@ -12,5 +12,5 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION // NOLINT
 #include "stb_image.h"

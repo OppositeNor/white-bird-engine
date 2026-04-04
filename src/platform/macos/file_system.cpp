@@ -14,9 +14,14 @@
 */
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <stdexcept>
 #include <string>
+#include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -32,7 +37,7 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
     auto splitted = split_string(p_str, '/');
-    if (splitted.size() == 0) {
+    if (splitted.empty()) {
         return Directory();
     }
     std::vector<std::string> path_stack;
@@ -44,18 +49,18 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
             }
             continue;
         }
-        if (dir_name == "." || dir_name == "") {
+        if (dir_name == "." || dir_name.empty()) {
             continue;
         }
         path_stack.push_back(dir_name);
     }
-    return Directory(path_stack, p_str.size() != 0 && p_str[0] == '/');
+    return Directory(path_stack, !p_str.empty() && p_str[0] == '/');
 }
 
 std::string FileSystem::dir_to_string(const Directory& p_directory) {
     std::string result = p_directory.get_is_absolute() ? "/" : "";
-    auto& dir_names = p_directory.get_dir_names();
-    for (auto& dir_name : dir_names) {
+    const auto& dir_names = p_directory.get_dir_names();
+    for (const auto& dir_name : dir_names) {
         result += dir_name + "/";
     }
     return result;
@@ -83,7 +88,7 @@ std::string FileSystem::path_to_string(const Path& p_path) {
 }
 
 std::string FileSystem::get_ext(const Path& p_path) {
-    auto& file_name = p_path.get_file_name();
+    const auto& file_name = p_path.get_file_name();
     size_t ext_dest = file_name.find_last_of('.');
     if (ext_dest == 0 || ext_dest == std::string::npos) {
         return "";
@@ -92,8 +97,8 @@ std::string FileSystem::get_ext(const Path& p_path) {
 }
 
 Directory FileSystem::get_executable_dir() {
-    Buffer<1024> buf;
-    ssize_t len = readlink("/proc/self/exe", buf.buffer, buf.BUFFER_SIZE);
+    Buffer<1024> buf{};
+    ssize_t len = readlink("/proc/self/exe", buf.buffer, WhiteBirdEngine::Buffer<1024>::BUFFER_SIZE);
     if (len < 0) {
         throw std::runtime_error("Failed to get the executable path.");
     }
@@ -105,5 +110,5 @@ Directory FileSystem::get_executable_dir() {
 }
 
 
-}
+}  // namespace WhiteBirdEngine
 

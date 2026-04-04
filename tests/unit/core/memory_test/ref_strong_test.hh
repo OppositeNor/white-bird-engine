@@ -15,12 +15,18 @@
 #ifndef WBE_FILE_REF_STRONG_TEST_HH
 #define WBE_FILE_REF_STRONG_TEST_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <cstdint>
+#include <cstdlib>
 #include <gtest/gtest.h>
+#include <memory>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -95,8 +101,7 @@ TEST_F(WBERefStrongTest, ConstructDestruct) {
         ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
         ASSERT_EQ(test_val, 1);
         {
-            WBE::Ref<TestClass> ref1 = ref;
-            ASSERT_EQ(test_val, 1);
+                       ASSERT_EQ(test_val, 1);
         }
         ASSERT_EQ(test_val, 1);
     }
@@ -108,7 +113,7 @@ TEST_F(WBERefStrongTest, DynamicDispatch) {
     class A {
     public:
         A() = default;
-        virtual ~A() {}
+        virtual ~A() = default;
 
         virtual void func() {
             num = 1;
@@ -120,7 +125,7 @@ TEST_F(WBERefStrongTest, DynamicDispatch) {
     class B : public A {
     public:
         B() = default;
-        virtual ~B() override {}
+        virtual ~B() override = default;
         virtual void func() override {
             num = 2;
         }
@@ -264,7 +269,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     // Test successful downcast (Base -> Derived)
     {
         WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
-        static_cast<DerivedClass*>(base_ref.get())->derived_value = 999;
+        dynamic_cast<DerivedClass*>(base_ref.get())->derived_value = 999;
         
         WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
         ASSERT_NE(derived_ref, nullptr);
@@ -321,7 +326,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     // Test side cast (Derived1 -> Derived2 through common base)
     {
         WBE::Ref<BaseClass> base_ref = WBE::Ref<AnotherClass>::make_ref(&allocator);
-        static_cast<AnotherClass*>(base_ref.get())->another_value = 555;
+        dynamic_cast<AnotherClass*>(base_ref.get())->another_value = 555;
         
         // This should fail since AnotherClass is not DerivedClass
         WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();

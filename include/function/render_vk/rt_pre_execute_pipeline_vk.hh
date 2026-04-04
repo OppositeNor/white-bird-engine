@@ -15,8 +15,11 @@
 #ifndef WBE_FILE_RT_PRE_EXECUTE_PIPELINE_VK_HH
 #define WBE_FILE_RT_PRE_EXECUTE_PIPELINE_VK_HH
 
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/semaphore_vk.hh"
 #include "utils/defs.hh"
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {

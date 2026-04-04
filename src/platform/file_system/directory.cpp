@@ -14,7 +14,12 @@
 */
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
+#include <cstddef>
 #include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 

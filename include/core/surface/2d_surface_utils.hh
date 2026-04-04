@@ -18,6 +18,7 @@
 #include "utils/defs.hh"
 
 #include <glm/glm.hpp>
+#include <cstdlib>
 #include <cstdint>
 #include <stdexcept>
 
@@ -100,10 +101,11 @@ private:
             glm::vec2 vert_next_pos = get_vert(p_vertex_list, p_vert_count, p_index + 1)->position;
             glm::vec2 vert_prev_pos = get_vert(p_vertex_list, p_vert_count, p_index - 1)->position;
             glm::vec2 vert_pos = get_vert(p_vertex_list, p_vert_count, p_index)->position;
-            if (cross_vec2(i_pos - vert_prev_pos, vert_next_pos - vert_pos) < 0.0f
-                && cross_vec2(i_pos - vert_next_pos, vert_pos - i_pos) < 0.0f
-                && cross_vec2(i_pos - vert_pos, vert_prev_pos - i_pos) < 0.0f)
+            if (cross_vec2(i_pos - vert_prev_pos, vert_next_pos - vert_pos) < 0.0F
+                && cross_vec2(i_pos - vert_next_pos, vert_pos - i_pos) < 0.0F
+                && cross_vec2(i_pos - vert_pos, vert_prev_pos - i_pos) < 0.0F) {
                 return false;
+}
         }
         return true;
     }
@@ -111,6 +113,6 @@ private:
 
 
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

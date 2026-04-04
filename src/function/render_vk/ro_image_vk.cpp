@@ -13,12 +13,15 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
-#include <vulkan/vulkan_raii.hpp>
+#include <glm/glm.hpp>
+#include <set>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -154,7 +157,7 @@ VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = WBE_REQUIRED(usage);
     create_info.initialLayout = initial_image_layout;
-    WBE_DEBUG_ASSERT(queue_family_indices.size() >= 1);
+    WBE_DEBUG_ASSERT(!queue_family_indices.empty());
     if (queue_family_indices.size() == 1) {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }

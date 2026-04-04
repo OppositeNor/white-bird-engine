@@ -14,9 +14,12 @@
 */
 
 #include "function/input_manager/input_manager.hh"
+#include "function/input_manager/key_codes.hh"
+#include <cstdint>
+#include <atomic>
 
-#define WBE_SET_ATOMIC_BITSET_TRUE(bitset, index) (bitset[index / 8].fetch_or(static_cast<uint8_t>(0b1 << (index % 8)), std::memory_order_release))
-#define WBE_SET_ATOMIC_BITSET_FALSE(bitset, index) (bitset[index / 8].fetch_and(static_cast<uint8_t>(~(0b1 << (index % 8))), std::memory_order_release))
+#define WBE_SET_ATOMIC_BITSET_TRUE(bitset, index) ((bitset)[(index) / 8].fetch_or(static_cast<uint8_t>(0b1 << ((index) % 8)), std::memory_order_release))
+#define WBE_SET_ATOMIC_BITSET_FALSE(bitset, index) ((bitset)[(index) / 8].fetch_and(static_cast<uint8_t>(~(0b1 << ((index) % 8))), std::memory_order_release))
 
 namespace WhiteBirdEngine {
 

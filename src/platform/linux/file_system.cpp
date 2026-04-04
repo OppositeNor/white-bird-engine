@@ -14,9 +14,14 @@
 */
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <stdexcept>
 #include <string>
+#include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -32,7 +37,7 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
 
 Directory FileSystem::parse_directory(const std::string& p_str) {
     auto splitted = split_string(p_str, '/');
-    if (splitted.size() == 0) {
+    if (splitted.empty()) {
         return Directory();
     }
     std::vector<std::string> path_stack;
@@ -44,12 +49,12 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
             }
             continue;
         }
-        if (dir_name == "." || dir_name == "") {
+        if (dir_name == "." || dir_name.empty()) {
             continue;
         }
         path_stack.push_back(dir_name);
     }
-    return Directory(path_stack, p_str.size() != 0 && p_str[0] == '/');
+    return Directory(path_stack, !p_str.empty() && p_str[0] == '/');
 }
 
 std::string FileSystem::dir_to_string(const Directory& p_directory) {

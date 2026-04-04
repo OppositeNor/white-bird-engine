@@ -23,7 +23,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-inline std::string general_test_str1 = \
+inline const std::string GENERAL_TEST_STR1 = \
 R"(
 # this is a comment
 fruit: apple # another comment
@@ -31,14 +31,14 @@ vegetable: "lettice"
 number: 123
 )";
 
-inline std::string general_test_str2 = \
+inline const std::string GENERAL_TEST_STR2 = \
 R"(
 # this is a comment
 vegetable: "lettice"
 numbers: [123, -200, 5, 60, -123]
 )";
 
-inline std::string general_test_str2_ident = \
+inline const std::string GENERAL_TEST_STR2_IDENT = \
 R"(
 # this is a comment
 vegetable: "lettice"
@@ -50,12 +50,12 @@ numbers:
     - -123
 )";
 
-inline std::string general_test_str3 = \
+inline const std::string GENERAL_TEST_STR3 = \
 R"(
 test_pair:
     test_key1: test_val1
     test_key2: 123
-    test_key3: 3.1415926
+    test_key3: 3.14
 numbers:
     - 123
     - -200
@@ -66,8 +66,8 @@ numbers:
 
 TEST(ParserYAMLTest, ParseFromBuffer) {
     WBE::ParserYAML parser;
-    test_parser_general(parser, general_test_str1, general_test_str2, general_test_str3);
-    test_parser_general(parser, general_test_str1, general_test_str2_ident, general_test_str3);
+    test_parser_general(parser, GENERAL_TEST_STR1, GENERAL_TEST_STR2, GENERAL_TEST_STR3);
+    test_parser_general(parser, GENERAL_TEST_STR1, GENERAL_TEST_STR2_IDENT, GENERAL_TEST_STR3);
 }
 
 // Test edge cases
@@ -260,9 +260,9 @@ special_chars: "Line1\nLine2\tTab\"Quote'"
     parser.parse_from_buffer(yaml_data);
     
     // Test retrieving into different buffer sizes
-    WBE::Buffer<16> small_buffer;
-    WBE::Buffer<64> medium_buffer;
-    WBE::Buffer<128> large_buffer;
+    WBE::Buffer<16> small_buffer{};
+    WBE::Buffer<64> medium_buffer{};
+    WBE::Buffer<128> large_buffer{};
     
     // Test short text fits in all buffers
     std::string key = "short_text";
@@ -304,12 +304,12 @@ long_text: "This is a very long text that exceeds small buffer capacity"
     parser.parse_from_buffer(yaml_data);
     
     // Test that attempting to retrieve long text into small buffer throws exception
-    WBE::Buffer<16> small_buffer;
+    WBE::Buffer<16> small_buffer{};
     std::string key = "long_text";
     ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
     
     // Test that it works with appropriately sized buffer
-    WBE::Buffer<128> large_buffer;
+    WBE::Buffer<128> large_buffer{};
     ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
     ASSERT_STREQ(large_buffer.buffer, "This is a very long text that exceeds small buffer capacity");
 }
@@ -324,7 +324,7 @@ max_text: "123456789012345"
     
     parser.parse_from_buffer(yaml_data);
     
-    WBE::Buffer<16> buffer;
+    WBE::Buffer<16> buffer{};
     std::string key = "max_text";
     parser.get_data().get_value(key, buffer);
     ASSERT_STREQ(buffer.buffer, "123456789012345");
@@ -357,7 +357,7 @@ multiline_folded: >
     parser.parse_from_buffer(yaml_data);
     
     // Test multiline literal retrieval
-    WBE::Buffer<128> buffer;
+    WBE::Buffer<128> buffer{};
     std::string key = "multiline_literal";
     parser.get_data().get_value(key, buffer);
     ASSERT_TRUE(strstr(buffer.buffer, "This is a literal\nmultiline string") != nullptr);
@@ -629,30 +629,30 @@ v4:
     parser.parse_from_buffer(glm_yaml);
 
     glm::vec2 v2 = parser.get_value<glm::vec2>("v2");
-    ASSERT_FLOAT_EQ(v2.x, 1.5f);
-    ASSERT_FLOAT_EQ(v2.y, 2.5f);
+    ASSERT_FLOAT_EQ(v2.x, 1.5F);
+    ASSERT_FLOAT_EQ(v2.y, 2.5F);
 
     glm::vec3 v3 = parser.get_value<glm::vec3>("v3");
-    ASSERT_FLOAT_EQ(v3.x, 1.0f);
-    ASSERT_FLOAT_EQ(v3.y, 2.0f);
-    ASSERT_FLOAT_EQ(v3.z, 3.0f);
+    ASSERT_FLOAT_EQ(v3.x, 1.0F);
+    ASSERT_FLOAT_EQ(v3.y, 2.0F);
+    ASSERT_FLOAT_EQ(v3.z, 3.0F);
 
     glm::vec4 v4 = parser.get_value<glm::vec4>("v4");
-    ASSERT_FLOAT_EQ(v4.x, -1.25f);
-    ASSERT_FLOAT_EQ(v4.y, 0.0f);
-    ASSERT_FLOAT_EQ(v4.z, 4.5f);
-    ASSERT_FLOAT_EQ(v4.w, 8.75f);
+    ASSERT_FLOAT_EQ(v4.x, -1.25F);
+    ASSERT_FLOAT_EQ(v4.y, 0.0F);
+    ASSERT_FLOAT_EQ(v4.z, 4.5F);
+    ASSERT_FLOAT_EQ(v4.w, 8.75F);
 
     glm::vec2 v2ip;
     parser.get_value<glm::vec2>("v2", v2ip);
-    ASSERT_FLOAT_EQ(v2ip.x, 1.5f);
-    ASSERT_FLOAT_EQ(v2ip.y, 2.5f);
+    ASSERT_FLOAT_EQ(v2ip.x, 1.5F);
+    ASSERT_FLOAT_EQ(v2ip.y, 2.5F);
 
     glm::vec3 v3ip;
     parser.get_value<glm::vec3>("v3", v3ip);
-    ASSERT_FLOAT_EQ(v3ip.x, 1.0f);
-    ASSERT_FLOAT_EQ(v3ip.y, 2.0f);
-    ASSERT_FLOAT_EQ(v3ip.z, 3.0f);
+    ASSERT_FLOAT_EQ(v3ip.x, 1.0F);
+    ASSERT_FLOAT_EQ(v3ip.y, 2.0F);
+    ASSERT_FLOAT_EQ(v3ip.z, 3.0F);
 
     glm::vec4 v4ip;
     parser.get_value<glm::vec4>("v4", v4ip);

@@ -19,6 +19,7 @@
 #include "platform/file_system/file_system.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -59,20 +60,20 @@ TEST(WindowsFileSystemTest, DirToString) {
 
 TEST(WindowsFileSystemTest, ParseDirectory) {
     WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
-    WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello\\world\\\\this\\is\\not\\..\\a\\test\\.\\directory\\XD");
+    WBE::Directory parsed_dir = WBE::FileSystem::parse_directory(R"(hello\world\\this\is\not\..\a\test\.\directory\XD)");
     ASSERT_TRUE(parsed_dir == expected);
-    WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory("..\\hello\\world\\this\\\\\\is\\not\\..\\a\\test\\.\\directory\\XD\\..\\");
+    WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory(R"(..\hello\world\this\\\is\not\..\a\test\.\directory\XD\..\)");
     ASSERT_TRUE(parsed_dir_1 == expected);
-    WBE::Directory parsed_dir_2 = WBE::FileSystem::parse_directory(".\\hello\\world\\this\\is\\not\\\\..\\a\\test\\.\\directory\\XD\\..\\");
+    WBE::Directory parsed_dir_2 = WBE::FileSystem::parse_directory(R"(.\hello\world\this\is\not\\..\a\test\.\directory\XD\..\)");
     ASSERT_TRUE(parsed_dir_2 == expected);
     WBE::Directory expected_absolute({ "D:", "hello", "this", "is", "me" }, true);
-    WBE::Directory parsed_dir_absolute = WBE::FileSystem::parse_directory("D:\\..\\hello\\this\\is\\me\\");
+    WBE::Directory parsed_dir_absolute = WBE::FileSystem::parse_directory(R"(D:\..\hello\this\is\me\)");
     ASSERT_TRUE(parsed_dir_absolute == expected_absolute);
-    WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory("D:\\.\\..\\hello\\that\\..\\\\this\\\\is\\\\\\\\\\me\\XD\\");
+    WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory(R"(D:\.\..\hello\that\..\\this\\is\\\\\me\XD\)");
     ASSERT_TRUE(parsed_dir_absolute_1 == expected_absolute);
-    WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory("D:\\..\\hello\\this\\is\\me\\\\");
+    WBE::Directory parsed_dir_absolute_2 = WBE::FileSystem::parse_directory(R"(D:\..\hello\this\is\me\\)");
     ASSERT_TRUE(parsed_dir_absolute_2 == expected_absolute);
-    WBE::Directory parsed_dir_relataive = WBE::FileSystem::parse_directory("C\\this\\is\\relative\\but\\looks\\absolute");
+    WBE::Directory parsed_dir_relataive = WBE::FileSystem::parse_directory(R"(C\this\is\relative\but\looks\absolute)");
     WBE::Directory expected_relative({ "C", "this", "is", "relative", "but", "looks", "absolute" }, false);
     // Colon is only allowed in volume indication.
     ASSERT_THROW(WBE::Directory parsed_dir_absolute_invalid_1 = WBE::FileSystem::parse_directory("D:\\..\\hello\\th:is\\is\\me\\\\"), std::runtime_error);
@@ -94,24 +95,24 @@ TEST(WindowsFileSystemTest, ParseDirectoryEmptyEdgeCases) {
     ASSERT_TRUE(parsed_empty == expected_empty);
     
     // String with only separators and dots should result in appropriate directories
-    WBE::Directory parsed_dots_only = WBE::FileSystem::parse_directory(".\\.\\.\\.\\.");
+    WBE::Directory parsed_dots_only = WBE::FileSystem::parse_directory(R"(.\.\.\.\.)");
     ASSERT_TRUE(parsed_dots_only == expected_empty);
     
     // String with only double dots that cancel out
-    WBE::Directory parsed_cancelled = WBE::FileSystem::parse_directory("..\\dir\\..\\");
+    WBE::Directory parsed_cancelled = WBE::FileSystem::parse_directory(R"(..\dir\..\)");
     ASSERT_TRUE(parsed_cancelled == expected_empty);
     
     // Multiple backslashes should be treated as single separators
-    WBE::Directory parsed_multiple_slashes = WBE::FileSystem::parse_directory("C:\\\\\\");
+    WBE::Directory parsed_multiple_slashes = WBE::FileSystem::parse_directory(R"(C:\\\)");
     WBE::Directory expected_absolute_empty({"C:"}, true);
     ASSERT_TRUE(parsed_multiple_slashes == expected_absolute_empty);
     
     // Complex case that results in empty after processing
-    WBE::Directory parsed_complex_empty = WBE::FileSystem::parse_directory(".\\a\\..\\b\\..\\c\\..\\");
+    WBE::Directory parsed_complex_empty = WBE::FileSystem::parse_directory(R"(.\a\..\b\..\c\..\)");
     ASSERT_TRUE(parsed_complex_empty == expected_empty);
     
     // Verify splitted.size() == 0 condition is properly handled with Windows paths
-    WBE::Directory parsed_only_separators = WBE::FileSystem::parse_directory("D:\\\\\\\\");
+    WBE::Directory parsed_only_separators = WBE::FileSystem::parse_directory(R"(D:\\\\)");
     WBE::Directory expected_d_empty({"D:"}, true);
     ASSERT_TRUE(parsed_only_separators == expected_d_empty);
 }

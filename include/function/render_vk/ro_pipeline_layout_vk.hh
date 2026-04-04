@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_PIPELINE_LAYOUT_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"

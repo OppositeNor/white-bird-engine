@@ -15,13 +15,16 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_HH
 #define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_HH
 
+#include "boost/thread/pthread/shared_mutex.hpp"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
 #include "utils/defs.hh"
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include <cstdint>
+#include <cstddef>
 #include <limits>
 #include <memory>
+#include <string>
 
 namespace WhiteBirdEngine {
 

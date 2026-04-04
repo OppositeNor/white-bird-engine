@@ -16,12 +16,15 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "core/allocator/heap_allocator_pool.hh"
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

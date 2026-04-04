@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_SYSTEMS_HH
 #define WBE_FILE_SYSTEMS_HH
 
-#include <glm/glm.hpp>
 #include <entt/entt.hpp>
 
 namespace WhiteBirdEngine {

@@ -17,6 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
 namespace WhiteBirdEngine {
 
 class Material {

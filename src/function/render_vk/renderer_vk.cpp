@@ -15,6 +15,8 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
+#include "core/job/job_buffer_ring_spsc.hh"
+#include "core/job/job.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -30,25 +32,31 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
+#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
 #include "function/render_vk/material_vk.hh"
+#include "function/window/i_window.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <functional>
+#include <limits>
 #include <map>
 #include <ranges>
 #include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
-#include <unistd.h>
+#include <utility>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -88,7 +96,7 @@ void RendererVK::tick(double p_delta) {
     }
 
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
-    if (run_pipeline.size() == 0) {
+    if (run_pipeline.empty()) {
         stdout_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
         return;
     }
@@ -322,7 +330,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.descriptor_pool = descriptor_pool;
     base_render_data.current_frame = 1;
-    if (in_flight_fences.size() > 0) {
+    if (!in_flight_fences.empty()) {
         base_render_data.in_flight_fence = in_flight_fences[0];
     }
     else {
@@ -784,7 +792,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
     int32_t pick_device_index = game_config.render_device_index;
     if (pick_device_index >= 0) {
         // The refered device index is provided, use the index to pick device. If failed to pick, fall back to automatic picking.
-        if (pick_device_index >= static_cast<int32_t>(p_physical_devices.size())) {
+        if (std::cmp_greater_equal(pick_device_index ,p_physical_devices.size())) {
             // Index out of range.
             stdout_log(WBE_CHANNEL_DEBUG)->warning(std::format(
                 "Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). Picking"
@@ -941,7 +949,7 @@ RendererVK::Vector<Ref<RendererVK::PipelineInfo>> RendererVK::compile_pipeline(c
     if (p_pipeline_info.root_task == MEM_NULL) {
         throw std::runtime_error("Root task of a render pipeline cannot be NULL.");
     }
-    if (p_pipeline_info.root_task->prev.size() != 0) {
+    if (!p_pipeline_info.root_task->prev.empty()) {
         throw std::runtime_error("The first task of the render pipeline must not have any previous tasks.");
     }
     Vector<Ref<RendererVK::PipelineInfo>> pipeline_infos(allocator);

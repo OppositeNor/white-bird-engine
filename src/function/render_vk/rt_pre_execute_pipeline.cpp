@@ -13,8 +13,13 @@
    limitations under the License.
 */
 #include "core/allocator/i_allocator.hh"
+#include "function/render_vk/render_vk_defs.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
+#include "function/render_vk/semaphore_vk.hh"
 #include "utils/defs.hh"
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 

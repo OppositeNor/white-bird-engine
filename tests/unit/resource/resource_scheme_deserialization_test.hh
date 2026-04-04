@@ -15,7 +15,9 @@
 #ifndef WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 #define WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 
+#include <exception>
 #include <gtest/gtest.h>
+#include <memory>
 #include <string>
 #include "core/parser/parser_json.hh"
 #include "global/global.hh"

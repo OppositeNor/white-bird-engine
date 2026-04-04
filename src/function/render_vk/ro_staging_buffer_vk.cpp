@@ -14,8 +14,15 @@
 */
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/function_utils.hh"
+#include "function/render_vk/render_vk_defs.hh"
+#include "utils/defs.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "utils/utils.hh"
+#include <cstdint>
+#include <cstddef>
+#include <format>
 #include <stdexcept>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

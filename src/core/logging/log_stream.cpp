@@ -14,6 +14,7 @@
 */
 #include "core/logging/log_stream.hh"
 #include "core/engine_core.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 void LogStream::message(const std::string& p_str) {

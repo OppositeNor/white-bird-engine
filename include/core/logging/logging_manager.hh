@@ -20,6 +20,9 @@
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <cstddef>
+#include <cstdint>
+#include "utils/utils.hh"
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>

@@ -18,11 +18,14 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_render_pass_vk.hh"
+#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <initializer_list>
+#include <span>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 

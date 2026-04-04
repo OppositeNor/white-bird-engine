@@ -15,11 +15,13 @@
 #include "core/allocator/heap_allocator_ram.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
+#include <cstddef>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
 HeapAllocatorRAM::~HeapAllocatorRAM() {
-    if (allocated.size() != 0) {
+    if (!allocated.empty()) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorRAM not empty during destruction.");
     }
     for (const auto& iter : allocated) {

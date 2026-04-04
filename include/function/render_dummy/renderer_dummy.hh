@@ -14,11 +14,16 @@
 */
 #ifndef __WBE_RENDERER_DUMMY_H__
 #define __WBE_RENDERER_DUMMY_H__
+#include "core/job/job.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render/i_renderer.hh"
+#include "function/render/render_task.hh"
 #include "function/render_dummy/material_dummy.hh"
+#include "utils/defs.hh"
+#include <string>
+#include <functional>
 namespace WhiteBirdEngine {
 
 /**

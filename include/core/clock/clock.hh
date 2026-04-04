@@ -28,17 +28,14 @@ public:
     Clock() {
         start_time = std::chrono::high_resolution_clock::now();
     }
-    ~Clock() {}
+    ~Clock() = default;
     Clock(const Clock& p_other)
+         = default;
+    Clock(Clock&& p_other) noexcept
         : start_time(p_other.start_time) {}
-    Clock(Clock&& p_other)
-        : start_time(std::move(p_other.start_time)) {}
-    Clock& operator=(const Clock& p_other) {
+    Clock& operator=(const Clock& p_other) = default;
+    Clock& operator=(Clock&& p_other)  noexcept {
         start_time = p_other.start_time;
-        return *this;
-    }
-    Clock& operator=(Clock&& p_other) {
-        start_time = std::move(p_other.start_time);
         return *this;
     }
 
@@ -57,6 +54,6 @@ private:
 
 };
 
-}
+}  // namespace WhiteBirdEngine
 
 #endif

@@ -21,7 +21,9 @@
 #include "core/object/object.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/stl_allocator.hh"
+#include "utils/defs.hh"
 #include <stdexcept>
+#include <utility>
 namespace WhiteBirdEngine {
 /**
  * @class SceneNode

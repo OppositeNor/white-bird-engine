@@ -14,6 +14,7 @@
 */
 #include "platform/file_system/path.hh"
 #include "platform/file_system/file_system.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 

@@ -15,10 +15,17 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 
+#include "core/core_utils.hh"
+#include "core/job/job.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
+#include "core/memory/reference_strong.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include <chrono>
 #include <gtest/gtest.h>
+#include <memory>
+#include <stdexcept>
 #include <thread>
 #include <atomic>
 #include <vector>

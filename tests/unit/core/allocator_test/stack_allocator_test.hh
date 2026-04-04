@@ -15,8 +15,14 @@
 #ifndef WBE_FILE_STACK_ALLOCATOR_TEST_HH
 #define WBE_FILE_STACK_ALLOCATOR_TEST_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include <cstddef>
+#include "utils/utils.hh"
+#include "utils/defs.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -150,7 +156,7 @@ TEST(StackAllocator, ComplexObjectLifecycle) {
     
     class ComplexClass {
     public:
-        ComplexClass(int val, const std::string& str) : value(val), text(str) {}
+        ComplexClass(int p_val, const std::string& p_str) : value(p_val), text(p_str) {}
         ~ComplexClass() { value = -1; }
         
         int value;
@@ -198,7 +204,7 @@ TEST(StackAllocator, ArrayOperations) {
     class ArrayElement {
     public:
         ArrayElement() : value(0) {}
-        ArrayElement(int val) : value(val) {}
+        ArrayElement(int p_val) : value(p_val) {}
         ~ArrayElement() { value = -1; }
         int value;
     };

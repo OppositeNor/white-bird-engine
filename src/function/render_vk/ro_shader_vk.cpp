@@ -20,7 +20,10 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
+#include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

@@ -16,6 +16,7 @@
 #define WBE_FILE_CLA_LEXER_TEST_HH
 
 #include "core/cla/cla_lexer.hh"
+#include "core/cla/cla_utils.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <vector>
