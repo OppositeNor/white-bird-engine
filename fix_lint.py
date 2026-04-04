@@ -25,6 +25,8 @@ import sys
 
 import build_config
 from build_script.utils import list_files
+from git import Repo
+from git.exc import BadName, InvalidGitRepositoryError, NoSuchPathError
 
 
 def find_compile_commands_dir(root_dir: Path) -> Path | None:
@@ -69,6 +71,53 @@ def gather_project_sources(root_dir: Path, include_tests: bool) -> list[str]:
     return [path for path in files if Path(path).suffix in build_config.source_extensions]
 
 
+def gather_changed_project_sources(root_dir: Path, project_sources: list[str]) -> list[str]:
+    try:
+        repo = Repo(root_dir, search_parent_directories=True)
+    except (InvalidGitRepositoryError, NoSuchPathError):
+        print("WBEFixLint: Current workspace is not in a Git repository.")
+        return []
+
+    if repo.working_tree_dir is None:
+        print("WBEFixLint: Failed to determine Git working tree directory.")
+        return []
+
+    repo_root = Path(repo.working_tree_dir).resolve()
+    source_set = {str(Path(source).resolve()) for source in project_sources}
+
+    changed_rel_paths: set[str] = set()
+
+    # Unstaged changes.
+    for diff in repo.index.diff(None):
+        if diff.a_path is not None:
+            changed_rel_paths.add(diff.a_path)
+        if diff.b_path is not None:
+            changed_rel_paths.add(diff.b_path)
+
+    # Staged changes.
+    try:
+        staged_diffs = repo.index.diff("HEAD")
+    except BadName:
+        staged_diffs = []
+    for diff in staged_diffs:
+        if diff.a_path is not None:
+            changed_rel_paths.add(diff.a_path)
+        if diff.b_path is not None:
+            changed_rel_paths.add(diff.b_path)
+
+    # Untracked files.
+    for rel_path in repo.untracked_files:
+        changed_rel_paths.add(rel_path)
+
+    changed_sources: set[str] = set()
+    for rel_path in changed_rel_paths:
+        abs_path = str((repo_root / rel_path).resolve())
+        if abs_path in source_set:
+            changed_sources.add(abs_path)
+
+    return sorted(changed_sources)
+
+
 def run_clang_tidy_fix(file_path: str, compile_commands_dir: Path) -> subprocess.CompletedProcess[str]:
     cmd = [
         "clang-tidy",
@@ -103,7 +152,12 @@ def fix_and_check_file(file_path: str, compile_commands_dir: Path) -> tuple[str,
 def main() -> int:
     parser = ArgumentParser(
         prog="fix_lint.py",
-        description="Run clang-tidy with auto-fix for project source files.",
+        description="Run clang-tidy with auto-fix (changed files by default).",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run lint fix for all project source files instead of only changed files.",
     )
     parser.add_argument(
         "--no-tests",
@@ -145,12 +199,24 @@ def main() -> int:
         print(f"WBEFixLint: compile_commands.json not found in {compile_commands_dir}.")
         return 1
 
-    sources = gather_project_sources(root_dir, include_tests=not args.no_tests)
+    project_sources = gather_project_sources(root_dir, include_tests=not args.no_tests)
+    if args.all:
+        sources = sorted(project_sources)
+    else:
+        sources = gather_changed_project_sources(root_dir, project_sources)
+
     if len(sources) == 0:
-        print("WBEFixLint: No source files found.")
+        if args.all:
+            print("WBEFixLint: No source files found.")
+        else:
+            print("WBEFixLint: No changed source files found.")
         return 0
 
     print(f"WBEFixLint: Using compile_commands from {compile_commands_dir}")
+    if args.all:
+        print("WBEFixLint: Running in full-project mode (--all).")
+    else:
+        print("WBEFixLint: Running in changed-files mode (default).")
     print(f"WBEFixLint: Lint-fixing {len(sources)} files with {args.jobs} workers...")
 
     failed_runs: list[str] = []

@@ -15,15 +15,20 @@
 #ifndef WBE_FILE_WORKER_HH
 #define WBE_FILE_WORKER_HH
 
+#include "core/job/job.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/job/job_handler.hh"
 #include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <cstddef>
+#include <functional>
 #include <future>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 

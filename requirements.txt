@@ -1,4 +1,5 @@
 clang
+GitPython
 Jinja2
 pydantic
 matplotlib
