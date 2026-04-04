@@ -19,9 +19,12 @@
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/path.hh"
+#include "utils/utils.hh"
+#include <cstdint>
 #include <string>
-namespace WhiteBirdEngine {
+#include <vector>
 
+namespace WhiteBirdEngine {
 /**
  * @brief Parse a resource path relative to the resource directory.
  *
@@ -41,7 +44,7 @@ inline Path parse_res_rel_path(const std::string& p_res_path) {
             }
             continue;
         }
-        if (dir_name == "." || dir_name == "") {
+        if (dir_name == "." || dir_name.empty()) {
             continue;
         }
         path_stack.push_back(dir_name);

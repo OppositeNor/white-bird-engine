@@ -14,4 +14,4 @@
 */
 #include "resource_scheme_deserialization_test.hh"
 #include "resource_utils_test.hh"
-#include "resource_populator_test.hh"
+#include "resource_unit_loader_test.hh"
