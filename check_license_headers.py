@@ -13,7 +13,7 @@
 # limitations under the License.
 from pathlib import Path
 import build_config
-from build_setup import project_files
+from build_config import project_files
 
 
 LICENSE_KEYWORDS = [

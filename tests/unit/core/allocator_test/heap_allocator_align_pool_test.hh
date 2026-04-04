@@ -29,6 +29,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -200,6 +201,10 @@ TEST_F(WBEAllocAlignedPoolTest, ConstructDestructCall) {
         ~TestClass() {
             *test_val_ptr = 2;
         }
+        TestClass(const TestClass&) noexcept = default;
+        TestClass(TestClass&&) noexcept = default;
+        TestClass& operator=(const TestClass&) noexcept = default;
+        TestClass& operator=(TestClass&&) noexcept = default;
         uint32_t* test_val_ptr;
     };
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool();
@@ -255,8 +260,8 @@ TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     const int num_allocs = 64;
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024 + AAPT_HEADER_SIZE * num_allocs);
     WBEAllocPoolBehavTestClass behv_test("HeapAllocatorAlignedPool", 1024 + AAPT_HEADER_SIZE * num_allocs, AAPT_HEADER_SIZE);
-    WBE::MemID mems[num_allocs];
-    for (unsigned long & mem : mems) {
+    std::vector<WBE::MemID> mems(num_allocs);
+    for (uint64_t & mem : mems) {
         mem = allocator.allocate(16);
         ASSERT_NE(mem, WBE::MEM_NULL);
         ASSERT_EQ(mem % 8, 0);
@@ -266,7 +271,7 @@ TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {
         {true, -1},
     });
     ASSERT_EQ(static_cast<std::string>(allocator), exp);
-    for (unsigned long mem : mems) {
+    for (uint64_t mem : mems) {
         allocator.deallocate(mem);
     }
     ASSERT_EQ(allocator.get_remain_size(), 1024 + AAPT_HEADER_SIZE * num_allocs);

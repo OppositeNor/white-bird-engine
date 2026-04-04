@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+from pathlib import Path
+from build_script.utils import list_files
+
 target_info = {
     "debug" : {
         "c-compiler" : "clang",
@@ -98,3 +102,19 @@ gen_info = {
 }
 
 gen_info["static_serializables"].extend(gen_info["serializables"])
+
+# Setup directories
+root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+
+project_files = list_files(root_dir, ignore_dirs=["dependencies", "generated",
+                                                  ".cache", ".git", ".github", "__pycache__",
+                                                  "build"])
+project_sources = [path for path in project_files if Path(path).suffix in source_extensions]
+project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies", "generated",
+                                                                ".cache", ".git", ".github", "__pycache__",
+                                                                "build"])
+project_sources_exclude_tests = [path for path in project_files_exclude_tests if Path(path).suffix in source_extensions]
+gen_info_files = list_files(root_dir, ignore_dirs=[".cache", ".git",
+                                                   ".github", "__pycache__", "build"])
+gen_info_files = [gen_info for gen_info in gen_info_files if os.path.basename(gen_info) == "generate.json"]
+

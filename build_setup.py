@@ -21,7 +21,6 @@ import build_config
 from build_script.resource.acp.acp import WBEACP
 from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
 from build_script.resource.acp.asp_compiler_discard import WBEACPCompilerDiscard
-from build_script.utils import list_files
 
 # SETUP
 print("WBEBuilder: Setting up...")
@@ -35,9 +34,8 @@ args = arg_parser.parse_args()
 
 build_target = build_config.target_info[args.target]
 
-# Setup directories
-root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 # Sources dirs
+root_dir = build_config.root_dir
 include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
 test_dir = os.path.join(root_dir, build_config.test_dir)
@@ -63,16 +61,6 @@ assets_output_dir = os.path.join(resource_output_dir, "assets")
 metadata_path = os.path.join(test_env_dir, "metadata.json")
 metadata_cache_dir = os.path.join(build_dir, "metadata_cache")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
-
-gen_info_files = list_files(root_dir, ignore_dirs=[".cache", ".git",
-                                                   ".github", "__pycache__", "build"])
-gen_info_files = [gen_info for gen_info in gen_info_files if os.path.basename(gen_info) == "generate.json"]
-project_files = list_files(root_dir, ignore_dirs=["dependencies", "generated",
-                                                  ".cache", ".git", ".github", "__pycache__",
-                                                  "build"])
-project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies", "generated",
-                                                                ".cache", ".git", ".github", "__pycache__",
-                                                                "build"])
 
 # Create directories
 os.makedirs(metadata_cache_dir, exist_ok=True)
