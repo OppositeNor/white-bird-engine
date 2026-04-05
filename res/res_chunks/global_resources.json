@@ -23,7 +23,7 @@
                 },
                 "roughness_metallic_ao": {
                     "type": "image",
-                    "path": "assets/images/default_rma.png",
+                    "path": "assets/images/default_rmo.png",
                     "color_space": "rgb",
                     "channel_count": 3
                 }

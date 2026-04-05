@@ -125,7 +125,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
 }
 
 void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
-    if (p_scheme.material_id.empty()) {
+    if (!p_scheme.material_id.empty()) {
         p_res_chunk.create_ref_to(reinterpret_cast<void**>(&p_resource_unit.material), p_scheme.material_id);
     }
     else {
