@@ -26,7 +26,7 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-VkBuffer ROStagingBufferVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkBuffer ROStagingBufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = size;
@@ -49,7 +49,7 @@ VkBuffer ROStagingBufferVK::Builder::build(const BaseRenderDataVK* p_render_data
 
 ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    buffer = p_builder.build(p_render_data);
+    buffer = p_builder.create_vk_object(p_render_data);
     VkMemoryRequirements memory_requirements;
     vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
     exposed_fields.buffer_size = p_builder.size;

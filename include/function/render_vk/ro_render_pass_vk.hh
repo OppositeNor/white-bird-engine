@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_RENDER_PASS_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
@@ -53,8 +54,16 @@ public:
         // Add a single subpass dependency.
         Builder& add_dependency(const VkSubpassDependency& p_dependency);
 
+        Ref<RORenderPassVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RORenderPassVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<RORenderPassVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RORenderPassVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkRenderPass build(const BaseRenderDataVK* p_render_data) const;
+        VkRenderPass create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     RORenderPassVK() = delete;

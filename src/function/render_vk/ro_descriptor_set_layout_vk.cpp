@@ -44,7 +44,7 @@ RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::add_ubo(uint
     return *this;
 }
 
-VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkDescriptorSetLayout RODescriptorSetLayoutVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
@@ -73,7 +73,7 @@ RODescriptorSetLayoutVK::~RODescriptorSetLayoutVK() {
 }
 
 void RODescriptorSetLayoutVK::init(const Builder& p_builder) {
-    descriptor_set_layout = p_builder.build(render_data);
+    descriptor_set_layout = p_builder.create_vk_object(render_data);
 }
 
 } // namespace WhiteBirdEngine

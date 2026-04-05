@@ -16,7 +16,7 @@
 #define WBE_FILE_RESOURCE_CHUNK_LOADER_HH
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
-#include "core/parser/parser.hh"
+#include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -24,7 +24,6 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
-#include <functional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -32,12 +31,13 @@
 
 namespace WhiteBirdEngine {
 
+using ParserResource = ParserJSON;
+
 /**
  * @class ResourceChunk
  * @brief Chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
  * @todo Test
  */
-template <ParserConcept ParserType>
 class ResourceChunkLoadFile final : public IResourceChunk {
 public:
     ~ResourceChunkLoadFile() {
@@ -99,7 +99,7 @@ public:
 
 protected:
 
-    using ParserDataType = ParserType::DataType;
+    using ParserDataType = ParserResource::DataType;
 
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
@@ -137,8 +137,7 @@ private:
     }
 };
 
-template <ParserConcept ParserType>
-void ResourceChunkLoadFile<ParserType>::resolve_load_resource(
+inline void ResourceChunkLoadFile::resolve_load_resource(
     std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
     if (std::any_of(p_included_pathes.begin(), p_included_pathes.end(), [&](const auto& p_str) { return p_str == p_res_chunk_path; })) {
         throw std::runtime_error(std::format("Include recursion found: {}", p_res_chunk_path));
@@ -146,11 +145,12 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(
     p_included_pathes.push_back(p_res_chunk_path);
 
     auto rc_file_path = get_resource_path(p_res_chunk_path);
-    ParserType parser;
+    ParserResource parser;
     parser.parse(rc_file_path);
 
     std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
     for (auto& res : resources) {
+        // Use generic scheme only for quick type/id extraction during dispatch.
         RUScheme resource_scheme;
         resource_scheme.deserialize(res);
         if (resource_map.contains(resource_scheme.id)) {
@@ -158,19 +158,7 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(
             continue; // This might be a bit unsafe, but considered that C++ also kind of handles its inline function like this, so
                       // I think this is fine. -- OppositeNor
         }
-        const auto& resource_unit_loaders = ResourceManager::get_singleton()->get_resource_unit_loaders();
-        bool is_resource_supported = false;
-        for (const auto& resource_unit_loader : resource_unit_loaders) {
-            if (!resource_unit_loader->is_resource_supported(resource_scheme)) {
-                continue;
-            }
-            resource_unit_loader->populate_scheme(*this, std::cref(res));
-            is_resource_supported = true;
-            break;
-        }
-        if (!is_resource_supported) {
-            throw std::runtime_error(std::format("Unrecognized resource type: {}.", resource_scheme.type));
-        }
+        ResourceManager::get_singleton()->get_resource_unit_loader(resource_scheme.type)->populate_scheme(*this, res);
     }
 
     if (parser.contains("include")) {
@@ -183,8 +171,7 @@ void ResourceChunkLoadFile<ParserType>::resolve_load_resource(
     p_included_pathes.pop_back();
 }
 
-template <ParserConcept ParserType>
-ResourceChunkLoadFile<ParserType>::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
+inline ResourceChunkLoadFile::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
     allocator = &p_allocator;
     std::vector<std::string> included_pathes;
     resolve_load_resource(included_pathes, p_path);

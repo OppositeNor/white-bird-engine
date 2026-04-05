@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -60,8 +61,16 @@ public:
             return *this;
         }
 
+        Ref<RODescriptorSetVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RODescriptorSetVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<RODescriptorSetVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RODescriptorSetVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkDescriptorSet build(const BaseRenderDataVK* p_render_data) const;
+        VkDescriptorSet create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**

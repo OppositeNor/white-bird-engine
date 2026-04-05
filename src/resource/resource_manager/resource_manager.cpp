@@ -15,7 +15,6 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
@@ -41,7 +40,7 @@ ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_globa
     add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
-    global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile<ParserJSON>>(
+    global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile>(
         global_allocator(), p_global_res_path, stack_allocator));
 }
 

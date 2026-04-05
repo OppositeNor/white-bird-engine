@@ -22,7 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkFramebuffer ROFramebufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkFramebufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     create_info.renderPass = render_pass->get_render_pass();
@@ -46,7 +46,7 @@ VkFramebuffer ROFramebufferVK::Builder::build(const BaseRenderDataVK* p_render_d
 
 ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    framebuffer = p_builder.build(p_render_data);
+    framebuffer = p_builder.create_vk_object(p_render_data);
     exposed_fields.extent = {*(p_builder.width), *(p_builder.height)};
     exposed_fields.render_pass = p_builder.render_pass;
 }

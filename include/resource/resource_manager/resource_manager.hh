@@ -24,6 +24,8 @@
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstddef>
+#include <format>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -142,17 +144,29 @@ public:
     }
 
     void add_resource_unit_loader(Ref<IResourceUnitLoader> p_resource_unit_loader) {
-        resource_unit_loaders.push_back(p_resource_unit_loader);
+        for (const auto& resource_type : p_resource_unit_loader->get_supported_resource_types()) {
+            if (!resource_unit_loaders.contains(resource_type)) {
+                resource_unit_loaders[resource_type] = p_resource_unit_loader;
+                continue;
+            }
+            throw std::runtime_error(std::format(
+                "Failed to add resource loader: resource type '{}' already has a loader.", resource_type));
+        }
     }
 
-    const std::vector<Ref<IResourceUnitLoader>>& get_resource_unit_loaders() const {
-        return resource_unit_loaders;
+    Ref<IResourceUnitLoader> get_resource_unit_loader(const std::string& p_resource_type) const {
+        auto it = resource_unit_loaders.find(p_resource_type);
+        if (it == resource_unit_loaders.end()) {
+            throw std::runtime_error(std::format(
+                "No resource loader registered for resource type: {}.", p_resource_type));
+        }
+        return it->second;
     }
 
 private:
     ResourceChunkID global_res_chunk_id;
     std::vector<Ref<IResourceChunk>> resource_chunks;
-    std::vector<Ref<IResourceUnitLoader>> resource_unit_loaders;
+    std::map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
     Ref<IResourceChunk> find_resource_chunk_containing_resource(const std::string& p_id) const;

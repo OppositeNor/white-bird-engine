@@ -43,7 +43,7 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) 
     return set_code(p_resource->data.get(), p_resource->size);
 }
 
-VkShaderModule ROShaderVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.pCode = reinterpret_cast<const uint32_t*>(WBE_REQUIRED(code));
@@ -87,7 +87,7 @@ ROShaderVK::~ROShaderVK() {
 }
 
 void ROShaderVK::init(const Builder& p_builder) {
-    shader_module = p_builder.build(render_data);
+    shader_module = p_builder.create_vk_object(render_data);
 }
 
 } // namespace WhiteBirdEngine

@@ -95,6 +95,35 @@ def gather_changed_project_sources(root_dir: Path, project_sources: list[str]) -
     return sorted(changed_sources)
 
 
+def gather_commit_project_sources(root_dir: Path, project_sources: list[str], commit_id: str) -> list[str]:
+    try:
+        repo = Repo(root_dir, search_parent_directories=True)
+    except (InvalidGitRepositoryError, NoSuchPathError):
+        print("WBEFixLint: Current workspace is not in a Git repository.")
+        return []
+
+    if repo.working_tree_dir is None:
+        print("WBEFixLint: Failed to determine Git working tree directory.")
+        return []
+
+    try:
+        commit = repo.commit(commit_id)
+    except (BadName, ValueError):
+        print(f"WBELint: Failed to resolve commit id: {commit_id}")
+        return []
+
+    repo_root = Path(repo.working_tree_dir).resolve()
+    source_set = {str(Path(source).resolve()) for source in project_sources}
+
+    changed_sources: set[str] = set()
+    for rel_path in commit.stats.files.keys():
+        abs_path = str((repo_root / rel_path).resolve())
+        if abs_path in source_set:
+            changed_sources.add(abs_path)
+
+    return sorted(changed_sources)
+
+
 def run_clang_tidy_fix(file_path: str, compile_commands_dir: Path) -> subprocess.CompletedProcess[str]:
     cmd = [
         "clang-tidy",
@@ -153,6 +182,12 @@ def main() -> int:
         help="Run lint on all project source files instead of only changed files.",
     )
     parser.add_argument(
+        "--commit-id",
+        type=str,
+        default=None,
+        help="Run lint on project source files changed in a specific commit.",
+    )
+    parser.add_argument(
         "--no-tests",
         action="store_true",
         help="Exclude files under tests/ from lint fixing.",
@@ -171,6 +206,9 @@ def main() -> int:
         help="Number of parallel workers used to run clang-tidy.",
     )
     args = parser.parse_args()
+
+    if args.all and args.commit_id is not None:
+        parser.error("--all and --commit-id cannot be used together.")
 
     root_dir = Path(__file__).resolve().parent
 
@@ -195,6 +233,8 @@ def main() -> int:
     project_sources = build_config.project_sources
     if args.all:
         sources = sorted(project_sources)
+    elif args.commit_id is not None:
+        sources = gather_commit_project_sources(root_dir, project_sources, args.commit_id)
     else:
         sources = gather_changed_project_sources(root_dir, project_sources)
 
@@ -212,6 +252,8 @@ def main() -> int:
         print("WBELint: Running in check-only mode (default).")
     if args.all:
         print("WBELint: Running in full-project scope (--all).")
+    elif args.commit_id is not None:
+        print(f"WBELint: Running in commit scope (--commit-id={args.commit_id}).")
     else:
         print("WBELint: Running in changed-files scope (default).")
 

@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_PIPELINE_LAYOUT_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -49,8 +50,16 @@ public:
         // Add a single push constant range.
         Builder& add_push_constant_range(const VkPushConstantRange& p_push_constant_range);
 
+        Ref<ROPipelineLayoutVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROPipelineLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROPipelineLayoutVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROPipelineLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkPipelineLayout build(const BaseRenderDataVK* p_render_data) const;
+        VkPipelineLayout create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
     ROPipelineLayoutVK() = delete;
     virtual ~ROPipelineLayoutVK() override;

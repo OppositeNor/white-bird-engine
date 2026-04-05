@@ -25,7 +25,7 @@
 
 namespace WhiteBirdEngine {
 
-VkDescriptorSet RODescriptorSetVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = p_render_data->descriptor_pool;
@@ -45,7 +45,7 @@ VkDescriptorSet RODescriptorSetVK::Builder::build(const BaseRenderDataVK* p_rend
 
 RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data), descriptor_set_layouts(p_render_data->allocator), bound_objects(p_render_data->allocator) {
-    descriptor_set = p_builder.build(p_render_data);
+    descriptor_set = p_builder.create_vk_object(p_render_data);
     descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
     for (const auto& layout : p_builder.descriptor_set_layouts) {
         descriptor_set_layouts.push_back(layout);

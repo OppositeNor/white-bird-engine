@@ -333,7 +333,8 @@ struct RUShader : public ResourceUnit {
     RefRes<char> data;
     // The size of the binary data.
     size_t size;
-    // TODO: Shader metadata.
+    // The path to the metadata. Ending with an NUL terminater.
+    RefRes<char> metadata_path;
 };
 
 /**

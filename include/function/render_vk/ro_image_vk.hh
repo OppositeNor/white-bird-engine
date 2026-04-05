@@ -17,6 +17,7 @@
 
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -98,8 +99,16 @@ public:
         // Set the initial image layout.
         Builder& set_initial_layout(VkImageLayout p_initial_layout);
 
+        Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkImage build(const BaseRenderDataVK* p_render_data) const;
+        VkImage create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROImageVK() = delete;

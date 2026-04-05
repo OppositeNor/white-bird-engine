@@ -22,7 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-VkBufferView ROBufferViewVK::Builder::create(const BaseRenderDataVK* p_render_data) const {
+VkBufferView ROBufferViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkBufferViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
     create_info.buffer = WBE_REQUIRED(buffer).get_buffer();
@@ -38,7 +38,7 @@ VkBufferView ROBufferViewVK::Builder::create(const BaseRenderDataVK* p_render_da
 
 ROBufferViewVK::ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    buffer_view = p_builder.create(p_render_data);
+    buffer_view = p_builder.create_vk_object(p_render_data);
     exposed_fields.buffer = p_builder.buffer;
 }
 

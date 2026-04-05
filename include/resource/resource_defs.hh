@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 
 namespace WhiteBirdEngine {
+// Shader metadata of the generated json file.
 // NOLINTBEGIN
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataBinding)

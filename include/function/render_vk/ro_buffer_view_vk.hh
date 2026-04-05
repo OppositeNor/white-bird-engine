@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -93,8 +94,16 @@ public:
             range = p_range;
             return *this;
         }
+
+        Ref<ROBufferViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferViewVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROBufferViewVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferViewVK>(p_render_data->allocator, p_render_data, *this);
+        }
     private:
-        VkBufferView create(const BaseRenderDataVK* p_render_data) const;
+        VkBufferView create_vk_object(const BaseRenderDataVK* p_render_data) const;
    };
 
     /**

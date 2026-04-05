@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_BUFFER_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -138,8 +139,16 @@ public:
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
+
+        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
     private:
-        VkBuffer build(const BaseRenderDataVK* p_render_data) const;
+        VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**

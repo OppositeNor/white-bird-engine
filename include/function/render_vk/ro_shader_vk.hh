@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_SHADER_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -48,8 +49,16 @@ public:
 
         // Set from a resource.
         Builder& set_code(RefRes<RUShader> p_resource);
+
+        Ref<ROShaderVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROShaderVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
+        }
     private:
-        VkShaderModule build(const BaseRenderDataVK* p_render_data) const;
+        VkShaderModule create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROShaderVK() = delete;

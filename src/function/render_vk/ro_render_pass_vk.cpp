@@ -51,7 +51,7 @@ RORenderPassVK::Builder& RORenderPassVK::Builder::add_dependency(const VkSubpass
     return *this;
 }
 
-VkRenderPass RORenderPassVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkRenderPass RORenderPassVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkRenderPassCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     create_info.attachmentCount = attachments.size();
@@ -84,7 +84,7 @@ RORenderPassVK::~RORenderPassVK() {
 }
 
 void RORenderPassVK::init(const Builder& p_builder) {
-    render_pass = p_builder.build(render_data);
+    render_pass = p_builder.create_vk_object(render_data);
 }
 
 } // namespace WhiteBirdEngine

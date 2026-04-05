@@ -145,7 +145,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     image->exposed_fileds.image_layout = *new_layout;
 }
 
-VkImage ROImageVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     create_info.imageType = WBE_REQUIRED(image_type);
@@ -199,7 +199,7 @@ ROImageVK::~ROImageVK() {
 }
 
 void ROImageVK::init(const Builder& p_builder) {
-    exposed_fileds.image = p_builder.build(render_data);
+    exposed_fileds.image = p_builder.create_vk_object(render_data);
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
     // Images are only allowed to be allocated on device.

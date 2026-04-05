@@ -18,6 +18,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
@@ -73,8 +74,16 @@ public:
         // Set from image configurations. All features are default to match to the image config.
         Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);
 
+        Ref<ROImageViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROImageViewVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkImageView build(const BaseRenderDataVK* p_render_data) const;
+        VkImageView create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
     ROImageViewVK() = delete;
     virtual ~ROImageViewVK() override;

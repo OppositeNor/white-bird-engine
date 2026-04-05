@@ -17,6 +17,7 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -115,8 +116,16 @@ public:
             render_pass = p_render_pass;
             return *this;
         }
+
+        Ref<ROFramebufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROFramebufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROFramebufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROFramebufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
     private:
-        VkFramebuffer build(const BaseRenderDataVK* p_render_data) const;
+        VkFramebuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
     ROFramebufferVK() = delete;
     virtual ~ROFramebufferVK() override;

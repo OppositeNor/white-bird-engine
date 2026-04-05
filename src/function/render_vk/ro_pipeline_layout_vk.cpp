@@ -43,7 +43,7 @@ ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::add_push_constant_rang
     return *this;
 }
 
-VkPipelineLayout ROPipelineLayoutVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkPipelineLayout ROPipelineLayoutVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkPipelineLayoutCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     std::vector<VkDescriptorSetLayout> descriptor_set_layouts_vk;
@@ -89,7 +89,7 @@ ROPipelineLayoutVK::~ROPipelineLayoutVK() {
 }
 
 void ROPipelineLayoutVK::init(const Builder& p_builder) {
-    pipeline_layout = p_builder.build(render_data);
+    pipeline_layout = p_builder.create_vk_object(render_data);
     exposed_fields.descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
     for (const auto& descriptor_set_layout : p_builder.descriptor_set_layouts) {
         exposed_fields.descriptor_set_layouts.push_back(descriptor_set_layout);

@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_DESCRIPTOR_SET_LAYOUT_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
@@ -63,8 +64,16 @@ public:
          */
         Builder& add_ubo(uint32_t p_binding, uint32_t p_descriptor_count, VkShaderStageFlags p_shader_stages = VK_SHADER_STAGE_ALL);
 
+        Ref<RODescriptorSetLayoutVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RODescriptorSetLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<RODescriptorSetLayoutVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RODescriptorSetLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
     private:
-        VkDescriptorSetLayout build(const BaseRenderDataVK* p_render_data) const;
+        VkDescriptorSetLayout create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ~RODescriptorSetLayoutVK();

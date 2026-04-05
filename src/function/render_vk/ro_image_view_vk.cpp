@@ -72,7 +72,7 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROIm
     return *this;
 }
 
-VkImageView ROImageViewVK::Builder::build(const BaseRenderDataVK* p_render_data) const {
+VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     create_info.image = WBE_REQUIRED(image).get_image();
@@ -104,7 +104,7 @@ ROImageViewVK::~ROImageViewVK() {
 }
 
 void ROImageViewVK::init(const Builder& p_builder) {
-    image_view = p_builder.build(render_data);
+    image_view = p_builder.create_vk_object(render_data);
     exposed_fields.image = p_builder.image;
 }
 

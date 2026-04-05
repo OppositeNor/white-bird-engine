@@ -56,7 +56,6 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -195,7 +194,7 @@ Ref<RendResVK> RendererVK::get_resource(RendResID p_res_id, RendResTID p_res_typ
 }
 
 template <typename T>
-static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, DeviceDomain p_domain,
+static void update_buffer(const BaseRenderDataVK* p_render_data, DeviceDomain p_domain,
                           Ref<ROBufferVK>& p_buffer, const Vector<T>& p_from_buffer, VkBufferUsageFlags p_buffer_usage,
                           Ref<ROStagingBufferVK> p_staging_buffer) {
     size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
@@ -205,7 +204,7 @@ static void update_buffer(RenderAllocator* p_allocator, const BaseRenderDataVK* 
         builder.set_domain(p_domain)
             .set_usage(p_buffer_usage)
             .set_size(size_in_bytes);
-        p_buffer = make_ref<ROBufferVK>(p_allocator, p_render_data, builder);
+        p_buffer = builder.create_ref(p_render_data);
     }
     switch (p_domain) {
         case DeviceDomain::HOST_DEVICE:
@@ -229,21 +228,21 @@ void RendererVK::update_static_opaque_triangles() {
     // Vertices
     const auto& static_opaque_triangles_vertices = render_database->get_static_opaque_triangles_info().vertices;
     auto vertex_buffer = render_objects->static_opaque_triangles_buffer_vertices_resource->res.dynamic_cast_ref<ROBufferVK>();
-    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, vertex_buffer, static_opaque_triangles_vertices,
+    update_buffer(&base_render_data, DeviceDomain::DEVICE, vertex_buffer, static_opaque_triangles_vertices,
                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_vertices_resource->res = vertex_buffer;
 
     // Indices
     const auto& static_opaque_triangles_indices = render_database->get_static_opaque_triangles_info().indices;
     auto index_buffer = render_objects->static_opaque_triangles_buffer_indices_resource->res.dynamic_cast_ref<ROBufferVK>();
-    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, index_buffer, static_opaque_triangles_indices,
+    update_buffer(&base_render_data, DeviceDomain::DEVICE, index_buffer, static_opaque_triangles_indices,
                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_indices_resource->res = index_buffer;
 
     // Object IDs
     const auto& static_opaque_triangles_obj_ids = render_database->get_static_opaque_triangles_info().obj_id;
     auto obj_ids_buffer = render_objects->static_opaque_triangles_buffer_obj_ids_resource->res.dynamic_cast_ref<ROBufferVK>();
-    update_buffer(allocator, &base_render_data, DeviceDomain::DEVICE, obj_ids_buffer, static_opaque_triangles_obj_ids,
+    update_buffer(&base_render_data, DeviceDomain::DEVICE, obj_ids_buffer, static_opaque_triangles_obj_ids,
                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, render_objects->staging_buffer);
     render_objects->static_opaque_triangles_buffer_obj_ids_resource->res = obj_ids_buffer;
 }
@@ -356,14 +355,14 @@ void RendererVK::init_swap_chain_framebuffers() {
             .set_render_pass(render_objects->result_render_pass)
             .set_extent(swap_chain_extent)
             .set_layers(1);
-        render_objects->swap_chain_framebuffers[i] = make_ref<ROFramebufferVK>(allocator, &base_render_data, builder);
+        render_objects->swap_chain_framebuffers[i] = builder.create_ref(&base_render_data);
     }
 }
 
 void RendererVK::setup_render_resource() {
     ROStagingBufferVK::Builder staging_buffer_builder;
     staging_buffer_builder.set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT).set_size(STAGING_BUFFER_SIZE);
-    render_objects->staging_buffer = make_ref<ROStagingBufferVK>(allocator, &base_render_data, staging_buffer_builder);
+    render_objects->staging_buffer = staging_buffer_builder.create_ref(&base_render_data);
     // Setup swap_chain_framebuffer_resource.
     setup_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, TypeUUID<ROFramebufferVK>::UUID,
                    render_objects->swap_chain_framebuffer_resource, MEM_NULL);
@@ -581,9 +580,7 @@ void RendererVK::init_swap_chain_image_views() {
                 VK_COMPONENT_SWIZZLE_IDENTITY)
             .set_subresource_range(subresource_range);
 
-        render_objects->swap_chain_image_views.emplace_back(
-            make_ref<ROImageViewVK>(allocator, &base_render_data, builder)
-        );
+        render_objects->swap_chain_image_views.emplace_back(builder.create_ref(&base_render_data));
     }
 }
 
@@ -675,7 +672,7 @@ void RendererVK::init_render_pass() {
 
     RORenderPassVK::Builder render_pass_builder;
     render_pass_builder.add_attachment(color_attachment).add_subpass(subpass).add_dependency(dependency);
-    render_objects->result_render_pass = make_ref<RORenderPassVK>(allocator, &base_render_data, render_pass_builder);
+    render_objects->result_render_pass = render_pass_builder.create_ref(&base_render_data);
 }
 
 void RendererVK::create_physical_device() {
@@ -749,8 +746,8 @@ void RendererVK::create_logical_device() {
 
     // Get the device queues.
     vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &graphics_queue);
-    vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &compute_queue);
-    vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &present_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.compute.value(), 0, &compute_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.present.value(), 0, &present_queue);
 }
 
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {

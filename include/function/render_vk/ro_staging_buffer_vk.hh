@@ -17,6 +17,7 @@
 
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "core/memory/unique.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -116,8 +117,16 @@ public:
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
+
+        Ref<ROStagingBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROStagingBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
     private:
-        VkBuffer build(const BaseRenderDataVK* p_render_data) const;
+        VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
