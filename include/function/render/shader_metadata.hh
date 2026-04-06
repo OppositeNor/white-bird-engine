@@ -17,6 +17,9 @@
 
 #include "core/reflection/serializable.hh"
 #include "core/reflection/reflection_defs.hh"
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace WhiteBirdEngine{
 
