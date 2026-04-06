@@ -89,9 +89,10 @@ public:
                                                                                WBE::ROPipelineLayoutVK::Builder()
                                                                                .add_descriptor_set_layout(descriptor_set_layout));
         auto render_pass = renderer->get_swap_chain_render_pass();
-        auto pipeline_configuration = WBE::ROGraphicsPipelineVK::get_default_render_opaque_configuration(
-            base_render_data, shader_config, graphics_pipeline_layout, render_pass);
-        auto graphics_pipeline = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data, pipeline_configuration);
+        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
+            .default_render_opaque_configuration(
+                base_render_data, shader_config, graphics_pipeline_layout, render_pass)
+            .create_ref(base_render_data);
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
         camera_info = WBE::CameraInfoVKUBO {
             // Look at the origin from (2,2,2)

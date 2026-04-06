@@ -53,7 +53,6 @@ public:
     /**
      * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
      *
-     * @todo Test
      * @param p_pipeline_name The name of the pipeline to register.
      * @param p_root_task The root render task of the pipeline.
      */
@@ -62,7 +61,6 @@ public:
     /**
      * @brief Activate a pipeline.
      *
-     * @todo Test
      * @param p_pipeline_name The name of the pipeline to activate.
      */
     virtual void activate_pipeline(const std::string& p_pipeline_name) = 0;

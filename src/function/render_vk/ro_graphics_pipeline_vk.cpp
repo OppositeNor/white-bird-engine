@@ -51,12 +51,12 @@ ROGraphicsPipelineVK::Config& ROGraphicsPipelineVK::Config::build_pipeline(
     return *this;
 }
 
-ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config)
+ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
-    init(p_config);
+    init(p_builder.config);
 }
 
 ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {

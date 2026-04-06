@@ -70,9 +70,7 @@ public:
 
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
-        shader_config.set_shaders(
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_triangle_vert"),
-            WBE::make_ref<WBE::ROShaderVK>(render_allocator, base_render_data, "draw_triangle_frag"));
+        shader_config.set_shaders(base_render_data, "draw_triangle_vert", "draw_triangle_frag");
 
         // Setup graphics pipeline layout.
         WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout
@@ -84,10 +82,10 @@ public:
                                                      WBE::ROPipelineLayoutVK::Builder()
                                                      .add_descriptor_set_layout(descriptor_set_layout));
         auto render_pass = renderer->get_swap_chain_render_pass();
-        auto graphics_pipeline
-            = WBE::make_ref<WBE::ROGraphicsPipelineVK>(render_allocator, base_render_data,
-                                                       WBE::ROGraphicsPipelineVK::get_default_render_opaque_configuration(
-                                                       base_render_data, shader_config, graphics_pipeline_layout, render_pass));
+        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
+            .default_render_opaque_configuration(
+                base_render_data, shader_config, graphics_pipeline_layout, render_pass)
+            .create_ref(base_render_data);
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
         // Setup time UBO
         time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data, WBE::ROBufferVK::Builder()

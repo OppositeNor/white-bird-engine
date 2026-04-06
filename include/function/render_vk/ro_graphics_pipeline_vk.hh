@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
@@ -117,11 +118,15 @@ public:
                                       const std::string& p_fragment_shader_res_id,
                                       const std::string& p_vertex_entry_function = "main",
                                       const std::string& p_fragment_entry_function = "main") {
+                ROShaderVK::Builder vertex_shader_builder;
+                vertex_shader_builder.set_code(p_vertex_shader_res_id);
+                ROShaderVK::Builder fragment_shader_builder;
+                fragment_shader_builder.set_code(p_fragment_shader_res_id);
                 set_vertex_shader(
-                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_vertex_shader_res_id),
+                    vertex_shader_builder.create_ref(p_render_data),
                     p_vertex_entry_function);
                 set_fragment_shader(
-                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_fragment_shader_res_id),
+                    fragment_shader_builder.create_ref(p_render_data),
                     p_fragment_entry_function);
                 return *this;
             }
@@ -130,11 +135,15 @@ public:
                                       RefRes<RUShader> p_fragment_shader_res,
                                       const std::string& p_vertex_entry_function = "main",
                                       const std::string& p_fragment_entry_function = "main") {
+                ROShaderVK::Builder vertex_shader_builder;
+                vertex_shader_builder.set_code(p_vertex_shader_res);
+                ROShaderVK::Builder fragment_shader_builder;
+                fragment_shader_builder.set_code(p_fragment_shader_res);
                 set_vertex_shader(
-                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_vertex_shader_res),
+                    vertex_shader_builder.create_ref(p_render_data),
                     p_vertex_entry_function);
                 set_fragment_shader(
-                    make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, p_fragment_shader_res),
+                    fragment_shader_builder.create_ref(p_render_data),
                     p_fragment_entry_function);
                 return *this;
             }
@@ -613,6 +622,109 @@ public:
         uint32_t subpass_index = 0;
     };
 
+    /**
+     * @class Builder
+     * @brief Builder for graphics pipeline render object.
+     */
+    struct Builder {
+        friend ROGraphicsPipelineVK;
+
+        // Graphics pipeline configuration payload.
+        Config config{};
+
+        /**
+         * @brief Set the full graphics pipeline config by copy.
+         *
+         * @param p_config The configuration to copy into this builder.
+         * @return *this.
+         */
+        Builder& set_config(const Config& p_config) {
+            config = p_config;
+            return *this;
+        }
+
+        /**
+         * @brief Set the full graphics pipeline config by move.
+         *
+         * @param p_config The configuration to move into this builder.
+         * @return *this.
+         */
+        Builder& set_config(Config&& p_config) {
+            config = std::move(p_config);
+            return *this;
+        }
+
+        /**
+         * @brief Build config fields from a graphics pipeline resource.
+         *
+         * @param p_render_data Base render data.
+         * @param p_res_key Resource key of the graphics pipeline scheme.
+         * @param p_render_pass Render pass used by the generated config.
+         * @return *this.
+         */
+        Builder& build_pipeline(const BaseRenderDataVK* p_render_data,
+                                const std::string& p_res_key,
+                                Ref<RORenderPassVK> p_render_pass) {
+            config.build_pipeline(p_render_data, p_res_key, p_render_pass);
+            return *this;
+        }
+
+        /**
+         * @brief Apply default opaque-rendering pipeline configuration.
+         *
+         * This helper configures textured vertex input, viewport/scissor from
+         * render data, pipeline layout/render pass bindings, a default color
+         * attachment state, and default dynamic states.
+         *
+         * @param p_render_data Base render data for viewport/scissor defaults.
+         * @param p_shader_config Shader stage configuration.
+         * @param p_pipeline_layout Pipeline layout instance.
+         * @param p_render_pass Render pass instance.
+         * @return *this.
+         */
+        Builder& default_render_opaque_configuration(
+            const BaseRenderDataVK* p_render_data,
+            const Config::ShaderConfig& p_shader_config,
+            Ref<ROPipelineLayoutVK> p_pipeline_layout,
+            Ref<RORenderPassVK> p_render_pass) {
+
+            ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
+            vertex_input_config
+                .add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)
+                .add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
+
+            config.shader = p_shader_config;
+            config.vertex_input = vertex_input_config;
+            config.viewport.viewports = { p_render_data->viewport };
+            config.viewport.scissors = { p_render_data->scissor };
+            config.pipeline_layout = p_pipeline_layout;
+            config.render_pass = p_render_pass;
+            config.color_blend.add_default_color_attachment();
+            config.dynamic_state.add_default_dynamic_states();
+            return *this;
+        }
+
+        /**
+         * @brief Create a reference-counted graphics pipeline object.
+         *
+         * @param p_render_data Base render data.
+         * @return Reference-counted graphics pipeline object.
+         */
+        Ref<ROGraphicsPipelineVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        /**
+         * @brief Create a unique-ownership graphics pipeline object.
+         *
+         * @param p_render_data Base render data.
+         * @return Unique-ownership graphics pipeline object.
+         */
+        Unique<ROGraphicsPipelineVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
+        }
+    };
+
     ~ROGraphicsPipelineVK();
     ROGraphicsPipelineVK(const ROGraphicsPipelineVK&) = delete;
     ROGraphicsPipelineVK(ROGraphicsPipelineVK&&) = delete;
@@ -622,40 +734,9 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_shaders The list of shaders used in the pipeline.
+     * @param p_builder The builder instance.
      */
-    ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Config& p_config);
-
-    /**
-     * @brief Get the default configurations.
-     *
-     * @param p_shader_config The shader configurations.
-     * @param p_vertex_input_config The vertex input configurations.
-     * @param p_pipeline_layout The pipeline layout.
-     * @param p_render_pass The render pass.
-     * @return The default configurations according to the input parameters.
-     */
-    static Config get_default_render_opaque_configuration(
-        const BaseRenderDataVK* p_render_data,
-        const Config::ShaderConfig& p_shader_config,
-        Ref<ROPipelineLayoutVK> p_pipeline_layout,
-        Ref<RORenderPassVK> p_render_pass) {
-
-        ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
-        vertex_input_config
-            .add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)
-            .add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
-        auto result = Config();
-        result.shader = p_shader_config;
-        result.vertex_input = vertex_input_config;
-        result.viewport.viewports = { p_render_data->viewport };
-        result.viewport.scissors = { p_render_data->scissor };
-        result.pipeline_layout = p_pipeline_layout;
-        result.render_pass = p_render_pass;
-        result.color_blend.add_default_color_attachment();
-        result.dynamic_state.add_default_dynamic_states();
-        return result;
-    }
+    ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the graphics pipeline instance.
