@@ -22,6 +22,7 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <set>
 #include <sstream>
 #include <unordered_map>
@@ -70,7 +71,7 @@ public:
             return MEM_NULL;
         }
         size_t align_size = get_align_size(p_size, p_alignment);
-        void* mem = aligned_alloc(p_alignment, align_size);
+        void* mem = aligned_alloc(p_alignment, align_size); // NOLINT
         MemID result = reinterpret_cast<MemID>(mem);
         allocated.insert(result);
         size_map[result] = align_size;

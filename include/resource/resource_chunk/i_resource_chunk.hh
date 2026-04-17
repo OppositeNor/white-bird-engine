@@ -28,6 +28,7 @@ namespace WhiteBirdEngine {
 class ResourceManager;
 
 using ResourceChunkID = HashCode;
+constexpr ResourceChunkID RES_CHUNK_NULL = 0x0;
 
 /**
  * @class IResourceChunk

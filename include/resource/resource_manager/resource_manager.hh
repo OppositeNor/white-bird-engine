@@ -50,7 +50,7 @@ public:
      * @param p_alloc_size The total capacity of the resource manager.
      * @param p_global_res_path The path to the global resources.
      */
-    ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path);
+    ResourceManager(size_t p_alloc_size);
 
     /**
      * @brief Register a resource chunk.
@@ -163,8 +163,10 @@ public:
         return it->second;
     }
 
+    void load_global_resource(const std::string& p_global_res_path);
+
 private:
-    ResourceChunkID global_res_chunk_id;
+    ResourceChunkID global_res_chunk_id = RES_CHUNK_NULL;
     std::vector<Ref<IResourceChunk>> resource_chunks;
     std::map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;

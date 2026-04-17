@@ -22,7 +22,6 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_task.hh"
-#include "core/job/job.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
@@ -119,16 +118,8 @@ public:
 
     virtual void update_static_opaque_triangles() override;
 
-    virtual void add_job(Ref<Job> p_job) override {
+    virtual void add_job(std::function<void()> p_job) override {
         job_buffer->add_job(std::move(p_job));
-    }
-
-    virtual void add_job(const std::function<void()>& p_job) override {
-        add_job(make_ref<Job>(allocator, p_job));
-    }
-
-    virtual void add_job(std::function<void()>&& p_job) override {
-        add_job(make_ref<Job>(allocator, std::move(p_job)));
     }
 
 
@@ -295,6 +286,7 @@ private:
                 && present.has_value();
         }
         Set<uint32_t> get_unique_indices() const {
+            WBE_DEBUG_ASSERT(is_complete());
             Set<uint32_t> result(allocator);
             result.insert(graphics.value());
             result.insert(compute.value());

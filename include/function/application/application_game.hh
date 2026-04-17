@@ -16,7 +16,6 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
-#include "core/job/job.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/audio/audio_renderer.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
@@ -27,6 +26,8 @@
 #include "function/window/i_window.hh"
 #include "utils/defs.hh"
 #include <atomic>
+#include <functional>
+#include <utility>
 namespace WhiteBirdEngine {
 
 /**
@@ -71,8 +72,8 @@ public:
     /**
      * @brief Add a job for the renderer.
      */
-    void add_render_job(Ref<Job> p_job) {
-        render_job_buffer->add_job(p_job);
+    void add_render_job(std::function<void()> p_job) {
+        render_job_buffer->add_job(std::move(p_job));
     }
 
 private:

@@ -15,8 +15,6 @@
 #ifndef WBE_FILE_JOB_HANDLER_HH
 #define WBE_FILE_JOB_HANDLER_HH
 
-#include "core/job/job.hh"
-#include "core/memory/reference_strong.hh"
 #include "utils/defs.hh"
 #include <functional>
 namespace WhiteBirdEngine {
@@ -35,21 +33,7 @@ public:
      *
      * @param p_job The job to add.
      */
-    virtual void add_job(Ref<Job> p_job) = 0;
-
-    /**
-     * @brief Add a job to the handler.
-     *
-     * @param p_job The job to add.
-     */
-    virtual void add_job(const std::function<void()>& p_job) = 0;
-
-    /**
-     * @brief Add a job to the handler.
-     *
-     * @param p_job The job to add.
-     */
-    virtual void add_job(std::function<void()>&& p_job) = 0;
+    virtual void add_job(std::function<void()> p_job) = 0;
 };
 
 } // namespace WhiteBirdEngine

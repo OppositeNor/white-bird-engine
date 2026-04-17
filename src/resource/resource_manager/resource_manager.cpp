@@ -25,23 +25,23 @@
 
 namespace WhiteBirdEngine {
 
-ResourceManager::ResourceManager(size_t p_alloc_size, const std::string& p_global_res_path)
+ResourceManager::ResourceManager(size_t p_alloc_size)
     : stack_allocator(p_alloc_size) {
     singleton = this;
-    // Default resources that are supported by the engine.
+    // Default resources that are supported by the resource layer.
     add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderGraphicsPipeline>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
+}
+
+void ResourceManager::load_global_resource(const std::string& p_global_res_path) {
     global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile>(
-        global_allocator(), p_global_res_path, stack_allocator));
+    global_allocator(), p_global_res_path, stack_allocator));
 }
 
 ResourceManager::~ResourceManager() {

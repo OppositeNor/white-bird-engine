@@ -16,10 +16,8 @@
 #define WBE_FILE_RENDER_DATABASE_HH
 
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render/material.hh"
 #include "render_defs.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -70,7 +68,7 @@ public:
         // Represents a material that is used.
         struct MaterialUnit {
             // The instance of the material.
-            Ref<Material> material;
+            // TODO
             // The subregion of indices that this material is applying on.
             SubRegion sub_region;
         };
@@ -105,10 +103,8 @@ public:
 
     /**
      * @brief Constructor.
-     *
-     * @param p_allocator The allocator for resource allocations.
      */
-    RenderDatabase(AllocType* p_allocator, Unique<IMaterialFactory> p_material_factory);
+    RenderDatabase(AllocType* p_allocator);
 
 
     /**
@@ -171,7 +167,6 @@ public:
 private:
 
     inline static RenderDatabase* singleton = nullptr;
-    Unique<IMaterialFactory> material_factory;
 
     AllocType* allocator = nullptr;
 

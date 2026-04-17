@@ -16,14 +16,13 @@
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_HH
 
 #include "core/core_utils.hh"
-#include "core/job/job.hh"
 #include "core/job/job_buffer.hh"
-#include "core/memory/reference_strong.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
-#include <cstddef>
-#include <semaphore>
 #include <atomic>
+#include <cstddef>
+#include <functional>
+#include <semaphore>
 namespace WhiteBirdEngine {
 
 /**
@@ -48,8 +47,8 @@ public:
      */
     JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size);
 
-    Ref<Job> retrieve_job(bool p_block = false);
-    void add_job(Ref<Job> p_job);
+    std::function<void()> retrieve_job(bool p_block = false);
+    void add_job(std::function<void()> p_job);
 
     /**
      * @brief Get the semaphore.
@@ -62,7 +61,7 @@ public:
 
 private:
     std::counting_semaphore<32> semaphore{0};
-    Vector<Ref<Job>> buffer;
+    Vector<std::function<void()>> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };

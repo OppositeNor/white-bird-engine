@@ -15,9 +15,9 @@
 
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>

@@ -25,6 +25,7 @@
 #include "function/render_dummy/renderer_dummy.hh"
 #include "function/window/i_window.hh"
 #include "function/window/window_sdl.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <format>
@@ -72,6 +73,7 @@ void ApplicationGame::init() {
     }
     worker = make_ref<Worker>(global_allocator());
     // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
+    ResourceManager::get_singleton()->load_global_resource("res_chunks/global_resources.json");
 }
 
 void ApplicationGame::run_render() {

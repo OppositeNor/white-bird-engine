@@ -12,15 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef __WBE_RENDERER_DUMMY_H__
-#define __WBE_RENDERER_DUMMY_H__
-#include "core/job/job.hh"
+#ifndef WBE_FILE_RENDERER_DUMMY_H
+#define WBE_FILE_RENDERER_DUMMY_H
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_task.hh"
-#include "function/render_dummy/material_dummy.hh"
 #include "utils/defs.hh"
 #include <string>
 #include <functional>
@@ -34,7 +31,7 @@ namespace WhiteBirdEngine {
 class RendererDummy final : public IRenderer {
 public:
     RendererDummy(RenderAllocator* p_allocator)
-        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryDummy>(p_allocator))) {}
+        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {}
     
     virtual ~RendererDummy() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
@@ -53,17 +50,11 @@ public:
 
     virtual void update_static_opaque_triangles() override {}
 
-    virtual void add_job(Ref<Job> p_job) override {}
-
-    virtual void add_job(const std::function<void()>& p_job) override {}
-
-    virtual void add_job(std::function<void()>&& p_job) override {}
+    virtual void add_job(std::function<void()> p_job) override {}
 private:
     Ref<RenderDatabase> dummy_database;
 };
 
 } // namespace WhiteBirdEngine
-
-
 
 #endif

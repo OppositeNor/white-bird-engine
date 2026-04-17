@@ -13,15 +13,12 @@
    limitations under the License.
 */
 #include "function/render/render_database.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
-#include "core/memory/unique.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "core/surface/3d_primitive.hh"
-#include "function/render/material.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 
 #include <algorithm>
@@ -37,10 +34,9 @@
 
 namespace WhiteBirdEngine {
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator, Unique<IMaterialFactory> p_material_factory)
-    : material_factory(std::move(p_material_factory)), static_opaque(p_allocator), dynamic_opaque(p_allocator),
+RenderDatabase::RenderDatabase(AllocType* p_allocator)
+    : static_opaque(p_allocator), dynamic_opaque(p_allocator),
     render_objects_resources(p_allocator) {
-    WBE_DEBUG_ASSERT(material_factory != MEM_NULL);
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
@@ -98,7 +94,7 @@ void RenderDatabase::set_opaque_triangles_linear(
         auto& material = submesh->material;
         if (!registered_material_index.contains(material.get())) {
             // If not registered before, register.
-            p_triangles_info.materials.push_back({.material = material_factory->create(material)});
+            // TODO: Register material.
             MaterialMeshInfo info = {.submeshes = Vector<RUSubmesh3D*>(allocator)};
             registered_material_index.insert({material.get(), material_mesh_infos.size()});
             material_mesh_infos.push_back(info);

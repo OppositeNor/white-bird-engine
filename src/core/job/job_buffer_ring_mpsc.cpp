@@ -14,13 +14,12 @@
 */
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/core_utils.hh"
-#include "core/memory/reference_strong.hh"
-#include "core/job/job.hh"
-#include "core/allocator/i_allocator.hh"
 #include "utils/utils.hh"
-#include <cstddef>
 #include <atomic>
+#include <cstddef>
+#include <functional>
 #include <stdexcept>
+#include <utility>
 
 namespace WhiteBirdEngine {
 
@@ -32,7 +31,7 @@ JobBufferRingMPSC::JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p
     buffer.resize(p_buffer_size);
 }
 
-void JobBufferRingMPSC::add_job(Ref<Job> p_job) {
+void JobBufferRingMPSC::add_job(std::function<void()> p_job) {
     size_t head_l;
     size_t next;
 
@@ -51,26 +50,22 @@ void JobBufferRingMPSC::add_job(Ref<Job> p_job) {
             break;
         }
     }
-    buffer[head_l] = p_job;
+    buffer[head_l] = std::move(p_job);
     std::atomic_thread_fence(std::memory_order_release);
     semaphore.release();
 }
 
-Ref<Job> JobBufferRingMPSC::retrieve_job(bool p_block) {
+std::function<void()> JobBufferRingMPSC::retrieve_job(bool p_block) {
     if (p_block) {
         semaphore.acquire();
     }
     else if (!semaphore.try_acquire()) {
-        return MEM_NULL;
+        return std::function<void()>();
     }
     size_t tail_l = tail.load(std::memory_order_acquire);
 
-    // We don't dereference buffer[tail_l] here because it might cause the Job object to be destroyed.
-    // And since the object was allocated in the producer thread, destroying it at the consumer thread
-    // requires an atomic pool, which desatisfies the lock-free requirement. So the job will be referenced
-    // until the producer thread adds a new job, which overwrites the old reference and dereferences it safely.
-    // This is not ideal, so a lock-free deallocation design would be better in the future.
-    Ref<Job> result = buffer[tail_l];
+    std::function<void()> result = std::move(buffer[tail_l]);
+    buffer[tail_l] = nullptr;
     tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
     return result;
 }

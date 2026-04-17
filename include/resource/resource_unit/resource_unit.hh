@@ -31,6 +31,8 @@ namespace WhiteBirdEngine {
 
 struct ResourceUnit {};
 
+struct RUMaterial;
+
 template <typename T>
 constexpr bool IS_RESOURCE_UNIT = std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
 
@@ -318,54 +320,6 @@ struct RUBinary : public ResourceUnit {
 };
 
 /**
- * @class RUShader
- * @brief Shader resource unit. contains a size (in bytes) and a MemID pointing to
- * the data chunk that stores the data of the binary data.
- *
- * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit, and
- * then release the data) It is recommended to store the image data right before the
- * text resource unit in a stack allocator.
- *
- */
-struct RUShader : public ResourceUnit {
-    // The binary data.
-    RefRes<char> data;
-    // The size of the binary data.
-    size_t size;
-    // The path to the metadata. Ending with an NUL terminater.
-    RefRes<char> metadata_path;
-};
-
-/**
- * @class RUGraphicsPipeline
- * @brief Graphics pipeline.
- *
- */
-struct RUGraphicsPipeline : public ResourceUnit {
-    // The vertex shader.
-    RefRes<RUShader> vertex_stage;
-    // Entry function for the vertex stage.
-    RefRes<char> vertex_stage_entry;
-    // The tessellation shader.
-    RefRes<RUShader> tessellation_stage;
-    // Entry function for the tessellation stage.
-    RefRes<char> tessellation_stage_entry;
-    // The geometry shader.
-    RefRes<RUShader> geometry_stage;
-    // Entry function for the geometry stage.
-    RefRes<char> geometry_stage_entry;
-    // The fragment shader.
-    RefRes<RUShader> fragment_stage;
-    // Entry function for the fragment stage.
-    RefRes<char> fragment_stage_entry;
-    // Should enable depth test.
-    bool depth_test = true;
-    // Should enable depth write.
-    bool depth_write = true;
-};
-
-/**
  * @class RUFont
  * @brief Font resource unit.
  */
@@ -434,14 +388,6 @@ struct RUText : public ResourceUnit {
  * @brief Video resource unit.
  */
 struct RUVideo : public ResourceUnit {
-    // TODO
-};
-
-/**
- * @class RUMaterial
- * @brief Material resource unit.
- */
-struct RUMaterial : public ResourceUnit {
     // TODO
 };
 

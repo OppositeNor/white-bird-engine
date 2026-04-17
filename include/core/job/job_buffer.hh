@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_JOB_BUFFER_HH
 #define WBE_FILE_JOB_BUFFER_HH
 
-#include "core/job/job.hh"
-#include "core/memory/reference_strong.hh"
 #include "utils/defs.hh"
+#include <functional>
 #include <semaphore>
+#include <utility>
 namespace WhiteBirdEngine {
 
 /**
@@ -34,9 +34,9 @@ public:
      * @brief Retrieve a job.
      *
      * @param p_block Block and wait for a new job if the buffer is empty.
-     * @return THe instance of a job. Or MEM_NULL if p_block is false, and the buffer is empty.
+     * @return The job function. Returns an empty function if p_block is false and the buffer is empty.
      */
-    Ref<Job> retrieve_job(bool p_block = false) {
+    std::function<void()> retrieve_job(bool p_block = false) {
         return static_cast<ChildT*>(this)->retrieve_job(p_block);
     }
 
@@ -46,8 +46,8 @@ public:
      * @throws std::runtime_error If buffer overflow.
      * @param p_job The job to add to the buffer.
      */
-    void add_job(Ref<Job> p_job) {
-        return static_cast<ChildT*>(this)->add_job(p_job);
+    void add_job(std::function<void()> p_job) {
+        return static_cast<ChildT*>(this)->add_job(std::move(p_job));
     }
 
     /**

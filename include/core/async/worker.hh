@@ -15,11 +15,9 @@
 #ifndef WBE_FILE_WORKER_HH
 #define WBE_FILE_WORKER_HH
 
-#include "core/job/job.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/job/job_handler.hh"
 #include "core/core_utils.hh"
-#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
@@ -64,9 +62,7 @@ public:
         singleton = nullptr;
     }
 
-    virtual void add_job(Ref<Job> p_job) override;
-    virtual void add_job(const std::function<void()>& p_job) override;
-    virtual void add_job(std::function<void()>&& p_job) override;
+    virtual void add_job(std::function<void()> p_job) override;
 
     static Worker* get_singleton() {
         return singleton;

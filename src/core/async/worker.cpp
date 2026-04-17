@@ -13,8 +13,6 @@
    limitations under the License.
 */
 #include "core/async/worker.hh"
-#include "core/job/job.hh"
-#include "core/memory/reference_strong.hh"
 #include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <functional>
@@ -25,20 +23,16 @@
 
 namespace WhiteBirdEngine {
 
-void Worker::add_job(Ref<Job> p_job) {
-    job_buffer->add_job(p_job);
-}
-void Worker::add_job(const std::function<void()>& p_job) {
-    job_buffer->add_job(make_ref<Job>(&allocator, p_job));
-}
-void Worker::add_job(std::function<void()>&& p_job) {
-    job_buffer->add_job(make_ref<Job>(&allocator, std::move(p_job)));
+void Worker::add_job(std::function<void()> p_job) {
+    job_buffer->add_job(std::move(p_job));
 }
 
 void Worker::run() {
     while (!should_exit) {
         auto job = job_buffer->retrieve_job(true);
-        job->perform();
+        if (job != nullptr) {
+            job();
+        }
     }
 }
 

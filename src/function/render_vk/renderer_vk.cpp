@@ -16,7 +16,6 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
-#include "core/job/job.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -36,7 +35,7 @@
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
-#include "function/render_vk/material_vk.hh"
+#include "function/renderer_vk/renderer_vk_resource_unit_loader.hh"
 #include "function/window/i_window.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
@@ -63,7 +62,7 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator),
-    render_database(make_ref<RenderDatabase>(p_allocator, p_allocator, make_unique<MaterialFactoryVK>(allocator))),
+    render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
     allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
     base_render_data(p_allocator), pipelines(p_allocator), render_resources(p_allocator), per_frame_in_flight_resource(p_allocator),
     activated_pipeline(p_allocator) {
@@ -74,6 +73,7 @@ RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBuf
     for (auto& delayed_call : delayed_calls) {
         delayed_call.second = -1;
     }
+    register_renderer_vk_resource_unit_loaders();
     init();
 }
 
@@ -87,11 +87,11 @@ void RendererVK::tick(double p_delta) {
 
     // Run some jobs stored in the job buffer.
     for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
-        Ref<Job> job = job_buffer->retrieve_job();
-        if (job == MEM_NULL) {
+        std::function<void()> job = job_buffer->retrieve_job();
+        if (job == nullptr) {
             break;
         }
-        job->perform();
+        job();
     }
 
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;

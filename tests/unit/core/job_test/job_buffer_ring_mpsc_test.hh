@@ -15,15 +15,20 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 
+#include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include <algorithm>
+#include <functional>
 #include <gtest/gtest.h>
-#include <thread>
 #include <atomic>
-#include <vector>
-#include <numeric>
+#include <memory>
 #include <mutex>
+#include <numeric>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -42,10 +47,6 @@ protected:
     // Helper to get allocator from global
     WBE::HeapAllocatorDefault* get_allocator() {
         return global->engine_core->pool_allocator;
-    }
-
-    WBE::HeapAllocatorAtomicDefault* get_atomic_allocator() {
-        return global->engine_core->atomic_pool_allocator;
     }
 };
 
@@ -80,32 +81,32 @@ TEST_F(WBEJobBufferRingMPSCTest, ConstructorInvalidSize) {
 TEST_F(WBEJobBufferRingMPSCTest, RetrieveFromEmptyBuffer) {
     JobBufferRingMPSC buffer(get_allocator(), 5);
     
-    // Empty buffer should return MEM_NULL
-    WBE::Ref<WBE::Job> job = buffer.retrieve_job();
-    EXPECT_EQ(job, WBE::MEM_NULL);
+    // Empty buffer should return an empty function.
+    std::function<void()> job = buffer.retrieve_job();
+    EXPECT_EQ(job, nullptr);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveSingleJob) {
     JobBufferRingMPSC buffer(get_allocator(), 5);
     
     bool performed = false;
-    auto job = WBE::make_ref<WBE::Job>(get_allocator(), [&performed]() { performed = true; });
+    auto job = std::function<void()>([&performed]() { performed = true; });
     
     // Add job
     EXPECT_NO_THROW(buffer.add_job(job));
     
     // Retrieve job
-    WBE::Ref<WBE::Job> retrieved = buffer.retrieve_job();
-    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    std::function<void()> retrieved = buffer.retrieve_job();
+    EXPECT_NE(retrieved, nullptr);
     
     // Perform the job
     EXPECT_FALSE(performed);
-    retrieved->perform();
+    retrieved();
     EXPECT_TRUE(performed);
     
     // Buffer should be empty again
-    WBE::Ref<WBE::Job> empty = buffer.retrieve_job();
-    EXPECT_EQ(empty, WBE::MEM_NULL);
+    std::function<void()> empty = buffer.retrieve_job();
+    EXPECT_EQ(empty, nullptr);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveMultipleJobs) {
@@ -114,64 +115,64 @@ TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveMultipleJobs) {
     // Add multiple jobs
     std::vector<bool> performed(3, false);
     for (int i = 0; i < 3; ++i) {
-        auto job = WBE::make_ref<WBE::Job>(get_allocator(), [&performed, i]() { performed[i] = true; });
+        auto job = std::function<void()>([&performed, i]() { performed[i] = true; });
         buffer.add_job(job);
     }
     
     // Retrieve jobs (should be in FIFO order)
     for (int i = 0; i < 3; ++i) {
-        WBE::Ref<WBE::Job> retrieved = buffer.retrieve_job();
-        EXPECT_NE(retrieved, WBE::MEM_NULL);
+        std::function<void()> retrieved = buffer.retrieve_job();
+        EXPECT_NE(retrieved, nullptr);
         
         EXPECT_FALSE(performed[i]);
-        retrieved->perform();
+        retrieved();
         EXPECT_TRUE(performed[i]);
     }
     
     // Buffer should be empty
-    WBE::Ref<WBE::Job> empty = buffer.retrieve_job();
-    EXPECT_EQ(empty, WBE::MEM_NULL);
+    std::function<void()> empty = buffer.retrieve_job();
+    EXPECT_EQ(empty, nullptr);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, BufferOverflow) {
     JobBufferRingMPSC buffer(get_allocator(), 3);  // Small buffer
     
-    auto job1 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
-    auto job2 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
+    auto job1 = std::function<void()>([]() {});
+    auto job2 = std::function<void()>([]() {});
     
     EXPECT_NO_THROW(buffer.add_job(job1));
     EXPECT_NO_THROW(buffer.add_job(job2));
     
     // This should cause overflow
-    auto job3 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
+    auto job3 = std::function<void()>([]() {});
     EXPECT_THROW(buffer.add_job(job3), std::runtime_error);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, RingBufferWrapAround) {
     JobBufferRingMPSC buffer(get_allocator(), 4);
     
-    auto job1 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
-    auto job2 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
-    auto job3 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
+    auto job1 = std::function<void()>([]() {});
+    auto job2 = std::function<void()>([]() {});
+    auto job3 = std::function<void()>([]() {});
     
     buffer.add_job(job1);
     buffer.add_job(job2);
     buffer.add_job(job3);
     
-    WBE::Ref<WBE::Job> retrieved = buffer.retrieve_job();
-    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    std::function<void()> retrieved = buffer.retrieve_job();
+    EXPECT_NE(retrieved, nullptr);
     
-    auto job4 = WBE::make_ref<WBE::Job>(get_allocator(), []() {});
+    auto job4 = std::function<void()>([]() {});
     EXPECT_NO_THROW(buffer.add_job(job4));
     
     retrieved = buffer.retrieve_job();
-    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    EXPECT_NE(retrieved, nullptr);
     
     retrieved = buffer.retrieve_job();
-    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    EXPECT_NE(retrieved, nullptr);
     
     retrieved = buffer.retrieve_job();
-    EXPECT_NE(retrieved, WBE::MEM_NULL);
+    EXPECT_NE(retrieved, nullptr);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
@@ -185,6 +186,8 @@ TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
     std::atomic<int> perform_count{0};
     std::vector<std::thread> producers;
     std::mutex consumed_mutex;
+    std::vector<int> consumed_job_ids;
+    consumed_job_ids.reserve(TOTAL_JOBS);
 
     producers.reserve(NUM_PRODUCERS);
     for (int i = 0; i < NUM_PRODUCERS; ++i) {
@@ -192,8 +195,8 @@ TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
             for (int j = 0; j < JOBS_PER_PRODUCER; ++j) {
                 // Unique job ID for each job across all producers
                 int job_id = producer_id * JOBS_PER_PRODUCER + j;
-                auto job = WBE::make_ref<WBE::Job>(get_atomic_allocator(), [job_id, &consumed_job_ids, &perform_count, &consumed_mutex]() {
-                    std::lock_guard<std::mutex> lock(consumed_mutex);
+                auto job = std::function<void()>([job_id, &consumed_job_ids, &perform_count, &consumed_mutex]() {
+                    std::scoped_lock lock(consumed_mutex);
                     consumed_job_ids.push_back(job_id);
                     perform_count.fetch_add(1);
                 });
@@ -211,22 +214,20 @@ TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
         });
     }
 
-    std::vector<int> consumed_job_ids;
-    consumed_job_ids.reserve(TOTAL_JOBS);
     int consumed_count = 0;
 
     // Consumer logic
     while (consumed_count < TOTAL_JOBS) {
-        WBE::Ref<WBE::Job> job = buffer.retrieve_job();
-        if (job != WBE::MEM_NULL) {
-            job->perform();
+        std::function<void()> job = buffer.retrieve_job();
+        if (job != nullptr) {
+            job();
             consumed_count++;
         } else {
             // If all producers are done and buffer is empty, break
             // A simple check, in a real scenario might need a more robust signal
             if (produced_count.load() == TOTAL_JOBS) {
                  // to avoid busy-waiting
-                if (buffer.retrieve_job() == WBE::MEM_NULL) {
+                if (buffer.retrieve_job() == nullptr) {
                     break;
                 }
             }
@@ -261,14 +262,16 @@ TEST_F(WBEJobBufferRingMPSCTest, StressTestManyProducers) {
     std::atomic<int> perform_count{0};
     std::vector<std::thread> producers;
     std::mutex consumed_mutex;
+    std::vector<int> consumed_job_ids;
+    consumed_job_ids.reserve(TOTAL_JOBS);
 
     producers.reserve(NUM_PRODUCERS);
     for (int i = 0; i < NUM_PRODUCERS; ++i) {
         producers.emplace_back([&, producer_id = i]() {
             for (int j = 0; j < JOBS_PER_PRODUCER; ++j) {
                 int job_id = producer_id * JOBS_PER_PRODUCER + j;
-                auto job = WBE::make_ref<WBE::Job>(get_atomic_allocator(), [job_id, &consumed_job_ids, &perform_count, &consumed_mutex]() {
-                    std::lock_guard<std::mutex> lock(consumed_mutex);
+                auto job = std::function<void()>([job_id, &consumed_job_ids, &perform_count, &consumed_mutex]() {
+                    std::scoped_lock lock(consumed_mutex);
                     consumed_job_ids.push_back(job_id);
                     perform_count.fetch_add(1);
                 });
@@ -286,23 +289,21 @@ TEST_F(WBEJobBufferRingMPSCTest, StressTestManyProducers) {
         });
     }
 
-    std::vector<int> consumed_job_ids;
-    consumed_job_ids.reserve(TOTAL_JOBS);
     int consumed_count = 0;
 
     while (consumed_count < TOTAL_JOBS) {
-        WBE::Ref<WBE::Job> job = buffer.retrieve_job();
-        if (job != WBE::MEM_NULL) {
-            job->perform();
+        std::function<void()> job = buffer.retrieve_job();
+        if (job != nullptr) {
+            job();
             consumed_count++;
         } else if (produced_count.load() == TOTAL_JOBS) {
             // All jobs produced, but buffer might be temporarily empty.
             // One final check to ensure we don't exit prematurely.
             job = buffer.retrieve_job();
-            if (job == WBE::MEM_NULL) {
+            if (job == nullptr) {
                 break;
             }
-            job->perform();
+            job();
             consumed_count++;
         } else {
             std::this_thread::yield();
