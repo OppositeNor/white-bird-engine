@@ -25,7 +25,6 @@ Checks: >
   -readability-implicit-bool-conversion,
   -readability-isolate-declaration,
   -readability-convert-member-functions-to-static,
-  -readability-function-size,
   -readability-simplify-boolean-expr,
   -readability-use-anyofallof,
   -readability-math-missing-parentheses,
@@ -49,7 +48,6 @@ Checks: >
   -google-readability-todo,
   -google-default-arguments,
   -hicpp-named-parameter,
-  -hicpp-function-size,
   -hicpp-avoid-c-arrays,
   -hicpp-use-override,
   -hicpp-explicit-conversions,
@@ -248,5 +246,5 @@ WarningsAsErrors: ''
 # Inherit parent config if exists
 InheritParentConfig: false
 
-# Use .clang-format file for formatting
+# Use workspace .clang-format for formatting/fix-its (including indentation constraints)
 FormatStyle: file

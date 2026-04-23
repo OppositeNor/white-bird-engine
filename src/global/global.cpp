@@ -23,7 +23,7 @@ namespace WhiteBirdEngine {
 
 Global::Global(int p_argc, char* p_argv[]) {
     singleton = this;
-    engine_core = new EngineCore(p_argc, p_argv);
+    engine_core = new EngineCore(static_cast<uint32_t>(p_argc), p_argv);
     auto* file_system = Global::get_singleton()->engine_core->file_system;
     engine_resource = make_unique<EngineResource>(global_allocator());
     engine_function = make_unique<EngineFunction>(global_allocator(), Path(file_system->get_config_directory(), "game_config.yaml"));
@@ -31,7 +31,7 @@ Global::Global(int p_argc, char* p_argv[]) {
 
 Global::Global(int p_argc, char* p_argv[], const Directory& p_root_dir) {
     singleton = this;
-    engine_core = new EngineCore(p_argc, p_argv, p_root_dir);
+    engine_core = new EngineCore(static_cast<uint32_t>(p_argc), p_argv, p_root_dir);
     auto* file_system = Global::get_singleton()->engine_core->file_system;
     engine_resource = make_unique<EngineResource>(global_allocator());
     engine_function = make_unique<EngineFunction>(global_allocator(), Path(file_system->get_config_directory(), "game_config.yaml"));

@@ -49,7 +49,7 @@ public:
      * @param p_argc argc.
      * @param p_argv argv.
      */
-    EngineCore(int p_argc, char* p_argv[]);
+    EngineCore(uint32_t p_argc, char* p_argv[]);
 
     /**
      * @brief Constructor.
@@ -58,7 +58,7 @@ public:
      * @param p_argv argv.
      * @param p_root_dir The root directory.
      */
-    EngineCore(int p_argc, char* p_argv[], const Directory& p_root_dir);
+    EngineCore(uint32_t p_argc, char* p_argv[], const Directory& p_root_dir);
 
     /**
      * @brief Get the singleton.
@@ -108,7 +108,7 @@ public:
     TypeUUIDManager* type_uuid_manager = nullptr;
 
 private:
-    void initialize(int p_argc, char* p_argv[]);
+    void initialize(uint32_t p_argc, char* p_argv[]);
     inline static EngineCore* singleton;
 };
 

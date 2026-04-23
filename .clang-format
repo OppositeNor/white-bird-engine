@@ -1,0 +1,25 @@
+---
+BasedOnStyle: LLVM
+
+# Global indentation constraints.
+UseTab: Never
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+
+# Class/struct indentation constraints.
+AccessModifierOffset: -4
+
+# Function implementation/signature and call continuation constraints.
+AlignAfterOpenBracket: DontAlign
+IndentWrappedFunctionNames: false
+BinPackParameters: false
+BinPackArguments: false
+ConstructorInitializerIndentWidth: 4
+LambdaBodyIndentation: Signature
+
+# Keep preprocessor directives at top-level indentation.
+IndentPPDirectives: None
+
+# Namespace scopes should not affect indentation.
+NamespaceIndentation: None

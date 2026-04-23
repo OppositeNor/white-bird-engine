@@ -49,6 +49,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <optional>
 #include <ranges>
 #include <set>
 #include <span>
@@ -86,82 +87,32 @@ void RendererVK::tick(double p_delta) {
     WBE_DEBUG_ASSERT(!(this_ref.is_null()));
 
     // Run some jobs stored in the job buffer.
-    for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
-        std::function<void()> job = job_buffer->retrieve_job();
-        if (job == nullptr) {
-            break;
-        }
-        job();
-    }
+    run_stored_jobs();
 
+    // Setup pipeline.
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
-    if (run_pipeline.empty()) {
-        stdout_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
+    auto tick_frame_counter = tick_setup_pipeline(run_pipeline);
+    if (tick_frame_counter.has_value()) {
+        // No pipeline selected, continue.
         return;
     }
+    uint32_t frame_counter = *tick_frame_counter;
 
-    static uint32_t frame_counter = 0;
-    frame_counter = (frame_counter + 1) % frames_in_flight;
-    base_render_data.in_flight_fence = in_flight_fences[frame_counter];
-
-    vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
-
-    for (auto& delayed_call : delayed_calls) {
-        if (delayed_call.second < 0) {
-            continue;
-        }
-        --(delayed_call.second);
-        if (delayed_call.second < 0) {
-            // Run delayed calls that should be called in the current frame.
-            delayed_call.first();
-            delayed_call.first = nullptr;
-        }
-    }
-
-    // Aquire swap chain image.
-    uint32_t image_index = 0;
+    // Acquire swap chain image.
     auto* image_available_semaphore = run_pipeline[frame_counter]->image_available_semaphore->get_semaphore();
-    VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX,
-                                            image_available_semaphore,
-                                            VK_NULL_HANDLE, &image_index);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        recreate_swap_chain();
+    auto next_image_index = acquire_swapchain_next_image(image_available_semaphore);
+    if (!next_image_index.has_value()) {
+        // Swap chain resetted, needs re-acquire. Skip this frame's rendering.
         return;
     }
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error("Failed to acquire swap chain image.");
-    }
+    uint32_t image_index = *next_image_index;
 
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
     render_objects->swap_chain_framebuffer_resource->res = render_objects->swap_chain_framebuffers[image_index];
-    auto curr_pipeline = run_pipeline[frame_counter];
+    const auto& curr_pipeline = run_pipeline[frame_counter];
 
-    for (auto& task_info : curr_pipeline->task_infos) {
-        if (task_info.render_task == MEM_NULL) {
-            stdout_log(WBE_CHANNEL_RENDER)->warning(
-                std::format("Render task {} is NULL. Skipped.", LabelManager::get_singleton()->get_label_name(task_info.task_id)));
-            continue;
-        }
-        task_info.render_task->perform(p_delta);
-    }
-
-    VkPresentInfoKHR present_info{};
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.waitSemaphoreCount = curr_pipeline->result_semaphores.size();
-    Vector<VkSemaphore> result_semaphores(allocator);
-    result_semaphores.reserve(curr_pipeline->result_semaphores.size());
-    for (auto& semaphore : curr_pipeline->result_semaphores) {
-        result_semaphores.push_back(semaphore->get_semaphore());
-    }
-    present_info.pWaitSemaphores = result_semaphores.data();
-
-    VkSwapchainKHR swap_chains[] = {swap_chain};
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains = swap_chains;
-    present_info.pImageIndices = &image_index;
-
-    present_info.pResults = nullptr;
-    vkQueuePresentKHR(present_queue, &present_info);
+    run_pipeline_tasks(p_delta, curr_pipeline);
+    present(curr_pipeline, image_index);
 
     // Clear pre-execute tasks queue.
     base_render_data.pre_execute_tasks_queue.clear();
@@ -377,7 +328,7 @@ void RendererVK::setup_render_resource() {
                    render_objects->static_opaque_triangles_buffer_obj_ids_resource, MEM_NULL);
 }
 
-void RendererVK::create_instance() {
+void RendererVK::create_instance() { // NOLINT
     // Get configuration informations.
     const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
@@ -463,7 +414,7 @@ void RendererVK::create_device() {
     create_logical_device();
 }
 
-void RendererVK::create_swap_chain() {
+void RendererVK::create_swap_chain() { // NOLINT
     // Get informations to create swap chain.
     SwapChainSupportDetails details = get_swap_chain_support_details(physical_device);
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(details.formats);
@@ -860,7 +811,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
     Vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
-    int i = 0;
+    uint32_t i = 0;
     for (auto& queue_family_property : queue_family_properties) {
         if (queue_family_property.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphics = i;
@@ -1280,4 +1231,91 @@ uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, DeviceDomain p_dom
     }
     return best_type;
 }
+
+void RendererVK::run_stored_jobs() {
+    // Run some jobs stored in the job buffer.
+    for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {
+        std::function<void()> job = job_buffer->retrieve_job();
+        if (job == nullptr) {
+            break;
+        }
+        job();
+    }
+
+}
+
+std::optional<uint32_t> RendererVK::acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore) {
+    uint32_t image_index;
+    auto* image_available_semaphore = p_image_avialable_semaphore;
+    VkResult result = vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX,
+                                            image_available_semaphore,
+                                            VK_NULL_HANDLE, &image_index);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        // Swapchian outdated, needs to recreate.
+        recreate_swap_chain();
+        return std::nullopt;
+    }
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to acquire swap chain image.");
+    }
+    return image_index;
+}
+
+std::optional<uint32_t> RendererVK::tick_setup_pipeline(const Vector<Ref<PipelineInfo>>& p_run_pipeline) {
+    if (p_run_pipeline.empty()) {
+        stdout_log(WBE_CHANNEL_RENDER)->warning("No pipeline activated. Skipping renderer update.");
+        return std::nullopt;
+    }
+
+    static uint32_t frame_counter = 0;
+    frame_counter = (frame_counter + 1) % frames_in_flight;
+    base_render_data.in_flight_fence = in_flight_fences[frame_counter];
+
+    vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
+
+    for (auto& delayed_call : delayed_calls) {
+        if (delayed_call.second < 0) {
+            continue;
+        }
+        --(delayed_call.second);
+        if (delayed_call.second < 0) {
+            // Run delayed calls that should be called in the current frame.
+            delayed_call.first();
+            delayed_call.first = nullptr;
+        }
+    }
+    return frame_counter;
+}
+
+void RendererVK::run_pipeline_tasks(double p_delta, Ref<PipelineInfo> p_curr_pipeline) {
+    for (auto& task_info : p_curr_pipeline->task_infos) {
+        if (task_info.render_task == MEM_NULL) {
+            stdout_log(WBE_CHANNEL_RENDER)->warning(
+                std::format("Render task {} is NULL. Skipped.", LabelManager::get_singleton()->get_label_name(task_info.task_id)));
+            continue;
+        }
+        task_info.render_task->perform(p_delta);
+    }
+}
+
+void RendererVK::present(Ref<PipelineInfo> p_curr_pipeline, uint32_t p_image_index) {
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = p_curr_pipeline->result_semaphores.size();
+    Vector<VkSemaphore> result_semaphores(allocator);
+    result_semaphores.reserve(p_curr_pipeline->result_semaphores.size());
+    for (auto& semaphore : p_curr_pipeline->result_semaphores) {
+        result_semaphores.push_back(semaphore->get_semaphore());
+    }
+    present_info.pWaitSemaphores = result_semaphores.data();
+
+    VkSwapchainKHR swap_chains[] = {swap_chain};
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swap_chains;
+    present_info.pImageIndices = &p_image_index;
+
+    present_info.pResults = nullptr;
+    vkQueuePresentKHR(present_queue, &present_info);
+}
+
 } // namespace WhiteBirdEngine

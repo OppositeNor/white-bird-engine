@@ -415,6 +415,12 @@ private:
 
     int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
     uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;
+
+    void run_stored_jobs();
+    std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
+    std::optional<uint32_t> tick_setup_pipeline(const Vector<Ref<PipelineInfo>>& p_run_pipeline);
+    void run_pipeline_tasks(double p_delta, Ref<PipelineInfo> p_curr_pipeline);
+    void present(Ref<PipelineInfo> p_curr_pipeline, uint32_t p_image_index);
 };
 
 } // namespace WhiteBirdEngine

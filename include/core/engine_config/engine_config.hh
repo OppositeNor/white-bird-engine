@@ -95,7 +95,7 @@ public:
      * @param p_argc argc
      * @param p_argv argv
      */
-    EngineConfig(const Path& p_config_file_path, int p_argc, char* p_argv[]) {
+    EngineConfig(const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
         parse_config_file(p_config_file_path);
         if (p_argc > 0) {
             parse_cla(p_argc, p_argv);
@@ -119,7 +119,7 @@ public:
 private:
     EngineConfigOptions config_options;
 
-    void parse_cla(int p_argc, char* p_argv[]) {
+    void parse_cla(uint32_t p_argc, char* p_argv[]) {
         // TODO
     }
 
