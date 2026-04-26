@@ -92,7 +92,7 @@ void RendererVK::tick(double p_delta) {
     // Setup pipeline.
     Vector<Ref<PipelineInfo>> run_pipeline = activated_pipeline;
     auto tick_frame_counter = tick_setup_pipeline(run_pipeline);
-    if (tick_frame_counter.has_value()) {
+    if (!tick_frame_counter.has_value()) {
         // No pipeline selected, continue.
         return;
     }

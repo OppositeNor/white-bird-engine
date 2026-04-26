@@ -114,9 +114,9 @@ void RenderDatabase::set_opaque_triangles_linear(
         // This is useful for object edge detection or some per-object operations.
         static std::atomic<uint32_t> obj_id_tracker = 0;
         uint32_t curr_obj_id = obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
-
         auto& mesh_info = material_mesh_infos[i];
-        size_t material_mesh_start = p_triangles_info.indices.size();
+        // size_t material_mesh_start = p_triangles_info.indices.size();
+        (void)i;
         for (auto& submesh : mesh_info.submeshes) {
             uint32_t max_index = 0;
             size_t curr_index = p_triangles_info.vertices.size();
@@ -136,10 +136,7 @@ void RenderDatabase::set_opaque_triangles_linear(
             p_triangles_info.vertices.resize(curr_index + max_index + 1);
             memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
         }
-        // Setup subregion for the material.
-        p_triangles_info.materials[i].sub_region.starting_index = material_mesh_start;
-        p_triangles_info.materials[i].sub_region.size = p_triangles_info.indices.size() - material_mesh_start;
+        // TODO: Setup subregion for the material.
     }
 }
-
 } // namespace WhiteBirdEngine
