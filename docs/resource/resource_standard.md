@@ -1,28 +1,23 @@
-# Asset standard
+# Asset Standard
 
-Assets should be stored in the `res` folder, and will be processed by the ASP during compile time.
+Assets are described by manifest files in the `res` folder and processed by ACP during build time.
 
-Types of assets are:
+## Manifest Entry Rules
 
-- RUAudio
+- Every resource entry must contain a `type` field.
+- Type-specific fields are allowed and preserved.
+- For shader resources, use:
+    - `src`: source shader file in `res`.
+    - `dst`: compiled shader output path in runtime resources.
+    - `metadata`: reflection metadata output path.
+- For direct-copy resources, use:
+    - `file`: source file path in `res`.
+- Missing files referenced by `file` are treated as build errors.
 
-- RUBinary
+## Runtime Index Output
 
-- RUShader
+ACP generates runtime index files from manifests. Each manifest file produces a corresponding
+index file in the output resource directory.
 
-- RUFont
-
-- RUImage
-
-- RUText
-
-- RUVideo
-
-- RUMaterial
-
-- RUMesh
-
-Then, index files should be written to index the files by the resource path. The standard of the
-resource path is:
-
-The relative path relative to the `res` folder, with `/` separating the directory scope.
+The engine runtime consumes generated index files using resource paths relative to `res`, with
+`/` as path separator.

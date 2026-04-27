@@ -3,42 +3,15 @@
         "assets/meshes/cube.json",
         "assets/meshes/triangle.json",
         "assets/shaders/main_pipeline/main_pipeline_shader.json",
+        "assets/materials/default_material.json",
         "assets/shaders/draw_triangle/draw_triangle_shader.json",
         "assets/shaders/draw_cube/draw_cube_shader.json"
     ],
     "resources": [
         {
-            "id": "default_material",
-            "type": "material",
-            "shading_model": {
-                "type": "resource_reference",
-                "id": "cook_torrance_pbr"
-            },
-            "textures": {
-                "normal": {
-                    "type": "image",
-                    "path": "assets/images/default_normal.png",
-                    "color_space": "rgb",
-                    "channel_count": 3
-                },
-                "albedo": {
-                    "type": "image",
-                    "path": "assets/images/default_albedo.png",
-                    "color_space": "srgb",
-                    "channel_count": 3
-                },
-                "roughness_metallic_ao": {
-                    "type": "image",
-                    "path": "assets/images/default_rmo.png",
-                    "color_space": "rgb",
-                    "channel_count": 3
-                }
-            }
-        },
-        {
             "id": "test_text",
             "type": "text",
-            "path": "test_text_files/test_file_utf8.txt"
+            "file": "test_text_files/test_file_utf8.txt"
         }
     ]
 }

@@ -4,13 +4,15 @@
         {
             "id": "main_shader_vert",
             "type": "shader",
-            "path": "assets/shaders/main_pipeline/main_pipeline_vert.spv",
+            "src": "assets/shaders/main_pipeline/main_pipeline_vert.slang",
+            "dst": "assets/shaders/main_pipeline/main_pipeline_vert.spv",
             "metadata": "assets/shaders/main_pipeline/main_pipeline_vert.json"
         },
         {
             "id": "main_shader_frag",
             "type": "shader",
-            "path": "assets/shaders/main_pipeline/main_pipeline_frag.spv",
+            "src": "assets/shaders/main_pipeline/main_pipeline_frag.slang",
+            "dst": "assets/shaders/main_pipeline/main_pipeline_frag.spv",
             "metadata": "assets/shaders/main_pipeline/main_pipeline_frag.json"
         }
     ]

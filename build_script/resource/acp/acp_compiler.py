@@ -13,26 +13,33 @@
 # limitations under the License.
 import abc
 from pathlib import Path
+from typing import Any
+
+ManifestResource = dict[str, Any]
 
 class WBEACPCompiler(abc.ABC):
     """The compiler interface for the ACP."""
     @abc.abstractmethod
-    def get_supported_file_extensions(self) -> list[str]:
-        """Get the file extensions that this compiler is able to compile. Note that the '.'
-        is included, i.e., for PNG files it should be [".png"]
+    def get_supported_resource_types(self) -> list[str]:
+        """Get the resource types supported by this compiler.
 
         Returns:
-            A list of strings of the file extensions that this compiler is able to compile.
-            The '.' is included.
+            A list of strings of the resource types supported by this compiler.
         """
         pass
 
     @abc.abstractmethod
-    def compile(self, res_path: Path, output_dir: Path) -> None:
-        """Compile a file.
+    def compile(self, resource: ManifestResource, manifest_path: Path,
+                res_dir: Path, res_output_dir: Path) -> ManifestResource:
+        """Compile or transform one resource from a manifest entry.
 
         Args:
-            res_path: The res path of the file to be compiled.
-            output_dir: The directory that the compiled resource will be export to.
+            resource: Input resource manifest entry.
+            manifest_path: Relative path of the manifest file that owns this entry.
+            res_dir: Root source resource directory.
+            res_output_dir: Root output resource directory.
+
+        Returns:
+            The normalized resource entry to write to generated runtime index files.
         """
         pass
