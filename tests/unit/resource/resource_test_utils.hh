@@ -31,6 +31,7 @@ public:
         std::function<WBE::RefRes<char>(const std::string&)> get_resource_callback = nullptr;
         std::function<size_t()> get_size_callback = nullptr;
         std::function<WBE::RefRes<char>(size_t, const void*)> push_data_callback = nullptr;
+        std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> register_object_callback;
         std::function<void*(WBE::MemID)> get_data_callback = nullptr;
         std::function<const void*(WBE::MemID)> get_data_const_callback = nullptr;
         std::function<std::vector<std::string>()> get_all_keys_callback = nullptr;
@@ -51,6 +52,11 @@ public:
 
         Builder& set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)> p_callback) {
             push_data_callback = p_callback;
+            return *this;
+        }
+
+        Builder& set_register_object_callback(std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> p_callback) {
+            register_object_callback = p_callback;
             return *this;
         }
 
@@ -89,6 +95,7 @@ public:
                 get_resource_callback,
                 get_size_callback,
                 push_data_callback,
+                register_object_callback,
                 get_data_callback,
                 get_data_const_callback,
                 get_all_keys_callback,
@@ -100,10 +107,11 @@ public:
         }
     };
 
-    MockResourceChunk(
+    MockResourceChunk( // NOLINT
         std::function<WBE::RefRes<char>(const std::string&)> p_get_resource_cb,
         std::function<size_t()> p_get_size_cb,
         std::function<WBE::RefRes<char>(size_t, const void*)> p_push_data_cb,
+        std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> p_register_object_cb,
         std::function<void*(WBE::MemID)> p_get_data_cb,
         std::function<const void*(WBE::MemID)> p_get_data_const_cb,
         std::function<std::vector<std::string>()> p_get_all_keys_cb,
@@ -114,6 +122,7 @@ public:
     ) : get_resource_callback(p_get_resource_cb),
         get_size_callback(p_get_size_cb),
         push_data_callback(p_push_data_cb),
+        register_object_callback(p_register_object_cb),
         get_data_callback(p_get_data_cb),
         get_data_const_callback(p_get_data_const_cb),
         get_all_keys_callback(p_get_all_keys_cb),
@@ -147,6 +156,14 @@ public:
         }
         (*os) << "push_data " << p_res_size << " p_res" << '\n';
         return ret;
+    }
+
+    virtual WBE::RefRes<WBE::Object> register_object(WBE::Unique<WBE::Object>&& p_object) override {
+        if (register_object_callback) {
+            return register_object_callback(std::move(p_object));
+        }
+        (*os) << "register_object\n";
+        return WBE::RefRes<WBE::Object>(p_object);
     }
 
     virtual void* get_data(WBE::MemID p_mem_id) override {
@@ -206,6 +223,7 @@ private:
     std::function<WBE::RefRes<char>(const std::string&)> get_resource_callback;
     std::function<size_t()> get_size_callback;
     std::function<WBE::RefRes<char>(size_t, const void*)> push_data_callback;
+    std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> register_object_callback;
     std::function<void*(WBE::MemID)> get_data_callback;
     std::function<const void*(WBE::MemID)> get_data_const_callback;
     std::function<std::vector<std::string>()> get_all_keys_callback;
