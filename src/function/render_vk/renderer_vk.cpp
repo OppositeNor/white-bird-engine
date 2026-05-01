@@ -35,7 +35,7 @@
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/rt_pre_execute_pipeline_vk.hh"
-#include "function/renderer_vk/renderer_vk_resource_unit_loader.hh"
+#include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/window/i_window.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"

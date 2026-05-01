@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDERER_VK_RESOURCE_UNIT_LOADER_HH
-#define WBE_FILE_RENDERER_VK_RESOURCE_UNIT_LOADER_HH
+#ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
+#define WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
 
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include <string>

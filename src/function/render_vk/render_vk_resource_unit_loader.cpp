@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/renderer_vk/renderer_vk_resource_unit_loader.hh"
+#include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "core/parser/parser_json.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/engine_core.hh"
