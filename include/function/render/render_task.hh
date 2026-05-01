@@ -249,7 +249,7 @@ struct RendTaskInfo {
             return *this;
         }
 
-        Ref<RendTaskInfo> build(RenderAllocator* p_allocator) const {
+        Ref<RendTaskInfo> create_ref(RenderAllocator* p_allocator) const {
             auto result = make_ref<RendTaskInfo>(p_allocator);
             result->task_id = WBE_REQUIRED(task_id);
 

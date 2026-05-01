@@ -15,11 +15,9 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
 #include <string>
@@ -27,29 +25,6 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-
-ROGraphicsPipelineVK::Config& ROGraphicsPipelineVK::Config::build_pipeline(
-    const BaseRenderDataVK* p_render_data,
-    const std::string& p_res_key,
-    Ref<RORenderPassVK> p_render_pass) {
-    auto resource = ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_res_key);
-    shader.set_shaders(p_render_data, resource->vertex_stage, resource->fragment_stage,
-                       std::string(resource->vertex_stage_entry.get()),
-                       std::string(resource->fragment_stage_entry.get()));
-    vertex_input
-        .add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION)
-        .add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
-    // TODO: Make viewport and sissors configurable.
-    viewport.add_viewport(p_render_data->viewport, p_render_data->scissor);
-    // TODO: Setup pipeline layout from shaders' metadata.
-    render_pass = p_render_pass;
-    depth_test.set_depth_test(resource->depth_test);
-    depth_test.set_depth_write(resource->depth_write);
-    // TODO: Make color blend and dynamic state configurable.
-    color_blend.add_default_color_attachment();
-    dynamic_state.add_default_dynamic_states();
-    return *this;
-}
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {

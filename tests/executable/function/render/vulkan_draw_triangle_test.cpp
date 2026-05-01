@@ -70,7 +70,14 @@ public:
 
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
-        shader_config.set_shaders(base_render_data, "draw_triangle_vert", "draw_triangle_frag");
+        // Setup shaders
+        auto vertex_shader = WBE::ROShaderVK::Builder()
+            .set_code("draw_cube_vert")
+            .create_ref(base_render_data);
+        auto fragment_shader = WBE::ROShaderVK::Builder()
+            .set_code("draw_cube_frag")
+            .create_ref(base_render_data);
+        shader_config.set_shaders(vertex_shader, fragment_shader);
 
         // Setup graphics pipeline layout.
         WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout
@@ -117,7 +124,7 @@ public:
             .add_req_res(WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE::TypeUUID<WBE::ROBufferVK>::UUID)
             .set_render_task_factory(WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(
                 render_allocator, renderer->get_base_render_data(), descriptor_sets, true))
-            .build(render_allocator);
+            .create_ref(render_allocator);
         WBE::RendPipelineInfo pipeline_info;
         pipeline_info
             .set_root_task(rend_task_info)

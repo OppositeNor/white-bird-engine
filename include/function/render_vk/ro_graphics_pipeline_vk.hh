@@ -20,7 +20,6 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
@@ -100,51 +99,6 @@ public:
                                       const std::string& p_fragment_entry_function = "main") {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
                 set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
-                return *this;
-            }
-
-            /**
-             * @brief Set shaders from resource IDs.
-             *
-             * @param p_render_data The global render data.
-             * @param p_vertex_shader_res_id The vertex shader resource ID.
-             * @param p_fragment_shader_res_id The fragment shader resource ID.
-             * @param p_vertex_entry_function The vertex shader entry function.
-             * @param p_fragment_entry_function The fragment shader entry function.
-             * @return *this.
-             */
-            ShaderConfig& set_shaders(const BaseRenderDataVK* p_render_data,
-                                      const std::string& p_vertex_shader_res_id,
-                                      const std::string& p_fragment_shader_res_id,
-                                      const std::string& p_vertex_entry_function = "main",
-                                      const std::string& p_fragment_entry_function = "main") {
-                ROShaderVK::Builder vertex_shader_builder;
-                vertex_shader_builder.set_code(p_vertex_shader_res_id);
-                ROShaderVK::Builder fragment_shader_builder;
-                fragment_shader_builder.set_code(p_fragment_shader_res_id);
-                set_vertex_shader(
-                    vertex_shader_builder.create_ref(p_render_data),
-                    p_vertex_entry_function);
-                set_fragment_shader(
-                    fragment_shader_builder.create_ref(p_render_data),
-                    p_fragment_entry_function);
-                return *this;
-            }
-            ShaderConfig& set_shaders(const BaseRenderDataVK* p_render_data,
-                                      RefRes<RUShader> p_vertex_shader_res,
-                                      RefRes<RUShader> p_fragment_shader_res,
-                                      const std::string& p_vertex_entry_function = "main",
-                                      const std::string& p_fragment_entry_function = "main") {
-                ROShaderVK::Builder vertex_shader_builder;
-                vertex_shader_builder.set_code(p_vertex_shader_res);
-                ROShaderVK::Builder fragment_shader_builder;
-                fragment_shader_builder.set_code(p_fragment_shader_res);
-                set_vertex_shader(
-                    vertex_shader_builder.create_ref(p_render_data),
-                    p_vertex_entry_function);
-                set_fragment_shader(
-                    fragment_shader_builder.create_ref(p_render_data),
-                    p_fragment_entry_function);
                 return *this;
             }
         };
@@ -586,14 +540,6 @@ public:
             }
         };
 
-        /**
-         * @brief Build the pipeline from a resource.
-         *
-         * @param p_res_key The key to the resource for building the pipeline.
-         * @return *this
-         */
-        Config& build_pipeline(const BaseRenderDataVK* p_render_data, const std::string& p_res_key, Ref<RORenderPassVK> p_render_pass);
-
         // The input shaders. Manual setup needed!
         ShaderConfig shader{};
         // Vertex input stage configurations.
@@ -651,21 +597,6 @@ public:
          */
         Builder& set_config(Config&& p_config) {
             config = std::move(p_config);
-            return *this;
-        }
-
-        /**
-         * @brief Build config fields from a graphics pipeline resource.
-         *
-         * @param p_render_data Base render data.
-         * @param p_res_key Resource key of the graphics pipeline scheme.
-         * @param p_render_pass Render pass used by the generated config.
-         * @return *this.
-         */
-        Builder& build_pipeline(const BaseRenderDataVK* p_render_data,
-                                const std::string& p_res_key,
-                                Ref<RORenderPassVK> p_render_pass) {
-            config.build_pipeline(p_render_data, p_res_key, p_render_pass);
             return *this;
         }
 

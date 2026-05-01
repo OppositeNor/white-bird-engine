@@ -13,7 +13,9 @@
    limitations under the License.
 */
 #include "function/renderer_vk/renderer_vk_resource_unit_loader.hh"
+#include "core/parser/parser_json.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/engine_core.hh"
 #include "function/render_vk/render_vk_resource_unit.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
@@ -48,8 +50,11 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     auto file_path = get_resource_path(p_scheme.path);
     auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
     auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
+    ParserJSON metadata_parser;
+    metadata_parser.parse(get_resource_path(p_scheme.metadata));
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
+    resource_unit.metadata.deserialize(metadata_parser.get_data());
     resource_unit.data = data;
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUShader>();

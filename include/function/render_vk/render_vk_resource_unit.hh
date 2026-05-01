@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
 #define WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
 
+#include "function/render_vk/shader_metadata_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 
 namespace WhiteBirdEngine {
@@ -37,6 +38,8 @@ struct RUShader : public ResourceUnit {
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.
     RefRes<char> metadata_path;
+    // The parsed shader reflection metadata.
+    ShaderMetadata metadata;
 };
 
 /**

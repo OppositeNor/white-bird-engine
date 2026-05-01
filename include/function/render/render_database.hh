@@ -15,19 +15,14 @@
 #ifndef WBE_FILE_RENDER_DATABASE_HH
 #define WBE_FILE_RENDER_DATABASE_HH
 
-#include "core/memory/reference_strong.hh"
 #include "core/surface/3d_primitive.hh"
-#include "function/render/i_render_object.hh"
 #include "render_defs.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include "utils/utils.hh"
-
 #include <cstddef>
 #include <cstdint>
-#include <shared_mutex>
 
 namespace WhiteBirdEngine {
 
@@ -143,23 +138,6 @@ public:
         return dynamic_opaque;
     }
 
-    /**
-     * @brief Checks if a render object resource was registered.
-     *
-     * @param p_key The key of the resource.
-     * @return True if it was registered, false otherwise.
-     */
-    bool contains_resource(HashCode p_key);
-
-    /**
-     * @brief Register a render object resource.
-     *
-     * @todo Test
-     * @param p_key The key of the render object to be registered.
-     * @param p_render_object The render object to be registered.
-     */
-    void register_render_object_resource(HashCode p_key, Ref<IRenderObject> p_render_object);
-
     static RenderDatabase* get_singleton() {
         return singleton;
     }
@@ -172,9 +150,6 @@ private:
 
     OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;
-
-    mutable std::shared_mutex render_objects_resources_mutex;
-    Map<HashCode, RefWeak<IRenderObject>> render_objects_resources;
 
     void set_opaque_triangles_linear(
         OpaqueTrianglesInfo& p_triangles_info,
