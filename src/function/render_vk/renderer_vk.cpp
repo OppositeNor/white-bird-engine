@@ -1009,10 +1009,83 @@ void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
     }
     active_graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     active_graph->build_from_descriptor(*pipeline_entry->second);
+
+    // Re-inject the global static-opaque mesh buffers into the freshly-built
+    // graph so render tasks referencing the global resource IDs can resolve
+    // them without per-pipeline registration.
+    if (render_objects->static_opaque_vertices != MEM_NULL) {
+        active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
+                                   render_objects->static_opaque_vertices,
+                                   TypeUUID<ROBufferVK>::UUID);
+    }
+    if (render_objects->static_opaque_indices != MEM_NULL) {
+        active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+                                   render_objects->static_opaque_indices,
+                                   TypeUUID<ROBufferVK>::UUID);
+    }
+    if (render_objects->static_opaque_obj_ids != MEM_NULL) {
+        active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK,
+                                   render_objects->static_opaque_obj_ids,
+                                   TypeUUID<ROBufferVK>::UUID);
+    }
 }
 
+namespace {
+template <typename T, typename SrcAlloc>
+Ref<ROBufferVK> build_or_resize_host_visible_buffer(const BaseRenderDataVK* p_render_data,
+                                                   Ref<ROBufferVK> p_existing,
+                                                   const Vector<T, SrcAlloc>& p_data,
+                                                   VkBufferUsageFlags p_usage) {
+    const size_t size_in_bytes = p_data.size() * sizeof(T);
+    if (size_in_bytes == 0) {
+        return p_existing;
+    }
+    Ref<ROBufferVK> buffer = p_existing;
+    if (buffer == MEM_NULL || size_in_bytes > buffer->fields().buffer_size) {
+        buffer = ROBufferVK::Builder()
+            .set_domain(DeviceDomain::HOST_DEVICE)
+            .set_size(size_in_bytes)
+            .set_usage(p_usage)
+            .create_ref(p_render_data);
+    }
+    buffer->update_buffer(p_data.data(), size_in_bytes);
+    return buffer;
+}
+} // namespace
+
 void RendererVK::update_static_opaque_triangles() {
-    // TODO: Re-introduce static opaque triangle support on top of the new render-graph pipeline.
+    WBE_DEBUG_ASSERT(render_database != MEM_NULL);
+    const auto& info = render_database->get_static_opaque_triangles_info();
+
+    render_objects->static_opaque_vertices = build_or_resize_host_visible_buffer(
+        &base_render_data, render_objects->static_opaque_vertices, info.vertices,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    render_objects->static_opaque_indices = build_or_resize_host_visible_buffer(
+        &base_render_data, render_objects->static_opaque_indices, info.indices,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    render_objects->static_opaque_obj_ids = build_or_resize_host_visible_buffer(
+        &base_render_data, render_objects->static_opaque_obj_ids, info.obj_id,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    // Publish the buffers under the global resource IDs so render tasks in the
+    // active graph can resolve them without per-pipeline registration.
+    if (active_graph != MEM_NULL) {
+        if (render_objects->static_opaque_vertices != MEM_NULL) {
+            active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
+                                       render_objects->static_opaque_vertices,
+                                       TypeUUID<ROBufferVK>::UUID);
+        }
+        if (render_objects->static_opaque_indices != MEM_NULL) {
+            active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+                                       render_objects->static_opaque_indices,
+                                       TypeUUID<ROBufferVK>::UUID);
+        }
+        if (render_objects->static_opaque_obj_ids != MEM_NULL) {
+            active_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK,
+                                       render_objects->static_opaque_obj_ids,
+                                       TypeUUID<ROBufferVK>::UUID);
+        }
+    }
 }
 
 void RendererVK::setup_render_resource() {

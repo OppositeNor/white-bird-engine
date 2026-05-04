@@ -210,7 +210,7 @@ void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
     terminal_semaphores.clear();
     terminal_semaphores.reserve(frames);
     for (uint32_t f = 0; f < frames; ++f) {
-        terminal_semaphores.push_back(
+        terminal_semaphores.emplace_back(
             make_ref<SemaphoreVK>(render_data->allocator, render_data, true));
     }
 }

@@ -29,6 +29,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -334,6 +335,13 @@ private:
         Vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
+        // Global static-opaque mesh GPU buffers, populated by
+        // RendererVK::update_static_opaque_triangles() from the RenderDatabase
+        // and exposed to render tasks via the global resource IDs
+        // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES,OBJ_IDS}_VK.
+        Ref<ROBufferVK> static_opaque_vertices;
+        Ref<ROBufferVK> static_opaque_indices;
+        Ref<ROBufferVK> static_opaque_obj_ids;
     };
     Unique<RenderObjects> render_objects;
 
