@@ -77,6 +77,8 @@ Checks: >
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
   -performance-no-int-to-ptr,
   -performance-enum-size,
+  -misc-use-internal-linkage
+  -bugprone-invalid-enum-default-initialization
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets

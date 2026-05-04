@@ -23,6 +23,7 @@
 #include <glm/glm.hpp>
 #include <cstdint>
 #include <stdexcept>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -54,6 +55,11 @@ ROImageVK::Builder& ROImageVK::Builder::set_layers(uint32_t p_layers_count) {
 
 ROImageVK::Builder& ROImageVK::Builder::set_usage(VkImageUsageFlags p_usage) {
     usage = p_usage;
+    return *this;
+}
+
+ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_families) {
+    queue_families = p_queue_families;
     return *this;
 }
 
@@ -121,18 +127,8 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     barrier.oldLayout = old_layout;
     barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED || 
-        image->exposed_fileds.in_queue == VK_QUEUE_FAMILY_IGNORED || 
-        image->exposed_fileds.in_queue == dst_queue_family_index) {
-        // If the original data was discarded, or the image is not owned by any queue,
-        // or this is performed in the same queue, no queue transfer should be performed.
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    }
-    else {
-        barrier.srcQueueFamilyIndex = image->exposed_fileds.in_queue;
-        barrier.dstQueueFamilyIndex = dst_queue_family_index;
-    }
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
     barrier.image = WBE_REQUIRED(image).get_image();
     barrier.subresourceRange = subresource_range;
@@ -143,10 +139,6 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     vkCmdPipelineBarrier2(p_command_buffer, &info);
     // Update image's internal state.
     image->exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
-    if (dst_queue_family_index != VK_QUEUE_FAMILY_IGNORED) {
-        // Only transfer queue when there is a queue transformation specified.
-        image->exposed_fileds.in_queue = dst_queue_family_index;
-    }
 }
 
 VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
@@ -161,8 +153,16 @@ VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_da
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = WBE_REQUIRED(usage);
     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    // Only exclusive mode is allowed.
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    std::vector<uint32_t> initial_queues(queue_families.begin(), queue_families.end());
+    if (initial_queues.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = initial_queues.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+    
     VkImage result;
     if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan image.");
@@ -196,6 +196,7 @@ ROImageVK::~ROImageVK() {
 
 void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.create_vk_object(render_data);
+    exposed_fileds.queue_families = p_builder.queue_families;
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
     // Images are only allowed to be allocated on device.

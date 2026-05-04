@@ -12,169 +12,140 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_task.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "generated/type_uuid.gen.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <glm/glm.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <optional>
 #include <span>
 #include <stdexcept>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
-                                                 const std::span<const Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight_fence)
-    : RenderTaskVK(p_render_data), clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
-    signal_in_flight_fence(p_signal_in_flight_fence), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
-    descriptor_sets_instances(p_render_data->allocator) {
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+                                                 const glm::vec4& p_clear_color,
+                                                 RendResID p_framebuffer_id,
+                                                 RendResID p_pipeline_id,
+                                                 std::optional<RendResID> p_vertex_buffer_id,
+                                                 std::optional<RendResID> p_index_buffer_id,
+                                                 std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
+: render_data(p_render_data),
+  clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
+  framebuffer_id(p_framebuffer_id),
+  pipeline_id(p_pipeline_id),
+  vertex_buffer_id(p_vertex_buffer_id),
+  index_buffer_id(p_index_buffer_id),
+  descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
+  descriptor_sets_instances(p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
-    for (const auto& descriptor_set : descriptor_sets) {
-        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
-    }
-    VkCommandBufferAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc_info.commandPool = render_data->graphics_command_pool;
-    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 1;
-    if (vkAllocateCommandBuffers(render_data->logic_device, &alloc_info, &command_buffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffer.");
+    for (const auto& ds : descriptor_sets) {
+        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(ds->get_descriptor_set()));
     }
 }
 
-RTRunGraphicsPipelineVK::~RTRunGraphicsPipelineVK() {
-    vkFreeCommandBuffers(render_data->logic_device, render_data->graphics_command_pool, 1, &command_buffer);
+Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() const {
+    Vector<ResAccessVK, RenderAllocator> r(render_data->allocator);
+    r.push_back({.res_id = pipeline_id, .access = VK_ACCESS_2_SHADER_READ_BIT,
+                 .stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT});
+    if (vertex_buffer_id.has_value()) {
+        r.push_back({.res_id = *vertex_buffer_id, .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
+                     .stage = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT});
+    }
+    if (index_buffer_id.has_value()) {
+        r.push_back({.res_id = *index_buffer_id, .access = VK_ACCESS_2_INDEX_READ_BIT,
+                     .stage = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT});
+    }
+    return r;
 }
 
-void RTRunGraphicsPipelineVK::init() {
-    if (wait_stages.size() < depend_semaphores.size()) {
-        wait_stages.append_range(std::vector<VkPipelineStageFlags2>(
-            depend_semaphores.size() - wait_stages.size(), VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT));
-    }
-    wait_stages.reserve(depend_semaphores.size());
-    for (size_t i = 0; i < depend_semaphores.size(); ++i) {
-        wait_stages.push_back(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-    }
+Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::write_resources() const {
+    Vector<ResAccessVK, RenderAllocator> w(render_data->allocator);
+    w.push_back({.res_id = framebuffer_id, .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                 .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT});
+    return w;
 }
 
-void RTRunGraphicsPipelineVK::perform(double p_delta) {
-    (void)p_delta;
-    vkResetCommandBuffer(command_buffer, 0);
-    // The resources may be loaded in-flight, so we should check if they are valid every single frame.
-    if (check_req_res({
-        TypeUUID<ROFramebufferVK>::UUID,
-        TypeUUID<ROGraphicsPipelineVK>::UUID})) {
-        // Vertex/index buffer not provided, draw without vertex binding.
-        record_command_buffer_without_vertex_binding();
+void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_cmd,
+                                     const Vector<RendResVK, RenderAllocator>& p_resources,
+                                     double /*p_delta*/) {
+    // Layout (matches read_resources() then write_resources()):
+    //   [0] graphics_pipeline
+    //   [1?] vertex_buffer
+    //   [2?] index_buffer
+    //   [last] framebuffer
+    if (p_resources.size() < 2) {
+        throw std::runtime_error("RTRunGraphicsPipelineVK: insufficient bound resources.");
     }
-    else if (check_req_res({
-        TypeUUID<ROFramebufferVK>::UUID,
-        TypeUUID<ROGraphicsPipelineVK>::UUID,
-        TypeUUID<ROBufferVK>::UUID,
-        TypeUUID<ROBufferVK>::UUID})) {
-        // Vertex and index buffer provided, draw with index
-        record_command_buffer_with_vertex_binding();
+    size_t idx = 0;
+    auto graphics_pipeline = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+    Ref<ROBufferVK> vertex_buffer = MEM_NULL;
+    Ref<ROBufferVK> index_buffer  = MEM_NULL;
+    if (vertex_buffer_id.has_value()) {
+        vertex_buffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROBufferVK>());
     }
-    submit_command_buffer(command_buffer, render_data->graphics_queue, wait_stages, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, signal_in_flight_fence);
-}
+    if (index_buffer_id.has_value()) {
+        index_buffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROBufferVK>());
+    }
+    auto framebuffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROFramebufferVK>());
 
-void RTRunGraphicsPipelineVK::record_command_buffer_without_vertex_binding() {
-    if (req_rend_res[0]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: framebuffer must be specified.");
-    }
-    if (req_rend_res[1]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: graphics pipeline must be specified.");
-    }
-    RecordCommandBufferGuard record_command_buffer_guard(command_buffer);
+    // Begin render pass.
+    VkRenderPassBeginInfo rp{};
+    rp.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
+    rp.framebuffer = framebuffer->get_framebuffer();
+    rp.renderArea.offset = {.x = 0, .y = 0};
+    auto extent = framebuffer->fields().extent;
+    rp.renderArea.extent = {.width = extent.x, .height = extent.y};
+    rp.clearValueCount = 1;
+    rp.pClearValues = &clear_value;
+    vkCmdBeginRenderPass(p_cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
 
-    Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
-    Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
-
-    // Setup render pass.
-    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_value);
-    vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
-    vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
+    vkCmdBindPipeline(p_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
+    vkCmdSetViewport(p_cmd, 0, 1, &(render_data->viewport));
     VkRect2D scissor{};
     scissor.offset = {.x = 0, .y = 0};
-    auto extent = framebuffer->fields().extent;
     scissor.extent = {.width = extent.x, .height = extent.y};
-    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+    vkCmdSetScissor(p_cmd, 0, 1, &scissor);
 
-    // Usually when vertex buffer is not provided, it is used to draw screen triangle for some GPU local rendering.
-    // So we draw 3 vertices for the screen triangle.
-    vkCmdDraw(command_buffer, 3, 1, 0, 0);
-
-    vkCmdEndRenderPass(command_buffer);
-}
-
-void RTRunGraphicsPipelineVK::record_command_buffer_with_vertex_binding() {
-    if (req_rend_res[0]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: framebuffer must be specified.");
-    }
-    if (req_rend_res[1]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: graphics pipeline must be specified.");
-    }
-    if (req_rend_res[2]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: vertex buffer must be specified.");
-    }
-    if (req_rend_res[3]->res == MEM_NULL) {
-        throw std::runtime_error("Failed to perform render task: index buffer must be specified.");
-    }
-    RecordCommandBufferGuard record_command_buffer_guard(command_buffer);
-
-    Ref<ROFramebufferVK> framebuffer = WBE_REQUIRES_VALID(req_rend_res[0]->res.dynamic_cast_ref<ROFramebufferVK>());
-    Ref<ROGraphicsPipelineVK> graphics_pipeline = WBE_REQUIRES_VALID(req_rend_res[1]->res.dynamic_cast_ref<ROGraphicsPipelineVK>());
-    Ref<ROBufferVK> vertex_buffer = WBE_REQUIRES_VALID(req_rend_res[2]->res.dynamic_cast_ref<ROBufferVK>());
-    Ref<ROBufferVK> index_buffer = WBE_REQUIRES_VALID(req_rend_res[3]->res.dynamic_cast_ref<ROBufferVK>());
-
-    // Setup render pass.
-    VkRenderPassBeginInfo render_pass_info = get_render_pass_begin_info(graphics_pipeline->get_config().render_pass, framebuffer, clear_value);
-    vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
-    VkRect2D scissor{};
-    scissor.offset = {.x = 0, .y = 0};
-    auto extent = framebuffer->fields().extent;
-    scissor.extent = {.width = extent.x, .height = extent.y};
-    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-
-    // Setup vertex and index buffer.
-    VkBuffer vertex_buffer_inst = vertex_buffer->get_buffer();
-    VkBuffer index_buffer_inst = index_buffer->get_buffer();
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_inst, &offset);
-    vkCmdBindIndexBuffer(command_buffer, index_buffer_inst, 0, VK_INDEX_TYPE_UINT32);
-    if (!descriptor_sets.empty()) {
-        // Bind descriptors if any.
+    if (!descriptor_sets_instances.empty()) {
         vkCmdBindDescriptorSets(
-            command_buffer,
+            p_cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             graphics_pipeline->fields().pipeline_layout->get_pipeline_layout(),
             0,
-            descriptor_sets_instances.size(),
+            static_cast<uint32_t>(descriptor_sets_instances.size()),
             descriptor_sets_instances.data(),
-            0,
-            nullptr);
+            0, nullptr);
     }
-    vkCmdSetViewport(command_buffer, 0, 1, &(render_data->viewport));
 
-    size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
-    // Draw the entire index buffer.
-    vkCmdDrawIndexed(command_buffer, index_count, 1, 0, 0, 0);
+    if (vertex_buffer != MEM_NULL && index_buffer != MEM_NULL) {
+        VkBuffer vbuf = vertex_buffer->get_buffer();
+        VkBuffer ibuf = index_buffer->get_buffer();
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(p_cmd, VERTEX_BUFFER_BINDPOINT, 1, &vbuf, &offset);
+        vkCmdBindIndexBuffer(p_cmd, ibuf, 0, VK_INDEX_TYPE_UINT32);
+        size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
+        vkCmdDrawIndexed(p_cmd, static_cast<uint32_t>(index_count), 1, 0, 0, 0);
+    } else {
+        // Screen-triangle / no vertex binding case.
+        vkCmdDraw(p_cmd, 3, 1, 0, 0);
+    }
 
-    vkCmdEndRenderPass(command_buffer);
+    vkCmdEndRenderPass(p_cmd);
 }
 
 } // namespace WhiteBirdEngine

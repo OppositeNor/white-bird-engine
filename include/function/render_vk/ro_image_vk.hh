@@ -27,6 +27,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <set>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -54,6 +55,8 @@ public:
         uint32_t layers_count = 1;
         // Image usages.
         Required<VkImageUsageFlags> usage;
+        // The queue families this image will be used in.
+        std::set<uint32_t> queue_families;
 
         // Set the image type.
         Builder& set_image_type(VkImageType p_image_type);
@@ -67,6 +70,8 @@ public:
         Builder& set_layers(uint32_t p_layers_count);
         // Set the image usage.
         Builder& set_usage(VkImageUsageFlags p_usage);
+        // Set the queue families.
+        Builder& set_queue_families(const std::set<uint32_t>& p_queue_families);
         // Make a 2D image.
         Builder& image_2d(glm::uvec2 p_size);
         // Make a 2D image.
@@ -154,9 +159,9 @@ public:
          */
         VkDeviceMemory image_memory = VK_NULL_HANDLE;
         /**
-         * @brief The queue of the image is staying inside.
+         * @brief The queue families the image is shared between.
          */
-        uint32_t in_queue = VK_QUEUE_FAMILY_IGNORED;
+        std::set<uint32_t> queue_families;
         /**
          * @brief The image's current layout after all pending transitions.
          */

@@ -35,14 +35,21 @@
 #include "function/render/render_task.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
 #include <exception>
 #include <format>
+#include <glm/ext/vector_float4.hpp>
 #include <memory>
+#include <optional>
 #include <print>
+#include <span>
+#include <utility>
 #include <glm/ext/matrix_transform.hpp>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -133,23 +140,26 @@ public:
         );
         // Setup render task
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets {descriptor_set};
-        auto rend_task_info = WBE::RendTaskInfo::Builder()
-            .set_task_id(WBE::RT_RUN_PIPELINE)
-            .add_req_res(WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE::TypeUUID<WBE::ROFramebufferVK>::UUID)
-            .add_req_res(WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID)
-            .add_req_res(WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, WBE::TypeUUID<WBE::ROBufferVK>::UUID)
-            .add_req_res(WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE::TypeUUID<WBE::ROBufferVK>::UUID)
-            .set_render_task_factory(WBE::make_ref<WBE::RTRunGraphicsPipelineFactoryVK>(
-                render_allocator, renderer->get_base_render_data(), descriptor_sets, true))
-            .create_ref(render_allocator);
-        WBE::RendPipelineInfo pipeline_info;
-        pipeline_info
-            .set_root_task(rend_task_info)
-            .add_resource(WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
-                          WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-                          graphics_pipeline);
-        get_renderer()->register_pipeline("test_pipeline", pipeline_info);
-        get_renderer()->activate_pipeline("test_pipeline");
+        WBE::RendPipelineDescVK pipeline_desc(render_allocator);
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{
+            .res_id = WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
+            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            .res = graphics_pipeline});
+        WBE::RendTaskDescVK task_desc(render_allocator);
+        task_desc.task_id = WBE::RT_RUN_PIPELINE;
+        const auto* brd = renderer->get_base_render_data();
+        task_desc.create = [render_allocator, brd, descriptor_sets]() -> WBE::Ref<WBE::RenderTaskVK> {
+            return WBE::make_ref<WBE::RTRunGraphicsPipelineVK>(
+                render_allocator, brd, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
+                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
+                std::optional<WBE::RendResID>{},
+                std::optional<WBE::RendResID>{},
+                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
+        };
+        pipeline_desc.tasks.emplace_back(std::move(task_desc));
+        WBE::RendererVK::get_singleton()->register_pipeline("test_pipeline", std::move(pipeline_desc));
+        WBE::RendererVK::get_singleton()->activate_pipeline("test_pipeline");
     }
 
 private:

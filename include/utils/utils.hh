@@ -48,13 +48,13 @@ enum class EncodeType {
 };
 
 // Type of access.
-enum class AccessType {
+enum class AccessType : uint8_t {
     // Read only.
-    READ_ONLY,
+    READ_ONLY = 0b01,
     // Write only.
-    WRITE_ONLY,
+    WRITE_ONLY = 0b10,
     // Read or write.
-    READ_WRITE
+    READ_WRITE = 0b11
 };
 
 /**
