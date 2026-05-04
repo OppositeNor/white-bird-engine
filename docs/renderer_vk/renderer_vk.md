@@ -1,9 +1,16 @@
 Tick render stages:
 
-- pre-execution tasks: A serial of callback functions, with a command buffer as parameter,
-which the callback functions could record commands in the command buffer, and it would be
-pushed to the command queue before all the tasks are executing in the next frame.
+- pre-execution tasks: A series of callback functions, each taking a command
+  buffer as a parameter. The callbacks record commands into the command buffer,
+  which is submitted to the queue before any render-graph work executes in the
+  next frame.
 
-- Run render tasks: As how they are passed into the render task compiler, in the order of
-BFS, run each tasks. A task will only be run after the dependent task finishes (implemented
-based on semaphores).
+- Run render tasks: The active `RenderGraphVK` (built from a
+  `RendPipelineDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
+  in topological order. Each `RenderTaskVK` records into its own primary
+  command buffer; cross-submit ordering between tasks is enforced with timeline
+  semaphores attached to the graph's execution edges, and per-resource hazards
+  are resolved with `vkCmdPipelineBarrier2` driven by each task's declared
+  `read_resources()` / `write_resources()` access and stage masks. After the
+  last graphics submission the graph signals a terminal binary semaphore, which
+  `RendererVK::present()` waits on before `vkQueuePresentKHR`.

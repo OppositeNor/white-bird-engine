@@ -112,13 +112,21 @@ void RendererVK::tick(double p_delta) {
 
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
+    // Inject the current swap-chain framebuffer into the active graph so tasks
+    // referencing REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK resolve to the correct
+    // per-frame target.
+    base_render_data.current_swap_chain_index = image_index;
+    active_graph->set_resource(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                               render_objects->swap_chain_framebuffers[image_index],
+                               TypeUUID<ROFramebufferVK>::UUID);
+
     // Tell the graph to wait on the swap-chain image-available binary semaphore at COLOR_ATTACHMENT_OUTPUT.
     VkSemaphoreSubmitInfo wait_info = image_available_semaphore->get_submit_info(
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-    std::array<VkSemaphoreSubmitInfo, 1> waits{wait_info};
-    std::span<const VkSemaphoreSubmitInfo> signals_extra{};
+    std::array<VkSemaphoreSubmitInfo, 1> wait_infos{wait_info};
+    std::span<const VkSemaphoreSubmitInfo> extra_signals{};
     active_graph->execute(base_render_data.current_frame + 1, p_delta,
-                          std::span<const VkSemaphoreSubmitInfo>(waits.data(), waits.size()), signals_extra);
+                          std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
     present(image_index);
 
@@ -168,6 +176,10 @@ void RendererVK::init() {
     init_render_pass();
     init_swap_chain_framebuffers();
     setup_render_resource();
+    image_available_semaphores.reserve(frames_in_flight);
+    for (size_t i = 0; i < frames_in_flight; ++i) {
+        image_available_semaphores.push_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
+    }
     stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
@@ -175,10 +187,30 @@ void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
     render_objects.reset();
 
-    for (auto& delayed_call : delayed_calls) {
-        // Call all delayed calls before terminating
-        if (delayed_call.second >= 0) {
-            delayed_call.first();
+    // Release the active render graph and any registered pipeline descriptors.
+    // These hold Refs to render-object resources (buffers, images, etc.) whose
+    // destructors enqueue device-object cleanup via register_delayed_call.
+    // We must drop them before draining the delayed-call list, otherwise the
+    // resources outlive vkDestroyDevice() and trigger validation leaks.
+    active_graph = MEM_NULL;
+    pipelines.clear();
+    image_available_semaphores.clear();
+
+    // Drain every pending delayed call regardless of remaining frame countdown
+    // (the device is about to be destroyed, so all per-frame deferrals must
+    // run now). Loop until no slot has work left, since running a call may
+    // register more delayed calls into freed slots.
+    bool ran_any = true;
+    while (ran_any) {
+        ran_any = false;
+        for (auto& delayed_call : delayed_calls) {
+            if (delayed_call.first && delayed_call.second >= 0) {
+                auto call = std::move(delayed_call.first);
+                delayed_call.first = nullptr;
+                delayed_call.second = -1;
+                call();
+                ran_any = true;
+            }
         }
     }
     for (auto* fence : in_flight_fences) {
@@ -510,10 +542,6 @@ void RendererVK::create_async_objects() {
             throw std::runtime_error("Failed to create in flight fence");
         }
         in_flight_fences.push_back(fence);
-    }
-    image_available_semaphores.reserve(frames_in_flight);
-    for (size_t i = 0; i < frames_in_flight; ++i) {
-        image_available_semaphores.push_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
     }
 }
 
@@ -922,6 +950,7 @@ std::optional<uint32_t> RendererVK::tick_setup_pipeline() {
     static uint32_t frame_counter = 0;
     frame_counter = (frame_counter + 1) % frames_in_flight;
     base_render_data.in_flight_fence = in_flight_fences[frame_counter];
+    base_render_data.current_frame_slot = frame_counter;
 
     vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
     return frame_counter;
@@ -969,17 +998,17 @@ void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipel
 }
 
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
-    auto it = pipelines.find(p_pipeline_name);
-    if (it == pipelines.end()) {
+    auto pipeline_entry = pipelines.find(p_pipeline_name);
+    if (pipeline_entry == pipelines.end()) {
         throw std::runtime_error("RendererVK::activate_pipeline: pipeline not found.");
     }
     // Defer-destroy any previous graph.
     if (active_graph != MEM_NULL) {
-        Ref<RenderGraphVK> old = active_graph;
-        register_delay_call([old]() mutable { old = MEM_NULL; }, frames_in_flight);
+        Ref<RenderGraphVK> previous_graph = active_graph;
+        register_delay_call([previous_graph]() mutable { previous_graph = MEM_NULL; }, frames_in_flight);
     }
     active_graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
-    active_graph->build_from_descriptor(*it->second);
+    active_graph->build_from_descriptor(*pipeline_entry->second);
 }
 
 void RendererVK::update_static_opaque_triangles() {

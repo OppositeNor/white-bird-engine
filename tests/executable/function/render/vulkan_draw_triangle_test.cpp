@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/reflection/reflection_defs.hh"
+#include "core/surface/3d_primitive.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -39,6 +40,8 @@
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
+#include <cstdint>
+#include <array>
 #include <exception>
 #include <format>
 #include <glm/ext/vector_float4.hpp>
@@ -54,6 +57,8 @@ namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
 WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, WBE_RENDER_RESOURCE);
 // WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_SHADER_VERT, WBE_RENDER_RESOURCE);
 // WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_SHADER_FRAG, WBE_RENDER_RESOURCE);
 }
@@ -121,6 +126,25 @@ public:
                     .offset = 0
                 })
         );
+        // Build triangle vertex/index buffers (matches assets/meshes/triangle.json).
+        static const std::array<WBE::Vertex3DTextured, 3> triangle_vertices = {{
+            {{ 0.0F,  0.5F, 0.0F}, {}, {}, {}, {0.5F, 1.0F}},
+            {{-0.5F, -0.5F, 0.0F}, {}, {}, {}, {0.0F, 0.0F}},
+            {{ 0.5F, -0.5F, 0.0F}, {}, {}, {}, {1.0F, 0.0F}},
+        }};
+        static const std::array<uint32_t, 3> triangle_indices = {{0, 1, 2}};
+        auto vertex_buffer = WBE::ROBufferVK::Builder()
+            .add_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+            .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+            .set_size(sizeof(triangle_vertices))
+            .create_ref(base_render_data);
+        vertex_buffer->update_buffer(triangle_vertices.data(), sizeof(triangle_vertices));
+        auto index_buffer = WBE::ROBufferVK::Builder()
+            .add_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+            .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+            .set_size(sizeof(triangle_indices))
+            .create_ref(base_render_data);
+        index_buffer->update_buffer(triangle_indices.data(), sizeof(triangle_indices));
         // Setup render task
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets {descriptor_set};
         WBE::RendPipelineDescVK pipeline_desc(render_allocator);
@@ -128,16 +152,23 @@ public:
             .res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
             .res = graphics_pipeline});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{
+            .res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
+            .res_type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID,
+            .res = vertex_buffer});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{
+            .res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
+            .res_type_id = WBE::TypeUUID<WBE::ROBufferVK>::UUID,
+            .res = index_buffer});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
-        const auto* brd = renderer->get_base_render_data();
-        task_desc.create = [render_allocator, brd, descriptor_sets]() -> WBE::Ref<WBE::RenderTaskVK> {
+        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Ref<WBE::RenderTaskVK> {
             return WBE::make_ref<WBE::RTRunGraphicsPipelineVK>(
-                render_allocator, brd, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
+                render_allocator, base_render_data, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
                 WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
-                std::optional<WBE::RendResID>{},
-                std::optional<WBE::RendResID>{},
+                std::optional<WBE::RendResID>{WBE::REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER},
+                std::optional<WBE::RendResID>{WBE::REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER},
                 std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));

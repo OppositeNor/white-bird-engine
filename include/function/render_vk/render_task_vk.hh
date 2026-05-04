@@ -100,12 +100,12 @@ struct RenderTaskVK : public RenderTask {
      * resource edges into this task have already been emitted before this is
      * invoked.
      *
-     * @param p_cmd       The command buffer to record into.
+     * @param p_command_buffer The command buffer to record into.
      * @param p_resources All bound resources for the active pipeline, indexed
      *                    by resource id.
      * @param p_delta     The frame delta in seconds.
      */
-    virtual void record(VkCommandBuffer p_cmd,
+    virtual void record(VkCommandBuffer p_command_buffer,
                         const Vector<RendResVK, RenderAllocator>& p_resources,
                         double p_delta) = 0;
 

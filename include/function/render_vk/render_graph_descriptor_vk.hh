@@ -27,9 +27,8 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RendTaskDescVK
- * @brief A high-level Vulkan render task descriptor. Replaces the cross-API
- * RendTaskInfo + IRenderTaskFactory pair: a single std::function defers the
- * concrete RenderTaskVK instantiation until the graph is built.
+ * @brief A high-level Vulkan render task descriptor. A single std::function
+ * defers the concrete RenderTaskVK instantiation until the graph is built.
  */
 struct RendTaskDescVK {
     RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator) {}
@@ -45,9 +44,9 @@ struct RendTaskDescVK {
 
 /**
  * @class RendPipelineDescVK
- * @brief A high-level Vulkan render pipeline descriptor. Replaces the
- * cross-API RendPipelineInfo: resources are already concrete RendResVK
- * (containing Ref<RenderObjectVK>), and tasks reference each other by id.
+ * @brief A high-level Vulkan render pipeline descriptor. Resources are
+ * concrete RendResVK (containing Ref<RenderObjectVK>), and tasks reference
+ * each other by id.
  */
 struct RendPipelineDescVK {
     RendPipelineDescVK(RenderAllocator* p_allocator) : tasks(p_allocator), resources(p_allocator) {}

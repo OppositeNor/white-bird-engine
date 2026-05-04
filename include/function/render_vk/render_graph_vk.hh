@@ -26,6 +26,7 @@
 #include "utils/defs.hh"
 #include <cstdint>
 #include <span>
+#include <tuple>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -193,11 +194,27 @@ public:
                  std::span<const VkSemaphoreSubmitInfo> p_extra_signals_last_submit);
 
     /**
+     * @brief Insert or override a runtime-bound resource by id. This lets the
+     * renderer inject per-frame resources (e.g., the current swap-chain
+     * framebuffer) whose identity is fixed by label but whose object changes
+     * across frames. If a resource with the given id already exists, its
+     * res / res_type_id are updated in place.
+     *
+     * @param p_res_id      The resource id (label).
+     * @param p_resource    The resource instance.
+     * @param p_res_type_id The runtime type id of the resource.
+     */
+    void set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+
+    /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
      * queue submit of the most recent execute(). Caller waits on it at
-     * present time.
+     * present time. One semaphore per frame-in-flight slot, since binary
+     * semaphores cannot be re-signaled while a previous wait is pending.
      */
-    Ref<SemaphoreVK> get_terminal_semaphore() const { return terminal_semaphore; }
+    Ref<SemaphoreVK> get_terminal_semaphore() const {
+        return terminal_semaphores[render_data->current_frame_slot];
+    }
 
 private:
     const BaseRenderDataVK* render_data;
@@ -205,18 +222,41 @@ private:
     Vector<Ref<RGNode>, RenderAllocator> nodes;
     Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
     Vector<Ref<RGResEdge>, RenderAllocator> res_edges;
+    // All resources known to the graph (declared in the pipeline descriptor
+    // plus per-frame overrides set via set_resource()). Indexed by id when
+    // building per-node bindings.
+    Vector<Ref<RendResVK>, RenderAllocator> all_resources;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
     // Per-node source command pool (parallel to `nodes`).
     Vector<VkCommandPool, RenderAllocator> command_buffer_pools;
 
-    // Binary semaphore signaled by the last graphics submit; consumed by present.
-    Ref<SemaphoreVK> terminal_semaphore;
+    // Binary semaphores signaled by the last graphics submit; consumed by
+    // present. One per frame-in-flight slot.
+    Vector<Ref<SemaphoreVK>, RenderAllocator> terminal_semaphores;
 
     void allocate_command_buffers();
     void free_command_buffers();
     void topological_sort();
+
+    Vector<Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
+    Vector<RendTaskID, RenderAllocator>     instantiate_tasks(const RendPipelineDescVK& p_desc);
+    void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc,
+                                  const Vector<RendTaskID, RenderAllocator>& p_task_ids);
+    void infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
+
+    std::tuple<size_t, size_t> find_graphics_range() const;
+    Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
+    void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer,
+                     const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta);
+    void collect_edge_semaphores(Ref<RGNode> p_node, uint64_t p_timeline_value,
+                                 Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
+                                 Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals) const;
+    void submit_node(VkCommandBuffer p_command_buffer, QueueFamilyVK p_queue_family,
+                     const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
+                     const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals,
+                     VkFence p_fence);
 };
 
 } // namespace WhiteBirdEngine

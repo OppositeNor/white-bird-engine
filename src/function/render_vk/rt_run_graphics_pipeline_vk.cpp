@@ -23,7 +23,6 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
@@ -52,34 +51,34 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
   descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
   descriptor_sets_instances(p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
-    for (const auto& ds : descriptor_sets) {
-        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(ds->get_descriptor_set()));
+    for (const auto& descriptor_set : descriptor_sets) {
+        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
     }
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() const {
-    Vector<ResAccessVK, RenderAllocator> r(render_data->allocator);
-    r.push_back({.res_id = pipeline_id, .access = VK_ACCESS_2_SHADER_READ_BIT,
+    Vector<ResAccessVK, RenderAllocator> read_accesses(render_data->allocator);
+    read_accesses.push_back({.res_id = pipeline_id, .access = VK_ACCESS_2_SHADER_READ_BIT,
                  .stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT});
     if (vertex_buffer_id.has_value()) {
-        r.push_back({.res_id = *vertex_buffer_id, .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
+        read_accesses.push_back({.res_id = *vertex_buffer_id, .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
                      .stage = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT});
     }
     if (index_buffer_id.has_value()) {
-        r.push_back({.res_id = *index_buffer_id, .access = VK_ACCESS_2_INDEX_READ_BIT,
+        read_accesses.push_back({.res_id = *index_buffer_id, .access = VK_ACCESS_2_INDEX_READ_BIT,
                      .stage = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT});
     }
-    return r;
+    return read_accesses;
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::write_resources() const {
-    Vector<ResAccessVK, RenderAllocator> w(render_data->allocator);
-    w.push_back({.res_id = framebuffer_id, .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+    Vector<ResAccessVK, RenderAllocator> write_accesses(render_data->allocator);
+    write_accesses.push_back({.res_id = framebuffer_id, .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                  .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT});
-    return w;
+    return write_accesses;
 }
 
-void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_cmd,
+void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer,
                                      const Vector<RendResVK, RenderAllocator>& p_resources,
                                      double /*p_delta*/) {
     // Layout (matches read_resources() then write_resources()):
@@ -90,40 +89,40 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_cmd,
     if (p_resources.size() < 2) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: insufficient bound resources.");
     }
-    size_t idx = 0;
-    auto graphics_pipeline = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+    size_t bound_index = 0;
+    auto graphics_pipeline = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROGraphicsPipelineVK>());
     Ref<ROBufferVK> vertex_buffer = MEM_NULL;
     Ref<ROBufferVK> index_buffer  = MEM_NULL;
     if (vertex_buffer_id.has_value()) {
-        vertex_buffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROBufferVK>());
+        vertex_buffer = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROBufferVK>());
     }
     if (index_buffer_id.has_value()) {
-        index_buffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROBufferVK>());
+        index_buffer = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROBufferVK>());
     }
-    auto framebuffer = WBE_REQUIRES_VALID(p_resources[idx++].res.dynamic_cast_ref<ROFramebufferVK>());
+    auto framebuffer = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROFramebufferVK>());
 
     // Begin render pass.
-    VkRenderPassBeginInfo rp{};
-    rp.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rp.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
-    rp.framebuffer = framebuffer->get_framebuffer();
-    rp.renderArea.offset = {.x = 0, .y = 0};
+    VkRenderPassBeginInfo render_pass_begin_info{};
+    render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_begin_info.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
+    render_pass_begin_info.framebuffer = framebuffer->get_framebuffer();
+    render_pass_begin_info.renderArea.offset = {.x = 0, .y = 0};
     auto extent = framebuffer->fields().extent;
-    rp.renderArea.extent = {.width = extent.x, .height = extent.y};
-    rp.clearValueCount = 1;
-    rp.pClearValues = &clear_value;
-    vkCmdBeginRenderPass(p_cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
+    render_pass_begin_info.renderArea.extent = {.width = extent.x, .height = extent.y};
+    render_pass_begin_info.clearValueCount = 1;
+    render_pass_begin_info.pClearValues = &clear_value;
+    vkCmdBeginRenderPass(p_command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(p_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
-    vkCmdSetViewport(p_cmd, 0, 1, &(render_data->viewport));
+    vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
+    vkCmdSetViewport(p_command_buffer, 0, 1, &(render_data->viewport));
     VkRect2D scissor{};
     scissor.offset = {.x = 0, .y = 0};
     scissor.extent = {.width = extent.x, .height = extent.y};
-    vkCmdSetScissor(p_cmd, 0, 1, &scissor);
+    vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
 
     if (!descriptor_sets_instances.empty()) {
         vkCmdBindDescriptorSets(
-            p_cmd,
+            p_command_buffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             graphics_pipeline->fields().pipeline_layout->get_pipeline_layout(),
             0,
@@ -133,19 +132,19 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_cmd,
     }
 
     if (vertex_buffer != MEM_NULL && index_buffer != MEM_NULL) {
-        VkBuffer vbuf = vertex_buffer->get_buffer();
-        VkBuffer ibuf = index_buffer->get_buffer();
+        VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
+        VkBuffer index_buffer_handle = index_buffer->get_buffer();
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(p_cmd, VERTEX_BUFFER_BINDPOINT, 1, &vbuf, &offset);
-        vkCmdBindIndexBuffer(p_cmd, ibuf, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &offset);
+        vkCmdBindIndexBuffer(p_command_buffer, index_buffer_handle, 0, VK_INDEX_TYPE_UINT32);
         size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
-        vkCmdDrawIndexed(p_cmd, static_cast<uint32_t>(index_count), 1, 0, 0, 0);
+        vkCmdDrawIndexed(p_command_buffer, static_cast<uint32_t>(index_count), 1, 0, 0, 0);
     } else {
         // Screen-triangle / no vertex binding case.
-        vkCmdDraw(p_cmd, 3, 1, 0, 0);
+        vkCmdDraw(p_command_buffer, 3, 1, 0, 0);
     }
 
-    vkCmdEndRenderPass(p_cmd);
+    vkCmdEndRenderPass(p_command_buffer);
 }
 
 } // namespace WhiteBirdEngine

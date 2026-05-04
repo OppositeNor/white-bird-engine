@@ -73,7 +73,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    virtual void record(VkCommandBuffer p_cmd,
+    virtual void record(VkCommandBuffer p_command_buffer,
                         const Vector<RendResVK, RenderAllocator>& p_resources,
                         double p_delta) override;
 
