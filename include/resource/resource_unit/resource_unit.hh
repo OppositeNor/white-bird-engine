@@ -40,7 +40,7 @@ template <typename T>
 concept ResourceUnitConcept = IS_RESOURCE_UNIT<T>;
 
 template <typename T>
-using RefRes = RefRaw<T, IAllocator>;
+using RefRes = RefRaw<T, IAllocator, false>;
 
 /**
  * @class ResourceScheme

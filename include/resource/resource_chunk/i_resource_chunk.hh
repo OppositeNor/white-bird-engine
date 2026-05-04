@@ -16,6 +16,8 @@
 #define WBE_FILE_I_RESOURCE_CHUNK_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/memory/unique.hh"
+#include "core/object/object.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -63,6 +65,15 @@ public:
      * @return The result memory id.
      */
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;
+
+    /**
+     * @brief Register an object to the chunk, which it will be destructed when the chunk
+     * is unloaded.
+     *
+     * @param p_object The object to register.
+     * @return The resource reference to the object.
+     */
+    virtual RefRes<Object> register_object(Unique<Object>&& p_object) = 0;
 
     /**
      * @brief Get the data at ID.

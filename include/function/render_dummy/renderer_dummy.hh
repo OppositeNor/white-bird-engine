@@ -44,8 +44,6 @@ public:
         return dummy_database;
     }
 
-    virtual void register_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) override {}
-
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {}
 
     virtual void update_static_opaque_triangles() override {}

@@ -20,7 +20,6 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
 #include "render_defs.hh"
-#include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <string>
@@ -49,14 +48,6 @@ public:
      * @brief Get the instance of the render database.
      */
     virtual Ref<RenderDatabase> get_render_database() = 0;
-
-    /**
-     * @brief Register a graphics pipeline. If a pipeline is already registered, it will be overritten.
-     *
-     * @param p_pipeline_name The name of the pipeline to register.
-     * @param p_root_task The root render task of the pipeline.
-     */
-    virtual void register_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) = 0;
 
     /**
      * @brief Activate a pipeline.

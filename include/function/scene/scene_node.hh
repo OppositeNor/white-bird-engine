@@ -18,7 +18,6 @@
 #include "core/core_utils.hh"
 #include "scene.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/object/object.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
@@ -31,12 +30,10 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class WBE_META() SceneNode : public Object, public ThisRef<SceneNode> {
+class WBE_META() SceneNode : public ThisRef<SceneNode> {
 protected:
 public:
-
-    WBE_DECL_OBJECT(SceneNode)
-
+    SceneNode() = delete;
     virtual ~SceneNode() override = default;
     SceneNode(const SceneNode&) = delete;
     SceneNode(SceneNode&& p_other) noexcept

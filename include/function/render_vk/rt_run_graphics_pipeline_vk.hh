@@ -16,130 +16,78 @@
 #define WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
-#include "glm/ext/vector_float4.hpp"
+#include <cstdint>
+#include <glm/ext/vector_float4.hpp>
+#include <optional>
 #include <span>
-#include <vector>
 #include <vulkan/vulkan_core.h>
+
 namespace WhiteBirdEngine {
 
 /**
  * @class RTRunGraphicsPipelineVK
  * @brief Render task that runs a graphics pipeline and produces an image.
  *
+ * Resource binding contract (declared in this exact order; the render graph
+ * passes `bound_resources` to record() in the same order):
+ *   reads:  [graphics_pipeline, (vertex_buffer?), (index_buffer?)]
+ *   writes: [framebuffer]
+ * Therefore inside record(): index 0 = graphics_pipeline, then optionally
+ * vertex_buffer and index_buffer, finally framebuffer at the end.
  */
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
-    virtual ~RTRunGraphicsPipelineVK() override;
+    virtual ~RTRunGraphicsPipelineVK() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RTRunGraphicsPipelineVK)
 
     /**
      * @brief Constructor.
      *
-     * @param p_render_data The base render data.
-     * @param p_clear_color The clear color.
-     * @param p_signal_in_flight_fence If set to true, the in_flight_fence will be signaled after the task is finished.
-     * @param p_descriptor_sets The descriptor sets to be bound.
+     * @param p_render_data        Base render data.
+     * @param p_clear_color        Clear color used in the render pass begin.
+     * @param p_framebuffer_id     Resource id of the framebuffer (write).
+     * @param p_pipeline_id        Resource id of the graphics pipeline (read).
+     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
+     * @param p_index_buffer_id    Optional resource id of the index buffer (read).
+     * @param p_descriptor_sets    Descriptor sets to bind in order.
      */
-    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
-                            const std::span<const Ref<RODescriptorSetVK>>& p_descriptor_sets,
-                            bool p_signal_in_flight_fence);
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+                            const glm::vec4& p_clear_color,
+                            RendResID p_framebuffer_id,
+                            RendResID p_pipeline_id,
+                            std::optional<RendResID> p_vertex_buffer_id,
+                            std::optional<RendResID> p_index_buffer_id,
+                            std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
 
-    virtual void init() override;
+    virtual QueueFamilyVK queue_family() const override { return QueueFamilyVK::GRAPHICS; }
 
-    virtual void perform(double p_delta) override;
+    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
-    /**
-     * @brief Add a descriptor set to the pipeline.
-     * The set index is determined by the order of addition.
-     *
-     * @param p_descriptor_set The descriptor set to add.
-     * @return *this.
-     */
-    RTRunGraphicsPipelineVK& add_descriptor_set(Ref<RODescriptorSetVK> p_descriptor_set) {
-        descriptor_sets.push_back(p_descriptor_set);
-        descriptor_sets_instances.push_back(p_descriptor_set->get_descriptor_set());
-        return *this;
-    }
+    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+
+    virtual void record(VkCommandBuffer p_command_buffer,
+                        const Vector<RendResVK, RenderAllocator>& p_resources,
+                        double p_delta) override;
 
 private:
-    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    VkClearValue clear_value;
-    bool signal_in_flight_fence = false;
-    inline static std::vector<VkPipelineStageFlags2> wait_stages { VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT };
-    void record_command_buffer_without_vertex_binding();
-    void record_command_buffer_with_vertex_binding();
-    Vector<Ref<RODescriptorSetVK>> descriptor_sets;
-    // Keeping an easy access to the VkDescriptorSet instances.
-    Vector<VkDescriptorSet> descriptor_sets_instances;
+    const BaseRenderDataVK* render_data = nullptr;
+    VkClearValue clear_value{};
+    RendResID framebuffer_id = 0;
+    RendResID pipeline_id = 0;
+    std::optional<RendResID> vertex_buffer_id;
+    std::optional<RendResID> index_buffer_id;
+    Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
+    Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
 };
 
-/**
- * @class RTRunGraphicsPipelineFactoryVK
- * @brief Factory for RTRunGraphicsPipeline.
- *
- */
-class RTRunGraphicsPipelineFactoryVK final : public RenderTaskFactoryVK {
-public:
-    RTRunGraphicsPipelineFactoryVK() = delete;
-    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(RTRunGraphicsPipelineFactoryVK)
-
-    /**
-     * @brief Constructor.
-     *
-     * @param p_render_data The render data.
-     * @param p_signal_in_flight Should signal in flight fence.
-     */
-    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, bool p_signal_in_flight = false)
-        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight), clear_color(0.0F, 0.0F, 0.0F, 1.0F) {}
-
-    /**
-     * @brief Constructor.
-     *
-     * @param p_render_data The render data.
-     * @param p_clear_color The clear color.
-     * @param p_signal_in_flight Should signal in flight fence.
-     */
-    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color, bool p_signal_in_flight = false)
-        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight), clear_color(p_clear_color) {}
-
-    /**
-     * @brief Constructor.
-     *
-     * @param p_render_data The render data.
-     * @param p_clear_color The clear color.
-     * @param p_signal_in_flight Should signal in flight fence.
-     * @param p_descriptor_sets The descriptor sets to be bound.
-     */
-    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data, const glm::vec4& p_clear_color,
-                                   const std::span<Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight = false)
-        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight),
-        clear_color(p_clear_color), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end()) {}
-
-    /**
-     * @brief Constructor.
-     *
-     * @param p_render_data The render data.
-     * @param p_signal_in_flight Should signal in flight fence.
-     * @param p_descriptor_sets The descriptor sets to be bound.
-     */
-    RTRunGraphicsPipelineFactoryVK(const BaseRenderDataVK* p_render_data,
-                                   const std::span<Ref<RODescriptorSetVK>>& p_descriptor_sets, bool p_signal_in_flight = false)
-        : RenderTaskFactoryVK(p_render_data), signal_in_flight(p_signal_in_flight),
-        clear_color(0.0F, 0.0F, 0.0F, 1.0F), descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end()) {}
-
-    virtual Ref<RenderTask> create() const override {
-        return make_ref<RTRunGraphicsPipelineVK>(render_data->allocator, render_data, clear_color, descriptor_sets, signal_in_flight);
-    }
-private:
-    bool signal_in_flight;
-    glm::vec4 clear_color;
-    std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
-};
 } // namespace WhiteBirdEngine
 
 #endif

@@ -21,7 +21,6 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <glm/glm.hpp>
-#include <set>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -59,8 +58,8 @@ ROImageVK::Builder& ROImageVK::Builder::set_usage(VkImageUsageFlags p_usage) {
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_family_indices) {
-    queue_family_indices = p_queue_family_indices;
+ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_families) {
+    queue_families = p_queue_families;
     return *this;
 }
 
@@ -118,11 +117,6 @@ ROImageVK::Builder& ROImageVK::Builder::rgba_hdr() {
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_initial_layout(VkImageLayout p_initial_layout) {
-    initial_image_layout = p_initial_layout;
-    return *this;
-}
-
 void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_buffer) {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -131,9 +125,11 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     barrier.dstStageMask = dst_stage_mask;
     barrier.dstAccessMask = dst_access_mask;
     barrier.oldLayout = old_layout;
-    barrier.newLayout = WBE_REQUIRED(new_layout);
-    barrier.srcQueueFamilyIndex = src_queue_family_index;
-    barrier.dstQueueFamilyIndex = dst_queue_family_index;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
     barrier.image = WBE_REQUIRED(image).get_image();
     barrier.subresourceRange = subresource_range;
     VkDependencyInfo info{};
@@ -141,8 +137,8 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     info.imageMemoryBarrierCount = 1;
     info.pImageMemoryBarriers = &barrier;
     vkCmdPipelineBarrier2(p_command_buffer, &info);
-    // Update the image's layout to new layout.
-    image->exposed_fileds.image_layout = *new_layout;
+    // Update image's internal state.
+    image->exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
 }
 
 VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
@@ -156,17 +152,17 @@ VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_da
     create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = WBE_REQUIRED(usage);
-    create_info.initialLayout = initial_image_layout;
-    WBE_DEBUG_ASSERT(!queue_family_indices.empty());
-    if (queue_family_indices.size() == 1) {
+    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    
+    std::vector<uint32_t> initial_queues(queue_families.begin(), queue_families.end());
+    if (initial_queues.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = initial_queues.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
+    } else {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
-    else {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.queueFamilyIndexCount = queue_family_indices.size();
-        std::vector<uint32_t> queue_family_indices_array(queue_family_indices.begin(), queue_family_indices.end());
-        create_info.pQueueFamilyIndices = queue_family_indices_array.data();
-    }
+    
     VkImage result;
     if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan image.");
@@ -200,22 +196,21 @@ ROImageVK::~ROImageVK() {
 
 void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.create_vk_object(render_data);
+    exposed_fileds.queue_families = p_builder.queue_families;
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
     // Images are only allowed to be allocated on device.
     exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
-    exposed_fileds.image_layout = p_builder.initial_image_layout;
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {
     MemoryBarrierBuilder barrier_builder;
-    VkImageLayout old_layout = exposed_fileds.image_layout;
     barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .set_new_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL).apply_barrier(p_command_buffer);
-    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &p_region_info);
+        .apply_barrier(p_command_buffer);
+    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
     // After transfering the data, retrieve the original layout.
     barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT)
-        .set_new_layout(old_layout).apply_barrier(p_command_buffer);
+        .apply_barrier(p_command_buffer);
 }
 
 } // namespace WhiteBirdEngine

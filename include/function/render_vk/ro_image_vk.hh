@@ -55,12 +55,8 @@ public:
         uint32_t layers_count = 1;
         // Image usages.
         Required<VkImageUsageFlags> usage;
-        // Queue family indices. Either this size is 1 or is empty will make the imagae
-        // created in exclusive sharing mode, otherwise it will be created in concurrent
-        // sharing mode.
-        std::set<uint32_t> queue_family_indices;
-        // The initial image layout. This could be changed by setting image barriers.
-        VkImageLayout initial_image_layout = VK_IMAGE_LAYOUT_GENERAL;
+        // The queue families this image will be used in.
+        std::set<uint32_t> queue_families;
 
         // Set the image type.
         Builder& set_image_type(VkImageType p_image_type);
@@ -74,8 +70,8 @@ public:
         Builder& set_layers(uint32_t p_layers_count);
         // Set the image usage.
         Builder& set_usage(VkImageUsageFlags p_usage);
-        // Set the queue family indices.
-        Builder& set_queue_families(const std::set<uint32_t>& p_queue_family_indices);
+        // Set the queue families.
+        Builder& set_queue_families(const std::set<uint32_t>& p_queue_families);
         // Make a 2D image.
         Builder& image_2d(glm::uvec2 p_size);
         // Make a 2D image.
@@ -96,8 +92,6 @@ public:
         Builder& rgb_hdr();
         // Make an RGBA HDR image with each element 32 bit wide.
         Builder& rgba_hdr();
-        // Set the initial image layout.
-        Builder& set_initial_layout(VkImageLayout p_initial_layout);
 
         Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
             return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
@@ -129,7 +123,6 @@ public:
      *
      * @param p_render_data The base render data.
      * @param p_image The vulkan image instance.
-     * @param p_initial_image_layout THe initial image layout.
      */
     ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
 
@@ -166,9 +159,11 @@ public:
          */
         VkDeviceMemory image_memory = VK_NULL_HANDLE;
         /**
-         * @brief The image's current layout after all pending transitions. Notice that this field does not
-         * represent the actual current layout of the image, but it represent the image layout after all pending
-         * transitions of the barriers that was pushed.
+         * @brief The queue families the image is shared between.
+         */
+        std::set<uint32_t> queue_families;
+        /**
+         * @brief The image's current layout after all pending transitions.
          */
         VkImageLayout image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
@@ -199,14 +194,8 @@ public:
         VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The old layout of the image. You can set this to VK_IMAGE_LAYOUT_UNDEFINED if you don't care about the
         // existing image data.
-        VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        // The new layout that the image is going to transition to.
-        Required<VkImageLayout> new_layout;
-        // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
-        // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
-        uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
-        // The destination queue family to tranfer ownership. If all the ownerships in ROBufferVK is
-        // set in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        VkImageLayout old_layout = VK_IMAGE_LAYOUT_GENERAL;
+        // The destination queue family to tranfer ownership.
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The image to set barrier on.
         Ref<ROImageVK> image;
@@ -291,21 +280,6 @@ public:
             else {
                 old_layout = p_image->fields().image_layout;
             }
-            if (!new_layout.has_value()) {
-                // If new layout not specified, use the old layout, which the layout will not be changed.
-                new_layout = p_image->fields().image_layout;
-            }
-            return *this;
-        }
-
-        /**
-         * @brief Set the layout that this image will be transitioned to after triggering this barrier.
-         *
-         * @param p_new_layout The new layout to transition to.
-         * @return *this.
-         */
-        MemoryBarrierBuilder& set_new_layout(VkImageLayout p_new_layout) {
-            new_layout = p_new_layout;
             return *this;
         }
 

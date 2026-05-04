@@ -16,9 +16,7 @@
 #define WBE_FILE_RENDER_OBJECT_VK_HH
 
 #include "function/function_utils.hh"
-#include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
@@ -63,16 +61,6 @@ protected:
     VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const;
 };
 
-/**
- * @class RendResVK
- * @brief A vulkan resource instance.
- *
- */
-struct RendResVK {
-    RendResTID res_type_id;
-    RendResID res_id;
-    Ref<RenderObjectVK> res;
-};
 } // namespace WhiteBirdEngine
 
 #endif

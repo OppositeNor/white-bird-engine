@@ -15,22 +15,8 @@
 #ifndef WBE_FILE_OBJECT_HH
 #define WBE_FILE_OBJECT_HH
 
+#include "utils/defs.hh"
 #include <string_view>
-#include "core/reflection/serializable.hh"
-#include "core/reflection/reflection_defs.hh"
-#include "utils/utils.hh"
-#include <string_view>
-
-#define WBE_DECL_OBJECT(class_name)\
-    WBE_DECL_SERIALIZABLE(class_name)\
-    virtual std::string_view get_type() const override {\
-        return #class_name;\
-    }\
-    virtual TypeID get_type_id() const override {\
-        return static_hash(#class_name);\
-    }\
-
-
 
 namespace WhiteBirdEngine {
 
@@ -39,12 +25,9 @@ namespace WhiteBirdEngine {
  * @brief Object class.
  *
  */
-class WBE_META(WBE_SERIALIZABLE) Object : public Serializable {
+class Object {
 public:
-    WBE_DECL_SERIALIZABLE(Object)
-
-    Object() = default;
-    virtual ~Object() {}
+    WBE_R6_DEFAULT_VIRTUAL(Object);
 
     /**
      * @brief Get the type of the object in string.
@@ -52,13 +35,6 @@ public:
      * @return The type of the object in string.
      */
     virtual std::string_view get_type() const = 0;
-
-    /**
-     * @brief Get the type ID of the object.
-     *
-     * @return The type ID of the object.
-     */
-    virtual TypeID get_type_id() const = 0;
 
 };
 

@@ -16,6 +16,8 @@
 #define WBE_FILE_RESOURCE_CHUNK_LOADER_HH
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/memory/unique.hh"
+#include "core/object/object.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -68,6 +70,12 @@ public:
         return result;
     }
 
+    virtual RefRes<Object> register_object(Unique<Object>&& p_object) override {
+        objects.emplace_back(std::move(p_object));
+        auto& object = objects.back();
+        return RefRes<Object>(object);
+    }
+
     virtual size_t get_size() const override {
         return total_size;
     }
@@ -118,6 +126,8 @@ private:
     size_t total_size = 0;
     std::unordered_map<std::string, RefRes<char>> resource_map;
     std::unordered_map<void**, std::string> ref_map;
+    // For resources that needs RAII support.
+    std::vector<Unique<Object>> objects; 
     StackAllocator* allocator;
 
     void resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path);

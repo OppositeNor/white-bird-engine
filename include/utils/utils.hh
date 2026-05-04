@@ -47,6 +47,16 @@ enum class EncodeType {
     UTF32BE
 };
 
+// Type of access.
+enum class AccessType : uint8_t {
+    // Read only.
+    READ_ONLY = 0b01,
+    // Write only.
+    WRITE_ONLY = 0b10,
+    // Read or write.
+    READ_WRITE = 0b11
+};
+
 /**
  * @brief Get the size after alignment.
  *

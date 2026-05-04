@@ -13,19 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/render_task_vk.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render/render_task.hh"
-#include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
-#include "function/render_vk/semaphore_vk.hh"
-#include "global/stl_allocator.hh"
-#include "utils/defs.hh"
-#include <cstddef>
-#include <initializer_list>
-#include <span>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -48,78 +36,6 @@ RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
         // Destructor cannot throw an exception. 
         stdout_log()->error("Failed to record command buffer.");
     }
-}
-
-VkMemoryBarrier2 RenderTaskVK::MemoryBarrierBuilder::build() const {
-    VkMemoryBarrier2 result{};
-    result.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    result.srcAccessMask = src_access_mask;
-    result.srcStageMask = src_stage_mask;
-    result.dstAccessMask = dst_access_mask;
-    result.dstStageMask = dst_stage_mask;
-    return result;
-}
-
-bool RenderTaskVK::check_req_res(std::initializer_list<RendResTID> p_expected_req_res) const {
-    if (req_rend_res.size() != p_expected_req_res.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < p_expected_req_res.size(); ++i) {
-        if (req_rend_res[i] == MEM_NULL) {
-            return false;
-        }
-    }
-    return true;
-}
-
-const Vector<VkSemaphoreSubmitInfo>& RenderTaskVK::get_dependent_semaphores_submit_infos(const std::span<VkPipelineStageFlags2>& p_wait_stages) {
-    WBE_DEBUG_ASSERT(depend_semaphores.size() == depend_semaphores_submit_infos.size());
-    size_t n = depend_semaphores_submit_infos.size();
-    for (size_t i = 0; i < n; ++i) {
-        depend_semaphores_submit_infos[i] = depend_semaphores[i]->get_submit_info(p_wait_stages[i], render_data->current_frame);
-    }
-    return depend_semaphores_submit_infos;
-}
-
-void RenderTaskVK::submit_command_buffer(VkCommandBuffer p_command_buffer, VkQueue p_queue,
-                                         const std::span<VkPipelineStageFlags2>& p_wait_stages,
-                                         VkPipelineStageFlags2 p_signal_stage,
-                                         bool p_signal_in_flight_fence) {
-    VkSemaphoreSubmitInfo signal_semaphore_submit_info = task_semaphore->get_submit_info(p_signal_stage, render_data->current_frame);
-    const auto& wait_semaphores = get_dependent_semaphores_submit_infos(p_wait_stages);
-    VkCommandBufferSubmitInfo command_buffer_submit_info{};
-    command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-    command_buffer_submit_info.commandBuffer = p_command_buffer;
-
-    VkSubmitInfo2 submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submit_info.commandBufferInfoCount = 1;
-    submit_info.pCommandBufferInfos = &command_buffer_submit_info;
-    submit_info.waitSemaphoreInfoCount = wait_semaphores.size();
-    submit_info.pWaitSemaphoreInfos = wait_semaphores.data();
-    submit_info.signalSemaphoreInfoCount = 1;
-    submit_info.pSignalSemaphoreInfos = &signal_semaphore_submit_info;
-    if (vkQueueSubmit2(p_queue, 1, &submit_info, p_signal_in_flight_fence ?
-                       render_data->in_flight_fence : VK_NULL_HANDLE) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer to queue.");
-    }
-}
-
-VkRenderPassBeginInfo RenderTaskVK::get_render_pass_begin_info(Ref<const RORenderPassVK> p_render_pass,
-                                                               Ref<const ROFramebufferVK> p_framebuffer,
-                                                               VkClearValue& p_clear_value) const {
-    VkRenderPassBeginInfo render_pass_info{};
-    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_info.renderPass = p_render_pass->get_render_pass();
-    render_pass_info.framebuffer = p_framebuffer->get_framebuffer();
-    render_pass_info.renderArea.offset.x = 0;
-    render_pass_info.renderArea.offset.y = 0;
-    // Draw on the entire framebuffer.
-    auto extent = p_framebuffer->fields().extent;
-    render_pass_info.renderArea.extent = {.width = extent.x, .height = extent.y};
-    render_pass_info.clearValueCount = 1;
-    render_pass_info.pClearValues = &p_clear_value;
-    return render_pass_info;
 }
 
 } // namespace WhiteBirdEngine

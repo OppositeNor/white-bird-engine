@@ -34,6 +34,8 @@ template <typename T, typename AllocType = HeapAllocator>
 class Unique {
     template <typename T1, typename AllocType1>
     friend class Unique;
+    template <typename T1, typename AllocType1, bool AllowDestruct>
+    friend class RefRaw;
 
 public:
     Unique()
@@ -161,6 +163,10 @@ public:
 
     bool operator==(std::nullptr_t) {
         return mem_id == MEM_NULL;
+    }
+
+    operator Unique<const T, AllocType>&() const {
+        return reinterpret_cast<Unique<const T, AllocType>&>(const_cast<Unique<T, AllocType>&>(*this));
     }
 
     /**

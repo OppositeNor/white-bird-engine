@@ -25,15 +25,17 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
-#include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/window/i_window.hh"
 #include "global/stl_allocator.hh"
@@ -42,11 +44,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <format>
 #include <functional>
 #include <map>
 #include <optional>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -100,17 +100,16 @@ public:
 
     virtual void tick(double p_delta) override;
 
-    virtual void register_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info) override {
-        pipelines.insert(std::pair(p_pipeline_name, compile_pipeline(p_pipeline_name, p_pipeline_info)));
-    }
+    /**
+     * @brief Register a Vulkan pipeline descriptor under the given name. Concrete-renderer
+     * non-virtual API: callers cast to RendererVK to use it.
+     *
+     * @param p_pipeline_name The name to register under.
+     * @param p_desc          The pipeline descriptor.
+     */
+    void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
 
-    virtual void activate_pipeline(const std::string& p_pipeline_name) override {
-        auto find_result = pipelines.find(p_pipeline_name);
-        if (find_result == pipelines.end()) {
-            throw std::runtime_error(std::format("Failed to activate pipeline: {}, pipeline not registered.", p_pipeline_name));
-        }
-        activated_pipeline = find_result->second;
-    }
+    virtual void activate_pipeline(const std::string& p_pipeline_name) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
@@ -188,14 +187,6 @@ public:
         return render_objects->result_render_pass;
     }
 
-    /**
-     * @brief Get a render resource.
-     *
-     * @param p_res_id The ID of the resource to get.
-     * @param p_res_type_id The type of the resource.
-     */
-    Ref<RendResVK> get_resource(RendResID p_res_id, RendResTID p_res_type_id);
-
 private:
     static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
@@ -257,6 +248,14 @@ private:
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
+    // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
+    Vector<Ref<SemaphoreVK>> image_available_semaphores;
+
+    // Registered pipeline descriptors, keyed by name.
+    std::map<std::string, Ref<RendPipelineDescVK>> pipelines;
+    // The currently active render graph (rebuilt on every activate_pipeline()).
+    Ref<RenderGraphVK> active_graph;
+
     std::vector<const char*> enabled_layers {
 #ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
@@ -267,6 +266,9 @@ private:
 
     const std::vector<const char*> enabled_device_extensions {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+
+        // To make VK_IMAGE_LAYOUT_GENERAL works as well as other layouts.
+        VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
     };
 
 #ifdef WBE_VK_ENABLE_VALIDATION
@@ -314,24 +316,8 @@ private:
         Ref<RenderTaskVK> render_task;
     };
 
-    struct PipelineInfo {
-        String pipeline_name;
-        Vector<Ref<RendResVK>> rend_res;
-        Vector<TaskInfo> task_infos;
-        Ref<SemaphoreVK> image_available_semaphore;
-        Vector<Ref<SemaphoreVK>> result_semaphores;
-        uint64_t max_depth = 0;
-        PipelineInfo(AllocType* p_allocator)
-            : pipeline_name(p_allocator), rend_res(p_allocator), task_infos(p_allocator),
-            result_semaphores(p_allocator) {}
-    };
-
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
-    Map<std::string, Vector<Ref<PipelineInfo>>> pipelines;
-    Map<RendResID, RefWeak<RendResVK>> render_resources;
-    Map<RendResID, Vector<RefWeak<RendResVK>>> per_frame_in_flight_resource;
-    Vector<Ref<PipelineInfo>> activated_pipeline;
 
     // Render objects for the renderer.
     struct RenderObjects {
@@ -349,16 +335,13 @@ private:
         Vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
-        // The swap chain image resource.
-        Ref<RendResVK> swap_chain_framebuffer_resource;
-        // The base graphics pipeline resource.
-        Ref<RendResVK> base_graphics_pipeline_resource;
-        // Vertex buffer for static opaque triangles.
-        Ref<RendResVK> static_opaque_triangles_buffer_vertices_resource;
-        // Index buffer for static opaque triangles.
-        Ref<RendResVK> static_opaque_triangles_buffer_indices_resource;
-        // Buffer that stores the object ids.
-        Ref<RendResVK> static_opaque_triangles_buffer_obj_ids_resource;
+        // Global static-opaque mesh GPU buffers, populated by
+        // RendererVK::update_static_opaque_triangles() from the RenderDatabase
+        // and exposed to render tasks via the global resource IDs
+        // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES,OBJ_IDS}_VK.
+        Ref<ROBufferVK> static_opaque_vertices;
+        Ref<ROBufferVK> static_opaque_indices;
+        Ref<ROBufferVK> static_opaque_obj_ids;
     };
     Unique<RenderObjects> render_objects;
 
@@ -372,8 +355,6 @@ private:
     void init_render_pass();
     void init_swap_chain_framebuffers();
     void setup_render_resource();
-
-    void setup_resource(RendResID p_res_id, RendResTID p_res_type, Ref<RendResVK>& p_res, Ref<RenderObjectVK> p_default_object);
     void recreate_swap_chain();
 
     void create_instance();
@@ -403,24 +384,14 @@ private:
         return allocator_vk->get_allocation_callbacks();
     }
 
-    Vector<Ref<PipelineInfo>> compile_pipeline(const std::string& p_pipeline_name, const RendPipelineInfo& p_pipeline_info);
-    void compile_tasks(Ref<RendTaskInfo> p_root_task, const RendPipelineInfo& p_entered_pipeline_info, Ref<PipelineInfo> p_pipeline_info);
-    void compile_render_graph(Ref<RendTaskInfo> p_root_task, Ref<PipelineInfo> p_pipeline_info,
-                           std::map<RendTaskID, std::pair<Ref<RenderTaskVK>, const std::vector<RendTaskID>*>>& p_render_task_map);
-    Ref<RendResVK> get_rend_res(RendResID p_res, RendResTID p_type_id);
-    Vector<Ref<RendResVK>> get_per_frame_in_flight_rend_res(RendResID p_res, RendResTID p_type_id);
-    void fill_task_render_resource(Ref<RendTaskInfo> p_task, TaskInfo& p_task_info, Ref<PipelineInfo> p_pipeline);
-    void register_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::Resource> p_pipeline_resources);
-    void register_pfif_pipeline_resources(Ref<PipelineInfo> p_pipeline, std::span<const RendPipelineInfo::PFIFResource> p_pipeline_resources);
-
     int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
     uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;
 
     void run_stored_jobs();
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
-    std::optional<uint32_t> tick_setup_pipeline(const Vector<Ref<PipelineInfo>>& p_run_pipeline);
-    void run_pipeline_tasks(double p_delta, Ref<PipelineInfo> p_curr_pipeline);
-    void present(Ref<PipelineInfo> p_curr_pipeline, uint32_t p_image_index);
+    std::optional<uint32_t> tick_setup_pipeline();
+    void run_delayed_calls();
+    void present(uint32_t p_image_index);
 };
 
 } // namespace WhiteBirdEngine
