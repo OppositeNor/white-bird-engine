@@ -72,6 +72,11 @@ struct RendResVK {
     RendResTID res_type_id;
     RendResID res_id;
     Ref<RenderObjectVK> res;
+    enum class RendResPipelineState {
+        WAS_READ,
+        WAS_WRITTEN,
+        WAS_RW,
+    } res_pipeline_state;
 };
 } // namespace WhiteBirdEngine
 

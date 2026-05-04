@@ -600,13 +600,15 @@ void RendererVK::init_render_pass() {
     // The attachment's initial layout is not known.
     color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     // The attachment's final layout should be able to present on screen.
+    // Note that even though VK_KHR_unified_image_layouts_extension allows
+    // most images to have VK_IMAGE_LAYOUT_GENERAL as their image layouts,
+    // the color attachment should still remain VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
     color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     // Color attachment.
     VkAttachmentReference color_attachment_reference{};
     color_attachment_reference.attachment = 0;
-    // Image going to be rendered using a graphics pipeline.
-    color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment_reference.layout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
