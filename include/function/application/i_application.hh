@@ -62,7 +62,6 @@ public:
     virtual void logic_update(double p_delta) {};
 
 protected:
-
 };
 
 } // namespace WhiteBirdEngine

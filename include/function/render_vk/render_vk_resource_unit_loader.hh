@@ -15,6 +15,9 @@
 #ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
 #define WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
 
+#include "core/parser/parser_json.hh"
+#include "resource/resource_chunk/i_resource_chunk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include <string>
 #include <vector>
@@ -24,25 +27,34 @@ namespace WhiteBirdEngine {
 // TODO: Test
 class ResourceUnitLoaderShader final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual std::vector<std::string>
+    get_supported_resource_types() const override;
+    virtual void populate_scheme(
+        IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual void populate_scheme(IResourceChunk& p_res_chunk,
+        const ParserJSON::DataType& p_scheme_data) const override;
 };
 
 // TODO: Test
 class ResourceUnitLoaderGraphicsPipeline final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual std::vector<std::string>
+    get_supported_resource_types() const override;
+    virtual void populate_scheme(
+        IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual void populate_scheme(IResourceChunk& p_res_chunk,
+        const ParserJSON::DataType& p_scheme_data) const override;
 };
 
 // TODO: Test
 class ResourceUnitLoaderMaterial final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual std::vector<std::string>
+    get_supported_resource_types() const override;
+    virtual void populate_scheme(
+        IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual void populate_scheme(IResourceChunk& p_res_chunk,
+        const ParserJSON::DataType& p_scheme_data) const override;
 };
 
 void register_renderer_vk_resource_unit_loaders();

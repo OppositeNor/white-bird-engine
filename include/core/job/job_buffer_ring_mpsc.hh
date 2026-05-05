@@ -34,7 +34,6 @@ namespace WhiteBirdEngine {
  */
 class JobBufferRingMPSC final : public JobBuffer<JobBufferRingMPSC> {
 public:
-
     JobBufferRingMPSC() = delete;
     virtual ~JobBufferRingMPSC() = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(JobBufferRingMPSC)
@@ -55,9 +54,7 @@ public:
      *
      * @return The semaphore.
      */
-    std::counting_semaphore<32>& get_semaphore() {
-        return semaphore;
-    }
+    std::counting_semaphore<32>& get_semaphore() { return semaphore; }
 
 private:
     std::counting_semaphore<32> semaphore{0};

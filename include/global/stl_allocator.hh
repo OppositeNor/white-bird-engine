@@ -38,33 +38,41 @@ namespace WhiteBirdEngine {
  * @tparam POCCA Propagate on container copy assignment.
  * @tparam POCMA Propagate on container move assignment.
  * @tparam POCS Propagate on container swap.
- * @return 
+ * @return
  */
 template <typename T, typename AllocType, bool POCCA, bool POCMA, bool POCS>
-    requires (!(AllocatorTrait<AllocType>::WILL_ADDR_MOVE))
+    requires(!(AllocatorTrait<AllocType>::WILL_ADDR_MOVE))
 struct STLAllocator {
     using value_type = T; // NOLINT(readability-identifier-naming)
     AllocType* allocator = nullptr;
 
     template <typename U>
     struct rebind { // NOLINT(readability-identifier-naming)
-        using other = STLAllocator<U, AllocType, POCCA, POCMA, POCS>; // NOLINT(readability-identifier-naming)
+        using other = STLAllocator<U,
+            AllocType,
+            POCCA,
+            POCMA,
+            POCS>; // NOLINT(readability-identifier-naming)
     };
 
-    using propagate_on_container_copy_assignment = std::conditional_t<POCCA, std::true_type, std::false_type>; // NOLINT(readability-identifier-naming)
-    using propagate_on_container_move_assignment = std::conditional_t<POCMA, std::true_type, std::false_type>; // NOLINT(readability-identifier-naming)
-    using propagate_on_container_swap = std::conditional_t<POCS, std::true_type, std::false_type>; // NOLINT(readability-identifier-naming)
+    using propagate_on_container_copy_assignment = std::conditional_t<POCCA,
+        std::true_type,
+        std::false_type>; // NOLINT(readability-identifier-naming)
+    using propagate_on_container_move_assignment = std::conditional_t<POCMA,
+        std::true_type,
+        std::false_type>; // NOLINT(readability-identifier-naming)
+    using propagate_on_container_swap = std::conditional_t<POCS,
+        std::true_type,
+        std::false_type>; // NOLINT(readability-identifier-naming)
 
     /**
      * @brief Constructor.
      *
      * @param p_allocator The allocator that this STL allocator uses.
      */
-    STLAllocator(AllocType* p_allocator)
-        : allocator(p_allocator) {}
+    STLAllocator(AllocType* p_allocator) : allocator(p_allocator) {}
     ~STLAllocator() = default;
-    STLAllocator(const STLAllocator& p_other)
-        : allocator(p_other.allocator) {}
+    STLAllocator(const STLAllocator& p_other) : allocator(p_other.allocator) {}
     STLAllocator(STLAllocator&& p_other) noexcept
         : allocator(p_other.allocator) {
         p_other.allocator = nullptr;
@@ -93,10 +101,10 @@ struct STLAllocator {
      * @param p_other The allocator to be copied.
      */
     template <typename T1>
-    STLAllocator(const STLAllocator<T1, AllocType, POCCA, POCMA, POCS>& p_other) noexcept
+    STLAllocator(
+        const STLAllocator<T1, AllocType, POCCA, POCMA, POCS>& p_other) noexcept
         : allocator(p_other.allocator) {}
 
-    
     /**
      * @brief Allocate memory.
      *
@@ -133,7 +141,8 @@ using Vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType = HeapAllocatorDefault>
-using Set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
+using Set =
+    std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
  * @brief STL set that uses a custom allocator.
@@ -142,7 +151,10 @@ using Set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename T, typename AllocType = HeapAllocatorDefault>
-using HashSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
+using HashSet = std::unordered_set<T,
+    std::hash<T>,
+    std::equal_to<T>,
+    STLAllocator<T, AllocType, false, true, false>>;
 
 /**
  * @brief STL string that uses a custom allocator.
@@ -150,7 +162,9 @@ using HashSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocat
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
 template <typename AllocType = HeapAllocatorDefault>
-using String = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false, true, false>>;
+using String = std::basic_string<char,
+    std::char_traits<char>,
+    STLAllocator<char, AllocType, false, true, false>>;
 
 /**
  * @brief STL deque that uses a custom allocator.
@@ -161,8 +175,13 @@ using String = std::basic_string<char, std::char_traits<char>, STLAllocator<char
 template <typename T, typename AllocType = HeapAllocatorDefault>
 using Deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
 
-template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
-using Map = std::map<TKey, TVal, std::less<TKey>, STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
+template <typename TKey,
+    typename TVal,
+    typename AllocType = HeapAllocatorDefault>
+using Map = std::map<TKey,
+    TVal,
+    std::less<TKey>,
+    STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
 
 } // namespace WhiteBirdEngine
 

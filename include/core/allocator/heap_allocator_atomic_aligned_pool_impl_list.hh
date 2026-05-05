@@ -15,28 +15,32 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_HH
 #define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/i_allocator.hh"
 #ifdef _DEBUG
 #include "core/debug_utils/debug_mutex.hh"
 #endif
 #include "utils/defs.hh"
+#include <boost/thread/lock_types.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <boost/thread/lock_types.hpp>
 #include <string>
 
-#define WBE_HAAAPIL_GET_HEADER_SIZE(p_header) p_header & TOTAL_SIZE_MASK
-#define WBE_HAAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
-#define WBE_HAAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
-#define WBE_HAAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size) WBE_HAAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
-
+#define WBE_HAAAPIL_GET_HEADER_SIZE(p_header) p_header& TOTAL_SIZE_MASK
+#define WBE_HAAAPIL_GET_CHUNK_SIZE(p_chunk)                                    \
+    WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
+#define WBE_HAAAPIL_SET_HEADER(p_header, p_head_type, p_size)                  \
+    (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
+#define WBE_HAAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size)                  \
+    WBE_HAAAPIL_SET_HEADER(                                                    \
+        reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
 
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final : public AllocatorTrait<HeapAllocatorAligned> {
+struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final
+    : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicAlignedPoolImplicitList>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -50,19 +54,26 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final : 
 
 /**
  * @class HeapAllocatorAtomicAlignedPoolImplicitList
- * @brief Heap allocator atomic pool with memory alignment support, with an implicit list.
+ * @brief Heap allocator atomic pool with memory alignment support, with an
+ * implicit list.
  */
-class HeapAllocatorAtomicAlignedPoolImplicitList final : public HeapAllocatorAligned {
+class HeapAllocatorAtomicAlignedPoolImplicitList final
+    : public HeapAllocatorAligned {
 private:
     using Header = uint64_t;
+
 public:
     HeapAllocatorAtomicAlignedPoolImplicitList()
-    : HeapAllocatorAtomicAlignedPoolImplicitList(WBE_KiB(64)) {}
+        : HeapAllocatorAtomicAlignedPoolImplicitList(WBE_KiB(64)) {}
     virtual ~HeapAllocatorAtomicAlignedPoolImplicitList() override;
-    HeapAllocatorAtomicAlignedPoolImplicitList(const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
+    HeapAllocatorAtomicAlignedPoolImplicitList(
+        const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
+    HeapAllocatorAtomicAlignedPoolImplicitList(
+        HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
+    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(
+        const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
+    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(
+        HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
 
     /**
      * @brief The size of the allocated memory header.
@@ -72,7 +83,8 @@ public:
     /**
      * @brief The maximum total size that the allocator can contain.
      */
-    static constexpr size_t TOTAL_SIZE_MASK = std::numeric_limits<Header>::max() >> 4;
+    static constexpr size_t TOTAL_SIZE_MASK =
+        std::numeric_limits<Header>::max() >> 4;
 
     /**
      * @brief Constructor.
@@ -81,7 +93,8 @@ public:
      */
     HeapAllocatorAtomicAlignedPoolImplicitList(size_t p_size);
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
+    virtual MemID allocate(
+        size_t p_size, size_t p_alignment = HEADER_SIZE) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -107,7 +120,8 @@ public:
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         boost::shared_lock lock(mutex);
-        return WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)));
+        return WBE_HAAAPIL_GET_HEADER_SIZE(
+            *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)));
     }
 
     /**
@@ -148,7 +162,8 @@ public:
     bool is_in_pool(MemID p_mem_id) const;
 
     /**
-     * @brief Check if the pool is broken. Throws an error if the pool is broken.
+     * @brief Check if the pool is broken. Throws an error if the pool is
+     * broken.
      */
     void check_broken() const {
         boost::shared_lock lock(mutex);
@@ -156,7 +171,6 @@ public:
     }
 
 private:
-
     size_t size;
     char* mem_chunk;
     mutable char* possible_valid;
@@ -184,7 +198,8 @@ private:
     MemID find_valid_chunk(size_t p_aligned_size, size_t p_alignment);
     template <bool CheckFirst, bool CoalesceEnabled>
     char* get_next_free_memory(char* p_from);
-    void* acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
+    void* acquire_memory(
+        char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(char* p_insert_start, size_t p_insert_size);
 
     void coalesce_all() const;
@@ -200,6 +215,5 @@ private:
 #undef WBE_HAAAPIL_GET_CHUNK_SIZE
 #undef WBE_HAAAPIL_SET_HEADER
 #undef WBE_HAAAPIL_SET_CHUNK_HEADER
-
 
 #endif

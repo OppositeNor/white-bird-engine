@@ -16,7 +16,5 @@
 #include "platform/os/os.hh"
 
 namespace WhiteBirdEngine {
-    // TODO
+// TODO
 }
-
-

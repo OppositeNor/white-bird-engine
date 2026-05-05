@@ -19,14 +19,14 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
-#include <span>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,7 +39,8 @@ namespace WhiteBirdEngine {
  * @brief The graphics pipeline.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROGraphicsPipelineVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROGraphicsPipelineVK final
+    : public RenderObjectVK {
 public:
     /**
      * @class PipelineConfigurations
@@ -68,8 +69,10 @@ public:
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                vertex_shader = { .entry_function = p_entry_function, .shader = p_shader };
+            ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader,
+                const std::string& p_entry_function = "main") {
+                vertex_shader = {
+                    .entry_function = p_entry_function, .shader = p_shader};
                 return *this;
             }
 
@@ -79,8 +82,10 @@ public:
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                fragment_shader = { .entry_function = p_entry_function, .shader = p_shader };
+            ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader,
+                const std::string& p_entry_function = "main") {
+                fragment_shader = {
+                    .entry_function = p_entry_function, .shader = p_shader};
                 return *this;
             }
 
@@ -90,15 +95,17 @@ public:
              * @param p_vertex_shader The vertex shader instance.
              * @param p_fragment_shader The fragment shader instance.
              * @param p_vertex_entry_function The vertex shader entry function.
-             * @param p_fragment_entry_function The fragment shader entry function.
+             * @param p_fragment_entry_function The fragment shader entry
+             * function.
              * @return *this.
              */
             ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
-                                      Ref<ROShaderVK> p_fragment_shader,
-                                      const std::string& p_vertex_entry_function = "main",
-                                      const std::string& p_fragment_entry_function = "main") {
+                Ref<ROShaderVK> p_fragment_shader,
+                const std::string& p_vertex_entry_function = "main",
+                const std::string& p_fragment_entry_function = "main") {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
-                set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
+                set_fragment_shader(
+                    p_fragment_shader, p_fragment_entry_function);
                 return *this;
             }
         };
@@ -108,14 +115,16 @@ public:
             std::vector<VkVertexInputBindingDescription> bindings;
             // The vertex attributes.
             std::vector<VkVertexInputAttributeDescription> attributes;
-            
+
             /**
              * @brief Set the vertex input bindings.
              *
              * @param p_bindings The vertex input bindings.
              * @return *this
              */
-            VertexInputConfig& set_bindings(const std::vector<VkVertexInputBindingDescription>& p_bindings) {
+            VertexInputConfig& set_bindings(
+                const std::vector<VkVertexInputBindingDescription>&
+                    p_bindings) {
                 bindings = p_bindings;
                 return *this;
             }
@@ -126,7 +135,8 @@ public:
              * @param p_bindings The vertex input bindings.
              * @return *this
              */
-            VertexInputConfig& set_bindings(std::vector<VkVertexInputBindingDescription>&& p_bindings) {
+            VertexInputConfig& set_bindings(
+                std::vector<VkVertexInputBindingDescription>&& p_bindings) {
                 bindings = std::move(p_bindings);
                 return *this;
             }
@@ -137,7 +147,9 @@ public:
              * @param p_attributes The vertex input attributes.
              * @return *this
              */
-            VertexInputConfig& set_attributes(const std::vector<VkVertexInputAttributeDescription>& p_attributes) {
+            VertexInputConfig& set_attributes(
+                const std::vector<VkVertexInputAttributeDescription>&
+                    p_attributes) {
                 attributes = p_attributes;
                 return *this;
             }
@@ -148,7 +160,8 @@ public:
              * @param p_attributes The vertex input attributes.
              * @return *this
              */
-            VertexInputConfig& set_attributes(std::vector<VkVertexInputAttributeDescription>&& p_attributes) {
+            VertexInputConfig& set_attributes(
+                std::vector<VkVertexInputAttributeDescription>&& p_attributes) {
                 attributes = std::move(p_attributes);
                 return *this;
             }
@@ -159,7 +172,8 @@ public:
              * @param p_binding The binding to add to the vertex input bindings.
              * @return *this
              */
-            VertexInputConfig& add_binding(VkVertexInputBindingDescription p_binding) {
+            VertexInputConfig& add_binding(
+                VkVertexInputBindingDescription p_binding) {
                 bindings.push_back(p_binding);
                 return *this;
             }
@@ -167,10 +181,12 @@ public:
             /**
              * @brief Add a range of bindings to the vertex input bindings.
              *
-             * @param p_bindings The bindings to add to the vertex input bindings.
+             * @param p_bindings The bindings to add to the vertex input
+             * bindings.
              * @return *this
              */
-            VertexInputConfig& add_bindings(std::span<const VkVertexInputBindingDescription> p_bindings) {
+            VertexInputConfig& add_bindings(
+                std::span<const VkVertexInputBindingDescription> p_bindings) {
                 bindings.append_range(p_bindings);
                 return *this;
             }
@@ -178,10 +194,12 @@ public:
             /**
              * @brief Add an atribute to the vertex input attributes.
              *
-             * @param p_attribute The attribute to add to the vertex input attributes.
+             * @param p_attribute The attribute to add to the vertex input
+             * attributes.
              * @return *this
              */
-            VertexInputConfig& add_attribute(VkVertexInputAttributeDescription p_attribute) {
+            VertexInputConfig& add_attribute(
+                VkVertexInputAttributeDescription p_attribute) {
                 attributes.push_back(p_attribute);
                 return *this;
             }
@@ -189,10 +207,13 @@ public:
             /**
              * @brief Add a range of atributes to the vertex input attributes.
              *
-             * @param p_attributes The attributes to add to the vertex input attributes.
+             * @param p_attributes The attributes to add to the vertex input
+             * attributes.
              * @return *this
              */
-            VertexInputConfig& add_attributes(std::span<const VkVertexInputAttributeDescription> p_attributes) {
+            VertexInputConfig& add_attributes(
+                std::span<const VkVertexInputAttributeDescription>
+                    p_attributes) {
                 attributes.append_range(p_attributes);
                 return *this;
             }
@@ -200,7 +221,8 @@ public:
         // Input assembly configurations.
         struct InputAssemblyConfig {
             // The topology used in the input assembly stage.
-            VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            VkPrimitiveTopology primitive_topology =
+                VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
             // Enable restart for strip and fan primitive topology.
             VkBool32 primitive_restart_enabled = VK_FALSE;
 
@@ -210,7 +232,8 @@ public:
              * @param p_primitive_topology The primitive input topology.
              * @return *this
              */
-            InputAssemblyConfig& set_primitive_topology(VkPrimitiveTopology p_primitive_topology) {
+            InputAssemblyConfig& set_primitive_topology(
+                VkPrimitiveTopology p_primitive_topology) {
                 primitive_topology = p_primitive_topology;
                 return *this;
             }
@@ -238,10 +261,12 @@ public:
             /**
              * @brief Set primitive restart.
              *
-             * @param p_primitive_restart_enabled VK_TRUE to enable primitive restart, VK_FALSE otherwise.
+             * @param p_primitive_restart_enabled VK_TRUE to enable primitive
+             * restart, VK_FALSE otherwise.
              * @return *this
              */
-            InputAssemblyConfig& set_primitive_restart(VkBool32 p_primitive_restart_enabled) {
+            InputAssemblyConfig& set_primitive_restart(
+                VkBool32 p_primitive_restart_enabled) {
                 primitive_restart_enabled = p_primitive_restart_enabled;
                 return *this;
             }
@@ -255,7 +280,8 @@ public:
             // Viewports. Manual setup needed!
             std::vector<VkViewport> viewports;
             // Scissors. Manual setup needed!
-            // A scissor clamps a rectangle region that the fragments will only be generated inside this region.
+            // A scissor clamps a rectangle region that the fragments will only
+            // be generated inside this region.
             std::vector<VkRect2D> scissors;
 
             /**
@@ -265,7 +291,8 @@ public:
              * @param p_scissor The scissor of this viewport.
              * @return *this
              */
-            ViewportStateConfig& add_viewport(VkViewport p_viewport, VkRect2D p_scissor) {
+            ViewportStateConfig& add_viewport(
+                VkViewport p_viewport, VkRect2D p_scissor) {
                 viewports.push_back(p_viewport);
                 scissors.push_back(p_scissor);
                 return *this;
@@ -282,7 +309,8 @@ public:
                 scissor.offset.x = 0;
                 scissor.offset.y = 0;
                 scissor.extent.width = static_cast<uint32_t>(p_viewport.width);
-                scissor.extent.height = static_cast<uint32_t>(p_viewport.height);
+                scissor.extent.height =
+                    static_cast<uint32_t>(p_viewport.height);
                 viewports.push_back(p_viewport);
                 scissors.push_back(scissor);
                 return *this;
@@ -290,13 +318,15 @@ public:
         };
         // Rasterization configuraion.
         struct RasterizationConfig {
-            // If set to true, the fragments of depth over 1.0 or smaller than 0.0 won't be discarded but will be clamped.
+            // If set to true, the fragments of depth over 1.0 or smaller than
+            // 0.0 won't be discarded but will be clamped.
             VkBool32 depth_clamp_enabled = VK_FALSE;
             // Polygon mode.
             VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
             // Cull mode. Default cull back faces.
             VkCullModeFlags cull_mode = VK_CULL_MODE_BACK_BIT;
-            // Which direction is considered front, default to counter-clockwise.
+            // Which direction is considered front, default to
+            // counter-clockwise.
             VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
             /**
@@ -322,11 +352,13 @@ public:
             /**
              * @brief Enable/disable depth clamp.
              *
-             * @param p_depth_clamp_enabled VK_TRUE to enable depth clamp, VK_FALSE otherwise.
-             * @return 
+             * @param p_depth_clamp_enabled VK_TRUE to enable depth clamp,
+             * VK_FALSE otherwise.
+             * @return
              */
             RasterizationConfig& set_depth_clamp(bool p_depth_clamp_enabled) {
-                depth_clamp_enabled = p_depth_clamp_enabled ? VK_TRUE : VK_FALSE;
+                depth_clamp_enabled =
+                    p_depth_clamp_enabled ? VK_TRUE : VK_FALSE;
                 return *this;
             }
 
@@ -336,7 +368,8 @@ public:
              * @param p_polygon_mode The polygon mode to set to.
              * @return *this
              */
-            RasterizationConfig& set_polygon_mode(VkPolygonMode p_polygon_mode) {
+            RasterizationConfig& set_polygon_mode(
+                VkPolygonMode p_polygon_mode) {
                 polygon_mode = p_polygon_mode;
                 return *this;
             }
@@ -362,7 +395,6 @@ public:
                 front_face = p_front_face;
                 return *this;
             }
-
         };
         // Multisample configurations.
         struct MultisampleConfig {
@@ -400,8 +432,9 @@ public:
             /**
              * @brief Enable/disable depth test.
              *
-             * @param p_depth_test_enabled VK_TRUE to enable depth test, VK_FALSE otherwise.
-             * @return 
+             * @param p_depth_test_enabled VK_TRUE to enable depth test,
+             * VK_FALSE otherwise.
+             * @return
              */
             DepthTestConfig& set_depth_test(VkBool32 p_depth_test_enabled) {
                 depth_test_enabled = p_depth_test_enabled;
@@ -431,8 +464,9 @@ public:
             /**
              * @brief Enable/disable depth write.
              *
-             * @param p_depth_write_enabled VK_TRUE to enable depth write, VK_FALSE otherwise.
-             * @return 
+             * @param p_depth_write_enabled VK_TRUE to enable depth write,
+             * VK_FALSE otherwise.
+             * @return
              */
             DepthTestConfig& set_depth_write(VkBool32 p_depth_write_enabled) {
                 depth_write_enabled = p_depth_write_enabled;
@@ -487,11 +521,10 @@ public:
              * @return *this
              */
             ColorBlendConfig& add_default_color_attachment() {
-                attachments.push_back({
-                    .blendEnable = VK_FALSE,
-                    .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-                    | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-                });
+                attachments.push_back({.blendEnable = VK_FALSE,
+                    .colorWriteMask =
+                        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT});
                 return *this;
             }
         };
@@ -512,7 +545,8 @@ public:
              * @param p_dynamic_state The dynamic state to be added.
              * @return *this
              */
-            DynamicStateConfig& add_dynamic_state(VkDynamicState p_dynamic_state) {
+            DynamicStateConfig& add_dynamic_state(
+                VkDynamicState p_dynamic_state) {
                 dynamic_states.push_back(p_dynamic_state);
                 return *this;
             }
@@ -523,7 +557,8 @@ public:
              * @param p_dynamic_state The dynamic states to set to.
              * @return *this
              */
-            DynamicStateConfig& set_dynamic_states(const std::vector<VkDynamicState>& p_dynamic_state) {
+            DynamicStateConfig& set_dynamic_states(
+                const std::vector<VkDynamicState>& p_dynamic_state) {
                 dynamic_states = p_dynamic_state;
                 return *this;
             }
@@ -534,7 +569,8 @@ public:
              * @param p_dynamic_state The dynamic states to set to.
              * @return *this
              */
-            DynamicStateConfig& set_dynamic_states(std::vector<VkDynamicState>&& p_dynamic_state) {
+            DynamicStateConfig& set_dynamic_states(
+                std::vector<VkDynamicState>&& p_dynamic_state) {
                 dynamic_states = std::move(p_dynamic_state);
                 return *this;
             }
@@ -626,8 +662,8 @@ public:
 
             config.shader = p_shader_config;
             config.vertex_input = vertex_input_config;
-            config.viewport.viewports = { p_render_data->viewport };
-            config.viewport.scissors = { p_render_data->scissor };
+            config.viewport.viewports = {p_render_data->viewport};
+            config.viewport.scissors = {p_render_data->scissor};
             config.pipeline_layout = p_pipeline_layout;
             config.render_pass = p_render_pass;
             config.color_blend.add_default_color_attachment();
@@ -641,8 +677,10 @@ public:
          * @param p_render_data Base render data.
          * @return Reference-counted graphics pipeline object.
          */
-        Ref<ROGraphicsPipelineVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
+        Ref<ROGraphicsPipelineVK> create_ref(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROGraphicsPipelineVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
         /**
@@ -651,8 +689,10 @@ public:
          * @param p_render_data Base render data.
          * @return Unique-ownership graphics pipeline object.
          */
-        Unique<ROGraphicsPipelineVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<ROGraphicsPipelineVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROGraphicsPipelineVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
     };
 
@@ -667,25 +707,22 @@ public:
      *
      * @param p_builder The builder instance.
      */
-    ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROGraphicsPipelineVK(
+        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the graphics pipeline instance.
      *
      * @return The graphics pipeline instance.
      */
-    VkPipeline get_graphics_pipeline() const {
-        return graphics_pipeline;
-    }
+    VkPipeline get_graphics_pipeline() const { return graphics_pipeline; }
 
     /**
      * @brief Get the configurations of the graphics pipeline.
      *
      * @return The configurations of the graphics pipeline.
      */
-    const Config& get_config() const {
-        return config;
-    }
+    const Config& get_config() const { return config; }
 
     struct ExposedFields {
         Ref<const ROShaderVK> vertex_shader;
@@ -695,9 +732,7 @@ public:
         Ref<const RORenderPassVK> render_pass;
     };
 
-    const ExposedFields& fields() const {
-        return exposed_fields;
-    }
+    const ExposedFields& fields() const { return exposed_fields; }
 
 private:
     Config config;
@@ -719,25 +754,27 @@ private:
     void init(const Config& p_config);
 
     void setup_vertex_input_state_create_info(const Config& p_config,
-                                              PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_input_assembly_state_create_info(const Config& p_config,
-                                                PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_tessellation_state_create_info(const Config& p_config,
-                                              PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_viewport_state_create_info(const Config& p_config,
-                                          PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_rasterization_state_create_info(const Config& p_config,
-                                              PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_mulitsample_state_create_info(const Config& p_config,
-                                             PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_depth_stencil_state_create_info(const Config& p_config,
-                                               PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_color_blend_state_create_info(const Config& p_config,
-                                               PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_dynamic_state_create_info(const Config& p_config,
-                                         PipelineStateCreateInfo& p_pipeline_create_infos);
+        PipelineStateCreateInfo& p_pipeline_create_infos);
 
-    static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);
+    static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(
+        VkShaderStageFlagBits p_stage_flag,
+        const Config::ShaderConfig::ShaderStage& p_stage);
 };
 } // namespace WhiteBirdEngine
 

@@ -15,8 +15,9 @@
 #ifndef WBE_FILE_RO_RENDER_PASS_VK_HH
 #define WBE_FILE_RO_RENDER_PASS_VK_HH
 
-#include "core/reflection/reflection_defs.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
@@ -42,28 +43,36 @@ public:
         std::vector<VkSubpassDependency> dependencies;
 
         // Set attachment descriptions.
-        Builder& set_attachments(const std::vector<VkAttachmentDescription>& p_attachments);
+        Builder& set_attachments(
+            const std::vector<VkAttachmentDescription>& p_attachments);
         // Add a single attachment description.
         Builder& add_attachment(const VkAttachmentDescription& p_attachment);
         // Set subpass descriptions.
-        Builder& set_subpasses(const std::vector<VkSubpassDescription>& p_subpasses);
+        Builder& set_subpasses(
+            const std::vector<VkSubpassDescription>& p_subpasses);
         // Add a single subpass description.
         Builder& add_subpass(const VkSubpassDescription& p_subpass);
         // Set subpass dependencies.
-        Builder& set_dependencies(const std::vector<VkSubpassDependency>& p_dependencies);
+        Builder& set_dependencies(
+            const std::vector<VkSubpassDependency>& p_dependencies);
         // Add a single subpass dependency.
         Builder& add_dependency(const VkSubpassDependency& p_dependency);
 
-        Ref<RORenderPassVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<RORenderPassVK>(p_render_data->allocator, p_render_data, *this);
+        Ref<RORenderPassVK> create_ref(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RORenderPassVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<RORenderPassVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<RORenderPassVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<RORenderPassVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RORenderPassVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkRenderPass create_vk_object(const BaseRenderDataVK* p_render_data) const;
+        VkRenderPass create_vk_object(
+            const BaseRenderDataVK* p_render_data) const;
     };
 
     RORenderPassVK() = delete;
@@ -76,16 +85,15 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    RORenderPassVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RORenderPassVK(
+        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the render pass instance.
      *
      * @return The render pass instance.
      */
-    VkRenderPass get_render_pass() const {
-        return render_pass;
-    }
+    VkRenderPass get_render_pass() const { return render_pass; }
 
 private:
     VkRenderPass render_pass = VK_NULL_HANDLE;

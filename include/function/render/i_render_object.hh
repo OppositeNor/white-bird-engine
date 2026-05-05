@@ -25,9 +25,7 @@ namespace WhiteBirdEngine {
  */
 class IRenderObject {
 public:
-
     WBE_R6_DELETE_COPY_MOVE_VIRTUAL(IRenderObject)
-
 };
 
 } // namespace WhiteBirdEngine

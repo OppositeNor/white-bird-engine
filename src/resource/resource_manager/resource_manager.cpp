@@ -29,19 +29,28 @@ ResourceManager::ResourceManager(size_t p_alloc_size)
     : stack_allocator(p_alloc_size) {
     singleton = this;
     // Default resources that are supported by the resource layer.
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderAudio>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderBinary>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderFont>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderImage>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderMesh>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderText>(global_allocator()));
+    add_resource_unit_loader(
+        make_ref<ResourceUnitLoaderVideo>(global_allocator()));
 }
 
-void ResourceManager::load_global_resource(const std::string& p_global_res_path) {
+void ResourceManager::load_global_resource(
+    const std::string& p_global_res_path) {
     global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile>(
-    global_allocator(), p_global_res_path, stack_allocator));
+        global_allocator(), p_global_res_path, stack_allocator));
 }
 
 ResourceManager::~ResourceManager() {
@@ -50,13 +59,15 @@ ResourceManager::~ResourceManager() {
     stack_allocator.clear();
 }
 
-Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_resource(const std::string& p_id) const {
+Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_resource(
+    const std::string& p_id) const {
     for (const Ref<IResourceChunk>& chunk : resource_chunks) {
         if (chunk->contains(p_id)) {
             return chunk;
         }
     }
-    throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_id));
+    throw std::runtime_error(
+        std::format("Failed to find resource chunk containing key: {}.", p_id));
 }
 
 } // namespace WhiteBirdEngine

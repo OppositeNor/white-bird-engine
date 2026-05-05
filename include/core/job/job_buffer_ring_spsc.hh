@@ -35,7 +35,6 @@ namespace WhiteBirdEngine {
  */
 class JobBufferRingSPSC final : public JobBuffer<JobBufferRingSPSC> {
 public:
-
     WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(JobBufferRingSPSC)
 
     /**
@@ -49,9 +48,7 @@ public:
     std::function<void()> retrieve_job(bool p_block = false);
     void add_job(std::function<void()> p_job);
 
-    std::counting_semaphore<32>& get_semaphore() {
-        return semaphore;
-    }
+    std::counting_semaphore<32>& get_semaphore() { return semaphore; }
 
 private:
     std::counting_semaphore<32> semaphore{0};

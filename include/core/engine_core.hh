@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_ENGINE_CORE_HH
 #define WBE_FILE_ENGINE_CORE_HH
 #include "core/allocator/stack_allocator.hh"
+#include "core/clock/clock.hh"
 #include "core/core_utils.hh"
 #include "core/engine_config/engine_config.hh"
-#include "core/clock/clock.hh"
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
 #include "generated/label_manager.gen.hh"
@@ -26,6 +26,7 @@
 #include "platform/file_system/file_system.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <cstdint>
 #include <ostream>
 
 namespace WhiteBirdEngine {
@@ -34,7 +35,8 @@ using HeapAllocatorGlobal = HeapAllocatorDefault;
 
 /**
  * @class EngineCore
- * @brief Core singleton of the engine. Contains all singletons of the core layer.
+ * @brief Core singleton of the engine. Contains all singletons of the core
+ * layer.
  *
  */
 class EngineCore : public ISingleton<EngineCore> {
@@ -65,12 +67,11 @@ public:
      *
      * @return The singleton of engine core.
      */
-    static EngineCore* get_singleton() {
-        return singleton;
-    }
+    static EngineCore* get_singleton() { return singleton; }
 
     /**
-     * @brief The global clock starts recording when the engine core is constructed.
+     * @brief The global clock starts recording when the engine core is
+     * constructed.
      */
     Clock* global_clock = nullptr;
 
@@ -83,7 +84,8 @@ public:
      */
     EngineConfig* engine_config = nullptr;
     /**
-     * @brief Single tick stack allocator. Contents will be cleared every time a tick ends.
+     * @brief Single tick stack allocator. Contents will be cleared every time a
+     * tick ends.
      */
     StackAllocator* single_tick_allocator = nullptr;
     /**

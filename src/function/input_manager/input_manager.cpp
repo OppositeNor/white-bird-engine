@@ -15,26 +15,30 @@
 
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
-#include <cstdint>
 #include <atomic>
+#include <cstdint>
 
-#define WBE_SET_ATOMIC_BITSET_TRUE(bitset, index) ((bitset)[(index) / 8].fetch_or(static_cast<uint8_t>(0b1 << ((index) % 8)), std::memory_order_release))
-#define WBE_SET_ATOMIC_BITSET_FALSE(bitset, index) ((bitset)[(index) / 8].fetch_and(static_cast<uint8_t>(~(0b1 << ((index) % 8))), std::memory_order_release))
+#define WBE_SET_ATOMIC_BITSET_TRUE(bitset, index)                              \
+    ((bitset)[(index) / 8].fetch_or(                                           \
+        static_cast<uint8_t>(0b1 << ((index) % 8)),                            \
+        std::memory_order_release))
+#define WBE_SET_ATOMIC_BITSET_FALSE(bitset, index)                             \
+    ((bitset)[(index) / 8].fetch_and(                                          \
+        static_cast<uint8_t>(~(0b1 << ((index) % 8))),                         \
+        std::memory_order_release))
 
 namespace WhiteBirdEngine {
 
-InputManager::InputManager() {
-    singleton = this;
-}
+InputManager::InputManager() { singleton = this; }
 
-InputManager::~InputManager() {
-    singleton = nullptr;
-}
+InputManager::~InputManager() { singleton = nullptr; }
 
 InputStatus InputManager::get_input_status(KeyCode p_key_code) const {
     return InputStatus{
-        .status_code = static_cast<uint8_t>(key_status_map[p_key_code / 8].load(std::memory_order_acquire) >> (p_key_code % 8) & 0b1)
-    };
+        .status_code = static_cast<uint8_t>(
+            key_status_map[p_key_code / 8].load(std::memory_order_acquire) >>
+                (p_key_code % 8) &
+            0b1)};
 }
 
 void InputManager::set_keydown(KeyCode p_key_code) {

@@ -31,7 +31,8 @@ namespace WhiteBirdEngine {
  * @brief Pipeline layout.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROPipelineLayoutVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROPipelineLayoutVK final
+    : public RenderObjectVK {
 public:
     // Builder for ROPipelineLayoutVK
     struct Builder {
@@ -42,24 +43,34 @@ public:
         std::vector<VkPushConstantRange> push_constant_ranges;
 
         // Set descriptor set layouts.
-        Builder& set_descriptor_set_layouts(const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts);
+        Builder& set_descriptor_set_layouts(
+            const std::vector<Ref<RODescriptorSetLayoutVK>>&
+                p_descriptor_set_layouts);
         // Add a single descriptor set layout.
-        Builder& add_descriptor_set_layout(Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout);
+        Builder& add_descriptor_set_layout(
+            Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout);
         // Set push constant ranges.
-        Builder& set_push_constant_ranges(const std::vector<VkPushConstantRange>& p_push_constant_ranges);
+        Builder& set_push_constant_ranges(
+            const std::vector<VkPushConstantRange>& p_push_constant_ranges);
         // Add a single push constant range.
-        Builder& add_push_constant_range(const VkPushConstantRange& p_push_constant_range);
+        Builder& add_push_constant_range(
+            const VkPushConstantRange& p_push_constant_range);
 
-        Ref<ROPipelineLayoutVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROPipelineLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        Ref<ROPipelineLayoutVK> create_ref(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROPipelineLayoutVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROPipelineLayoutVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROPipelineLayoutVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<ROPipelineLayoutVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROPipelineLayoutVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkPipelineLayout create_vk_object(const BaseRenderDataVK* p_render_data) const;
+        VkPipelineLayout create_vk_object(
+            const BaseRenderDataVK* p_render_data) const;
     };
     ROPipelineLayoutVK() = delete;
     virtual ~ROPipelineLayoutVK() override;
@@ -71,7 +82,8 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    ROPipelineLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROPipelineLayoutVK(
+        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Constructor with default empty layout.
@@ -83,9 +95,7 @@ public:
      *
      * @return The vulkan pipeline layout instance.
      */
-    VkPipelineLayout get_pipeline_layout() const {
-        return pipeline_layout;
-    }
+    VkPipelineLayout get_pipeline_layout() const { return pipeline_layout; }
 
     /**
      * @class ExposedFields
@@ -98,9 +108,8 @@ public:
         Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
     };
 
-    const ExposedFields& fields() const {
-        return exposed_fields;
-    }
+    const ExposedFields& fields() const { return exposed_fields; }
+
 private:
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     ExposedFields exposed_fields;

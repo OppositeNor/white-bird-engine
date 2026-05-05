@@ -34,13 +34,13 @@ struct ResourceUnit {};
 struct RUMaterial;
 
 template <typename T>
-constexpr bool IS_RESOURCE_UNIT = std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
+constexpr bool IS_RESOURCE_UNIT =
+    std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
 
 template <typename T>
 concept ResourceUnitConcept = IS_RESOURCE_UNIT<T>;
 
-template <typename T>
-using RefRes = RefRaw<T, IAllocator, false>;
+template <typename T> using RefRes = RefRaw<T, IAllocator, false>;
 
 /**
  * @class ResourceScheme
@@ -49,7 +49,8 @@ using RefRes = RefRaw<T, IAllocator, false>;
  */
 struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
     WBE_DECL_SERIALIZABLE(RUScheme)
-    // The id of the resource. Default to empty string, which is an ananymous resource.
+    // The id of the resource. Default to empty string, which is an ananymous
+    // resource.
     WBE_META(WBE_REFLECT)
     std::string id;
     // The type of the resource.
@@ -279,7 +280,8 @@ struct RUAudio : public ResourceUnit {
      * @brief Configurations to this resource unit.
      */
     enum AudioConfig {
-        // Should the audio be streamed. If true, then audio data will be a stb_vorbis object.
+        // Should the audio be streamed. If true, then audio data will be a
+        // stb_vorbis object.
         IS_STREAM,
         // To track the total number of bits.
         TOTAL_CONFIG_BIT
@@ -298,18 +300,17 @@ struct RUAudio : public ResourceUnit {
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The data of the audio.
     RefRes<char> audio_data;
-
 };
 
 /**
  * @class RUBinary
- * @brief Binary resource unit. contains a size (in bytes) and a MemID pointing to
- * the data chunk that stores the data of the binary data.
+ * @brief Binary resource unit. contains a size (in bytes) and a MemID pointing
+ * to the data chunk that stores the data of the binary data.
  *
  * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit, and
- * then release the data) It is recommended to store the image data right before the
- * text resource unit in a stack allocator.
+ * release process should always be backwards (first release the resource unit,
+ * and then release the data) It is recommended to store the image data right
+ * before the text resource unit in a stack allocator.
  *
  */
 struct RUBinary : public ResourceUnit {
@@ -366,13 +367,13 @@ struct RUImage : public ResourceUnit {
 /**
  * @class RUText
  * @brief Text resource unit. contains encoding type, size (in bytes, including
- * the NUL terminater) and a MemID pointing to the data chunk that stores the data
- * of the string (ends with a NUL terminater).
+ * the NUL terminater) and a MemID pointing to the data chunk that stores the
+ * data of the string (ends with a NUL terminater).
  *
  * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit, and
- * then release the data) It is recommended to store the image data right before the
- * text resource unit in a stack allocator.
+ * release process should always be backwards (first release the resource unit,
+ * and then release the data) It is recommended to store the image data right
+ * before the text resource unit in a stack allocator.
  */
 struct RUText : public ResourceUnit {
     // The encoding type.
@@ -396,9 +397,9 @@ struct RUVideo : public ResourceUnit {
  * @brief 3D submesh resource unit.
  *
  * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit, and
- * then release the data) It is recommended to store the image data right before the
- * text resource unit in a stack allocator.
+ * release process should always be backwards (first release the resource unit,
+ * and then release the data) It is recommended to store the image data right
+ * before the text resource unit in a stack allocator.
  */
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.

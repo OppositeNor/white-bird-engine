@@ -14,8 +14,8 @@
 */
 #ifndef WBE_FILE_HEAP_ALLOCATOR_POOL_ALIGNED_HH
 #define WBE_FILE_HEAP_ALLOCATOR_POOL_ALIGNED_HH
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <sstream>
@@ -23,8 +23,7 @@
 
 namespace WhiteBirdEngine {
 
-template <>
-struct AllocatorTrait<class HeapAllocatorAligned> {
+template <> struct AllocatorTrait<class HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAligned>);
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_ALIGNABLE = true;
@@ -43,9 +42,9 @@ public:
 
     /**
      * @brief Allocate memory of a specific size.
-     * @note If IS_ALLOC_FIXED_SIZE is true for this allocator, allocating a size
-     * that is not the same as the specified size for the allocator will cause an
-     * error.
+     * @note If IS_ALLOC_FIXED_SIZE is true for this allocator, allocating a
+     * size that is not the same as the specified size for the allocator will
+     * cause an error.
      *
      * @param p_size The size to allocate.
      * @return The memory ID of the allocated resource.
@@ -56,9 +55,9 @@ public:
 
     /**
      * @brief Allocate memory of a specific size.
-     * @note If IS_ALLOC_FIXED_SIZE is true for this allocator, allocating a size
-     * that is not the same as the specified size for the allocator will cause an
-     * error.
+     * @note If IS_ALLOC_FIXED_SIZE is true for this allocator, allocating a
+     * size that is not the same as the specified size for the allocator will
+     * cause an error.
      *
      * @param p_size The size to allocate.
      * @param p_alignment Alignment.
@@ -81,8 +80,7 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    template <typename T>
-    T* get_obj(MemID p_id) const {
+    template <typename T> T* get_obj(MemID p_id) const {
         return static_cast<T*>(get(p_id));
     }
 

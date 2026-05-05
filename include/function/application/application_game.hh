@@ -16,10 +16,10 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/audio/audio_renderer.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/application/i_application.hh"
+#include "function/audio/audio_renderer.hh"
 #include "function/game_config/game_config_options.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
@@ -65,9 +65,7 @@ public:
      *
      * @return The renderer instance.
      */
-    Ref<IRenderer> get_renderer() const {
-        return renderer;
-    }
+    Ref<IRenderer> get_renderer() const { return renderer; }
 
     /**
      * @brief Add a job for the renderer.
@@ -88,12 +86,14 @@ private:
     WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
+
 protected:
     Ref<JobBufferRingSPSC> render_job_buffer;
     Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
     Ref<Worker> worker;
-    WindowProperties get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options);
+    WindowProperties get_window_properties_from_game_config_options(
+        const GameConfigOptions& p_game_config_options);
 };
 
 } // namespace WhiteBirdEngine

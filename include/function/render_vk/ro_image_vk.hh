@@ -36,9 +36,11 @@ namespace WhiteBirdEngine {
  * @brief Image.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK, ThisRef<ROImageVK> {
+class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK,
+                                                    ThisRef<ROImageVK> {
     friend struct MemoryBarrierBuilder;
     friend class RendererVK;
+
 public:
     // Builder for ROImageVK
     struct Builder {
@@ -94,11 +96,14 @@ public:
         Builder& rgba_hdr();
 
         Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+            return make_ref<ROImageVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<ROImageVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROImageVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
     private:
@@ -118,32 +123,34 @@ public:
     ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
-     * @brief Constructor for swap chain images. This image will not manually allocate memory, and will not
-     * deallocate memory when destroyed.
+     * @brief Constructor for swap chain images. This image will not manually
+     * allocate memory, and will not deallocate memory when destroyed.
      *
      * @param p_render_data The base render data.
      * @param p_image The vulkan image instance.
      */
-    ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
+    ROImageVK(const BaseRenderDataVK* p_render_data,
+        VkImage p_image,
+        VkImageLayout p_initial_image_layout);
 
     /**
      * @brief Get image instance.
      *
      * @return The image instance.
      */
-    VkImage get_image() const {
-        return exposed_fileds.image;
-    }
+    VkImage get_image() const { return exposed_fileds.image; }
 
     /**
-     * @brief Set the data of the image immediately. This function has to be called
-     * within a scope of recording command buffer.
+     * @brief Set the data of the image immediately. This function has to be
+     * called within a scope of recording command buffer.
      *
      * @param p_command_buffer The command buffer to record the image transfer.
      * @param p_data The buffer to get data from.
      * @param p_region_info The region info of the src buffer and the dst image.
      */
-    void set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info);
+    void set_image_data_immediate(VkCommandBuffer p_command_buffer,
+        Ref<ROBufferVK> p_data,
+        VkBufferImageCopy p_region_info);
 
     struct ExposedFields {
         /**
@@ -173,9 +180,7 @@ public:
      *
      * @return The exposed fields.
      */
-    const ExposedFields& fields() const {
-        return exposed_fileds;
-    }
+    const ExposedFields& fields() const { return exposed_fileds; }
 
     /**
      * @class BufferMemoryBarrierBuilder
@@ -187,13 +192,16 @@ public:
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         // The source stage.
-        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 src_stage_mask =
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_2_MEMORY_READ_BIT;
         // The destination stage.
-        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        // The old layout of the image. You can set this to VK_IMAGE_LAYOUT_UNDEFINED if you don't care about the
-        // existing image data.
+        VkPipelineStageFlags2 dst_stage_mask =
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        // The old layout of the image. You can set this to
+        // VK_IMAGE_LAYOUT_UNDEFINED if you don't care about the existing image
+        // data.
         VkImageLayout old_layout = VK_IMAGE_LAYOUT_GENERAL;
         // The destination queue family to tranfer ownership.
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
@@ -220,7 +228,8 @@ public:
          * @param p_src_stage The source pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask,
+            VkPipelineStageFlags2 p_src_stage_mask) {
             src_access_mask = p_src_access_mask;
             src_stage_mask = p_src_stage_mask;
             return *this;
@@ -244,7 +253,8 @@ public:
          * @param p_dst_stage_mask The destination pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask,
+            VkPipelineStageFlags2 p_dst_stage_mask) {
             dst_access_mask = p_dst_access_mask;
             dst_stage_mask = p_dst_stage_mask;
             return *this;
@@ -255,9 +265,10 @@ public:
          *
          * @param p_src_access_mask The source access bit mask.
          * @param p_dst_access_mask The destination access bit mask.
-         * @return 
+         * @return
          */
-        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+        MemoryBarrierBuilder& set_access(
+            VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
             return *this;
@@ -267,17 +278,19 @@ public:
          * @brief Set the buffer to apply the barrier on.
          *
          * @param p_buffer The buffer to apply the barrier on.
-         * @param p_drop_old Should drop the old data. The old data of the image won't be kept if true.
-         * If false, old_layout information would be retrieved from the image.
+         * @param p_drop_old Should drop the old data. The old data of the image
+         * won't be kept if true. If false, old_layout information would be
+         * retrieved from the image.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_image(Ref<ROImageVK> p_image, bool p_drop_old = false) {
+        MemoryBarrierBuilder& set_image(
+            Ref<ROImageVK> p_image, bool p_drop_old = false) {
             image = p_image;
             if (p_drop_old) {
-                // If the old data will be dropped, set the old layout to VK_IMAGE_LAYOUT_UNDEFINED
+                // If the old data will be dropped, set the old layout to
+                // VK_IMAGE_LAYOUT_UNDEFINED
                 old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-            }
-            else {
+            } else {
                 old_layout = p_image->fields().image_layout;
             }
             return *this;

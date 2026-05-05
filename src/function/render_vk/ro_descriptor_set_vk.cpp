@@ -13,19 +13,20 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
-#include <vector>
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
-#include <cstddef>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(
+    const BaseRenderDataVK* p_render_data) const {
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = p_render_data->descriptor_pool;
@@ -37,14 +38,18 @@ VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDat
     alloc_info.descriptorSetCount = static_cast<uint32_t>(layouts.size());
     alloc_info.pSetLayouts = layouts.data();
     VkDescriptorSet result;
-    if (vkAllocateDescriptorSets(p_render_data->logic_device, &alloc_info, &result) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(
+            p_render_data->logic_device, &alloc_info, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate descriptor set.");
     }
     return result;
 }
 
-RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data), descriptor_set_layouts(p_render_data->allocator), bound_objects(p_render_data->allocator) {
+RODescriptorSetVK::RODescriptorSetVK(
+    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+    : RenderObjectVK(p_render_data),
+      descriptor_set_layouts(p_render_data->allocator),
+      bound_objects(p_render_data->allocator) {
     descriptor_set = p_builder.create_vk_object(p_render_data);
     descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
     for (const auto& layout : p_builder.descriptor_set_layouts) {
@@ -53,14 +58,17 @@ RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, cons
 }
 
 RODescriptorSetVK::~RODescriptorSetVK() {
-    vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
+    vkFreeDescriptorSets(render_data->logic_device,
+        render_data->descriptor_pool,
+        1,
+        &descriptor_set);
 }
 
 static void write_buffer_info(VkDescriptorType p_descriptor_type,
-                              VkWriteDescriptorSet& p_write_info,
-                              const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-                              Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
-                              std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos);
+    VkWriteDescriptorSet& p_write_info,
+    const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos);
 
 void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     // Make sure only one type of resource is being written.
@@ -73,7 +81,8 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     }
     // TODO: Image view and texel buffer view
     if (resource_type_count != 1) {
-        throw std::runtime_error("Failed to write descriptor set: only one type of resource can be written at a time.");
+        throw std::runtime_error("Failed to write descriptor set: only one "
+                                 "type of resource can be written at a time.");
     }
     VkWriteDescriptorSet write_info{};
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -82,7 +91,8 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.dstArrayElement = 0;
     std::vector<VkDescriptorBufferInfo> buffer_infos;
     // Prepare buffer infos
-    auto emplace_result = bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>>(render_data->allocator));
+    auto emplace_result = bound_objects.emplace(write_info.dstBinding,
+        Vector<Ref<RenderObjectVK>>(render_data->allocator));
     auto bound_object_it = emplace_result.first;
     if (!emplace_result.second) {
         // If previously existed, clear the bound objects.
@@ -90,21 +100,30 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     }
 
     if (!p_writer.storage_buffer_infos.empty()) {
-        write_buffer_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, p_writer.storage_buffer_infos, bound_object_it, buffer_infos);
+        write_buffer_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            write_info,
+            p_writer.storage_buffer_infos,
+            bound_object_it,
+            buffer_infos);
     }
     if (!p_writer.uniform_buffer_infos.empty()) {
-        write_buffer_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, bound_object_it, buffer_infos);
+        write_buffer_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            write_info,
+            p_writer.uniform_buffer_infos,
+            bound_object_it,
+            buffer_infos);
     }
     // TODO: Image view
     // TODO: Texel buffer view
-	vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
+    vkUpdateDescriptorSets(
+        render_data->logic_device, 1, &write_info, 0, nullptr);
 }
 
 static void write_buffer_info(VkDescriptorType p_descriptor_type,
-                              VkWriteDescriptorSet& p_write_info,
-                              const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-                              Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
-                              std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
+    VkWriteDescriptorSet& p_write_info,
+    const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
     p_write_info.descriptorType = p_descriptor_type;
     p_result_buffer_infos.reserve(p_buffer_infos.size());
     p_bound_object_it->second.reserve(p_buffer_infos.size());

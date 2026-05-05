@@ -23,3 +23,8 @@ IndentPPDirectives: None
 
 # Namespace scopes should not affect indentation.
 NamespaceIndentation: None
+
+# Pointer/reference qualifiers attach to the type (e.g. `int* a`, `int& a`).
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Left

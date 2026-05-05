@@ -25,8 +25,7 @@ namespace WhiteBirdEngine {
  * @class JobBuffer
  * @brief Stores a buffer that contians all the job for an instance to execute.
  */
-template <typename ChildT>
-class JobBuffer {
+template <typename ChildT> class JobBuffer {
 public:
     WBE_R6_DELETE_COPY_MOVE_VIRTUAL(JobBuffer)
 
@@ -34,7 +33,8 @@ public:
      * @brief Retrieve a job.
      *
      * @param p_block Block and wait for a new job if the buffer is empty.
-     * @return The job function. Returns an empty function if p_block is false and the buffer is empty.
+     * @return The job function. Returns an empty function if p_block is false
+     * and the buffer is empty.
      */
     std::function<void()> retrieve_job(bool p_block = false) {
         return static_cast<ChildT*>(this)->retrieve_job(p_block);
@@ -42,7 +42,7 @@ public:
 
     /**
      * @brief Add a job to the buffer.
-     * 
+     *
      * @throws std::runtime_error If buffer overflow.
      * @param p_job The job to add to the buffer.
      */

@@ -24,6 +24,7 @@
 #include "function/render_vk/semaphore_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <tuple>
@@ -85,10 +86,12 @@ struct RGExecEdge {
     Ref<RGNode> after;
     // The pipeline stage at which the producer's work is considered
     // observable.
-    VkPipelineStageFlags2 before_finish_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags2 before_finish_pipeline_stage =
+        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     // The pipeline stage at which the consumer's work needs the producer's
     // output to be visible.
-    VkPipelineStageFlags2 after_start_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags2 after_start_pipeline_stage =
+        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     // The timeline semaphore used to signal/wait this edge between submits.
     Ref<SemaphoreVK> semaphore;
 };
@@ -149,17 +152,21 @@ public:
      * @brief Imperative builder: connect two nodes with an execution edge.
      * Allocates a timeline semaphore for the edge.
      */
-    Ref<RGExecEdge> add_exec_edge(Ref<RGNode> p_before, Ref<RGNode> p_after,
-                                  VkPipelineStageFlags2 p_before_finish_stage,
-                                  VkPipelineStageFlags2 p_after_start_stage);
+    Ref<RGExecEdge> add_exec_edge(Ref<RGNode> p_before,
+        Ref<RGNode> p_after,
+        VkPipelineStageFlags2 p_before_finish_stage,
+        VkPipelineStageFlags2 p_after_start_stage);
 
     /**
      * @brief Imperative builder: connect two nodes with a resource edge.
      */
     Ref<RGResEdge> add_res_edge(Ref<RendResVK> p_resource,
-                                Ref<RGNode> p_before, Ref<RGNode> p_after,
-                                VkAccessFlags2 p_before_access, VkAccessFlags2 p_after_access,
-                                VkPipelineStageFlags2 p_before_stage, VkPipelineStageFlags2 p_after_stage);
+        Ref<RGNode> p_before,
+        Ref<RGNode> p_after,
+        VkAccessFlags2 p_before_access,
+        VkAccessFlags2 p_after_access,
+        VkPipelineStageFlags2 p_before_stage,
+        VkPipelineStageFlags2 p_after_stage);
 
     /**
      * @brief Build the graph from a high-level descriptor: instantiate every
@@ -186,12 +193,15 @@ public:
      *
      * @param p_frame_index The current frame counter (timeline base value).
      * @param p_delta       Frame delta forwarded to RenderTaskVK::record().
-     * @param p_extra_waits_first_submit  Extra waits on the first graphics submit.
-     * @param p_extra_signals_last_submit Extra signals on the last graphics submit.
+     * @param p_extra_waits_first_submit  Extra waits on the first graphics
+     * submit.
+     * @param p_extra_signals_last_submit Extra signals on the last graphics
+     * submit.
      */
-    void execute(uint64_t p_frame_index, double p_delta,
-                 std::span<const VkSemaphoreSubmitInfo> p_extra_waits_first_submit,
-                 std::span<const VkSemaphoreSubmitInfo> p_extra_signals_last_submit);
+    void execute(uint64_t p_frame_index,
+        double p_delta,
+        std::span<const VkSemaphoreSubmitInfo> p_extra_waits_first_submit,
+        std::span<const VkSemaphoreSubmitInfo> p_extra_signals_last_submit);
 
     /**
      * @brief Insert or override a runtime-bound resource by id. This lets the
@@ -204,7 +214,9 @@ public:
      * @param p_resource    The resource instance.
      * @param p_res_type_id The runtime type id of the resource.
      */
-    void set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+    void set_resource(RendResID p_res_id,
+        Ref<RenderObjectVK> p_resource,
+        RendResTID p_res_type_id);
 
     /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
@@ -240,23 +252,31 @@ private:
     void free_command_buffers();
     void topological_sort();
 
-    Vector<Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
-    Vector<RendTaskID, RenderAllocator>     instantiate_tasks(const RendPipelineDescVK& p_desc);
+    Vector<Ref<RendResVK>, RenderAllocator> index_resources(
+        const RendPipelineDescVK& p_desc);
+    Vector<RendTaskID, RenderAllocator> instantiate_tasks(
+        const RendPipelineDescVK& p_desc);
     void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc,
-                                  const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
+        const Vector<RendTaskID, RenderAllocator>& p_task_ids);
+    void infer_res_edges(
+        const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;
-    Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
-    void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer,
-                     const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta);
-    void collect_edge_semaphores(Ref<RGNode> p_node, uint64_t p_timeline_value,
-                                 Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
-                                 Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals) const;
-    void submit_node(VkCommandBuffer p_command_buffer, QueueFamilyVK p_queue_family,
-                     const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
-                     const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals,
-                     VkFence p_fence);
+    Vector<RendResVK, RenderAllocator> build_per_node_bound(
+        Ref<RGNode> p_node) const;
+    void record_node(Ref<RGNode> p_node,
+        VkCommandBuffer p_command_buffer,
+        const Vector<RendResVK, RenderAllocator>& p_bound,
+        double p_delta);
+    void collect_edge_semaphores(Ref<RGNode> p_node,
+        uint64_t p_timeline_value,
+        Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
+        Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals) const;
+    void submit_node(VkCommandBuffer p_command_buffer,
+        QueueFamilyVK p_queue_family,
+        const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
+        const Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals,
+        VkFence p_fence);
 };
 
 } // namespace WhiteBirdEngine

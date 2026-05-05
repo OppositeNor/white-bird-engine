@@ -55,27 +55,33 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_clear_color        Clear color used in the render pass begin.
      * @param p_framebuffer_id     Resource id of the framebuffer (write).
      * @param p_pipeline_id        Resource id of the graphics pipeline (read).
-     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
-     * @param p_index_buffer_id    Optional resource id of the index buffer (read).
+     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer
+     * (read).
+     * @param p_index_buffer_id    Optional resource id of the index buffer
+     * (read).
      * @param p_descriptor_sets    Descriptor sets to bind in order.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
-                            const glm::vec4& p_clear_color,
-                            RendResID p_framebuffer_id,
-                            RendResID p_pipeline_id,
-                            std::optional<RendResID> p_vertex_buffer_id,
-                            std::optional<RendResID> p_index_buffer_id,
-                            std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
+        const glm::vec4& p_clear_color,
+        RendResID p_framebuffer_id,
+        RendResID p_pipeline_id,
+        std::optional<RendResID> p_vertex_buffer_id,
+        std::optional<RendResID> p_index_buffer_id,
+        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
 
-    virtual QueueFamilyVK queue_family() const override { return QueueFamilyVK::GRAPHICS; }
+    virtual QueueFamilyVK queue_family() const override {
+        return QueueFamilyVK::GRAPHICS;
+    }
 
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
+    virtual Vector<ResAccessVK, RenderAllocator>
+    read_resources() const override;
 
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual Vector<ResAccessVK, RenderAllocator>
+    write_resources() const override;
 
     virtual void record(VkCommandBuffer p_command_buffer,
-                        const Vector<RendResVK, RenderAllocator>& p_resources,
-                        double p_delta) override;
+        const Vector<RendResVK, RenderAllocator>& p_resources,
+        double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

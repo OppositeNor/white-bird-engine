@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief The manager for the function layer.
  *
  */
-class EngineFunction final : public ISingleton<EngineFunction>{
+class EngineFunction final : public ISingleton<EngineFunction> {
 public:
     EngineFunction() = delete;
     virtual ~EngineFunction() override;
@@ -47,16 +47,14 @@ public:
      *
      * @return The singleton instance.
      */
-    static EngineFunction* get_singleton() {
-        return singleton;
-    }
+    static EngineFunction* get_singleton() { return singleton; }
 
     /**
      * @brief The game configuration.
      */
     Unique<GameConfig> game_config = MEM_NULL;
-private:
 
+private:
     inline static EngineFunction* singleton;
 };
 

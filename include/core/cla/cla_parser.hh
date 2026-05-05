@@ -44,12 +44,11 @@ public:
      * @brief Parse tokens into ast.
      *
      * @param p_tokens The tokens to parse.
-     * @return 
+     * @return
      */
     Ref<CLAASTNode> parse(const std::vector<CLAToken>& p_tokens);
-    
-private:
 
+private:
     enum class ParseState {
         START,
         GET_ROOT_OPERAND,
@@ -59,11 +58,21 @@ private:
 
     Ref<CLAASTNodeOperation> curr_option = MEM_NULL;
 
-    void process_token(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
-    void parse_start(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
-    void parse_get_root_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
-    void parse_get_option(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
-    void parse_get_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations);
+    void process_token(const CLAToken& p_token,
+        std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_start(const CLAToken& p_token,
+        std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_root_operand(const CLAToken& p_token,
+        std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_option(const CLAToken& p_token,
+        std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>& p_operations);
+    void parse_get_operand(const CLAToken& p_token,
+        std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>& p_operations);
 };
 
 } // namespace WhiteBirdEngine

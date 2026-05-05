@@ -31,6 +31,8 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-derived-method-shadowing-base-method,
+  -bugprone-invalid-enum-default-initialization,
+  -bugprone-exception-escape,
   -misc-non-private-member-variables-in-classes,
   -misc-no-recursion,
   -misc-const-correctness,
@@ -78,7 +80,6 @@ Checks: >
   -performance-no-int-to-ptr,
   -performance-enum-size,
   -misc-use-internal-linkage
-  -bugprone-invalid-enum-default-initialization
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets

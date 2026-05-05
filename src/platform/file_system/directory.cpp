@@ -16,10 +16,10 @@
 #include "platform/file_system/file_system.hh"
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
@@ -43,7 +43,8 @@ Directory& Directory::operator=(Directory&& p_other) noexcept {
 }
 
 bool Directory::operator==(const Directory& p_other) const {
-    if (is_absolute != p_other.is_absolute || dir_names.size() != p_other.dir_names.size()) {
+    if (is_absolute != p_other.is_absolute ||
+        dir_names.size() != p_other.dir_names.size()) {
         return false;
     }
     size_t dir_names_size = dir_names.size();
@@ -56,12 +57,12 @@ bool Directory::operator==(const Directory& p_other) const {
 }
 
 Directory::Directory(std::vector<std::string> p_dir_names, bool p_is_absolute)
-: dir_names(p_dir_names), is_absolute(p_is_absolute) {}
-
+    : dir_names(p_dir_names), is_absolute(p_is_absolute) {}
 
 Directory Directory::combine(const Directory& p_other) const {
     if (p_other.is_absolute) {
-        throw std::runtime_error("Only allows to combine with a relative path.");
+        throw std::runtime_error(
+            "Only allows to combine with a relative path.");
     }
     Directory result(*this);
     result.dir_names.reserve(dir_names.size() + p_other.dir_names.size());

@@ -23,7 +23,8 @@
 
 namespace WhiteBirdEngine {
 
-JobBufferRingSPSC::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
+JobBufferRingSPSC::JobBufferRingSPSC(
+    HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
     : buffer(p_allocator), head(0), tail(0) {
     if (p_buffer_size <= 1) {
         throw std::runtime_error("Buffer has to be at least size 2.");
@@ -34,14 +35,14 @@ JobBufferRingSPSC::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p
 std::function<void()> JobBufferRingSPSC::retrieve_job(bool p_block) {
     if (p_block) {
         semaphore.acquire();
-    }
-    else if (!semaphore.try_acquire()) {
+    } else if (!semaphore.try_acquire()) {
         return std::function<void()>();
     }
     size_t tail_l = tail.load(std::memory_order_acquire);
     std::function<void()> result = std::move(buffer[tail_l]);
     buffer[tail_l] = nullptr;
-    tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
+    tail.store(
+        ring_increment(tail_l, buffer.size()), std::memory_order_release);
     return result;
 }
 
@@ -56,6 +57,5 @@ void JobBufferRingSPSC::add_job(std::function<void()> p_job) {
     head.store(next, std::memory_order_release);
     semaphore.release();
 }
-
 
 } // namespace WhiteBirdEngine

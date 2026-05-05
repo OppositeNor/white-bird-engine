@@ -16,13 +16,14 @@
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/clock/clock.hh"
 #include "core/engine_config/engine_config.hh"
-#include "core/logging/logging_manager.hh"
 #include "core/logging/log_stream.hh"
+#include "core/logging/logging_manager.hh"
 #include "core/profiling/profiling_manager.hh"
 #include "generated/label_manager.gen.hh"
 #include "generated/type_uuid.gen.hh"
-#include "platform/file_system/file_system.hh"
 #include "platform/file_system/directory.hh"
+#include "platform/file_system/file_system.hh"
+#include <cstdint>
 #include <iostream>
 
 namespace WhiteBirdEngine {
@@ -45,16 +46,22 @@ EngineCore::EngineCore(uint32_t p_argc, char* p_argv[]) {
     initialize(p_argc, p_argv);
 }
 
-EngineCore::EngineCore(uint32_t p_argc, char* p_argv[], const Directory& p_root_dir) {
+EngineCore::EngineCore(
+    uint32_t p_argc, char* p_argv[], const Directory& p_root_dir) {
     global_clock = new Clock();
     file_system = new FileSystem(p_root_dir);
     initialize(p_argc, p_argv);
 }
 
 void EngineCore::initialize(uint32_t p_argc, char* p_argv[]) {
-    engine_config = new EngineConfig(Path(file_system->get_config_directory(), "engine_config.yaml"), p_argc, p_argv);
-    pool_allocator = new HeapAllocatorAlignedPoolImplicitList(engine_config->get_config_options().global_mem_pool_size);
-    stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
+    engine_config = new EngineConfig(
+        Path(file_system->get_config_directory(), "engine_config.yaml"),
+        p_argc,
+        p_argv);
+    pool_allocator = new HeapAllocatorAlignedPoolImplicitList(
+        engine_config->get_config_options().global_mem_pool_size);
+    stdio_logging_manager =
+        new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();
     label_manager = new LabelManager();
     type_uuid_manager = new TypeUUIDManager();
@@ -62,4 +69,3 @@ void EngineCore::initialize(uint32_t p_argc, char* p_argv[]) {
 }
 
 } // namespace WhiteBirdEngine
-

@@ -79,6 +79,6 @@ struct CLAOperation {
     std::vector<std::string> arguments;
 };
 
-}  // namespace WhiteBirdEngine
+} // namespace WhiteBirdEngine
 
 #endif

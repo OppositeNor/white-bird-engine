@@ -25,8 +25,7 @@
 
 namespace WhiteBirdEngine {
 
-template <>
-struct AllocatorTrait<class StackAllocator> {
+template <> struct AllocatorTrait<class StackAllocator> {
     WBE_TRAIT(AllocatorTrait<StackAllocator>);
     static constexpr AllocatorType TYPE = AllocatorType::STACK_ALLOCATOR;
     static constexpr bool IS_POOL = true;
@@ -42,7 +41,8 @@ struct AllocatorTrait<class StackAllocator> {
 
 /**
  * @class StackAllocator
- * @brief Stack style allocation. Can only allocate and deallocate from the top of the stack.
+ * @brief Stack style allocation. Can only allocate and deallocate from the top
+ * of the stack.
  * @todo Test
  */
 class StackAllocator final : public IAllocator {
@@ -61,14 +61,13 @@ public:
      */
     StackAllocator(size_t p_size)
         : total_size(p_size), stack_pointer(0),
-        mem_chunk(std::make_unique<char[]>(total_size)) {
-    }
+          mem_chunk(std::make_unique<char[]>(total_size)) {}
 
     /**
      * @brief Allocate memory with a specified size.
      *
      * @param p_size The size of the memory to be allocated in bytes.
-     * @return 
+     * @return
      */
     MemID allocate(size_t p_size) {
         void* result = mem_chunk.get() + stack_pointer;
@@ -86,7 +85,8 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) >= mem_chunk.get());
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) <= (mem_chunk.get() + stack_pointer));
+        WBE_DEBUG_ASSERT(
+            reinterpret_cast<void*>(p_id) <= (mem_chunk.get() + stack_pointer));
         return reinterpret_cast<void*>(p_id);
     }
 
@@ -96,7 +96,8 @@ public:
      * @param p_id The ID of the memory to get.
      */
     virtual void* get(MemID p_id) const override {
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
+        WBE_DEBUG_ASSERT(
+            reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return reinterpret_cast<void*>(p_id);
     }
 
@@ -107,9 +108,9 @@ public:
      * @param p_id The memory ID.
      * @return The pointer to the object.
      */
-    template <typename T>
-    T* get_obj(MemID p_id) const {
-        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
+    template <typename T> T* get_obj(MemID p_id) const {
+        WBE_DEBUG_ASSERT(
+            reinterpret_cast<void*>(p_id) < (mem_chunk.get() + stack_pointer));
         return reinterpret_cast<T*>(p_id);
     }
 
@@ -126,33 +127,27 @@ public:
     /**
      * @brief Clear the allocator.
      */
-    void clear() {
-        stack_pointer = 0;
-    }
+    void clear() { stack_pointer = 0; }
 
     /**
      * @brief Get the size of the allocator buffer.
      *
      * @return The size of the buffer.
      */
-    size_t get_alloc_size() const {
-        return stack_pointer;
-    }
+    size_t get_alloc_size() const { return stack_pointer; }
 
     /**
      * @brief Get the total size of the allocator.
      *
-     * @return 
+     * @return
      */
-    size_t get_total_size() const {
-        return total_size;
-    }
+    size_t get_total_size() const { return total_size; }
 
     operator std::string() const {
         std::stringstream ss;
         ss << R"({"type":"StackAllocator","total_size":)" << total_size
-           << R"(,"stack_pointer":)" << stack_pointer
-           << R"(,"available":)" << (total_size - stack_pointer) << "}";
+           << R"(,"stack_pointer":)" << stack_pointer << R"(,"available":)"
+           << (total_size - stack_pointer) << "}";
         return ss.str();
     }
 
@@ -165,12 +160,11 @@ private:
 template <typename T, typename... Args>
 MemID create_stack_obj(StackAllocator& p_allocator, Args&&... p_args) {
     MemID result = p_allocator.allocate(sizeof(T));
-    new(p_allocator.get(result)) T(std::forward<Args>(p_args)...);
+    new (p_allocator.get(result)) T(std::forward<Args>(p_args)...);
     return result;
 }
 
-template <typename T>
-void pop_stack_obj(StackAllocator& p_allocator) {
+template <typename T> void pop_stack_obj(StackAllocator& p_allocator) {
     static_cast<T*>(p_allocator.pop_stack(sizeof(T)))->~T();
 }
 

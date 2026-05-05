@@ -26,27 +26,21 @@ namespace WhiteBirdEngine {
  */
 class Scene {
 public:
-    Scene(HeapAllocatorDefault* p_allocator)
-        : allocator(p_allocator) {}
+    Scene(HeapAllocatorDefault* p_allocator) : allocator(p_allocator) {}
 
     /**
      * @brief Get the allocator of the scene.
      *
      * @return The allocator of the scene.
      */
-    HeapAllocatorDefault* get_allocator() {
-        return allocator;
-    }
-
+    HeapAllocatorDefault* get_allocator() { return allocator; }
 
     /**
      * @brief Get the allocator of the scene.
      *
      * @return The allocator of the scene.
      */
-    const HeapAllocatorDefault* get_allocator() const {
-        return allocator;
-    }
+    const HeapAllocatorDefault* get_allocator() const { return allocator; }
 
 private:
     HeapAllocatorDefault* allocator;

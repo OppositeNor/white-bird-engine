@@ -19,13 +19,18 @@
 
 namespace WhiteBirdEngine {
 
-VkDeviceMemory RenderObjectVK::allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const {
+VkDeviceMemory RenderObjectVK::allocate_device_memory(
+    VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const {
     VkMemoryAllocateInfo allocate_info{};
     allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocate_info.allocationSize = p_memory_requirements.size;
-    allocate_info.memoryTypeIndex = render_data->find_memory_type(p_memory_requirements.memoryTypeBits, p_domain);
+    allocate_info.memoryTypeIndex = render_data->find_memory_type(
+        p_memory_requirements.memoryTypeBits, p_domain);
     VkDeviceMemory result = VK_NULL_HANDLE;
-    if (vkAllocateMemory(render_data->logic_device, &allocate_info, render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+    if (vkAllocateMemory(render_data->logic_device,
+            &allocate_info,
+            render_data->allocation_callbacks,
+            &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate memory.");
     }
     return result;

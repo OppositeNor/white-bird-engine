@@ -18,10 +18,12 @@
 #include "core/parser/parser_json.hh"
 #include "core/reflection/reflection_defs.hh"
 
-#define WBE_DECL_SERIALIZABLE(class_name)\
-    friend class ::WhiteBirdEngine::SerializableSD<class_name>;\
-    virtual void serialize(::WhiteBirdEngine::JSONData& p_data) const override;\
-    virtual void deserialize(const ::WhiteBirdEngine::JSONData& p_data) override;
+#define WBE_DECL_SERIALIZABLE(class_name)                                      \
+    friend class ::WhiteBirdEngine::SerializableSD<class_name>;                \
+    virtual void serialize(::WhiteBirdEngine::JSONData& p_data)                \
+        const override;                                                        \
+    virtual void deserialize(const ::WhiteBirdEngine::JSONData& p_data)        \
+        override;
 
 namespace WhiteBirdEngine {
 
@@ -53,7 +55,6 @@ public:
      */
     virtual void deserialize(const JSONData& p_data) = 0;
 };
-
 
 } // namespace WhiteBirdEngine
 

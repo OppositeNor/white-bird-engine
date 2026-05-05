@@ -37,7 +37,6 @@ namespace WhiteBirdEngine {
  */
 class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public RenderObjectVK {
 public:
-
     /**
      * @class ExposedFields
      * @brief The exposed fields of ro_buffer_vk.
@@ -62,9 +61,10 @@ public:
         size_t size = WBE_KiB(4UL);
         // The usage of the buffer.
         Required<VkBufferUsageFlags> usage;
-        // Queue families this buffer is going to be used across. Either this size is 1 or is empty will
-        // make the buffer created in exclusive sharing mode, otherwise it will be created in concurrent
-        // sharing mode.
+        // Queue families this buffer is going to be used across. Either this
+        // size is 1 or is empty will make the buffer created in exclusive
+        // sharing mode, otherwise it will be created in concurrent sharing
+        // mode.
         std::set<uint32_t> queue_family_indices;
         // The domain where this buffer's memory will be allocated.
         Required<DeviceDomain> domain;
@@ -111,8 +111,7 @@ public:
         Builder& add_usage(VkBufferUsageFlags p_usage) {
             if (usage.has_value()) {
                 *usage |= p_usage;
-            }
-            else {
+            } else {
                 usage = p_usage;
             }
             return *this;
@@ -121,10 +120,12 @@ public:
         /**
          * @brief Set the queue families that may use this buffer.
          *
-         * @param p_queue_family_indices The queue family indices that might use this buffer.
+         * @param p_queue_family_indices The queue family indices that might use
+         * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
+        Builder& set_queue_family_indices(
+            const std::set<uint32_t>& p_queue_family_indices) {
             queue_family_indices = p_queue_family_indices;
             return *this;
         }
@@ -132,21 +133,28 @@ public:
         /**
          * @brief Set the queue families that may use this buffer.
          *
-         * @param p_queue_family_indices The queue family indices that might use this buffer.
+         * @param p_queue_family_indices The queue family indices that might use
+         * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
+        Builder& set_queue_family_indices(
+            std::set<uint32_t>&& p_queue_family_indices) {
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
 
-        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        Ref<ROBufferVK> create_ref(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<ROBufferVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
+
     private:
         VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
@@ -161,23 +169,27 @@ public:
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         // The source stage.
-        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 src_stage_mask =
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_2_MEMORY_READ_BIT;
         // The destination stage.
-        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        // The source queue family to tranfer ownership. If all the ownerships in ROBufferVK is set
-        // in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        VkPipelineStageFlags2 dst_stage_mask =
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        // The source queue family to tranfer ownership. If all the ownerships
+        // in ROBufferVK is set in queue_family_indices, this field could be set
+        // to VK_QUEUE_FAMILY_IGNORED.
         uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
-        // The destination queue family to tranfer ownership. If all the ownerships in ROBufferVK is
-        // set in queue_family_indices, this field could be set to VK_QUEUE_FAMILY_IGNORED.
+        // The destination queue family to tranfer ownership. If all the
+        // ownerships in ROBufferVK is set in queue_family_indices, this field
+        // could be set to VK_QUEUE_FAMILY_IGNORED.
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The buffer to set barrier on.
         Ref<ROBufferVK> buffer;
         // The offset of the data to apply barrier on in the buffer.
         VkDeviceSize offset = 0;
-        // The size of the data to apply barrier on in the buffer. If set to 0, the barrier is 
-        // going to be applied from offset to the end of barrier.
+        // The size of the data to apply barrier on in the buffer. If set to 0,
+        // the barrier is going to be applied from offset to the end of barrier.
         VkDeviceSize size = 0;
 
         /**
@@ -198,7 +210,8 @@ public:
          * @param p_src_stage The source pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask,
+            VkPipelineStageFlags2 p_src_stage_mask) {
             src_access_mask = p_src_access_mask;
             src_stage_mask = p_src_stage_mask;
             return *this;
@@ -222,7 +235,8 @@ public:
          * @param p_dst_stage_mask The destination pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask,
+            VkPipelineStageFlags2 p_dst_stage_mask) {
             dst_access_mask = p_dst_access_mask;
             dst_stage_mask = p_dst_stage_mask;
             return *this;
@@ -233,9 +247,10 @@ public:
          *
          * @param p_src_access_mask The source access bit mask.
          * @param p_dst_access_mask The destination access bit mask.
-         * @return 
+         * @return
          */
-        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+        MemoryBarrierBuilder& set_access(
+            VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
             return *this;
@@ -253,7 +268,8 @@ public:
         }
 
         /**
-         * @brief Set the offset of the data region in the buffer that this barrier is going to be applied on.
+         * @brief Set the offset of the data region in the buffer that this
+         * barrier is going to be applied on.
          *
          * @param p_offset The offset.
          * @return *this.
@@ -264,9 +280,11 @@ public:
         }
 
         /**
-         * @brief Set the size of the data region in the buffer that this barrier is going to be applied on.
+         * @brief Set the size of the data region in the buffer that this
+         * barrier is going to be applied on.
          *
-         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @param p_size The size. If set to 0, map the region from p_offset to
+         * the end of the buffer.
          * @return *this.
          */
         MemoryBarrierBuilder& set_size(VkDeviceSize p_size) {
@@ -275,13 +293,16 @@ public:
         }
 
         /**
-         * @brief Set the data region in the buffer that this barrier is going to be applied on.
+         * @brief Set the data region in the buffer that this barrier is going
+         * to be applied on.
          *
          * @param p_offset The offset.
-         * @param p_size The size. If set to 0, map the region from p_offset to the end of the buffer.
+         * @param p_size The size. If set to 0, map the region from p_offset to
+         * the end of the buffer.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_data_region(VkDeviceSize p_offset, VkDeviceSize p_size) {
+        MemoryBarrierBuilder& set_data_region(
+            VkDeviceSize p_offset, VkDeviceSize p_size) {
             offset = p_offset;
             size = p_size;
             return *this;
@@ -309,21 +330,23 @@ public:
      *
      * @return The buffer instance.
      */
-    VkBuffer get_buffer() const {
-        return buffer;
-    }
+    VkBuffer get_buffer() const { return buffer; }
 
     /**
-     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
+     * @brief Update the buffer. Updating from main memory must specify the
+     * device domain as host.
      *
      * @param p_data The data to copy from.
-     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to.
-     * @param p_size The size of the data in bytes that would be copied to the buffer.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data
+     * would be copied to.
+     * @param p_size The size of the data in bytes that would be copied to the
+     * buffer.
      */
     void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
 
     /**
-     * @brief Update the buffer. Updating from main memory must specify the device domain as host.
+     * @brief Update the buffer. Updating from main memory must specify the
+     * device domain as host.
      *
      * @param p_data The data to be updated to.
      * @param p_size The size of data that will be transmitted.
@@ -338,22 +361,29 @@ public:
      * @param p_dst_offset The offset to copy data to in the buffer.
      * @param p_size The size to copy (in bytes).
      */
-    void update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size);
+    void update_buffer(Ref<ROBufferVK> p_data,
+        size_t p_src_offset,
+        size_t p_dst_offset,
+        size_t p_size);
 
     /**
      * @brief Update the buffer from another buffer object.
      *
      * @param p_data The buffer object to copy data from.
-     * @param p_dst_offset Offset in the buffer that the beginning of the data would be copied to. This has to be a multiple of 4.
-     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     * @param p_dst_offset Offset in the buffer that the beginning of the data
+     * would be copied to. This has to be a multiple of 4.
+     * @param p_size The size of the data in bytes that would be copied to the
+     * buffer. This has to be a multiple of 4.
      */
-    void update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
+    void update_buffer(
+        Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
 
     /**
      * @brief Update the buffer from another buffer object.
      *
      * @param p_data The buffer object to copy data from.
-     * @param p_size The size of the data in bytes that would be copied to the buffer. This has to be a multiple of 4.
+     * @param p_size The size of the data in bytes that would be copied to the
+     * buffer. This has to be a multiple of 4.
      */
     void update_buffer(Ref<ROBufferVK> p_data, size_t p_size);
 
@@ -370,11 +400,10 @@ public:
      * @param p_buffer The staging buffer to retrieve data.
      * @param p_data The data to fill in.
      */
-    void update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
+    void update_buffer(
+        Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
 
-    const ExposedFields& fields() const {
-        return exposed_fields;
-    }
+    const ExposedFields& fields() const { return exposed_fields; }
 
 private:
     void* mapped_memory = nullptr;

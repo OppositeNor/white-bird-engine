@@ -14,6 +14,5 @@
 */
 
 namespace WhiteBirdEngine {
-    // TODO
+// TODO
 }
-

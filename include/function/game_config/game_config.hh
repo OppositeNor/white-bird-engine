@@ -16,11 +16,11 @@
 #define WBE_FILE_GAME_CONFIG_HH
 
 #include "core/parser/parser_yaml.hh"
+#include "game_config_options.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include "generated/serializables_sd.gen.hh"
-#include "game_config_options.hh"
 
 namespace WhiteBirdEngine {
 
@@ -31,9 +31,7 @@ namespace WhiteBirdEngine {
 class GameConfig : public ISingleton<GameConfig> {
 public:
     GameConfig() = delete;
-    virtual ~GameConfig() override {
-        singleton = nullptr;
-    }
+    virtual ~GameConfig() override { singleton = nullptr; }
     WBE_R6_NDCD_DELETE_COPY_MOVE(GameConfig)
 
     /**
@@ -45,7 +43,8 @@ public:
         singleton = this;
         auto parser = ParserYAML();
         parser.parse(p_config_file_path);
-        SerializableSD<GameConfigOptions>::deserialize(parser.get_data(), config_options);
+        SerializableSD<GameConfigOptions>::deserialize(
+            parser.get_data(), config_options);
     }
 
     /**
@@ -62,9 +61,7 @@ public:
      *
      * @return The singleton instance.
      */
-    static GameConfig* get_singleton() {
-        return singleton;
-    }
+    static GameConfig* get_singleton() { return singleton; }
 
 private:
     GameConfigOptions config_options;

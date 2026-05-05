@@ -52,7 +52,8 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_directory The directory of the file that the path is referencing to.
+     * @param p_directory The directory of the file that the path is referencing
+     * to.
      * @param p_file_name The name of the file the path is referencing to.
      */
     Path(const Directory& p_directory, const std::string& p_file_name)
@@ -61,7 +62,8 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_directory The directory of the file that the path is referencing to.
+     * @param p_directory The directory of the file that the path is referencing
+     * to.
      * @param p_file_name The name of the file the path is referencing to.
      */
     Path(Directory&& p_directory, const std::string& p_file_name)
@@ -80,18 +82,14 @@ public:
      *
      * @return The directory of the path.
      */
-    const Directory& get_directory() const {
-        return directory;
-    }
+    const Directory& get_directory() const { return directory; }
 
     /**
      * @brief Get the file name of the path.
      *
      * @return The file name of the path.
      */
-    const std::string& get_file_name() const {
-        return file_name;
-    }
+    const std::string& get_file_name() const { return file_name; }
 
     /**
      * @brief Get the extension of the file.
@@ -112,9 +110,7 @@ public:
      *
      * @return True if the path is absolute. False otherwise.
      */
-    bool is_absolute() const {
-        return directory.get_is_absolute();
-    }
+    bool is_absolute() const { return directory.get_is_absolute(); }
 
     HashCode hash() const {
         return dynam_hash(static_cast<std::string>(*this).c_str());

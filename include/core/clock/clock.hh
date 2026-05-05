@@ -25,16 +25,12 @@ namespace WhiteBirdEngine {
  */
 class Clock {
 public:
-    Clock() {
-        start_time = std::chrono::high_resolution_clock::now();
-    }
+    Clock() { start_time = std::chrono::high_resolution_clock::now(); }
     ~Clock() = default;
-    Clock(const Clock& p_other)
-         = default;
-    Clock(Clock&& p_other) noexcept
-        : start_time(p_other.start_time) {}
+    Clock(const Clock& p_other) = default;
+    Clock(Clock&& p_other) noexcept : start_time(p_other.start_time) {}
     Clock& operator=(const Clock& p_other) = default;
-    Clock& operator=(Clock&& p_other)  noexcept {
+    Clock& operator=(Clock&& p_other) noexcept {
         start_time = p_other.start_time;
         return *this;
     }
@@ -45,15 +41,15 @@ public:
      * @return The duration in seconds.
      */
     double get_duration() const {
-        std::chrono::duration<double> duration = std::chrono::high_resolution_clock::now() - start_time;
+        std::chrono::duration<double> duration =
+            std::chrono::high_resolution_clock::now() - start_time;
         return duration.count();
     }
 
 private:
     std::chrono::high_resolution_clock::time_point start_time;
-
 };
 
-}  // namespace WhiteBirdEngine
+} // namespace WhiteBirdEngine
 
 #endif

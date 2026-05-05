@@ -28,7 +28,6 @@ namespace WhiteBirdEngine {
 class OS {
 public:
     OS() = delete;
-
 };
 
 } // namespace WhiteBirdEngine

@@ -16,10 +16,10 @@
 #define WBE_FILE_SCENE_NODE_HH
 
 #include "core/core_utils.hh"
-#include "scene.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/stl_allocator.hh"
+#include "scene.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
 #include <utility>
@@ -37,8 +37,8 @@ public:
     virtual ~SceneNode() override = default;
     SceneNode(const SceneNode&) = delete;
     SceneNode(SceneNode&& p_other) noexcept
-        : name(std::move(p_other.name)), parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
-    }
+        : name(std::move(p_other.name)), parent(std::move(p_other.parent)),
+          children(std::move(p_other.children)) {}
     SceneNode& operator=(const SceneNode&) = delete;
     SceneNode& operator=(SceneNode&& p_other) noexcept {
         parent = std::move(p_other.parent);
@@ -99,7 +99,6 @@ public:
         p_parent->children.push_back(this_ref.lock());
     }
 
-
 private:
     String<> name;
     RefWeak<SceneNode> parent;
@@ -107,6 +106,5 @@ private:
 };
 
 } // namespace WhiteBirdEngine
-
 
 #endif

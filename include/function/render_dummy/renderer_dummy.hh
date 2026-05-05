@@ -15,12 +15,12 @@
 #ifndef WBE_FILE_RENDERER_DUMMY_H
 #define WBE_FILE_RENDERER_DUMMY_H
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_database.hh"
 #include "function/render/i_renderer.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
-#include <string>
 #include <functional>
+#include <string>
 namespace WhiteBirdEngine {
 
 /**
@@ -32,23 +32,25 @@ class RendererDummy final : public IRenderer {
 public:
     RendererDummy(RenderAllocator* p_allocator)
         : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {}
-    
+
     virtual ~RendererDummy() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
 
     virtual void tick(double p_delta) override {}
 
     virtual Ref<RenderDatabase> get_render_database() override {
-        // Because of RAII, we have to return a valid database since the caller is going to assume
-        // this is valid.
+        // Because of RAII, we have to return a valid database since the caller
+        // is going to assume this is valid.
         return dummy_database;
     }
 
-    virtual void activate_pipeline(const std::string& p_pipeline_name) override {}
+    virtual void activate_pipeline(
+        const std::string& p_pipeline_name) override {}
 
     virtual void update_static_opaque_triangles() override {}
 
     virtual void add_job(std::function<void()> p_job) override {}
+
 private:
     Ref<RenderDatabase> dummy_database;
 };

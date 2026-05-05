@@ -22,7 +22,8 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorRAM::~HeapAllocatorRAM() {
     if (!allocated.empty()) {
-        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorRAM not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)
+            ->warning("HeapAllocatorRAM not empty during destruction.");
     }
     for (const auto& iter : allocated) {
         free(get(iter)); // NOLINT
@@ -41,7 +42,8 @@ MemID HeapAllocatorRAM::allocate(size_t p_size) {
 void HeapAllocatorRAM::deallocate(MemID p_mem) {
     auto iter = allocated.find(p_mem);
     if (iter == allocated.end()) {
-        throw std::runtime_error("Failed to deallocate memory: memory not allocated by this allocator.");
+        throw std::runtime_error("Failed to deallocate memory: memory not "
+                                 "allocated by this allocator.");
     }
     free(get(p_mem)); // NOLINT
     allocated.erase(p_mem);

@@ -26,10 +26,7 @@ namespace WhiteBirdEngine {
  */
 class Directory {
 public:
-
-    Directory()
-        : is_absolute(false) {
-    }
+    Directory() : is_absolute(false) {}
     ~Directory() = default;
     Directory(const Directory& p_other) = default;
     Directory(Directory&& p_other) noexcept = default;
@@ -45,15 +42,17 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_dir_names The names of the full path to the directory. The root should be
-     * at index 0, and the followings should be ordered according to the depth.
+     * @param p_dir_names The names of the full path to the directory. The root
+     * should be at index 0, and the followings should be ordered according to
+     * the depth.
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.
      */
     Directory(std::vector<std::string> p_dir_names, bool p_is_absolute = false);
 
     /**
-     * @brief Get the directory after combine this directory with another directory.
+     * @brief Get the directory after combine this directory with another
+     * directory.
      *
      * @param p_other The directory to combine to this directory.
      * @return The combined directory.
@@ -63,22 +62,20 @@ public:
     /**
      * @brief Get if this directory is absolute.
      *
-     * @return True if the directory is absolute, false if the directory is relative.
-     * By relative it means relative to the user current working directory.
+     * @return True if the directory is absolute, false if the directory is
+     * relative. By relative it means relative to the user current working
+     * directory.
      */
-    bool get_is_absolute() const {
-        return is_absolute;
-    }
+    bool get_is_absolute() const { return is_absolute; }
 
     /**
-     * @brief Get the names of the path to the directory. The rooth directory will be at
-     * index 0, and the followings will be ordered according to the depth.
+     * @brief Get the names of the path to the directory. The rooth directory
+     * will be at index 0, and the followings will be ordered according to the
+     * depth.
      *
      * @return The names of the path to the directory.
      */
-    const std::vector<std::string>& get_dir_names() const {
-        return dir_names;
-    }
+    const std::vector<std::string>& get_dir_names() const { return dir_names; }
 
     operator std::string() const;
 
@@ -87,11 +84,13 @@ private:
     bool is_absolute;
 };
 
-inline std::ostream& operator<<(std::ostream& p_ostream, const Directory& p_directory) {
+inline std::ostream& operator<<(
+    std::ostream& p_ostream, const Directory& p_directory) {
     return p_ostream << static_cast<std::string>(p_directory);
 }
 
-inline Directory operator+(const Directory& p_first, const Directory& p_second) {
+inline Directory operator+(
+    const Directory& p_first, const Directory& p_second) {
     return p_first.combine(p_second);
 }
 

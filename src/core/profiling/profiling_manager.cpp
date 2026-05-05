@@ -23,7 +23,6 @@ void ProfilingManager::push_profiling_data(ProfileData&& p_profile_data) {
     profile_stash[p_profile_data.channel].push_back(std::move(p_profile_data));
 }
 
-
 void ProfilingManager::push_profiling_data(const ProfileData& p_profile_data) {
     std::unique_lock lock(profile_stash_mutex);
     profile_stash[p_profile_data.channel].push_back(p_profile_data);

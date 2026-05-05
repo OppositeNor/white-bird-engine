@@ -22,9 +22,7 @@
 #include <windows.h>
 
 namespace WhiteBirdEngine {
-FileSystem::FileSystem()
-    : FileSystem(get_executable_dir()) {
-}
+FileSystem::FileSystem() : FileSystem(get_executable_dir()) {}
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
     root_directory = p_root_dir;
@@ -41,7 +39,9 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
     auto front = path_stack.front();
     bool is_absolute = front.size() == 2 && front[1] == ':';
     if (std::count(p_str.begin(), p_str.end(), ':') > is_absolute ? 1 : 0) {
-        throw std::runtime_error("Failed to parse directory: volume indicator ':' not used properly in the path: " + p_str + ".");
+        throw std::runtime_error("Failed to parse directory: volume indicator "
+                                 "':' not used properly in the path: " +
+                                 p_str + ".");
     }
     for (auto& dir_name : splitted) {
         if (dir_name == "..") {
@@ -73,16 +73,13 @@ size_t get_last_splitter_pos(const std::string& p_path) {
     if (last_slash < last_bslash) {
         if (last_bslash == std::string::npos) {
             return last_slash;
-        }
-        else {
+        } else {
             return last_bslash;
         }
-    }
-    else {
+    } else {
         if (last_slash == std::string::npos) {
             return last_bslash;
-        }
-        else {
+        } else {
             return last_slash;
         }
     }
@@ -115,7 +112,9 @@ std::string FileSystem::get_ext(const Path& p_path) {
     // TODO: Test
     auto& file_name = p_path.get_file_name();
     auto ext_result = file_name.substr(file_name.find_last_of('.'));
-    std::for_each(ext_result.begin(), ext_result.end(), [](char& p_c) { p_c = std::tolower(p_c); });
+    std::for_each(ext_result.begin(), ext_result.end(), [](char& p_c) {
+        p_c = std::tolower(p_c);
+    });
     return ext_result;
 }
 
@@ -126,11 +125,11 @@ Directory FileSystem::get_executable_dir() {
         throw std::runtime_error("Failed to get the executable path.");
     }
     if (len >= 1024) {
-        throw std::runtime_error("Buffer overflow for executable path finding.");
+        throw std::runtime_error(
+            "Buffer overflow for executable path finding.");
     }
     buf.buffer[len] = '\0';
     return parse_directory(std::string(buf.buffer));
 }
 
-}
-
+} // namespace WhiteBirdEngine

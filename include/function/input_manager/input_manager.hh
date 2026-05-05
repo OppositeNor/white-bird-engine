@@ -18,8 +18,8 @@
 #include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <cstdint>
 #include <atomic>
+#include <cstdint>
 #include <type_traits>
 
 namespace WhiteBirdEngine {
@@ -47,18 +47,14 @@ struct InputStatus {
      *
      * @return True if the key is up. False otherwise.
      */
-    bool is_up() const {
-        return status_code & KEY_UP;
-    }
+    bool is_up() const { return status_code & KEY_UP; }
 
     /**
      * @brief Is key up.
      *
      * @return True if the key is up. False otherwise.
      */
-    bool is_down() const {
-        return status_code & KEY_DOWN;
-    }
+    bool is_down() const { return status_code & KEY_DOWN; }
 };
 /**
  * @class InputManager
@@ -76,9 +72,7 @@ public:
      *
      * @return The singleton instance.
      */
-    static InputManager* get_singleton() {
-        return singleton;
-    }
+    static InputManager* get_singleton() { return singleton; }
 
     /**
      * @brief Get the input status of a key.
@@ -100,8 +94,13 @@ public:
 
 private:
     // Use an atomic keyset to store the key statuses.
-    std::atomic<uint8_t> key_status_map[KeyCode::TOTAL_KEYCODES % 8 == 0 ? KeyCode::TOTAL_KEYCODES / 8 : KeyCode::TOTAL_KEYCODES / 8 + 1] = {};
-    static_assert(std::remove_cvref_t<decltype(key_status_map[0])>::is_always_lock_free, "Key status map must be lock free");
+    std::atomic<uint8_t> key_status_map[KeyCode::TOTAL_KEYCODES % 8 == 0
+                                            ? KeyCode::TOTAL_KEYCODES / 8
+                                            : KeyCode::TOTAL_KEYCODES / 8 + 1] =
+        {};
+    static_assert(
+        std::remove_cvref_t<decltype(key_status_map[0])>::is_always_lock_free,
+        "Key status map must be lock free");
     inline static InputManager* singleton = nullptr;
 };
 } // namespace WhiteBirdEngine

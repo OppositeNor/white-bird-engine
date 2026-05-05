@@ -23,12 +23,11 @@ namespace WhiteBirdEngine {
  * @brief Update transform matrices.
  *
  * @param p_registry The registry of the entities and components.
- * @param p_version A value that keeps the version of the current update, to ensure
- * every data that might be dirty are up to date.
+ * @param p_version A value that keeps the version of the current update, to
+ * ensure every data that might be dirty are up to date.
  */
 void update_transform_mats(entt::registry& p_registry, int64_t p_version);
 
 } // namespace WhiteBirdEngine
-
 
 #endif

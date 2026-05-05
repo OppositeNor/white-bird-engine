@@ -27,7 +27,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorPool> final : public AllocatorTrait<HeapAllocator> {
+struct AllocatorTrait<class HeapAllocatorPool> final
+    : public AllocatorTrait<HeapAllocator> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -42,7 +43,8 @@ struct AllocatorTrait<class HeapAllocatorPool> final : public AllocatorTrait<Hea
 
 /**
  * @class HeapAllocatorPool
- * @brief Pool allocator. Allocate from a continuous memory pool, to prevent memory fragmentation.
+ * @brief Pool allocator. Allocate from a continuous memory pool, to prevent
+ * memory fragmentation.
  *
  */
 class HeapAllocatorPool final : public HeapAllocator {
@@ -64,7 +66,8 @@ public:
     /**
      * @brief The maximum total size that the allocator can contain.
      */
-    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
+    static constexpr size_t MAX_TOTAL_SIZE =
+        std::numeric_limits<Header>::max() >> 4;
 
     /**
      * @brief Constructor.
@@ -87,12 +90,11 @@ public:
     virtual operator std::string() const override;
 
     size_t get_allocated_data_size(MemID p_mem_id) const {
-        return *reinterpret_cast<size_t*>(p_mem_id - HEADER_SIZE) & MAX_TOTAL_SIZE;
+        return *reinterpret_cast<size_t*>(p_mem_id - HEADER_SIZE) &
+               MAX_TOTAL_SIZE;
     }
 
-    size_t get_total_size() const {
-        return size;
-    }
+    size_t get_total_size() const { return size; }
 
     size_t get_remain_size() const;
 
@@ -107,20 +109,20 @@ public:
         idle_list_head->next = nullptr;
     }
 
-    size_t get_max_data_size() const {
-        return max_data_loc_tracker;
-    }
+    size_t get_max_data_size() const { return max_data_loc_tracker; }
 
 private:
-    
     struct IdleListNode {
         size_t size;
         char* mem_start;
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
-    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
-    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    void* acquire_memory(
+        std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert,
+        char* p_insert_start,
+        size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 

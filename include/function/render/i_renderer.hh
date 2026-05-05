@@ -40,7 +40,8 @@ public:
     /**
      * @brief Called every frame.
      *
-     * @param p_delta The difference between the last two calls of this function.
+     * @param p_delta The difference between the last two calls of this
+     * function.
      */
     virtual void tick(double p_delta) = 0;
 
@@ -63,7 +64,6 @@ public:
 
 private:
     void initialize_render_pass();
-
 };
 
 } // namespace WhiteBirdEngine

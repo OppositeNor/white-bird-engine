@@ -59,7 +59,8 @@ public:
      *
      * @param p_utility_name The name of the utility.
      */
-    CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
+    CLAASTNodeRoot(const std::string& p_utility_name,
+        std::vector<Ref<CLAASTNode>>&& p_operations)
         : utility_name(p_utility_name), operations(std::move(p_operations)) {}
     virtual ~CLAASTNodeRoot() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRoot)
@@ -71,9 +72,7 @@ public:
      *
      * @return The utility name.
      */
-    const std::string& get_utility_name() const {
-        return utility_name;
-    }
+    const std::string& get_utility_name() const { return utility_name; }
 
     /**
      * @brief Get the operations.
@@ -83,7 +82,6 @@ public:
     const std::vector<Ref<CLAASTNode>>& get_operations() const {
         return operations;
     }
-
 
 private:
     std::string utility_name;
@@ -112,8 +110,11 @@ public:
      * @param p_arguments The arguments of the operation.
      * @param p_is_short Is the name a short notation.
      */
-    CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
-        : is_short(p_is_short), operation_name(p_operation_name), arguments(std::move(p_arguments)) {}
+    CLAASTNodeOperation(const std::string& p_operation_name,
+        std::vector<std::string>&& p_arguments,
+        bool p_is_short)
+        : is_short(p_is_short), operation_name(p_operation_name),
+          arguments(std::move(p_arguments)) {}
 
     virtual ~CLAASTNodeOperation() override = default;
 
@@ -126,18 +127,14 @@ public:
      *
      * @return The name of the operation.
      */
-    const std::string& get_operation_name() const {
-        return operation_name;
-    }
+    const std::string& get_operation_name() const { return operation_name; }
 
     /**
      * @brief Get the arguments.
      *
      * @return The arguments of the operation.
      */
-    const std::vector<std::string>& get_arguments() const {
-        return arguments;
-    }
+    const std::vector<std::string>& get_arguments() const { return arguments; }
 
     /**
      * @brief Push argument into this operation node.
@@ -155,8 +152,11 @@ public:
      */
     void remove_argument(uint32_t p_index) {
         if (arguments.size() >= p_index) {
-            throw std::runtime_error("Failed to remove argument: index " + std::to_string(p_index) + " out of range."
-                                     " arguments size: " + std::to_string(arguments.size()));
+            throw std::runtime_error("Failed to remove argument: index " +
+                                     std::to_string(p_index) +
+                                     " out of range."
+                                     " arguments size: " +
+                                     std::to_string(arguments.size()));
         }
         arguments.erase(arguments.begin() + p_index);
     }
@@ -166,9 +166,7 @@ public:
      *
      * @return True if the name of this operation is short. False otherwise.
      */
-    bool is_name_short() const {
-        return is_short;
-    }
+    bool is_name_short() const { return is_short; }
 
 private:
     bool is_short;
@@ -202,9 +200,7 @@ public:
      *
      * @return The name of the operation.
      */
-    const std::string& get_operand_name() const {
-        return operand_name;
-    }
+    const std::string& get_operand_name() const { return operand_name; }
 
 private:
     std::string operand_name;

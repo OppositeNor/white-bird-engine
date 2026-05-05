@@ -27,7 +27,8 @@ namespace WhiteBirdEngine {
  * @brief Configuration options for game.
  *
  */
-struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable {
+struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(GameConfigOptions)
     /**
      * @brief The name of the game.
@@ -83,15 +84,15 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
 
     /**
      * @brief Set limit to the logic fps. 0 stands for unlimited.
-     * Unlimited logic FPS is strongly unrecognized, since logic computation will consume
-     * substancial amount of CPU resources.
+     * Unlimited logic FPS is strongly unrecognized, since logic computation
+     * will consume substancial amount of CPU resources.
      */
     WBE_META(WBE_REFLECT)
     int32_t limit_logic_fps = 60;
 
     /**
-     * @brief The name of the prefered audio device. This field should be "" if not
-     * specified, and the default audio device will be used.
+     * @brief The name of the prefered audio device. This field should be "" if
+     * not specified, and the default audio device will be used.
      */
     WBE_META(WBE_REFLECT)
     std::string audio_device;
@@ -99,6 +100,4 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
 
 } // namespace WhiteBirdEngine
 
-
 #endif
-

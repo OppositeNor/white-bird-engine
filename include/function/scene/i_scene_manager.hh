@@ -49,10 +49,9 @@ public:
     /**
      * @brief Change the scene according to scene ID.
      *
-     * @param p_scene_id 
+     * @param p_scene_id
      */
     virtual void change_scene(const std::string& p_scene_id) = 0;
-
 };
 
 } // namespace WhiteBirdEngine

@@ -20,8 +20,8 @@
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -31,7 +31,8 @@ namespace WhiteBirdEngine {
  * @brief Engine configurations.
  *
  */
-struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializable {
+struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final
+    : public Serializable {
 
     WBE_DECL_SERIALIZABLE(EngineConfigOptions)
 
@@ -87,7 +88,6 @@ struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializab
  */
 class EngineConfig : public ISingleton<EngineConfig> {
 public:
-
     /**
      * @brief Constructor.
      *
@@ -95,7 +95,8 @@ public:
      * @param p_argc argc
      * @param p_argv argv
      */
-    EngineConfig(const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
+    EngineConfig(
+        const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
         parse_config_file(p_config_file_path);
         if (p_argc > 0) {
             parse_cla(p_argc, p_argv);
@@ -112,9 +113,7 @@ public:
      *
      * @return The configuration options.
      */
-    const EngineConfigOptions& get_config_options(){
-        return config_options;
-    }
+    const EngineConfigOptions& get_config_options() { return config_options; }
 
 private:
     EngineConfigOptions config_options;
@@ -126,7 +125,6 @@ private:
     void parse_config_file(const Path& p_path) {
         // TODO
     }
-
 };
 } // namespace WhiteBirdEngine
 

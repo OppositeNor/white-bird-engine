@@ -28,7 +28,6 @@ namespace WhiteBirdEngine {
  */
 class RenderPipeline {
 public:
-
     RenderPipeline() = default;
     ~RenderPipeline() = default;
     RenderPipeline(const RenderPipeline&) = delete;
@@ -46,8 +45,8 @@ public:
             task->perform(p_delta);
         }
     }
-protected:
 
+protected:
     /**
      * @brief Add a render task. The render tasks will be involked in the
      * sequence they are added.
@@ -62,6 +61,6 @@ private:
     std::vector<Ref<RenderTask>> render_tasks;
 };
 
-}  // namespace WhiteBirdEngine
+} // namespace WhiteBirdEngine
 
 #endif

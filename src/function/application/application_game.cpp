@@ -21,8 +21,8 @@
 #include "function/game_config/game_config.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render_vk/renderer_vk.hh"
 #include "function/render_dummy/renderer_dummy.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "function/window/i_window.hh"
 #include "function/window/window_sdl.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -33,17 +33,11 @@
 
 namespace WhiteBirdEngine {
 
-ApplicationGame::ApplicationGame() {
-    init();
-}
+ApplicationGame::ApplicationGame() { init(); }
 
 void ApplicationGame::run() {
-    std::jthread render_thread([this]() {
-        run_render();
-    });
-    std::jthread logic_thread([this]() {
-        run_logic();
-    });
+    std::jthread render_thread([this]() { run_render(); });
+    std::jthread logic_thread([this]() { run_logic(); });
     std::jthread worker_thread([this]() {
         // The logic thread is responsible for ending the worker thread.
         worker->run();
@@ -56,24 +50,34 @@ void ApplicationGame::init() {
     render_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);
 
-    render_job_buffer = make_ref<JobBufferRingSPSC>(global_allocator(), global_allocator(), 64);
-    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), WBE_MiB(1));
+    render_job_buffer =
+        make_ref<JobBufferRingSPSC>(global_allocator(), global_allocator(), 64);
+    renderer_allocator =
+        make_ref<RenderAllocator>(global_allocator(), WBE_MiB(1));
     input_manager = make_ref<InputManager>(global_allocator());
-    window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
+    window = make_ref<WindowSDL>(global_allocator(),
+        input_manager,
+        get_window_properties_from_game_config_options(game_config));
     if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer);
-    }
-    else if (game_config.render_api == "dummy") {
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
-    }
-    else {
-        stdout_log(WBE_CHANNEL_RENDER)->warning(
-            std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
+        renderer = make_ref<RendererVK>(global_allocator(),
+            renderer_allocator.get(),
+            window,
+            render_job_buffer);
+    } else if (game_config.render_api == "dummy") {
+        renderer = make_ref<RendererDummy>(
+            global_allocator(), renderer_allocator.get());
+    } else {
+        stdout_log(WBE_CHANNEL_RENDER)
+            ->warning(std::format(
+                "Unrecognized renderer: \"{}\", using a dummy renderer.",
+                game_config.render_api));
+        renderer = make_ref<RendererDummy>(
+            global_allocator(), renderer_allocator.get());
     }
     worker = make_ref<Worker>(global_allocator());
     // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
-    ResourceManager::get_singleton()->load_global_resource("res_chunks/global_resources.json");
+    ResourceManager::get_singleton()->load_global_resource(
+        "res_chunks/global_resources.json");
 }
 
 void ApplicationGame::run_render() {
@@ -85,7 +89,7 @@ void ApplicationGame::run_render() {
         render_update(render_delta.load(std::memory_order_relaxed));
         window->tick_render();
         renderer->tick(render_delta.load(std::memory_order_relaxed));
-        end_time =  global_clock->get_duration();
+        end_time = global_clock->get_duration();
         render_delta.store(end_time - start_time, std::memory_order_release);
         local_should_close = should_close.load(std::memory_order_acquire);
     }
@@ -108,8 +112,10 @@ void ApplicationGame::run_logic() {
     worker->stop();
 }
 
-WindowProperties ApplicationGame::get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options) {
-    WindowProperties properties {
+WindowProperties
+ApplicationGame::get_window_properties_from_game_config_options(
+    const GameConfigOptions& p_game_config_options) {
+    WindowProperties properties{
         .title = p_game_config_options.game_name,
         .width = p_game_config_options.window_width,
         .height = p_game_config_options.window_height,

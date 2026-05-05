@@ -52,11 +52,11 @@ def gather_changed_project_sources(root_dir: Path, project_sources: list[str]) -
     try:
         repo = Repo(root_dir, search_parent_directories=True)
     except (InvalidGitRepositoryError, NoSuchPathError):
-        print("WBEFixLint: Current workspace is not in a Git repository.")
+        print("WBECheckLint: Current workspace is not in a Git repository.")
         return []
 
     if repo.working_tree_dir is None:
-        print("WBEFixLint: Failed to determine Git working tree directory.")
+        print("WBECheckLint: Failed to determine Git working tree directory.")
         return []
 
     repo_root = Path(repo.working_tree_dir).resolve()
@@ -99,17 +99,17 @@ def gather_commit_project_sources(root_dir: Path, project_sources: list[str], co
     try:
         repo = Repo(root_dir, search_parent_directories=True)
     except (InvalidGitRepositoryError, NoSuchPathError):
-        print("WBEFixLint: Current workspace is not in a Git repository.")
+        print("WBECheckLint: Current workspace is not in a Git repository.")
         return []
 
     if repo.working_tree_dir is None:
-        print("WBEFixLint: Failed to determine Git working tree directory.")
+        print("WBECheckLint: Failed to determine Git working tree directory.")
         return []
 
     try:
         commit = repo.commit(commit_id)
     except (BadName, ValueError):
-        print(f"WBELint: Failed to resolve commit id: {commit_id}")
+        print(f"WBECheckLint: Failed to resolve commit id: {commit_id}")
         return []
 
     repo_root = Path(repo.working_tree_dir).resolve()
@@ -147,6 +147,27 @@ def run_clang_tidy_check(file_path: str, compile_commands_dir: Path) -> subproce
     return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
+def run_clang_format_check(file_path: str) -> subprocess.CompletedProcess[str]:
+    cmd = [
+        "clang-format",
+        "--dry-run",
+        "--Werror",
+        "--style=file",
+        file_path,
+    ]
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+
+def run_clang_format_fix(file_path: str) -> subprocess.CompletedProcess[str]:
+    cmd = [
+        "clang-format",
+        "-i",
+        "--style=file",
+        file_path,
+    ]
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+
 def has_remaining_lints(file_path: str, compile_commands_dir: Path) -> bool:
     result = run_clang_tidy_check(file_path, compile_commands_dir)
     output = f"{result.stdout}\n{result.stderr}"
@@ -155,15 +176,32 @@ def has_remaining_lints(file_path: str, compile_commands_dir: Path) -> bool:
 
 def fix_and_check_file(file_path: str, compile_commands_dir: Path) -> tuple[str, bool, bool]:
     fix_result = run_clang_tidy_fix(file_path, compile_commands_dir)
+    format_fix_result = run_clang_format_fix(file_path)
     has_unfixed_lints = has_remaining_lints(file_path, compile_commands_dir)
-    return file_path, fix_result.returncode != 0, has_unfixed_lints
+    format_check_result = run_clang_format_check(file_path)
+    has_unfixed_format = format_check_result.returncode != 0
+    run_failed = fix_result.returncode != 0 or format_fix_result.returncode != 0
+    return file_path, run_failed, has_unfixed_lints or has_unfixed_format
 
 
 def check_file(file_path: str, compile_commands_dir: Path) -> tuple[str, bool, bool, str]:
-    result = run_clang_tidy_check(file_path, compile_commands_dir)
-    output = f"{result.stdout}\n{result.stderr}".strip()
-    has_lints = re.search(r"\b(warning|error):", output) is not None
-    return file_path, result.returncode != 0, has_lints, output
+    tidy_result = run_clang_tidy_check(file_path, compile_commands_dir)
+    tidy_output = f"{tidy_result.stdout}\n{tidy_result.stderr}".strip()
+    has_lints = re.search(r"\b(warning|error):", tidy_output) is not None
+
+    format_result = run_clang_format_check(file_path)
+    format_output = f"{format_result.stdout}\n{format_result.stderr}".strip()
+    has_format_diag = format_result.returncode != 0 or len(format_output) > 0
+
+    combined_parts: list[str] = []
+    if tidy_output:
+        combined_parts.append(tidy_output)
+    if format_output:
+        combined_parts.append("-- clang-format --\n" + format_output)
+    combined_output = "\n\n".join(combined_parts)
+
+    run_failed = tidy_result.returncode != 0
+    return file_path, run_failed, has_lints or has_format_diag, combined_output
 
 
 def main() -> int:
@@ -213,7 +251,11 @@ def main() -> int:
     root_dir = Path(__file__).resolve().parent
 
     if shutil.which("clang-tidy") is None:
-        print("WBELint: clang-tidy is not available in PATH.")
+        print("WBECheckLint: clang-tidy is not available in PATH.")
+        return 1
+
+    if shutil.which("clang-format") is None:
+        print("WBECheckLint: clang-format is not available in PATH.")
         return 1
 
     if args.compile_commands_dir is not None:
@@ -221,13 +263,13 @@ def main() -> int:
     else:
         found_dir = find_compile_commands_dir(root_dir)
         if found_dir is None:
-            print("WBELint: Failed to locate compile_commands.json.")
-            print("WBELint: Build the project first or provide --compile-commands-dir.")
+            print("WBECheckLint: Failed to locate compile_commands.json.")
+            print("WBECheckLint: Build the project first or provide --compile-commands-dir.")
             return 1
         compile_commands_dir = found_dir
 
     if not (compile_commands_dir / "compile_commands.json").exists():
-        print(f"WBELint: compile_commands.json not found in {compile_commands_dir}.")
+        print(f"WBECheckLint: compile_commands.json not found in {compile_commands_dir}.")
         return 1
 
     project_sources = build_config.project_sources
@@ -240,25 +282,25 @@ def main() -> int:
 
     if len(sources) == 0:
         if args.all:
-            print("WBELint: No source files found.")
+            print("WBECheckLint: No source files found.")
         else:
-            print("WBELint: No changed source files found.")
+            print("WBECheckLint: No changed source files found.")
         return 0
 
-    print(f"WBELint: Using compile_commands from {compile_commands_dir}")
+    print(f"WBECheckLint: Using compile_commands from {compile_commands_dir}")
     if args.fix:
-        print("WBELint: Running in auto-fix mode (--fix).")
+        print("WBECheckLint: Running in auto-fix mode (--fix).")
     else:
-        print("WBELint: Running in check-only mode (default).")
+        print("WBECheckLint: Running in check-only mode (default).")
     if args.all:
-        print("WBELint: Running in full-project scope (--all).")
+        print("WBECheckLint: Running in full-project scope (--all).")
     elif args.commit_id is not None:
-        print(f"WBELint: Running in commit scope (--commit-id={args.commit_id}).")
+        print(f"WBECheckLint: Running in commit scope (--commit-id={args.commit_id}).")
     else:
-        print("WBELint: Running in changed-files scope (default).")
+        print("WBECheckLint: Running in changed-files scope (default).")
 
     action_label = "Lint-fixing" if args.fix else "Checking lint for"
-    print(f"WBELint: {action_label} {len(sources)} files with {args.jobs} workers...")
+    print(f"WBECheckLint: {action_label} {len(sources)} files with {args.jobs} workers...")
 
     failed_runs: list[str] = []
     linted_files: list[str] = []
@@ -297,25 +339,25 @@ def main() -> int:
                     linted_files.append(file_path)
                     lint_outputs[file_path] = output
 
-    print("WBELint: Finished running clang-tidy.")
+    print("WBECheckLint: Finished running clang-tidy.")
 
     if failed_runs:
-        print("WBELint: clang-tidy failed on these files:")
+        print("WBECheckLint: clang-tidy failed on these files:")
         for file_path in failed_runs:
             print(f"  - {file_path}")
 
     if args.fix:
         if linted_files:
-            print("WBELint: These files still have diagnostics after auto-fix:")
+            print("WBECheckLint: These files still have diagnostics after auto-fix:")
             for file_path in linted_files:
                 print(f"  - {file_path}")
         if failed_runs or linted_files:
             return 1
-        print("WBELint: No remaining diagnostics were found after auto-fix.")
+        print("WBECheckLint: No remaining diagnostics were found after auto-fix.")
         return 0
 
     if linted_files:
-        print("WBELint: Lint diagnostics:")
+        print("WBECheckLint: Lint diagnostics:")
         for file_path in sorted(linted_files):
             print(f"\n== {file_path} ==")
             print(lint_outputs[file_path])
@@ -323,7 +365,7 @@ def main() -> int:
     if failed_runs or linted_files:
         return 1
 
-    print("WBELint: No lint diagnostics found.")
+    print("WBECheckLint: No lint diagnostics found.")
     return 0
 
 

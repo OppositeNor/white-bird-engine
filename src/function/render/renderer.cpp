@@ -20,4 +20,4 @@ void IRenderer::initialize_render_pass() {
     // TODO
 }
 
-}
+} // namespace WhiteBirdEngine

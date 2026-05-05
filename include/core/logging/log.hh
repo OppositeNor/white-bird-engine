@@ -29,7 +29,6 @@ WBE_LABEL(WBE_CHANNEL_DEBUG, WBE_CHANNEL)
 
 class ILog {
 public:
-
     WBE_R6_DEFAULT_VIRTUAL(ILog)
 
     /**

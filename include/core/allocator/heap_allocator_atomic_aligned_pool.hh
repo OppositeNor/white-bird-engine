@@ -16,12 +16,12 @@
 #define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_HH
 
 #include "boost/thread/pthread/shared_mutex.hpp"
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include <boost/thread/lock_types.hpp>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
@@ -29,7 +29,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
+struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final
+    : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicAlignedPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -40,7 +41,6 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public Alloc
 
     WBE_TRAIT_REQUIRES(AllocatorTraitConcept);
 };
-
 
 /**
  * @class HeapAllocatorAtomicAlignedPool
@@ -64,7 +64,8 @@ public:
     /**
      * @brief The maximum total size that the allocator can contain.
      */
-    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
+    static constexpr size_t MAX_TOTAL_SIZE =
+        std::numeric_limits<Header>::max() >> 4;
 
     /**
      * @brief Constructor.
@@ -73,7 +74,8 @@ public:
      */
     HeapAllocatorAtomicAlignedPool(size_t p_size);
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
+    virtual MemID allocate(
+        size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -82,8 +84,9 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(is_in_pool(p_id));
-        // getting the resource is not protected by a lock. The user should protect a resource's use
-        // from allocation and deallocation by themselves.
+        // getting the resource is not protected by a lock. The user should
+        // protect a resource's use from allocation and deallocation by
+        // themselves.
         return reinterpret_cast<void*>(p_id);
     }
 
@@ -102,7 +105,8 @@ public:
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         boost::shared_lock lock(mutex);
-        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) &
+               MAX_TOTAL_SIZE;
     }
 
     size_t get_total_size() const {
@@ -111,7 +115,6 @@ public:
     }
 
     size_t get_remain_size() const;
-
 
     /**
      * @brief Is the memory ID in this pool
@@ -133,7 +136,6 @@ public:
     }
 
 private:
-
     bool is_empty_unguarded() const {
         return idle_list_head != nullptr && idle_list_head->size == size;
     }
@@ -146,8 +148,12 @@ private:
 
     bool unguard_is_in_pool(MemID p_mem_id) const;
 
-    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
-    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node,
+        char* p_mem_start,
+        size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert,
+        char* p_insert_start,
+        size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 

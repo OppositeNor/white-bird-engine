@@ -18,8 +18,8 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
@@ -59,8 +59,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3D {
  *
  * @tparam TVertType The type of vertices.
  */
-template <typename TVertType>
-struct Triangle3D {
+template <typename TVertType> struct Triangle3D {
     /**
      * @brief The first vertex of the triangle.
      */
@@ -112,8 +111,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3DTextured {
  *
  * @tparam TVertType The type of the vertices.
  */
-template <typename TVertType>
-struct Triangle3DIndx {
+template <typename TVertType> struct Triangle3DIndx {
     /**
      * @brief The vertex array.
      */

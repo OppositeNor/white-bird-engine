@@ -31,13 +31,12 @@ public:
 
     /**
      * @brief Get the type of the object in string.
-     * 
+     *
      * @return The type of the object in string.
      */
     virtual std::string_view get_type() const = 0;
-
 };
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

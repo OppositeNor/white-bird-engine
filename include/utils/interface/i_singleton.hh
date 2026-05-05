@@ -23,16 +23,17 @@ namespace WhiteBirdEngine {
 
 /**
  * @class ISingleton
- * @brief Singleton interface. This interface ensures a class that inherits it has only one instance.
+ * @brief Singleton interface. This interface ensures a class that inherits it
+ * has only one instance.
  *
  * @tparam T The type of the singleton.
  */
-template <typename T>
-class ISingleton {
+template <typename T> class ISingleton {
 public:
     ISingleton() {
         if (instance_count.fetch_add(1, std::memory_order_acq_rel) != 0) {
-            throw std::runtime_error("Failed to construct object: trying to construct multiple singletons.");
+            throw std::runtime_error("Failed to construct object: trying to "
+                                     "construct multiple singletons.");
         }
     }
 

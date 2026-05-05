@@ -53,9 +53,7 @@ public:
      *
      * @return The directory of the executable file.
      */
-    const Directory& get_root_directory() const {
-        return root_directory;
-    }
+    const Directory& get_root_directory() const { return root_directory; }
 
     /**
      * @brief Get the directory of the resource directory.
@@ -71,9 +69,7 @@ public:
      *
      * @return The config directory.
      */
-    const Directory& get_config_directory() const {
-        return config_directory;
-    }
+    const Directory& get_config_directory() const { return config_directory; }
 
     /**
      * @brief Cast the directory to a string.

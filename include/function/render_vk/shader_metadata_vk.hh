@@ -24,7 +24,8 @@
 
 namespace WhiteBirdEngine {
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataBinding)
 
     WBE_META(WBE_REFLECT)
@@ -37,7 +38,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding final : public Serializa
     int32_t space = 0;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataTypeAtom)
 
     WBE_META(WBE_REFLECT)
@@ -52,7 +54,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final : public Serializ
     std::string element_scalar_type;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataTypeField)
 
     WBE_META(WBE_REFLECT)
@@ -69,7 +72,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Seriali
     int32_t semantic_index = 0;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataType)
 
     WBE_META(WBE_REFLECT)
@@ -86,7 +90,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable
     std::string scalar_type;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataParameter final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataParameter final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataParameter)
 
     WBE_META(WBE_REFLECT)
@@ -103,7 +108,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataParameter final : public Seriali
     int32_t semantic_index = 0;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataResult final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataResult final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataResult)
 
     WBE_META(WBE_REFLECT)
@@ -118,7 +124,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataResult final : public Serializab
     ShaderMetadataType type;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataEntryPoint final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataEntryPoint final
+    : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataEntryPoint)
 
     WBE_META(WBE_REFLECT)

@@ -18,4 +18,3 @@ namespace WhiteBirdEngine {
 using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
 
 }
-

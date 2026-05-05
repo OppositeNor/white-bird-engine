@@ -15,9 +15,10 @@
 #ifndef WBE_RO_STAGING_BUFFER_VK_HH
 #define WBE_RO_STAGING_BUFFER_VK_HH
 
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "core/memory/unique.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -29,8 +30,8 @@ namespace WhiteBirdEngine {
 
 class ROStagingBufferVK final : public RenderObjectVK {
     friend class ROBufferVK;
-public:
 
+public:
     /**
      * @class ExposedFields
      * @brief The exposed fields of ROStagingBufferVK..
@@ -53,9 +54,10 @@ public:
         size_t size = WBE_KiB(4UL);
         // The usage of the buffer.
         Required<VkBufferUsageFlags> usage;
-        // Queue families this buffer is going to be used across. Either this size is 1 or is empty will
-        // make the buffer created in exclusive sharing mode, otherwise it will be created in concurrent
-        // sharing mode.
+        // Queue families this buffer is going to be used across. Either this
+        // size is 1 or is empty will make the buffer created in exclusive
+        // sharing mode, otherwise it will be created in concurrent sharing
+        // mode.
         std::set<uint32_t> queue_family_indices;
 
         /**
@@ -89,8 +91,7 @@ public:
         Builder& add_usage(VkBufferUsageFlags p_usage) {
             if (usage.has_value()) {
                 *usage |= p_usage;
-            }
-            else {
+            } else {
                 usage = p_usage;
             }
             return *this;
@@ -99,10 +100,12 @@ public:
         /**
          * @brief Set the queue families that may use this buffer.
          *
-         * @param p_queue_family_indices The queue family indices that might use this buffer.
+         * @param p_queue_family_indices The queue family indices that might use
+         * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
+        Builder& set_queue_family_indices(
+            const std::set<uint32_t>& p_queue_family_indices) {
             queue_family_indices = p_queue_family_indices;
             return *this;
         }
@@ -110,26 +113,34 @@ public:
         /**
          * @brief Set the queue families that may use this buffer.
          *
-         * @param p_queue_family_indices The queue family indices that might use this buffer.
+         * @param p_queue_family_indices The queue family indices that might use
+         * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
+        Builder& set_queue_family_indices(
+            std::set<uint32_t>&& p_queue_family_indices) {
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
 
-        Ref<ROStagingBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
+        Ref<ROStagingBufferVK> create_ref(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROStagingBufferVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROStagingBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
+        Unique<ROStagingBufferVK> create_unique(
+            const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROStagingBufferVK>(
+                p_render_data->allocator, p_render_data, *this);
         }
+
     private:
         VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
-    ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROStagingBufferVK(
+        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROStagingBufferVK() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(ROStagingBufferVK)
 
@@ -138,13 +149,12 @@ public:
      *
      * @return The exposed fields.
      */
-    const ExposedFields& fields() const {
-        return exposed_fields;
-    }
+    const ExposedFields& fields() const { return exposed_fields; }
 
     /**
      * @brief Allocate a chunk of memory.
-     * Every allocation will be automatically freed after per_frame_in_flight frames.
+     * Every allocation will be automatically freed after per_frame_in_flight
+     * frames.
      */
     void* allocate(size_t p_size);
 
@@ -153,9 +163,7 @@ public:
      *
      * @return The buffer instance.
      */
-    VkBuffer get_buffer() const {
-        return buffer;
-    }
+    VkBuffer get_buffer() const { return buffer; }
 
 private:
     struct DataChunkHeader {
@@ -163,7 +171,8 @@ private:
         uint32_t size;
         uint64_t frame;
     };
-    static_assert(sizeof(DataChunkHeader) == 16, "The size of the data chunk header should be 16.");
+    static_assert(sizeof(DataChunkHeader) == 16,
+        "The size of the data chunk header should be 16.");
     static constexpr size_t DATA_CHUNK_HEADER_SIZE = sizeof(DataChunkHeader);
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;

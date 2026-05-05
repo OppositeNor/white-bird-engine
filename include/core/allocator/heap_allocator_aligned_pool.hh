@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_ALIGNED_POOL_HH
 #define WBE_FILE_HEAP_ALLOCATOR_ALIGNED_POOL_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -27,7 +27,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
+struct AllocatorTrait<class HeapAllocatorAlignedPool> final
+    : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAlignedPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -47,12 +48,12 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> final : public AllocatorTr
  */
 class HeapAllocatorAlignedPool final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAlignedPool()
-        : HeapAllocatorAlignedPool(WBE_KiB(64UL)) {}
+    HeapAllocatorAlignedPool() : HeapAllocatorAlignedPool(WBE_KiB(64UL)) {}
     virtual ~HeapAllocatorAlignedPool() override;
     HeapAllocatorAlignedPool(const HeapAllocatorAlignedPool&) = delete;
     HeapAllocatorAlignedPool(HeapAllocatorAlignedPool&&) = delete;
-    HeapAllocatorAlignedPool& operator=(const HeapAllocatorAlignedPool&) = delete;
+    HeapAllocatorAlignedPool& operator=(
+        const HeapAllocatorAlignedPool&) = delete;
     HeapAllocatorAlignedPool& operator=(HeapAllocatorAlignedPool&&) = delete;
 
     using Header = uint64_t;
@@ -65,7 +66,8 @@ public:
     /**
      * @brief The maximum total size that the allocator can contain.
      */
-    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
+    static constexpr size_t MAX_TOTAL_SIZE =
+        std::numeric_limits<Header>::max() >> 4;
 
     /**
      * @brief Constructor.
@@ -74,7 +76,8 @@ public:
      */
     HeapAllocatorAlignedPool(size_t p_size);
 
-    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
+    virtual MemID allocate(
+        size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -98,7 +101,8 @@ public:
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) &
+               MAX_TOTAL_SIZE;
     }
 
     /**
@@ -106,9 +110,7 @@ public:
      *
      * @return The total size of the pool.
      */
-    size_t get_total_size() const {
-        return size;
-    }
+    size_t get_total_size() const { return size; }
 
     /**
      * @brief Get the total size of the free chunkes.
@@ -132,15 +134,18 @@ public:
     }
 
 private:
-
     struct IdleListNode {
         size_t size = 0;
         char* mem_start = nullptr;
         std::unique_ptr<IdleListNode> next = nullptr;
     };
 
-    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
-    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node,
+        char* p_mem_start,
+        size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert,
+        char* p_insert_start,
+        size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 

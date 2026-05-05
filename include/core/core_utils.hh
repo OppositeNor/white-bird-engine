@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_CORE_UTILS_HH
 #define WBE_FILE_CORE_UTILS_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "utils/defs.hh"
@@ -27,15 +27,14 @@ namespace WhiteBirdEngine {
 
 /**
  * @class ThisRef
- * @brief Interface for objects that could be able to get a reference of themselves (this_ref).
- * If this object is not created as a reference, this_ref will be MEM_NULL.
+ * @brief Interface for objects that could be able to get a reference of
+ * themselves (this_ref). If this object is not created as a reference, this_ref
+ * will be MEM_NULL.
  *
  * @tparam T The type of the class.
  */
-template <typename T>
-class ThisRef {
+template <typename T> class ThisRef {
 public:
-
     ThisRef() = default;
     virtual ~ThisRef() = default;
     ThisRef(const ThisRef&) = default;
@@ -57,8 +56,7 @@ protected:
     RefWeak<T> this_ref;
 };
 
-template <typename T>
-T& required(const std::string& p_name, Ref<T> p_ref) {
+template <typename T> T& required(const std::string& p_name, Ref<T> p_ref) {
     if (p_ref == MEM_NULL) {
         throw std::runtime_error("Reference: \"" + p_name + "\" is required.");
     }
@@ -68,7 +66,8 @@ T& required(const std::string& p_name, Ref<T> p_ref) {
 template <typename T>
 Ref<T> requires_valid(const std::string& p_name, Ref<T> p_ref) {
     if (p_ref == MEM_NULL) {
-        throw std::runtime_error("Reference: \"" + p_name + "\" is required to be valid.");
+        throw std::runtime_error(
+            "Reference: \"" + p_name + "\" is required to be valid.");
     }
     return p_ref;
 }
@@ -76,7 +75,8 @@ Ref<T> requires_valid(const std::string& p_name, Ref<T> p_ref) {
 template <typename T>
 RefWeak<T> requires_valid(const std::string& p_name, RefWeak<T> p_ref) {
     if (!p_ref.is_valid() || p_ref == MEM_NULL) {
-        throw std::runtime_error("Weak reference: \"" + p_name + "\" is required to be valid.");
+        throw std::runtime_error(
+            "Weak reference: \"" + p_name + "\" is required to be valid.");
     }
     return p_ref;
 }

@@ -28,39 +28,54 @@
 
 namespace WhiteBirdEngine {
 
-VkBuffer ROBufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkBuffer ROBufferVK::Builder::create_vk_object(
+    const BaseRenderDataVK* p_render_data) const {
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = size;
     create_info.usage = WBE_REQUIRED(usage);
     if (queue_family_indices.size() > 1) {
         create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        std::vector<uint32_t> vec_queue_family_indices(queue_family_indices.begin(), queue_family_indices.end());
+        std::vector<uint32_t> vec_queue_family_indices(
+            queue_family_indices.begin(), queue_family_indices.end());
         create_info.queueFamilyIndexCount = vec_queue_family_indices.size();
         create_info.pQueueFamilyIndices = vec_queue_family_indices.data();
-    }
-    else {
+    } else {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
     VkBuffer result;
-    if (vkCreateBuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+    if (vkCreateBuffer(p_render_data->logic_device,
+            &create_info,
+            p_render_data->allocation_callbacks,
+            &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create buffer.");
     }
     return result;
 }
 
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROBufferVK::ROBufferVK(
+    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     buffer = p_builder.create_vk_object(p_render_data);
     VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
+    vkGetBufferMemoryRequirements(
+        render_data->logic_device, buffer, &memory_requirements);
     exposed_fields.buffer_size = p_builder.size;
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
-    buffer_memory = allocate_device_memory(memory_requirements, exposed_fields.domain);
-    if (exposed_fields.domain == DeviceDomain::HOST || exposed_fields.domain == DeviceDomain::HOST_DEVICE) {
-        vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
+    buffer_memory =
+        allocate_device_memory(memory_requirements, exposed_fields.domain);
+    if (exposed_fields.domain == DeviceDomain::HOST ||
+        exposed_fields.domain == DeviceDomain::HOST_DEVICE) {
+        vkMapMemory(render_data->logic_device,
+            buffer_memory,
+            0,
+            exposed_fields.buffer_size,
+            0,
+            &mapped_memory);
     }
-    if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
+    if (vkBindBufferMemory(
+            render_data->logic_device, buffer, buffer_memory, 0) !=
+        VK_SUCCESS) {
         throw std::runtime_error("Failed to bind buffer memory.");
     }
 }
@@ -70,34 +85,58 @@ ROBufferVK::~ROBufferVK() {
         vkUnmapMemory(render_data->logic_device, buffer_memory);
     }
     // Deallocate resource after frames in flight.
-    render_data->register_delayed_call([render_data = render_data, buffer = buffer, buffer_memory = buffer_memory]() {
-        vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-        vkFreeMemory(render_data->logic_device, buffer_memory, render_data->allocation_callbacks);
-    }, render_data->frames_in_flight);
+    render_data->register_delayed_call(
+        [render_data = render_data,
+            buffer = buffer,
+            buffer_memory = buffer_memory]() {
+            vkDestroyBuffer(render_data->logic_device,
+                buffer,
+                render_data->allocation_callbacks);
+            vkFreeMemory(render_data->logic_device,
+                buffer_memory,
+                render_data->allocation_callbacks);
+        },
+        render_data->frames_in_flight);
 }
 
-void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
-    if (exposed_fields.domain != DeviceDomain::HOST && exposed_fields.domain != DeviceDomain::HOST_DEVICE) {
-        throw std::runtime_error("Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
+void ROBufferVK::update_buffer(
+    const void* p_data, size_t p_dst_offset, size_t p_size) {
+    if (exposed_fields.domain != DeviceDomain::HOST &&
+        exposed_fields.domain != DeviceDomain::HOST_DEVICE) {
+        throw std::runtime_error(
+            "Failed to update buffer: the domain of the device must be "
+            "declared as host to update buffer from host memory.");
     }
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(
-            std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
-                        p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
+            std::format("Failed to update buffer: trying to map a region ({} "
+                        "to {}) onto a buffer with capacity {}.",
+                p_dst_offset,
+                p_dst_offset + p_size,
+                exposed_fields.buffer_size));
     }
     memcpy(static_cast<uint8_t*>(mapped_memory) + p_dst_offset, p_data, p_size);
 }
 
-void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
+void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data,
+    size_t p_src_offset,
+    size_t p_dst_offset,
+    size_t p_size) {
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(
-            std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
-                        p_dst_offset, p_dst_offset + p_size, exposed_fields.buffer_size));
+            std::format("Failed to update buffer: trying to map a region ({} "
+                        "to {}) onto a buffer with capacity {}.",
+                p_dst_offset,
+                p_dst_offset + p_size,
+                exposed_fields.buffer_size));
     }
     if (p_src_offset + p_size > p_data->exposed_fields.buffer_size) {
         throw std::runtime_error(
-            std::format("Failed to update buffer: trying to read a region ({} to {}) from a buffer with capacity {}.",
-                        p_src_offset, p_src_offset + p_size, p_data->exposed_fields.buffer_size));
+            std::format("Failed to update buffer: trying to read a region ({} "
+                        "to {}) from a buffer with capacity {}.",
+                p_src_offset,
+                p_src_offset + p_size,
+                p_data->exposed_fields.buffer_size));
     }
     VkBufferCopy copy_region{};
     copy_region.srcOffset = p_src_offset;
@@ -105,17 +144,22 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size
     copy_region.size = p_size;
     // Register a pre-execute task to copy the buffer.
     RendererVK::get_singleton()->add_pre_execute_task(
-        [src_buffer = p_data, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
-            vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
-        }
-    );
+        [src_buffer = p_data, dst_buffer = this->get_buffer(), copy_region](
+            VkCommandBuffer p_command_buffer) {
+            vkCmdCopyBuffer(p_command_buffer,
+                src_buffer->get_buffer(),
+                dst_buffer,
+                1,
+                &copy_region);
+        });
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_size) {
     update_buffer(p_data, 0, p_size);
 }
 
-void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size) {
+void ROBufferVK::update_buffer(
+    Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size) {
     update_buffer(p_data, 0, p_dst_offset, p_size);
 }
 
@@ -127,17 +171,23 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
     update_buffer(p_data, 0, 0, p_data->exposed_fields.buffer_size);
 }
 
-void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size) { // NOLINT
-    size_t src_offset = reinterpret_cast<uintptr_t>(p_data) - reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
+void ROBufferVK::update_buffer(
+    Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size) { // NOLINT
+    size_t src_offset = reinterpret_cast<uintptr_t>(p_data) -
+                        reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
     VkBufferCopy copy_region{};
     copy_region.srcOffset = src_offset;
     copy_region.dstOffset = 0;
     copy_region.size = p_size;
     RendererVK::get_singleton()->add_pre_execute_task(
-        [src_buffer = p_buffer, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
-            vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
-        }
-    );
+        [src_buffer = p_buffer, dst_buffer = this->get_buffer(), copy_region](
+            VkCommandBuffer p_command_buffer) {
+            vkCmdCopyBuffer(p_command_buffer,
+                src_buffer->get_buffer(),
+                dst_buffer,
+                1,
+                &copy_region);
+        });
 }
 
 VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
@@ -155,6 +205,4 @@ VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
     return result;
 }
 
-
 } // namespace WhiteBirdEngine
-

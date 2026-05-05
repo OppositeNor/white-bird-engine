@@ -34,7 +34,8 @@ constexpr ResourceChunkID RES_CHUNK_NULL = 0x0;
 
 /**
  * @class IResourceChunk
- * @brief Interface for chunk of resources. Used for containing multiple resources to be loaded and deloaded at once.
+ * @brief Interface for chunk of resources. Used for containing multiple
+ * resources to be loaded and deloaded at once.
  * @todo Test
  */
 class IResourceChunk {
@@ -57,7 +58,8 @@ public:
     virtual size_t get_size() const = 0;
 
     /**
-     * @brief Push a chunk of data into the chunk. The data will be copied to the allocator.
+     * @brief Push a chunk of data into the chunk. The data will be copied to
+     * the allocator.
      *
      * @param p_res_size The size of the resource to push to.
      * @param p_res The pointer to the resource to be pushed into the chunk.
@@ -67,8 +69,8 @@ public:
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;
 
     /**
-     * @brief Register an object to the chunk, which it will be destructed when the chunk
-     * is unloaded.
+     * @brief Register an object to the chunk, which it will be destructed when
+     * the chunk is unloaded.
      *
      * @param p_object The object to register.
      * @return The resource reference to the object.
@@ -134,8 +136,7 @@ public:
      * @param p_mem_id The ID to get the data from.
      * @return The pointer to the data to get.
      */
-    template <typename T>
-    T* get_data(MemID p_mem_id) {
+    template <typename T> T* get_data(MemID p_mem_id) {
         return static_cast<T*>(get_data(p_mem_id));
     }
 
@@ -146,8 +147,7 @@ public:
      * @param p_mem_id The ID to get the data from.
      * @return The pointer to the data to get.
      */
-    template <typename T>
-    const T* get_data(MemID p_mem_id) const {
+    template <typename T> const T* get_data(MemID p_mem_id) const {
         return static_cast<const T*>(get_data(p_mem_id));
     }
 
@@ -159,7 +159,8 @@ protected:
      * @param p_res The pointer to the resource unit.
      * @param p_size The size of the resource unit.
      */
-    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
+    virtual RefRes<char> push_res_unit_ptr(
+        const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
 } // namespace WhiteBirdEngine

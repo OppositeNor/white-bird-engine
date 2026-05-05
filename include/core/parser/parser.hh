@@ -27,10 +27,8 @@ namespace WhiteBirdEngine {
  *
  * @tparam ChildType The type of the child class for CRTP
  */
-template <typename ChildType>
-class ParserData {
+template <typename ChildType> class ParserData {
 public:
-
     /**
      * @brief Get all the key values.
      */
@@ -39,7 +37,8 @@ public:
     }
 
     /**
-     * @brief Set a value. If the value was not recorded, a new value will be created.
+     * @brief Set a value. If the value was not recorded, a new value will be
+     * created.
      *
      * @tparam T The type of the value to set.
      * @param p_key The key of the value.
@@ -47,7 +46,8 @@ public:
      */
     template <typename T>
     void set_value(const std::string& p_key, T&& p_value) {
-        static_cast<ChildType*>(this)->set_value(p_key, std::forward<T>(p_value));
+        static_cast<ChildType*>(this)->set_value(
+            p_key, std::forward<T>(p_value));
     }
 
     /**
@@ -56,8 +56,7 @@ public:
      * @tparam T The type of the value to set.
      * @param p_value The value to set to.
      */
-    template <typename T>
-    void set(T&& p_value) {
+    template <typename T> void set(T&& p_value) {
         static_cast<ChildType*>(this)->set(std::forward<T>(p_value));
     }
 
@@ -68,9 +67,9 @@ public:
      * @param p_key The key of the value.
      * @return The value of the key.
      */
-    template <typename T>
-    T get_value(const std::string& p_key) const {
-        return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
+    template <typename T> T get_value(const std::string& p_key) const {
+        return static_cast<const ChildType*>(this)->template get_value<T>(
+            p_key);
     }
 
     /**
@@ -79,8 +78,7 @@ public:
      * @tparam T The type of the value to get.
      * @return The value of the key.
      */
-    template <typename T>
-    T get() const {
+    template <typename T> T get() const {
         return static_cast<const ChildType*>(this)->get();
     }
 
@@ -90,8 +88,7 @@ public:
      * @tparam T The type of the value.
      * @param p_value The value to write to.
      */
-    template <typename T>
-    void get(T& p_value) const {
+    template <typename T> void get(T& p_value) const {
         static_cast<const ChildType*>(this)->get(p_value);
     }
 
@@ -102,8 +99,7 @@ public:
      * @param p_key The key to get value from.
      * @param p_value The value to write to.
      */
-    template <typename T>
-    void get(const std::string& p_key, T& p_value) const {
+    template <typename T> void get(const std::string& p_key, T& p_value) const {
         return static_cast<const ChildType*>(this)->get(p_key, p_value);
     }
 
@@ -120,10 +116,10 @@ public:
 WBE_DECL_CRTP_CONCEPT(ParserData);
 
 template <ParserDataConcept ParserDataType>
-inline std::ostream& operator<<(std::ostream& p_ostream, const ParserData<ParserDataType>& p_parser) {
+inline std::ostream& operator<<(
+    std::ostream& p_ostream, const ParserData<ParserDataType>& p_parser) {
     return operator<<(p_ostream, p_parser);
 }
-
 
 /**
  * @class Parser
@@ -131,8 +127,7 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const ParserData<Parser
  *
  * @tparam ChildType The type of the child class for CRTP
  */
-template <typename ChildType>
-class Parser {
+template <typename ChildType> class Parser {
 public:
     Parser() = default;
     ~Parser() {}
@@ -162,9 +157,9 @@ public:
      * @param p_key The key to get value from.
      * @return The value of the key.
      */
-    template <typename T>
-    T get_value(const std::string& p_key) const {
-        return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
+    template <typename T> T get_value(const std::string& p_key) const {
+        return static_cast<const ChildType*>(this)->template get_value<T>(
+            p_key);
     }
 
     /**
@@ -176,7 +171,8 @@ public:
      */
     template <typename T>
     void get_value(const std::string& p_key, T& p_val) const {
-        static_cast<const ChildType*>(this)->template get_value<T>(p_key, p_val);
+        static_cast<const ChildType*>(this)->template get_value<T>(
+            p_key, p_val);
     }
 
     /**
@@ -185,8 +181,7 @@ public:
      * @tparam T The type of the value.
      * @return The value.
      */
-    template <typename T>
-    T get() const {
+    template <typename T> T get() const {
         return static_cast<const ChildType*>(this)->template get<T>();
     }
 
@@ -196,8 +191,7 @@ public:
      * @tparam T The type of the value.
      * @param p_val The output value.
      */
-    template <typename T>
-    void get(T& p_val) const {
+    template <typename T> void get(T& p_val) const {
         static_cast<const ChildType*>(this)->template get<T>(p_val);
     }
 
@@ -222,9 +216,7 @@ public:
      *
      * @return The data of the parser.
      */
-    auto& get_data() {
-        return static_cast<ChildType*>(this)->get_data();
-    }
+    auto& get_data() { return static_cast<ChildType*>(this)->get_data(); }
 
     /**
      * @brief Check if contains a key.
@@ -244,12 +236,13 @@ public:
      */
     template <typename T>
     void get_value(std::string& p_key, T&& p_value) const {
-        return static_cast<const ChildType*>(this)->get_value(p_key, std::forward<T>(p_value));
+        return static_cast<const ChildType*>(this)->get_value(
+            p_key, std::forward<T>(p_value));
     }
 };
 
 WBE_DECL_CRTP_CONCEPT(Parser);
 
-}
+} // namespace WhiteBirdEngine
 
 #endif

@@ -15,6 +15,5 @@
 #ifndef WBE_FILE_RESOURCE_DEFS_HH
 #define WBE_FILE_RESOURCE_DEFS_HH
 
-namespace WhiteBirdEngine {
-} // namespace WhiteBirdEngine
+namespace WhiteBirdEngine {} // namespace WhiteBirdEngine
 #endif

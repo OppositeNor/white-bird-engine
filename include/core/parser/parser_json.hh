@@ -15,6 +15,10 @@
 #ifndef WBE_FILE_PARSER_JSON_HH
 #define WBE_FILE_PARSER_JSON_HH
 
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
+#include "glm/fwd.hpp"
 #include "parser.hh"
 #include "platform/file_system/path.hh"
 #include "utils/utils.hh"
@@ -42,7 +46,9 @@ namespace WhiteBirdEngine {
 class JSONData final : public ParserData<JSONData> {
     using Json = nlohmann::json;
     friend class ParserJSON;
-    friend std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parser);
+    friend std::ostream& operator<<(
+        std::ostream& p_ostream, const JSONData& p_parser);
+
 public:
     JSONData() = default;
     ~JSONData() = default;
@@ -63,10 +69,8 @@ public:
         return *this;
     }
 
-    JSONData(const Json& p_data)
-        : data(p_data) {}
-    JSONData(Json&& p_data)
-        : data(std::move(p_data)) {}
+    JSONData(const Json& p_data) : data(p_data) {}
+    JSONData(Json&& p_data) : data(std::move(p_data)) {}
 
     template <typename T>
     void set_value(const std::string& p_key, T&& p_value) {
@@ -78,8 +82,11 @@ public:
             std::string result = p_value.buffer;
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
-                    result, BufferT::BUFFER_SIZE, result.size()));
+                    "Failed to get string value: {}. Buffer capacity: {}. "
+                    "String length: {} (without NUL terminator).",
+                    result,
+                    BufferT::BUFFER_SIZE,
+                    result.size()));
             }
             data[p_key] = result;
             p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
@@ -90,7 +97,8 @@ public:
             data[p_key]["x"] = p_value.x;
             data[p_key]["y"] = p_value.y;
             data[p_key]["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> ||
+                             std::same_as<Type, glm::quat>) {
             data[p_key]["x"] = p_value.x;
             data[p_key]["y"] = p_value.y;
             data[p_key]["z"] = p_value.z;
@@ -106,8 +114,7 @@ public:
      * @tparam T The type of the value to set.
      * @param p_value The value to set to.
      */
-    template <typename T>
-    void set(T&& p_value) {
+    template <typename T> void set(T&& p_value) {
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, JSONData>) {
             data = p_value.data;
@@ -121,8 +128,11 @@ public:
             std::string result = p_value.buffer;
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
-                    result, BufferT::BUFFER_SIZE, result.size()));
+                    "Failed to get string value: {}. Buffer capacity: {}. "
+                    "String length: {} (without NUL terminator).",
+                    result,
+                    BufferT::BUFFER_SIZE,
+                    result.size()));
             }
             data = result;
         } else if constexpr (std::same_as<Type, glm::vec2>) {
@@ -134,7 +144,8 @@ public:
             data["x"] = p_value.x;
             data["y"] = p_value.y;
             data["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> ||
+                             std::same_as<Type, glm::quat>) {
             data = Json();
             data["x"] = p_value.x;
             data["y"] = p_value.y;
@@ -145,22 +156,19 @@ public:
         }
     }
 
-    template <typename T>
-    T get_value(const std::string& p_key) const {
+    template <typename T> T get_value(const std::string& p_key) const {
         T result;
         get_value<T>(p_key, result);
         return result;
     }
 
-    template <typename T>
-    T get() const {
+    template <typename T> T get() const {
         T val;
         get<T>(val);
         return val;
     }
 
-    template <typename T>
-    void get(T& p_value) const {
+    template <typename T> void get(T& p_value) const {
         if constexpr (std::same_as<T, std::vector<JSONData>>) {
             std::vector<JSONData> result;
             for (const auto& elem : data.get<Json>()) {
@@ -172,30 +180,29 @@ public:
             std::string result = data.get<std::string>();
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
-                    result, BufferT::BUFFER_SIZE, result.size()));
+                    "Failed to get string value: {}. Buffer capacity: {}. "
+                    "String length: {} (without NUL terminator).",
+                    result,
+                    BufferT::BUFFER_SIZE,
+                    result.size()));
             }
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
             p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<T, glm::vec2>) {
             if (data.contains("u")) {
                 p_value = glm::vec2(
-                    data.at("u").get<float>(),
-                    data.at("v").get<float>());
-            }
-            else {
+                    data.at("u").get<float>(), data.at("v").get<float>());
+            } else {
                 p_value = glm::vec2(
-                    data.at("x").get<float>(),
-                    data.at("y").get<float>());
+                    data.at("x").get<float>(), data.at("y").get<float>());
             }
         } else if constexpr (std::same_as<T, glm::vec3>) {
-            p_value = glm::vec3(
-                data.at("x").get<float>(),
+            p_value = glm::vec3(data.at("x").get<float>(),
                 data.at("y").get<float>(),
                 data.at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
-            p_value = T(
-                data.at("x").get<float>(),
+        } else if constexpr (std::same_as<T, glm::vec4> ||
+                             std::same_as<T, glm::quat>) {
+            p_value = T(data.at("x").get<float>(),
                 data.at("y").get<float>(),
                 data.at("z").get<float>(),
                 data.at("w").get<float>());
@@ -219,30 +226,29 @@ public:
             std::string result = data.at(p_key).get<std::string>();
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. String length: {} (without NUL terminator).",
-                    result, BufferT::BUFFER_SIZE, result.size()));
+                    "Failed to get string value: {}. Buffer capacity: {}. "
+                    "String length: {} (without NUL terminator).",
+                    result,
+                    BufferT::BUFFER_SIZE,
+                    result.size()));
             }
             strncpy(p_value.buffer, result.data(), BufferT::BUFFER_SIZE - 1);
             p_value.buffer[BufferT::BUFFER_SIZE - 1] = '\0';
         } else if constexpr (std::same_as<T, glm::vec2>) {
             if (data.at(p_key).contains("u")) {
-                p_value = glm::vec2(
-                    data.at(p_key).at("u").get<float>(),
+                p_value = glm::vec2(data.at(p_key).at("u").get<float>(),
                     data.at(p_key).at("v").get<float>());
-            }
-            else {
-                p_value = glm::vec2(
-                    data.at(p_key).at("x").get<float>(),
+            } else {
+                p_value = glm::vec2(data.at(p_key).at("x").get<float>(),
                     data.at(p_key).at("y").get<float>());
             }
         } else if constexpr (std::same_as<T, glm::vec3>) {
-            p_value = glm::vec3(
-                data.at(p_key).at("x").get<float>(),
+            p_value = glm::vec3(data.at(p_key).at("x").get<float>(),
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
-            p_value = T(
-                data.at(p_key).at("x").get<float>(),
+        } else if constexpr (std::same_as<T, glm::vec4> ||
+                             std::same_as<T, glm::quat>) {
+            p_value = T(data.at(p_key).at("x").get<float>(),
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>(),
                 data.at(p_key).at("w").get<float>());
@@ -271,12 +277,13 @@ public:
     bool contains(const std::string& p_key) const {
         return data.contains(p_key);
     }
-  
+
 private:
     Json data;
 };
 
-inline std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parser) {
+inline std::ostream& operator<<(
+    std::ostream& p_ostream, const JSONData& p_parser) {
     return p_ostream << p_parser.data;
 }
 
@@ -287,15 +294,14 @@ inline std::ostream& operator<<(std::ostream& p_ostream, const JSONData& p_parse
  */
 class ParserJSON final : public Parser<ParserJSON> {
     using Json = nlohmann::json;
+
 public:
     using DataType = JSONData;
 
     ParserJSON() = default;
     virtual ~ParserJSON() = default;
-    ParserJSON(const ParserJSON& p_other)
-        : data(p_other.data) {}
-    ParserJSON(ParserJSON&& p_other) noexcept
-        : data(std::move(p_other.data)) {}
+    ParserJSON(const ParserJSON& p_other) : data(p_other.data) {}
+    ParserJSON(ParserJSON&& p_other) noexcept : data(std::move(p_other.data)) {}
     ParserJSON& operator=(const ParserJSON& p_other) {
         if (&p_other == this) {
             return *this;
@@ -316,11 +322,14 @@ public:
             std::ifstream f;
             f.open(static_cast<std::string>(p_path));
             if (!f.is_open()) {
-                throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
+                throw std::runtime_error("Failed to open file at path: " +
+                                         static_cast<std::string>(p_path));
             }
             data.data = Json::parse(f);
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to parse JSON file at path: " + static_cast<std::string>(p_path) + ". Error: " + e.what());
+            throw std::runtime_error("Failed to parse JSON file at path: " +
+                                     static_cast<std::string>(p_path) +
+                                     ". Error: " + e.what());
         }
     }
 
@@ -328,27 +337,23 @@ public:
         try {
             data.data = Json::parse(p_buffer);
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to parse JSON from buffer. Error: " + std::string(e.what()));
+            throw std::runtime_error(
+                "Failed to parse JSON from buffer. Error: " +
+                std::string(e.what()));
         }
     }
 
-    template <typename T>
-    T get_value(const std::string& p_key) const {
+    template <typename T> T get_value(const std::string& p_key) const {
         return data.get_value<T>(p_key);
     }
 
-    template <typename T>
-    void get_value(std::string& p_key, T&& p_value) {
+    template <typename T> void get_value(std::string& p_key, T&& p_value) {
         return data.get_value<T>(p_key, std::forward<T>(p_value));
     }
 
-    template <typename T>
-    T get() const {
-        return data.get<T>();
-    }
+    template <typename T> T get() const { return data.get<T>(); }
 
-    template <typename T>
-    void get(T& p_val) const {
+    template <typename T> void get(T& p_val) const {
         return data.get<T>(p_val);
     }
 
@@ -362,13 +367,9 @@ public:
         return data.get_all_keys();
     }
 
-    const JSONData& get_data() const {
-        return data;
-    }
+    const JSONData& get_data() const { return data; }
 
-    JSONData& get_data() {
-        return data;
-    }
+    JSONData& get_data() { return data; }
 
     bool contains(const std::string& p_key) const {
         return data.contains(p_key);

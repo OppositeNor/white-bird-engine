@@ -20,8 +20,8 @@
 
 namespace WhiteBirdEngine {
 
-// Keycodes white bird engine uses. The corresponding keycode enum name reflects the character
-// on a US QWERTY keyboard layout.
+// Keycodes white bird engine uses. The corresponding keycode enum name reflects
+// the character on a US QWERTY keyboard layout.
 enum KeyCode {
     // Numbers.
     KEYCODE_0,
@@ -116,51 +116,96 @@ enum KeyCode {
     TOTAL_KEYCODES
 };
 
-static_assert(KEYCODE_1 - KEYCODE_0 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_2 - KEYCODE_1 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_3 - KEYCODE_2 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_4 - KEYCODE_3 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_5 - KEYCODE_4 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_6 - KEYCODE_5 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_7 - KEYCODE_6 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_8 - KEYCODE_7 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_9 - KEYCODE_8 == 1,       "Keycodes of numbers that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_B - KEYCODE_A == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_C - KEYCODE_B == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_D - KEYCODE_C == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_E - KEYCODE_D == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F - KEYCODE_E == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_G - KEYCODE_F == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_H - KEYCODE_G == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_I - KEYCODE_H == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_J - KEYCODE_I == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_K - KEYCODE_J == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_L - KEYCODE_K == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_M - KEYCODE_L == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_N - KEYCODE_M == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_O - KEYCODE_N == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_P - KEYCODE_O == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_Q - KEYCODE_P == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_R - KEYCODE_Q == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_S - KEYCODE_R == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_T - KEYCODE_S == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_U - KEYCODE_T == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_V - KEYCODE_U == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_W - KEYCODE_V == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_X - KEYCODE_W == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_Y - KEYCODE_X == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_Z - KEYCODE_Y == 1,       "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F2 - KEYCODE_F1 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F3 - KEYCODE_F2 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F4 - KEYCODE_F3 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F5 - KEYCODE_F4 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F6 - KEYCODE_F5 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F7 - KEYCODE_F6 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F8 - KEYCODE_F7 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F9 - KEYCODE_F8 == 1,     "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F10 - KEYCODE_F9 == 1,    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F11 - KEYCODE_F10 == 1,   "Keycodes of F keys that are differed by 1 must also be differed by 1.");
-static_assert(KEYCODE_F12 - KEYCODE_F11 == 1,   "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_1 - KEYCODE_0 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_2 - KEYCODE_1 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_3 - KEYCODE_2 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_4 - KEYCODE_3 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_5 - KEYCODE_4 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_6 - KEYCODE_5 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_7 - KEYCODE_6 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_8 - KEYCODE_7 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_9 - KEYCODE_8 == 1,
+    "Keycodes of numbers that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_B - KEYCODE_A == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_C - KEYCODE_B == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_D - KEYCODE_C == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_E - KEYCODE_D == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F - KEYCODE_E == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_G - KEYCODE_F == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_H - KEYCODE_G == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_I - KEYCODE_H == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_J - KEYCODE_I == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_K - KEYCODE_J == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_L - KEYCODE_K == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_M - KEYCODE_L == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_N - KEYCODE_M == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_O - KEYCODE_N == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_P - KEYCODE_O == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_Q - KEYCODE_P == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_R - KEYCODE_Q == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_S - KEYCODE_R == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_T - KEYCODE_S == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_U - KEYCODE_T == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_V - KEYCODE_U == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_W - KEYCODE_V == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_X - KEYCODE_W == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_Y - KEYCODE_X == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_Z - KEYCODE_Y == 1,
+    "Keycodes of alphabet that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F2 - KEYCODE_F1 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F3 - KEYCODE_F2 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F4 - KEYCODE_F3 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F5 - KEYCODE_F4 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F6 - KEYCODE_F5 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F7 - KEYCODE_F6 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F8 - KEYCODE_F7 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F9 - KEYCODE_F8 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F10 - KEYCODE_F9 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F11 - KEYCODE_F10 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
+static_assert(KEYCODE_F12 - KEYCODE_F11 == 1,
+    "Keycodes of F keys that are differed by 1 must also be differed by 1.");
 
 /**
  * @brief Convert a number to a keycode.
@@ -180,8 +225,10 @@ inline KeyCode number_to_keycode(uint64_t p_number) {
  * @return The converted keycode.
  */
 inline KeyCode alphabet_to_keycode(char p_letter) {
-    WBE_DEBUG_ASSERT((p_letter >= 'a' && p_letter <= 'z') || (p_letter >= 'A' && p_letter <= 'Z'));
-    return static_cast<KeyCode>((p_letter > 'A' ? p_letter - 'A' : p_letter - 'a') + KEYCODE_A);
+    WBE_DEBUG_ASSERT((p_letter >= 'a' && p_letter <= 'z') ||
+                     (p_letter >= 'A' && p_letter <= 'Z'));
+    return static_cast<KeyCode>(
+        (p_letter > 'A' ? p_letter - 'A' : p_letter - 'a') + KEYCODE_A);
 }
 
 inline KeyCode f_keycode(uint64_t p_number) {

@@ -39,7 +39,6 @@ private:
 
     void init();
     void terminate();
-
 };
 
 } // namespace WhiteBirdEngine

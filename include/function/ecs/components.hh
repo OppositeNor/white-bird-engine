@@ -19,6 +19,9 @@
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/fwd.hpp"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
@@ -27,8 +30,7 @@
 #include <string_view>
 namespace WhiteBirdEngine {
 
-template <typename T>
-using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
+template <typename T> using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
 /**
  * @class ComponentLabel
@@ -47,9 +49,9 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel {
 
 /**
  * @class ComponentTransform
- * @brief Component that stores a transform based on scale, rotation and translation data.
- * The transform will be performed in the order of: scale, rotate and then translation
- * (i.e. translation * rotation * scale).
+ * @brief Component that stores a transform based on scale, rotation and
+ * translation data. The transform will be performed in the order of: scale,
+ * rotate and then translation (i.e. translation * rotation * scale).
  */
 struct WBE_META(WBE_COMPONENT) ComponentTransform {
     // The scale value: x, y, z

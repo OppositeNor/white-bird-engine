@@ -66,8 +66,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex2DTextured {
  *
  * @tparam TVertType The type of the vertices.
  */
-template <typename TVertType>
-struct Triangle2D {
+template <typename TVertType> struct Triangle2D {
     /**
      * @brief The first vertex.
      */

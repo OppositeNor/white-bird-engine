@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_REFERENCE_STRONG_HH
 #define WBE_FILE_REFERENCE_STRONG_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <concepts>
@@ -34,28 +34,23 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocator>
-class Ref {
-    template <typename T1, typename AllocType1>
-    friend class Ref;
+template <typename T, typename AllocType = HeapAllocator> class Ref {
+    template <typename T1, typename AllocType1> friend class Ref;
 
-    template <typename T1, typename AllocTYpe1>
-    friend class RefWeak;
+    template <typename T1, typename AllocTYpe1> friend class RefWeak;
 
     friend struct ::std::hash<Ref<T, AllocType>>;
 
     struct ControlBlock;
-public:
 
+public:
     using ObjType = T;
 
     Ref() {
         control_block = nullptr;
         ref();
     }
-    ~Ref() {
-        deref();
-    }
+    ~Ref() { deref(); }
     Ref(const Ref& p_other) {
         p_other.ref();
         control_block = p_other.control_block;
@@ -88,23 +83,27 @@ public:
             control_block = nullptr;
             return;
         }
-        throw std::runtime_error("Cannot directly asign an memory id to a reference unless it's MEM_NULL.");
+        throw std::runtime_error("Cannot directly asign an memory id to a "
+                                 "reference unless it's MEM_NULL.");
     }
 
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+        requires std::convertible_to<T1*, T*> &&
+                 std::convertible_to<AllocType1*, AllocType*>
     Ref(const Ref<T1, AllocType1>& p_other) {
         p_other.ref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
     }
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+        requires std::convertible_to<T1*, T*> &&
+                 std::convertible_to<AllocType1*, AllocType*>
     Ref(Ref<T1, AllocType1>&& p_other) noexcept {
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
         p_other.control_block = nullptr;
     }
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+        requires std::convertible_to<T1*, T*> &&
+                 std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(const Ref<T1, AllocType1>& p_other) {
         if (*this == p_other) {
             return *this;
@@ -115,7 +114,8 @@ public:
         return *this;
     }
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+        requires std::convertible_to<T1*, T*> &&
+                 std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(Ref<T1, AllocType1>&& p_other) noexcept {
         if (*this == p_other) {
             return *this;
@@ -154,8 +154,10 @@ public:
      */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        MemID control_block_mem_id = create_obj<ControlBlock>(*p_allocator, p_allocator, p_mem_id);
-        control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
+        MemID control_block_mem_id =
+            create_obj<ControlBlock>(*p_allocator, p_allocator, p_mem_id);
+        control_block =
+            p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
         control_block->control_block_mem_id = control_block_mem_id;
         ref();
     }
@@ -169,34 +171,40 @@ public:
      * @return The created reference.
      */
     template <typename... Args>
-    static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
-        return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
+    static Ref<T, AllocType> make_ref(
+        AllocType* p_allocator, Args&&... p_args) {
+        return Ref(p_allocator,
+            create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
     /**
      * @brief Get the resource pointer.
      *
-     * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
+     * @return The pointer pointing to the resource. nullptr if mem_id is
+     * MEM_NULL.
      */
     T* get() {
         if (control_block == nullptr) {
             return nullptr;
         }
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     /**
      * @brief Get the resource pointer.
      *
-     * @return The pointer pointing to the resource. nullptr if mem_id is MEM_NULL.
+     * @return The pointer pointing to the resource. nullptr if mem_id is
+     * MEM_NULL.
      */
     const T* get() const {
         if (control_block == nullptr) {
             return nullptr;
         }
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     /**
@@ -206,16 +214,17 @@ public:
      * @tparam T1 The type to cast to.
      * @return The casted reference. MEM_NULL if the cast fails.
      */
-    template <typename T1>
-    Ref<T1, AllocType> dynamic_cast_ref() const {
+    template <typename T1> Ref<T1, AllocType> dynamic_cast_ref() const {
         if (control_block == nullptr || control_block->allocator == nullptr) {
             return Ref<T1, AllocType>(nullptr);
         }
-        T1* casted_ptr = dynamic_cast<T1*>(static_cast<T*>(control_block->allocator->get(control_block->mem_id)));
+        T1* casted_ptr = dynamic_cast<T1*>(static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id)));
         if (casted_ptr == nullptr) {
             return MEM_NULL;
         }
-        return Ref<T1, AllocType>(reinterpret_cast<Ref<T1, AllocType>::ControlBlock*>(control_block));
+        return Ref<T1, AllocType>(
+            reinterpret_cast<Ref<T1, AllocType>::ControlBlock*>(control_block));
     }
 
     /**
@@ -230,52 +239,56 @@ public:
     T* operator->() {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     const T* operator->() const {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     T& operator*() {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return *static_cast<T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     const T& operator*() const {
         WBE_DEBUG_ASSERT(control_block != nullptr);
         WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
+        return *static_cast<const T*>(
+            control_block->allocator->get(control_block->mem_id));
     }
 
     template <typename T1, typename AllocType1>
     bool operator==(const Ref<T1, AllocType1>& p_other) const {
-        return control_block == reinterpret_cast<decltype(control_block)>(p_other.control_block);
+        return control_block ==
+               reinterpret_cast<decltype(control_block)>(p_other.control_block);
     }
 
-    bool operator==(std::nullptr_t) const {
-        return is_null();
-    }
+    bool operator==(std::nullptr_t) const { return is_null(); }
 
     bool operator==(void* p_ptr) const {
         if (p_ptr != nullptr) {
-            throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
+            throw std::runtime_error(
+                "Cannot compare a unique with a pointer that is not nullptr.");
         }
         return is_null();
     }
 
     bool operator==(MemID p_mem_id) const {
         if (p_mem_id != MEM_NULL) {
-            throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
+            throw std::runtime_error("Cannot compare a unique with a memory ID "
+                                     "that is not MEM_NULL.");
         }
         return is_null();
     }
 
-    template <typename T1>
-    bool operator!=(T1 p_obj) const {
+    template <typename T1> bool operator!=(T1 p_obj) const {
         return !(*this == p_obj);
     }
 
@@ -290,13 +303,12 @@ public:
             return 1;
         }
         // Compare based on the control block.
-        return static_cast<int>(std::hash<ControlBlock*>{}(control_block)) - std::hash<ControlBlock*>{}(p_obj.control_block);
+        return static_cast<int>(std::hash<ControlBlock*>{}(control_block)) -
+               std::hash<ControlBlock*>{}(p_obj.control_block);
     }
 
 private:
-
-    Ref(ControlBlock* p_control_block)
-        : control_block(p_control_block) {
+    Ref(ControlBlock* p_control_block) : control_block(p_control_block) {
         ref();
     }
 
@@ -317,8 +329,10 @@ private:
         if (control_block == nullptr) {
             return;
         }
-        control_block->strong_ref_counter.fetch_add(1, std::memory_order_release);
-        // For all strong reference, create a hidden weak reference, since only weak reference could destruct control block.
+        control_block->strong_ref_counter.fetch_add(
+            1, std::memory_order_release);
+        // For all strong reference, create a hidden weak reference, since only
+        // weak reference could destruct control block.
         control_block->weak_ref_counter.fetch_add(1, std::memory_order_release);
     }
 
@@ -326,8 +340,10 @@ private:
         if (control_block == nullptr) {
             return;
         }
-        if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            // If all the references of the control block is freed, destroy the object.
+        if (control_block->strong_ref_counter.fetch_sub(
+                1, std::memory_order_acq_rel) == 1) {
+            // If all the references of the control block is freed, destroy the
+            // object.
             destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
         }
         // Dereference the hidden weak reference.
@@ -336,10 +352,15 @@ private:
     }
 
     void weak_deref() const {
-        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
-        if (weak_ref_count == 1 && control_block->strong_ref_counter.load(std::memory_order_acquire) == 0) {
-            // If this is the last weak reference referencing this, and no strong reference is referencing this, destroy the control block.
-            destroy_obj<typename Ref<T>::ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
+        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(
+            1, std::memory_order_acq_rel);
+        if (weak_ref_count == 1 && control_block->strong_ref_counter.load(
+                                       std::memory_order_acquire) == 0) {
+            // If this is the last weak reference referencing this, and no
+            // strong reference is referencing this, destroy the control block.
+            destroy_obj<typename Ref<T>::ControlBlock>(
+                *(control_block->allocator),
+                control_block->control_block_mem_id);
         }
         control_block = nullptr;
     }
@@ -348,9 +369,8 @@ private:
 };
 
 template <typename T>
-concept ThisRefAsignable = requires(T* p_ins, Ref<T> p_ref) {
-    p_ins->set_ref_of_this(p_ref);
-};
+concept ThisRefAsignable =
+    requires(T* p_ins, Ref<T> p_ref) { p_ins->set_ref_of_this(p_ref); };
 
 /**
  * @brief Make a reference with given constructor arguments.
@@ -382,7 +402,7 @@ namespace std {
  *
  * @tparam T The type of the reference.
  * @param p_ref The reference to hash.
- * @return 
+ * @return
  */
 template <typename T, typename AllocType>
 struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT(cert-dcl58-cpp)
@@ -391,9 +411,10 @@ struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT(cert-dcl58-cpp)
             return WhiteBirdEngine::MEM_NULL;
         }
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
-        return std::hash<AllocType*>{}(p_ref.control_block->allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_ref.control_block->mem_id);
+        return std::hash<AllocType*>{}(p_ref.control_block->allocator) ^
+               std::hash<::WhiteBirdEngine::MemID>{}(
+                   p_ref.control_block->mem_id);
     }
-
 };
 } // namespace std
 

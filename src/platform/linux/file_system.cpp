@@ -25,9 +25,7 @@
 
 namespace WhiteBirdEngine {
 
-FileSystem::FileSystem()
-    : FileSystem(get_executable_dir()) {
-}
+FileSystem::FileSystem() : FileSystem(get_executable_dir()) {}
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
     root_directory = p_root_dir;
@@ -98,15 +96,16 @@ std::string FileSystem::get_ext(const Path& p_path) {
 
 Directory FileSystem::get_executable_dir() {
     Buffer<1024> buf{};
-    ssize_t len = readlink("/proc/self/exe", buf.buffer, decltype(buf)::BUFFER_SIZE);
+    ssize_t len =
+        readlink("/proc/self/exe", buf.buffer, decltype(buf)::BUFFER_SIZE);
     if (len < 0) {
         throw std::runtime_error("Failed to get the executable path.");
     }
     if (len >= 1024) {
-        throw std::runtime_error("Buffer overflow for executable path finding.");
+        throw std::runtime_error(
+            "Buffer overflow for executable path finding.");
     }
     buf.buffer[len] = '\0';
     return get_file_dir(std::string(buf.buffer));
 }
 } // namespace WhiteBirdEngine
-

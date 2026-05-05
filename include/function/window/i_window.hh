@@ -116,8 +116,8 @@ public:
      *
      * @return The required Vulkan
      */
-    virtual std::vector<const char*> get_required_vulkan_instance_extensions() const = 0;
-
+    virtual std::vector<const char*>
+    get_required_vulkan_instance_extensions() const = 0;
 };
 
 } // namespace WhiteBirdEngine

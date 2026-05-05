@@ -15,8 +15,8 @@
 
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -28,62 +28,75 @@
 
 namespace WhiteBirdEngine {
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_code_size) {
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(
+    const char* p_code, size_t p_code_size) {
     code = p_code;
     code_size = p_code_size;
     return *this;
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::string& p_resource_id) {
-    auto resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(
+    const std::string& p_resource_id) {
+    auto resource =
+        ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
     return set_code(resource);
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) {
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(
+    RefRes<RUShader> p_resource) {
     return set_code(p_resource->data.get(), p_resource->size);
 }
 
-VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkShaderModule ROShaderVK::Builder::create_vk_object(
+    const BaseRenderDataVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.pCode = reinterpret_cast<const uint32_t*>(WBE_REQUIRED(code));
     create_info.codeSize = WBE_REQUIRED(code_size);
-    
+
     VkShaderModule result = VK_NULL_HANDLE;
-    if (vkCreateShaderModule(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
+    if (vkCreateShaderModule(p_render_data->logic_device,
+            &create_info,
+            p_render_data->allocation_callbacks,
+            &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create shader module.");
     }
     return result;
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
+ROShaderVK::ROShaderVK(
+    const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
     : RenderObjectVK(p_base_render_data) {
     init(p_builder);
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id)
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data,
+    const std::string& p_resource_id)
     : RenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource_id);
     init(builder);
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource)
+ROShaderVK::ROShaderVK(
+    const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource)
     : RenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource);
     init(builder);
 }
 
-VkShaderModule ROShaderVK::get_shader_module() const {
-    return shader_module;
-}
+VkShaderModule ROShaderVK::get_shader_module() const { return shader_module; }
 
 ROShaderVK::~ROShaderVK() {
     // Deallocate resource after frames in flight.
-    render_data->register_delayed_call([render_data = render_data, shader_module = shader_module]() {
-        vkDestroyShaderModule(render_data->logic_device, shader_module, render_data->allocation_callbacks);
-    }, render_data->frames_in_flight);
+    render_data->register_delayed_call(
+        [render_data = render_data, shader_module = shader_module]() {
+            vkDestroyShaderModule(render_data->logic_device,
+                shader_module,
+                render_data->allocation_callbacks);
+        },
+        render_data->frames_in_flight);
 }
 
 void ROShaderVK::init(const Builder& p_builder) {

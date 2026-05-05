@@ -26,13 +26,21 @@
 
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))
 #define WBE_HAFSP_DATA_CHUNK_START (mem_chunk)
-#define WBE_HAFSP_WRITE_ID(id, data_index) do { *(index_chunk_start + (id) - 1) = (data_index); } while (false)
-#define WBE_HAFSP_WRITE_DATA_INDEX(data_index, id) do { *(index_chunk_rev_start + (data_index) - 1) = (id); } while (false)
+#define WBE_HAFSP_WRITE_ID(id, data_index)                                     \
+    do {                                                                       \
+        *(index_chunk_start + (id) - 1) = (data_index);                        \
+    } while (false)
+#define WBE_HAFSP_WRITE_DATA_INDEX(data_index, id)                             \
+    do {                                                                       \
+        *(index_chunk_rev_start + (data_index) - 1) = (id);                    \
+    } while (false)
 
 namespace WhiteBirdEngine {
 HeapAllocatorFixedSizePool::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
-        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)
+            ->warning(
+                "HeapAllocatorFixedSizePool not empty during destruction.");
     }
     free(mem_chunk); // NOLINT
 }
@@ -42,10 +50,13 @@ inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {
         p_size = element_size;
     }
     if (get_align_size(p_size, WBE_DEFAULT_ALIGNMENT) != element_size) {
-        throw std::runtime_error(std::format("Failed to allocate memory: size must be: {} after alignment.", element_size));
+        throw std::runtime_error(std::format(
+            "Failed to allocate memory: size must be: {} after alignment.",
+            element_size));
     }
     if (alloc_obj_count >= max_obj) {
-        throw std::runtime_error("Failed to allocate memory: not enough space for memory pool.");
+        throw std::runtime_error(
+            "Failed to allocate memory: not enough space for memory pool.");
     }
     InternalID curr_id = retrieve_valid_index();
     write_info(curr_id, ++alloc_obj_count);
@@ -55,7 +66,8 @@ inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {
 inline void HeapAllocatorFixedSizePool::deallocate(MemID p_mem) {
     DataIndex data_index = WBE_HAFSP_GET_DATA_INDEX(p_mem);
     if (data_index == MEM_NULL || p_mem > max_obj) {
-        throw std::runtime_error("Failed to deallocate memory: memory not allocated in this memory pool.");
+        throw std::runtime_error("Failed to deallocate memory: memory not "
+                                 "allocated in this memory pool.");
     }
     if (alloc_obj_count > 1 && data_index != alloc_obj_count) {
         void* data_loc = get_mem_loc_at_id(p_mem);

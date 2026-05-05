@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
  */
 enum class QueueFamilyVK : uint32_t {
     GRAPHICS = 0,
-    COMPUTE  = 1,
+    COMPUTE = 1,
 };
 
 /**
@@ -54,7 +54,8 @@ struct RendResVK;
 struct ResAccessVK {
     // The id of the resource consumed/produced by the task.
     RendResID res_id = 0;
-    // Combined access flags for this access (read or write side as appropriate).
+    // Combined access flags for this access (read or write side as
+    // appropriate).
     VkAccessFlags2 access = VK_ACCESS_2_NONE;
     // Pipeline stage(s) at which the access occurs.
     VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
@@ -106,8 +107,8 @@ struct RenderTaskVK : public RenderTask {
      * @param p_delta     The frame delta in seconds.
      */
     virtual void record(VkCommandBuffer p_command_buffer,
-                        const Vector<RendResVK, RenderAllocator>& p_resources,
-                        double p_delta) = 0;
+        const Vector<RendResVK, RenderAllocator>& p_resources,
+        double p_delta) = 0;
 
     /**
      * @brief Default no-op for the cross-API perform() entry point. The
@@ -140,7 +141,7 @@ struct RenderTaskVK : public RenderTask {
          *                           command buffers; nullptr for primary.
          */
         RecordCommandBufferGuard(VkCommandBuffer p_command_buffer,
-                                 VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
+            VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
 
         VkCommandBuffer command_buffer;
     };

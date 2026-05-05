@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_CLA_LEXER_HH
 #define WBE_FILE_CLA_LEXER_HH
 
-#include "utils/defs.hh"
 #include "cla_utils.hh"
+#include "utils/defs.hh"
 
 #include <cstdint>
 #include <string>
@@ -50,7 +50,8 @@ public:
         WBE_DEBUG_ASSERT(p_argc >= 1);
         std::vector<CLAToken> result;
         result.reserve(p_argc);
-        result.push_back({ .value = std::string(p_argv[0]), .type = CLAToken::Type::UTILITY_NAME });
+        result.push_back({.value = std::string(p_argv[0]),
+            .type = CLAToken::Type::UTILITY_NAME});
         for (uint32_t i = 1; i < p_argc; ++i) {
             CLAToken token{};
             token.value = std::string(p_argv[i]);
@@ -61,7 +62,6 @@ public:
     }
 
 private:
-
     CLAToken::Type get_token_type(const std::string& p_token_value) {
         if (!p_token_value.empty() && p_token_value[0] == '-') {
             if (p_token_value.size() > 1 && p_token_value[1] == '-') {
@@ -73,6 +73,6 @@ private:
     }
 };
 
-}  // namespace WhiteBirdEngine
+} // namespace WhiteBirdEngine
 
 #endif
