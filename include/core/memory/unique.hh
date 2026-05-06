@@ -30,18 +30,22 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the instance.
  */
-template <typename T, typename AllocType = HeapAllocator> class Unique {
-    template <typename T1, typename AllocType1> friend class Unique;
+template <typename T, typename AllocType = HeapAllocator>
+class Unique {
+    template <typename T1, typename AllocType1>
+    friend class Unique;
     template <typename T1, typename AllocType1, bool AllowDestruct>
     friend class RefRaw;
 
 public:
-    Unique() : mem_id(MEM_NULL), allocator(nullptr) {}
-    ~Unique() { reset(); }
+    Unique() : mem_id(MEM_NULL), allocator(nullptr) {
+    }
+    ~Unique() {
+        reset();
+    }
     // Unique is not copyable.
     Unique(const Unique&) = delete;
-    Unique(Unique&& p_other) noexcept
-        : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    Unique(Unique&& p_other) noexcept : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     Unique& operator=(const Unique&) = delete;
@@ -54,15 +58,12 @@ public:
     }
 
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> &&
-                     std::convertible_to<AllocType1*, AllocType*>
-    Unique(Unique<T1, AllocType1>&& p_other)
-        : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
+    Unique(Unique<T1, AllocType1>&& p_other) : mem_id(p_other.mem_id), allocator(p_other.allocator) {
         p_other.mem_id = MEM_NULL;
     }
     template <typename T1, typename AllocType1>
-        requires std::convertible_to<T1*, T*> &&
-                 std::convertible_to<AllocType1*, AllocType*>
+        requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Unique& operator=(Unique<T1, AllocType1>&& p_other) {
         reset();
         mem_id = p_other.mem_id;
@@ -71,8 +72,8 @@ public:
         return *this;
     }
 
-    Unique(AllocType* p_allocator, MemID p_mem_id)
-        : mem_id(p_mem_id), allocator(p_allocator) {}
+    Unique(AllocType* p_allocator, MemID p_mem_id) : mem_id(p_mem_id), allocator(p_allocator) {
+    }
 
     Unique(MemID p_mem_id) : Unique() {
         if (p_mem_id != MEM_NULL) {
@@ -91,8 +92,7 @@ public:
      */
     template <typename... Args>
     static Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
-        return Unique(p_allocator,
-            create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
+        return Unique(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
     }
 
     /**
@@ -129,13 +129,17 @@ public:
         }
     }
 
-    T* operator->() { return static_cast<T*>(allocator->get(mem_id)); }
+    T* operator->() {
+        return static_cast<T*>(allocator->get(mem_id));
+    }
 
     const T* operator->() const {
         return static_cast<T*>(allocator->get(mem_id));
     }
 
-    T& operator*() { return *static_cast<T*>(allocator->get(mem_id)); }
+    T& operator*() {
+        return *static_cast<T*>(allocator->get(mem_id));
+    }
 
     const T& operator*() const {
         return *static_cast<T*>(allocator->get(mem_id));
@@ -143,25 +147,20 @@ public:
 
     bool operator==(MemID p_mem_id) {
         if (p_mem_id != MEM_NULL) {
-            throw std::runtime_error("Cannot compare a unique with a memory ID "
-                                     "that is not MEM_NULL.");
+            throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
         }
         return mem_id == MEM_NULL;
     }
 
     bool operator==(void* p_ptr) {
         if (p_ptr != nullptr) {
-            throw std::runtime_error(
-                "Cannot compare a unique with a pointer that is not nullptr.");
+            throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
         }
         return mem_id == MEM_NULL;
     }
 
-    bool operator==(std::nullptr_t) { return mem_id == MEM_NULL; }
-
-    operator Unique<const T, AllocType>&() const {
-        return reinterpret_cast<Unique<const T, AllocType>&>(
-            const_cast<Unique<T, AllocType>&>(*this));
+    bool operator==(std::nullptr_t) {
+        return mem_id == MEM_NULL;
     }
 
     /**
@@ -169,7 +168,9 @@ public:
      *
      * @return True if is NULL, false otherwise.
      */
-    bool is_null() const { return allocator == nullptr || mem_id == MEM_NULL; }
+    bool is_null() const {
+        return allocator == nullptr || mem_id == MEM_NULL;
+    }
 
 private:
     MemID mem_id;
@@ -193,7 +194,7 @@ Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
 }
 
 } // namespace WhiteBirdEngine
-//
+
 namespace std {
 /**
  * @brief Hash function for unique instance.
@@ -208,9 +209,7 @@ struct hash<::WhiteBirdEngine::Unique<T, AllocType>> { // NOLINT
         if (p_unique.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }
-        return std::hash<AllocType*>{}(p_unique.allocator) ^
-               std::hash<::WhiteBirdEngine::MemID>{}(
-                   p_unique.control_block->mem_id);
+        return std::hash<AllocType*>{}(p_unique.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.control_block->mem_id);
     }
 };
 

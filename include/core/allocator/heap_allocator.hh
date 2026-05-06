@@ -23,7 +23,8 @@
 
 namespace WhiteBirdEngine {
 
-template <> struct AllocatorTrait<class HeapAllocator> {
+template <>
+struct AllocatorTrait<class HeapAllocator> {
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
 };
 
@@ -83,7 +84,8 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    template <typename T> T* get_obj(MemID p_id) {
+    template <typename T>
+    T* get_obj(MemID p_id) {
         return static_cast<T*>(get(p_id));
     }
 
@@ -94,7 +96,8 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    template <typename T> const T* get_obj(MemID p_id) const {
+    template <typename T>
+    const T* get_obj(MemID p_id) const {
         return static_cast<const T*>(get(p_id));
     }
 
@@ -151,8 +154,7 @@ inline void destroy_obj(AllocType& p_allocator, MemID p_id) {
  * @return The array created.
  */
 template <typename T, typename AllocType, typename... Args>
-inline MemID create_array(
-    AllocType& p_allocator, size_t p_num, Args&&... p_args) {
+inline MemID create_array(AllocType& p_allocator, size_t p_num, Args&&... p_args) {
     T* begin = reinterpret_cast<T*>(p_allocator.allocate(sizeof(T) * p_num));
     for (size_t i = 0; i < p_num; ++i) {
         new (begin + i) T(std::forward<Args>(p_args)...);

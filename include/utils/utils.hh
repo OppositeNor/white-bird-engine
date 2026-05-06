@@ -65,9 +65,7 @@ enum class AccessType : uint8_t {
  * @return The size after alignment.
  */
 constexpr size_t get_align_size(size_t p_size, size_t p_alignment) {
-    return p_alignment == 0
-               ? p_size
-               : ((p_size + p_alignment - 1) / p_alignment) * p_alignment;
+    return p_alignment == 0 ? p_size : ((p_size + p_alignment - 1) / p_alignment) * p_alignment;
 }
 
 using HashCode = uint32_t;
@@ -82,8 +80,7 @@ using TypeID = uint32_t;
 consteval HashCode static_hash(const char* p_str) {
     // from
     // https://stackoverflow.com/questions/2111667/compile-time-string-hashing
-    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1)
-                  : 5381;
+    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1) : 5381;
 }
 
 /**
@@ -95,8 +92,7 @@ consteval HashCode static_hash(const char* p_str) {
 constexpr HashCode dynam_hash(const char* p_str) {
     // from
     // https://stackoverflow.com/questions/2111667/compile-time-string-hashing
-    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1)
-                  : 5381;
+    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
 }
 
 /**
@@ -232,11 +228,14 @@ constexpr HashCode dynam_hash(const std::string& p_str) {
 using TypeID = HashCode;
 using ConstID = HashCode;
 
-template <typename T> struct TypeIDTrait;
+template <typename T>
+struct TypeIDTrait;
 
-template <TypeID T> struct TypeIDRevTrait;
+template <TypeID T>
+struct TypeIDRevTrait;
 
-template <HashCode CODE> struct LabelTrait;
+template <HashCode CODE>
+struct LabelTrait;
 
 /**
  * @brief Split the string with respect to a token.
@@ -264,8 +263,7 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
  * @param p_tokens The tokens to look for.
  * @return The index of the token that is first found.
  */
-inline size_t find_first_pos(
-    const std::string& p_str, const std::string& p_tokens) {
+inline size_t find_first_pos(const std::string& p_str, const std::string& p_tokens) {
     if (p_tokens.empty()) {
         return std::string::npos;
     }
@@ -284,8 +282,7 @@ inline size_t find_first_pos(
  * @param p_token The list of tokens.
  * @return Array of strings.
  */
-inline std::vector<std::string> split_string(
-    std::string p_str, const std::string& p_tokens) {
+inline std::vector<std::string> split_string(std::string p_str, const std::string& p_tokens) {
     std::vector<std::string> result;
     auto split_pos = find_first_pos(p_str, p_tokens);
     while (split_pos != std::string::npos) {
@@ -328,24 +325,21 @@ inline EncodeType get_encode_type_from_str(const std::string& p_str) {
  * @param p_path The path to the text file.
  * @return The content of the text file.
  */
-inline std::string load_text_file(
-    const char* p_path, EncodeType p_encode_type = EncodeType::UTF8) {
+inline std::string load_text_file(const char* p_path, EncodeType p_encode_type = EncodeType::UTF8) {
     if (p_encode_type != EncodeType::UTF8) {
         return ""; // TODO
     }
     std::string content;
     std::ifstream file_stream(p_path, std::ios::in);
     if (!file_stream.is_open()) {
-        throw std::runtime_error(
-            "Failed to open text file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to open text file at path: " + std::string(p_path));
     }
     file_stream.seekg(0, std::ios::end);
     size_t size = file_stream.tellg();
     file_stream.seekg(0, std::ios::beg);
     content.resize(size);
     if (!file_stream.read(content.data(), static_cast<std::streamsize>(size))) {
-        throw std::runtime_error(
-            "Failed to read text file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to read text file at path: " + std::string(p_path));
     }
     return content;
 }
@@ -360,16 +354,14 @@ inline std::string load_text_file(
 inline std::vector<char> load_binary_file(const char* p_path) {
     std::ifstream file_stream(p_path, std::ios::binary);
     if (!file_stream.is_open()) {
-        throw std::runtime_error(
-            "Failed to open file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to open file at path: " + std::string(p_path));
     }
     file_stream.seekg(0, std::ios::end);
     size_t size = file_stream.tellg();
     file_stream.seekg(0, std::ios::beg);
     std::vector<char> content(size);
     if (!file_stream.read(content.data(), static_cast<std::streamsize>(size))) {
-        throw std::runtime_error(
-            "Failed to read file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
     }
     return content;
 }
@@ -383,26 +375,22 @@ inline std::vector<char> load_binary_file(const char* p_path) {
  * size.
  * @param p_size The size of the file. Ignored if p_result is not nullptr.
  */
-inline void load_binary_file(
-    const char* p_path, void* p_result, size_t* p_size) {
+inline void load_binary_file(const char* p_path, void* p_result, size_t* p_size) {
     if (p_path == nullptr) {
         throw std::invalid_argument("Path to binary file cannot be null.");
     }
     if (p_result == nullptr && p_size == nullptr) {
-        throw std::invalid_argument(
-            "Either p_result or p_size must be provided.");
+        throw std::invalid_argument("Either p_result or p_size must be provided.");
     }
 
     std::ifstream file_stream(p_path, std::ios::binary | std::ios::ate);
     if (!file_stream.is_open()) {
-        throw std::runtime_error(
-            "Failed to open file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to open file at path: " + std::string(p_path));
     }
 
     const std::ifstream::pos_type end_pos = file_stream.tellg();
     if (end_pos < 0) {
-        throw std::runtime_error(
-            "Failed to get file size at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to get file size at path: " + std::string(p_path));
     }
 
     const size_t size = static_cast<size_t>(end_pos);
@@ -413,26 +401,21 @@ inline void load_binary_file(
         return;
     }
 
-    if (size >
-        static_cast<size_t>(std::numeric_limits<std::streamsize>::max())) {
-        throw std::runtime_error(
-            "File is too large to read at path: " + std::string(p_path));
+    if (size > static_cast<size_t>(std::numeric_limits<std::streamsize>::max())) {
+        throw std::runtime_error("File is too large to read at path: " + std::string(p_path));
     }
 
     file_stream.seekg(0, std::ios::beg);
     if (!file_stream.good()) {
-        throw std::runtime_error(
-            "Failed to seek file at path: " + std::string(p_path));
+        throw std::runtime_error("Failed to seek file at path: " + std::string(p_path));
     }
 
     if (size == 0) {
         return;
     }
 
-    if (!file_stream.read(
-            static_cast<char*>(p_result), static_cast<std::streamsize>(size))) {
-        throw std::runtime_error(
-            "Failed to read file at path: " + std::string(p_path));
+    if (!file_stream.read(static_cast<char*>(p_result), static_cast<std::streamsize>(size))) {
+        throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
     }
 }
 
@@ -492,31 +475,25 @@ template <typename T>
 using Required = std::optional<T>; // What's optional is actually required...
 
 template <typename T>
-inline T required(
-    const std::string& p_value_name, std::optional<T> p_optional_value) {
+inline T required(const std::string& p_value_name, std::optional<T> p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value.value();
 }
 
 template <typename T>
-inline std::optional<T>& requires_valid(
-    const std::string& p_value_name, std::optional<T>& p_optional_value) {
+inline std::optional<T>& requires_valid(const std::string& p_value_name, std::optional<T>& p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::optional<T> requires_valid(
-    const std::string& p_value_name, std::optional<T>&& p_optional_value) {
+inline std::optional<T> requires_valid(const std::string& p_value_name, std::optional<T>&& p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value;
 }
@@ -524,28 +501,23 @@ inline std::optional<T> requires_valid(
 template <typename T>
 inline T* requires_valid(const std::string& p_value_name, T* p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::shared_ptr<T> requires_valid(
-    const std::string& p_value_name, std::shared_ptr<T> p_optional_value) {
+inline std::shared_ptr<T> requires_valid(const std::string& p_value_name, std::shared_ptr<T> p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::unique_ptr<T> requires_valid(
-    const std::string& p_value_name, std::unique_ptr<T> p_optional_value) {
+inline std::unique_ptr<T> requires_valid(const std::string& p_value_name, std::unique_ptr<T> p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error(
-            "Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
     }
     return p_optional_value;
 }
@@ -555,7 +527,8 @@ inline std::unique_ptr<T> requires_valid(
  * @brief Base class for buffers. Used to identify buffers.
  *
  */
-template <typename Child> struct BufferBase {
+template <typename Child>
+struct BufferBase {
     // The size of the buffer (in bytes).
     static constexpr size_t BUFFER_SIZE = Child::BUFFER_SIZE;
 };
@@ -563,7 +536,8 @@ template <typename Child> struct BufferBase {
 /**
  * @brief A buffer type.
  */
-template <size_t SIZE> struct Buffer : public BufferBase<Buffer<SIZE>> {
+template <size_t SIZE>
+struct Buffer : public BufferBase<Buffer<SIZE>> {
     // The size of the buffer (in bytes).
     static constexpr size_t BUFFER_SIZE = SIZE;
     // The buffer.

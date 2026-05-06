@@ -124,8 +124,7 @@ public:
          * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(
-            const std::set<uint32_t>& p_queue_family_indices) {
+        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
             queue_family_indices = p_queue_family_indices;
             return *this;
         }
@@ -137,22 +136,17 @@ public:
          * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(
-            std::set<uint32_t>&& p_queue_family_indices) {
+        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
 
-        Ref<ROBufferVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROBufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROBufferVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROBufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
@@ -169,13 +163,11 @@ public:
         // The source access.
         VkAccessFlags2 src_access_mask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         // The source stage.
-        VkPipelineStageFlags2 src_stage_mask =
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The destination access.
         VkAccessFlags2 dst_access_mask = VK_ACCESS_2_MEMORY_READ_BIT;
         // The destination stage.
-        VkPipelineStageFlags2 dst_stage_mask =
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags2 dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         // The source queue family to tranfer ownership. If all the ownerships
         // in ROBufferVK is set in queue_family_indices, this field could be set
         // to VK_QUEUE_FAMILY_IGNORED.
@@ -210,8 +202,7 @@ public:
          * @param p_src_stage The source pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask,
-            VkPipelineStageFlags2 p_src_stage_mask) {
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
             src_access_mask = p_src_access_mask;
             src_stage_mask = p_src_stage_mask;
             return *this;
@@ -235,8 +226,7 @@ public:
          * @param p_dst_stage_mask The destination pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask,
-            VkPipelineStageFlags2 p_dst_stage_mask) {
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
             dst_access_mask = p_dst_access_mask;
             dst_stage_mask = p_dst_stage_mask;
             return *this;
@@ -249,8 +239,7 @@ public:
          * @param p_dst_access_mask The destination access bit mask.
          * @return
          */
-        MemoryBarrierBuilder& set_access(
-            VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
             return *this;
@@ -301,8 +290,7 @@ public:
          * the end of the buffer.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_data_region(
-            VkDeviceSize p_offset, VkDeviceSize p_size) {
+        MemoryBarrierBuilder& set_data_region(VkDeviceSize p_offset, VkDeviceSize p_size) {
             offset = p_offset;
             size = p_size;
             return *this;
@@ -330,7 +318,9 @@ public:
      *
      * @return The buffer instance.
      */
-    VkBuffer get_buffer() const { return buffer; }
+    VkBuffer get_buffer() const {
+        return buffer;
+    }
 
     /**
      * @brief Update the buffer. Updating from main memory must specify the
@@ -361,10 +351,7 @@ public:
      * @param p_dst_offset The offset to copy data to in the buffer.
      * @param p_size The size to copy (in bytes).
      */
-    void update_buffer(Ref<ROBufferVK> p_data,
-        size_t p_src_offset,
-        size_t p_dst_offset,
-        size_t p_size);
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size);
 
     /**
      * @brief Update the buffer from another buffer object.
@@ -375,8 +362,7 @@ public:
      * @param p_size The size of the data in bytes that would be copied to the
      * buffer. This has to be a multiple of 4.
      */
-    void update_buffer(
-        Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
+    void update_buffer(Ref<ROBufferVK> p_data, size_t p_dst_offset, size_t p_size);
 
     /**
      * @brief Update the buffer from another buffer object.
@@ -400,10 +386,11 @@ public:
      * @param p_buffer The staging buffer to retrieve data.
      * @param p_data The data to fill in.
      */
-    void update_buffer(
-        Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
+    void update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size);
 
-    const ExposedFields& fields() const { return exposed_fields; }
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     void* mapped_memory = nullptr;

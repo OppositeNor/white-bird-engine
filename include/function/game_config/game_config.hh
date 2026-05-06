@@ -31,7 +31,9 @@ namespace WhiteBirdEngine {
 class GameConfig : public ISingleton<GameConfig> {
 public:
     GameConfig() = delete;
-    virtual ~GameConfig() override { singleton = nullptr; }
+    virtual ~GameConfig() override {
+        singleton = nullptr;
+    }
     WBE_R6_NDCD_DELETE_COPY_MOVE(GameConfig)
 
     /**
@@ -43,8 +45,7 @@ public:
         singleton = this;
         auto parser = ParserYAML();
         parser.parse(p_config_file_path);
-        SerializableSD<GameConfigOptions>::deserialize(
-            parser.get_data(), config_options);
+        SerializableSD<GameConfigOptions>::deserialize(parser.get_data(), config_options);
     }
 
     /**
@@ -61,7 +62,9 @@ public:
      *
      * @return The singleton instance.
      */
-    static GameConfig* get_singleton() { return singleton; }
+    static GameConfig* get_singleton() {
+        return singleton;
+    }
 
 private:
     GameConfigOptions config_options;

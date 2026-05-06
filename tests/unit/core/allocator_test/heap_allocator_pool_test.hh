@@ -21,9 +21,9 @@
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "test_utilities.hh"
+#include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <bit>
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -44,36 +44,21 @@ TEST(WBEAllocPoolTest, ToString) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     WBE::HeapAllocatorPool pool(1024);
     WBEAllocPoolBehavTestClass behv_test("HeapAllocatorPool", 1024, APT_HEADER_SIZE);
-    std::string exp_1 = behv_test({
-        {false, 1024}
-    });
+    std::string exp_1 = behv_test({{false, 1024}});
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     WBE::MemID mem1 = pool.allocate(2);
-    std::string exp_2 = behv_test({
-        {true, 2},
-        {false, -1}
-    });
+    std::string exp_2 = behv_test({{true, 2}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp_2);
     WBE::MemID mem2 = pool.allocate(8);
-    std::string exp_3 = behv_test({
-        {true, 2},
-        {true, 8},
-        {false, -1}
-    });
+    std::string exp_3 = behv_test({{true, 2}, {true, 8}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp_3);
     pool.deallocate(mem1);
-    std::string exp_4 = behv_test({
-        {false, 2 + APT_HEADER_SIZE},
-        {true, 8},
-        {false, -1}
-    });
+    std::string exp_4 = behv_test({{false, 2 + APT_HEADER_SIZE}, {true, 8}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp_4);
     pool.deallocate(mem2);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
     auto mem3 = pool.allocate(1024 - APT_HEADER_SIZE);
-    std::string exp_5 = behv_test({
-        {true, -1}
-    });
+    std::string exp_5 = behv_test({{true, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp_5);
     pool.deallocate(mem3);
     ASSERT_EQ(static_cast<std::string>(pool), exp_1);
@@ -88,32 +73,16 @@ TEST(WBEAllocPoolTest, RemoveIdleFront) {
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(4);
     pool.deallocate(mem3);
-    std::string exp1 = behv_test({
-        {true, 4},
-        {true, 8},
-        {false, 4 + APT_HEADER_SIZE},
-        {true, 4},
-        {false, -1}
-    });
+    std::string exp1 = behv_test({{true, 4}, {true, 8}, {false, 4 + APT_HEADER_SIZE}, {true, 4}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem2);
-    std::string exp2 = behv_test({
-        {true, 4},
-        {false, 12 + APT_HEADER_SIZE * 2},
-        {true, 4},
-        {false, -1}
-    });
+    std::string exp2 = behv_test({{true, 4}, {false, 12 + APT_HEADER_SIZE * 2}, {true, 4}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = behv_test({
-        {true, 4},
-        {false, -1}
-    });
+    std::string exp3 = behv_test({{true, 4}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = behv_test({
-        {false, -1}
-    });
+    std::string exp4 = behv_test({{false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
@@ -126,32 +95,16 @@ TEST(WBEAllocPoolTest, RemoveIdleBack) {
     WBE::MemID mem3 = pool.allocate(4);
     WBE::MemID mem4 = pool.allocate(12);
     pool.deallocate(mem2);
-    std::string exp1 = behv_test({
-        {true, 4},
-        {false, 8 + APT_HEADER_SIZE},
-        {true, 4},
-        {true, 12},
-        {false, -1}
-    });
+    std::string exp1 = behv_test({{true, 4}, {false, 8 + APT_HEADER_SIZE}, {true, 4}, {true, 12}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = behv_test({
-        {true, 4},
-        {false, 12 + APT_HEADER_SIZE * 2},
-        {true, 12},
-        {false, -1}
-    });
+    std::string exp2 = behv_test({{true, 4}, {false, 12 + APT_HEADER_SIZE * 2}, {true, 12}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem4);
-    std::string exp3 = behv_test({
-        {true, 4},
-        {false, -1}
-    });
+    std::string exp3 = behv_test({{true, 4}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = behv_test({
-        {false, -1}
-    });
+    std::string exp4 = behv_test({{false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
@@ -165,44 +118,20 @@ TEST(WBEAllocPoolTest, RemoveIdleMiddle) {
     WBE::MemID mem4 = pool.allocate(12);
     WBE::MemID mem5 = pool.allocate(128);
     pool.deallocate(mem2);
-    std::string exp1 = behv_test({
-        {true, 4},
-        {false, 8 + APT_HEADER_SIZE},
-        {true, 4},
-        {true, 12},
-        {true, 128},
-        {false, -1}
-    });
+    std::string exp1 = behv_test({{true, 4}, {false, 8 + APT_HEADER_SIZE}, {true, 4}, {true, 12}, {true, 128}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem4);
-    std::string exp2 = behv_test({
-        {true, 4},
-        {false, 8 + APT_HEADER_SIZE},
-        {true, 4},
-        {false, 12 + APT_HEADER_SIZE},
-        {true, 128},
-        {false, -1}
-    });
+    std::string exp2 =
+        behv_test({{true, 4}, {false, 8 + APT_HEADER_SIZE}, {true, 4}, {false, 12 + APT_HEADER_SIZE}, {true, 128}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem3);
-    std::string exp3 = behv_test({
-        {true, 4},
-        {false, 24 + APT_HEADER_SIZE * 3},
-        {true, 128},
-        {false, -1}
-    });
+    std::string exp3 = behv_test({{true, 4}, {false, 24 + APT_HEADER_SIZE * 3}, {true, 128}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = behv_test({
-        {false, 28 + APT_HEADER_SIZE * 4},
-        {true, 128},
-        {false, -1}
-    });
+    std::string exp4 = behv_test({{false, 28 + APT_HEADER_SIZE * 4}, {true, 128}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
     pool.deallocate(mem5);
-    std::string exp5 = behv_test({
-        {false, -1}
-    });
+    std::string exp5 = behv_test({{false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp5);
 }
 
@@ -213,35 +142,22 @@ TEST(WBEAllocPoolTest, RemoveIdleEnd) {
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(1012 - 3 * APT_HEADER_SIZE);
-    std::string exp1 = behv_test({
-        {true, 4},
-        {true, 8},
-        {true, -1}
-    });
+    std::string exp1 = behv_test({{true, 4}, {true, 8}, {true, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp1);
     pool.deallocate(mem3);
-    std::string exp2 = behv_test({
-        {true, 4},
-        {true, 8},
-        {false, -1}
-    });
+    std::string exp2 = behv_test({{true, 4}, {true, 8}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp2);
     pool.deallocate(mem2);
-    std::string exp3 = behv_test({
-        {true, 4},
-        {false, -1}
-    });
+    std::string exp3 = behv_test({{true, 4}, {false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp3);
     pool.deallocate(mem1);
-    std::string exp4 = behv_test({
-        {false, -1}
-    });
+    std::string exp4 = behv_test({{false, -1}});
     ASSERT_EQ(static_cast<std::string>(pool), exp4);
 }
 
 TEST(WBEAllocPoolTest, RemainSize) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    
+
     WhiteBirdEngine::HeapAllocatorPool pool(1024);
     WBE::MemID mem = pool.allocate(2);
     ASSERT_EQ(pool.get_remain_size(), 1022 - APT_HEADER_SIZE);

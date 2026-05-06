@@ -32,20 +32,19 @@
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))
 #define WBE_HAFSP_INDEX_CHUNK_REV_START
 #define WBE_HAFSP_DATA_CHUNK_START (mem_chunk)
-#define WBE_HAFSP_WRITE_ID(id, data_index)                                     \
-    do {                                                                       \
-        *(index_chunk_start + (id) - 1) = (data_index);                        \
+#define WBE_HAFSP_WRITE_ID(id, data_index)                                                                                  \
+    do {                                                                                                                    \
+        *(index_chunk_start + (id) - 1) = (data_index);                                                                     \
     } while (false)
-#define WBE_HAFSP_WRITE_DATA_INDEX(data_index, id)                             \
-    do {                                                                       \
-        *(index_chunk_rev_start + (data_index) - 1) = (id);                    \
+#define WBE_HAFSP_WRITE_DATA_INDEX(data_index, id)                                                                          \
+    do {                                                                                                                    \
+        *(index_chunk_rev_start + (data_index) - 1) = (id);                                                                 \
     } while (false)
 
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorFixedSizePool> final
-    : public AllocatorTrait<HeapAllocator> {
+struct AllocatorTrait<class HeapAllocatorFixedSizePool> final : public AllocatorTrait<HeapAllocator> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorFixedSizePool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = true;
@@ -71,16 +70,13 @@ public:
     /**
      * @brief The maximum number of objects the pool can hold.
      */
-    static constexpr uint32_t MAX_OBJ =
-        std::numeric_limits<InternalID>::max() - 1;
+    static constexpr uint32_t MAX_OBJ = std::numeric_limits<InternalID>::max() - 1;
 
     virtual ~HeapAllocatorFixedSizePool() override;
     HeapAllocatorFixedSizePool(const HeapAllocatorFixedSizePool&) = delete;
     HeapAllocatorFixedSizePool(HeapAllocatorFixedSizePool&&) = delete;
-    HeapAllocatorFixedSizePool& operator=(
-        const HeapAllocatorFixedSizePool&) = delete;
-    HeapAllocatorFixedSizePool& operator=(
-        HeapAllocatorFixedSizePool&&) = delete;
+    HeapAllocatorFixedSizePool& operator=(const HeapAllocatorFixedSizePool&) = delete;
+    HeapAllocatorFixedSizePool& operator=(HeapAllocatorFixedSizePool&&) = delete;
 
     /**
      * @brief Constructor.
@@ -90,13 +86,11 @@ public:
      */
     HeapAllocatorFixedSizePool(size_t p_element_size, uint32_t p_max_obj)
         : max_obj(p_max_obj), element_size(p_element_size) {
-        if (get_align_size(p_element_size, WBE_DEFAULT_ALIGNMENT) !=
-            p_element_size) {
+        if (get_align_size(p_element_size, WBE_DEFAULT_ALIGNMENT) != p_element_size) {
             stdout_log(WBE_CHANNEL_GLOBAL)
-                ->warning(std::format(
-                    "Creating HeapAllocatorFixedSizePool with element size {} "
-                    "which is not aligned to default alignment {}."
-                    " Consider using aligned size for better performance.",
+                ->warning(std::format("Creating HeapAllocatorFixedSizePool with element size {} "
+                                      "which is not aligned to default alignment {}."
+                                      " Consider using aligned size for better performance.",
                     p_element_size,
                     WBE_DEFAULT_ALIGNMENT));
         }
@@ -114,13 +108,9 @@ public:
         // InteralID. data space stores the data. Notice that when DataIndex or
         // InternalID is 0 it maps to MEM_NULL, so for offseting, the true
         // offset for the reverse data is internal id - 1.
-        mem_chunk = static_cast<char*>(
-            malloc(element_size * max_obj + sizeof(DataIndex) * max_obj +
-                   sizeof(InternalID) * max_obj)); // NOLINT
-        index_chunk_start =
-            reinterpret_cast<DataIndex*>(mem_chunk + element_size * max_obj);
-        index_chunk_rev_start = reinterpret_cast<InternalID*>(
-            mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
+        mem_chunk = static_cast<char*>(malloc(element_size * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj)); // NOLINT
+        index_chunk_start = reinterpret_cast<DataIndex*>(mem_chunk + element_size * max_obj);
+        index_chunk_rev_start = reinterpret_cast<InternalID*>(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
         clear_indices();
     }
 
@@ -149,7 +139,9 @@ public:
      *
      * @return The number of allocated objects.
      */
-    uint32_t obj_count() const { return alloc_obj_count; }
+    uint32_t obj_count() const {
+        return alloc_obj_count;
+    }
 
     std::vector<MemID> get_allocated() const {
         std::vector<MemID> result;
@@ -162,9 +154,13 @@ public:
 
     virtual operator std::string() const override;
 
-    const void* get_mem_start() const { return WBE_HAFSP_DATA_CHUNK_START; }
+    const void* get_mem_start() const {
+        return WBE_HAFSP_DATA_CHUNK_START;
+    }
 
-    virtual bool is_empty() const override { return alloc_obj_count == 0; }
+    virtual bool is_empty() const override {
+        return alloc_obj_count == 0;
+    }
 
     // TODO: Test
     virtual void clear() override {
@@ -172,7 +168,9 @@ public:
         alloc_obj_count = 0;
     }
 
-    size_t get_element_size() const { return element_size; }
+    size_t get_element_size() const {
+        return element_size;
+    }
 
 private:
     DataIndex max_obj;
@@ -220,8 +218,7 @@ private:
                 return id;
             }
         }
-        throw std::runtime_error(
-            "Failed to retrieve valid index: memory chunk is full.");
+        throw std::runtime_error("Failed to retrieve valid index: memory chunk is full.");
     }
 };
 

@@ -31,8 +31,7 @@ namespace WhiteBirdEngine {
  * @brief Engine configurations.
  *
  */
-struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final
-    : public Serializable {
+struct WBE_META(WBE_CONFIG_OPTION) EngineConfigOptions final : public Serializable {
 
     WBE_DECL_SERIALIZABLE(EngineConfigOptions)
 
@@ -95,8 +94,7 @@ public:
      * @param p_argc argc
      * @param p_argv argv
      */
-    EngineConfig(
-        const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
+    EngineConfig(const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
         parse_config_file(p_config_file_path);
         if (p_argc > 0) {
             parse_cla(p_argc, p_argv);
@@ -113,7 +111,9 @@ public:
      *
      * @return The configuration options.
      */
-    const EngineConfigOptions& get_config_options() { return config_options; }
+    const EngineConfigOptions& get_config_options() {
+        return config_options;
+    }
 
 private:
     EngineConfigOptions config_options;

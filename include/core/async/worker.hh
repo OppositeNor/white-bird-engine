@@ -51,8 +51,7 @@ public:
      */
     Worker() : allocator(WBE_MiB(0.5)) {
         singleton = this;
-        job_buffer = make_unique<JobBufferRingMPSC>(
-            &allocator, &allocator, WORKER_MAX_TASK);
+        job_buffer = make_unique<JobBufferRingMPSC>(&allocator, &allocator, WORKER_MAX_TASK);
     }
 
     virtual ~Worker() override {
@@ -63,7 +62,9 @@ public:
 
     virtual void add_job(std::function<void()> p_job) override;
 
-    static Worker* get_singleton() { return singleton; }
+    static Worker* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief Execute the worker thread.
@@ -76,8 +77,7 @@ public:
      * @param p_promise The promise to retrieve result.
      * @param p_path The path to the file to read.
      */
-    void read_file(
-        std::promise<std::vector<char>>& p_promise, const Path& p_path) {
+    void read_file(std::promise<std::vector<char>>& p_promise, const Path& p_path) {
         read_binary_file(p_promise, p_path);
     }
 
@@ -87,8 +87,7 @@ public:
      * @param p_promise The promise to retrieve result.
      * @param p_path The path to the text file.
      */
-    void read_text_file(
-        std::promise<std::string>& p_promise, const Path& p_path);
+    void read_text_file(std::promise<std::string>& p_promise, const Path& p_path);
 
     /**
      * @brief Read a binary file.
@@ -96,14 +95,15 @@ public:
      * @param p_promise The promise to retrieve result.
      * @param p_path The path to the file.
      */
-    void read_binary_file(
-        std::promise<std::vector<char>>& p_promise, const Path& p_path);
+    void read_binary_file(std::promise<std::vector<char>>& p_promise, const Path& p_path);
 
     /**
      * @brief Stop.
      */
     void stop() {
-        add_job([&]() { should_exit = true; });
+        add_job([&]() {
+            should_exit = true;
+        });
     }
 
 private:

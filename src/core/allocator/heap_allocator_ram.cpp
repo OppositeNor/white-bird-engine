@@ -22,8 +22,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorRAM::~HeapAllocatorRAM() {
     if (!allocated.empty()) {
-        stdout_log(WBE_CHANNEL_GLOBAL)
-            ->warning("HeapAllocatorRAM not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorRAM not empty during destruction.");
     }
     for (const auto& iter : allocated) {
         free(get(iter)); // NOLINT

@@ -52,21 +52,16 @@ public:
         // Set from a resource.
         Builder& set_code(RefRes<RUShader> p_resource);
 
-        Ref<ROShaderVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROShaderVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROShaderVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROShaderVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROShaderVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROShaderVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkShaderModule create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkShaderModule create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROShaderVK() = delete;
@@ -82,24 +77,21 @@ public:
      * @param p_base_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    ROShaderVK(
-        const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
     /**
      * @brief Constructor from resource ID.
      *
      * @param p_base_render_data The base render data.
      * @param p_resource_id The resource ID.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data,
-        const std::string& p_resource_id);
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id);
     /**
      * @brief Constructor from a shader resource.
      *
      * @param p_base_render_data The base render data.
      * @param p_resource_id The shader's resource.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data,
-        RefRes<RUShader> p_resource);
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource);
 
     /**
      * @brief Get the shader module.

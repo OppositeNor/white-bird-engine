@@ -36,8 +36,7 @@ namespace WhiteBirdEngine {
  * @brief Descriptor set
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetVK final
-    : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetVK final : public RenderObjectVK {
 public:
     /**
      * @class Builder
@@ -57,27 +56,21 @@ public:
          * @param p_descriptor_set_layout The descriptor set layout to add.
          * @return Builder& Reference to this builder.
          */
-        Builder& add_descriptor_set_layout(
-            const Ref<RODescriptorSetLayoutVK>& p_descriptor_set_layout) {
+        Builder& add_descriptor_set_layout(const Ref<RODescriptorSetLayoutVK>& p_descriptor_set_layout) {
             descriptor_set_layouts.push_back(p_descriptor_set_layout);
             return *this;
         }
 
-        Ref<RODescriptorSetVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<RODescriptorSetVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<RODescriptorSetVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RODescriptorSetVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<RODescriptorSetVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<RODescriptorSetVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<RODescriptorSetVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RODescriptorSetVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkDescriptorSet create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkDescriptorSet create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -167,8 +160,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    RODescriptorSetVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Write to the descriptor set.
@@ -182,7 +174,9 @@ public:
      *
      * @return The VkDescriptorSet instance.
      */
-    VkDescriptorSet get_descriptor_set() const { return descriptor_set; }
+    VkDescriptorSet get_descriptor_set() const {
+        return descriptor_set;
+    }
 
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;

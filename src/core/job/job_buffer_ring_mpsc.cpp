@@ -23,8 +23,7 @@
 
 namespace WhiteBirdEngine {
 
-JobBufferRingMPSC::JobBufferRingMPSC(
-    HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
+JobBufferRingMPSC::JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
     : buffer(p_allocator), head(0), tail(0) {
     if (p_buffer_size <= 1) {
         throw std::runtime_error("Buffer has to be at least size 2.");
@@ -43,10 +42,7 @@ void JobBufferRingMPSC::add_job(std::function<void()> p_job) {
         if (next == tail.load(std::memory_order_acquire)) {
             throw std::runtime_error("Buffer overflow.");
         }
-        if (head.compare_exchange_weak(head_l,
-                next,
-                std::memory_order_acquire,
-                std::memory_order_relaxed)) {
+        if (head.compare_exchange_weak(head_l, next, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
         }
     }
@@ -65,8 +61,7 @@ std::function<void()> JobBufferRingMPSC::retrieve_job(bool p_block) {
 
     std::function<void()> result = std::move(buffer[tail_l]);
     buffer[tail_l] = nullptr;
-    tail.store(
-        ring_increment(tail_l, buffer.size()), std::memory_order_release);
+    tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
     return result;
 }
 

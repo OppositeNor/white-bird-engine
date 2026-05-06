@@ -20,9 +20,9 @@
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <gtest/gtest.h>
-#include <atomic>
 #include <memory>
 #include <mutex>
 #include <numeric>
@@ -43,7 +43,7 @@ protected:
     }
 
     std::unique_ptr<WBE::Global> global;
-    
+
     // Helper to get allocator from global
     WBE::HeapAllocatorDefault* get_allocator() {
         return global->engine_core->pool_allocator;
@@ -54,33 +54,23 @@ using JobBufferRingMPSC = WBE::JobBufferRingMPSC;
 
 TEST_F(WBEJobBufferRingMPSCTest, ConstructorValidSize) {
     // Should succeed with size >= 2
-    EXPECT_NO_THROW({
-        JobBufferRingMPSC buffer(get_allocator(), 2);
-    });
-    
-    EXPECT_NO_THROW({
-        JobBufferRingMPSC buffer(get_allocator(), 10);
-    });
-    
-    EXPECT_NO_THROW({
-        JobBufferRingMPSC buffer(get_allocator(), 1000);
-    });
+    EXPECT_NO_THROW({ JobBufferRingMPSC buffer(get_allocator(), 2); });
+
+    EXPECT_NO_THROW({ JobBufferRingMPSC buffer(get_allocator(), 10); });
+
+    EXPECT_NO_THROW({ JobBufferRingMPSC buffer(get_allocator(), 1000); });
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, ConstructorInvalidSize) {
     // Should throw with size < 2
-    EXPECT_THROW({
-        JobBufferRingMPSC buffer(get_allocator(), 0);
-    }, std::runtime_error);
-    
-    EXPECT_THROW({
-        JobBufferRingMPSC buffer(get_allocator(), 1);
-    }, std::runtime_error);
+    EXPECT_THROW({ JobBufferRingMPSC buffer(get_allocator(), 0); }, std::runtime_error);
+
+    EXPECT_THROW({ JobBufferRingMPSC buffer(get_allocator(), 1); }, std::runtime_error);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, RetrieveFromEmptyBuffer) {
     JobBufferRingMPSC buffer(get_allocator(), 5);
-    
+
     // Empty buffer should return an empty function.
     std::function<void()> job = buffer.retrieve_job();
     EXPECT_EQ(job, nullptr);
@@ -88,22 +78,24 @@ TEST_F(WBEJobBufferRingMPSCTest, RetrieveFromEmptyBuffer) {
 
 TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveSingleJob) {
     JobBufferRingMPSC buffer(get_allocator(), 5);
-    
+
     bool performed = false;
-    auto job = std::function<void()>([&performed]() { performed = true; });
-    
+    auto job = std::function<void()>([&performed]() {
+        performed = true;
+    });
+
     // Add job
     EXPECT_NO_THROW(buffer.add_job(job));
-    
+
     // Retrieve job
     std::function<void()> retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, nullptr);
-    
+
     // Perform the job
     EXPECT_FALSE(performed);
     retrieved();
     EXPECT_TRUE(performed);
-    
+
     // Buffer should be empty again
     std::function<void()> empty = buffer.retrieve_job();
     EXPECT_EQ(empty, nullptr);
@@ -111,66 +103,75 @@ TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveSingleJob) {
 
 TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveMultipleJobs) {
     JobBufferRingMPSC buffer(get_allocator(), 5);
-    
+
     // Add multiple jobs
     std::vector<bool> performed(3, false);
     for (int i = 0; i < 3; ++i) {
-        auto job = std::function<void()>([&performed, i]() { performed[i] = true; });
+        auto job = std::function<void()>([&performed, i]() {
+            performed[i] = true;
+        });
         buffer.add_job(job);
     }
-    
+
     // Retrieve jobs (should be in FIFO order)
     for (int i = 0; i < 3; ++i) {
         std::function<void()> retrieved = buffer.retrieve_job();
         EXPECT_NE(retrieved, nullptr);
-        
+
         EXPECT_FALSE(performed[i]);
         retrieved();
         EXPECT_TRUE(performed[i]);
     }
-    
+
     // Buffer should be empty
     std::function<void()> empty = buffer.retrieve_job();
     EXPECT_EQ(empty, nullptr);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, BufferOverflow) {
-    JobBufferRingMPSC buffer(get_allocator(), 3);  // Small buffer
-    
-    auto job1 = std::function<void()>([]() {});
-    auto job2 = std::function<void()>([]() {});
-    
+    JobBufferRingMPSC buffer(get_allocator(), 3); // Small buffer
+
+    auto job1 = std::function<void()>([]() {
+    });
+    auto job2 = std::function<void()>([]() {
+    });
+
     EXPECT_NO_THROW(buffer.add_job(job1));
     EXPECT_NO_THROW(buffer.add_job(job2));
-    
+
     // This should cause overflow
-    auto job3 = std::function<void()>([]() {});
+    auto job3 = std::function<void()>([]() {
+    });
     EXPECT_THROW(buffer.add_job(job3), std::runtime_error);
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, RingBufferWrapAround) {
     JobBufferRingMPSC buffer(get_allocator(), 4);
-    
-    auto job1 = std::function<void()>([]() {});
-    auto job2 = std::function<void()>([]() {});
-    auto job3 = std::function<void()>([]() {});
-    
+
+    auto job1 = std::function<void()>([]() {
+    });
+    auto job2 = std::function<void()>([]() {
+    });
+    auto job3 = std::function<void()>([]() {
+    });
+
     buffer.add_job(job1);
     buffer.add_job(job2);
     buffer.add_job(job3);
-    
+
     std::function<void()> retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, nullptr);
-    
-    auto job4 = std::function<void()>([]() {});
+
+    auto job4 = std::function<void()>([]() {
+    });
     EXPECT_NO_THROW(buffer.add_job(job4));
-    
+
     retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, nullptr);
-    
+
     retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, nullptr);
-    
+
     retrieved = buffer.retrieve_job();
     EXPECT_NE(retrieved, nullptr);
 }
@@ -200,7 +201,7 @@ TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
                     consumed_job_ids.push_back(job_id);
                     perform_count.fetch_add(1);
                 });
-                
+
                 while (true) {
                     try {
                         buffer.add_job(job);
@@ -226,7 +227,7 @@ TEST_F(WBEJobBufferRingMPSCTest, ConcurrentMultiProducerSingleConsumer) {
             // If all producers are done and buffer is empty, break
             // A simple check, in a real scenario might need a more robust signal
             if (produced_count.load() == TOTAL_JOBS) {
-                 // to avoid busy-waiting
+                // to avoid busy-waiting
                 if (buffer.retrieve_job() == nullptr) {
                     break;
                 }
@@ -275,7 +276,7 @@ TEST_F(WBEJobBufferRingMPSCTest, StressTestManyProducers) {
                     consumed_job_ids.push_back(job_id);
                     perform_count.fetch_add(1);
                 });
-                
+
                 while (true) {
                     try {
                         buffer.add_job(job);
@@ -325,6 +326,5 @@ TEST_F(WBEJobBufferRingMPSCTest, StressTestManyProducers) {
 
     EXPECT_EQ(consumed_job_ids, expected_ids);
 }
-
 
 #endif

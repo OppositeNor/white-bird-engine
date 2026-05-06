@@ -23,7 +23,8 @@
 
 namespace WhiteBirdEngine {
 
-template <> struct AllocatorTrait<class HeapAllocatorAligned> {
+template <>
+struct AllocatorTrait<class HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAligned>);
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_ALIGNABLE = true;
@@ -80,7 +81,8 @@ public:
      * @param p_id The resource id to get the pointer from.
      * @return The pointer of the resource.
      */
-    template <typename T> T* get_obj(MemID p_id) const {
+    template <typename T>
+    T* get_obj(MemID p_id) const {
         return static_cast<T*>(get(p_id));
     }
 

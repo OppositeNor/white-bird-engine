@@ -26,18 +26,15 @@
 
 namespace WhiteBirdEngine {
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+RenderDatabase::RenderDatabase(AllocType* p_allocator) : static_opaque(p_allocator), dynamic_opaque(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
-        throw std::runtime_error(
-            "Failed to create renderer database: allocator is null.");
+        throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
     allocator = p_allocator;
 }
 
-void RenderDatabase::set_opaque_triangles_linear(
-    OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh) {
+void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh) {
     if (p_mesh == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: mesh "
                                  "resource should not be NULL.");
@@ -64,10 +61,8 @@ void RenderDatabase::set_opaque_triangles_linear(
         if (!registered_material_index.contains(material.get())) {
             // If not registered before, register.
             // TODO: Register material.
-            MaterialMeshInfo info = {
-                .submeshes = Vector<RUSubmesh3D*>(allocator)};
-            registered_material_index.insert(
-                {material.get(), material_mesh_infos.size()});
+            MaterialMeshInfo info = {.submeshes = Vector<RUSubmesh3D*>(allocator)};
+            registered_material_index.insert({material.get(), material_mesh_infos.size()});
             material_mesh_infos.push_back(info);
         }
         // Register the submeshes to the corresponding mesh.
@@ -85,8 +80,7 @@ void RenderDatabase::set_opaque_triangles_linear(
         // from other submeshes. This is useful for object edge detection or
         // some per-object operations.
         static std::atomic<uint32_t> obj_id_tracker = 0;
-        uint32_t curr_obj_id =
-            obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
+        uint32_t curr_obj_id = obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
         auto& mesh_info = material_mesh_infos[i];
         // size_t material_mesh_start = p_triangles_info.indices.size();
         (void)i;
@@ -98,26 +92,18 @@ void RenderDatabase::set_opaque_triangles_linear(
                 // Because we are merging the vertices into one array, the
                 // original indices should add the offset where this submesh's
                 // vertices is stored in the vertex array.
-                p_triangles_info.indices.push_back(
-                    curr_index + triangle.indices.vert_1);
-                p_triangles_info.indices.push_back(
-                    curr_index + triangle.indices.vert_2);
-                p_triangles_info.indices.push_back(
-                    curr_index + triangle.indices.vert_3);
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_1);
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_2);
+                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_3);
                 // We also record the maximum index to determine how much
                 // vertices are copied.
-                max_index = std::max({max_index,
-                    triangle.indices.vert_1,
-                    triangle.indices.vert_2,
-                    triangle.indices.vert_3});
+                max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
             }
             // Assign an unique ID for each triangle to distinguish from other
             p_triangles_info.obj_id.push_back(curr_obj_id);
 
             p_triangles_info.vertices.resize(curr_index + max_index + 1);
-            memcpy(&(p_triangles_info.vertices[curr_index]),
-                submesh->triangles->vert_array.get(),
-                (max_index + 1) * sizeof(Vertex3DTextured));
+            memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
         }
         // TODO: Setup subregion for the material.
     }

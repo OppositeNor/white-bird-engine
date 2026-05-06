@@ -17,9 +17,12 @@
 #define WBE_FILE_DESERIALIZER_TEST_HH
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
 #include "utils/utils.hh"
-#include <glm/glm.hpp>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <string>
 #include <vector>
 
@@ -32,17 +35,17 @@ struct WBE_META(WBE_SERIALIZABLE) TestSerializable final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializable)
 
     WBE_META(WBE_REFLECT)
-    int32_t  si32_test = 0;
+    int32_t si32_test = 0;
     WBE_META(WBE_REFLECT)
-    int64_t  si64_test = 0;
+    int64_t si64_test = 0;
     WBE_META(WBE_REFLECT)
     uint32_t ui32_test = 0;
     WBE_META(WBE_REFLECT)
     uint64_t ui64_test = 0;
     WBE_META(WBE_REFLECT)
-    float    f32_test = 0.0F;
+    float f32_test = 0.0F;
     WBE_META(WBE_REFLECT)
-    double   f64_test = 0.0;
+    double f64_test = 0.0;
     WBE_META(WBE_REFLECT)
     glm::vec3 vec3_test = glm::vec3(0.0F);
     WBE_META(WBE_REFLECT)
@@ -57,9 +60,9 @@ struct WBE_META(WBE_SERIALIZABLE) TestPartialStruct final : public Serializable 
     WBE_DECL_SERIALIZABLE(TestPartialStruct)
 
     WBE_META(WBE_REFLECT)
-    int32_t  si32_test = 0;
+    int32_t si32_test = 0;
     WBE_META(WBE_REFLECT)
-    int64_t  si64_test = 0;
+    int64_t si64_test = 0;
     WBE_META(WBE_REFLECT)
     uint32_t ui32_test = 0;
     WBE_META(WBE_REFLECT)
@@ -280,7 +283,8 @@ struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredInheritanceB : public Seri
     std::string optional_b_desc;
 };
 
-struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredChild final : public TestMultipleRequiredInheritanceA, public TestMultipleRequiredInheritanceB {
+struct WBE_META(WBE_SERIALIZABLE) TestMultipleRequiredChild final : public TestMultipleRequiredInheritanceA,
+                                                                    public TestMultipleRequiredInheritanceB {
     WBE_DECL_SERIALIZABLE(TestMultipleRequiredChild)
 
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)

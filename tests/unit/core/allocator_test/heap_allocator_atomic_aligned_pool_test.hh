@@ -20,13 +20,13 @@
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/defs.hh"
+#include <atomic>
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <memory>
 #include <thread>
 #include <utility>
 #include <vector>
-#include <atomic>
 
 namespace WBE = WhiteBirdEngine;
 constexpr size_t AAAPT_HEADER_SIZE = WBE::HeapAllocatorAtomicAlignedPool::HEADER_SIZE;
@@ -70,11 +70,12 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
         }
     };
     threads.reserve(num_threads);
-for (int t = 0; t < num_threads; ++t) {
+    for (int t = 0; t < num_threads; ++t) {
         threads.emplace_back(alloc_func, t);
     }
-    for (auto& th : threads) { th.join();
-}
+    for (auto& th : threads) {
+        th.join();
+    }
     ASSERT_EQ(alloc_count, num_threads * allocs_per_thread);
     for (auto mem : mem_ids) {
         allocator.deallocate(mem);
@@ -102,16 +103,18 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
             ASSERT_NE(ptr, nullptr);
             *ptr = idx * 10;
             values[idx] = *ptr;
-            if (*ptr == idx * 10) { ++success_count;
-}
+            if (*ptr == idx * 10) {
+                ++success_count;
+            }
         }
     };
     threads.reserve(num_threads);
-for (int t = 0; t < num_threads; ++t) {
+    for (int t = 0; t < num_threads; ++t) {
         threads.emplace_back(alloc_and_write_func, t);
     }
-    for (auto& th : threads) { th.join();
-}
+    for (auto& th : threads) {
+        th.join();
+    }
     ASSERT_EQ(success_count, num_threads * allocs_per_thread);
     // Verify values after all threads finished
     for (int idx = 0; idx < num_threads * allocs_per_thread; ++idx) {
@@ -155,11 +158,12 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
         mems.clear();
     };
     threads.reserve(num_threads);
-for (int t = 0; t < num_threads; ++t) {
+    for (int t = 0; t < num_threads; ++t) {
         threads.emplace_back(mix_func, t);
     }
-    for (auto& th : threads) { th.join();
-}
+    for (auto& th : threads) {
+        th.join();
+    }
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
     ASSERT_GE(alloc_count, num_threads * ops_per_thread / 2); // At least half ops are allocs
     ASSERT_EQ(dealloc_count, alloc_count);
@@ -200,11 +204,12 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
         mems.clear();
     };
     threads.reserve(num_threads);
-for (int t = 0; t < num_threads; ++t) {
+    for (int t = 0; t < num_threads; ++t) {
         threads.emplace_back(mix_func, t);
     }
-    for (auto& th : threads) { th.join();
-}
+    for (auto& th : threads) {
+        th.join();
+    }
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
@@ -231,11 +236,12 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
         }
     };
     threads.reserve(num_threads);
-for (int t = 0; t < num_threads; ++t) {
+    for (int t = 0; t < num_threads; ++t) {
         threads.emplace_back(dealloc_func, t);
     }
-    for (auto& th : threads) { th.join();
-}
+    for (auto& th : threads) {
+        th.join();
+    }
     ASSERT_EQ(dealloc_count, num_threads * allocs_per_thread);
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }

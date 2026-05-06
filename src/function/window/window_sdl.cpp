@@ -30,8 +30,7 @@
 
 namespace WhiteBirdEngine {
 
-WindowSDL::WindowSDL(Ref<InputManager> p_input_manager,
-    const WindowProperties& p_window_properties)
+WindowSDL::WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties)
     : window_properties(p_window_properties), input_manager(p_input_manager) {
     SDL_Init(SDL_INIT_VIDEO);
     window = SDL_CreateWindow(std::string(window_properties.title).c_str(),
@@ -318,9 +317,7 @@ bool WindowSDL::should_close() const {
 }
 
 void WindowSDL::get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) {
-    SDL_GetWindowSizeInPixels(window,
-        reinterpret_cast<int*>(&p_width),
-        reinterpret_cast<int*>(&p_height));
+    SDL_GetWindowSizeInPixels(window, reinterpret_cast<int*>(&p_width), reinterpret_cast<int*>(&p_height));
     window_properties.width = p_width;
     window_properties.height = p_height;
 }
@@ -331,8 +328,7 @@ void WindowSDL::init_vulkan(VkInstance p_instance) {
                                  "Window already initialized.");
     }
     SDL_Vulkan_LoadLibrary(nullptr);
-    if (SDL_Vulkan_CreateSurface(window, p_instance, &vulkan_surface) !=
-        SDL_TRUE) {
+    if (SDL_Vulkan_CreateSurface(window, p_instance, &vulkan_surface) != SDL_TRUE) {
         throw std::runtime_error("Failed to create Vulkan surface.");
     }
     window_type = WindowType::VULKAN;
@@ -340,21 +336,17 @@ void WindowSDL::init_vulkan(VkInstance p_instance) {
 
 VkSurfaceKHR WindowSDL::get_vulkan_surface() const {
     if (window_type != WindowType::VULKAN) {
-        throw std::runtime_error(
-            std::format("Failed to get vulkan surface: {}.",
-                window_type == WindowType::UNKNOWN ? "Window not initialized"
-                                                   : "Not a Vulkan window."));
+        throw std::runtime_error(std::format("Failed to get vulkan surface: {}.",
+            window_type == WindowType::UNKNOWN ? "Window not initialized" : "Not a Vulkan window."));
     }
     return vulkan_surface;
 }
 
-std::vector<const char*>
-WindowSDL::get_required_vulkan_instance_extensions() const {
+std::vector<const char*> WindowSDL::get_required_vulkan_instance_extensions() const {
     uint32_t extensions_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, nullptr);
     std::vector<const char*> extension_names(extensions_count);
-    SDL_Vulkan_GetInstanceExtensions(
-        window, &extensions_count, extension_names.data());
+    SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extension_names.data());
     return extension_names;
 }
 

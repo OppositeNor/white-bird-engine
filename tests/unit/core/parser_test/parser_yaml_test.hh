@@ -16,30 +16,39 @@
 #define WBE_FILE_PARSER_YAML_TEST_HH
 
 #include "core/parser/parser_yaml.hh"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
 #include "parser_test_general.hh"
-#include <gtest/gtest.h>
+#include "utils/utils.hh"
+#include <algorithm>
 #include <cstring>
+#include <exception>
+#include <gtest/gtest.h>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
-inline const std::string GENERAL_TEST_STR1 = \
-R"(
+inline const std::string GENERAL_TEST_STR1 =
+    R"(
 # this is a comment
 fruit: apple # another comment
 vegetable: "lettice"
 number: 123
 )";
 
-inline const std::string GENERAL_TEST_STR2 = \
-R"(
+inline const std::string GENERAL_TEST_STR2 =
+    R"(
 # this is a comment
 vegetable: "lettice"
 numbers: [123, -200, 5, 60, -123]
 )";
 
-inline const std::string GENERAL_TEST_STR2_IDENT = \
-R"(
+inline const std::string GENERAL_TEST_STR2_IDENT =
+    R"(
 # this is a comment
 vegetable: "lettice"
 numbers: 
@@ -50,8 +59,8 @@ numbers:
     - -123
 )";
 
-inline const std::string GENERAL_TEST_STR3 = \
-R"(
+inline const std::string GENERAL_TEST_STR3 =
+    R"(
 test_pair:
     test_key1: test_val1
     test_key2: 123
@@ -87,18 +96,18 @@ TEST(ParserYAMLTest, ParseFromBufferEdgeCases) {
                      .template get_value<WBE::ParserYAML::DataType>("level3")
                      .template get_value<std::string>("level4")
                      .c_str(),
-                 "deep_value");
-  // Null values
-  parser.parse_from_buffer(R"({ key_with_null: null })");
-  ASSERT_TRUE(parser.contains("key_with_null"));
-  // Getting the key as YAMLData should produce an empty/null node (no keys)
-  auto null_node = parser.get_value<WBE::YAMLData>("key_with_null");
-  ASSERT_TRUE(null_node.get_all_keys().empty());
+        "deep_value");
+    // Null values
+    parser.parse_from_buffer(R"({ key_with_null: null })");
+    ASSERT_TRUE(parser.contains("key_with_null"));
+    // Getting the key as YAMLData should produce an empty/null node (no keys)
+    auto null_node = parser.get_value<WBE::YAMLData>("key_with_null");
+    ASSERT_TRUE(null_node.get_all_keys().empty());
 }
 
 TEST(ParserYAMLTest, ParseListOfObjects) {
     WBE::ParserYAML parser;
-    
+
     // Test parsing an array of simple objects
     const std::string yaml_simple_objects = R"(
 users:
@@ -112,32 +121,32 @@ users:
     name: Charlie
     active: true
 )";
-    
-  parser.parse_from_buffer(yaml_simple_objects);
 
-  // Get the list of objects as vector<YAMLData>
-  auto users = parser.get_value<std::vector<WBE::YAMLData>>("users");
-  ASSERT_EQ(users.size(), 3);
+    parser.parse_from_buffer(yaml_simple_objects);
 
-  // Verify first user
-  ASSERT_EQ(users[0].get_value<int>("id"), 1);
-  ASSERT_EQ(users[0].get_value<std::string>("name"), "Alice");
-  ASSERT_EQ(users[0].get_value<bool>("active"), true);
+    // Get the list of objects as vector<YAMLData>
+    auto users = parser.get_value<std::vector<WBE::YAMLData>>("users");
+    ASSERT_EQ(users.size(), 3);
 
-  // Verify second user
-  ASSERT_EQ(users[1].get_value<int>("id"), 2);
-  ASSERT_EQ(users[1].get_value<std::string>("name"), "Bob");
-  ASSERT_EQ(users[1].get_value<bool>("active"), false);
+    // Verify first user
+    ASSERT_EQ(users[0].get_value<int>("id"), 1);
+    ASSERT_EQ(users[0].get_value<std::string>("name"), "Alice");
+    ASSERT_EQ(users[0].get_value<bool>("active"), true);
 
-  // Verify third user
-  ASSERT_EQ(users[2].get_value<int>("id"), 3);
-  ASSERT_EQ(users[2].get_value<std::string>("name"), "Charlie");
-  ASSERT_EQ(users[2].get_value<bool>("active"), true);
+    // Verify second user
+    ASSERT_EQ(users[1].get_value<int>("id"), 2);
+    ASSERT_EQ(users[1].get_value<std::string>("name"), "Bob");
+    ASSERT_EQ(users[1].get_value<bool>("active"), false);
+
+    // Verify third user
+    ASSERT_EQ(users[2].get_value<int>("id"), 3);
+    ASSERT_EQ(users[2].get_value<std::string>("name"), "Charlie");
+    ASSERT_EQ(users[2].get_value<bool>("active"), true);
 }
 
 TEST(ParserYAMLTest, ParseListOfNestedObjects) {
     WBE::ParserYAML parser;
-    
+
     // Test parsing an array of objects with nested structures
     const std::string yaml_nested_objects = R"(
 products:
@@ -165,52 +174,52 @@ products:
       - electronics
       - accessories
 )";
-    
-  parser.parse_from_buffer(yaml_nested_objects);
 
-  // Get the list of products
-  auto products = parser.get_value<std::vector<WBE::YAMLData>>("products");
-  ASSERT_EQ(products.size(), 2);
+    parser.parse_from_buffer(yaml_nested_objects);
 
-  // Verify first product
-  ASSERT_EQ(products[0].get_value<int>("id"), 101);
-  ASSERT_EQ(products[0].get_value<std::string>("name"), "Laptop");
+    // Get the list of products
+    auto products = parser.get_value<std::vector<WBE::YAMLData>>("products");
+    ASSERT_EQ(products.size(), 2);
 
-  // Verify nested details of first product
-  auto details1 = products[0].get_value<WBE::YAMLData>("details");
-  ASSERT_EQ(details1.get_value<std::string>("brand"), "TechCorp");
-  ASSERT_EQ(details1.get_value<std::string>("model"), "X1000");
+    // Verify first product
+    ASSERT_EQ(products[0].get_value<int>("id"), 101);
+    ASSERT_EQ(products[0].get_value<std::string>("name"), "Laptop");
 
-  // Verify deeply nested specs
-  auto specs1 = details1.get_value<WBE::YAMLData>("specs");
-  ASSERT_EQ(specs1.get_value<std::string>("ram"), "16GB");
-  ASSERT_EQ(specs1.get_value<std::string>("storage"), "512GB SSD");
+    // Verify nested details of first product
+    auto details1 = products[0].get_value<WBE::YAMLData>("details");
+    ASSERT_EQ(details1.get_value<std::string>("brand"), "TechCorp");
+    ASSERT_EQ(details1.get_value<std::string>("model"), "X1000");
 
-  // Verify tags array within the object
-  auto tags1 = products[0].get_value<std::vector<std::string>>("tags");
-  ASSERT_EQ(tags1.size(), 3);
-  ASSERT_EQ(tags1[0], "electronics");
-  ASSERT_EQ(tags1[1], "computers");
-  ASSERT_EQ(tags1[2], "portable");
+    // Verify deeply nested specs
+    auto specs1 = details1.get_value<WBE::YAMLData>("specs");
+    ASSERT_EQ(specs1.get_value<std::string>("ram"), "16GB");
+    ASSERT_EQ(specs1.get_value<std::string>("storage"), "512GB SSD");
 
-  // Verify second product
-  ASSERT_EQ(products[1].get_value<int>("id"), 102);
-  ASSERT_EQ(products[1].get_value<std::string>("name"), "Mouse");
+    // Verify tags array within the object
+    auto tags1 = products[0].get_value<std::vector<std::string>>("tags");
+    ASSERT_EQ(tags1.size(), 3);
+    ASSERT_EQ(tags1[0], "electronics");
+    ASSERT_EQ(tags1[1], "computers");
+    ASSERT_EQ(tags1[2], "portable");
 
-  auto details2 = products[1].get_value<WBE::YAMLData>("details");
-  auto specs2 = details2.get_value<WBE::YAMLData>("specs");
-  ASSERT_EQ(specs2.get_value<std::string>("dpi"), "1600");
-  ASSERT_EQ(specs2.get_value<std::string>("buttons"), "5");
+    // Verify second product
+    ASSERT_EQ(products[1].get_value<int>("id"), 102);
+    ASSERT_EQ(products[1].get_value<std::string>("name"), "Mouse");
 
-  auto tags2 = products[1].get_value<std::vector<std::string>>("tags");
-  ASSERT_EQ(tags2.size(), 2);
-  ASSERT_EQ(tags2[0], "electronics");
-  ASSERT_EQ(tags2[1], "accessories");
+    auto details2 = products[1].get_value<WBE::YAMLData>("details");
+    auto specs2 = details2.get_value<WBE::YAMLData>("specs");
+    ASSERT_EQ(specs2.get_value<std::string>("dpi"), "1600");
+    ASSERT_EQ(specs2.get_value<std::string>("buttons"), "5");
+
+    auto tags2 = products[1].get_value<std::vector<std::string>>("tags");
+    ASSERT_EQ(tags2.size(), 2);
+    ASSERT_EQ(tags2[0], "electronics");
+    ASSERT_EQ(tags2[1], "accessories");
 }
 
 TEST(ParserYAMLTest, ParseEmptyAndMixedLists) {
     WBE::ParserYAML parser;
-    
+
     // Test empty array and mixed content
     const std::string yaml_empty_and_mixed = R"(
 empty_list: []
@@ -223,22 +232,22 @@ mixed_content:
     value: true
 simple_array: [1, 2, 3, 4, 5]
 )";
-    
+
     parser.parse_from_buffer(yaml_empty_and_mixed);
-    
+
     // Verify empty list can be accessed
     ASSERT_TRUE(parser.contains("empty_list"));
     auto empty_list = parser.get_value<WBE::YAMLData>("empty_list");
-    
+
     // Verify mixed content list can be accessed
     ASSERT_TRUE(parser.contains("mixed_content"));
     auto mixed_content = parser.get_value<WBE::YAMLData>("mixed_content");
-    
+
     // Since we can't access the internal node directly, we verify that
     // the YAML parser can handle these structures without throwing exceptions
     // This tests the parser's ability to handle empty sequences and
     // sequences of mixed object types
-    
+
     // Test simple array parsing (existing functionality)
     auto simple_array = parser.get_value<std::vector<int>>("simple_array");
     ASSERT_EQ(simple_array.size(), 5);
@@ -248,7 +257,7 @@ simple_array: [1, 2, 3, 4, 5]
 
 TEST(ParserYAMLTest, BufferRetrieval) {
     WBE::ParserYAML parser;
-    
+
     const std::string yaml_data = R"(
 short_text: "Hello"
 medium_text: "This is a medium length text"
@@ -256,38 +265,38 @@ long_text: "This is a very long text that should test buffer capacity limits and
 empty_text: ""
 special_chars: "Line1\nLine2\tTab\"Quote'"
 )";
-    
+
     parser.parse_from_buffer(yaml_data);
-    
+
     // Test retrieving into different buffer sizes
     WBE::Buffer<16> small_buffer{};
     WBE::Buffer<64> medium_buffer{};
     WBE::Buffer<128> large_buffer{};
-    
+
     // Test short text fits in all buffers
     std::string key = "short_text";
     parser.get_data().get_value(key, small_buffer);
     ASSERT_STREQ(small_buffer.buffer, "Hello");
-    
+
     parser.get_data().get_value(key, medium_buffer);
     ASSERT_STREQ(medium_buffer.buffer, "Hello");
-    
+
     parser.get_data().get_value(key, large_buffer);
     ASSERT_STREQ(large_buffer.buffer, "Hello");
-    
+
     // Test medium text fits in medium and large buffers
     key = "medium_text";
     parser.get_data().get_value(key, medium_buffer);
     ASSERT_STREQ(medium_buffer.buffer, "This is a medium length text");
-    
+
     parser.get_data().get_value(key, large_buffer);
     ASSERT_STREQ(large_buffer.buffer, "This is a medium length text");
-    
+
     // Test empty text
     key = "empty_text";
     parser.get_data().get_value(key, small_buffer);
     ASSERT_STREQ(small_buffer.buffer, "");
-    
+
     // Test special characters
     key = "special_chars";
     parser.get_data().get_value(key, medium_buffer);
@@ -296,18 +305,18 @@ special_chars: "Line1\nLine2\tTab\"Quote'"
 
 TEST(ParserYAMLTest, BufferBoundsChecking) {
     WBE::ParserYAML parser;
-    
+
     const std::string yaml_data = R"(
 long_text: "This is a very long text that exceeds small buffer capacity"
 )";
-    
+
     parser.parse_from_buffer(yaml_data);
-    
+
     // Test that attempting to retrieve long text into small buffer throws exception
     WBE::Buffer<16> small_buffer{};
     std::string key = "long_text";
     ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
-    
+
     // Test that it works with appropriately sized buffer
     WBE::Buffer<128> large_buffer{};
     ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
@@ -316,24 +325,24 @@ long_text: "This is a very long text that exceeds small buffer capacity"
 
 TEST(ParserYAMLTest, BufferMaxCapacityRetrieval) {
     WBE::ParserYAML parser;
-    
+
     // Test string that exactly fits buffer capacity (15 chars + null terminator for size 16)
     const std::string yaml_data = R"(
 max_text: "123456789012345"
 )";
-    
+
     parser.parse_from_buffer(yaml_data);
-    
+
     WBE::Buffer<16> buffer{};
     std::string key = "max_text";
     parser.get_data().get_value(key, buffer);
     ASSERT_STREQ(buffer.buffer, "123456789012345");
-    
+
     // Test string that's one character too long
     const std::string yaml_data_too_long = R"(
 too_long: "1234567890123456"
 )";
-    
+
     parser.parse_from_buffer(yaml_data_too_long);
     key = "too_long";
     ASSERT_THROW(parser.get_data().get_value(key, buffer), std::runtime_error);
@@ -341,7 +350,7 @@ too_long: "1234567890123456"
 
 TEST(ParserYAMLTest, BufferWithYAMLSpecificFeatures) {
     WBE::ParserYAML parser;
-    
+
     const std::string yaml_data = R"(
 multiline_literal: |
   This is a literal
@@ -353,15 +362,15 @@ multiline_folded: >
   multiline string
   that becomes a single line
 )";
-    
+
     parser.parse_from_buffer(yaml_data);
-    
+
     // Test multiline literal retrieval
     WBE::Buffer<128> buffer{};
     std::string key = "multiline_literal";
     parser.get_data().get_value(key, buffer);
     ASSERT_TRUE(strstr(buffer.buffer, "This is a literal\nmultiline string") != nullptr);
-    
+
     // Test multiline folded retrieval
     key = "multiline_folded";
     parser.get_data().get_value(key, buffer);
@@ -370,7 +379,7 @@ multiline_folded: >
 
 TEST(ParserYAMLTest, ComplexNestedStructures) {
     WBE::ParserYAML parser;
-    
+
     // Test deeply nested YAML structures
     const std::string complex_yaml = R"(
 application:
@@ -414,45 +423,45 @@ application:
       version: "1.0.0"
       required: false
 )";
-    
+
     parser.parse_from_buffer(complex_yaml);
-    
+
     // Test top-level access
     auto app = parser.get_value<WBE::YAMLData>("application");
     ASSERT_EQ(app.get_value<std::string>("name"), "Test App");
     ASSERT_EQ(app.get_value<std::string>("version"), "1.2.3");
-    
+
     // Test nested features
     auto features = app.get_value<WBE::YAMLData>("features");
     auto auth = features.get_value<WBE::YAMLData>("authentication");
     ASSERT_EQ(auth.get_value<bool>("enabled"), true);
-    
+
     // Test sequence within nested structure
     auto methods = auth.get_value<std::vector<std::string>>("methods");
     ASSERT_EQ(methods.size(), 3);
     ASSERT_EQ(methods[0], "oauth");
     ASSERT_EQ(methods[1], "basic");
     ASSERT_EQ(methods[2], "token");
-    
+
     // Test deeply nested config
     auto config = auth.get_value<WBE::YAMLData>("config");
     ASSERT_EQ(config.get_value<int>("timeout"), 3600);
     ASSERT_EQ(config.get_value<int>("max_attempts"), 3);
-    
+
     // Test providers mapping
     auto providers = config.get_value<WBE::YAMLData>("providers");
     auto google = providers.get_value<WBE::YAMLData>("google");
     ASSERT_EQ(google.get_value<std::string>("client_id"), "google_client_123");
     ASSERT_EQ(google.get_value<bool>("enabled"), true);
-    
+
     auto facebook = providers.get_value<WBE::YAMLData>("facebook");
     ASSERT_EQ(facebook.get_value<std::string>("app_id"), "fb_app_456");
     ASSERT_EQ(facebook.get_value<bool>("enabled"), false);
-    
+
     // Test other nested sections
     auto logging = features.get_value<WBE::YAMLData>("logging");
     ASSERT_EQ(logging.get_value<std::string>("level"), "info");
-    
+
     auto destinations = logging.get_value<std::vector<std::string>>("destinations");
     ASSERT_EQ(destinations.size(), 3);
     ASSERT_EQ(destinations[0], "console");
@@ -462,7 +471,7 @@ application:
 
 TEST(ParserYAMLTest, SequenceVariations) {
     WBE::ParserYAML parser;
-    
+
     // Test various YAML sequence types and structures
     const std::string sequence_yaml = R"(
 empty_sequence: []
@@ -497,29 +506,29 @@ multiline_sequence:
     Second multiline
     string entry
 )";
-    
+
     parser.parse_from_buffer(sequence_yaml);
-    
+
     // Test empty sequence
     auto empty_seq = parser.get_value<std::vector<WBE::YAMLData>>("empty_sequence");
     ASSERT_EQ(empty_seq.size(), 0);
-    
+
     // Test string sequence
     auto string_seq = parser.get_value<std::vector<std::string>>("string_sequence");
     ASSERT_EQ(string_seq.size(), 3);
     ASSERT_EQ(string_seq[1], "two");
-    
+
     // Test number sequence
     auto number_seq = parser.get_value<std::vector<int>>("number_sequence");
     ASSERT_EQ(number_seq.size(), 5);
     ASSERT_EQ(number_seq[3], 4);
-    
+
     // Test boolean sequence
     auto boolean_seq = parser.get_value<std::vector<bool>>("boolean_sequence");
     ASSERT_EQ(boolean_seq.size(), 5);
     ASSERT_EQ(boolean_seq[0], true);
     ASSERT_EQ(boolean_seq[1], false);
-    
+
     // Test inline sequence
     auto inline_seq = parser.get_value<std::vector<std::string>>("inline_sequence");
     ASSERT_EQ(inline_seq.size(), 3);
@@ -530,10 +539,10 @@ multiline_sequence:
 
 TEST(ParserYAMLTest, ErrorHandlingAndValidation) {
     WBE::ParserYAML parser;
-    
+
     // Test malformed YAML handling
     ASSERT_THROW(parser.parse_from_buffer("invalid: yaml: content: ["), std::exception);
-    
+
     // Test valid YAML with various edge cases
     parser.parse_from_buffer(R"(
 null_value: null
@@ -542,15 +551,15 @@ zero: 0
 boolean_true: true
 boolean_false: false
 )");
-    
+
     // Test accessing non-existent keys
     ASSERT_FALSE(parser.contains("non_existent_key"));
     ASSERT_THROW(parser.get_value<std::string>("non_existent_key"), std::exception);
-    
+
     // Test type access and validation
     ASSERT_TRUE(parser.contains("zero"));
     ASSERT_EQ(parser.get_value<int>("zero"), 0);
-    
+
     // Test accessing valid keys
     ASSERT_TRUE(parser.contains("null_value"));
     ASSERT_TRUE(parser.contains("empty_string"));
@@ -561,7 +570,7 @@ boolean_false: false
 
 TEST(ParserYAMLTest, KeyManagementAndUtilities) {
     WBE::ParserYAML parser;
-    
+
     const std::string test_yaml = R"(
 key1: value1
 key2: 123
@@ -574,35 +583,35 @@ sequence:
   - item2
   - item3
 )";
-    
+
     parser.parse_from_buffer(test_yaml);
-    
+
     // Test get_all_keys functionality
     auto keys = parser.get_all_keys();
     ASSERT_EQ(keys.size(), 5);
-    
+
     // Keys should include all top-level keys
     std::sort(keys.begin(), keys.end());
     std::vector<std::string> expected_keys = {"key1", "key2", "key3", "nested", "sequence"};
     std::sort(expected_keys.begin(), expected_keys.end());
     ASSERT_EQ(keys, expected_keys);
-    
+
     // Test nested key access
     auto nested = parser.get_value<WBE::YAMLData>("nested");
     auto nested_keys = nested.get_all_keys();
     ASSERT_EQ(nested_keys.size(), 2);
-    
+
     std::sort(nested_keys.begin(), nested_keys.end());
     std::vector<std::string> expected_nested = {"subkey1", "subkey2"};
     std::sort(expected_nested.begin(), expected_nested.end());
     ASSERT_EQ(nested_keys, expected_nested);
-    
+
     // Test contains functionality at different levels
     ASSERT_TRUE(parser.contains("key1"));
     ASSERT_TRUE(parser.contains("nested"));
     ASSERT_TRUE(parser.contains("sequence"));
     ASSERT_FALSE(parser.contains("subkey1")); // Not at top level
-    
+
     ASSERT_TRUE(nested.contains("subkey1"));
     ASSERT_TRUE(nested.contains("subkey2"));
     ASSERT_FALSE(nested.contains("key1")); // Not in nested level
@@ -656,10 +665,10 @@ v4:
 
     glm::vec4 v4ip;
     parser.get_value<glm::vec4>("v4", v4ip);
-    ASSERT_FLOAT_EQ(v4ip.x, -1.25f);
-    ASSERT_FLOAT_EQ(v4ip.y, 0.0f);
-    ASSERT_FLOAT_EQ(v4ip.z, 4.5f);
-    ASSERT_FLOAT_EQ(v4ip.w, 8.75f);
+    ASSERT_FLOAT_EQ(v4ip.x, -1.25F);
+    ASSERT_FLOAT_EQ(v4ip.y, 0.0F);
+    ASSERT_FLOAT_EQ(v4ip.z, 4.5F);
+    ASSERT_FLOAT_EQ(v4ip.w, 8.75F);
 }
 
 TEST(ParserYAMLTest, ParseGLMVectorsMissingFields) {
@@ -686,97 +695,97 @@ v4:
 }
 
 TEST(ParserYAMLTest, YAMLDataSetMethod) {
-  // Test the single-argument set(T&&) that assigns the current node
-  WBE::YAMLData root;
+    // Test the single-argument set(T&&) that assigns the current node
+    WBE::YAMLData root;
 
-  // Primitives: set the node to a scalar
-  root.set(std::string("apple"));
-  ASSERT_EQ(root.get<std::string>(), "apple");
+    // Primitives: set the node to a scalar
+    root.set(std::string("apple"));
+    ASSERT_EQ(root.get<std::string>(), "apple");
 
-  root.set(123);
-  ASSERT_EQ(root.get<int>(), 123);
+    root.set(123);
+    ASSERT_EQ(root.get<int>(), 123);
 
-  root.set(3.14);
-  ASSERT_DOUBLE_EQ(root.get<double>(), 3.14);
+    root.set(3.14);
+    ASSERT_DOUBLE_EQ(root.get<double>(), 3.14);
 
-  // Arrays
-  root.set(std::vector<int>{10, 20, 30});
-  auto nums = root.get<std::vector<int>>();
-  ASSERT_EQ(nums.size(), 3);
-  ASSERT_EQ(nums[0], 10);
-  ASSERT_EQ(nums[1], 20);
-  ASSERT_EQ(nums[2], 30);
+    // Arrays
+    root.set(std::vector<int>{10, 20, 30});
+    auto nums = root.get<std::vector<int>>();
+    ASSERT_EQ(nums.size(), 3);
+    ASSERT_EQ(nums[0], 10);
+    ASSERT_EQ(nums[1], 20);
+    ASSERT_EQ(nums[2], 30);
 
-  // Buffer type
-  WBE::Buffer<16> buf;
-  strcpy(buf.buffer, "bufval");
-  root.set(buf);
-  ASSERT_EQ(root.get<std::string>(), "bufval");
+    // Buffer type
+    WBE::Buffer<16> buf{};
+    strcpy(buf.buffer, "bufval");
+    root.set(buf);
+    ASSERT_EQ(root.get<std::string>(), "bufval");
 
-  // glm vector
-  glm::vec3 v{1.0f, 2.0f, 3.0f};
-  root.set(v);
-  auto v_out = root.get<glm::vec3>();
-  ASSERT_FLOAT_EQ(v_out.x, 1.0f);
-  ASSERT_FLOAT_EQ(v_out.y, 2.0f);
-  ASSERT_FLOAT_EQ(v_out.z, 3.0f);
+    // glm vector
+    glm::vec3 v{1.0F, 2.0F, 3.0F};
+    root.set(v);
+    auto v_out = root.get<glm::vec3>();
+    ASSERT_FLOAT_EQ(v_out.x, 1.0F);
+    ASSERT_FLOAT_EQ(v_out.y, 2.0F);
+    ASSERT_FLOAT_EQ(v_out.z, 3.0F);
 
-  // Nested YAMLData by copy
-  WBE::YAMLData child;
-  child.set_value("key1", "value1");
-  child.set_value("key2", 777);
-  root.set(child); // copy
+    // Nested YAMLData by copy
+    WBE::YAMLData child;
+    child.set_value("key1", "value1");
+    child.set_value("key2", 777);
+    root.set(child); // copy
 
-  auto child_copy = root.get<WBE::YAMLData>();
-  ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
-  ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
+    auto child_copy = root.get<WBE::YAMLData>();
+    ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
+    ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
 
-  // Nested YAMLData by move
-  WBE::YAMLData child_move;
-  child_move.set_value("moved", "yes");
-  root.set(std::move(child_move));
-  auto child_moved = root.get<WBE::YAMLData>();
-  ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
+    // Nested YAMLData by move
+    WBE::YAMLData child_move;
+    child_move.set_value("moved", "yes");
+    root.set(std::move(child_move));
+    auto child_moved = root.get<WBE::YAMLData>();
+    ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
 }
 
 TEST(ParserYAMLTest, YAMLDataSetValueMethod) {
-  // Test setting primitive values, arrays and nested YAMLData via set_value(key, value)
-  WBE::YAMLData root;
+    // Test setting primitive values, arrays and nested YAMLData via set_value(key, value)
+    WBE::YAMLData root;
 
-  // Primitives
-  root.set_value("fruit", std::string("apple"));
-  root.set_value("number", 123);
-  root.set_value("floating", 3.14);
+    // Primitives
+    root.set_value("fruit", std::string("apple"));
+    root.set_value("number", 123);
+    root.set_value("floating", 3.14);
 
-  ASSERT_EQ(root.get_value<std::string>("fruit"), "apple");
-  ASSERT_EQ(root.get_value<int>("number"), 123);
-  ASSERT_DOUBLE_EQ(root.get_value<double>("floating"), 3.14);
+    ASSERT_EQ(root.get_value<std::string>("fruit"), "apple");
+    ASSERT_EQ(root.get_value<int>("number"), 123);
+    ASSERT_DOUBLE_EQ(root.get_value<double>("floating"), 3.14);
 
-  // Arrays
-  root.set_value("numbers", std::vector<int>{10, 20, 30});
-  auto nums = root.get_value<std::vector<int>>("numbers");
-  ASSERT_EQ(nums.size(), 3);
-  ASSERT_EQ(nums[0], 10);
-  ASSERT_EQ(nums[1], 20);
-  ASSERT_EQ(nums[2], 30);
+    // Arrays
+    root.set_value("numbers", std::vector<int>{10, 20, 30});
+    auto nums = root.get_value<std::vector<int>>("numbers");
+    ASSERT_EQ(nums.size(), 3);
+    ASSERT_EQ(nums[0], 10);
+    ASSERT_EQ(nums[1], 20);
+    ASSERT_EQ(nums[2], 30);
 
-  // Nested YAMLData by copy
-  WBE::YAMLData child;
-  child.set_value("key1", "value1");
-  child.set_value("key2", 777);
-  root.set_value("child_copy", child);
+    // Nested YAMLData by copy
+    WBE::YAMLData child;
+    child.set_value("key1", "value1");
+    child.set_value("key2", 777);
+    root.set_value("child_copy", child);
 
-  auto child_copy = root.get_value<WBE::YAMLData>("child_copy");
-  ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
-  ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
+    auto child_copy = root.get_value<WBE::YAMLData>("child_copy");
+    ASSERT_EQ(child_copy.get_value<std::string>("key1"), "value1");
+    ASSERT_EQ(child_copy.get_value<int>("key2"), 777);
 
-  // Nested YAMLData by move (rvalue)
-  WBE::YAMLData child_move;
-  child_move.set_value("moved", "yes");
-  root.set_value("child_move", std::move(child_move));
+    // Nested YAMLData by move (rvalue)
+    WBE::YAMLData child_move;
+    child_move.set_value("moved", "yes");
+    root.set_value("child_move", std::move(child_move));
 
-  auto child_moved = root.get_value<WBE::YAMLData>("child_move");
-  ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
+    auto child_moved = root.get_value<WBE::YAMLData>("child_move");
+    ASSERT_EQ(child_moved.get_value<std::string>("moved"), "yes");
 }
 
 #endif

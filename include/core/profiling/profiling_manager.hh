@@ -56,10 +56,8 @@ public:
 
         explicit operator std::string() const {
             std::stringstream ss;
-            ss << R"({"channel":")" << get_label_name(channel) << '\"'
-               << R"(,"message":")" << message << '\"' << R"(,"start_time":)"
-               << start_time << R"(,"delta":)" << delta << R"(,"file":")"
-               << file << '\"' << R"(,"line":)" << line << R"(})";
+            ss << R"({"channel":")" << get_label_name(channel) << '\"' << R"(,"message":")" << message << '\"' << R"(,"start_time":)"
+               << start_time << R"(,"delta":)" << delta << R"(,"file":")" << file << '\"' << R"(,"line":)" << line << R"(})";
             return ss.str();
         }
     };
@@ -98,12 +96,10 @@ public:
 
 private:
     mutable std::shared_mutex profile_stash_mutex;
-    mutable std::unordered_map<ChannelID, std::vector<ProfileData>>
-        profile_stash;
+    mutable std::unordered_map<ChannelID, std::vector<ProfileData>> profile_stash;
 
     static const std::string& get_label_name(HashCode p_label) {
-        return EngineCore::get_singleton()->label_manager->get_label_name(
-            p_label);
+        return EngineCore::get_singleton()->label_manager->get_label_name(p_label);
     }
 };
 

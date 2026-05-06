@@ -34,13 +34,13 @@ struct ResourceUnit {};
 struct RUMaterial;
 
 template <typename T>
-constexpr bool IS_RESOURCE_UNIT =
-    std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
+constexpr bool IS_RESOURCE_UNIT = std::is_base_of_v<ResourceUnit, std::remove_cvref_t<T>>;
 
 template <typename T>
 concept ResourceUnitConcept = IS_RESOURCE_UNIT<T>;
 
-template <typename T> using RefRes = RefRaw<T, IAllocator, false>;
+template <typename T>
+using RefRes = RefRaw<T, IAllocator, false>;
 
 /**
  * @class ResourceScheme

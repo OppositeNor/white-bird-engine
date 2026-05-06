@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_IMPL_LIST_TEST_HH
 #define WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_IMPL_LIST_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/defs.hh"
@@ -26,12 +26,11 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <memory>
+#include <random>
 #include <stdexcept>
 #include <vector>
-#include <random>
 
 namespace WBE = WhiteBirdEngine;
-
 
 class WBEAllocAlignedPoolImplicitListTest : public ::testing::Test {
 protected:
@@ -87,8 +86,8 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, ZeroSizeAllocation) {
 }
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, AlignmentTest) {
-    WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList allocator
-        = WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList(WBE_MiB(0.5));
+    WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList allocator =
+        WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList(WBE_MiB(0.5));
     constexpr size_t ALIGN_REQ = alignof(WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList::Header);
     WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
     ASSERT_EQ(mem1 % ALIGN_REQ, 0);
@@ -205,8 +204,9 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
     for (int i = 0; i < 32; ++i) {
         int sz = dist(rng);
         WBE::MemID mem = pool.allocate(sz);
-        if (mem != WBE::MEM_NULL) { mems.push_back(mem);
-}
+        if (mem != WBE::MEM_NULL) {
+            mems.push_back(mem);
+        }
     }
     std::shuffle(mems.begin(), mems.end(), rng);
     for (unsigned long mem : mems) {

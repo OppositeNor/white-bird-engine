@@ -36,9 +36,7 @@ public:
             [render_data = render_data, semaphore = semaphore]() {
                 // Semaphores are created one per in-flight frame; however, just
                 // in case it is used elsewhere, we are still delaying this.
-                vkDestroySemaphore(render_data->logic_device,
-                    semaphore,
-                    render_data->allocation_callbacks);
+                vkDestroySemaphore(render_data->logic_device, semaphore, render_data->allocation_callbacks);
             },
             render_data->frames_in_flight);
     }
@@ -59,16 +57,12 @@ public:
         if (!p_binary) {
             // Create timeline semaphore
             VkSemaphoreTypeCreateInfo type_create_info{};
-            type_create_info.sType =
-                VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
             type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
             type_create_info.initialValue = 0;
             create_info.pNext = &type_create_info;
         }
-        if (vkCreateSemaphore(render_data->logic_device,
-                &create_info,
-                render_data->allocation_callbacks,
-                &semaphore) != VK_SUCCESS) {
+        if (vkCreateSemaphore(render_data->logic_device, &create_info, render_data->allocation_callbacks, &semaphore) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create semaphore.");
         }
     }
@@ -79,14 +73,18 @@ public:
      * @return True if this is a binary semaphore, false if this is a binary
      * semaphore.
      */
-    bool binary() const { return is_binary; }
+    bool binary() const {
+        return is_binary;
+    }
 
     /**
      * @brief Get semaphore.
      *
      * @return The vulkan semaphore instance.
      */
-    VkSemaphore get_semaphore() const { return semaphore; }
+    VkSemaphore get_semaphore() const {
+        return semaphore;
+    }
 
     /**
      * @brief Get the semaphore's submit info.
@@ -96,8 +94,7 @@ public:
      * semaphore. If not, this value is ignored.
      * @return The semaphore's create info.
      */
-    VkSemaphoreSubmitInfo get_submit_info(
-        VkPipelineStageFlags2 p_pipeline_stage, uint64_t p_value = 0) const {
+    VkSemaphoreSubmitInfo get_submit_info(VkPipelineStageFlags2 p_pipeline_stage, uint64_t p_value = 0) const {
         VkSemaphoreSubmitInfo submit_info{};
         submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         submit_info.semaphore = semaphore;

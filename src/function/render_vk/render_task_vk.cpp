@@ -20,8 +20,7 @@
 namespace WhiteBirdEngine {
 
 RenderTaskVK::RecordCommandBufferGuard::RecordCommandBufferGuard(
-    VkCommandBuffer p_command_buffer,
-    VkCommandBufferInheritanceInfo* p_inheritance_info)
+    VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info)
     : command_buffer(p_command_buffer) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

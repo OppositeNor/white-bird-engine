@@ -38,8 +38,8 @@ namespace WhiteBirdEngine {
  */
 struct BaseRenderDataVK {
     BaseRenderDataVK(RenderAllocator* p_allocator)
-        : queue_family_indices(p_allocator),
-          pre_execute_tasks_queue(p_allocator) {}
+        : queue_family_indices(p_allocator), pre_execute_tasks_queue(p_allocator) {
+    }
     // The render allocator.
     RenderAllocator* allocator = nullptr;
     // The render database.
@@ -97,9 +97,7 @@ struct BaseRenderDataVK {
     std::function<uint32_t(uint32_t, DeviceDomain)> find_memory_type;
 
     // Function to register a delayed call.
-    std::function<void(
-        std::function<void()>&& p_function, uint32_t p_delayed_frames)>
-        register_delayed_call;
+    std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;
 };
 
 /**
@@ -110,42 +108,38 @@ constexpr uint32_t VERTEX_BUFFER_BINDPOINT = 0;
 /**
  * @brief The binding description for Vertex3DTextured.
  */
-constexpr VkVertexInputBindingDescription
-    VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION = {
-        .binding = VERTEX_BUFFER_BINDPOINT,
-        .stride = sizeof(Vertex3DTextured),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
+constexpr VkVertexInputBindingDescription VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION = {
+    .binding = VERTEX_BUFFER_BINDPOINT, .stride = sizeof(Vertex3DTextured), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
 
 /**
  * @brief The vertex input attribute description of Vertex3DTextured.
  */
-constexpr std::array<VkVertexInputAttributeDescription, 5>
-    VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION = {
-        VkVertexInputAttributeDescription{// position
-            .location = 0,
-            .binding = VERTEX_BUFFER_BINDPOINT,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex3DTextured, position)},
-        {// normal
-            .location = 1,
-            .binding = VERTEX_BUFFER_BINDPOINT,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex3DTextured, normal)},
-        {// tangent
-            .location = 2,
-            .binding = VERTEX_BUFFER_BINDPOINT,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex3DTextured, tangent)},
-        {// bitangent
-            .location = 3,
-            .binding = VERTEX_BUFFER_BINDPOINT,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex3DTextured, bitangent)},
-        {// uv
-            .location = 4,
-            .binding = VERTEX_BUFFER_BINDPOINT,
-            .format = VK_FORMAT_R32G32_SFLOAT,
-            .offset = offsetof(Vertex3DTextured, uv)}};
+constexpr std::array<VkVertexInputAttributeDescription, 5> VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION = {
+    VkVertexInputAttributeDescription{// position
+        .location = 0,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, position)},
+    {// normal
+        .location = 1,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, normal)},
+    {// tangent
+        .location = 2,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, tangent)},
+    {// bitangent
+        .location = 3,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32B32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, bitangent)},
+    {// uv
+        .location = 4,
+        .binding = VERTEX_BUFFER_BINDPOINT,
+        .format = VK_FORMAT_R32G32_SFLOAT,
+        .offset = offsetof(Vertex3DTextured, uv)}};
 
 struct CameraInfoVKUBO {
     /**

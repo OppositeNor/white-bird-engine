@@ -30,7 +30,8 @@
 #include <string_view>
 namespace WhiteBirdEngine {
 
-template <typename T> using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
+template <typename T>
+using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
 /**
  * @class ComponentLabel
@@ -44,7 +45,8 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel {
     // The name of the component.
     std::string_view name;
 
-    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {}
+    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
+    }
 };
 
 /**

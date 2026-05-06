@@ -24,11 +24,11 @@ namespace WBE = WhiteBirdEngine;
 struct TrackedObject {
     int value;
     static int instance_count;
-    
+
     TrackedObject(int p_value = 0) : value(p_value) {
         instance_count++;
     }
-    
+
     ~TrackedObject() {
         instance_count--;
         value = -999; // Mark as destroyed
@@ -52,4 +52,3 @@ protected:
 
     std::unique_ptr<WBE::Global> global;
 };
-

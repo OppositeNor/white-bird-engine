@@ -22,10 +22,11 @@
 namespace WhiteBirdEngine {
 
 EngineResource::EngineResource() {
-    resource_manager = make_unique<ResourceManager>(
-        EngineCore::get_singleton()->pool_allocator, WBE_MiB(0.5));
+    resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, WBE_MiB(0.5));
 }
 
-EngineResource::~EngineResource() { resource_manager.reset(); }
+EngineResource::~EngineResource() {
+    resource_manager.reset();
+}
 
 } // namespace WhiteBirdEngine

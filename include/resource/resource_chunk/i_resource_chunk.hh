@@ -136,7 +136,8 @@ public:
      * @param p_mem_id The ID to get the data from.
      * @return The pointer to the data to get.
      */
-    template <typename T> T* get_data(MemID p_mem_id) {
+    template <typename T>
+    T* get_data(MemID p_mem_id) {
         return static_cast<T*>(get_data(p_mem_id));
     }
 
@@ -147,7 +148,8 @@ public:
      * @param p_mem_id The ID to get the data from.
      * @return The pointer to the data to get.
      */
-    template <typename T> const T* get_data(MemID p_mem_id) const {
+    template <typename T>
+    const T* get_data(MemID p_mem_id) const {
         return static_cast<const T*>(get_data(p_mem_id));
     }
 
@@ -159,8 +161,7 @@ protected:
      * @param p_res The pointer to the resource unit.
      * @param p_size The size of the resource unit.
      */
-    virtual RefRes<char> push_res_unit_ptr(
-        const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
+    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
 } // namespace WhiteBirdEngine

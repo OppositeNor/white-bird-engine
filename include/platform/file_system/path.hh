@@ -26,28 +26,17 @@ namespace WhiteBirdEngine {
 
 /**
  * @class Path
- * @brief Path class.
- * @todo Test
+ * @brief Path class. Thin wrapper around a directory plus a file name, backed
+ * conceptually by std::filesystem::path semantics.
  */
 class Path final {
 public:
     Path() = default;
-    virtual ~Path() = default;
+    ~Path() = default;
     Path(const Path& p_other) = default;
-    Path(Path&& p_other) = default;
-    Path& operator=(const Path& p_other) {
-        if (&p_other == this) {
-            return *this;
-        }
-        directory = p_other.directory;
-        file_name = p_other.file_name;
-        return *this;
-    }
-    Path& operator=(Path&& p_other) noexcept {
-        directory = std::move(p_other.directory);
-        file_name = std::move(p_other.file_name);
-        return *this;
-    }
+    Path(Path&& p_other) noexcept = default;
+    Path& operator=(const Path& p_other) = default;
+    Path& operator=(Path&& p_other) noexcept = default;
 
     /**
      * @brief Constructor.
@@ -56,8 +45,8 @@ public:
      * to.
      * @param p_file_name The name of the file the path is referencing to.
      */
-    Path(const Directory& p_directory, const std::string& p_file_name)
-        : directory(p_directory), file_name(p_file_name) {}
+    Path(const Directory& p_directory, const std::string& p_file_name) : directory(p_directory), file_name(p_file_name) {
+    }
 
     /**
      * @brief Constructor.
@@ -67,14 +56,15 @@ public:
      * @param p_file_name The name of the file the path is referencing to.
      */
     Path(Directory&& p_directory, const std::string& p_file_name)
-        : directory(std::move(p_directory)), file_name(p_file_name) {}
+        : directory(std::move(p_directory)), file_name(p_file_name) {
+    }
 
     bool operator==(const Path& p_other) const {
         return directory == p_other.directory && file_name == p_other.file_name;
     }
 
     bool operator!=(const Path& p_other) const {
-        return directory != p_other.directory || file_name != p_other.file_name;
+        return !(*this == p_other);
     }
 
     /**
@@ -82,27 +72,39 @@ public:
      *
      * @return The directory of the path.
      */
-    const Directory& get_directory() const { return directory; }
+    const Directory& get_directory() const {
+        return directory;
+    }
 
     /**
      * @brief Get the file name of the path.
      *
      * @return The file name of the path.
      */
-    const std::string& get_file_name() const { return file_name; }
+    const std::string& get_file_name() const {
+        return file_name;
+    }
 
     /**
-     * @brief Get the extension of the file.
+     * @brief Get the extension of the file (without the leading dot).
      *
-     * @todo: Test
      * @return The extension of the file. Empty string if no extension.
      */
     std::string get_extension() const {
         size_t dot_pos = file_name.rfind('.');
-        if (dot_pos == std::string::npos || dot_pos == file_name.length() - 1) {
+        if (dot_pos == std::string::npos || dot_pos == 0 || dot_pos == file_name.length() - 1) {
             return "";
         }
         return file_name.substr(dot_pos + 1);
+    }
+
+    /**
+     * @brief Build a std::filesystem::path equivalent to this path.
+     *
+     * @return The composed std::filesystem::path.
+     */
+    std::filesystem::path to_filesystem_path() const {
+        return directory.get_path() / file_name;
     }
 
     /**
@@ -110,13 +112,17 @@ public:
      *
      * @return True if the path is absolute. False otherwise.
      */
-    bool is_absolute() const { return directory.get_is_absolute(); }
+    bool is_absolute() const {
+        return directory.get_is_absolute();
+    }
 
     HashCode hash() const {
         return dynam_hash(static_cast<std::string>(*this).c_str());
     }
 
-    operator std::string() const;
+    operator std::string() const {
+        return static_cast<std::string>(directory) + file_name;
+    }
 
 private:
     Directory directory;

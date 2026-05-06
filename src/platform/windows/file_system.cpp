@@ -22,7 +22,8 @@
 #include <windows.h>
 
 namespace WhiteBirdEngine {
-FileSystem::FileSystem() : FileSystem(get_executable_dir()) {}
+FileSystem::FileSystem() : FileSystem(get_executable_dir()) {
+}
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
     root_directory = p_root_dir;
@@ -59,7 +60,7 @@ Directory FileSystem::parse_directory(const std::string& p_str) {
 }
 
 std::string FileSystem::dir_to_string(const Directory& p_directory) {
-    auto& dir_names = p_directory.get_dir_names();
+    auto dir_names = p_directory.get_dir_names();
     std::stringstream ss;
     for (auto& dir_name : dir_names) {
         ss << dir_name << '\\';
@@ -125,8 +126,7 @@ Directory FileSystem::get_executable_dir() {
         throw std::runtime_error("Failed to get the executable path.");
     }
     if (len >= 1024) {
-        throw std::runtime_error(
-            "Buffer overflow for executable path finding.");
+        throw std::runtime_error("Buffer overflow for executable path finding.");
     }
     buf.buffer[len] = '\0';
     return parse_directory(std::string(buf.buffer));

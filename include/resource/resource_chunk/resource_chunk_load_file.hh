@@ -44,7 +44,9 @@ using ParserResource = ParserJSON;
  */
 class ResourceChunkLoadFile final : public IResourceChunk {
 public:
-    ~ResourceChunkLoadFile() { allocator->pop_stack(total_size); }
+    ~ResourceChunkLoadFile() {
+        allocator->pop_stack(total_size);
+    }
     ResourceChunkLoadFile(const ResourceChunkLoadFile&) = delete;
     ResourceChunkLoadFile(ResourceChunkLoadFile&&) = delete;
     ResourceChunkLoadFile& operator=(const ResourceChunkLoadFile&) = delete;
@@ -56,15 +58,13 @@ public:
      * @param p_path The resource path to the resource file.
      * @param p_parser The parser to get resource from.
      */
-    ResourceChunkLoadFile(
-        const std::string& p_path, StackAllocator& p_allocator);
+    ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator);
 
     virtual RefRes<char> get_resource(const std::string& p_id) const override {
         return resource_map.at(p_id);
     }
 
-    virtual RefRes<char> push_data(
-        size_t p_res_size, const void* p_res) override {
+    virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) override {
         total_size += p_res_size;
         MemID result_mem_id = allocator->allocate(p_res_size);
         memcpy(allocator->get(result_mem_id), p_res, p_res_size);
@@ -78,7 +78,9 @@ public:
         return RefRes<Object>(object);
     }
 
-    virtual size_t get_size() const override { return total_size; }
+    virtual size_t get_size() const override {
+        return total_size;
+    }
 
     virtual void* get_data(MemID p_mem_id) override {
         return allocator->get(p_mem_id);
@@ -108,12 +110,9 @@ public:
 protected:
     using ParserDataType = ParserResource::DataType;
 
-    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key,
-        const void* p_res,
-        size_t p_size) override {
+    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
-            throw std::runtime_error(
-                std::format("Redefinition of key: {}.", p_res_key));
+            throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
@@ -133,8 +132,7 @@ private:
     std::vector<Unique<Object>> objects;
     StackAllocator* allocator;
 
-    void resolve_load_resource(std::vector<std::string>& p_included_pathes,
-        const std::string& p_res_chunk_path);
+    void resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path);
 
     void resolve_refs() {
         auto* resource_manager = ResourceManager::get_singleton();
@@ -151,14 +149,11 @@ private:
     }
 };
 
-inline void ResourceChunkLoadFile::resolve_load_resource(
-    std::vector<std::string>& p_included_pathes,
-    const std::string& p_res_chunk_path) {
-    if (std::any_of(p_included_pathes.begin(),
-            p_included_pathes.end(),
-            [&](const auto& p_str) { return p_str == p_res_chunk_path; })) {
-        throw std::runtime_error(
-            std::format("Include recursion found: {}", p_res_chunk_path));
+inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
+    if (std::any_of(p_included_pathes.begin(), p_included_pathes.end(), [&](const auto& p_str) {
+            return p_str == p_res_chunk_path;
+        })) {
+        throw std::runtime_error(std::format("Include recursion found: {}", p_res_chunk_path));
     }
     p_included_pathes.push_back(p_res_chunk_path);
 
@@ -166,8 +161,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(
     ParserResource parser;
     parser.parse(rc_file_path);
 
-    std::vector<ParserDataType> resources =
-        parser.template get_value<std::vector<ParserDataType>>("resources");
+    std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
     for (auto& res : resources) {
         // Use generic scheme only for quick type/id extraction during dispatch.
         RUScheme resource_scheme;
@@ -178,15 +172,12 @@ inline void ResourceChunkLoadFile::resolve_load_resource(
                       // also kind of handles its inline function like this, so
                       // I think this is fine. -- OppositeNor
         }
-        ResourceManager::get_singleton()
-            ->get_resource_unit_loader(resource_scheme.type)
-            ->populate_scheme(*this, res);
+        ResourceManager::get_singleton()->get_resource_unit_loader(resource_scheme.type)->populate_scheme(*this, res);
     }
 
     if (parser.contains("include")) {
         // Resolve includes
-        auto included_resource_chunks =
-            parser.template get_value<std::vector<std::string>>("include");
+        auto included_resource_chunks = parser.template get_value<std::vector<std::string>>("include");
         for (auto& include_path : included_resource_chunks) {
             resolve_load_resource(p_included_pathes, include_path);
         }
@@ -194,8 +185,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(
     p_included_pathes.pop_back();
 }
 
-inline ResourceChunkLoadFile::ResourceChunkLoadFile(
-    const std::string& p_path, StackAllocator& p_allocator) {
+inline ResourceChunkLoadFile::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
     allocator = &p_allocator;
     std::vector<std::string> included_pathes;
     resolve_load_resource(included_pathes, p_path);

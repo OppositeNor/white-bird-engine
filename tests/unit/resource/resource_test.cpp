@@ -14,6 +14,6 @@
 */
 // NOLINTBEGIN
 #include "resource_scheme_deserialization_test.hh"
-#include "resource_utils_test.hh"
 #include "resource_unit_loader_test.hh"
+#include "resource_utils_test.hh"
 // NOLINTEND

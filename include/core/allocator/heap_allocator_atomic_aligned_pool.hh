@@ -29,8 +29,7 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final
-    : public AllocatorTrait<HeapAllocatorAligned> {
+struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicAlignedPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -49,8 +48,8 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final
  */
 class HeapAllocatorAtomicAlignedPool final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAtomicAlignedPool()
-        : HeapAllocatorAtomicAlignedPool(WBE_KiB(64)) {}
+    HeapAllocatorAtomicAlignedPool() : HeapAllocatorAtomicAlignedPool(WBE_KiB(64)) {
+    }
     virtual ~HeapAllocatorAtomicAlignedPool() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicAlignedPool)
 
@@ -64,8 +63,7 @@ public:
     /**
      * @brief The maximum total size that the allocator can contain.
      */
-    static constexpr size_t MAX_TOTAL_SIZE =
-        std::numeric_limits<Header>::max() >> 4;
+    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
 
     /**
      * @brief Constructor.
@@ -74,8 +72,7 @@ public:
      */
     HeapAllocatorAtomicAlignedPool(size_t p_size);
 
-    virtual MemID allocate(
-        size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -105,8 +102,7 @@ public:
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         boost::shared_lock lock(mutex);
-        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) &
-               MAX_TOTAL_SIZE;
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
     }
 
     size_t get_total_size() const {
@@ -148,12 +144,8 @@ private:
 
     bool unguard_is_in_pool(MemID p_mem_id) const;
 
-    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node,
-        char* p_mem_start,
-        size_t p_mem_size);
-    void insert_free_memory(IdleListNode* p_node_before_insert,
-        char* p_insert_start,
-        size_t p_insert_size);
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
     bool combine_idle_with_next(IdleListNode* p_node);
     std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
 

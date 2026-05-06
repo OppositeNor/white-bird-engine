@@ -31,8 +31,7 @@
 
 namespace WhiteBirdEngine {
 
-ROImageVK::Builder& ROImageVK::Builder::set_image_type(
-    VkImageType p_image_type) {
+ROImageVK::Builder& ROImageVK::Builder::set_image_type(VkImageType p_image_type) {
     image_type = p_image_type;
     return *this;
 }
@@ -47,8 +46,7 @@ ROImageVK::Builder& ROImageVK::Builder::set_extent(VkExtent3D p_extent) {
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_mipmap_level(
-    uint32_t p_mipmap_level) {
+ROImageVK::Builder& ROImageVK::Builder::set_mipmap_level(uint32_t p_mipmap_level) {
     mipmap_level = p_mipmap_level;
     return *this;
 }
@@ -63,8 +61,7 @@ ROImageVK::Builder& ROImageVK::Builder::set_usage(VkImageUsageFlags p_usage) {
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_queue_families(
-    const std::set<uint32_t>& p_queue_families) {
+ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_families) {
     queue_families = p_queue_families;
     return *this;
 }
@@ -83,8 +80,7 @@ ROImageVK::Builder& ROImageVK::Builder::image_2d(VkExtent2D p_extent) {
 
 ROImageVK::Builder& ROImageVK::Builder::image_3d(glm::uvec3 p_size) {
     image_type = VK_IMAGE_TYPE_3D;
-    extent =
-        VkExtent3D{.width = p_size.x, .height = p_size.y, .depth = p_size.z};
+    extent = VkExtent3D{.width = p_size.x, .height = p_size.y, .depth = p_size.z};
     return *this;
 }
 
@@ -124,8 +120,7 @@ ROImageVK::Builder& ROImageVK::Builder::rgba_hdr() {
     return *this;
 }
 
-void ROImageVK::MemoryBarrierBuilder::apply_barrier(
-    VkCommandBuffer p_command_buffer) {
+void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_buffer) {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     barrier.srcStageMask = src_stage_mask;
@@ -149,8 +144,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(
     image->exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
 }
 
-VkImage ROImageVK::Builder::create_vk_object(
-    const BaseRenderDataVK* p_render_data) const {
+VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     create_info.imageType = WBE_REQUIRED(image_type);
@@ -163,36 +157,27 @@ VkImage ROImageVK::Builder::create_vk_object(
     create_info.usage = WBE_REQUIRED(usage);
     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    std::vector<uint32_t> initial_queues(
-        queue_families.begin(), queue_families.end());
+    std::vector<uint32_t> initial_queues(queue_families.begin(), queue_families.end());
     if (initial_queues.size() > 1) {
         create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.pQueueFamilyIndices = initial_queues.data();
-        create_info.queueFamilyIndexCount =
-            static_cast<uint32_t>(initial_queues.size());
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
     } else {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
     VkImage result;
-    if (vkCreateImage(p_render_data->logic_device,
-            &create_info,
-            p_render_data->allocation_callbacks,
-            &result) != VK_SUCCESS) {
+    if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create vulkan image.");
     }
     return result;
 }
 
-ROImageVK::ROImageVK(
-    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
     init(p_builder);
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data,
-    VkImage p_image,
-    VkImageLayout p_initial_image_layout)
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
     : RenderObjectVK(p_render_data) {
     exposed_fileds.image = p_image;
     p_image = VK_NULL_HANDLE;
@@ -205,15 +190,9 @@ ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
     if (!exposed_fileds.is_swap_chain_image) {
         render_data->register_delayed_call(
-            [render_data = render_data,
-                image = exposed_fileds.image,
-                image_memory = exposed_fileds.image_memory]() {
-                vkDestroyImage(render_data->logic_device,
-                    image,
-                    render_data->allocation_callbacks);
-                vkFreeMemory(render_data->logic_device,
-                    image_memory,
-                    render_data->allocation_callbacks);
+            [render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
+                vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+                vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
             },
             render_data->frames_in_flight);
     }
@@ -223,31 +202,17 @@ void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.create_vk_object(render_data);
     exposed_fileds.queue_families = p_builder.queue_families;
     VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(
-        render_data->logic_device, exposed_fileds.image, &memory_requirements);
+    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
     // Images are only allowed to be allocated on device.
-    exposed_fileds.image_memory =
-        allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
+    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
 }
 
-void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer,
-    Ref<ROBufferVK> p_data,
-    VkBufferImageCopy p_region_info) {
+void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {
     MemoryBarrierBuilder barrier_builder;
-    barrier_builder.set_image(this_ref.lock())
-        .set_access(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .apply_barrier(p_command_buffer);
-    vkCmdCopyBufferToImage(p_command_buffer,
-        p_data->get_buffer(),
-        exposed_fileds.image,
-        VK_IMAGE_LAYOUT_GENERAL,
-        1,
-        &p_region_info);
+    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT).apply_barrier(p_command_buffer);
+    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
     // After transfering the data, retrieve the original layout.
-    barrier_builder.set_image(this_ref.lock())
-        .set_access(
-            VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT)
-        .apply_barrier(p_command_buffer);
+    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT).apply_barrier(p_command_buffer);
 }
 
 } // namespace WhiteBirdEngine

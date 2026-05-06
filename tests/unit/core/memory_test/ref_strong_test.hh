@@ -17,8 +17,8 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "mock_heap_allocator_aligned.hh"
 #include "global/global.hh"
+#include "mock_heap_allocator_aligned.hh"
 #include "platform/file_system/directory.hh"
 #include <cstdint>
 #include <cstdlib>
@@ -87,8 +87,7 @@ TEST_F(WBERefStrongTest, ConstructDestruct) {
     class TestClass {
     public:
         int* modify_val;
-        TestClass(int* p_modify_val)
-            : modify_val(p_modify_val) {
+        TestClass(int* p_modify_val) : modify_val(p_modify_val) {
             ++(*modify_val);
         }
         ~TestClass() {
@@ -101,7 +100,7 @@ TEST_F(WBERefStrongTest, ConstructDestruct) {
         ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
         ASSERT_EQ(test_val, 1);
         {
-                       ASSERT_EQ(test_val, 1);
+            ASSERT_EQ(test_val, 1);
         }
         ASSERT_EQ(test_val, 1);
     }
@@ -160,8 +159,7 @@ TEST_F(WBERefStrongTest, NullReference) {
 
 class TestClass {
 public:
-    TestClass(int* p_val)
-        : val(p_val) {
+    TestClass(int* p_val) : val(p_val) {
         ++(*p_val);
     }
     ~TestClass() {
@@ -181,8 +179,7 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
             refs.push_back(p_ref1);
-        }
-        else {
+        } else {
             refs.push_back(p_ref2);
         }
     }
@@ -192,14 +189,11 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
             uint32_t choice = rand() % 4;
             if (choice == 0) {
                 refs[j] = p_ref1;
-            }
-            else if (choice == 1) {
+            } else if (choice == 1) {
                 refs[j] = p_ref2;
-            }
-            else if (choice == 2) {
+            } else if (choice == 2) {
                 refs[j] = refs[rand() % refs.size()];
-            }
-            else {
+            } else {
                 int val = 3;
                 {
                     WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&allocator, &val);
@@ -239,27 +233,33 @@ TEST_F(WBERefStrongTest, Multithread) {
 
 TEST_F(WBERefStrongTest, DynamicCastRef) {
     WBE::MockHeapAllocatorAligned allocator(1024);
-    
+
     // Test classes for polymorphic casting
     class BaseClass {
     public:
         virtual ~BaseClass() = default;
         int base_value = 42;
-        virtual int get_type() const { return 1; }
+        virtual int get_type() const {
+            return 1;
+        }
     };
-    
+
     class DerivedClass : public BaseClass {
     public:
         int derived_value = 123;
-        int get_type() const override { return 2; }
+        int get_type() const override {
+            return 2;
+        }
     };
-    
+
     class AnotherClass : public BaseClass {
     public:
         int another_value = 456;
-        int get_type() const override { return 3; }
+        int get_type() const override {
+            return 3;
+        }
     };
-    
+
     class UnrelatedClass {
     public:
         virtual ~UnrelatedClass() = default;
@@ -270,13 +270,13 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     {
         WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
         dynamic_cast<DerivedClass*>(base_ref.get())->derived_value = 999;
-        
+
         WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
         ASSERT_NE(derived_ref, nullptr);
         ASSERT_EQ(derived_ref->base_value, 42);
         ASSERT_EQ(derived_ref->derived_value, 999);
         ASSERT_EQ(derived_ref->get_type(), 2);
-        
+
         // Verify they point to the same object
         ASSERT_EQ(base_ref.get(), derived_ref.get());
     }
@@ -285,12 +285,12 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     {
         WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
         derived_ref->derived_value = 777;
-        
+
         WBE::Ref<BaseClass> base_ref = derived_ref.dynamic_cast_ref<BaseClass>();
         ASSERT_NE(base_ref, nullptr);
         ASSERT_EQ(base_ref->base_value, 42);
         ASSERT_EQ(base_ref->get_type(), 2);
-        
+
         // Verify they point to the same object
         ASSERT_EQ(derived_ref.get(), base_ref.get());
     }
@@ -298,7 +298,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     // Test failed downcast (Base -> wrong Derived)
     {
         WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
-        
+
         WBE::Ref<AnotherClass> another_ref = base_ref.dynamic_cast_ref<AnotherClass>();
         ASSERT_EQ(another_ref, nullptr);
         ASSERT_EQ(another_ref, WBE::MEM_NULL);
@@ -308,7 +308,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     {
         WBE::Ref<BaseClass> null_ref;
         ASSERT_EQ(null_ref, nullptr);
-        
+
         WBE::Ref<DerivedClass> derived_ref = null_ref.dynamic_cast_ref<DerivedClass>();
         ASSERT_EQ(derived_ref, nullptr);
         ASSERT_EQ(derived_ref, WBE::MEM_NULL);
@@ -317,7 +317,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     // Test cast between unrelated types (should fail)
     {
         WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
-        
+
         WBE::Ref<UnrelatedClass> unrelated_ref = derived_ref.dynamic_cast_ref<UnrelatedClass>();
         ASSERT_EQ(unrelated_ref, nullptr);
         ASSERT_EQ(unrelated_ref, WBE::MEM_NULL);
@@ -327,11 +327,11 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     {
         WBE::Ref<BaseClass> base_ref = WBE::Ref<AnotherClass>::make_ref(&allocator);
         dynamic_cast<AnotherClass*>(base_ref.get())->another_value = 555;
-        
+
         // This should fail since AnotherClass is not DerivedClass
         WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
         ASSERT_EQ(derived_ref, nullptr);
-        
+
         // But casting to AnotherClass should succeed
         WBE::Ref<AnotherClass> another_ref = base_ref.dynamic_cast_ref<AnotherClass>();
         ASSERT_NE(another_ref, nullptr);
@@ -343,21 +343,21 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     {
         WBE::Ref<BaseClass> base_ref1 = WBE::Ref<DerivedClass>::make_ref(&allocator);
         WBE::Ref<BaseClass> base_ref2 = base_ref1; // Create another reference
-        
+
         WBE::Ref<DerivedClass> derived_ref = base_ref1.dynamic_cast_ref<DerivedClass>();
         ASSERT_NE(derived_ref, nullptr);
-        
+
         // All three references should point to the same object
         ASSERT_EQ(base_ref1.get(), base_ref2.get());
         ASSERT_EQ(base_ref1.get(), derived_ref.get());
-        
+
         // Object should still be alive after releasing one reference
         base_ref1 = nullptr;
         ASSERT_NE(base_ref2, nullptr);
         ASSERT_NE(derived_ref, nullptr);
         ASSERT_EQ(base_ref2.get(), derived_ref.get());
     }
-    
+
     ASSERT_TRUE(allocator.is_empty());
 }
 

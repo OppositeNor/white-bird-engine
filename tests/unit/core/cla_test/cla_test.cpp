@@ -13,9 +13,9 @@
    limitations under the License.
 */
 // NOLINTBEGIN
-#include <gtest/gtest.h>
-#include "cla_ast_visitor_test.hh"
 #include "cla_ast_visitor_assembler_test.hh"
+#include "cla_ast_visitor_test.hh"
 #include "cla_lexer_test.hh"
 #include "cla_parser_test.hh"
+#include <gtest/gtest.h>
 // NOLINTEND

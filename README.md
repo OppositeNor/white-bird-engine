@@ -66,3 +66,15 @@ python ./build.py -t debug-gcc      # Debug target with GCC compiler
 python ./build.py -t release-gcc    # Release target with GCC compiler
 python ./build.py -t deploy         # Deploy target with GCC compiler
 ```
+
+## Contribution
+
+### Use of AI
+
+Use of AI assistants is allowed and encouraged for this project. At the start of every new AI session, please have the
+agent read [CONVENTIONS_FOR_AI.md](./CONVENTIONS_FOR_AI.md) first. That file is a compact, high-density reference written
+specifically for AI agents and covers the project's layered architecture, build workflow, test layout, memory model, and
+naming rules.
+
+After the AI finishes editing, **carefully review** every change and make sure you understand exactly what it did before
+committing.

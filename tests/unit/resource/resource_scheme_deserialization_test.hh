@@ -15,14 +15,14 @@
 #ifndef WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 #define WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 
-#include <exception>
-#include <gtest/gtest.h>
-#include <memory>
-#include <string>
 #include "core/parser/parser_json.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <exception>
+#include <gtest/gtest.h>
+#include <memory>
+#include <string>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -120,11 +120,11 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioDefaults) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_audio_02");
     ASSERT_EQ(scheme.type, "audio");
-    ASSERT_EQ(scheme.sample_rate, -1); // Default value
-    ASSERT_EQ(scheme.channels, 1U); // Default value
-    ASSERT_EQ(scheme.bit_depth, -1); // Default value
+    ASSERT_EQ(scheme.sample_rate, -1);       // Default value
+    ASSERT_EQ(scheme.channels, 1U);          // Default value
+    ASSERT_EQ(scheme.bit_depth, -1);         // Default value
     ASSERT_FLOAT_EQ(scheme.duration, -1.0F); // Default value
-    ASSERT_EQ(scheme.frame_count, -1); // Default value
+    ASSERT_EQ(scheme.frame_count, -1);       // Default value
     ASSERT_TRUE(scheme.is_stream);
     ASSERT_EQ(scheme.path, "audio/test_audio_02.ogg");
 }
@@ -467,6 +467,5 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingRequiredFields)
     // Should throw because channel_count, color_space, is_hdr, and path are required
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
-
 
 #endif

@@ -38,8 +38,7 @@ public:
      */
     void lock() {
         mtx.lock();
-        unique_owner.store(
-            std::this_thread::get_id(), std::memory_order_release);
+        unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
     }
 
     /**
@@ -49,8 +48,7 @@ public:
      */
     bool try_lock() {
         if (mtx.try_lock()) {
-            unique_owner.store(
-                std::this_thread::get_id(), std::memory_order_release);
+            unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
             return true;
         }
         return false;
@@ -67,7 +65,9 @@ public:
     /**
      * @brief Shared lock.
      */
-    void lock_shared() { mtx.lock_shared(); }
+    void lock_shared() {
+        mtx.lock_shared();
+    }
 
     /**
      * @brief Try shared lock.
@@ -84,7 +84,9 @@ public:
     /**
      * @brief Unlock shared lock.
      */
-    void unlock_shared() { mtx.unlock_shared(); }
+    void unlock_shared() {
+        mtx.unlock_shared();
+    }
 
     /**
      * @brief Is the unique lock locked in current thread.

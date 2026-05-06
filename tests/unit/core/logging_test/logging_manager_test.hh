@@ -24,8 +24,8 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <ostream>
-#include <string>
 #include <sstream>
+#include <string>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
 WBE_LABEL(WBE_TEST_LABEL_1, WBE_CHANNEL)
 WBE_LABEL(WBE_TEST_LABEL_2, WBE_CHANNEL)
 WBE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
-}
+} // namespace WhiteBirdEngine
 
 class LogTestMock : public WBE::ILog {
 public:
@@ -41,8 +41,7 @@ public:
         return WBE::EngineCore::get_singleton()->label_manager->get_label_name(p_label);
     }
 
-    LogTestMock(WBE::ChannelID p_channel_id, std::ostream& p_ostream)
-        : channel_id(p_channel_id), ostream(&p_ostream) {
+    LogTestMock(WBE::ChannelID p_channel_id, std::ostream& p_ostream) : channel_id(p_channel_id), ostream(&p_ostream) {
         *ostream << "Construct " << get_channel_name(channel_id) << '\n';
     }
 
@@ -60,7 +59,6 @@ public:
     virtual void message(const std::string& p_str) override {
         *ostream << "Message " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
-
 
     virtual void warning(const std::string& p_str) override {
         *ostream << "Warning " << get_channel_name(channel_id) << " " << p_str << '\n';

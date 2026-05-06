@@ -50,10 +50,7 @@ public:
             .b = VK_COMPONENT_SWIZZLE_IDENTITY,
             .a = VK_COMPONENT_SWIZZLE_IDENTITY};
         // Subresource range.
-        VkImageSubresourceRange subresource_range{.baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1};
+        VkImageSubresourceRange subresource_range{.baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 
         // Set the source image.
         Builder& set_image(Ref<ROImageVK> p_image);
@@ -64,33 +61,23 @@ public:
         // Set component mapping.
         Builder& set_components(const VkComponentMapping& p_components);
         // Set component mapping.
-        Builder& set_components(VkComponentSwizzle p_r,
-            VkComponentSwizzle p_g,
-            VkComponentSwizzle p_b,
-            VkComponentSwizzle p_a);
+        Builder& set_components(VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a);
         // Set subresource range.
-        Builder& set_subresource_range(
-            const VkImageSubresourceRange& p_subresource_range);
+        Builder& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
         // Set from image configurations. All features are default to match to
         // the image config.
-        Builder& set_from_image_config(
-            const ROImageVK::Builder& p_image_config);
+        Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);
 
-        Ref<ROImageViewVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROImageViewVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROImageViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROImageViewVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROImageViewVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROImageViewVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkImageView create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkImageView create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
     ROImageViewVK() = delete;
     virtual ~ROImageViewVK() override;
@@ -102,15 +89,16 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    ROImageViewVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the image view instance.
      *
      * @return The image view instance.
      */
-    VkImageView get_image_view() const { return image_view; }
+    VkImageView get_image_view() const {
+        return image_view;
+    }
 
     /**
      * @class ExposedFields
@@ -124,7 +112,9 @@ public:
         Ref<ROImageVK> image = MEM_NULL;
     };
 
-    const ExposedFields& fields() const { return exposed_fields; }
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     VkImageView image_view = VK_NULL_HANDLE;

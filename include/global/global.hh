@@ -58,7 +58,9 @@ public:
      *
      * @return The singleton instance.
      */
-    static Global* get_singleton() { return singleton; }
+    static Global* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief The core singleton.

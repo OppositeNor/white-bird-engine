@@ -48,10 +48,12 @@ public:
     std::function<void()> retrieve_job(bool p_block = false);
     void add_job(std::function<void()> p_job);
 
-    std::counting_semaphore<32>& get_semaphore() { return semaphore; }
+    std::counting_semaphore<>& get_semaphore() {
+        return semaphore;
+    }
 
 private:
-    std::counting_semaphore<32> semaphore{0};
+    std::counting_semaphore<> semaphore{0};
     Vector<std::function<void()>> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;

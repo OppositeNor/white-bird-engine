@@ -36,8 +36,7 @@ namespace WhiteBirdEngine {
  * @brief Framebuffer render object.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROFramebufferVK final
-    : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROFramebufferVK final : public RenderObjectVK {
 public:
     /**
      * @class Builder
@@ -59,8 +58,7 @@ public:
         uint32_t layers = 1;
 
         // Set the attachment image views.
-        Builder& set_attachments(
-            const std::vector<Ref<ROImageViewVK>>& p_attachments) {
+        Builder& set_attachments(const std::vector<Ref<ROImageViewVK>>& p_attachments) {
             for (const auto& attachment : p_attachments) {
                 add_attachment(attachment);
             }
@@ -118,35 +116,31 @@ public:
             return *this;
         }
 
-        Ref<ROFramebufferVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROFramebufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROFramebufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROFramebufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROFramebufferVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROFramebufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROFramebufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROFramebufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkFramebuffer create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkFramebuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
     ROFramebufferVK() = delete;
     virtual ~ROFramebufferVK() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(ROFramebufferVK)
 
-    ROFramebufferVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the framebuffer instance.
      *
      * @return The framebuffer instance.
      */
-    VkFramebuffer get_framebuffer() const { return framebuffer; }
+    VkFramebuffer get_framebuffer() const {
+        return framebuffer;
+    }
 
     /**
      * @class ExposedFields
@@ -165,7 +159,9 @@ public:
      *
      * @return The exposed fields of framebuffer.
      */
-    const ExposedFields& fields() const { return exposed_fields; }
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     VkFramebuffer framebuffer;

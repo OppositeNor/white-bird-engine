@@ -104,8 +104,7 @@ public:
          * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(
-            const std::set<uint32_t>& p_queue_family_indices) {
+        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
             queue_family_indices = p_queue_family_indices;
             return *this;
         }
@@ -117,30 +116,24 @@ public:
          * this buffer.
          * @return *this.
          */
-        Builder& set_queue_family_indices(
-            std::set<uint32_t>&& p_queue_family_indices) {
+        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
             queue_family_indices = std::move(p_queue_family_indices);
             return *this;
         }
 
-        Ref<ROStagingBufferVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROStagingBufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROStagingBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROStagingBufferVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROStagingBufferVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROStagingBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
         VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
-    ROStagingBufferVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROStagingBufferVK() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(ROStagingBufferVK)
 
@@ -149,7 +142,9 @@ public:
      *
      * @return The exposed fields.
      */
-    const ExposedFields& fields() const { return exposed_fields; }
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
     /**
      * @brief Allocate a chunk of memory.
@@ -163,7 +158,9 @@ public:
      *
      * @return The buffer instance.
      */
-    VkBuffer get_buffer() const { return buffer; }
+    VkBuffer get_buffer() const {
+        return buffer;
+    }
 
 private:
     struct DataChunkHeader {
@@ -171,8 +168,7 @@ private:
         uint32_t size;
         uint64_t frame;
     };
-    static_assert(sizeof(DataChunkHeader) == 16,
-        "The size of the data chunk header should be 16.");
+    static_assert(sizeof(DataChunkHeader) == 16, "The size of the data chunk header should be 16.");
     static constexpr size_t DATA_CHUNK_HEADER_SIZE = sizeof(DataChunkHeader);
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;

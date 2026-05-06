@@ -24,7 +24,8 @@
 class WBEAllocPoolBehavTestClass {
 public:
     WBEAllocPoolBehavTestClass(const std::string& p_pool_name, size_t p_total_size, size_t p_header_size)
-        : pool_name(p_pool_name), total_size(p_total_size), header_size(p_header_size) {}
+        : pool_name(p_pool_name), total_size(p_total_size), header_size(p_header_size) {
+    }
 
     std::string operator()(const std::vector<std::pair<bool, int64_t>>& p_chunk_status) const {
         std::stringstream result;
@@ -35,8 +36,7 @@ public:
             if (status.first) {
                 if (status.second < 0) {
                     tracker = header_size;
-                }
-                else {
+                } else {
                     tracker += status.second + header_size;
                 }
                 continue;
@@ -46,11 +46,10 @@ public:
             }
             is_first = false;
             if (status.second < 0) {
-                result << R"({"begin":)" << tracker << R"(,"size":)" << total_size - tracker <<"}";
+                result << R"({"begin":)" << tracker << R"(,"size":)" << total_size - tracker << "}";
                 tracker = total_size;
-            }
-            else {
-                result << R"({"begin":)" << tracker << R"(,"size":)" << status.second <<"}";
+            } else {
+                result << R"({"begin":)" << tracker << R"(,"size":)" << status.second << "}";
                 tracker += status.second;
             }
         }
@@ -63,4 +62,3 @@ public:
 };
 
 #endif
-

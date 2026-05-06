@@ -15,11 +15,11 @@
 #ifndef WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 #define WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "mock_heap_allocator_aligned.hh"
 #include "global/global.hh"
+#include "mock_heap_allocator_aligned.hh"
 #include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
 #include <memory>
@@ -53,13 +53,23 @@ TEST_F(WBERefStrongExceptionsTest, MemIDOnlyConstructorThrowsOnNonNull) {
 TEST_F(WBERefStrongExceptionsTest, CompareWithNonNullVoidPointerThrows) {
     WBE::Ref<int> ref; // default null
     void* non_null = reinterpret_cast<void*>(0x1234);
-    ASSERT_THROW({ bool b = (ref == non_null); (void)b; }, std::runtime_error);
+    ASSERT_THROW(
+        {
+            bool b = (ref == non_null);
+            (void)b;
+        },
+        std::runtime_error);
 }
 
 TEST_F(WBERefStrongExceptionsTest, CompareWithNonNullMemIDThrows) {
     WBE::Ref<int> ref; // default null
     WBE::MemID non_null_id(42);
-    ASSERT_THROW({ bool b = (ref == non_null_id); (void)b; }, std::runtime_error);
+    ASSERT_THROW(
+        {
+            bool b = (ref == non_null_id);
+            (void)b;
+        },
+        std::runtime_error);
 }
 
 #endif

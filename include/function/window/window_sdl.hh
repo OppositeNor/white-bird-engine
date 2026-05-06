@@ -35,20 +35,19 @@ public:
     virtual ~WindowSDL() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(WindowSDL)
 
-    WindowSDL(Ref<InputManager> p_input_manager,
-        const WindowProperties& p_window_properties);
+    WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties);
 
-    virtual WindowType get_window_type() const override { return window_type; }
+    virtual WindowType get_window_type() const override {
+        return window_type;
+    }
     virtual void tick_render() override;
     virtual void tick_logic() override;
-    virtual void get_size_in_pixels(
-        uint32_t& p_width, uint32_t& p_height) override;
+    virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) override;
     virtual bool should_close() const override;
 
     virtual void init_vulkan(VkInstance p_instance) override;
     virtual VkSurfaceKHR get_vulkan_surface() const override;
-    virtual std::vector<const char*>
-    get_required_vulkan_instance_extensions() const override;
+    virtual std::vector<const char*> get_required_vulkan_instance_extensions() const override;
 
 private:
     WindowType window_type = WindowType::UNKNOWN;

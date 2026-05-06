@@ -20,14 +20,12 @@
 #ifdef WBE_REFLECTION_PARSER
 #define WBE_ATTR(...) __attribute__((annotate(#__VA_ARGS__)))
 #define WBE_META(...) WBE_ATTR(WBE, __VA_ARGS__)
-#define WBE_LABEL(label_name, ...)                                             \
-    constexpr HashCode WBE_META(__VA_ARGS__) label_name =                      \
-        static_hash(WBE_EXPAND_STR(label_name));
+#define WBE_LABEL(label_name, ...)                                                                                          \
+    constexpr HashCode WBE_META(__VA_ARGS__) label_name = static_hash(WBE_EXPAND_STR(label_name));
 
 #else
 #define WBE_META(...)
-#define WBE_LABEL(label_name, ...)                                             \
-    constexpr HashCode label_name = static_hash(WBE_EXPAND_STR(label_name));
+#define WBE_LABEL(label_name, ...) constexpr HashCode label_name = static_hash(WBE_EXPAND_STR(label_name));
 
 #endif
 
@@ -37,7 +35,8 @@ namespace WhiteBirdEngine {
  * @brief Serializer/deserializer for genenral types.
  * @tparam T The type to serialize/deserialize.
  */
-template <typename T> class SerializableSD {
+template <typename T>
+class SerializableSD {
 public:
     using ObjType = T;
 
@@ -49,8 +48,7 @@ public:
      * @param p_serializable The object to serialize.
      */
     template <typename ParserDataType>
-    static void serialize(
-        ParserDataType& p_data, const ObjType& p_serializable) {
+    static void serialize(ParserDataType& p_data, const ObjType& p_serializable) {
         p_data.set(p_serializable);
     }
 
@@ -60,8 +58,7 @@ public:
      * @param p_serializable The object to deserialize.
      */
     template <typename ParserDataType>
-    static void deserialize(
-        const ParserDataType& p_data, ObjType& p_serializable) {
+    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
         p_data.template get<ObjType>(p_serializable);
     }
 };

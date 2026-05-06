@@ -28,7 +28,8 @@
 #include <unordered_map>
 namespace WhiteBirdEngine {
 
-template <> struct AllocatorTrait<class HeapAllocatorAlignedRAM> {
+template <>
+struct AllocatorTrait<class HeapAllocatorAlignedRAM> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAlignedRAM>);
     static constexpr AllocatorType TYPE = AllocatorType::HEAP_ALLOCATOR;
     static constexpr bool IS_POOL = false;
@@ -53,8 +54,7 @@ public:
     HeapAllocatorAlignedRAM() = default;
     virtual ~HeapAllocatorAlignedRAM() override {
         if (!allocated.empty()) {
-            stdout_log(WBE_CHANNEL_GLOBAL)
-                ->warning("Non-empty allocator destructed.");
+            stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
         }
         for (auto data : allocated) {
             free(reinterpret_cast<void*>(data)); // NOLINT
@@ -65,8 +65,7 @@ public:
     HeapAllocatorAlignedRAM& operator=(const HeapAllocatorAlignedRAM&) = delete;
     HeapAllocatorAlignedRAM& operator=(HeapAllocatorAlignedRAM&&) = delete;
 
-    virtual MemID allocate(
-        size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
         if (p_size == 0) {
             return MEM_NULL;
         }
@@ -90,13 +89,21 @@ public:
         return reinterpret_cast<void*>(p_id);
     }
 
-    uint32_t obj_count() const { return allocated.size(); }
+    uint32_t obj_count() const {
+        return allocated.size();
+    }
 
-    std::set<MemID> get_allocated() const { return allocated; }
+    std::set<MemID> get_allocated() const {
+        return allocated;
+    }
 
-    virtual bool is_empty() const override { return allocated.empty(); }
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
 
-    virtual void clear() override { allocated.clear(); }
+    virtual void clear() override {
+        allocated.clear();
+    }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
         return size_map.at(p_mem_id);

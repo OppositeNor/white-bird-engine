@@ -73,15 +73,11 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    virtual Vector<ResAccessVK, RenderAllocator>
-    read_resources() const override;
+    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
-    virtual Vector<ResAccessVK, RenderAllocator>
-    write_resources() const override;
+    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    virtual void record(VkCommandBuffer p_command_buffer,
-        const Vector<RendResVK, RenderAllocator>& p_resources,
-        double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

@@ -24,14 +24,12 @@
 
 namespace WhiteBirdEngine {
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(
-    Ref<ROImageVK> p_image) {
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
     image = p_image;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_view_type(
-    VkImageViewType p_view_type) {
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_view_type(VkImageViewType p_view_type) {
     view_type = p_view_type;
     return *this;
 }
@@ -41,29 +39,23 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_format(VkFormat p_format) {
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(
-    const VkComponentMapping& p_components) {
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(const VkComponentMapping& p_components) {
     components = p_components;
     return *this;
 }
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(
-    VkComponentSwizzle p_r,
-    VkComponentSwizzle p_g,
-    VkComponentSwizzle p_b,
-    VkComponentSwizzle p_a) {
+    VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a) {
     components = {.r = p_r, .g = p_g, .b = p_b, .a = p_a};
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(
-    const VkImageSubresourceRange& p_subresource_range) {
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkImageSubresourceRange& p_subresource_range) {
     subresource_range = p_subresource_range;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(
-    const ROImageVK::Builder& p_image_config) {
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROImageVK::Builder& p_image_config) {
     switch (WBE_REQUIRED(p_image_config.image_type)) {
     case VK_IMAGE_TYPE_1D:
         view_type = VK_IMAGE_VIEW_TYPE_1D;
@@ -81,8 +73,7 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(
     return *this;
 }
 
-VkImageView ROImageViewVK::Builder::create_vk_object(
-    const BaseRenderDataVK* p_render_data) const {
+VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     create_info.image = WBE_REQUIRED(image).get_image();
@@ -92,17 +83,13 @@ VkImageView ROImageViewVK::Builder::create_vk_object(
     create_info.subresourceRange = subresource_range;
 
     VkImageView result;
-    if (vkCreateImageView(p_render_data->logic_device,
-            &create_info,
-            p_render_data->allocation_callbacks,
-            &result) != VK_SUCCESS) {
+    if (vkCreateImageView(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create image view.");
     }
     return result;
 }
 
-ROImageViewVK::ROImageViewVK(
-    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
@@ -114,9 +101,7 @@ ROImageViewVK::~ROImageViewVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
         [render_data = render_data, image_view = image_view]() {
-            vkDestroyImageView(render_data->logic_device,
-                image_view,
-                render_data->allocation_callbacks);
+            vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }

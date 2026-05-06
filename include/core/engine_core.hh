@@ -67,7 +67,9 @@ public:
      *
      * @return The singleton of engine core.
      */
-    static EngineCore* get_singleton() { return singleton; }
+    static EngineCore* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief The global clock starts recording when the engine core is

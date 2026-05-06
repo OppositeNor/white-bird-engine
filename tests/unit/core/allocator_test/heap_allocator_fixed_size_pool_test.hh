@@ -68,7 +68,7 @@ void test_continuous(WBE::HeapAllocatorFixedSizePool& p_pool, WBE::MemID p_mems[
         }
         if (curr_addr > p_pool.get(max_addr_id)) {
             max_addr_id = p_mems[i];
-        } 
+        }
     }
     ASSERT_TRUE(found_begin);
     // they should be ranged within a size of ArrSize * SIZE
@@ -104,6 +104,5 @@ TEST_F(WBEAllocFSPTest, MemContinuity) {
     }
     ASSERT_TRUE(pool.is_empty());
 }
-
 
 #endif

@@ -32,8 +32,7 @@ namespace WhiteBirdEngine {
  * @brief Descriptor set layout.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetLayoutVK final
-    : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) RODescriptorSetLayoutVK final : public RenderObjectVK {
 public:
     // Builder for RODescriptorSetLayoutVK
     struct Builder {
@@ -47,8 +46,7 @@ public:
          * @param p_bindings The bindings to set to.
          * @return *this.
          */
-        Builder& set_bindings(
-            const std::span<VkDescriptorSetLayoutBinding>& p_bindings);
+        Builder& set_bindings(const std::span<VkDescriptorSetLayoutBinding>& p_bindings);
         /**
          * @brief Add a binding.
          *
@@ -67,25 +65,18 @@ public:
          * binding.
          * @return *this.
          */
-        Builder& add_ubo(uint32_t p_binding,
-            uint32_t p_descriptor_count,
-            VkShaderStageFlags p_shader_stages = VK_SHADER_STAGE_ALL);
+        Builder& add_ubo(uint32_t p_binding, uint32_t p_descriptor_count, VkShaderStageFlags p_shader_stages = VK_SHADER_STAGE_ALL);
 
-        Ref<RODescriptorSetLayoutVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<RODescriptorSetLayoutVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<RODescriptorSetLayoutVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<RODescriptorSetLayoutVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<RODescriptorSetLayoutVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<RODescriptorSetLayoutVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<RODescriptorSetLayoutVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<RODescriptorSetLayoutVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkDescriptorSetLayout create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkDescriptorSetLayout create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ~RODescriptorSetLayoutVK();
@@ -97,8 +88,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
-    RODescriptorSetLayoutVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RODescriptorSetLayoutVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the vulkan descriptor set layout instance.

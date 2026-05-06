@@ -22,8 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-VkFramebuffer ROFramebufferVK::Builder::create_vk_object(
-    const BaseRenderDataVK* p_render_data) const {
+VkFramebuffer ROFramebufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkFramebufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     create_info.renderPass = render_pass->get_render_pass();
@@ -38,18 +37,14 @@ VkFramebuffer ROFramebufferVK::Builder::create_vk_object(
     create_info.height = WBE_REQUIRED(height);
     create_info.layers = layers;
     VkFramebuffer result;
-    if (vkCreateFramebuffer(p_render_data->logic_device,
-            &create_info,
-            p_render_data->allocation_callbacks,
-            &result) != VK_SUCCESS) {
+    if (vkCreateFramebuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create framebuffer.");
     }
 
     return result;
 }
 
-ROFramebufferVK::ROFramebufferVK(
-    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROFramebufferVK::ROFramebufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     framebuffer = p_builder.create_vk_object(p_render_data);
     exposed_fields.extent = {*(p_builder.width), *(p_builder.height)};
@@ -60,9 +55,7 @@ ROFramebufferVK::~ROFramebufferVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
         [render_data = render_data, framebuffer = framebuffer]() {
-            vkDestroyFramebuffer(render_data->logic_device,
-                framebuffer,
-                render_data->allocation_callbacks);
+            vkDestroyFramebuffer(render_data->logic_device, framebuffer, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }

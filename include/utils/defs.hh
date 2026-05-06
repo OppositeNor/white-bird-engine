@@ -36,8 +36,7 @@
 // TODO: fix this
 #define WBE_NO_OPTIMIZE __attribute__((optimize("O0")))
 #else
-#pragma message(                                                               \
-    Please indicate the "no optimization" attribute here for your compiler.)
+#pragma message(Please indicate the "no optimization" attribute here for your compiler.)
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
@@ -51,41 +50,36 @@
 #endif
 
 // Requires the struct to satisfy a specific concept.
-#define WBE_REQUIRES_CONCEPT(requires_concept, StructType)                     \
-    static_assert(requires_concept<StructType>)
+#define WBE_REQUIRES_CONCEPT(requires_concept, StructType) static_assert(requires_concept<StructType>)
 
 // Used inside a trait structure.
 #define WBE_TRAIT(trait_name) using TraitType = trait_name
 
 // Used inside a trait structure. Requires the trait to satisfy a specific
 // concept.
-#define WBE_TRAIT_REQUIRES(requires_concept)                                   \
-    WBE_REQUIRES_CONCEPT(requires_concept, TraitType)
+#define WBE_TRAIT_REQUIRES(requires_concept) WBE_REQUIRES_CONCEPT(requires_concept, TraitType)
 
 // Used for macro expansion.
 #define WBE_EXPAND_STR(x) #x
 
 // Define a type with metadata.
-#define WBE_TYPE_METADATA(type_name)                                           \
-    template <> struct TypeIDTrait<type_name> {                                \
-        static constexpr TypeID TYPE_ID =                                      \
-            WhiteBirdEngine::static_hash(WBE_EXPAND_STR(type_name));           \
-        static constexpr std::string_view TYPE_NAME =                          \
-            WBE_EXPAND_STR(type_name);                                         \
-    };                                                                         \
-    template <> struct TypeIDRevTrait<TypeIDTrait<type_name>::TYPE_ID> {       \
-        using Type = type_name;                                                \
+#define WBE_TYPE_METADATA(type_name)                                                                                        \
+    template <>                                                                                                             \
+    struct TypeIDTrait<type_name> {                                                                                         \
+        static constexpr TypeID TYPE_ID = WhiteBirdEngine::static_hash(WBE_EXPAND_STR(type_name));                          \
+        static constexpr std::string_view TYPE_NAME = WBE_EXPAND_STR(type_name);                                            \
+    };                                                                                                                      \
+    template <>                                                                                                             \
+    struct TypeIDRevTrait<TypeIDTrait<type_name>::TYPE_ID> {                                                                \
+        using Type = type_name;                                                                                             \
     };
 
 // Get the type from an ID.
 #define WBE_TYPE_FROM_ID(type_id) WhiteBirdEngine::TypeIDRevTrait<type_id>::Type
 // Get the ID of a type.
-#define WBE_TYPE_TO_ID(type_name)                                              \
-    WhiteBirdEngine::TypeIDTrait<type_name>::TYPE_ID
+#define WBE_TYPE_TO_ID(type_name) WhiteBirdEngine::TypeIDTrait<type_name>::TYPE_ID
 // Get the name of the type ID.
-#define WBE_TYPE_ID_NAME(type_id)                                              \
-    WhiteBirdEngine::TypeIDTrait<                                              \
-        WhiteBirdEngine::TypeIDRevTrait<type_id>::Type>::TYPE_NAME
+#define WBE_TYPE_ID_NAME(type_id) WhiteBirdEngine::TypeIDTrait<WhiteBirdEngine::TypeIDRevTrait<type_id>::Type>::TYPE_NAME
 
 // Kilobyte
 #define WBE_KB(x) x * 1000
@@ -105,10 +99,9 @@
 #define WBE_TiB(x) x* WBE_GiB(1024)
 
 // Declare a CRTP concept for a CRTP base class.
-#define WBE_DECL_CRTP_CONCEPT(Base)                                            \
-    template <typename T>                                                      \
-    concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>,    \
-        std::remove_cvref_t<T>>
+#define WBE_DECL_CRTP_CONCEPT(Base)                                                                                         \
+    template <typename T>                                                                                                   \
+    concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>
 
 // Labels an component. Used for reflection.
 #define WBE_COMPONENT(...)
@@ -121,12 +114,10 @@
 #define WBE_DEFAULT_ALIGNMENT 16 // TODO: set value according to the platform
 
 // Get a required optional value.
-#define WBE_REQUIRED(optional_value)                                           \
-    WhiteBirdEngine::required(#optional_value, (optional_value))
+#define WBE_REQUIRED(optional_value) WhiteBirdEngine::required(#optional_value, (optional_value))
 
 // Requires a pointer or reference to be non-null.
-#define WBE_REQUIRES_VALID(optional_value)                                     \
-    WhiteBirdEngine::requires_valid(#optional_value, (optional_value))
+#define WBE_REQUIRES_VALID(optional_value) WhiteBirdEngine::requires_valid(#optional_value, (optional_value))
 
 #define WBE_FLOAT_TOLARENCE 0.0000001
 
@@ -136,128 +127,128 @@
 
 // Definitions for rule of six macros.
 // Rule of six with default constructor, destructor, copy and move operations.
-#define WBE_R6_DEFAULT(ClassName)                                              \
-    ClassName() = default;                                                     \
-    ~ClassName() = default;                                                    \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_DEFAULT(ClassName)                                                                                           \
+    ClassName() = default;                                                                                                  \
+    ~ClassName() = default;                                                                                                 \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
 // Rule of six with default constructor, default virtual destructor, default
 // copy and move operations.
-#define WBE_R6_DEFAULT_VIRTUAL(ClassName)                                      \
-    ClassName() = default;                                                     \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_DEFAULT_VIRTUAL(ClassName)                                                                                   \
+    ClassName() = default;                                                                                                  \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
 // Rule of six with default constructor, default overrided destructor, default
 // copy and move operations.
-#define WBE_R6_DEFAULT_OVERRIDE(ClassName)                                     \
-    ClassName() = default;                                                     \
-    virtual ~ClassName() override = default;                                   \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_DEFAULT_OVERRIDE(ClassName)                                                                                  \
+    ClassName() = default;                                                                                                  \
+    virtual ~ClassName() override = default;                                                                                \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
 // Rule of six with default constructor, default virtual destructor, default
 // copy and move operations.
-#define WBE_R6_DEFAULT_VIRTUAL(ClassName)                                      \
-    ClassName() = default;                                                     \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_DEFAULT_VIRTUAL(ClassName)                                                                                   \
+    ClassName() = default;                                                                                                  \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
-#define WBE_R6_DELETE_COPY_MOVE(ClassName)                                     \
-    ClassName() = default;                                                     \
-    ~ClassName() = default;                                                    \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_DELETE_COPY_MOVE(ClassName)                                                                                  \
+    ClassName() = default;                                                                                                  \
+    ~ClassName() = default;                                                                                                 \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six with default constructor, default virtual destructor, deleted
 // copy and move operations.
-#define WBE_R6_DELETE_COPY_MOVE_VIRTUAL(ClassName)                             \
-    ClassName() = default;                                                     \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_DELETE_COPY_MOVE_VIRTUAL(ClassName)                                                                          \
+    ClassName() = default;                                                                                                  \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six with default constructor, default overrided destructor, deleted
 // copy and move operations.
-#define WBE_R6_DELETE_COPY_MOVE_OVERRIDE(ClassName)                            \
-    ClassName() = default;                                                     \
-    virtual ~ClassName() override = default;                                   \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_DELETE_COPY_MOVE_OVERRIDE(ClassName)                                                                         \
+    ClassName() = default;                                                                                                  \
+    virtual ~ClassName() override = default;                                                                                \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six not defined default constructor, with default destructor, copy
 // and move operations, with a override for the destructor.
-#define WBE_R6_NDC_DEFAULT_OVERRIDE(ClassName)                                 \
-    virtual ~ClassName() override = default;                                   \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_NDC_DEFAULT_OVERRIDE(ClassName)                                                                              \
+    virtual ~ClassName() override = default;                                                                                \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
 // Rule of six not defined default constructor, with default destructor, copy
 // and move operations, with a override for the destructor.
-#define WBE_R6_NDC_DEFAULT_VIRTUAL(ClassName)                                  \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_NDC_DEFAULT_VIRTUAL(ClassName)                                                                               \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 
-#define WBE_R6_NDC_DELETE_COPY_MOVE(ClassName)                                 \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_NDC_DELETE_COPY_MOVE(ClassName)                                                                              \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six not defined default constructor, with default destructor, deleted
 // copy and move operations, with a override for the destructor.
-#define WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(ClassName)                        \
-    virtual ~ClassName() override = default;                                   \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(ClassName)                                                                     \
+    virtual ~ClassName() override = default;                                                                                \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six not defined default constructor, with default destructor, deleted
 // copy and move operations, with a override for the destructor.
-#define WBE_R6_NDC_DELETE_COPY_MOVE_VIRTUAL(ClassName)                         \
-    virtual ~ClassName() = default;                                            \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_NDC_DELETE_COPY_MOVE_VIRTUAL(ClassName)                                                                      \
+    virtual ~ClassName() = default;                                                                                         \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six not defined default constructor and default destructor, deleted
 // copy and move operations.
-#define WBE_R6_NDCD_DELETE_COPY_MOVE(ClassName)                                \
-    ClassName(const ClassName&) = delete;                                      \
-    ClassName(ClassName&&) noexcept = delete;                                  \
-    ClassName& operator=(const ClassName&) = delete;                           \
+#define WBE_R6_NDCD_DELETE_COPY_MOVE(ClassName)                                                                             \
+    ClassName(const ClassName&) = delete;                                                                                   \
+    ClassName(ClassName&&) noexcept = delete;                                                                               \
+    ClassName& operator=(const ClassName&) = delete;                                                                        \
     ClassName& operator=(ClassName&&) noexcept = delete;
 
 // Rule of six not defined default constructor and default destructor, with
 // default copy and move operations.
-#define WBE_R6_NDCD_DEFAULT_COPY_MOVE(ClassName)                               \
-    ClassName(const ClassName&) = default;                                     \
-    ClassName(ClassName&&) noexcept = default;                                 \
-    ClassName& operator=(const ClassName&) = default;                          \
+#define WBE_R6_NDCD_DEFAULT_COPY_MOVE(ClassName)                                                                            \
+    ClassName(const ClassName&) = default;                                                                                  \
+    ClassName(ClassName&&) noexcept = default;                                                                              \
+    ClassName& operator=(const ClassName&) = default;                                                                       \
     ClassName& operator=(ClassName&&) noexcept = default;
 #endif

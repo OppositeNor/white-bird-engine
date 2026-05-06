@@ -18,7 +18,6 @@
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
@@ -29,13 +28,11 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
-#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/window/i_window.hh"
 #include "global/stl_allocator.hh"
@@ -96,9 +93,7 @@ public:
      * @param p_job_buffer The render job buffer. Used for committing jobs for
      * the renderer to perform.
      */
-    RendererVK(AllocType* p_allocator,
-        Ref<IWindow> p_window,
-        Ref<JobBufferRingSPSC> p_job_buffer);
+    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer);
 
     virtual void tick(double p_delta) override;
 
@@ -109,8 +104,7 @@ public:
      * @param p_pipeline_name The name to register under.
      * @param p_desc          The pipeline descriptor.
      */
-    void register_pipeline(
-        const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
+    void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override;
 
@@ -129,7 +123,9 @@ public:
      *
      * @return The singleton instance.
      */
-    static RendererVK* get_singleton() { return singleton; }
+    static RendererVK* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief Get the base render data of this renderer.
@@ -145,8 +141,7 @@ public:
      *
      * @param p_task The task to be added.
      */
-    void add_pre_execute_task(
-        const std::function<void(VkCommandBuffer)>& p_task) {
+    void add_pre_execute_task(const std::function<void(VkCommandBuffer)>& p_task) {
         base_render_data.pre_execute_tasks_queue.push_back(p_task);
     }
 
@@ -168,8 +163,7 @@ public:
      * @param p_task The task to be called.
      * @param p_delayed_frames The number of frames to be delayed.
      */
-    void register_delay_call(
-        std::function<void()>&& p_task, uint32_t p_delayed_frames) {
+    void register_delay_call(std::function<void()>&& p_task, uint32_t p_delayed_frames) {
         for (auto& delayed_call : delayed_calls) {
             if (delayed_call.second < 0) {
                 delayed_call.first = std::move(p_task);
@@ -177,8 +171,7 @@ public:
                 return;
             }
         }
-        throw std::runtime_error(
-            "Failed to register delay call: buffer overflow.");
+        throw std::runtime_error("Failed to register delay call: buffer overflow.");
     }
 
     /**
@@ -198,10 +191,12 @@ private:
 
     template <typename T>
     using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
-    template <typename T> using Set = ::WhiteBirdEngine::Set<T, AllocType>;
+    template <typename T>
+    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
     template <typename T>
     using HashSet = ::WhiteBirdEngine::HashSet<T, AllocType>;
-    template <typename T> using Deque = ::WhiteBirdEngine::Deque<T, AllocType>;
+    template <typename T>
+    using Deque = ::WhiteBirdEngine::Deque<T, AllocType>;
     template <typename TKey, typename TVal>
     using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
     using String = ::WhiteBirdEngine::String<AllocType>;
@@ -246,8 +241,7 @@ private:
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 
     Vector<VkFence> in_flight_fences;
-    std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS>
-        delayed_calls;
+    std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
     Vector<Ref<SemaphoreVK>> image_available_semaphores;
@@ -284,8 +278,7 @@ private:
         std::optional<uint32_t> compute;  // For compute shader
         std::optional<uint32_t> present;  // For presenting contents in window
         bool is_complete() const {
-            return graphics.has_value() && compute.has_value() &&
-                   present.has_value();
+            return graphics.has_value() && compute.has_value() && present.has_value();
         }
         Set<uint32_t> get_unique_indices() const {
             WBE_DEBUG_ASSERT(is_complete());
@@ -306,8 +299,7 @@ private:
         }
     };
 
-    std::vector<VkDynamicState> dynamic_states = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
     struct TaskInfo {
         RendTaskID task_id;
@@ -320,9 +312,8 @@ private:
     // Render objects for the renderer.
     struct RenderObjects {
         RenderObjects(AllocType* p_allocator)
-            : swap_chain_images(p_allocator),
-              swap_chain_image_views(p_allocator),
-              swap_chain_framebuffers(p_allocator) {}
+            : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {
+        }
         // Render pass.
         Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline layout.
@@ -367,36 +358,28 @@ private:
 
     bool check_device_extension_support(VkPhysicalDevice p_device);
     bool check_layer_support();
-    void pick_physical_device(
-        const Vector<VkPhysicalDevice>& p_physical_devices);
+    void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
 
     bool is_device_suitable(VkPhysicalDevice p_device);
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
-    SwapChainSupportDetails get_swap_chain_support_details(
-        VkPhysicalDevice p_device);
-    VkSurfaceFormatKHR choose_swap_surface_format(
-        const Vector<VkSurfaceFormatKHR>& p_available_formats);
-    VkPresentModeKHR choose_swap_present_mode(
-        const Vector<VkPresentModeKHR>& p_available_present_modes);
-    VkExtent2D choose_swap_extent(
-        const VkSurfaceCapabilitiesKHR& p_capabilities);
+    SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
+    VkSurfaceFormatKHR choose_swap_surface_format(const Vector<VkSurfaceFormatKHR>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const Vector<VkPresentModeKHR>& p_available_present_modes);
+    VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
     void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
         return allocator_vk->get_allocation_callbacks();
     }
 
-    int32_t rate_memory_type(
-        VkMemoryType p_memory_type, DeviceDomain p_domain) const;
-    uint32_t find_memory_type(
-        uint32_t p_type_filter, DeviceDomain p_domain) const;
+    int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
+    uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;
 
     void run_stored_jobs();
-    std::optional<uint32_t> acquire_swapchain_next_image(
-        VkSemaphore p_image_avialable_semaphore);
+    std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
     std::optional<uint32_t> tick_setup_pipeline();
     void run_delayed_calls();
     void present(uint32_t p_image_index);

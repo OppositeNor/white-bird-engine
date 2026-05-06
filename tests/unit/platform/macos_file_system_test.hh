@@ -24,13 +24,13 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(MacOSFileSystemTest, DirEquals) {
-    WBE::Directory dir1({ "Hello", "what", "is", "up" }, true);
+    WBE::Directory dir1({"Hello", "what", "is", "up"}, true);
     ASSERT_TRUE(dir1 == dir1);
     ASSERT_FALSE(dir1 != dir1);
-    WBE::Directory dir2({ "Hello", "what", "is", "up" }, false);
+    WBE::Directory dir2({"Hello", "what", "is", "up"}, false);
     ASSERT_FALSE(dir1 == dir2);
     ASSERT_TRUE(dir1 != dir2);
-    WBE::Directory dir3({ "Hello", "what", "is" }, true);
+    WBE::Directory dir3({"Hello", "what", "is"}, true);
     ASSERT_FALSE(dir1 == dir2);
     ASSERT_TRUE(dir1 != dir2);
     WBE::Directory dir_empty1({}, false);
@@ -48,23 +48,23 @@ TEST(MacOSFileSystemTest, DirEquals) {
 }
 
 TEST(MacOSFileSystemTest, DirToString) {
-    WBE::Directory test_dir({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
+    WBE::Directory test_dir({"hello", "world", "this", "is", "a", "test", "directory"}, false);
     ASSERT_EQ(WBE::FileSystem::dir_to_string(test_dir), std::string("hello/world/this/is/a/test/directory/"));
     ASSERT_EQ(std::string(test_dir), std::string("hello/world/this/is/a/test/directory/"));
-    WBE::Directory test_dir_absolute({ "this", "is", "a", "absolute", "test", "directory" }, true);
+    WBE::Directory test_dir_absolute({"this", "is", "a", "absolute", "test", "directory"}, true);
     ASSERT_EQ(WBE::FileSystem::dir_to_string(test_dir_absolute), std::string("/this/is/a/absolute/test/directory/"));
     ASSERT_EQ(std::string(test_dir_absolute), std::string("/this/is/a/absolute/test/directory/"));
 }
 
 TEST(MacOSFileSystemTest, ParseDirectory) {
-    WBE::Directory expected({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
+    WBE::Directory expected({"hello", "world", "this", "is", "a", "test", "directory"}, false);
     WBE::Directory parsed_dir = WBE::FileSystem::parse_directory("hello/world//this/is/not/../a/test/./directory");
     ASSERT_EQ(parsed_dir, expected);
     WBE::Directory parsed_dir_1 = WBE::FileSystem::parse_directory("../hello/world/this/is/not/../a/test/./directory/XD/../");
     ASSERT_EQ(parsed_dir_1, expected);
     WBE::Directory parsed_dir_2 = WBE::FileSystem::parse_directory("./hello/world/this/is/not/../a/test/./directory/XD/../");
     ASSERT_EQ(parsed_dir_2, expected);
-    WBE::Directory expected_absolute({ "hello", "this", "is", "me" }, true);
+    WBE::Directory expected_absolute({"hello", "this", "is", "me"}, true);
     WBE::Directory parsed_dir_absolute = WBE::FileSystem::parse_directory("/../hello/this/is/me/");
     ASSERT_EQ(parsed_dir_absolute, expected_absolute);
     WBE::Directory parsed_dir_absolute_1 = WBE::FileSystem::parse_directory("/./../hello/that/../this/is/me/");
@@ -82,41 +82,41 @@ TEST(MacOSFileSystemTest, ParseDirectory) {
 TEST(MacOSFileSystemTest, ParseDirectoryEmptyEdgeCases) {
     // Test specific edge case where splitting results in empty array
     WBE::Directory expected_empty({}, false);
-    
+
     // Empty string should return empty relative directory
     WBE::Directory parsed_empty = WBE::FileSystem::parse_directory("");
     ASSERT_EQ(parsed_empty, expected_empty);
-    
+
     // String with only separators and dots should result in appropriate directories
     WBE::Directory parsed_dots_only = WBE::FileSystem::parse_directory("./././.");
     ASSERT_EQ(parsed_dots_only, expected_empty);
-    
+
     // String with only double dots that cancel out
     WBE::Directory parsed_cancelled = WBE::FileSystem::parse_directory("../dir/../");
     ASSERT_EQ(parsed_cancelled, expected_empty);
-    
+
     // Multiple slashes should be treated as single separators
     WBE::Directory parsed_multiple_slashes = WBE::FileSystem::parse_directory("///");
     WBE::Directory expected_absolute_empty({}, true);
     ASSERT_EQ(parsed_multiple_slashes, expected_absolute_empty);
-    
+
     // Complex case that results in empty after processing
     WBE::Directory parsed_complex_empty = WBE::FileSystem::parse_directory("./a/../b/../c/../");
     ASSERT_EQ(parsed_complex_empty, expected_empty);
-    
+
     // Verify splitted.size() == 0 condition is properly handled
     WBE::Directory parsed_only_separators = WBE::FileSystem::parse_directory("////");
     ASSERT_EQ(parsed_only_separators, expected_absolute_empty);
 }
 
 TEST(MacOSFileSystemTest, CombineDirectory) {
-    WBE::Directory expected_absolute({ "hello", "world", "this", "is", "a", "test", "directory" }, true);
-    WBE::Directory dir1({ "hello", "world" }, true);
-    WBE::Directory dir = dir1.combine(WBE::Directory({ "this", "is", "a", "test", "directory" }, false));
+    WBE::Directory expected_absolute({"hello", "world", "this", "is", "a", "test", "directory"}, true);
+    WBE::Directory dir1({"hello", "world"}, true);
+    WBE::Directory dir = dir1.combine(WBE::Directory({"this", "is", "a", "test", "directory"}, false));
     ASSERT_EQ(expected_absolute, dir);
-    WBE::Directory expected_relative({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
-    WBE::Directory dir2({ "hello", "world" }, false);
-    WBE::Directory dir_rel = dir2.combine(WBE::Directory({ "this", "is", "a", "test", "directory" }, false));
+    WBE::Directory expected_relative({"hello", "world", "this", "is", "a", "test", "directory"}, false);
+    WBE::Directory dir2({"hello", "world"}, false);
+    WBE::Directory dir_rel = dir2.combine(WBE::Directory({"this", "is", "a", "test", "directory"}, false));
     ASSERT_EQ(expected_relative, dir_rel);
     ASSERT_EQ(dir1.combine(WBE::Directory(std::vector<std::string>())), dir1);
     ASSERT_EQ(dir2.combine(WBE::Directory(std::vector<std::string>())), dir2);
@@ -136,21 +136,21 @@ TEST(MacOSFileSystemTest, GetFileName) {
 }
 
 TEST(MacOSFileSystemTest, GetFileDir) {
-    WBE::Directory expected1({ "hello", "world", "this", "is", "a", "test" }, false);
+    WBE::Directory expected1({"hello", "world", "this", "is", "a", "test"}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("hello/world/this/is/a/test/file.txt"), expected1);
-    WBE::Directory expected2({ "hello", "world", "this", "is", "a", "test" }, true);
+    WBE::Directory expected2({"hello", "world", "this", "is", "a", "test"}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/hello/world/this/is/a/test/file.txt"), expected2);
     WBE::Directory expected3({}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("file.txt"), expected3);
     WBE::Directory expected4({}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/file.txt"), expected4);
-    WBE::Directory expected5({ "hello", "world", "this", "is", "a", "test", "directory" }, false);
+    WBE::Directory expected5({"hello", "world", "this", "is", "a", "test", "directory"}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("hello/world/this/is/a/test/directory/"), expected5);
-    WBE::Directory expected6({ "hello", "world", "this", "is", "a", "test", "directory" }, true);
+    WBE::Directory expected6({"hello", "world", "this", "is", "a", "test", "directory"}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/hello/world/this/is/a/test/directory/"), expected6);
-    WBE::Directory expected5_alt({ "hello", "world", "this", "is", "a", "test" }, false);
+    WBE::Directory expected5_alt({"hello", "world", "this", "is", "a", "test"}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("hello/world/this/is/a/test/directory"), expected5_alt);
-    WBE::Directory expected6_alt({ "hello", "world", "this", "is", "a", "test" }, true);
+    WBE::Directory expected6_alt({"hello", "world", "this", "is", "a", "test"}, true);
     ASSERT_EQ(WBE::FileSystem::get_file_dir("/hello/world/this/is/a/test/directory"), expected6_alt);
     WBE::Directory expected7({}, false);
     ASSERT_EQ(WBE::FileSystem::get_file_dir(""), expected7);
@@ -161,17 +161,17 @@ TEST(MacOSFileSystemTest, GetFileDir) {
 }
 
 TEST(MacOSFileSystemTest, PathToString) {
-    WBE::Path path1(WBE::Directory({ "hello", "world", "this", "is", "a", "test" }, false), "file.txt");
+    WBE::Path path1(WBE::Directory({"hello", "world", "this", "is", "a", "test"}, false), "file.txt");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path1), std::string("hello/world/this/is/a/test/file.txt"));
-    WBE::Path path2(WBE::Directory({ "hello", "world", "this", "is", "a", "test" }, true), "file.txt");
+    WBE::Path path2(WBE::Directory({"hello", "world", "this", "is", "a", "test"}, true), "file.txt");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path2), std::string("/hello/world/this/is/a/test/file.txt"));
     WBE::Path path3(WBE::Directory({}, false), "file.txt");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path3), std::string("file.txt"));
     WBE::Path path4(WBE::Directory({}, true), "file.txt");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path4), std::string("/file.txt"));
-    WBE::Path path5(WBE::Directory({ "hello", "world", "this", "is", "a", "test", "directory" }, false), "");
+    WBE::Path path5(WBE::Directory({"hello", "world", "this", "is", "a", "test", "directory"}, false), "");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path5), std::string("hello/world/this/is/a/test/directory/"));
-    WBE::Path path6(WBE::Directory({ "hello", "world", "this", "is", "a", "test", "directory" }, true), "");
+    WBE::Path path6(WBE::Directory({"hello", "world", "this", "is", "a", "test", "directory"}, true), "");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path6), std::string("/hello/world/this/is/a/test/directory/"));
     WBE::Path path7(WBE::Directory({}, false), "");
     ASSERT_EQ(WBE::FileSystem::path_to_string(path7), std::string(""));
@@ -180,15 +180,15 @@ TEST(MacOSFileSystemTest, PathToString) {
 }
 
 TEST(MacOSFileSystemTest, GetExt) {
-    WBE::Path path1(WBE::Directory({ "hello", "world" }, false), "file.txt");
+    WBE::Path path1(WBE::Directory({"hello", "world"}, false), "file.txt");
     ASSERT_EQ(WBE::FileSystem::get_ext(path1), std::string(".txt"));
-    WBE::Path path2(WBE::Directory({ "hello", "world" }, true), "archive.tar.gz");
+    WBE::Path path2(WBE::Directory({"hello", "world"}, true), "archive.tar.gz");
     ASSERT_EQ(WBE::FileSystem::get_ext(path2), std::string(".gz"));
     WBE::Path path3(WBE::Directory({}, false), "no_extension");
     ASSERT_EQ(WBE::FileSystem::get_ext(path3), std::string(""));
     WBE::Path path4(WBE::Directory({}, true), ".hiddenfile");
     ASSERT_EQ(WBE::FileSystem::get_ext(path4), std::string(""));
-    WBE::Path path5(WBE::Directory({ "some", "path" }, false), "complex.name.with.many.dots.ext");
+    WBE::Path path5(WBE::Directory({"some", "path"}, false), "complex.name.with.many.dots.ext");
     ASSERT_EQ(WBE::FileSystem::get_ext(path5), std::string(".ext"));
 }
 

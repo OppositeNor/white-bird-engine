@@ -17,13 +17,13 @@
 
 #include "core/parser/parser_json.hh"
 #include "core/parser/parser_yaml.hh"
+#include "core/reflection/serializable.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
-#include "core/reflection/serializable.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "reflection_test_data.hh"
-#include "generated/serializables_sd.gen.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -38,7 +38,6 @@ namespace WBE = WhiteBirdEngine;
 
 class WBESerializerTest : public ::testing::Test {
 protected:
-
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
     }
@@ -46,7 +45,7 @@ protected:
     void TearDown() override {
         global.reset();
     }
- 
+
     std::unique_ptr<WBE::Global> global;
 };
 template <typename ParserDataType>
@@ -194,8 +193,9 @@ inline void serializer_test_vector_primitives(ParserDataType p_data_ints, Parser
 
     auto out_ints = p_data_ints.template get<std::vector<int>>();
     ASSERT_EQ(out_ints.size(), ints.size());
-    for (size_t i = 0; i < ints.size(); ++i) { EXPECT_EQ(out_ints[i], ints[i]);
-}
+    for (size_t i = 0; i < ints.size(); ++i) {
+        EXPECT_EQ(out_ints[i], ints[i]);
+    }
 
     // Test vector<string>
     std::vector<std::string> strs = {"one", "two", "three"};
@@ -204,16 +204,23 @@ inline void serializer_test_vector_primitives(ParserDataType p_data_ints, Parser
 
     auto out_strs = p_data_strs.template get<std::vector<std::string>>();
     ASSERT_EQ(out_strs.size(), strs.size());
-    for (size_t i = 0; i < strs.size(); ++i) { EXPECT_EQ(out_strs[i], strs[i]);
-}
+    for (size_t i = 0; i < strs.size(); ++i) {
+        EXPECT_EQ(out_strs[i], strs[i]);
+    }
 }
 
 template <typename ParserDataType>
 inline void serializer_test_vector_serializables(ParserDataType p_data) {
     // Test serializing vector of WBE::TestSerializable objects
     std::vector<WBE::TestSerializable> vec;
-    WBE::TestSerializable a{}; a.si32_test = 1; a.str_test = "a"; strcpy(a.buffer_test.buffer, "A");
-    WBE::TestSerializable b{}; b.si32_test = 2; b.str_test = "b"; strcpy(b.buffer_test.buffer, "B");
+    WBE::TestSerializable a{};
+    a.si32_test = 1;
+    a.str_test = "a";
+    strcpy(a.buffer_test.buffer, "A");
+    WBE::TestSerializable b{};
+    b.si32_test = 2;
+    b.str_test = "b";
+    strcpy(b.buffer_test.buffer, "B");
     vec.push_back(a);
     vec.push_back(b);
 
@@ -236,8 +243,14 @@ inline void serializer_test_struct_with_vector_serializables(ParserDataType p_da
     container.ints = {10, 20, 30};
     container.strs = {"aa", "bb"};
 
-    WBE::TestSerializable a{}; a.si32_test = 5; a.str_test = "aa"; strcpy(a.buffer_test.buffer, "A");
-    WBE::TestSerializable b{}; b.si32_test = 6; b.str_test = "bb"; strcpy(b.buffer_test.buffer, "B");
+    WBE::TestSerializable a{};
+    a.si32_test = 5;
+    a.str_test = "aa";
+    strcpy(a.buffer_test.buffer, "A");
+    WBE::TestSerializable b{};
+    b.si32_test = 6;
+    b.str_test = "bb";
+    strcpy(b.buffer_test.buffer, "B");
     container.children.push_back(a);
     container.children.push_back(b);
 
@@ -315,13 +328,25 @@ template <typename ParserDataType>
 inline void serializer_vector_with_deep_nesting(ParserDataType p_data) {
     WBE::TestDeepVectorContainer container{};
 
-    WBE::TestDepth2 d2a{}; d2a.nested.si32_test = 31; d2a.depth2_id = 1; d2a.depth2_name = "d2a";
-    WBE::TestDepth2 d2b{}; d2b.nested.si32_test = 32; d2b.depth2_id = 2; d2b.depth2_name = "d2b";
+    WBE::TestDepth2 d2a{};
+    d2a.nested.si32_test = 31;
+    d2a.depth2_id = 1;
+    d2a.depth2_name = "d2a";
+    WBE::TestDepth2 d2b{};
+    d2b.nested.si32_test = 32;
+    d2b.depth2_id = 2;
+    d2b.depth2_name = "d2b";
     container.vec2.push_back(d2a);
     container.vec2.push_back(d2b);
 
-    WBE::TestDepth3 d3a{}; d3a.nested2.nested.si32_test = 41; d3a.depth3_id = 3; d3a.depth3_name = "d3a";
-    WBE::TestDepth3 d3b{}; d3b.nested2.nested.si32_test = 42; d3b.depth3_id = 4; d3b.depth3_name = "d3b";
+    WBE::TestDepth3 d3a{};
+    d3a.nested2.nested.si32_test = 41;
+    d3a.depth3_id = 3;
+    d3a.depth3_name = "d3a";
+    WBE::TestDepth3 d3b{};
+    d3b.nested2.nested.si32_test = 42;
+    d3b.depth3_id = 4;
+    d3b.depth3_name = "d3b";
     container.vec3.push_back(d3a);
     container.vec3.push_back(d3b);
 
@@ -482,15 +507,23 @@ template <typename ParserDataType>
 inline void serializer_test_inheritance_vector(ParserDataType p_data) {
     // Test vector of inherited objects
     std::vector<WBE::TestInheritedChild> children;
-    
+
     WBE::TestInheritedChild child1{};
-    child1.base_id = 1; child1.base_name = "base1"; child1.base_value = 1.1F;
-    child1.child_id = 11; child1.child_name = "child1"; child1.child_value = 11.1;
-    
+    child1.base_id = 1;
+    child1.base_name = "base1";
+    child1.base_value = 1.1F;
+    child1.child_id = 11;
+    child1.child_name = "child1";
+    child1.child_value = 11.1;
+
     WBE::TestInheritedChild child2{};
-    child2.base_id = 2; child2.base_name = "base2"; child2.base_value = 2.2F;
-    child2.child_id = 22; child2.child_name = "child2"; child2.child_value = 22.2;
-    
+    child2.base_id = 2;
+    child2.base_name = "base2";
+    child2.base_value = 2.2F;
+    child2.child_id = 22;
+    child2.child_name = "child2";
+    child2.child_value = 22.2;
+
     children.push_back(child1);
     children.push_back(child2);
 
@@ -612,17 +645,29 @@ template <typename ParserDataType>
 inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
     // Test vector of multiple inheritance objects
     std::vector<WBE::TestMultipleInheritanceChild> children;
-    
+
     WBE::TestMultipleInheritanceChild child1{};
-    child1.a_id = 1; child1.a_name = "a1"; child1.a_value = 1.1F;
-    child1.b_id = 2; child1.b_name = "b1"; child1.b_value = 2.2;
-    child1.child_id = 3; child1.child_name = "c1"; child1.child_vector = glm::vec2(1.0F, 2.0F);
-    
+    child1.a_id = 1;
+    child1.a_name = "a1";
+    child1.a_value = 1.1F;
+    child1.b_id = 2;
+    child1.b_name = "b1";
+    child1.b_value = 2.2;
+    child1.child_id = 3;
+    child1.child_name = "c1";
+    child1.child_vector = glm::vec2(1.0F, 2.0F);
+
     WBE::TestMultipleInheritanceChild child2{};
-    child2.a_id = 11; child2.a_name = "a2"; child2.a_value = 11.1F;
-    child2.b_id = 22; child2.b_name = "b2"; child2.b_value = 22.2;
-    child2.child_id = 33; child2.child_name = "c2"; child2.child_vector = glm::vec2(3.0F, 4.0F);
-    
+    child2.a_id = 11;
+    child2.a_name = "a2";
+    child2.a_value = 11.1F;
+    child2.b_id = 22;
+    child2.b_name = "b2";
+    child2.b_value = 22.2;
+    child2.child_id = 33;
+    child2.child_name = "c2";
+    child2.child_vector = glm::vec2(3.0F, 4.0F);
+
     children.push_back(child1);
     children.push_back(child2);
 
@@ -659,7 +704,7 @@ inline void serializer_test_multiple_inheritance_vector(ParserDataType p_data) {
 inline void dynamic_serializer_test_basic() {
     WBE::JSONData json_data;
     WBE::TestSerializable serializable{};
-    
+
     // Set some test values
     serializable.si32_test = 42;
     serializable.si64_test = -1337;
@@ -702,12 +747,12 @@ inline void dynamic_serializer_test_basic() {
 inline void dynamic_serializer_test_inheritance() {
     WBE::JSONData json_data;
     WBE::TestInheritedChild child{};
-    
+
     // Set inherited base fields
     child.base_id = 100;
     child.base_name = "dynamic_base";
     child.base_value = 1.23F;
-    
+
     // Set child fields
     child.child_id = 200;
     child.child_name = "dynamic_child";
@@ -735,17 +780,17 @@ inline void dynamic_serializer_test_inheritance() {
 inline void dynamic_serializer_test_multiple_inheritance() {
     WBE::JSONData json_data;
     WBE::TestMultipleInheritanceChild child{};
-    
+
     // Set fields from first parent (A)
     child.a_id = 111;
     child.a_name = "dynamic_a";
     child.a_value = 1.11F;
-    
+
     // Set fields from second parent (B)
     child.b_id = 222;
     child.b_name = "dynamic_b";
     child.b_value = 2.22;
-    
+
     // Set child's own fields
     child.child_id = 333;
     child.child_name = "dynamic_multi_child";
@@ -779,13 +824,13 @@ inline void dynamic_serializer_test_multiple_inheritance() {
 inline void dynamic_serializer_test_polymorphism() {
     // Test polymorphic serialization through base pointer
     WBE::JSONData json_data_base, json_data_child;
-    
+
     // Create objects
     WBE::TestInheritedBase base{};
     base.base_id = 42;
     base.base_name = "poly_base";
     base.base_value = 1.0F;
-    
+
     WBE::TestInheritedChild child{};
     child.base_id = 84;
     child.base_name = "poly_child_base";
@@ -802,7 +847,7 @@ inline void dynamic_serializer_test_polymorphism() {
     EXPECT_TRUE(json_data_base.contains("base_id"));
     EXPECT_TRUE(json_data_base.contains("base_name"));
     EXPECT_TRUE(json_data_base.contains("base_value"));
-    EXPECT_FALSE(json_data_base.contains("child_id"));  // Should not contain child fields
+    EXPECT_FALSE(json_data_base.contains("child_id")); // Should not contain child fields
     EXPECT_FALSE(json_data_base.contains("child_name"));
     EXPECT_FALSE(json_data_base.contains("child_value"));
 
@@ -825,12 +870,12 @@ inline void dynamic_serializer_test_polymorphism() {
 inline void dynamic_serializer_test_nested_objects() {
     WBE::JSONData json_data;
     WBE::TestInheritedWithNested obj{};
-    
+
     // Set inherited base fields
     obj.base_id = 999;
     obj.base_name = "dynamic_nested_base";
     obj.base_value = 7.77F;
-    
+
     // Set child fields
     obj.child_numbers = {10, 20, 30, 40};
     obj.nested_object.si32_test = 888;
@@ -868,7 +913,7 @@ inline void dynamic_serializer_test_nested_objects() {
 // Dynamic dispatch test functions
 inline void dynamic_dispatch_test_single_inheritance() {
     WBE::JSONData json_data_base, json_data_child;
-    
+
     // Create derived object
     auto child = std::make_unique<WBE::TestInheritedChild>();
     child->base_id = 500;
@@ -912,7 +957,7 @@ inline void dynamic_dispatch_test_single_inheritance() {
 
 inline void dynamic_dispatch_test_multilevel_inheritance() {
     WBE::JSONData json_data_base, json_data_child, json_data_grandchild;
-    
+
     // Create grandchild object
     auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
     grandchild->base_id = 100;
@@ -964,7 +1009,7 @@ inline void dynamic_dispatch_test_multilevel_inheritance() {
 
 inline void dynamic_dispatch_test_multiple_inheritance() {
     WBE::JSONData json_data_a, json_data_b;
-    
+
     // Create multiple inheritance child
     auto child = std::make_unique<WBE::TestMultipleInheritanceChild>();
     child->a_id = 777;
@@ -1014,13 +1059,13 @@ inline void dynamic_dispatch_test_multiple_inheritance() {
 inline void dynamic_dispatch_test_polymorphic_container() {
     // Test dynamic dispatch with polymorphic containers
     std::vector<std::unique_ptr<WBE::Serializable>> objects;
-    
+
     // Create different types of objects
     auto base = std::make_unique<WBE::TestInheritedBase>();
     base->base_id = 1;
     base->base_name = "container_base";
     base->base_value = 1.1F;
-    
+
     auto child = std::make_unique<WBE::TestInheritedChild>();
     child->base_id = 2;
     child->base_name = "container_child_base";
@@ -1028,7 +1073,7 @@ inline void dynamic_dispatch_test_polymorphic_container() {
     child->child_id = 22;
     child->child_name = "container_child";
     child->child_value = 2.22;
-    
+
     auto grandchild = std::make_unique<WBE::TestInheritedGrandchild>();
     grandchild->base_id = 3;
     grandchild->base_name = "container_grandchild_base";
@@ -1086,7 +1131,7 @@ inline void dynamic_dispatch_test_polymorphic_container() {
 
 inline void dynamic_dispatch_test_reference_semantics() {
     WBE::JSONData json_data;
-    
+
     // Test dynamic dispatch through references
     WBE::TestInheritedChild child{};
     child.base_id = 42;
@@ -1293,10 +1338,10 @@ inline void test_required_fields_serialization(ParserDataType p_data) {
     base_obj.required_id = 123;
     base_obj.required_name = "test_base";
     base_obj.optional_value = 2.5F;
-    
+
     WBE::SerializableSD<WBE::TestRequiredFieldsBase> base_sd;
     base_sd.serialize(p_data, base_obj);
-    
+
     EXPECT_TRUE(p_data.contains("required_id"));
     EXPECT_TRUE(p_data.contains("required_name"));
     EXPECT_TRUE(p_data.contains("optional_value"));
@@ -1314,20 +1359,20 @@ inline void test_required_fields_child_serialization(ParserDataType p_data) {
     child_obj.required_child_field = "child_data";
     child_obj.optional_child_value = 5.5;
     child_obj.required_vector = glm::vec3(1.0F, 2.0F, 3.0F);
-    
+
     WBE::SerializableSD<WBE::TestRequiredFieldsChild> child_sd;
     child_sd.serialize(p_data, child_obj);
-    
+
     // Base class fields
     EXPECT_TRUE(p_data.contains("required_id"));
     EXPECT_TRUE(p_data.contains("required_name"));
     EXPECT_TRUE(p_data.contains("optional_value"));
-    
+
     // Child class fields
     EXPECT_TRUE(p_data.contains("required_child_field"));
     EXPECT_TRUE(p_data.contains("optional_child_value"));
     EXPECT_TRUE(p_data.contains("required_vector"));
-    
+
     EXPECT_EQ(p_data.template get_value<int32_t>("required_id"), 456);
     EXPECT_EQ(p_data.template get_value<std::string>("required_name"), "test_child");
     EXPECT_EQ(p_data.template get_value<std::string>("required_child_field"), "child_data");
@@ -1343,17 +1388,17 @@ inline void test_multiple_required_inheritance_serialization(ParserDataType p_da
     multi_obj.optional_b_desc = "b_description";
     multi_obj.required_child_info = "child_info";
     multi_obj.optional_child_count = 42;
-    
+
     WBE::SerializableSD<WBE::TestMultipleRequiredChild> multi_sd;
     multi_sd.serialize(p_data, multi_obj);
-    
+
     EXPECT_TRUE(p_data.contains("required_a_id"));
     EXPECT_TRUE(p_data.contains("optional_a_name"));
     EXPECT_TRUE(p_data.contains("required_b_value"));
     EXPECT_TRUE(p_data.contains("optional_b_desc"));
     EXPECT_TRUE(p_data.contains("required_child_info"));
     EXPECT_TRUE(p_data.contains("optional_child_count"));
-    
+
     EXPECT_EQ(p_data.template get_value<int32_t>("required_a_id"), 100);
     EXPECT_EQ(p_data.template get_value<std::string>("optional_a_name"), "a_name");
     EXPECT_FLOAT_EQ(p_data.template get_value<float>("required_b_value"), 2.71F);
@@ -1368,14 +1413,14 @@ inline void test_static_serializable_serialization(ParserDataType p_data) {
     static_obj.static_id = 789;
     static_obj.static_name = "static_test";
     static_obj.static_value = 9.87F;
-    
+
     WBE::SerializableSD<WBE::TestStaticSerializable> static_sd;
     static_sd.serialize(p_data, static_obj);
-    
+
     EXPECT_TRUE(p_data.contains("static_id"));
     EXPECT_TRUE(p_data.contains("static_name"));
     EXPECT_TRUE(p_data.contains("static_value"));
-    
+
     EXPECT_EQ(p_data.template get_value<int32_t>("static_id"), 789);
     EXPECT_EQ(p_data.template get_value<std::string>("static_name"), "static_test");
     EXPECT_FLOAT_EQ(p_data.template get_value<float>("static_value"), 9.87F);
@@ -1387,14 +1432,14 @@ inline void test_static_with_required_serialization(ParserDataType p_data) {
     static_req_obj.required_static_field = "static_required";
     static_req_obj.optional_static_number = 100;
     static_req_obj.required_static_vector = glm::vec3(7.0F, 8.0F, 9.0F);
-    
+
     WBE::SerializableSD<WBE::TestStaticWithRequired> static_req_sd;
     static_req_sd.serialize(p_data, static_req_obj);
-    
+
     EXPECT_TRUE(p_data.contains("required_static_field"));
     EXPECT_TRUE(p_data.contains("optional_static_number"));
     EXPECT_TRUE(p_data.contains("required_static_vector"));
-    
+
     EXPECT_EQ(p_data.template get_value<std::string>("required_static_field"), "static_required");
     EXPECT_EQ(p_data.template get_value<int32_t>("optional_static_number"), 100);
 }
@@ -1408,27 +1453,27 @@ inline void test_static_complex_serialization(ParserDataType p_data) {
     static_complex_obj.nested_static.static_id = 555;
     static_complex_obj.nested_static.static_name = "nested_static";
     static_complex_obj.nested_static.static_value = 1.23F;
-    
+
     WBE::SerializableSD<WBE::TestStaticComplex> static_complex_sd;
     static_complex_sd.serialize(p_data, static_complex_obj);
-    
+
     EXPECT_TRUE(p_data.contains("static_numbers"));
     EXPECT_TRUE(p_data.contains("static_strings"));
     EXPECT_TRUE(p_data.contains("required_static_buffer"));
     EXPECT_TRUE(p_data.contains("nested_static"));
-    
+
     auto numbers_array = p_data.template get_value<std::vector<ParserDataType>>("static_numbers");
     EXPECT_EQ(numbers_array.size(), 5);
     EXPECT_EQ(numbers_array[0].template get<int>(), 1);
     EXPECT_EQ(numbers_array[4].template get<int>(), 5);
-    
+
     auto strings_array = p_data.template get_value<std::vector<ParserDataType>>("static_strings");
     EXPECT_EQ(strings_array.size(), 2);
     EXPECT_EQ(strings_array[0].template get<std::string>(), "static1");
     EXPECT_EQ(strings_array[1].template get<std::string>(), "static2");
-    
+
     EXPECT_EQ(p_data.template get_value<std::string>("required_static_buffer"), "static_buffer_data");
-    
+
     auto nested_static = p_data.template get_value<ParserDataType>("nested_static");
     EXPECT_TRUE(nested_static.contains("static_id"));
     EXPECT_TRUE(nested_static.contains("static_name"));
@@ -1438,61 +1483,61 @@ inline void test_static_complex_serialization(ParserDataType p_data) {
 template <typename ParserDataType>
 inline void test_mixed_container_serialization(ParserDataType p_data) {
     WBE::TestMixedContainer mixed_obj;
-    
+
     // Add required objects
     WBE::TestRequiredFieldsBase req_obj1;
     req_obj1.required_id = 1;
     req_obj1.required_name = "obj1";
     req_obj1.optional_value = 1.1F;
-    
+
     WBE::TestRequiredFieldsBase req_obj2;
     req_obj2.required_id = 2;
     req_obj2.required_name = "obj2";
     req_obj2.optional_value = 1.0F; // default
-    
+
     mixed_obj.required_objects = {req_obj1, req_obj2};
-    
+
     // Add static objects
     WBE::TestStaticSerializable static_obj;
     static_obj.static_id = 10;
     static_obj.static_name = "static1";
     static_obj.static_value = 2.2F;
-    
+
     mixed_obj.static_objects = {static_obj};
-    
+
     // Set required child
     mixed_obj.required_child.required_id = 999;
     mixed_obj.required_child.required_name = "child_test";
     mixed_obj.required_child.required_child_field = "child_value";
     mixed_obj.required_child.required_vector = glm::vec3(1.0F, 2.0F, 3.0F);
-    
+
     // Set optional static
     mixed_obj.optional_static.static_numbers = {100, 200};
     strcpy(mixed_obj.optional_static.required_static_buffer.buffer, "mixed_buffer");
-    
+
     WBE::SerializableSD<WBE::TestMixedContainer> mixed_sd;
     mixed_sd.serialize(p_data, mixed_obj);
-    
+
     EXPECT_TRUE(p_data.contains("required_objects"));
     EXPECT_TRUE(p_data.contains("static_objects"));
     EXPECT_TRUE(p_data.contains("required_child"));
     EXPECT_TRUE(p_data.contains("optional_static"));
-    
+
     auto req_objects_array = p_data.template get_value<std::vector<ParserDataType>>("required_objects");
     EXPECT_EQ(req_objects_array.size(), 2);
     auto req_obj_0 = req_objects_array[0].template get<ParserDataType>();
     EXPECT_EQ(req_obj_0.template get_value<int32_t>("required_id"), 1);
     EXPECT_EQ(req_obj_0.template get_value<std::string>("required_name"), "obj1");
-    
+
     auto static_objects_array = p_data.template get_value<std::vector<ParserDataType>>("static_objects");
     EXPECT_EQ(static_objects_array.size(), 1);
     auto static_obj_0 = static_objects_array[0].template get<ParserDataType>();
     EXPECT_EQ(static_obj_0.template get_value<int32_t>("static_id"), 10);
-    
+
     auto required_child = p_data.template get_value<ParserDataType>("required_child");
     EXPECT_EQ(required_child.template get_value<int32_t>("required_id"), 999);
     EXPECT_EQ(required_child.template get_value<std::string>("required_name"), "child_test");
-    
+
     auto optional_static = p_data.template get_value<ParserDataType>("optional_static");
     EXPECT_TRUE(optional_static.contains("static_numbers"));
     EXPECT_TRUE(optional_static.contains("required_static_buffer"));
@@ -1502,7 +1547,7 @@ TEST_F(WBESerializerTest, RequiredFieldsBaseSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_required_fields_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_required_fields_serialization(yaml_data);
@@ -1512,7 +1557,7 @@ TEST_F(WBESerializerTest, RequiredFieldsChildSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_required_fields_child_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_required_fields_child_serialization(yaml_data);
@@ -1522,7 +1567,7 @@ TEST_F(WBESerializerTest, MultipleRequiredInheritanceSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_multiple_required_inheritance_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_multiple_required_inheritance_serialization(yaml_data);
@@ -1532,7 +1577,7 @@ TEST_F(WBESerializerTest, StaticSerializableSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_static_serializable_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_static_serializable_serialization(yaml_data);
@@ -1542,7 +1587,7 @@ TEST_F(WBESerializerTest, StaticWithRequiredSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_static_with_required_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_static_with_required_serialization(yaml_data);
@@ -1552,7 +1597,7 @@ TEST_F(WBESerializerTest, StaticComplexSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_static_complex_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_static_complex_serialization(yaml_data);
@@ -1562,7 +1607,7 @@ TEST_F(WBESerializerTest, MixedContainerSerialization) {
     WBE::ParserJSON json_parser;
     const auto& json_data = json_parser.get_data();
     test_mixed_container_serialization(json_data);
-    
+
     WBE::ParserYAML yaml_parser;
     const auto& yaml_data = yaml_parser.get_data();
     test_mixed_container_serialization(yaml_data);

@@ -25,7 +25,8 @@ namespace WhiteBirdEngine {
  * @class JobBuffer
  * @brief Stores a buffer that contians all the job for an instance to execute.
  */
-template <typename ChildT> class JobBuffer {
+template <typename ChildT>
+class JobBuffer {
 public:
     WBE_R6_DELETE_COPY_MOVE_VIRTUAL(JobBuffer)
 
@@ -55,7 +56,7 @@ public:
      *
      * @return The semaphore.
      */
-    std::counting_semaphore<32>& get_semaphore() {
+    std::counting_semaphore<>& get_semaphore() {
         return static_cast<ChildT*>(this)->get_semaphore();
     }
 };

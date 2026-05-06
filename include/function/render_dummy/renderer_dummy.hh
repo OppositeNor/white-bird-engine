@@ -30,13 +30,14 @@ namespace WhiteBirdEngine {
  */
 class RendererDummy final : public IRenderer {
 public:
-    RendererDummy(RenderAllocator* p_allocator)
-        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {}
+    RendererDummy(RenderAllocator* p_allocator) : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+    }
 
     virtual ~RendererDummy() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
 
-    virtual void tick(double p_delta) override {}
+    virtual void tick(double p_delta) override {
+    }
 
     virtual Ref<RenderDatabase> get_render_database() override {
         // Because of RAII, we have to return a valid database since the caller
@@ -44,12 +45,14 @@ public:
         return dummy_database;
     }
 
-    virtual void activate_pipeline(
-        const std::string& p_pipeline_name) override {}
+    virtual void activate_pipeline(const std::string& p_pipeline_name) override {
+    }
 
-    virtual void update_static_opaque_triangles() override {}
+    virtual void update_static_opaque_triangles() override {
+    }
 
-    virtual void add_job(std::function<void()> p_job) override {}
+    virtual void add_job(std::function<void()> p_job) override {
+    }
 
 private:
     Ref<RenderDatabase> dummy_database;

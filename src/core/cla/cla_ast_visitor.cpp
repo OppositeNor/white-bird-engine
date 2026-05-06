@@ -26,8 +26,7 @@
 namespace WhiteBirdEngine {
 
 void CLAASTVisitorToString::visit(CLAASTNodeRoot* p_node) {
-    ss << std::string(2UL * indent_depth, ' ')
-       << "utility: " << p_node->get_utility_name() << "\n";
+    ss << std::string(2UL * indent_depth, ' ') << "utility: " << p_node->get_utility_name() << "\n";
     auto operations = p_node->get_operations();
     if (!operations.empty()) {
         ss << std::string(2UL * indent_depth, ' ') << "operations:\n";
@@ -50,8 +49,7 @@ void CLAASTVisitorToString::visit(class CLAASTNodeOperation* p_node) {
     if (!arguments.empty()) {
         ss << std::string(2UL * (indent_depth + 1), ' ') << "arguments:\n";
         for (auto& argument : arguments) {
-            ss << std::string(2UL * (indent_depth + 2), ' ') << "- " << argument
-               << "\n";
+            ss << std::string(2UL * (indent_depth + 2), ' ') << "- " << argument << "\n";
         }
     }
 }
@@ -76,42 +74,32 @@ void CLAASTVisitorAssembler::visit(CLAASTNodeOperation* p_node) {
     }
     size_t input_arg_num = p_node->get_arguments().size();
     if (arg_num >= 0 && std::cmp_less(input_arg_num, arg_num)) {
-        throw std::runtime_error(
-            "Failed to parse operation: " + operation_name +
-            ", not enough arguments. Expected: " + std::to_string(arg_num) +
-            ", inputed: " + std::to_string(input_arg_num) + ".");
+        throw std::runtime_error("Failed to parse operation: " + operation_name + ", not enough arguments. Expected: " +
+                                 std::to_string(arg_num) + ", inputed: " + std::to_string(input_arg_num) + ".");
     }
     get_operation(p_node, operation_name, arg_num);
 }
 
-bool CLAASTVisitorAssembler::get_operation_arg_count(
-    std::string& p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num) {
+bool CLAASTVisitorAssembler::get_operation_arg_count(std::string& p_op_name, CLAASTNodeOperation* p_node, int32_t& p_arg_num) {
     if (p_node->is_name_short()) {
         auto arg_name_short = arg_short_to_long.find(p_op_name[0]);
         if (arg_name_short == arg_short_to_long.end()) {
-            stdout_log(WBE_CHANNEL_GLOBAL)
-                ->message("Unrecognized argument name: \"" + p_op_name +
-                          "\", ignored.");
+            stdout_log(WBE_CHANNEL_GLOBAL)->message("Unrecognized argument name: \"" + p_op_name + "\", ignored.");
             return false;
         }
         p_op_name = arg_name_short->second;
     }
     auto find_arg_num = arg_count_long.find(p_op_name);
-    WBE_DEBUG_ASSERT(
-        !p_node->is_name_short() || find_arg_num != arg_count_long.end());
+    WBE_DEBUG_ASSERT(!p_node->is_name_short() || find_arg_num != arg_count_long.end());
     if (find_arg_num == arg_count_long.end()) {
-        stdout_log(WBE_CHANNEL_GLOBAL)
-            ->message(
-                "Unrecognized argument name: \"" + p_op_name + "\", ignored.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->message("Unrecognized argument name: \"" + p_op_name + "\", ignored.");
         return false;
     }
     p_arg_num = find_arg_num->second;
     return true;
 }
 
-void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node,
-    const std::string& p_op_name,
-    int32_t p_arg_num) {
+void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num) {
     const auto& arguments = p_node->get_arguments();
     size_t input_arg_num = p_node->get_arguments().size();
     if (p_arg_num < 0) {

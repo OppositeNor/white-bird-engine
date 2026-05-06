@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_LOG_STREAM_TEST_HH
 #define WBE_FILE_LOG_STREAM_TEST_HH
 
+#include "core/logging/log_stream.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
-#include "core/logging/log_stream.hh"
 #include "platform/file_system/directory.hh"
 
 #include <gtest/gtest.h>
@@ -33,12 +33,14 @@ TEST(WBELogStreamTest, General) {
     log_stream.message("Test message");
     ASSERT_EQ(ss.str(), std::string("[WBE_CHANNEL_UNKNOWN] <Message>: Test message\n"));
     log_stream.warning("Test warning");
-    ASSERT_EQ(ss.str(), std::string("[WBE_CHANNEL_UNKNOWN] <Message>: Test message\n"
-                                    "[WBE_CHANNEL_UNKNOWN] <Warning>: Test warning\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_CHANNEL_UNKNOWN] <Message>: Test message\n"
+                    "[WBE_CHANNEL_UNKNOWN] <Warning>: Test warning\n"));
     log_stream.error("Test error");
-    ASSERT_EQ(ss.str(), std::string("[WBE_CHANNEL_UNKNOWN] <Message>: Test message\n"
-                                    "[WBE_CHANNEL_UNKNOWN] <Warning>: Test warning\n"
-                                    "[WBE_CHANNEL_UNKNOWN] <Error>: Test error\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_CHANNEL_UNKNOWN] <Message>: Test message\n"
+                    "[WBE_CHANNEL_UNKNOWN] <Warning>: Test warning\n"
+                    "[WBE_CHANNEL_UNKNOWN] <Error>: Test error\n"));
 }
 
 namespace WhiteBirdEngine {
@@ -52,12 +54,14 @@ TEST(WBELogStreamTest, UserDefinedLabel) {
     log_stream.message("Test message");
     ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] <Message>: Test message\n"));
     log_stream.warning("Test warning");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] <Message>: Test message\n"
-                                    "[WBE_TEST_CHANNEL] <Warning>: Test warning\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_TEST_CHANNEL] <Message>: Test message\n"
+                    "[WBE_TEST_CHANNEL] <Warning>: Test warning\n"));
     log_stream.error("Test error");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_CHANNEL] <Message>: Test message\n"
-                                    "[WBE_TEST_CHANNEL] <Warning>: Test warning\n"
-                                    "[WBE_TEST_CHANNEL] <Error>: Test error\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_TEST_CHANNEL] <Message>: Test message\n"
+                    "[WBE_TEST_CHANNEL] <Warning>: Test warning\n"
+                    "[WBE_TEST_CHANNEL] <Error>: Test error\n"));
 }
 
 #define WBE_TEST_LABEL_NAME_MACRO WBE_TEST_LABEL_MACRO
@@ -73,14 +77,14 @@ TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
     log_stream.message("Test message");
     ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL_MACRO] <Message>: Test message\n"));
     log_stream.warning("Test warning");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL_MACRO] <Message>: Test message\n"
-                                    "[WBE_TEST_LABEL_MACRO] <Warning>: Test warning\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_TEST_LABEL_MACRO] <Message>: Test message\n"
+                    "[WBE_TEST_LABEL_MACRO] <Warning>: Test warning\n"));
     log_stream.error("Test error");
-    ASSERT_EQ(ss.str(), std::string("[WBE_TEST_LABEL_MACRO] <Message>: Test message\n"
-                                    "[WBE_TEST_LABEL_MACRO] <Warning>: Test warning\n"
-                                    "[WBE_TEST_LABEL_MACRO] <Error>: Test error\n"));
+    ASSERT_EQ(ss.str(),
+        std::string("[WBE_TEST_LABEL_MACRO] <Message>: Test message\n"
+                    "[WBE_TEST_LABEL_MACRO] <Warning>: Test warning\n"
+                    "[WBE_TEST_LABEL_MACRO] <Error>: Test error\n"));
 }
-
-
 
 #endif

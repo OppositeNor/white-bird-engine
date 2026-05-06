@@ -33,7 +33,8 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the class.
  */
-template <typename T> class ThisRef {
+template <typename T>
+class ThisRef {
 public:
     ThisRef() = default;
     virtual ~ThisRef() = default;
@@ -56,7 +57,8 @@ protected:
     RefWeak<T> this_ref;
 };
 
-template <typename T> T& required(const std::string& p_name, Ref<T> p_ref) {
+template <typename T>
+T& required(const std::string& p_name, Ref<T> p_ref) {
     if (p_ref == MEM_NULL) {
         throw std::runtime_error("Reference: \"" + p_name + "\" is required.");
     }
@@ -66,8 +68,7 @@ template <typename T> T& required(const std::string& p_name, Ref<T> p_ref) {
 template <typename T>
 Ref<T> requires_valid(const std::string& p_name, Ref<T> p_ref) {
     if (p_ref == MEM_NULL) {
-        throw std::runtime_error(
-            "Reference: \"" + p_name + "\" is required to be valid.");
+        throw std::runtime_error("Reference: \"" + p_name + "\" is required to be valid.");
     }
     return p_ref;
 }
@@ -75,8 +76,7 @@ Ref<T> requires_valid(const std::string& p_name, Ref<T> p_ref) {
 template <typename T>
 RefWeak<T> requires_valid(const std::string& p_name, RefWeak<T> p_ref) {
     if (!p_ref.is_valid() || p_ref == MEM_NULL) {
-        throw std::runtime_error(
-            "Weak reference: \"" + p_name + "\" is required to be valid.");
+        throw std::runtime_error("Weak reference: \"" + p_name + "\" is required to be valid.");
     }
     return p_ref;
 }

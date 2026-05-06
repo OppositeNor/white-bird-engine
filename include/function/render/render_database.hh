@@ -37,7 +37,8 @@ private:
     using AllocType = RenderAllocator;
     template <typename T, typename Allocator = AllocType>
     using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
-    template <typename T> using Set = ::WhiteBirdEngine::Set<T, AllocType>;
+    template <typename T>
+    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
 
 public:
     // Represents a subregion.
@@ -76,8 +77,8 @@ public:
          * @param p_allocator The allocator to allocate resource on.
          */
         OpaqueTrianglesInfo(AllocType* p_allocator)
-            : vertices(p_allocator), indices(p_allocator), obj_id(p_allocator),
-              materials(p_allocator) {}
+            : vertices(p_allocator), indices(p_allocator), obj_id(p_allocator), materials(p_allocator) {
+        }
 
         /**
          * @brief Clear all the data.
@@ -92,7 +93,9 @@ public:
 
     static constexpr size_t CLEAN_DEAD_RO_WEAK_REFS_THREASHOLD = 128;
 
-    virtual ~RenderDatabase() override { singleton = nullptr; }
+    virtual ~RenderDatabase() override {
+        singleton = nullptr;
+    }
     WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase)
 
     /**
@@ -136,7 +139,9 @@ public:
         return dynamic_opaque;
     }
 
-    static RenderDatabase* get_singleton() { return singleton; }
+    static RenderDatabase* get_singleton() {
+        return singleton;
+    }
 
 private:
     inline static RenderDatabase* singleton = nullptr;
@@ -146,8 +151,7 @@ private:
     OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;
 
-    void set_opaque_triangles_linear(
-        OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh);
+    void set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh);
 };
 
 } // namespace WhiteBirdEngine

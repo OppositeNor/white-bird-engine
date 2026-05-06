@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
 struct TypeB {};
 WBE_TYPE_METADATA(TypeA);
 WBE_TYPE_METADATA(TypeB);
-}
+} // namespace WhiteBirdEngine
 
 namespace WBE = WhiteBirdEngine;
 

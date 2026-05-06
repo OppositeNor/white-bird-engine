@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_ACCESSOR_TEST_HH
 #define WBE_FILE_ACCESSOR_TEST_HH
 
+#include "generated/serializables_access.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "reflection_test_data.hh"
-#include "generated/serializables_access.gen.hh"
 
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -42,8 +42,7 @@ protected:
 
 TEST_F(WBEDeserializerTest, General) {
     TestSerializable serializable;
-    serializable = {
-        .si32_test = 1,
+    serializable = {.si32_test = 1,
         .si64_test = -2,
         .ui32_test = 42,
         .ui64_test = 365,
@@ -51,8 +50,7 @@ TEST_F(WBEDeserializerTest, General) {
         .f64_test = 2.718,
         .vec3_test = glm::vec3(3, 2, 1),
         .vec4_test = glm::vec4(1, 2, 3, 4),
-        .str_test = "Hello, world!"
-    };
+        .str_test = "Hello, world!"};
     WBE::SerializableAccess<TestSerializable> accessor;
     EXPECT_EQ(accessor.get_field<int32_t>(serializable, "si32_test"), 1);
     EXPECT_EQ(accessor.get_field<int64_t>(serializable, "si64_test"), -2);
@@ -60,6 +58,5 @@ TEST_F(WBEDeserializerTest, General) {
     EXPECT_EQ(accessor.get_field<uint64_t>(serializable, "ui64_test"), 365);
     ASSERT_THROW(accessor.get_field<uint32_t>(serializable, "some_field"), std::runtime_error);
 }
-
 
 #endif

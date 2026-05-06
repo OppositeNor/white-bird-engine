@@ -53,8 +53,8 @@ struct RendResVK {
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : exec_before(p_allocator), exec_after(p_allocator),
-          res_before(p_allocator), res_after(p_allocator) {}
+        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {
+    }
     // The render task that should be performed during this node.
     Ref<RenderTaskVK> render_task;
     // The execution process edge before this node. All of these need
@@ -86,12 +86,10 @@ struct RGExecEdge {
     Ref<RGNode> after;
     // The pipeline stage at which the producer's work is considered
     // observable.
-    VkPipelineStageFlags2 before_finish_pipeline_stage =
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags2 before_finish_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     // The pipeline stage at which the consumer's work needs the producer's
     // output to be visible.
-    VkPipelineStageFlags2 after_start_pipeline_stage =
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags2 after_start_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     // The timeline semaphore used to signal/wait this edge between submits.
     Ref<SemaphoreVK> semaphore;
 };
@@ -152,10 +150,8 @@ public:
      * @brief Imperative builder: connect two nodes with an execution edge.
      * Allocates a timeline semaphore for the edge.
      */
-    Ref<RGExecEdge> add_exec_edge(Ref<RGNode> p_before,
-        Ref<RGNode> p_after,
-        VkPipelineStageFlags2 p_before_finish_stage,
-        VkPipelineStageFlags2 p_after_start_stage);
+    Ref<RGExecEdge> add_exec_edge(
+        Ref<RGNode> p_before, Ref<RGNode> p_after, VkPipelineStageFlags2 p_before_finish_stage, VkPipelineStageFlags2 p_after_start_stage);
 
     /**
      * @brief Imperative builder: connect two nodes with a resource edge.
@@ -214,9 +210,7 @@ public:
      * @param p_resource    The resource instance.
      * @param p_res_type_id The runtime type id of the resource.
      */
-    void set_resource(RendResID p_res_id,
-        Ref<RenderObjectVK> p_resource,
-        RendResTID p_res_type_id);
+    void set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
 
     /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
@@ -252,22 +246,14 @@ private:
     void free_command_buffers();
     void topological_sort();
 
-    Vector<Ref<RendResVK>, RenderAllocator> index_resources(
-        const RendPipelineDescVK& p_desc);
-    Vector<RendTaskID, RenderAllocator> instantiate_tasks(
-        const RendPipelineDescVK& p_desc);
-    void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc,
-        const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_res_edges(
-        const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
+    Vector<Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
+    Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendPipelineDescVK& p_desc);
+    void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
+    void infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;
-    Vector<RendResVK, RenderAllocator> build_per_node_bound(
-        Ref<RGNode> p_node) const;
-    void record_node(Ref<RGNode> p_node,
-        VkCommandBuffer p_command_buffer,
-        const Vector<RendResVK, RenderAllocator>& p_bound,
-        double p_delta);
+    Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
+    void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta);
     void collect_edge_semaphores(Ref<RGNode> p_node,
         uint64_t p_timeline_value,
         Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,

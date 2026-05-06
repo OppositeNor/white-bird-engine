@@ -47,10 +47,9 @@ public:
      * @param p_log_allocator_size The argument to input to the constructor of
      * the log object.
      */
-    LoggingManager(
-        T& p_channel_argument, size_t p_log_allocator_size = WBE_KiB(1))
-        : ISingleton<LoggingManager>(), channel_argument(&p_channel_argument),
-          log_allocator(p_log_allocator_size) {}
+    LoggingManager(T& p_channel_argument, size_t p_log_allocator_size = WBE_KiB(1))
+        : ISingleton<LoggingManager>(), channel_argument(&p_channel_argument), log_allocator(p_log_allocator_size) {
+    }
 
     virtual ~LoggingManager() override {
         size_t channel_logs_size = channel_logs.size();
@@ -82,8 +81,7 @@ public:
             if (channel != channel_logs.end()) {
                 return log_allocator.get_obj<ILog>(channel->second);
             }
-            MemID result = create_stack_obj<LogType>(
-                log_allocator, p_channel_id, *channel_argument);
+            MemID result = create_stack_obj<LogType>(log_allocator, p_channel_id, *channel_argument);
             channel_logs[p_channel_id] = result;
             return log_allocator.get_obj<ILog>(result);
         }

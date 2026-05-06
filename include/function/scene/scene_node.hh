@@ -37,8 +37,8 @@ public:
     virtual ~SceneNode() override = default;
     SceneNode(const SceneNode&) = delete;
     SceneNode(SceneNode&& p_other) noexcept
-        : name(std::move(p_other.name)), parent(std::move(p_other.parent)),
-          children(std::move(p_other.children)) {}
+        : name(std::move(p_other.name)), parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
+    }
     SceneNode& operator=(const SceneNode&) = delete;
     SceneNode& operator=(SceneNode&& p_other) noexcept {
         parent = std::move(p_other.parent);
@@ -51,8 +51,8 @@ public:
      *
      * @param p_scene The scene of this node lives in.
      */
-    SceneNode(Ref<Scene> p_scene)
-        : name(p_scene->get_allocator()), children(p_scene->get_allocator()) {}
+    SceneNode(Ref<Scene> p_scene) : name(p_scene->get_allocator()), children(p_scene->get_allocator()) {
+    }
 
     /**
      * @brief Remove a node in chilid.

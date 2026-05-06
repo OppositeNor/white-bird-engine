@@ -140,16 +140,7 @@ TEST(CLALexer, EdgeCaseTokens) {
 
 TEST(CLALexer, ComplexRealWorldExample) {
     WBE::CLALexer lexer;
-    const char* argv[] = {
-        "g++",
-        "main.cpp",
-        "utils.cpp",
-        "--optimize",
-        "--output",
-        "program",
-        "--debug",
-        "-g"
-    };
+    const char* argv[] = {"g++", "main.cpp", "utils.cpp", "--optimize", "--output", "program", "--debug", "-g"};
     uint32_t argc = sizeof(argv) / sizeof(const char*);
     auto tokens = lexer.apply(argc, argv);
 
@@ -174,15 +165,7 @@ TEST(CLALexer, ComplexRealWorldExample) {
 
 TEST(CLALexer, PathsAndSpecialCharacters) {
     WBE::CLALexer lexer;
-    const char* argv[] = {
-        "myapp",
-        "/path/to/file.txt",
-        "--config",
-        "/etc/myapp/config.json",
-        "-D",
-        "VERSION=1.0.0",
-        "file_with_underscores.txt"
-    };
+    const char* argv[] = {"myapp", "/path/to/file.txt", "--config", "/etc/myapp/config.json", "-D", "VERSION=1.0.0", "file_with_underscores.txt"};
     uint32_t argc = sizeof(argv) / sizeof(const char*);
     auto tokens = lexer.apply(argc, argv);
 

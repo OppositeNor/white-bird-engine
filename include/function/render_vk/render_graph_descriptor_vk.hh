@@ -31,7 +31,8 @@ namespace WhiteBirdEngine {
  * defers the concrete RenderTaskVK instantiation until the graph is built.
  */
 struct RendTaskDescVK {
-    RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator) {}
+    RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator) {
+    }
     // The id of this task within the pipeline.
     RendTaskID task_id = 0;
     // The ids of tasks that must complete before this task starts. Used by the
@@ -49,8 +50,8 @@ struct RendTaskDescVK {
  * each other by id.
  */
 struct RendPipelineDescVK {
-    RendPipelineDescVK(RenderAllocator* p_allocator)
-        : tasks(p_allocator), resources(p_allocator) {}
+    RendPipelineDescVK(RenderAllocator* p_allocator) : tasks(p_allocator), resources(p_allocator) {
+    }
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-
     // sorts them based on `prev` edges.
     Vector<RendTaskDescVK, RenderAllocator> tasks;

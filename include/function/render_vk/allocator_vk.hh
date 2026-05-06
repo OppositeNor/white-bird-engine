@@ -42,13 +42,9 @@ public:
     AllocatorVK(AllocType* p_allocator) {
         allocator = p_allocator;
         allocator_callbacks.pUserData = this;
-        allocator_callbacks.pfnAllocation =
-            reinterpret_cast<PFN_vkAllocationFunction>(AllocatorVK::allocation);
-        allocator_callbacks.pfnReallocation =
-            reinterpret_cast<PFN_vkReallocationFunction>(
-                AllocatorVK::reallocation);
-        allocator_callbacks.pfnFree =
-            reinterpret_cast<PFN_vkFreeFunction>(AllocatorVK::free);
+        allocator_callbacks.pfnAllocation = reinterpret_cast<PFN_vkAllocationFunction>(AllocatorVK::allocation);
+        allocator_callbacks.pfnReallocation = reinterpret_cast<PFN_vkReallocationFunction>(AllocatorVK::reallocation);
+        allocator_callbacks.pfnFree = reinterpret_cast<PFN_vkFreeFunction>(AllocatorVK::free);
     }
 
     /**
@@ -61,15 +57,9 @@ public:
     }
 
 private:
-    static void* allocation(AllocatorVK* p_this,
-        size_t p_size,
-        size_t p_alignment,
-        VkSystemAllocationScope p_allocation_scope);
-    static void* reallocation(AllocatorVK* p_this,
-        void* p_original,
-        size_t p_size,
-        size_t p_alignment,
-        VkSystemAllocationScope p_allocation_scope);
+    static void* allocation(AllocatorVK* p_this, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
+    static void* reallocation(
+        AllocatorVK* p_this, void* p_original, size_t p_size, size_t p_alignment, VkSystemAllocationScope p_allocation_scope);
     static void free(AllocatorVK* p_this, void* p_memory);
 
     VkAllocationCallbacks allocator_callbacks{};

@@ -94,21 +94,16 @@ public:
             return *this;
         }
 
-        Ref<ROBufferViewVK> create_ref(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROBufferViewVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Ref<ROBufferViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferViewVK>(p_render_data->allocator, p_render_data, *this);
         }
 
-        Unique<ROBufferViewVK> create_unique(
-            const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROBufferViewVK>(
-                p_render_data->allocator, p_render_data, *this);
+        Unique<ROBufferViewVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferViewVK>(p_render_data->allocator, p_render_data, *this);
         }
 
     private:
-        VkBufferView create_vk_object(
-            const BaseRenderDataVK* p_render_data) const;
+        VkBufferView create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -117,8 +112,7 @@ public:
      * @param p_render_data The base render data.
      * @param p_builder The builder that builds this render object.
      */
-    ROBufferViewVK(
-        const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferViewVK() override;
     WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferViewVK)
 
@@ -137,14 +131,18 @@ public:
      *
      * @return The Vulkan buffer view instance.
      */
-    VkBufferView get_buffer_view() const { return buffer_view; }
+    VkBufferView get_buffer_view() const {
+        return buffer_view;
+    }
 
     /**
      * @brief Get the exposed fields.
      *
      * @return The exposed fields.
      */
-    const ExposedFields& fields() const { return exposed_fields; }
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
 
 private:
     VkBufferView buffer_view;

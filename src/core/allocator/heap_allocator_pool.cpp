@@ -30,8 +30,7 @@ namespace WhiteBirdEngine {
 
 HeapAllocatorPool::~HeapAllocatorPool() {
     if (!is_empty()) {
-        stdout_log(WBE_CHANNEL_GLOBAL)
-            ->warning("HeapAllocatorPool not empty during destruction.");
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
     free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
@@ -39,10 +38,7 @@ HeapAllocatorPool::~HeapAllocatorPool() {
 
 HeapAllocatorPool::HeapAllocatorPool(size_t p_size) : size(p_size) {
     if (p_size > MAX_TOTAL_SIZE) {
-        throw std::runtime_error(
-            std::format("Failed to create pool: size: {} exceeds maximum: {}.",
-                p_size,
-                MAX_TOTAL_SIZE));
+        throw std::runtime_error(std::format("Failed to create pool: size: {} exceeds maximum: {}.", p_size, MAX_TOTAL_SIZE));
     }
     mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT
     if (mem_chunk == nullptr) {
@@ -65,9 +61,8 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
         if ((*valid_idle_node)->size >= p_size) {
             void* result = acquire_memory(*valid_idle_node, p_size);
             *reinterpret_cast<uint64_t*>(result) = p_size;
-            max_data_loc_tracker = std::max(max_data_loc_tracker,
-                reinterpret_cast<uintptr_t>(result) + p_size -
-                    reinterpret_cast<uintptr_t>(mem_chunk));
+            max_data_loc_tracker = std::max(
+                max_data_loc_tracker, reinterpret_cast<uintptr_t>(result) + p_size - reinterpret_cast<uintptr_t>(mem_chunk));
             return reinterpret_cast<MemID>(result) + HEADER_SIZE;
         }
         if ((*valid_idle_node)->next == nullptr) {
@@ -75,9 +70,8 @@ MemID HeapAllocatorPool::allocate(size_t p_size) {
         }
         valid_idle_node = &((*valid_idle_node)->next);
     }
-    throw std::runtime_error(std::format(
-        "Failed to allocate memory: not enough space for memory pool.\n"
-        "Trying to allocate: {} bytes.",
+    throw std::runtime_error(std::format("Failed to allocate memory: not enough space for memory pool.\n"
+                                         "Trying to allocate: {} bytes.",
         p_size));
 }
 
@@ -92,8 +86,7 @@ void HeapAllocatorPool::deallocate(MemID p_mem) {
     insert_free_memory(insert_pos, data_loc, data_size);
 }
 
-void* HeapAllocatorPool::acquire_memory(
-    std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
+void* HeapAllocatorPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
     WBE_DEBUG_ASSERT(p_node->size >= p_mem_size);
     p_node->size -= p_mem_size;
     void* mem_start = p_node->mem_start;
@@ -112,9 +105,7 @@ void* HeapAllocatorPool::acquire_memory(
     return mem_start;
 }
 
-void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert,
-    char* p_insert_start,
-    size_t p_insert_size) {
+void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
     if (idle_list_head == nullptr) {
         idle_list_head = std::make_unique<IdleListNode>();
         ++idle_chunks_count;
@@ -123,8 +114,7 @@ void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert,
         return;
     }
 
-    std::unique_ptr<IdleListNode> insert_node =
-        std::make_unique<IdleListNode>();
+    std::unique_ptr<IdleListNode> insert_node = std::make_unique<IdleListNode>();
     ++idle_chunks_count;
     insert_node->mem_start = p_insert_start;
     insert_node->size = p_insert_size;
@@ -146,8 +136,7 @@ void HeapAllocatorPool::insert_free_memory(IdleListNode* p_node_before_insert,
 
 bool HeapAllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     WBE_DEBUG_ASSERT(p_node != nullptr);
-    if (p_node->next == nullptr ||
-        p_node->mem_start + p_node->size != p_node->next->mem_start) {
+    if (p_node->next == nullptr || p_node->mem_start + p_node->size != p_node->next->mem_start) {
         return false;
     }
     p_node->size += p_node->next->size;
@@ -156,8 +145,7 @@ bool HeapAllocatorPool::combine_idle_with_next(IdleListNode* p_node) {
     return true;
 }
 
-std::unique_ptr<HeapAllocatorPool::IdleListNode>&
-HeapAllocatorPool::get_idle_node_before(void* p_loc) {
+std::unique_ptr<HeapAllocatorPool::IdleListNode>& HeapAllocatorPool::get_idle_node_before(void* p_loc) {
     std::unique_ptr<IdleListNode>* curr = &idle_list_head;
     while (curr != nullptr) {
         if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {

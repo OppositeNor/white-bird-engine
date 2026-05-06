@@ -29,40 +29,34 @@
 #include <string>
 
 #define WBE_HAAPIL_GET_HEADER_SIZE(p_header) ((p_header) & TOTAL_SIZE_MASK)
-#define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk)                                     \
-    WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
+#define WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
 
-#define WBE_HAAPIL_GET_HEADER_TYPE(p_header)                                   \
-    ((HeaderType)(((p_header) & HEADER_TYPE_MASK) >> 60))
-#define WBE_HAAPIL_GET_CHUNK_TYPE(p_chunk)                                     \
-    WBE_HAAPIL_GET_HEADER_TYPE(*reinterpret_cast<Header*>(p_chunk))
+#define WBE_HAAPIL_GET_HEADER_TYPE(p_header) ((HeaderType)(((p_header) & HEADER_TYPE_MASK) >> 60))
+#define WBE_HAAPIL_GET_CHUNK_TYPE(p_chunk) WBE_HAAPIL_GET_HEADER_TYPE(*reinterpret_cast<Header*>(p_chunk))
 
-#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size)                   \
-    (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
-#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size)                   \
-    WBE_HAAPIL_SET_HEADER(                                                     \
-        reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
+#define WBE_HAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
+#define WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size)                                                                \
+    WBE_HAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
 
-#define WBE_HAAPIL_UPDATE_POSIBLE_VALID(update_to)                                                                                                                                                                          \
-    /*If possible_valid did not contain a data, could be updated.*/                                                                                                                                                         \
-    if (possible_valid ==                                                                                                                                                                                                   \
-            nullptr /*If possible_valid was occupied, could be updated.*/                                                                                                                                                   \
-        || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::OCCUPIED /*Try to make it as compat as possible, so if the updated is at the front of */ /*possible_valid, also update possible valid to that place..*/ \
-        || (update_to) < possible_valid) {                                                                                                                                                                                  \
-        possible_valid = (update_to);                                                                                                                                                                                       \
-    } else                                                                                                                                                                                                                  \
+#define WBE_HAAPIL_UPDATE_POSIBLE_VALID(update_to)                                                                                    \
+    /*If possible_valid did not contain a data, could be updated.*/                                                                   \
+    if (possible_valid == nullptr /*If possible_valid was occupied, could be updated.*/                                               \
+        || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) ==                                                                               \
+               HeaderType::OCCUPIED /*Try to make it as compat as possible, so if the updated is at the front of */ /*possible_valid, \
+                                                                                                                       also update                                                                                                                               \
+                                                                                                                       possible valid                                                                                                                                \
+                                                                                                                       to that                                                                                                                                 \
+                                                                                                                       place..*/      \
+        || (update_to) < possible_valid) {                                                                                            \
+        possible_valid = (update_to);                                                                                                 \
+    } else                                                                                                                            \
         (void(0))
 
 namespace WhiteBirdEngine {
 
-HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(
-    size_t p_size)
-    : size(p_size) {
+HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_t p_size) : size(p_size) {
     if (p_size > TOTAL_SIZE_MASK) {
-        throw std::runtime_error(
-            std::format("Failed to create pool: size: {}  exceeds maximum: {}.",
-                p_size,
-                TOTAL_SIZE_MASK));
+        throw std::runtime_error(std::format("Failed to create pool: size: {}  exceeds maximum: {}.", p_size, TOTAL_SIZE_MASK));
     }
     mem_chunk = static_cast<char*>(aligned_alloc(HEADER_SIZE, p_size));
     if (mem_chunk == nullptr) {
@@ -76,23 +70,19 @@ HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(
 HeapAllocatorAlignedPoolImplicitList::~HeapAllocatorAlignedPoolImplicitList() {
     if (!is_empty()) {
         stdout_log(WBE_CHANNEL_GLOBAL)
-            ->warning(std::format(
-                "Non-empty allocator destructed. Allocator status: {}",
-                static_cast<std::string>(*this)));
+            ->warning(std::format("Non-empty allocator destructed. Allocator status: {}", static_cast<std::string>(*this)));
     }
     free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 
-MemID HeapAllocatorAlignedPoolImplicitList::allocate(
-    size_t p_size, size_t p_alignment) {
+MemID HeapAllocatorAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG(check_broken();)
     if (p_alignment == 0) {
         throw std::runtime_error("Allocation alignment must not be 0");
     }
     if (p_alignment % alignof(Header) != 0) {
-        throw std::runtime_error(std::format(
-            "Allocation alignment must be a multiple of {}", alignof(Header)));
+        throw std::runtime_error(std::format("Allocation alignment must be a multiple of {}", alignof(Header)));
     }
     if (p_size == 0) {
         return MEM_NULL;
@@ -110,89 +100,68 @@ MemID HeapAllocatorAlignedPoolImplicitList::allocate(
         WBE_DEBUG(check_broken();)
         return result;
     }
-    std::string err_msg =
-        "Failed to allocate memory: not enough space for memory pool.\n"
-        "Trying to allocate: " +
-        std::to_string(aligned_size) +
-        " bytes.\n"
-        "Pool status: " +
-        static_cast<std::string>(*this);
+    std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
+                          "Trying to allocate: " +
+                          std::to_string(aligned_size) +
+                          " bytes.\n"
+                          "Pool status: " +
+                          static_cast<std::string>(*this);
     throw std::runtime_error(err_msg);
 }
 
 template <bool CoalesceEnabled>
-MemID HeapAllocatorAlignedPoolImplicitList::check_posible_free(
-    size_t p_aligned_size, size_t p_alignment) {
+MemID HeapAllocatorAlignedPoolImplicitList::check_posible_free(size_t p_aligned_size, size_t p_alignment) {
     if constexpr (CoalesceEnabled) {
         if (possible_valid != nullptr) {
             coalesce_chunk(possible_valid);
         }
     }
-    WBE_DEBUG_ASSERT(
-        possible_valid == nullptr ||
-        WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::IDLE);
+    WBE_DEBUG_ASSERT(possible_valid == nullptr || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::IDLE);
     if (possible_valid == nullptr) {
         return MEM_NULL;
     }
-    uintptr_t proxy_mem_start_addr =
-        reinterpret_cast<uintptr_t>(possible_valid) + HEADER_SIZE;
-    char* idle_mem_start =
-        reinterpret_cast<char*>(
-            proxy_mem_start_addr % p_alignment == 0
-                ?
-                // Already aligned.
-                proxy_mem_start_addr
-                // Not aligned, align by finding the next value that is a
-                // multiple of p_alignment.
-                : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) -
-        HEADER_SIZE;
+    uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(possible_valid) + HEADER_SIZE;
+    char* idle_mem_start = reinterpret_cast<char*>(proxy_mem_start_addr % p_alignment == 0
+                                                       ?
+                                                       // Already aligned.
+                                                       proxy_mem_start_addr
+                                                       // Not aligned, align by finding the next value that is a
+                                                       // multiple of p_alignment.
+                                                       : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) -
+                           HEADER_SIZE;
     // If idle node valid, insert.
-    if (idle_mem_start + p_aligned_size <=
-        possible_valid + WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
-        void* result_loc =
-            acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
+    if (idle_mem_start + p_aligned_size <= possible_valid + WBE_HAAPIL_GET_CHUNK_SIZE(possible_valid)) {
+        void* result_loc = acquire_memory(possible_valid, idle_mem_start, p_aligned_size);
         MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
         *static_cast<Header*>(result_loc) = p_aligned_size;
-        internal_fragmentation_tracker =
-            std::max(internal_fragmentation_tracker,
-                reinterpret_cast<size_t>(result_loc) + p_aligned_size -
-                    reinterpret_cast<size_t>(mem_chunk));
+        internal_fragmentation_tracker = std::max(internal_fragmentation_tracker,
+            reinterpret_cast<size_t>(result_loc) + p_aligned_size - reinterpret_cast<size_t>(mem_chunk));
         return result_id;
     }
     return MEM_NULL;
 }
 
 template <bool CoalesceEnabled>
-MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(
-    size_t p_aligned_size, size_t p_alignment) {
-    MemID possible_result =
-        check_posible_free<CoalesceEnabled>(p_aligned_size, p_alignment);
+MemID HeapAllocatorAlignedPoolImplicitList::find_valid_chunk(size_t p_aligned_size, size_t p_alignment) {
+    MemID possible_result = check_posible_free<CoalesceEnabled>(p_aligned_size, p_alignment);
     if (possible_result != MEM_NULL) {
         return possible_result;
     }
     char* free_memory = get_next_free_memory<true, CoalesceEnabled>(mem_chunk);
     while (free_memory != nullptr) {
         // Find the aligned starting point.
-        uintptr_t proxy_mem_start_addr =
-            reinterpret_cast<uintptr_t>(free_memory) + HEADER_SIZE;
-        char* idle_mem_start =
-            reinterpret_cast<char*>(
-                (proxy_mem_start_addr / p_alignment) * p_alignment ==
-                        proxy_mem_start_addr
-                    ? proxy_mem_start_addr
-                    : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) -
-            HEADER_SIZE;
+        uintptr_t proxy_mem_start_addr = reinterpret_cast<uintptr_t>(free_memory) + HEADER_SIZE;
+        char* idle_mem_start = reinterpret_cast<char*>((proxy_mem_start_addr / p_alignment) * p_alignment == proxy_mem_start_addr
+                                                           ? proxy_mem_start_addr
+                                                           : (proxy_mem_start_addr / p_alignment + 1) * p_alignment) -
+                               HEADER_SIZE;
         // If idle node valid, insert.
-        if (idle_mem_start + p_aligned_size <=
-            free_memory + WBE_HAAPIL_GET_CHUNK_SIZE(free_memory)) {
-            void* result_loc =
-                acquire_memory(free_memory, idle_mem_start, p_aligned_size);
+        if (idle_mem_start + p_aligned_size <= free_memory + WBE_HAAPIL_GET_CHUNK_SIZE(free_memory)) {
+            void* result_loc = acquire_memory(free_memory, idle_mem_start, p_aligned_size);
             MemID result_id = reinterpret_cast<MemID>(result_loc) + HEADER_SIZE;
             *static_cast<Header*>(result_loc) = p_aligned_size;
-            internal_fragmentation_tracker =
-                std::max(internal_fragmentation_tracker,
-                    reinterpret_cast<size_t>(result_loc) + p_aligned_size -
-                        reinterpret_cast<size_t>(mem_chunk));
+            internal_fragmentation_tracker = std::max(internal_fragmentation_tracker,
+                reinterpret_cast<size_t>(result_loc) + p_aligned_size - reinterpret_cast<size_t>(mem_chunk));
             return result_id;
         }
         free_memory = get_next_free_memory<false, CoalesceEnabled>(free_memory);
@@ -208,8 +177,7 @@ void HeapAllocatorAlignedPoolImplicitList::deallocate(MemID p_mem) {
     }
     WBE_DEBUG_ASSERT(is_in_pool(p_mem));
     char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
-    size_t data_size = WBE_HAAPIL_GET_HEADER_SIZE(
-        *reinterpret_cast<Header*>((p_mem - HEADER_SIZE)));
+    size_t data_size = WBE_HAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem - HEADER_SIZE)));
     insert_free_memory(data_loc, data_size);
     WBE_DEBUG(check_broken();)
 }
@@ -237,14 +205,9 @@ char* HeapAllocatorAlignedPoolImplicitList::get_next_free_memory(char* p_from) {
     return p_from;
 }
 
-void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(
-    char* p_idle_chunk, char* p_mem_start, size_t p_mem_size) {
-    WBE_DEBUG_ASSERT(
-        p_mem_start >= mem_chunk &&
-        p_mem_start + p_mem_size <=
-            p_idle_chunk + WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk));
-    WBE_DEBUG_ASSERT(
-        WBE_HAAPIL_GET_CHUNK_TYPE(p_idle_chunk) == HeaderType::IDLE);
+void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size) {
+    WBE_DEBUG_ASSERT(p_mem_start >= mem_chunk && p_mem_start + p_mem_size <= p_idle_chunk + WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk));
+    WBE_DEBUG_ASSERT(WBE_HAAPIL_GET_CHUNK_TYPE(p_idle_chunk) == HeaderType::IDLE);
     size_t idle_chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_idle_chunk);
     size_t idle_before_size = p_mem_start - p_idle_chunk;
     // Get the inserted memory.
@@ -252,24 +215,19 @@ void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(
     char* next_chunk = p_idle_chunk + p_mem_size;
     // Insert the idle memory before the acquired memory chunk.
     if (p_idle_chunk != p_mem_start) {
-        WBE_HAAPIL_SET_CHUNK_HEADER(
-            p_idle_chunk, HeaderType::IDLE, idle_before_size);
+        WBE_HAAPIL_SET_CHUNK_HEADER(p_idle_chunk, HeaderType::IDLE, idle_before_size);
         WBE_HAAPIL_UPDATE_POSIBLE_VALID(p_idle_chunk);
     }
     // Insert the idle memory after the acquired memory chunk.
     if (p_mem_start + p_mem_size < p_idle_chunk + idle_chunk_size) {
         // The memory after the acquired should be size: idle_chunk_size -
         // idle_size_before - inserted_memory_size
-        WBE_HAAPIL_SET_CHUNK_HEADER(p_mem_start + p_mem_size,
-            HeaderType::IDLE,
-            idle_chunk_size - idle_before_size - p_mem_size);
+        WBE_HAAPIL_SET_CHUNK_HEADER(p_mem_start + p_mem_size, HeaderType::IDLE, idle_chunk_size - idle_before_size - p_mem_size);
         WBE_HAAPIL_UPDATE_POSIBLE_VALID(p_mem_start + p_mem_size);
     }
     // If this acquire uses up the possible_valid,
-    if (possible_valid == nullptr ||
-        WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::OCCUPIED) {
-        if (next_chunk < mem_chunk + size &&
-            WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
+    if (possible_valid == nullptr || WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) == HeaderType::OCCUPIED) {
+        if (next_chunk < mem_chunk + size && WBE_HAAPIL_GET_CHUNK_TYPE(next_chunk) == HeaderType::IDLE) {
             possible_valid = next_chunk;
         } else {
             possible_valid = nullptr;
@@ -278,10 +236,8 @@ void* HeapAllocatorAlignedPoolImplicitList::acquire_memory(
     return p_mem_start;
 }
 
-void HeapAllocatorAlignedPoolImplicitList::insert_free_memory(
-    char* p_insert_start, size_t p_insert_size) {
-    WBE_HAAPIL_SET_CHUNK_HEADER(
-        p_insert_start, HeaderType::IDLE, p_insert_size);
+void HeapAllocatorAlignedPoolImplicitList::insert_free_memory(char* p_insert_start, size_t p_insert_size) {
+    WBE_HAAPIL_SET_CHUNK_HEADER(p_insert_start, HeaderType::IDLE, p_insert_size);
     coalesce_chunk(p_insert_start);
 }
 
@@ -301,8 +257,7 @@ bool HeapAllocatorAlignedPoolImplicitList::is_in_pool(MemID p_mem_id) const {
     char* curr = mem_chunk;
     char* mem_ptr = reinterpret_cast<char*>(p_mem_id);
     while (curr <= mem_ptr && curr < mem_chunk + size - HEADER_SIZE) {
-        if (curr + HEADER_SIZE == mem_ptr &&
-            WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
+        if (curr + HEADER_SIZE == mem_ptr && WBE_HAAPIL_GET_CHUNK_TYPE(curr) == HeaderType::OCCUPIED) {
             return true;
         }
         curr += WBE_HAAPIL_GET_CHUNK_SIZE(curr);
@@ -312,8 +267,7 @@ bool HeapAllocatorAlignedPoolImplicitList::is_in_pool(MemID p_mem_id) const {
 
 void HeapAllocatorAlignedPoolImplicitList::check_broken() const {
     char* curr = mem_chunk;
-    if (possible_valid != nullptr &&
-        WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) != HeaderType::IDLE) {
+    if (possible_valid != nullptr && WBE_HAAPIL_GET_CHUNK_TYPE(possible_valid) != HeaderType::IDLE) {
         throw std::runtime_error("Broken possible_valid.");
     }
     while (curr < mem_chunk + size) {
@@ -342,12 +296,8 @@ void HeapAllocatorAlignedPoolImplicitList::coalesce_chunk(char* p_chunk) const {
     // Coalesce is not really changing the internal data. So here it allows to
     // be called in a const function.
     size_t chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk);
-    while (
-        p_chunk + chunk_size < mem_chunk + size &&
-        WBE_HAAPIL_GET_CHUNK_TYPE(p_chunk + chunk_size) == HeaderType::IDLE) {
-        WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk,
-            HeaderType::IDLE,
-            chunk_size + WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk + chunk_size));
+    while (p_chunk + chunk_size < mem_chunk + size && WBE_HAAPIL_GET_CHUNK_TYPE(p_chunk + chunk_size) == HeaderType::IDLE) {
+        WBE_HAAPIL_SET_CHUNK_HEADER(p_chunk, HeaderType::IDLE, chunk_size + WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk + chunk_size));
         chunk_size = WBE_HAAPIL_GET_CHUNK_SIZE(p_chunk);
     }
     WBE_HAAPIL_UPDATE_POSIBLE_VALID(p_chunk);

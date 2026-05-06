@@ -67,7 +67,9 @@ public:
     /**
      * @brief Pop a resource chunk from the end of the chunk stack.
      */
-    void pop_chunk() { resource_chunks.pop_back(); }
+    void pop_chunk() {
+        resource_chunks.pop_back();
+    }
 
     /**
      * @brief Get a resource from a chunk.
@@ -77,8 +79,7 @@ public:
      */
     template <typename T>
     T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_id) {
-        return reinterpret_cast<T*>(
-            get_resource_chunk(p_chunk_id)->get_resource(p_id).get());
+        return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_id).get());
     }
 
     /**
@@ -89,9 +90,7 @@ public:
      */
     Ref<IResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) {
         if (p_chunk_id >= resource_chunks.size()) {
-            throw std::runtime_error(
-                "Failed to get resource chunk: chunk with ID " +
-                std::to_string(p_chunk_id) + " not registered.");
+            throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
         }
         return resource_chunks[p_chunk_id];
     }
@@ -102,12 +101,9 @@ public:
      * @param p_chunk_id The ID of the chunk/
      * @return The resource chunk.
      */
-    Ref<const IResourceChunk> get_resource_chunk(
-        ResourceChunkID p_chunk_id) const {
+    Ref<const IResourceChunk> get_resource_chunk(ResourceChunkID p_chunk_id) const {
         if (p_chunk_id >= resource_chunks.size()) {
-            throw std::runtime_error(
-                "Failed to get resource chunk: chunk with ID " +
-                std::to_string(p_chunk_id) + " not registered.");
+            throw std::runtime_error("Failed to get resource chunk: chunk with ID " + std::to_string(p_chunk_id) + " not registered.");
         }
         return resource_chunks[p_chunk_id];
     }
@@ -120,9 +116,7 @@ public:
      */
     template <typename T>
     RefRes<T> get_resource(const std::string& p_id) const {
-        return find_resource_chunk_containing_resource(p_id)
-            ->get_resource(p_id)
-            .reint_cast<T>();
+        return find_resource_chunk_containing_resource(p_id)->get_resource(p_id).reint_cast<T>();
     }
 
     /**
@@ -130,7 +124,8 @@ public:
      *
      * @param p_memid The memory ID of the resource.
      */
-    template <typename T> T* get_res_by_memid(MemID p_memid) {
+    template <typename T>
+    T* get_res_by_memid(MemID p_memid) {
         return stack_allocator.get_obj<T>(p_memid);
     }
 
@@ -139,32 +134,30 @@ public:
      *
      * @return The singleton instance. Null if not initialized.
      */
-    static ResourceManager* get_singleton() { return singleton; }
+    static ResourceManager* get_singleton() {
+        return singleton;
+    }
 
-    ResourceChunkID global_res_chunk() const { return global_res_chunk_id; }
+    ResourceChunkID global_res_chunk() const {
+        return global_res_chunk_id;
+    }
 
-    void add_resource_unit_loader(
-        Ref<IResourceUnitLoader> p_resource_unit_loader) {
-        for (const auto& resource_type :
-            p_resource_unit_loader->get_supported_resource_types()) {
+    void add_resource_unit_loader(Ref<IResourceUnitLoader> p_resource_unit_loader) {
+        for (const auto& resource_type : p_resource_unit_loader->get_supported_resource_types()) {
             if (!resource_unit_loaders.contains(resource_type)) {
                 resource_unit_loaders[resource_type] = p_resource_unit_loader;
                 continue;
             }
-            throw std::runtime_error(
-                std::format("Failed to add resource loader: resource type '{}' "
-                            "already has a loader.",
-                    resource_type));
+            throw std::runtime_error(std::format("Failed to add resource loader: resource type '{}' "
+                                                 "already has a loader.",
+                resource_type));
         }
     }
 
-    Ref<IResourceUnitLoader> get_resource_unit_loader(
-        const std::string& p_resource_type) const {
+    Ref<IResourceUnitLoader> get_resource_unit_loader(const std::string& p_resource_type) const {
         auto it = resource_unit_loaders.find(p_resource_type);
         if (it == resource_unit_loaders.end()) {
-            throw std::runtime_error(std::format(
-                "No resource loader registered for resource type: {}.",
-                p_resource_type));
+            throw std::runtime_error(std::format("No resource loader registered for resource type: {}.", p_resource_type));
         }
         return it->second;
     }
@@ -177,8 +170,7 @@ private:
     std::map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
-    Ref<IResourceChunk> find_resource_chunk_containing_resource(
-        const std::string& p_id) const;
+    Ref<IResourceChunk> find_resource_chunk_containing_resource(const std::string& p_id) const;
 
     inline static ResourceManager* singleton = nullptr;
 };

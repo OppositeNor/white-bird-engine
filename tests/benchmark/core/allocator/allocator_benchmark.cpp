@@ -12,18 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <benchmark/benchmark.h>
 #include <cstddef>
+#include <ranges>
 #include <utility>
 #include <vector>
-#include <ranges>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -37,7 +37,7 @@ static void malloc_free_benchmark_with_shuffle(benchmark::State& p_state) {
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int))); // NOLINT
+        int* result = static_cast<int*>(malloc(ALLOC_NUM * sizeof(int))); // NOLINT
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result[i] = static_cast<int>(i);
         }
@@ -47,15 +47,14 @@ static void malloc_free_benchmark_with_shuffle(benchmark::State& p_state) {
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto* queued_free : allocated) {
                     free(queued_free); // NOLINT
                 }
-            }
-            else {
+            } else {
                 for (auto* queued_free : allocated | std::views::reverse) {
                     free(queued_free); // NOLINT
                 }
@@ -76,7 +75,7 @@ static void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State&
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -87,15 +86,14 @@ static void heap_allocated_aligned_pool_benchmark_with_shuffle(benchmark::State&
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -116,7 +114,7 @@ static void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchma
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -127,15 +125,14 @@ static void heap_allocated_aligned_pool_impl_list_benchmark_with_shuffle(benchma
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -155,7 +152,7 @@ static void malloc_free_benchmark_without_shuffle(benchmark::State& p_state) {
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int))); // NOLINT
+        int* result = static_cast<int*>(malloc(ALLOC_NUM * sizeof(int))); // NOLINT
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result[i] = static_cast<int>(i);
         }
@@ -165,8 +162,7 @@ static void malloc_free_benchmark_without_shuffle(benchmark::State& p_state) {
                 for (auto* queued_free : allocated) {
                     free(queued_free); // NOLINT
                 }
-            }
-            else {
+            } else {
                 for (auto* queued_free : allocated | std::views::reverse) {
                     free(queued_free); // NOLINT
                 }
@@ -187,7 +183,7 @@ static void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::Sta
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -198,8 +194,7 @@ static void heap_allocated_aligned_pool_benchmark_without_shuffle(benchmark::Sta
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -220,7 +215,7 @@ static void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benc
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -231,8 +226,7 @@ static void heap_allocated_aligned_pool_impl_list_benchmark_without_shuffle(benc
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -260,7 +254,7 @@ static void heap_allocated_atomic_aligned_pool_benchmark_with_shuffle(benchmark:
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
@@ -295,7 +289,7 @@ static void heap_allocated_atomic_aligned_pool_impl_list_benchmark_with_shuffle(
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
@@ -378,7 +372,7 @@ static void async_malloc_free_benchmark(benchmark::State& p_state) {
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        int* result = static_cast<int*>(malloc(ALLOC_NUM*sizeof(int))); // NOLINT
+        int* result = static_cast<int*>(malloc(ALLOC_NUM * sizeof(int))); // NOLINT
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result[i] = static_cast<int>(i);
         }
@@ -388,15 +382,14 @@ static void async_malloc_free_benchmark(benchmark::State& p_state) {
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto* queued_free : allocated) {
                     free(queued_free); // NOLINT
                 }
-            }
-            else {
+            } else {
                 for (auto* queued_free : allocated | std::views::reverse) {
                     free(queued_free); // NOLINT
                 }
@@ -417,7 +410,7 @@ static void async_heap_allocated_atomic_aligned_pool_benchmark(benchmark::State&
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -428,15 +421,14 @@ static void async_heap_allocated_atomic_aligned_pool_benchmark(benchmark::State&
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -457,7 +449,7 @@ static void async_heap_allocated_atomic_aligned_pool_impl_list_benchmark(benchma
     size_t counter = 0;
     for (auto _ : p_state) {
         ++counter;
-        WBE::MemID result = pool.allocate(ALLOC_NUM*sizeof(int));
+        WBE::MemID result = pool.allocate(ALLOC_NUM * sizeof(int));
         int* result_ptr = static_cast<int*>(pool.get(result));
         for (size_t i = 0; i < ALLOC_NUM; ++i) {
             result_ptr[i] = static_cast<int>(i);
@@ -468,15 +460,14 @@ static void async_heap_allocated_atomic_aligned_pool_impl_list_benchmark(benchma
                 size_t n = allocated.size();
                 for (size_t k = 0; k < n; ++k) {
                     std::swap(allocated[WBE::dynam_hash(counter + k) % FREE_BATCH],
-                              allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
+                        allocated[WBE::dynam_hash(counter + n + k) % FREE_BATCH]);
                 }
             }
             if (counter % (2 * FREE_BATCH)) {
                 for (auto queued_free : allocated) {
                     pool.deallocate(queued_free);
                 }
-            }
-            else {
+            } else {
                 for (auto queued_free : allocated | std::views::reverse) {
                     pool.deallocate(queued_free);
                 }
@@ -491,4 +482,3 @@ static void async_heap_allocated_atomic_aligned_pool_impl_list_benchmark(benchma
 BENCHMARK(async_heap_allocated_atomic_aligned_pool_impl_list_benchmark)->Threads(2)->Threads(4)->Threads(8);
 
 BENCHMARK_MAIN();
-

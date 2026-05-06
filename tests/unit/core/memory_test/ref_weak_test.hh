@@ -16,24 +16,23 @@
 #define WBE_FILE_REF_WEAK_TEST_HH
 
 #include "core/memory/reference_strong.hh"
-#include "mock_heap_allocator_aligned.hh"
 #include "core/memory/reference_weak.hh"
 #include "global/global.hh"
+#include "mock_heap_allocator_aligned.hh"
 #include "platform/file_system/directory.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <memory>
 #include <sstream>
-#include <vector>
 #include <thread>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
 class TestClassWeak {
 public:
-    TestClassWeak(std::stringstream& p_ss)
-    : ss(&p_ss) {
+    TestClassWeak(std::stringstream& p_ss) : ss(&p_ss) {
         (*ss) << "Construct.\n";
     }
 
@@ -67,17 +66,15 @@ TEST(WBERefWeakTest, General) {
             ref_weak.lock()->set_test_val(5);
             ASSERT_EQ(ref_weak.lock()->test_val, 5);
         }
-        ASSERT_EQ(test_ss.str(), std::string(
-            "Construct.\n"
-            "Set test val: 5.\n"
-        ));
+        ASSERT_EQ(test_ss.str(),
+            std::string("Construct.\n"
+                        "Set test val: 5.\n"));
         ASSERT_EQ((*ref).test_val, 5);
     }
-    ASSERT_EQ(test_ss.str(), std::string(
-        "Construct.\n"
-        "Set test val: 5.\n"
-        "Destruct.\n"
-    ));
+    ASSERT_EQ(test_ss.str(),
+        std::string("Construct.\n"
+                    "Set test val: 5.\n"
+                    "Destruct.\n"));
     ASSERT_TRUE(pool_allocator.is_empty());
 }
 
@@ -116,8 +113,7 @@ TEST(WBERefWeakTest, FirstWeakDestruct) {
 
 class TestClassWeakChild : public TestClassWeak {
 public:
-    TestClassWeakChild(std::stringstream& p_ss)
-    : TestClassWeak(p_ss) {
+    TestClassWeakChild(std::stringstream& p_ss) : TestClassWeak(p_ss) {
         (*ss) << "Child construct.\n";
     }
 
@@ -133,7 +129,6 @@ public:
     virtual int get_val() override {
         return 2;
     }
-
 };
 
 TEST(WBERefWeakTest, Polymorphic) {
@@ -149,30 +144,27 @@ TEST(WBERefWeakTest, Polymorphic) {
                 WBE::RefWeak<TestClassWeak> ref_weak = ref;
                 ASSERT_EQ(ref->test_val, 0);
                 ref_weak.lock()->set_test_val(5);
-                ASSERT_EQ(test_ss.str(), std::string(
-                    "Construct.\n"
-                    "Child construct.\n"
-                    "Child set test val: 5.\n"
-                ));
+                ASSERT_EQ(test_ss.str(),
+                    std::string("Construct.\n"
+                                "Child construct.\n"
+                                "Child set test val: 5.\n"));
                 ASSERT_EQ(ref->test_val, 5);
             }
             ref_weak_child.lock()->set_test_val(10);
-            ASSERT_EQ(test_ss.str(), std::string(
-                "Construct.\n"
-                "Child construct.\n"
-                "Child set test val: 5.\n"
-                "Child set test val: 10.\n"
-            ));
+            ASSERT_EQ(test_ss.str(),
+                std::string("Construct.\n"
+                            "Child construct.\n"
+                            "Child set test val: 5.\n"
+                            "Child set test val: 10.\n"));
             ASSERT_EQ(ref->test_val, 10);
         }
-        ASSERT_EQ(test_ss.str(), std::string(
-            "Construct.\n"
-            "Child construct.\n"
-            "Child set test val: 5.\n"
-            "Child set test val: 10.\n"
-            "Child destruct.\n"
-            "Destruct.\n"
-        ));
+        ASSERT_EQ(test_ss.str(),
+            std::string("Construct.\n"
+                        "Child construct.\n"
+                        "Child set test val: 5.\n"
+                        "Child set test val: 10.\n"
+                        "Child destruct.\n"
+                        "Destruct.\n"));
         ASSERT_FALSE(ref_weak_child.is_valid());
     }
     ASSERT_TRUE(pool_allocator.is_empty());
@@ -184,8 +176,7 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
             ref_weaks.emplace_back(p_ref1);
-        }
-        else {
+        } else {
             ref_weaks.emplace_back(p_ref2);
         }
     }
@@ -194,16 +185,16 @@ inline void multithread_ref_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<T
         for (uint32_t j = 0; j < rand_ref_weak_count; ++j) {
             uint32_t choice = rand() % 3;
             switch (choice) {
-                case 0:
-                    ref_weaks[j] = p_ref1;
-                    break;
-                case 1:
-                    ref_weaks[j] = p_ref2;
-                    break;
-                default:
-                    uint32_t pick_index = rand() % ref_weaks.size();
-                    ref_weaks[j] = ref_weaks[pick_index];
-                    break;
+            case 0:
+                ref_weaks[j] = p_ref1;
+                break;
+            case 1:
+                ref_weaks[j] = p_ref2;
+                break;
+            default:
+                uint32_t pick_index = rand() % ref_weaks.size();
+                ref_weaks[j] = ref_weaks[pick_index];
+                break;
             }
         }
     }
@@ -253,21 +244,20 @@ TEST(WBERefWeak, InvaldLockTest) {
     ASSERT_TRUE(pool_allocator.is_empty());
 }
 
-inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeakChild> p_ref2, uint32_t p_iteration_count) {
+inline void multithread_ref_strong_and_weak_test(
+    WBE::Ref<TestClassWeak> p_ref1, WBE::Ref<TestClassWeakChild> p_ref2, uint32_t p_iteration_count) {
     std::vector<WBE::RefWeak<TestClassWeak>> ref_weaks;
     std::vector<WBE::Ref<TestClassWeak>> ref_strongs;
     ref_weaks.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
             ref_weaks.emplace_back(p_ref1);
-        }
-        else {
+        } else {
             ref_weaks.emplace_back(p_ref2);
         }
         if (rand() & 0x1) {
             ref_strongs.push_back(p_ref1);
-        }
-        else {
+        } else {
             ref_strongs.emplace_back(p_ref2);
         }
     }
@@ -277,35 +267,34 @@ inline void multithread_ref_strong_and_weak_test(WBE::Ref<TestClassWeak> p_ref1,
             if (rand() % 0x1) {
                 uint32_t choice = rand() % 3;
                 switch (choice) {
-                    case 0:
-                        ref_weaks[j] = p_ref1;
-                        if (rand() & 0x1) {
-                            ASSERT_EQ(ref_weaks[j].lock()->get_val(), 1);
-                        }
-                        break;
-                    case 1:
-                        ref_weaks[j] = p_ref2;
-                        if (rand() & 0x1) {
-                            ASSERT_EQ(ref_weaks[j].lock()->get_val(), 2);
-                        }
-                        break;
-                    default:
-                        ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
+                case 0:
+                    ref_weaks[j] = p_ref1;
+                    if (rand() & 0x1) {
+                        ASSERT_EQ(ref_weaks[j].lock()->get_val(), 1);
+                    }
+                    break;
+                case 1:
+                    ref_weaks[j] = p_ref2;
+                    if (rand() & 0x1) {
+                        ASSERT_EQ(ref_weaks[j].lock()->get_val(), 2);
+                    }
+                    break;
+                default:
+                    ref_weaks[j] = ref_weaks[rand() % ref_weaks.size()];
                 }
-            }
-            else {
+            } else {
                 uint32_t choice = rand() % 4;
                 switch (choice) {
-                    case 0:
-                        ref_strongs[j] = p_ref1;
-                        break;
-                    case 1:
-                        ref_strongs[j] = p_ref2;
-                        break;
-                    case 2:
-                        ref_weaks[j] = ref_strongs[rand() % ref_strongs.size()];
-                    default:
-                        ref_strongs[j] = ref_strongs[rand() % ref_strongs.size()];
+                case 0:
+                    ref_strongs[j] = p_ref1;
+                    break;
+                case 1:
+                    ref_strongs[j] = p_ref2;
+                    break;
+                case 2:
+                    ref_weaks[j] = ref_strongs[rand() % ref_strongs.size()];
+                default:
+                    ref_strongs[j] = ref_strongs[rand() % ref_strongs.size()];
                 }
             }
         }
@@ -360,7 +349,6 @@ TEST(WBERefWeakTest, IsNullMethod_Behavior) {
         // After strong ref goes out of scope, weak becomes invalid; implementation returns false for invalid
         ASSERT_FALSE(weak.is_valid());
         ASSERT_TRUE(weak.is_null());
-
     }
     ASSERT_TRUE(pool_allocator.is_empty());
 }

@@ -59,7 +59,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3D {
  *
  * @tparam TVertType The type of vertices.
  */
-template <typename TVertType> struct Triangle3D {
+template <typename TVertType>
+struct Triangle3D {
     /**
      * @brief The first vertex of the triangle.
      */
@@ -111,7 +112,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3DTextured {
  *
  * @tparam TVertType The type of the vertices.
  */
-template <typename TVertType> struct Triangle3DIndx {
+template <typename TVertType>
+struct Triangle3DIndx {
     /**
      * @brief The vertex array.
      */

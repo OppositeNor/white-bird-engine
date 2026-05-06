@@ -28,7 +28,8 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the singleton.
  */
-template <typename T> class ISingleton {
+template <typename T>
+class ISingleton {
 public:
     ISingleton() {
         if (instance_count.fetch_add(1, std::memory_order_acq_rel) != 0) {

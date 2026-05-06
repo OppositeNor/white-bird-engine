@@ -15,29 +15,27 @@
 #ifndef WBE_FILE_DIRECTORY_HH
 #define WBE_FILE_DIRECTORY_HH
 
+#include <filesystem>
 #include <ostream>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
+
 namespace WhiteBirdEngine {
 
 /**
  * @class Directory
- * @brief Directory class.
+ * @brief Directory class. Thin wrapper around std::filesystem::path.
  */
 class Directory {
 public:
-    Directory() : is_absolute(false) {}
+    Directory() = default;
     ~Directory() = default;
     Directory(const Directory& p_other) = default;
     Directory(Directory&& p_other) noexcept = default;
-    Directory& operator=(const Directory& p_other);
-    Directory& operator=(Directory&& p_other) noexcept;
-
-    bool operator==(const Directory& p_other) const;
-
-    bool operator!=(const Directory& p_other) const {
-        return !(*this == p_other);
-    }
+    Directory& operator=(const Directory& p_other) = default;
+    Directory& operator=(Directory&& p_other) noexcept = default;
 
     /**
      * @brief Constructor.
@@ -48,7 +46,22 @@ public:
      * @param p_is_absolute Is the directory absolute or relative.
      * By relative it means relative to the user current working directory.
      */
-    Directory(std::vector<std::string> p_dir_names, bool p_is_absolute = false);
+    Directory(const std::vector<std::string>& p_dir_names, bool p_is_absolute = false) {
+        if (p_is_absolute) {
+            inner = std::filesystem::path("/");
+        }
+        for (const auto& name : p_dir_names) {
+            inner /= name;
+        }
+    }
+
+    bool operator==(const Directory& p_other) const {
+        return inner == p_other.inner;
+    }
+
+    bool operator!=(const Directory& p_other) const {
+        return !(*this == p_other);
+    }
 
     /**
      * @brief Get the directory after combine this directory with another
@@ -57,7 +70,16 @@ public:
      * @param p_other The directory to combine to this directory.
      * @return The combined directory.
      */
-    Directory combine(const Directory& p_other) const;
+    Directory combine(const Directory& p_other) const {
+        if (p_other.get_is_absolute()) {
+            throw std::runtime_error("Only allows to combine with a relative path.");
+        }
+        Directory result(*this);
+        for (const auto& component : p_other.inner) {
+            result.inner /= component;
+        }
+        return result;
+    }
 
     /**
      * @brief Get if this directory is absolute.
@@ -66,31 +88,55 @@ public:
      * relative. By relative it means relative to the user current working
      * directory.
      */
-    bool get_is_absolute() const { return is_absolute; }
+    bool get_is_absolute() const {
+        return inner.is_absolute();
+    }
 
     /**
-     * @brief Get the names of the path to the directory. The rooth directory
+     * @brief Get the names of the path to the directory. The root directory
      * will be at index 0, and the followings will be ordered according to the
      * depth.
      *
      * @return The names of the path to the directory.
      */
-    const std::vector<std::string>& get_dir_names() const { return dir_names; }
+    std::vector<std::string> get_dir_names() const {
+        std::vector<std::string> result;
+        for (const auto& component : inner) {
+            std::string s = component.generic_string();
+            if (s.empty() || s == "/") {
+                continue;
+            }
+            result.push_back(std::move(s));
+        }
+        return result;
+    }
 
-    operator std::string() const;
+    /**
+     * @brief Get the underlying std::filesystem::path.
+     *
+     * @return The wrapped path.
+     */
+    const std::filesystem::path& get_path() const {
+        return inner;
+    }
+
+    operator std::string() const {
+        std::string s = inner.generic_string();
+        if (s.empty() || s.back() == '/') {
+            return s;
+        }
+        return s + "/";
+    }
 
 private:
-    std::vector<std::string> dir_names;
-    bool is_absolute;
+    std::filesystem::path inner;
 };
 
-inline std::ostream& operator<<(
-    std::ostream& p_ostream, const Directory& p_directory) {
+inline std::ostream& operator<<(std::ostream& p_ostream, const Directory& p_directory) {
     return p_ostream << static_cast<std::string>(p_directory);
 }
 
-inline Directory operator+(
-    const Directory& p_first, const Directory& p_second) {
+inline Directory operator+(const Directory& p_first, const Directory& p_second) {
     return p_first.combine(p_second);
 }
 

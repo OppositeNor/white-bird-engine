@@ -28,3 +28,23 @@ NamespaceIndentation: None
 DerivePointerAlignment: false
 PointerAlignment: Left
 ReferenceAlignment: Left
+
+# Maximum line width.
+ColumnLimit: 125
+
+# Disallow single-line functions/lambdas/blocks; always break after `{`.
+AllowShortFunctionsOnASingleLine: None
+AllowShortLambdasOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+
+# Always break between a template declaration and the function/class it introduces.
+AlwaysBreakTemplateDeclarations: Yes
+
+# Never split string literals (e.g. error messages) across lines, even if they exceed ColumnLimit.
+BreakStringLiterals: false
+PenaltyBreakString: 1000000
+PenaltyExcessCharacter: 1

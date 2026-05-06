@@ -66,3 +66,13 @@ python ./build.py -t debug-gcc      # 使用 GCC 的 Debug 构建
 python ./build.py -t release-gcc    # 使用 GCC 的 Release 构建
 python ./build.py -t deploy         # 使用 GCC 的部署构建
 ```
+
+## 贡献
+
+### AI 的使用
+
+本项目允许并鼓励使用 AI 助手参与开发。每次开启新的 AI 会话时，请先让 AI 通读
+[CONVENTIONS_FOR_AI.md](./CONVENTIONS_FOR_AI.md)。该文件是专门面向 AI 代理编写的精简高密度参考资料，
+涵盖了本项目的分层架构、构建流程、测试目录结构、内存模型以及命名规范等关键约定。
+
+AI 完成编辑后，请**务必仔细审阅**每一处改动，确认你完全理解它所做的事情，然后再提交。

@@ -23,9 +23,9 @@
 #include "platform/file_system/directory.hh"
 #include <gtest/gtest.h>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -52,8 +52,8 @@ TEST(CLAASTVisitorToString, UtilityWithSingleOperand) {
     root->accept(&visitor);
 
     std::string expected = "utility: test_utility\n"
-        "operations:\n"
-        "  - operand: input_file\n";
+                           "operations:\n"
+                           "  - operand: input_file\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -68,8 +68,8 @@ TEST(CLAASTVisitorToString, UtilityWithSingleOperation) {
     root->accept(&visitor);
 
     std::string expected = "utility: test_utility\n"
-        "operations:\n"
-        "  - operation: help\n";
+                           "operations:\n"
+                           "  - operation: help\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -85,11 +85,11 @@ TEST(CLAASTVisitorToString, UtilityWithOperationAndArguments) {
     root->accept(&visitor);
 
     std::string expected = "utility: test_utility\n"
-        "operations:\n"
-        "  - operation: output\n"
-        "    arguments:\n"
-        "      - output.txt\n"
-        "      - verbose\n";
+                           "operations:\n"
+                           "  - operation: output\n"
+                           "    arguments:\n"
+                           "      - output.txt\n"
+                           "      - verbose\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -108,13 +108,13 @@ TEST(CLAASTVisitorToString, UtilityWithMultipleOperations) {
     root->accept(&visitor);
 
     std::string expected = "utility: converter\n"
-        "operations:\n"
-        "  - operand: input.txt\n"
-        "  - operation: verbose\n"
-        "  - operation: format\n"
-        "    arguments:\n"
-        "      - json\n"
-        "      - 2\n";
+                           "operations:\n"
+                           "  - operand: input.txt\n"
+                           "  - operation: verbose\n"
+                           "  - operation: format\n"
+                           "    arguments:\n"
+                           "      - json\n"
+                           "      - 2\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -130,10 +130,10 @@ TEST(CLAASTVisitorToString, OperationWithSingleArgument) {
     root->accept(&visitor);
 
     std::string expected = "utility: logger\n"
-        "operations:\n"
-        "  - operation: level\n"
-        "    arguments:\n"
-        "      - debug\n";
+                           "operations:\n"
+                           "  - operation: level\n"
+                           "    arguments:\n"
+                           "      - debug\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -154,19 +154,19 @@ TEST(CLAASTVisitorToString, ComplexUtilityExample) {
     WBE::CLAASTVisitorToString visitor;
     root->accept(&visitor);
     std::string expected = "utility: gcc\n"
-        "operations:\n"
-        "  - operand: source.cpp\n"
-        "  - operation: output\n"
-        "    arguments:\n"
-        "      - compiled.exe\n"
-        "  - operation: O\n"
-        "    arguments:\n"
-        "      - 3\n"
-        "  - operation: include\n"
-        "    arguments:\n"
-        "      - /usr/include\n"
-        "      - /opt/include\n"
-        "  - operation: debug\n";
+                           "operations:\n"
+                           "  - operand: source.cpp\n"
+                           "  - operation: output\n"
+                           "    arguments:\n"
+                           "      - compiled.exe\n"
+                           "  - operation: O\n"
+                           "    arguments:\n"
+                           "      - 3\n"
+                           "  - operation: include\n"
+                           "    arguments:\n"
+                           "      - /usr/include\n"
+                           "      - /opt/include\n"
+                           "  - operation: debug\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -183,10 +183,10 @@ TEST(CLAASTVisitorToString, MultipleOperands) {
     root->accept(&visitor);
 
     std::string expected = "utility: concat\n"
-        "operations:\n"
-        "  - operand: file1.txt\n"
-        "  - operand: file2.txt\n"
-        "  - operand: file3.txt\n";
+                           "operations:\n"
+                           "  - operand: file1.txt\n"
+                           "  - operand: file2.txt\n"
+                           "  - operand: file3.txt\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
@@ -205,72 +205,72 @@ TEST(CLAASTVisitorToString, OperationArgumentManipulation) {
     root->accept(&visitor);
 
     std::string expected = "utility: compiler\n"
-        "operations:\n"
-        "  - operation: include\n"
-        "    arguments:\n"
-        "      - /usr/local/include\n"
-        "      - /opt/local/include\n";
+                           "operations:\n"
+                           "  - operation: include\n"
+                           "    arguments:\n"
+                           "      - /usr/local/include\n"
+                           "      - /opt/local/include\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
 TEST(CLAASTVisitor, MultipleShortOptionsYAMLFormat) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    
+
     auto op_a = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "a", true);
     auto op_b = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "b", true);
     auto op_c = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "c", true);
-    
+
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
     operations.emplace_back(op_a);
     operations.emplace_back(op_b);
     operations.emplace_back(op_c);
-    
+
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "tool", std::move(operations));
-    
+
     WBE::CLAASTVisitorToString visitor;
     root->accept(&visitor);
-    
+
     std::string expected = "utility: tool\n"
-        "operations:\n"
-        "  - operation: a\n"
-        "  - operation: b\n"
-        "  - operation: c\n";
+                           "operations:\n"
+                           "  - operation: a\n"
+                           "  - operation: b\n"
+                           "  - operation: c\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 
 TEST(CLAASTVisitor, MixedSingleAndMultipleShortOptionsYAMLFormat) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
-    
+
     auto op_f = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "-f", true);
     op_f->push_argument("input.txt");
-    
+
     auto op_v = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "v", true);
     auto op_d = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "d", true);
-    
+
     auto op_o = WBE::make_ref<WBE::CLAASTNodeOperation>(WBE::global_allocator(), "-o", true);
     op_o->push_argument("output.txt");
-    
+
     std::vector<WBE::Ref<WBE::CLAASTNode>> operations;
     operations.emplace_back(op_f);
     operations.emplace_back(op_v);
     operations.emplace_back(op_d);
     operations.emplace_back(op_o);
-    
+
     auto root = WBE::make_ref<WBE::CLAASTNodeRoot>(WBE::global_allocator(), "tool", std::move(operations));
-    
+
     WBE::CLAASTVisitorToString visitor;
     root->accept(&visitor);
-    
+
     std::string expected = "utility: tool\n"
-        "operations:\n"
-        "  - operation: -f\n"
-        "    arguments:\n"
-        "      - input.txt\n"
-        "  - operation: v\n"
-        "  - operation: d\n"
-        "  - operation: -o\n"
-        "    arguments:\n"
-        "      - output.txt\n";
+                           "operations:\n"
+                           "  - operation: -f\n"
+                           "    arguments:\n"
+                           "      - input.txt\n"
+                           "  - operation: v\n"
+                           "  - operation: d\n"
+                           "  - operation: -o\n"
+                           "    arguments:\n"
+                           "      - output.txt\n";
     ASSERT_EQ(visitor.get_string(), expected);
 }
 

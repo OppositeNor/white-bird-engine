@@ -33,14 +33,11 @@ Ref<CLAASTNode> CLAParser::parse(const std::vector<CLAToken>& p_tokens) {
     for (const auto& token : p_tokens) {
         process_token(token, utility_name, operations);
     }
-    Ref<CLAASTNodeRoot> root_node = make_ref<CLAASTNodeRoot>(
-        global_allocator(), utility_name, std::move(operations));
+    Ref<CLAASTNodeRoot> root_node = make_ref<CLAASTNodeRoot>(global_allocator(), utility_name, std::move(operations));
     return root_node;
 }
 
-void CLAParser::process_token(const CLAToken& p_token,
-    std::string& p_utility_name,
-    std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::process_token(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (parse_state) {
     case ParseState::START:
         parse_start(p_token, p_utility_name, p_operations);
@@ -57,9 +54,7 @@ void CLAParser::process_token(const CLAToken& p_token,
     }
 }
 
-void CLAParser::parse_start(const CLAToken& p_token,
-    std::string& p_utility_name,
-    std::vector<Ref<CLAASTNode>>& /*p_operations*/) {
+void CLAParser::parse_start(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& /*p_operations*/) {
     if (p_token.type != CLAToken::Type::UTILITY_NAME) {
         throw std::runtime_error("Failed to parse CLA: the first token of the "
                                  "input tokens must be the utility name.");
@@ -68,9 +63,7 @@ void CLAParser::parse_start(const CLAToken& p_token,
     parse_state = ParseState::GET_ROOT_OPERAND;
 }
 
-void CLAParser::parse_get_root_operand(const CLAToken& p_token,
-    std::string& p_utility_name,
-    std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::parse_get_root_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (p_token.type) {
     case CLAToken::Type::OPTION_SHORT:
     case CLAToken::Type::OPTION_LONG:
@@ -78,20 +71,16 @@ void CLAParser::parse_get_root_operand(const CLAToken& p_token,
         process_token(p_token, p_utility_name, p_operations);
         break;
     case CLAToken::Type::OPERAND: {
-        Ref<CLAASTNodeRootOperand> operand =
-            make_ref<CLAASTNodeRootOperand>(global_allocator(), p_token.value);
+        Ref<CLAASTNodeRootOperand> operand = make_ref<CLAASTNodeRootOperand>(global_allocator(), p_token.value);
         p_operations.emplace_back(operand);
         break;
     }
     default:
-        throw std::runtime_error(
-            "Failed to parse CLA: invalid token: " + p_token.value + ".");
+        throw std::runtime_error("Failed to parse CLA: invalid token: " + p_token.value + ".");
     }
 }
 
-void CLAParser::parse_get_option(const CLAToken& p_token,
-    std::string& /*p_utility_name*/,
-    std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::parse_get_option(const CLAToken& p_token, std::string& /*p_utility_name*/, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (p_token.type) {
     case CLAToken::Type::OPTION_SHORT: {
         WBE_DEBUG_ASSERT(!p_token.value.empty());
@@ -99,14 +88,12 @@ void CLAParser::parse_get_option(const CLAToken& p_token,
         std::string options = p_token.value.substr(1);
         if (options.size() > 1) {
             for (auto operation : options) {
-                curr_option = make_ref<CLAASTNodeOperation>(
-                    global_allocator(), std::string(1, operation), true);
+                curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), std::string(1, operation), true);
                 p_operations.emplace_back(curr_option);
             }
             parse_state = ParseState::GET_ROOT_OPERAND;
         } else {
-            curr_option = make_ref<CLAASTNodeOperation>(
-                global_allocator(), p_token.value, true);
+            curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value, true);
             p_operations.emplace_back(curr_option);
             parse_state = ParseState::GET_OPERAND;
         }
@@ -115,20 +102,16 @@ void CLAParser::parse_get_option(const CLAToken& p_token,
     case CLAToken::Type::OPTION_LONG:
         WBE_DEBUG_ASSERT(p_token.value.size() >= 2);
         WBE_DEBUG_ASSERT(p_token.value.rfind("--", 0) == 0);
-        curr_option = make_ref<CLAASTNodeOperation>(
-            global_allocator(), p_token.value.substr(2), false);
+        curr_option = make_ref<CLAASTNodeOperation>(global_allocator(), p_token.value.substr(2), false);
         p_operations.emplace_back(curr_option);
         parse_state = ParseState::GET_OPERAND;
         break;
     default:
-        throw std::runtime_error(
-            "Failed to parse CLA: invalid token: " + p_token.value + ".");
+        throw std::runtime_error("Failed to parse CLA: invalid token: " + p_token.value + ".");
     }
 }
 
-void CLAParser::parse_get_operand(const CLAToken& p_token,
-    std::string& p_utility_name,
-    std::vector<Ref<CLAASTNode>>& p_operations) {
+void CLAParser::parse_get_operand(const CLAToken& p_token, std::string& p_utility_name, std::vector<Ref<CLAASTNode>>& p_operations) {
     switch (p_token.type) {
     case CLAToken::Type::OPTION_SHORT:
     case CLAToken::Type::OPTION_LONG:
@@ -142,8 +125,7 @@ void CLAParser::parse_get_operand(const CLAToken& p_token,
         break;
     }
     default:
-        throw std::runtime_error(
-            "Failed to parse CLA: invalid token: " + p_token.value + ".");
+        throw std::runtime_error("Failed to parse CLA: invalid token: " + p_token.value + ".");
     }
 }
 

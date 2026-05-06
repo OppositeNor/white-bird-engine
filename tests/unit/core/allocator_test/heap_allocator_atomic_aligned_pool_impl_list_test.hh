@@ -15,25 +15,25 @@
 #ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_TEST_HH
 #define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <atomic>
 #include <barrier>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <memory>
+#include <random>
+#include <set>
 #include <stdexcept>
 #include <sys/types.h>
-#include <set>
-#include <vector>
-#include <random>
 #include <thread>
-#include <atomic>
+#include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -92,8 +92,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ZeroSizeAllocation) {
 }
 
 TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, AlignmentTest) {
-    WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList allocator
-        = WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList(WBE_MiB(0.5));
+    WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList allocator =
+        WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList(WBE_MiB(0.5));
     constexpr size_t ALIGN_REQ = WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList::HEADER_SIZE;
     std::vector<WhiteBirdEngine::MemID> allocated;
     for (size_t i = 0; i < 1024; ++i) {
@@ -346,39 +346,39 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentAllocations) {
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int NUM_THREADS = 8;
     constexpr int ALLOCS_PER_THREAD = 100;
-    
+
     std::vector<std::thread> threads;
     std::vector<std::vector<WBE::MemID>> thread_mems(NUM_THREADS);
     std::atomic<int> success_count{0};
-    
+
     // Barrier to synchronize thread start
     std::barrier sync_point(NUM_THREADS);
-    
+
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 42);
             std::uniform_int_distribution<int> dist(16, 128);
-            
+
             for (int j = 0; j < ALLOCS_PER_THREAD; ++j) {
                 int size = dist(rng);
                 WBE::MemID mem = pool.allocate(size);
                 if (mem != WBE::MEM_NULL) {
                     thread_mems[i].push_back(mem);
                     success_count.fetch_add(1);
-                    
+
                     // Verify the memory is properly aligned and accessible
                     memset(pool.get(mem), 0xAA, size);
                 }
             }
         });
     }
-    
+
     for (auto& t : threads) {
         t.join();
     }
-    
+
     // Verify all allocations are unique and valid
     std::set<WBE::MemID> all_mems;
     for (int i = 0; i < NUM_THREADS; ++i) {
@@ -387,10 +387,10 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentAllocations) {
             ASSERT_TRUE(all_mems.insert(mem).second); // Should be unique
         }
     }
-    
+
     ASSERT_GT(success_count.load(), 0);
     ASSERT_EQ(all_mems.size(), success_count.load());
-    
+
     // Clean up
     for (int i = 0; i < NUM_THREADS; ++i) {
         for (WBE::MemID mem : thread_mems[i]) {
@@ -403,7 +403,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(2));
     constexpr int NUM_THREADS = 4;
     constexpr int ALLOCS_PER_THREAD = 50;
-    
+
     // First, allocate memory in single-threaded mode
     std::vector<std::vector<WBE::MemID>> thread_mems(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
@@ -416,13 +416,13 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
             }
         }
     }
-    
+
     size_t initial_remain = pool.get_remain_size();
-    
+
     // Now deallocate concurrently
     std::vector<std::thread> threads;
     std::barrier sync_point(NUM_THREADS);
-    
+
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
@@ -432,18 +432,18 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
             }
         });
     }
-    
+
     for (auto& t : threads) {
         t.join();
     }
-    
+
     // Verify all memory was properly deallocated
     for (int i = 0; i < NUM_THREADS; ++i) {
         for (WBE::MemID mem : thread_mems[i]) {
             ASSERT_FALSE(pool.is_in_pool(mem));
         }
     }
-    
+
     // The remaining size should be greater than initial (due to coalescing)
     ASSERT_GE(pool.get_remain_size(), initial_remain);
 }
@@ -452,13 +452,13 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(8));
     constexpr int NUM_THREADS = 6;
     constexpr int OPERATIONS_PER_THREAD = 200;
-    
+
     std::vector<std::thread> threads;
     std::vector<std::vector<WBE::MemID>> active_mems(NUM_THREADS);
     std::atomic<int> total_operations{0};
-    
+
     std::barrier sync_point(NUM_THREADS);
-    
+
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
@@ -466,10 +466,10 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
             std::mt19937 rng(i + 200);
             std::uniform_int_distribution<int> size_dist(16, 256);
             std::uniform_real_distribution<float> op_dist(0.0F, 1.0F);
-            
+
             for (int j = 0; j < OPERATIONS_PER_THREAD; ++j) {
                 bool should_allocate = active_mems[i].empty() || op_dist(rng) < 0.6F;
-                
+
                 if (should_allocate) {
                     // Allocate
                     int size = size_dist(rng);
@@ -493,20 +493,20 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
             }
         });
     }
-    
+
     for (auto& t : threads) {
         t.join();
     }
-    
+
     ASSERT_EQ(total_operations.load(), NUM_THREADS * OPERATIONS_PER_THREAD);
-    
+
     // Verify remaining allocations are valid
     for (int i = 0; i < NUM_THREADS; ++i) {
         for (WBE::MemID mem : active_mems[i]) {
             ASSERT_TRUE(pool.is_in_pool(mem));
         }
     }
-    
+
     // Clean up remaining allocations
     for (int i = 0; i < NUM_THREADS; ++i) {
         for (WBE::MemID mem : active_mems[i]) {
@@ -519,25 +519,24 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
     WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int NUM_THREADS = 4;
     constexpr int STRESS_ITERATIONS = 100;
-    
+
     std::vector<std::thread> threads;
     std::atomic<int> alignment_failures{0};
     std::atomic<int> allocation_count{0};
-    
+
     std::barrier sync_point(NUM_THREADS);
-    
+
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
         threads.emplace_back([&, i]() {
-
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 300);
             std::uniform_int_distribution<int> size_dist(8, 64);
             std::vector<size_t> alignments = {1, 2, 4, 8, 16, 32, 64};
             std::uniform_int_distribution<size_t> align_dist(0, alignments.size() - 1);
-            
+
             std::vector<WBE::MemID> mems;
-            
+
             for (int j = 0; j < STRESS_ITERATIONS; ++j) {
                 int size = size_dist(rng);
                 size_t alignment = alignments[align_dist(rng)] * AAPILT_HEADER_SIZE;
@@ -560,7 +559,7 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
                 for (WBE::MemID mem : mems) {
                     EXPECT_TRUE(pool.is_in_pool(mem));
                 }
-                
+
                 // Occasionally deallocate some memory
                 if (!mems.empty() && (j % 10 == 0)) {
                     std::uniform_int_distribution<size_t> idx_dist(0, mems.size() - 1);
@@ -569,18 +568,18 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignm
                     mems.erase(mems.begin() + static_cast<ssize_t>(idx));
                 }
             }
-            
+
             // Clean up remaining allocations
             for (WBE::MemID mem : mems) {
                 pool.deallocate(mem);
             }
         });
     }
-    
+
     for (auto& t : threads) {
         t.join();
     }
-    
+
     ASSERT_EQ(alignment_failures.load(), 0);
     ASSERT_GT(allocation_count.load(), 0);
 }

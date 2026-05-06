@@ -47,7 +47,9 @@ public:
      *
      * @return The singleton instance.
      */
-    static EngineFunction* get_singleton() { return singleton; }
+    static EngineFunction* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief The game configuration.

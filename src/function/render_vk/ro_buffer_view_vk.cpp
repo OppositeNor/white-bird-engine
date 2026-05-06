@@ -22,8 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-VkBufferView ROBufferViewVK::Builder::create_vk_object(
-    const BaseRenderDataVK* p_render_data) const {
+VkBufferView ROBufferViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkBufferViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
     create_info.buffer = WBE_REQUIRED(buffer).get_buffer();
@@ -31,17 +30,13 @@ VkBufferView ROBufferViewVK::Builder::create_vk_object(
     create_info.offset = offset;
     create_info.range = range;
     VkBufferView result;
-    if (vkCreateBufferView(p_render_data->logic_device,
-            &create_info,
-            p_render_data->allocation_callbacks,
-            &result) != VK_SUCCESS) {
+    if (vkCreateBufferView(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create buffer view.");
     }
     return result;
 }
 
-ROBufferViewVK::ROBufferViewVK(
-    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROBufferViewVK::ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     buffer_view = p_builder.create_vk_object(p_render_data);
     exposed_fields.buffer = p_builder.buffer;
@@ -51,9 +46,7 @@ ROBufferViewVK::~ROBufferViewVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
         [render_data = render_data, buffer_view = buffer_view]() {
-            vkDestroyBufferView(render_data->logic_device,
-                buffer_view,
-                render_data->allocation_callbacks);
+            vkDestroyBufferView(render_data->logic_device, buffer_view, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }

@@ -15,6 +15,4 @@
 #ifndef WBE_FILE_STL_ALLOCATOR_TEST_HH
 #define WBE_FILE_STL_ALLOCATOR_TEST_HH
 
-
-
 #endif

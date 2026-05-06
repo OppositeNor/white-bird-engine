@@ -21,44 +21,37 @@
 
 namespace WhiteBirdEngine {
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::set_attachments(
-    const std::vector<VkAttachmentDescription>& p_attachments) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_attachments(const std::vector<VkAttachmentDescription>& p_attachments) {
     attachments = p_attachments;
     return *this;
 }
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::add_attachment(
-    const VkAttachmentDescription& p_attachment) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_attachment(const VkAttachmentDescription& p_attachment) {
     attachments.push_back(p_attachment);
     return *this;
 }
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::set_subpasses(
-    const std::vector<VkSubpassDescription>& p_subpasses) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_subpasses(const std::vector<VkSubpassDescription>& p_subpasses) {
     subpasses = p_subpasses;
     return *this;
 }
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::add_subpass(
-    const VkSubpassDescription& p_subpass) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_subpass(const VkSubpassDescription& p_subpass) {
     subpasses.push_back(p_subpass);
     return *this;
 }
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::set_dependencies(
-    const std::vector<VkSubpassDependency>& p_dependencies) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::set_dependencies(const std::vector<VkSubpassDependency>& p_dependencies) {
     dependencies = p_dependencies;
     return *this;
 }
 
-RORenderPassVK::Builder& RORenderPassVK::Builder::add_dependency(
-    const VkSubpassDependency& p_dependency) {
+RORenderPassVK::Builder& RORenderPassVK::Builder::add_dependency(const VkSubpassDependency& p_dependency) {
     dependencies.push_back(p_dependency);
     return *this;
 }
 
-VkRenderPass RORenderPassVK::Builder::create_vk_object(
-    const BaseRenderDataVK* p_render_data) const {
+VkRenderPass RORenderPassVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkRenderPassCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     create_info.attachmentCount = attachments.size();
@@ -69,17 +62,13 @@ VkRenderPass RORenderPassVK::Builder::create_vk_object(
     create_info.pDependencies = dependencies.data();
 
     VkRenderPass result;
-    if (vkCreateRenderPass(p_render_data->logic_device,
-            &create_info,
-            p_render_data->allocation_callbacks,
-            &result) != VK_SUCCESS) {
+    if (vkCreateRenderPass(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass.");
     }
     return result;
 }
 
-RORenderPassVK::RORenderPassVK(
-    const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+RORenderPassVK::RORenderPassVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
@@ -91,9 +80,7 @@ RORenderPassVK::~RORenderPassVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
         [render_data = render_data, render_pass = render_pass]() {
-            vkDestroyRenderPass(render_data->logic_device,
-                render_pass,
-                render_data->allocation_callbacks);
+            vkDestroyRenderPass(render_data->logic_device, render_pass, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }

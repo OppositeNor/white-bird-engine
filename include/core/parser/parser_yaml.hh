@@ -45,14 +45,15 @@ namespace WhiteBirdEngine {
 class YAMLData : public ParserData<YAMLData> {
     using Yaml = YAML::Node;
     friend class ParserYAML;
-    friend std::ostream& operator<<(
-        std::ostream& p_ostream, const YAMLData& p_parser);
+    friend std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parser);
 
 public:
     YAMLData() = default;
     ~YAMLData() = default;
-    YAMLData(const YAMLData& p_other) : node(p_other.node) {}
-    YAMLData(YAMLData&& p_other) noexcept : node(p_other.node) {}
+    YAMLData(const YAMLData& p_other) : node(p_other.node) {
+    }
+    YAMLData(YAMLData&& p_other) noexcept : node(p_other.node) {
+    }
     YAMLData& operator=(const YAMLData& p_other) {
         if (&p_other == this) {
             return *this;
@@ -67,8 +68,10 @@ public:
         node = p_other.node;
         return *this;
     }
-    YAMLData(const Yaml& p_node) : node(p_node) {}
-    YAMLData(YAML::Node&& p_node) : node(p_node) {}
+    YAMLData(const Yaml& p_node) : node(p_node) {
+    }
+    YAMLData(YAML::Node&& p_node) : node(p_node) {
+    }
 
     template <typename T>
     void set_value(const std::string& p_key, T&& p_value) {
@@ -79,9 +82,8 @@ public:
             using BufferT = std::remove_cvref_t<T>;
             std::string result = p_value.buffer;
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
-                throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. "
-                    "String length: {} (without NUL terminator).",
+                throw std::runtime_error(std::format("Failed to get string value: {}. Buffer capacity: {}. "
+                                                     "String length: {} (without NUL terminator).",
                     result,
                     BufferT::BUFFER_SIZE,
                     result.size()));
@@ -100,8 +102,7 @@ public:
             node[p_key]["x"] = p_value.x;
             node[p_key]["y"] = p_value.y;
             node[p_key]["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4> ||
-                             std::same_as<Type, glm::quat>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             node[p_key]["x"] = p_value.x;
             node[p_key]["y"] = p_value.y;
             node[p_key]["z"] = p_value.z;
@@ -117,7 +118,8 @@ public:
      * @tparam T The type of the value to set.
      * @param p_value The value to set to.
      */
-    template <typename T> void set(T&& p_value) {
+    template <typename T>
+    void set(T&& p_value) {
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, YAMLData>) {
             node = p_value.node;
@@ -130,9 +132,8 @@ public:
             using BufferT = std::remove_cvref_t<T>;
             std::string result = p_value.buffer;
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
-                throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. "
-                    "String length: {} (without NUL terminator).",
+                throw std::runtime_error(std::format("Failed to get string value: {}. Buffer capacity: {}. "
+                                                     "String length: {} (without NUL terminator).",
                     result,
                     BufferT::BUFFER_SIZE,
                     result.size()));
@@ -153,8 +154,7 @@ public:
             node["x"] = p_value.x;
             node["y"] = p_value.y;
             node["z"] = p_value.z;
-        } else if constexpr (std::same_as<Type, glm::vec4> ||
-                             std::same_as<Type, glm::quat>) {
+        } else if constexpr (std::same_as<Type, glm::vec4> || std::same_as<Type, glm::quat>) {
             node = Yaml();
             node["x"] = p_value.x;
             node["y"] = p_value.y;
@@ -165,26 +165,28 @@ public:
         }
     }
 
-    template <typename T> T get_value(const std::string& p_key) const {
+    template <typename T>
+    T get_value(const std::string& p_key) const {
         T result;
         get_value<T>(p_key, result);
         return result;
     }
 
-    template <typename T> T get() const {
+    template <typename T>
+    T get() const {
         T val;
         get<T>(val);
         return val;
     }
 
-    template <typename T> void get(T& p_value) const {
+    template <typename T>
+    void get(T& p_value) const {
         if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
             std::string result = node.as<std::string>();
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
-                throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. "
-                    "String length: {} (without NUL terminator).",
+                throw std::runtime_error(std::format("Failed to get string value: {}. Buffer capacity: {}. "
+                                                     "String length: {} (without NUL terminator).",
                     result,
                     BufferT::BUFFER_SIZE,
                     result.size()));
@@ -199,19 +201,11 @@ public:
         } else if constexpr (std::same_as<T, glm::vec2>) {
             p_value = glm::vec2(node["x"].as<float>(), node["y"].as<float>());
         } else if constexpr (std::same_as<T, glm::vec3>) {
-            p_value = glm::vec3(node["x"].as<float>(),
-                node["y"].as<float>(),
-                node["z"].as<float>());
+            p_value = glm::vec3(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>());
         } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(node["x"].as<float>(),
-                node["y"].as<float>(),
-                node["z"].as<float>(),
-                node["w"].as<float>());
+            p_value = glm::vec4(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
         } else if constexpr (std::same_as<T, glm::quat>) {
-            p_value = glm::quat(node["x"].as<float>(),
-                node["y"].as<float>(),
-                node["z"].as<float>(),
-                node["w"].as<float>());
+            p_value = glm::quat(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
         } else if constexpr (std::same_as<T, YAMLData>) {
             p_value = YAMLData(node.as<Yaml>());
         } else {
@@ -225,9 +219,8 @@ public:
             using BufferT = std::remove_cvref_t<T>;
             std::string result = node[p_key].as<std::string>();
             if (result.size() > BufferT::BUFFER_SIZE - 1) {
-                throw std::runtime_error(std::format(
-                    "Failed to get string value: {}. Buffer capacity: {}. "
-                    "String length: {} (without NUL terminator).",
+                throw std::runtime_error(std::format("Failed to get string value: {}. Buffer capacity: {}. "
+                                                     "String length: {} (without NUL terminator).",
                     result,
                     BufferT::BUFFER_SIZE,
                     result.size()));
@@ -241,17 +234,12 @@ public:
             }
             p_value = result;
         } else if constexpr (std::same_as<T, glm::vec2>) {
-            p_value = glm::vec2(
-                node[p_key]["x"].as<float>(), node[p_key]["y"].as<float>());
+            p_value = glm::vec2(node[p_key]["x"].as<float>(), node[p_key]["y"].as<float>());
         } else if constexpr (std::same_as<T, glm::vec3>) {
-            p_value = glm::vec3(node[p_key]["x"].as<float>(),
-                node[p_key]["y"].as<float>(),
-                node[p_key]["z"].as<float>());
+            p_value = glm::vec3(node[p_key]["x"].as<float>(), node[p_key]["y"].as<float>(), node[p_key]["z"].as<float>());
         } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(node[p_key]["x"].as<float>(),
-                node[p_key]["y"].as<float>(),
-                node[p_key]["z"].as<float>(),
-                node[p_key]["w"].as<float>());
+            p_value = glm::vec4(
+                node[p_key]["x"].as<float>(), node[p_key]["y"].as<float>(), node[p_key]["z"].as<float>(), node[p_key]["w"].as<float>());
         } else if constexpr (std::same_as<T, YAMLData>) {
             p_value = YAMLData(node[p_key].as<Yaml>());
         } else {
@@ -276,8 +264,7 @@ private:
     Yaml node;
 };
 
-inline std::ostream& operator<<(
-    std::ostream& p_ostream, const YAMLData& p_parser) {
+inline std::ostream& operator<<(std::ostream& p_ostream, const YAMLData& p_parser) {
     return p_ostream << p_parser.node;
 }
 
@@ -294,8 +281,10 @@ public:
 
     ParserYAML() = default;
     virtual ~ParserYAML() = default;
-    ParserYAML(const ParserYAML& p_other) : data(p_other.data) {}
-    ParserYAML(ParserYAML&& p_other) noexcept : data(std::move(p_other.data)) {}
+    ParserYAML(const ParserYAML& p_other) : data(p_other.data) {
+    }
+    ParserYAML(ParserYAML&& p_other) noexcept : data(std::move(p_other.data)) {
+    }
     ParserYAML& operator=(const ParserYAML& p_other) {
         if (&p_other == this) {
             return *this;
@@ -319,7 +308,8 @@ public:
         data.node = YAML::Load(p_buffer);
     }
 
-    template <typename T> T get_value(const std::string& p_key) const {
+    template <typename T>
+    T get_value(const std::string& p_key) const {
         return data.get_value<T>(p_key);
     }
 
@@ -328,22 +318,33 @@ public:
         data.get_value<T>(p_key, p_val);
     }
 
-    template <typename T> T get() const { return data.get_value<T>(); }
-    template <typename T> void get(T& p_val) const { data.get_value<T>(p_val); }
+    template <typename T>
+    T get() const {
+        return data.get_value<T>();
+    }
+    template <typename T>
+    void get(T& p_val) const {
+        data.get_value<T>(p_val);
+    }
 
     std::vector<std::string> get_all_keys() const {
         return data.get_all_keys();
     }
 
-    const YAMLData& get_data() const { return data; }
+    const YAMLData& get_data() const {
+        return data;
+    }
 
-    YAMLData& get_data() { return data; }
+    YAMLData& get_data() {
+        return data;
+    }
 
     bool contains(const std::string& p_key) const {
         return data.contains(p_key);
     }
 
-    template <typename T> void get_value(std::string& p_key, T&& p_value) {
+    template <typename T>
+    void get_value(std::string& p_key, T&& p_value) {
         return data.get_value<T>(p_key, std::forward<T>(p_value));
     }
 

@@ -18,10 +18,10 @@
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
-#include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "resource_test_utils.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_utils.hh"
+#include "resource_test_utils.hh"
 #include "utils/utils.hh"
 
 #include <cstring>
@@ -77,15 +77,14 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     std::stringstream ss;
     std::string text_content_storage;
     auto res_chunk = MockResourceChunk::Builder()
-        .set_push_data_callback(std::function<WBE::RefRes<char> (size_t, const void *)> (
-            [&text_content_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-                text_content_storage.resize(p_res_size - 1);
-                std::memcpy(text_content_storage.data(), p_res, p_res_size - 1);
-                EXPECT_EQ(static_cast<const char*>(p_res)[p_res_size - 1], '\0');
-                return WBE::MEM_NULL;
-            }
-        ))
-        .build(ss);
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
+                             [&text_content_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                                 text_content_storage.resize(p_res_size - 1);
+                                 std::memcpy(text_content_storage.data(), p_res, p_res_size - 1);
+                                 EXPECT_EQ(static_cast<const char*>(p_res)[p_res_size - 1], '\0');
+                                 return WBE::MEM_NULL;
+                             }))
+                         .build(ss);
     loader.populate_scheme(*res_chunk, text_scheme);
     EXPECT_EQ(text_content_storage, test_file_content);
 }
@@ -98,26 +97,23 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     WBE::RUSchemeBinary binary_scheme;
     binary_scheme.path = "test_text_files/test_file_utf8.txt";
     auto res_chunk = MockResourceChunk::Builder()
-        .set_push_data_callback(std::function<WBE::RefRes<char> (size_t, const void *)> (
-            [&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-                binary_data_storage.resize(p_res_size);
-                std::memcpy(binary_data_storage.data(), p_res, p_res_size);
-                return WBE::MEM_NULL;
-            }
-        ))
-        .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char> (const std::string&, const void*, size_t)> (
-            [&captured_ru_binary](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
-                EXPECT_EQ(p_size, sizeof(WBE::RUBinary));
-                std::memcpy(static_cast<void*>(&captured_ru_binary), p_res, p_size);
-                return WBE::MEM_NULL;
-            }
-        ))
-        .build(ss);
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
+                             [&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                                 binary_data_storage.resize(p_res_size);
+                                 std::memcpy(binary_data_storage.data(), p_res, p_res_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
+                             [&captured_ru_binary](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(p_size, sizeof(WBE::RUBinary));
+                                 std::memcpy(static_cast<void*>(&captured_ru_binary), p_res, p_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .build(ss);
 
     loader.populate_scheme(*res_chunk, binary_scheme);
 
-    auto expected_binary = WBE::load_binary_file(
-        static_cast<std::string>(WBE::get_resource_path(binary_scheme.path)).c_str());
+    auto expected_binary = WBE::load_binary_file(static_cast<std::string>(WBE::get_resource_path(binary_scheme.path)).c_str());
     EXPECT_EQ(captured_ru_binary.size, expected_binary.size());
     EXPECT_EQ(binary_data_storage.size(), expected_binary.size());
     EXPECT_EQ(binary_data_storage, expected_binary);
@@ -132,21 +128,19 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     image_scheme.path = "assets/images/test_ppm3.ppm";
     image_scheme.color_space = "srgb";
     auto res_chunk = MockResourceChunk::Builder()
-        .set_push_data_callback(std::function<WBE::RefRes<char> (size_t, const void *)> (
-            [&image_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-                image_data_storage.resize(p_res_size);
-                std::memcpy(image_data_storage.data(), p_res, p_res_size);
-                return WBE::MEM_NULL;
-            }
-        ))
-        .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char> (const std::string&, const void*, size_t)> (
-            [&captured_ru_image](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
-                EXPECT_EQ(p_size, sizeof(WBE::RUImage));
-                std::memcpy(static_cast<void*>(&captured_ru_image), p_res, p_size);
-                return WBE::MEM_NULL;
-            }
-        ))
-        .build(ss);
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
+                             [&image_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                                 image_data_storage.resize(p_res_size);
+                                 std::memcpy(image_data_storage.data(), p_res, p_res_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
+                             [&captured_ru_image](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(p_size, sizeof(WBE::RUImage));
+                                 std::memcpy(static_cast<void*>(&captured_ru_image), p_res, p_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .build(ss);
     loader.populate_scheme(*res_chunk, image_scheme);
     EXPECT_EQ(captured_ru_image.width, 16);
     EXPECT_EQ(captured_ru_image.height, 16);

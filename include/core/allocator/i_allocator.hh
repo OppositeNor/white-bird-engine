@@ -23,7 +23,8 @@ namespace WhiteBirdEngine {
 using MemID = uintptr_t;
 constexpr MemID MEM_NULL = 0;
 
-template <typename T> struct AllocatorTrait;
+template <typename T>
+struct AllocatorTrait;
 
 /**
  * @brief Types of allocators.

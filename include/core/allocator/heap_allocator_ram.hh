@@ -26,8 +26,7 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorRAM> final
-    : public AllocatorTrait<HeapAllocator> {
+struct AllocatorTrait<class HeapAllocatorRAM> final : public AllocatorTrait<HeapAllocator> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorRAM>);
     static constexpr bool IS_POOL = false;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -62,14 +61,22 @@ public:
         return reinterpret_cast<void*>(p_id);
     }
 
-    uint32_t obj_count() const { return allocated.size(); }
+    uint32_t obj_count() const {
+        return allocated.size();
+    }
 
-    std::set<MemID> get_allocated() const { return allocated; }
+    std::set<MemID> get_allocated() const {
+        return allocated;
+    }
 
-    virtual bool is_empty() const override { return allocated.empty(); }
+    virtual bool is_empty() const override {
+        return allocated.empty();
+    }
 
     // TODO: Test
-    virtual void clear() override { allocated.clear(); }
+    virtual void clear() override {
+        allocated.clear();
+    }
 
     virtual operator std::string() const override {
         std::stringstream ss;

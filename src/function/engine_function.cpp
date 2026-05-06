@@ -22,9 +22,10 @@ namespace WhiteBirdEngine {
 
 EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
     singleton = this;
-    game_config = make_unique<GameConfig>(
-        EngineCore::get_singleton()->pool_allocator, p_game_config_file_path);
+    game_config = make_unique<GameConfig>(EngineCore::get_singleton()->pool_allocator, p_game_config_file_path);
 }
 
-EngineFunction::~EngineFunction() { singleton = nullptr; }
+EngineFunction::~EngineFunction() {
+    singleton = nullptr;
+}
 } // namespace WhiteBirdEngine

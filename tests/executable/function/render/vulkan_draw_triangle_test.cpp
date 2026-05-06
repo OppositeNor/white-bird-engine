@@ -12,29 +12,29 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/logging/log.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/profiling/profiler.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/application/application_game.hh"
 #include "function/function_utils.hh"
+#include "function/render/i_renderer.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
-#include "core/logging/log.hh"
-#include "core/memory/reference_strong.hh"
-#include "core/profiling/profiler.hh"
-#include "function/application/application_game.hh"
-#include "function/render/i_renderer.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
 #include <exception>
@@ -56,7 +56,6 @@ WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
     virtual void logic_update(double p_delta) override {
-
     }
 
     virtual void render_update(double p_delta) override {
@@ -73,64 +72,49 @@ public:
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
         // Setup shaders
-        auto vertex_shader = WBE::ROShaderVK::Builder()
-            .set_code("draw_cube_vert")
-            .create_ref(base_render_data);
-        auto fragment_shader = WBE::ROShaderVK::Builder()
-            .set_code("draw_cube_frag")
-            .create_ref(base_render_data);
+        auto vertex_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_vert").create_ref(base_render_data);
+        auto fragment_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_frag").create_ref(base_render_data);
         shader_config.set_shaders(vertex_shader, fragment_shader);
 
         // Setup graphics pipeline layout.
-        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout
-            = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(render_allocator, base_render_data,
-                                                          WBE::RODescriptorSetLayoutVK::Builder()
-                                                          .add_ubo(0, 1));
-        WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout
-            = WBE::make_ref<WBE::ROPipelineLayoutVK>(render_allocator, base_render_data,
-                                                     WBE::ROPipelineLayoutVK::Builder()
-                                                     .add_descriptor_set_layout(descriptor_set_layout));
+        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(
+            render_allocator, base_render_data, WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1));
+        WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout = WBE::make_ref<WBE::ROPipelineLayoutVK>(
+            render_allocator, base_render_data, WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
         auto render_pass = renderer->get_swap_chain_render_pass();
-        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
-            .default_render_opaque_configuration(
-                base_render_data, shader_config, graphics_pipeline_layout, render_pass)
-            .create_ref(base_render_data);
+        auto graphics_pipeline =
+            WBE::ROGraphicsPipelineVK::Builder()
+                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout, render_pass)
+                .create_ref(base_render_data);
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
         // Setup time UBO
-        time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator, base_render_data, WBE::ROBufferVK::Builder()
-                                                  .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                  .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                                  .set_size(sizeof(WBE::TimeVKUBO)));
+        time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator,
+            base_render_data,
+            WBE::ROBufferVK::Builder()
+                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(sizeof(WBE::TimeVKUBO)));
         time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
         // Setup descriptor sets.
-        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set
-            = WBE::make_ref<WBE::RODescriptorSetVK>(render_allocator, base_render_data,
-                                                    WBE::RODescriptorSetVK::Builder()
-                                                    .add_descriptor_set_layout(descriptor_set_layout));
-        descriptor_set->write_descriptor_set(
-            WBE::RODescriptorSetVK::Writer()
-            .set_binding(0)
-            .add_uniform_buffer_info(
-                WBE::RODescriptorSetVK::Writer::BufferInfo{
-                    .buffer = time_ubo,
-                    .offset = 0
-                })
-        );
+        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set = WBE::make_ref<WBE::RODescriptorSetVK>(
+            render_allocator, base_render_data, WBE::RODescriptorSetVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
+        descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(0).add_uniform_buffer_info(
+            WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = time_ubo, .offset = 0}));
         // Setup render task. The vertex/index data lives in the global static
         // opaque mesh, populated by RendererVK::update_static_opaque_triangles()
         // from the RenderDatabase, and exposed to render tasks under the
         // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
-        std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets {descriptor_set};
+        std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
         WBE::RendPipelineDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{
-            .res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
             .res = graphics_pipeline});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
         task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Ref<WBE::RenderTaskVK> {
-            return WBE::make_ref<WBE::RTRunGraphicsPipelineVK>(
-                render_allocator, base_render_data, glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
+            return WBE::make_ref<WBE::RTRunGraphicsPipelineVK>(render_allocator,
+                base_render_data,
+                glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
                 WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
@@ -168,8 +152,7 @@ int main(int p_argc, char* p_argv[]) {
         }
         const auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
         for (const auto& profile : global_profiles) {
-            WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds",
-                                                                          profile.message, profile.delta));
+            WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds", profile.message, profile.delta));
         }
     } catch (const std::exception& e) {
         std::println("Exception caught in main: {}", e.what());
@@ -177,4 +160,3 @@ int main(int p_argc, char* p_argv[]) {
     }
     return EXIT_SUCCESS;
 }
-

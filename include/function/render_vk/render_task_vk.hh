@@ -106,21 +106,21 @@ struct RenderTaskVK : public RenderTask {
      *                    by resource id.
      * @param p_delta     The frame delta in seconds.
      */
-    virtual void record(VkCommandBuffer p_command_buffer,
-        const Vector<RendResVK, RenderAllocator>& p_resources,
-        double p_delta) = 0;
+    virtual void record(VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double p_delta) = 0;
 
     /**
      * @brief Default no-op for the cross-API perform() entry point. The
      * Vulkan render graph drives execution via record(); perform() is kept
      * only to satisfy the abstract interface.
      */
-    virtual void perform(double /*p_delta*/) override {}
+    virtual void perform(double /*p_delta*/) override {
+    }
 
     /**
      * @brief Default no-op init.
      */
-    virtual void init() override {}
+    virtual void init() override {
+    }
 
     /**
      * @class RecordCommandBufferGuard
@@ -140,8 +140,7 @@ struct RenderTaskVK : public RenderTask {
          * @param p_inheritance_info The inheritance info, used for secondary
          *                           command buffers; nullptr for primary.
          */
-        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer,
-            VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
+        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
 
         VkCommandBuffer command_buffer;
     };

@@ -16,15 +16,18 @@
 #define WBE_FILE_PARSER_JSON_TEST_HH
 
 #include "core/parser/parser_json.hh"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
 #include "parser_test_general.hh"
 #include "utils/utils.hh"
 
-#include <cstddef>
-#include <exception>
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
-#include <gtest/gtest.h>
+#include <exception>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -34,9 +37,9 @@ namespace WBE = WhiteBirdEngine;
 TEST(ParserJSONTest, ParseFromBuffer) {
     WBE::ParserJSON parser;
     test_parser_general(parser,
-                        R"({ "fruit" : "apple", "vegetable" : "lettice", "number" : 123 })",
-                        R"({ "vegetable" : "lettice", "numbers" : [123, -200, 5, 60, -123] })",
-                        R"({ "test_pair" : {
+        R"({ "fruit" : "apple", "vegetable" : "lettice", "number" : 123 })",
+        R"({ "vegetable" : "lettice", "numbers" : [123, -200, 5, 60, -123] })",
+        R"({ "test_pair" : {
                                 "test_key1" : "test_val1",
                                 "test_key2" : 123,
                                 "test_key3" : 3.14
@@ -63,7 +66,7 @@ TEST(ParserJSONTest, ParseFromBufferEdgeCases) {
                      .template get_value<WBE::ParserJSON::DataType>("level3")
                      .template get_value<std::string>("level4")
                      .c_str(),
-                 "deep_value");
+        "deep_value");
 
     // Null values
     parser.parse_from_buffer(R"({ "key_with_null": null })");
@@ -72,7 +75,7 @@ TEST(ParserJSONTest, ParseFromBufferEdgeCases) {
 
 TEST(ParserJSONTest, ParseListOfObjects) {
     WBE::ParserJSON parser;
-    
+
     // Test parsing an array of simple objects
     const std::string json_simple_objects = R"({
         "users": [
@@ -93,23 +96,23 @@ TEST(ParserJSONTest, ParseListOfObjects) {
             }
         ]
     })";
-    
+
     parser.parse_from_buffer(json_simple_objects);
-    
+
     // Get the list of objects
     auto users = parser.get_value<std::vector<WBE::JSONData>>("users");
     ASSERT_EQ(users.size(), 3);
-    
+
     // Verify first user
     ASSERT_EQ(users[0].get_value<int>("id"), 1);
     ASSERT_EQ(users[0].get_value<std::string>("name"), "Alice");
     ASSERT_EQ(users[0].get_value<bool>("active"), true);
-    
+
     // Verify second user
     ASSERT_EQ(users[1].get_value<int>("id"), 2);
     ASSERT_EQ(users[1].get_value<std::string>("name"), "Bob");
     ASSERT_EQ(users[1].get_value<bool>("active"), false);
-    
+
     // Verify third user
     ASSERT_EQ(users[2].get_value<int>("id"), 3);
     ASSERT_EQ(users[2].get_value<std::string>("name"), "Charlie");
@@ -118,7 +121,7 @@ TEST(ParserJSONTest, ParseListOfObjects) {
 
 TEST(ParserJSONTest, ParseListOfNestedObjects) {
     WBE::ParserJSON parser;
-    
+
     // Test parsing an array of objects with nested structures
     const std::string json_nested_objects = R"({
         "products": [
@@ -150,43 +153,43 @@ TEST(ParserJSONTest, ParseListOfNestedObjects) {
             }
         ]
     })";
-    
+
     parser.parse_from_buffer(json_nested_objects);
-    
+
     // Get the list of products
     auto products = parser.get_value<std::vector<WBE::JSONData>>("products");
     ASSERT_EQ(products.size(), 2);
-    
+
     // Verify first product
     ASSERT_EQ(products[0].get_value<int>("id"), 101);
     ASSERT_EQ(products[0].get_value<std::string>("name"), "Laptop");
-    
+
     // Verify nested details of first product
     auto details1 = products[0].get_value<WBE::JSONData>("details");
     ASSERT_EQ(details1.get_value<std::string>("brand"), "TechCorp");
     ASSERT_EQ(details1.get_value<std::string>("model"), "X1000");
-    
+
     // Verify deeply nested specs
     auto specs1 = details1.get_value<WBE::JSONData>("specs");
     ASSERT_EQ(specs1.get_value<std::string>("ram"), "16GB");
     ASSERT_EQ(specs1.get_value<std::string>("storage"), "512GB SSD");
-    
+
     // Verify tags array within the object
     auto tags1 = products[0].get_value<std::vector<std::string>>("tags");
     ASSERT_EQ(tags1.size(), 3);
     ASSERT_EQ(tags1[0], "electronics");
     ASSERT_EQ(tags1[1], "computers");
     ASSERT_EQ(tags1[2], "portable");
-    
+
     // Verify second product
     ASSERT_EQ(products[1].get_value<int>("id"), 102);
     ASSERT_EQ(products[1].get_value<std::string>("name"), "Mouse");
-    
+
     auto details2 = products[1].get_value<WBE::JSONData>("details");
     auto specs2 = details2.get_value<WBE::JSONData>("specs");
     ASSERT_EQ(specs2.get_value<std::string>("dpi"), "1600");
     ASSERT_EQ(specs2.get_value<std::string>("buttons"), "5");
-    
+
     auto tags2 = products[1].get_value<std::vector<std::string>>("tags");
     ASSERT_EQ(tags2.size(), 2);
     ASSERT_EQ(tags2[0], "electronics");
@@ -195,7 +198,7 @@ TEST(ParserJSONTest, ParseListOfNestedObjects) {
 
 TEST(ParserJSONTest, ParseEmptyAndMixedLists) {
     WBE::ParserJSON parser;
-    
+
     // Test empty array
     const std::string json_empty_array = R"({
         "empty_list": [],
@@ -205,31 +208,31 @@ TEST(ParserJSONTest, ParseEmptyAndMixedLists) {
             { "type": "boolean", "value": true }
         ]
     })";
-    
+
     parser.parse_from_buffer(json_empty_array);
-    
+
     // Verify empty list
     auto empty_list = parser.get_value<std::vector<WBE::JSONData>>("empty_list");
     ASSERT_EQ(empty_list.size(), 0);
-    
+
     // Verify mixed content list
     auto mixed_content = parser.get_value<std::vector<WBE::JSONData>>("mixed_content");
     ASSERT_EQ(mixed_content.size(), 3);
-    
+
     // Verify each mixed item
     ASSERT_EQ(mixed_content[0].get_value<std::string>("type"), "object");
     ASSERT_EQ(mixed_content[0].get_value<int>("value"), 42);
-    
+
     ASSERT_EQ(mixed_content[1].get_value<std::string>("type"), "string");
     ASSERT_EQ(mixed_content[1].get_value<std::string>("value"), "hello");
-    
+
     ASSERT_EQ(mixed_content[2].get_value<std::string>("type"), "boolean");
     ASSERT_EQ(mixed_content[2].get_value<bool>("value"), true);
 }
 
 TEST(ParserJSONTest, BufferRetrieval) {
     WBE::ParserJSON parser;
-    
+
     const std::string json_data = R"({
         "short_text": "Hello",
         "medium_text": "This is a medium length text",
@@ -237,38 +240,38 @@ TEST(ParserJSONTest, BufferRetrieval) {
         "empty_text": "",
         "special_chars": "Line1\nLine2\tTab\"Quote'"
     })";
-    
+
     parser.parse_from_buffer(json_data);
-    
+
     // Test retrieving into different buffer sizes
     WBE::Buffer<16> small_buffer{};
     WBE::Buffer<64> medium_buffer{};
     WBE::Buffer<128> large_buffer{};
-    
+
     // Test short text fits in all buffers
     std::string key = "short_text";
     parser.get_data().get_value(key, small_buffer);
     ASSERT_STREQ(small_buffer.buffer, "Hello");
-    
+
     parser.get_data().get_value(key, medium_buffer);
     ASSERT_STREQ(medium_buffer.buffer, "Hello");
-    
+
     parser.get_data().get_value(key, large_buffer);
     ASSERT_STREQ(large_buffer.buffer, "Hello");
-    
+
     // Test medium text fits in medium and large buffers
     key = "medium_text";
     parser.get_data().get_value(key, medium_buffer);
     ASSERT_STREQ(medium_buffer.buffer, "This is a medium length text");
-    
+
     parser.get_data().get_value(key, large_buffer);
     ASSERT_STREQ(large_buffer.buffer, "This is a medium length text");
-    
+
     // Test empty text
     key = "empty_text";
     parser.get_data().get_value(key, small_buffer);
     ASSERT_STREQ(small_buffer.buffer, "");
-    
+
     // Test special characters
     key = "special_chars";
     parser.get_data().get_value(key, medium_buffer);
@@ -277,18 +280,18 @@ TEST(ParserJSONTest, BufferRetrieval) {
 
 TEST(ParserJSONTest, BufferBoundsChecking) {
     WBE::ParserJSON parser;
-    
+
     const std::string json_data = R"({
         "long_text": "This is a very long text that exceeds small buffer capacity"
     })";
-    
+
     parser.parse_from_buffer(json_data);
-    
+
     // Test that attempting to retrieve long text into small buffer throws exception
     WBE::Buffer<16> small_buffer{};
     std::string key = "long_text";
     ASSERT_THROW(parser.get_data().get_value(key, small_buffer), std::runtime_error);
-    
+
     // Test that it works with appropriately sized buffer
     WBE::Buffer<128> large_buffer{};
     ASSERT_NO_THROW(parser.get_data().get_value(key, large_buffer));
@@ -297,24 +300,24 @@ TEST(ParserJSONTest, BufferBoundsChecking) {
 
 TEST(ParserJSONTest, BufferMaxCapacityRetrieval) {
     WBE::ParserJSON parser;
-    
+
     // Test string that exactly fits buffer capacity (15 chars + null terminator for size 16)
     const std::string json_data = R"({
         "max_text": "123456789012345"
     })";
-    
+
     parser.parse_from_buffer(json_data);
-    
+
     WBE::Buffer<16> buffer{};
     std::string key = "max_text";
     parser.get_data().get_value(key, buffer);
     ASSERT_STREQ(buffer.buffer, "123456789012345");
-    
+
     // Test string that's one character too long
     const std::string json_data_too_long = R"({
         "too_long": "1234567890123456"
     })";
-    
+
     parser.parse_from_buffer(json_data_too_long);
     key = "too_long";
     ASSERT_THROW(parser.get_data().get_value(key, buffer), std::runtime_error);
@@ -322,7 +325,7 @@ TEST(ParserJSONTest, BufferMaxCapacityRetrieval) {
 
 TEST(ParserJSONTest, ComplexNestedStructures) {
     WBE::ParserJSON parser;
-    
+
     // Test deeply nested structures with mixed types
     const std::string complex_json = R"({
         "application": {
@@ -376,48 +379,48 @@ TEST(ParserJSONTest, ComplexNestedStructures) {
             ]
         }
     })";
-    
+
     parser.parse_from_buffer(complex_json);
-    
+
     // Test top-level access
     auto app = parser.get_value<WBE::JSONData>("application");
     ASSERT_EQ(app.get_value<std::string>("name"), "Test App");
     ASSERT_EQ(app.get_value<std::string>("version"), "1.2.3");
-    
+
     // Test nested features
     auto features = app.get_value<WBE::JSONData>("features");
     auto auth = features.get_value<WBE::JSONData>("authentication");
     ASSERT_EQ(auth.get_value<bool>("enabled"), true);
-    
+
     // Test array within nested structure
     auto methods = auth.get_value<std::vector<std::string>>("methods");
     ASSERT_EQ(methods.size(), 3);
     ASSERT_EQ(methods[0], "oauth");
     ASSERT_EQ(methods[1], "basic");
     ASSERT_EQ(methods[2], "token");
-    
+
     // Test deeply nested config
     auto config = auth.get_value<WBE::JSONData>("config");
     ASSERT_EQ(config.get_value<int>("timeout"), 3600);
     ASSERT_EQ(config.get_value<int>("max_attempts"), 3);
-    
+
     // Test providers object
     auto providers = config.get_value<WBE::JSONData>("providers");
     auto google = providers.get_value<WBE::JSONData>("google");
     ASSERT_EQ(google.get_value<std::string>("client_id"), "google_client_123");
     ASSERT_EQ(google.get_value<bool>("enabled"), true);
-    
+
     auto facebook = providers.get_value<WBE::JSONData>("facebook");
     ASSERT_EQ(facebook.get_value<std::string>("app_id"), "fb_app_456");
     ASSERT_EQ(facebook.get_value<bool>("enabled"), false);
-    
+
     // Test other nested sections
     auto logging = features.get_value<WBE::JSONData>("logging");
     ASSERT_EQ(logging.get_value<std::string>("level"), "info");
-    
+
     auto destinations = logging.get_value<std::vector<std::string>>("destinations");
     ASSERT_EQ(destinations.size(), 3);
-    
+
     // Test dependencies array
     auto dependencies = app.get_value<std::vector<WBE::JSONData>>("dependencies");
     ASSERT_EQ(dependencies.size(), 3);
@@ -428,7 +431,7 @@ TEST(ParserJSONTest, ComplexNestedStructures) {
 
 TEST(ParserJSONTest, ArrayVariations) {
     WBE::ParserJSON parser;
-    
+
     // Test various array types and structures
     const std::string array_json = R"({
         "empty_array": [],
@@ -447,34 +450,34 @@ TEST(ParserJSONTest, ArrayVariations) {
             {"id": 3, "data": [50, 60]}
         ]
     })";
-    
+
     parser.parse_from_buffer(array_json);
-    
+
     // Test empty array
     auto empty_array = parser.get_value<std::vector<WBE::JSONData>>("empty_array");
     ASSERT_EQ(empty_array.size(), 0);
-    
+
     // Test string array
     auto string_array = parser.get_value<std::vector<std::string>>("string_array");
     ASSERT_EQ(string_array.size(), 3);
     ASSERT_EQ(string_array[1], "two");
-    
+
     // Test number array
     auto number_array = parser.get_value<std::vector<int>>("number_array");
     ASSERT_EQ(number_array.size(), 5);
     ASSERT_EQ(number_array[3], 4);
-    
+
     // Test boolean array
     auto boolean_array = parser.get_value<std::vector<bool>>("boolean_array");
     ASSERT_EQ(boolean_array.size(), 5);
     ASSERT_EQ(boolean_array[0], true);
     ASSERT_EQ(boolean_array[1], false);
-    
+
     // Test array of objects
     auto object_array = parser.get_value<std::vector<WBE::JSONData>>("array_of_objects");
     ASSERT_EQ(object_array.size(), 3);
     ASSERT_EQ(object_array[1].get_value<int>("id"), 2);
-    
+
     auto data_array = object_array[1].get_value<std::vector<int>>("data");
     ASSERT_EQ(data_array.size(), 2);
     ASSERT_EQ(data_array[0], 30);
@@ -483,23 +486,23 @@ TEST(ParserJSONTest, ArrayVariations) {
 
 TEST(ParserJSONTest, ErrorHandlingAndValidation) {
     WBE::ParserJSON parser;
-    
+
     // Test malformed JSON handling
     ASSERT_THROW(parser.parse_from_buffer("{invalid json}"), std::exception);
     ASSERT_THROW(parser.parse_from_buffer("{\"unclosed\": \"string"), std::exception);
     ASSERT_THROW(parser.parse_from_buffer("{\"trailing\": \"comma\",}"), std::exception);
-    
+
     // Test valid JSON with various edge cases
     parser.parse_from_buffer(R"({"null_value": null, "empty_string": "", "zero": 0})");
-    
+
     // Test accessing non-existent keys
     ASSERT_FALSE(parser.contains("non_existent_key"));
     ASSERT_THROW(parser.get_value<std::string>("non_existent_key"), std::exception);
-    
+
     // Test type mismatches and valid access
     ASSERT_TRUE(parser.contains("zero"));
     ASSERT_EQ(parser.get_value<int>("zero"), 0);
-    
+
     // Test accessing valid keys
     ASSERT_TRUE(parser.contains("null_value"));
     ASSERT_TRUE(parser.contains("empty_string"));
@@ -508,7 +511,7 @@ TEST(ParserJSONTest, ErrorHandlingAndValidation) {
 
 TEST(ParserJSONTest, KeyManagementAndUtilities) {
     WBE::ParserJSON parser;
-    
+
     const std::string test_json = R"({
         "key1": "value1",
         "key2": 123,
@@ -519,34 +522,34 @@ TEST(ParserJSONTest, KeyManagementAndUtilities) {
         },
         "array": [1, 2, 3]
     })";
-    
+
     parser.parse_from_buffer(test_json);
-    
+
     // Test get_all_keys functionality
     auto keys = parser.get_all_keys();
     ASSERT_EQ(keys.size(), 5);
-    
+
     // Keys should include all top-level keys
     std::sort(keys.begin(), keys.end());
     std::vector<std::string> expected_keys = {"array", "key1", "key2", "key3", "nested"};
     std::sort(expected_keys.begin(), expected_keys.end());
     ASSERT_EQ(keys, expected_keys);
-    
+
     // Test nested key access
     auto nested = parser.get_value<WBE::JSONData>("nested");
     auto nested_keys = nested.get_all_keys();
     ASSERT_EQ(nested_keys.size(), 2);
-    
+
     std::sort(nested_keys.begin(), nested_keys.end());
     std::vector<std::string> expected_nested = {"subkey1", "subkey2"};
     std::sort(expected_nested.begin(), expected_nested.end());
     ASSERT_EQ(nested_keys, expected_nested);
-    
+
     // Test contains functionality at different levels
     ASSERT_TRUE(parser.contains("key1"));
     ASSERT_TRUE(parser.contains("nested"));
     ASSERT_FALSE(parser.contains("subkey1")); // Not at top level
-    
+
     ASSERT_TRUE(nested.contains("subkey1"));
     ASSERT_TRUE(nested.contains("subkey2"));
     ASSERT_FALSE(nested.contains("key1")); // Not in nested level

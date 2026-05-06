@@ -39,8 +39,7 @@ public:
      *
      * @param p_render_data The base render data.
      */
-    RenderObjectVK(const BaseRenderDataVK* p_render_data)
-        : render_data(p_render_data) {
+    RenderObjectVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
         if (p_render_data == nullptr) {
             throw std::runtime_error("Render data is nullptr.");
         }
@@ -59,9 +58,7 @@ protected:
      * @param p_domain The domain where this memory will be allocated.
      * @return The allocated device memory.
      */
-    VkDeviceMemory allocate_device_memory(
-        VkMemoryRequirements p_memory_requirements,
-        DeviceDomain p_domain) const;
+    VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const;
 };
 
 } // namespace WhiteBirdEngine

@@ -23,13 +23,16 @@
 
 namespace WhiteBirdEngine {
 
-AudioRendererMA::AudioRendererMA() { init(); }
+AudioRendererMA::AudioRendererMA() {
+    init();
+}
 
-AudioRendererMA::~AudioRendererMA() { terminate(); }
+AudioRendererMA::~AudioRendererMA() {
+    terminate();
+}
 
 void AudioRendererMA::init() {
-    stdout_log(WBE_CHANNEL_DEBUG)
-        ->message("Initializing miniaudio audio renderer.");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing miniaudio audio renderer.");
     // Initialize ma context
     if (ma_context_init(nullptr, 0, nullptr, &context) != MA_SUCCESS) {
         throw std::runtime_error("Failed to initialize miniaudio context");
@@ -40,19 +43,14 @@ void AudioRendererMA::init() {
     ma_uint32 playback_count;
     ma_device_info* capture_infos;
     ma_uint32 capture_count;
-    if (ma_context_get_devices(&context,
-            &playback_infos,
-            &playback_count,
-            &capture_infos,
-            &capture_count) != MA_SUCCESS) {
+    if (ma_context_get_devices(&context, &playback_infos, &playback_count, &capture_infos, &capture_count) != MA_SUCCESS) {
         throw std::runtime_error("Failed to get audio device from context.");
     }
 
     // Get the prefered device from game config, if does not present, then use
     // default instead.
     int32_t prefered_device_index = -1;
-    const auto& game_config =
-        EngineFunction::get_singleton()->game_config->get_config_options();
+    const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     for (uint32_t i = 0; i < playback_count; ++i) {
         if ((game_config.audio_device.empty() && playback_infos[i].isDefault) ||
             game_config.audio_device == playback_infos[i].name) {
@@ -62,14 +60,10 @@ void AudioRendererMA::init() {
     }
 
     // Initialize minaudio device
-    ma_device_config device_config =
-        ma_device_config_init(ma_device_type_playback);
+    ma_device_config device_config = ma_device_config_init(ma_device_type_playback);
     if (prefered_device_index != -1) {
-        stdout_log(WBE_CHANNEL_DEBUG)
-            ->message(std::format("Picked audio device: {}.",
-                playback_infos[prefered_device_index].name));
-        device_config.playback.pDeviceID =
-            &playback_infos[prefered_device_index].id;
+        stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked audio device: {}.", playback_infos[prefered_device_index].name));
+        device_config.playback.pDeviceID = &playback_infos[prefered_device_index].id;
     }
     device_config.playback.format = ma_format_f32;
     device_config.playback.channels = 2;
@@ -87,8 +81,7 @@ void AudioRendererMA::init() {
     if (ma_engine_init(&engine_config, &engine) != MA_SUCCESS) {
         throw std::runtime_error("Failed to initialize miniaudio engine.");
     }
-    stdout_log(WBE_CHANNEL_DEBUG)
-        ->message("Miniaudio audio renderer initialized.");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Miniaudio audio renderer initialized.");
 }
 
 void AudioRendererMA::terminate() {

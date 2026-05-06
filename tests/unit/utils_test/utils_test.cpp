@@ -15,4 +15,3 @@
 // NOLINTBEGIN
 #include "type_metadata_test.hh"
 // NOLINTEND
-

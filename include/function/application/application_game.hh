@@ -65,7 +65,9 @@ public:
      *
      * @return The renderer instance.
      */
-    Ref<IRenderer> get_renderer() const { return renderer; }
+    Ref<IRenderer> get_renderer() const {
+        return renderer;
+    }
 
     /**
      * @brief Add a job for the renderer.
@@ -92,8 +94,7 @@ protected:
     Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
     Ref<Worker> worker;
-    WindowProperties get_window_properties_from_game_config_options(
-        const GameConfigOptions& p_game_config_options);
+    WindowProperties get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options);
 };
 
 } // namespace WhiteBirdEngine

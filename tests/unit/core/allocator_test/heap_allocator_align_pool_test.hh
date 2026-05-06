@@ -16,8 +16,8 @@
 #define WBE_FILE_HEAP_ALOCATOR_ALIGNED_POOL_TEST_HH
 
 #include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned_pool.hh"
+#include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "test_utilities.hh"
@@ -261,7 +261,7 @@ TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {
     WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(1024 + AAPT_HEADER_SIZE * num_allocs);
     WBEAllocPoolBehavTestClass behv_test("HeapAllocatorAlignedPool", 1024 + AAPT_HEADER_SIZE * num_allocs, AAPT_HEADER_SIZE);
     std::vector<WBE::MemID> mems(num_allocs);
-    for (uint64_t & mem : mems) {
+    for (uint64_t& mem : mems) {
         mem = allocator.allocate(16);
         ASSERT_NE(mem, WBE::MEM_NULL);
         ASSERT_EQ(mem % 8, 0);

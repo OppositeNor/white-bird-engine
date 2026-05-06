@@ -12,28 +12,30 @@
 #ifndef WBE_FILE_MOCK_HEAP_ALLOCATOR_ALIGNED_HH
 #define WBE_FILE_MOCK_HEAP_ALLOCATOR_ALIGNED_HH
 
-#include "core/allocator/i_allocator.hh"
 #include "core/allocator/heap_allocator_aligned.hh"
+#include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
+#include <cstdlib>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <cstdlib>
 
 namespace WhiteBirdEngine {
 
 class MockHeapAllocatorAligned final : public HeapAllocatorAligned {
 public:
-    MockHeapAllocatorAligned(size_t p_max_size = 4096)
-        : max_size(p_max_size) {}
+    MockHeapAllocatorAligned(size_t p_max_size = 4096) : max_size(p_max_size) {
+    }
 
     MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
         call_log << "allocate(" << p_size << ", " << p_alignment << "); ";
-        if (p_size == 0 || used_size + p_size > max_size) { return MEM_NULL;
-}
+        if (p_size == 0 || used_size + p_size > max_size) {
+            return MEM_NULL;
+        }
         void* ptr = malloc(p_size);
-        if (!ptr) { return MEM_NULL;
-}
+        if (!ptr) {
+            return MEM_NULL;
+        }
         MemID id = reinterpret_cast<MemID>(ptr);
         allocations[id] = p_size;
         used_size += p_size;
@@ -50,10 +52,10 @@ public:
         }
     }
 
-    void* get(MemID mem_id) const override {
-        call_log << "get(" << mem_id << "); ";
-        if (allocations.contains(mem_id)) {
-            return reinterpret_cast<void*>(mem_id);
+    void* get(MemID p_mem_id) const override {
+        call_log << "get(" << p_mem_id << "); ";
+        if (allocations.contains(p_mem_id)) {
+            return reinterpret_cast<void*>(p_mem_id);
         }
         return nullptr;
     }
@@ -102,6 +104,6 @@ private:
     mutable std::stringstream call_log;
 };
 
-}  // namespace WhiteBirdEngine
+} // namespace WhiteBirdEngine
 
 #endif
