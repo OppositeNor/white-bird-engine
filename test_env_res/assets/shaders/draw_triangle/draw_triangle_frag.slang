@@ -13,8 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_triangle/draw_triangle_utils.slangh"
-#include "defs.slangh"
+#include "draw_triangle/draw_triangle_utils.slang"
+#include "defs.slang"
 
 [[vk::binding(0, 0)]] ConstantBuffer<Time> time;
 

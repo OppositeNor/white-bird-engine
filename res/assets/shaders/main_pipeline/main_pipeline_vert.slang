@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.slangh"
+#include "main_pipeline/main_pipeline_utils.slang"
 
 VSOutput main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;

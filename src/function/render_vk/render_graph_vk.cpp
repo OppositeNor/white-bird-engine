@@ -308,8 +308,7 @@ void RenderGraphVK::infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator
                 if (last_writer.id == read_access.res_id) {
                     auto resource = find_res(read_access.res_id);
                     if (resource == MEM_NULL) {
-                        throw std::runtime_error("RenderGraphVK: read resource "
-                                                 "not declared in pipeline.");
+                        throw std::runtime_error("RenderGraphVK: read resource not declared in pipeline.");
                     }
                     add_res_edge(resource,
                         last_writer.node,
@@ -468,6 +467,7 @@ void RenderGraphVK::record_node(
         if (edge == MEM_NULL) {
             continue;
         }
+        // TODO: Use buffer barrier or image barrier instead.
         VkMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
         barrier.srcStageMask = edge->before_stage;

@@ -1,5 +1,0 @@
-# Resource TODOs
-
-- [ ] Doc
-
-TODO

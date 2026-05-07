@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_DEFS_SLANGH
-#define WBE_FILE_DEFS_SLANGH
+#ifndef WBE_FILE_DEFS_SLANG
+#define WBE_FILE_DEFS_SLANG
 
 /**
  * @brief The input data from the vertex buffer

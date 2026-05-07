@@ -988,7 +988,7 @@ void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipel
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
     auto pipeline_entry = pipelines.find(p_pipeline_name);
     if (pipeline_entry == pipelines.end()) {
-        throw std::runtime_error("RendererVK::activate_pipeline: pipeline not found.");
+        throw std::runtime_error("Failed to activate pipeline: pipeline not found.");
     }
     // Defer-destroy any previous graph.
     if (active_graph != MEM_NULL) {

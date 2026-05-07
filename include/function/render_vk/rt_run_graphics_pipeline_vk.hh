@@ -24,7 +24,6 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
-#include <cstdint>
 #include <glm/ext/vector_float4.hpp>
 #include <optional>
 #include <span>

@@ -1,5 +1,0 @@
-# Platform TODOs
-
-- [ ] Doc
-
-TODO

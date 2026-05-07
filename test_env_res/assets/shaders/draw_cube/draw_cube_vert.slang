@@ -13,8 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_cube/draw_cube_utils.slangh"
-#include "defs.slangh"
+#include "draw_cube/draw_cube_utils.slang"
+#include "defs.slang"
 
 [[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
 

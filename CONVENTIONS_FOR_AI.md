@@ -98,7 +98,7 @@ Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw 
 - **No abbreviations** unless they are universally well-known. Examples:
   - Forbidden: `ci` (use `create_info`), `mgr` (use `manager`), `tex` (use `texture`), `cfg` (use `config` only if widely understood, else `configuration`).
   - Allowed well-known: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer), `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan).
-- If a name is too long, each word may be shortened to its first **≥4** letters. Examples: `initiate` → `init`, `information` → `info`, `allocator` → `allo` is **not** allowed (only 4 chars but loses clarity — keep `allocator`); use shortening only when it remains unambiguous (`init`, `info`, `config`, `descr`).
+- If a name is too long, each word may be shortened to its first **≥4** letters. Examples: `initiate` → `init`, `information` → `info`, `allocator` → `alloc`; use shortening only when it remains unambiguous (`init`, `info`, `config`, `descr`).
 - Preserve domain spellings already used in the codebase (e.g. test labels) even if unusual.
 
 ## Style
@@ -111,7 +111,7 @@ Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw 
   - `BreakStringLiterals: false` — long error-message string literals stay on one line.
 - Use `WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(ClassName)` etc. macros from `utils/defs.hh` for rule-of-N boilerplate.
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
-- Prefer `std::filesystem` for path work; engine wrappers `Directory` / `Path` (in `platform/file_system/`) are header-only thin wrappers — `Directory::get_dir_names()` returns by value, capture with `auto`.
+- Prefer the engine's file system wrappers `Directory` / `Path` (in `platform/file_system/`) over raw `std::filesystem`. They are header-only thin wrappers around `std::filesystem` — use them in engine code; drop down to `std::filesystem` only inside their implementation or when an API genuinely requires it. Note: `Directory::get_dir_names()` returns by value, capture with `auto`.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.
 
 ## Reflection / Codegen

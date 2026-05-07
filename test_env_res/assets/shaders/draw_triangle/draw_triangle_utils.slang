@@ -13,8 +13,8 @@
    limitations under the License.
 */
 
-#ifndef WBE_FILE_MAIN_PIPELINE_UTILS_SLANGH
-#define WBE_FILE_MAIN_PIPELINE_UTILS_SLANGH
+#ifndef WBE_FILE_DRAW_TRIANGLE_UTILS_SLANG
+#define WBE_FILE_DRAW_TRIANGLE_UTILS_SLANG
 struct VSOutput {
     float4 position : SV_Position;
     float2 uv       : TEXCOORD0;

@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.slangh"
+#include "main_pipeline/main_pipeline_utils.slang"
 
 float4 main(VSOutput p_input) : SV_Target0 {
     return float4(p_input.uv, 0.0, 1.0);
