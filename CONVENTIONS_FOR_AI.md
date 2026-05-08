@@ -85,7 +85,7 @@ Engine equivalents (in `core/memory/`):
 Construct via factories, passing the allocator:
 
 ```cpp
-Ref<Foo>    r = make_ref<Foo>(allocator, args...);
+Ref<Foo> r = make_ref<Foo>(allocator, args...);
 Unique<Foo> u = make_unique<Foo>(allocator, args...);
 ```
 
@@ -116,6 +116,6 @@ Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw 
 
 ## Reflection / Codegen
 
-- Headers under `include/` are scanned by `build_script/reflection/metaparser.py`.
-- Generated artifacts live in `*/generated/`; regenerated automatically each build. Do not edit by hand.
+- All C++ header code are scanned by `build_script/reflection/metaparser.py`.
+- Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.

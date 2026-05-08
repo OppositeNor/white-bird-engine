@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_RENDER_GRAPH_DESCRIPTOR_VK_HH
 #define WBE_FILE_RENDER_GRAPH_DESCRIPTOR_VK_HH
 
-#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -39,8 +38,8 @@ struct RendTaskDescVK {
     // graph to insert execution edges.
     Vector<RendTaskID, RenderAllocator> prev;
     // Factory invoked at graph-build time to construct the concrete task. The
-    // resulting Ref<RenderTaskVK> is owned by the graph.
-    std::function<Ref<RenderTaskVK>()> create;
+    // resulting Unique<RenderTaskVK> is owned by the graph.
+    std::function<Unique<RenderTaskVK>()> create;
 };
 
 /**

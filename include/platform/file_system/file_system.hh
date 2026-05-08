@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
 class FileSystem final : public ISingleton<FileSystem> {
 public:
     FileSystem();
-    ~FileSystem() = default;
+    ~FileSystem();
     WBE_R6_NDCD_DELETE_COPY_MOVE(FileSystem)
 
     /**
@@ -39,6 +39,15 @@ public:
      * @param p_root_dir The path of the root directory.
      */
     FileSystem(const Directory& p_root_dir);
+
+    /**
+     * @brief Get the singleton.
+     *
+     * @return The singleton.
+     */
+    static FileSystem* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief Parse a directory from a string.
@@ -132,6 +141,7 @@ private:
     Directory root_directory;
     Directory resource_directory;
     Directory config_directory;
+    inline static FileSystem* singleton = nullptr;
 };
 
 /**

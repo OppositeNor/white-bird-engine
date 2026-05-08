@@ -15,6 +15,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -68,10 +69,10 @@ RenderGraphVK::~RenderGraphVK() {
     free_command_buffers();
 }
 
-Ref<RGNode> RenderGraphVK::add_node(Ref<RenderTaskVK> p_task) {
+Ref<RGNode> RenderGraphVK::add_node(Unique<RenderTaskVK> p_task) {
     auto node = make_ref<RGNode>(render_data->allocator, render_data->allocator);
-    node->render_task = p_task;
-    node->in_queue = static_cast<uint32_t>(p_task->queue_family());
+    node->render_task = std::move(p_task);
+    node->in_queue = static_cast<uint32_t>(node->render_task->queue_family());
     nodes.emplace_back(node);
     return node;
 }
@@ -198,14 +199,13 @@ void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
     res_edges.clear();
     all_resources.clear();
 
-    auto resources_by_position = index_resources(p_desc);
-    all_resources = resources_by_position;
+    all_resources = index_resources(p_desc);
     auto task_ids = instantiate_tasks(p_desc);
     add_exec_edges_from_prev(p_desc, task_ids);
 
     // Topo-sort once; resource-edge inference walks nodes in execution order.
     topological_sort();
-    infer_res_edges(resources_by_position);
+    infer_res_edges(all_resources);
 
     allocate_command_buffers();
 
@@ -251,10 +251,10 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendP
     task_ids.reserve(p_desc.tasks.size());
     for (const auto& task_desc : p_desc.tasks) {
         auto task = task_desc.create();
-        if (task == MEM_NULL) {
+        if (task.is_null()) {
             throw std::runtime_error("RenderGraphVK: task factory returned null.");
         }
-        add_node(task);
+        add_node(std::move(task));
         task_ids.emplace_back(task_desc.task_id);
     }
     return task_ids;

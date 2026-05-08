@@ -148,6 +148,7 @@ set(libs ${libs}
     SDL2::SDL2
     yaml-cpp::yaml-cpp
     boost_thread
+    boost_program_options
     WBE_MINIAUDIO_BUILD_LIB
 )
 

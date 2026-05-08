@@ -14,6 +14,7 @@
 */
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
@@ -111,8 +112,8 @@ public:
             .res = graphics_pipeline});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
-        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Ref<WBE::RenderTaskVK> {
-            return WBE::make_ref<WBE::RTRunGraphicsPipelineVK>(render_allocator,
+        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+            return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,

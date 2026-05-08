@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,11 @@
 
 namespace WhiteBirdEngine {
 FileSystem::FileSystem() : FileSystem(get_executable_dir()) {
+    singleton = this;
+}
+
+FileSystem::~FileSystem() {
+    singleton = nullptr;
 }
 
 FileSystem::FileSystem(const Directory& p_root_dir) {
@@ -74,16 +80,13 @@ size_t get_last_splitter_pos(const std::string& p_path) {
     if (last_slash < last_bslash) {
         if (last_bslash == std::string::npos) {
             return last_slash;
-        } else {
-            return last_bslash;
         }
-    } else {
-        if (last_slash == std::string::npos) {
-            return last_bslash;
-        } else {
-            return last_slash;
-        }
+        return last_bslash;
     }
+    if (last_slash == std::string::npos) {
+        return last_bslash;
+    }
+    return last_slash;
 }
 
 std::string FileSystem::get_file_name(const std::string& p_path) {
@@ -111,17 +114,17 @@ std::string FileSystem::path_to_string(const Path& p_path) {
 
 std::string FileSystem::get_ext(const Path& p_path) {
     // TODO: Test
-    auto& file_name = p_path.get_file_name();
+    const auto& file_name = p_path.get_file_name();
     auto ext_result = file_name.substr(file_name.find_last_of('.'));
     std::for_each(ext_result.begin(), ext_result.end(), [](char& p_c) {
-        p_c = std::tolower(p_c);
+        p_c = static_cast<char>(std::tolower(p_c));
     });
     return ext_result;
 }
 
 Directory FileSystem::get_executable_dir() {
-    Buffer<1024> buf;
-    unsigned long len = GetModuleFileName(NULL, buf.buffer, buf.BUFFER_SIZE);
+    Buffer<1024> buf{};
+    uint64_t len = GetModuleFileName(NULL, buf.buffer, decltype(buf)::BUFFER_SIZE);
     if (len < 0) {
         throw std::runtime_error("Failed to get the executable path.");
     }

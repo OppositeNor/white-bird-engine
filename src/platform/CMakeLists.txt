@@ -23,8 +23,6 @@ else()
     message(FATAL_ERROR "Platform: ${WBE_BUILD_PLATFORM} not supported for white bird engine.")
 endif()
 
-add_subdirectory(file_system)
-
 set(WBE_SOURCES
     ${WBE_SOURCES}
     ${wbe_platform_src}

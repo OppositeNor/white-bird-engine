@@ -110,15 +110,15 @@ if __name__ == "__main__":
         _gather_license()
         print("WBEBuilder: Gathering sources...")
         if build_setup.build_target["generate-tests"]:
-            sources = [source for source in build_config.project_files if Path(source).suffix in build_config.source_extensions]
+            headers = build_config.project_headers
         else:
-            sources = [source for source in build_config.project_files_exclude_tests if Path(source).suffix in build_config.source_extensions]
+            headers = build_config.project_headers_exclude_tests
         print("WBEBuilder: Gathering generate.json...")
         gen_infos = _gather_gen_infos()
 
         # Run reflection script
         print("WBEBuilder: Running reflections...")
-        on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, sources, gen_infos)
+        on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, headers, gen_infos)
 
         # Build project with CMake
         print("WBEBuilder: Running cmake...")

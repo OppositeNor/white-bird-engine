@@ -54,10 +54,8 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_clear_color        Clear color used in the render pass begin.
      * @param p_framebuffer_id     Resource id of the framebuffer (write).
      * @param p_pipeline_id        Resource id of the graphics pipeline (read).
-     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer
-     * (read).
-     * @param p_index_buffer_id    Optional resource id of the index buffer
-     * (read).
+     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
+     * @param p_index_buffer_id    Optional resource id of the index buffer (read).
      * @param p_descriptor_sets    Descriptor sets to bind in order.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,

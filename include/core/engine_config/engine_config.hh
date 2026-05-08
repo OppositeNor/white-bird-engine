@@ -20,6 +20,10 @@
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/value_semantic.hpp>
+#include <boost/program_options/variables_map.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -119,7 +123,43 @@ private:
     EngineConfigOptions config_options;
 
     void parse_cla(uint32_t p_argc, char* p_argv[]) {
-        // TODO
+        if (p_argc == 0 || p_argv == nullptr) {
+            return;
+        }
+
+        if (p_argv[0] != nullptr) {
+            config_options.utility_name = p_argv[0];
+        }
+
+        boost::program_options::options_description options("White Bird Engine options");
+        options.add_options()("help,h", "Show engine command-line options.")
+            ("single_tick_stack_size", boost::program_options::value<size_t>(), "Override single_tick_stack_size.")
+            ("global_mem_pool_size", boost::program_options::value<size_t>(), "Override global_mem_pool_size.")
+            ("global_atomic_mem_pool_size", boost::program_options::value<size_t>(), "Override global_atomic_mem_pool_size.")
+            ("thread_mem_pool_size", boost::program_options::value<size_t>(), "Override thread_mem_pool_size.")
+            ("utility_name", boost::program_options::value<std::string>(), "Override utility name.");
+
+        const auto parsed =
+            boost::program_options::command_line_parser(static_cast<int>(p_argc), p_argv).options(options).allow_unregistered().run();
+        boost::program_options::variables_map arguments;
+        boost::program_options::store(parsed, arguments);
+        boost::program_options::notify(arguments);
+
+        if (arguments.contains("single_tick_stack_size")) {
+            config_options.single_tick_stack_size = arguments["single_tick_stack_size"].as<size_t>();
+        }
+        if (arguments.contains("global_mem_pool_size")) {
+            config_options.global_mem_pool_size = arguments["global_mem_pool_size"].as<size_t>();
+        }
+        if (arguments.contains("global_atomic_mem_pool_size")) {
+            config_options.global_atomic_mem_pool_size = arguments["global_atomic_mem_pool_size"].as<size_t>();
+        }
+        if (arguments.contains("thread_mem_pool_size")) {
+            config_options.thread_mem_pool_size = arguments["thread_mem_pool_size"].as<size_t>();
+        }
+        if (arguments.contains("utility_name")) {
+            config_options.utility_name = arguments["utility_name"].as<std::string>();
+        }
     }
 
     void parse_config_file(const Path& p_path) {

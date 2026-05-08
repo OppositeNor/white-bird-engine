@@ -16,6 +16,7 @@
 #define WBE_FILE_RENDER_GRAPH_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -53,10 +54,9 @@ struct RendResVK {
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {
-    }
-    // The render task that should be performed during this node.
-    Ref<RenderTaskVK> render_task;
+        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {}
+    // The render task that should be performed during this node. Unique ownership.
+    Unique<RenderTaskVK> render_task;
     // The execution process edge before this node. All of these need
     // to be finished before executing this node.
     Vector<RefWeak<struct RGExecEdge>, RenderAllocator> exec_before;
@@ -144,7 +144,7 @@ public:
      * @param p_task The task to wrap.
      * @return A strong ref to the newly created node.
      */
-    Ref<RGNode> add_node(Ref<RenderTaskVK> p_task);
+    Ref<RGNode> add_node(Unique<RenderTaskVK> p_task);
 
     /**
      * @brief Imperative builder: connect two nodes with an execution edge.
