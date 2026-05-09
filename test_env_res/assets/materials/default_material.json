@@ -3,10 +3,7 @@
         {
             "id": "default_material",
             "type": "material",
-            "shading_model": {
-                "type": "resource_reference",
-                "id": "cook_torrance_pbr"
-            },
+            "graphics_pipeline_id": "forward_cook_torrance_pbr",
             "textures": {
                 "normal": {
                     "type": "image",

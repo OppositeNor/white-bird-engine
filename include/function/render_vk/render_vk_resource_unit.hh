@@ -15,12 +15,78 @@
 #ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
 #define WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
 
+#include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include <cstdint>
+#include <string>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @class RUSchemeShader
+ * @brief The scheme of RUShader.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeShader)
+    // The path to the shader file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+    // The path to the shader's metadata file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string metadata;
+};
+
+/**
+ * @class RUSchemeGraphicsPipeline
+ * @brief The scheme of RUGraphicsPipeline.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeGraphicsPipeline)
+    // The resource ID of the vertex shader.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_stage_id;
+    // Entry function for the vertex stage.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_stage_entry = "main";
+    // The vertex shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader vertex_stage;
+    // The resource ID of the tessellation shader.
+    WBE_META(WBE_REFLECT)
+    std::string tessellation_stage_id;
+    // Entry function for the tessellation stage.
+    WBE_META(WBE_REFLECT)
+    std::string tessellation_stage_entry = "main";
+    // The tessellation shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader tessellation_stage;
+    // The resource ID of the geometry shader.
+    WBE_META(WBE_REFLECT)
+    std::string geometry_stage_id;
+    // Entry function for the geometry stage.
+    WBE_META(WBE_REFLECT)
+    std::string geometry_stage_entry = "main";
+    // The geometry shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader geometry_stage;
+    // The resource ID of the fragment shader.
+    WBE_META(WBE_REFLECT)
+    std::string fragment_stage_id;
+    // Entry function for the fragment stage.
+    WBE_META(WBE_REFLECT)
+    std::string fragment_stage_entry = "main";
+    // The fragment shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    RUSchemeShader fragment_stage;
+    // Should enable depth test.
+    WBE_META(WBE_REFLECT)
+    bool depth_test = true;
+    // Should enable depth write.
+    WBE_META(WBE_REFLECT)
+    bool depth_write = true;
+};
 
 /**
  * @class RUShader
@@ -74,10 +140,24 @@ struct RUGraphicsPipeline : public ResourceUnit {
 
 /**
  * @class RUMaterial
- * @brief Material resource unit.
+ * @brief Cook-Torrance material resource unit.
  */
 struct RUMaterial : public ResourceUnit {
-    int32_t placeholder; // TODO
+    // The graphics pipeline to run this material.
+    RefRes<RUGraphicsPipeline> graphics_pipeline;
+    /**
+     * @brief The texture slot.
+     */
+    struct TextureSlot {
+        // The key of the texture.
+        RefRes<RUText> texture_key;
+        // The texture instance.
+        RefRes<RUImage> texture;
+    };
+    // The texture slots.
+    RefRes<TextureSlot> textures;
+    // The number of texture slots.
+    size_t texture_count = 0;
 };
 
 } // namespace WhiteBirdEngine

@@ -16,6 +16,9 @@
 #define WBE_FILE_RESOURCE_POPULATOR_TEST_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -30,6 +33,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -166,7 +170,177 @@ TEST_F(ResourcePopulatorTest, FontResourceGeneral) {
 }
 
 TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
-    // TODO: loader is not implemented yet.
+    WBE::ResourceUnitLoaderMaterial loader;
+    WBE::StackAllocator stack_allocator(64 * 1024);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMaterial> captured_material;
+    std::vector<std::string> created_ref_keys;
+
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+
+    WBE::RUGraphicsPipeline graphics_pipeline;
+    auto graphics_pipeline_ref = push_to_stack(sizeof(graphics_pipeline), &graphics_pipeline).reint_cast<WBE::RUGraphicsPipeline>();
+    WBE::RUImage referenced_texture;
+    referenced_texture.width = 4;
+    referenced_texture.height = 4;
+    referenced_texture.channel_count = 3;
+    auto referenced_texture_ref = push_to_stack(sizeof(referenced_texture), &referenced_texture).reint_cast<WBE::RUImage>();
+    std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
+        {"main_pipeline", graphics_pipeline_ref.reint_cast<char>()},
+        {"normal_texture", referenced_texture_ref.reint_cast<char>()},
+    };
+
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
+                             [&captured_material, &push_to_stack](const std::string& p_res_key,
+                                 const void* p_res,
+                                 size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
+                                 if (p_res_key == "test_material") {
+                                     captured_material = saved_resource.reint_cast<WBE::RUMaterial>();
+                                 }
+                                 return saved_resource;
+                             }))
+                         .set_create_ref_to_callback(std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)>(
+                             [&created_ref_keys, &reference_resources](std::function<void(WBE::RefRes<char>)> p_assign_ref,
+                                 const std::string& p_key) {
+                                 created_ref_keys.push_back(p_key);
+                                 auto found_resource = reference_resources.find(p_key);
+                                 ASSERT_NE(found_resource, reference_resources.end());
+                                 p_assign_ref(found_resource->second);
+                             }))
+                         .build(stream);
+
+    std::string json_buffer = R"(
+    {
+        "id": "test_material",
+        "type": "material",
+        "graphics_pipeline_id": "main_pipeline",
+        "textures": {
+            "normal": {
+                "type": "resource_reference",
+                "id": "normal_texture"
+            },
+            "albedo": {
+                "type": "image",
+                "path": "assets/images/test_ppm3.ppm",
+                "color_space": "srgb",
+                "channel_count": 3
+            }
+        }
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+
+    loader.populate_scheme(*res_chunk, parser.get_data());
+
+    ASSERT_NE(captured_material, nullptr);
+    EXPECT_EQ(captured_material->graphics_pipeline.get(), graphics_pipeline_ref.get());
+    ASSERT_EQ(captured_material->texture_count, 2U);
+    auto* texture_slots = captured_material->textures.get();
+    ASSERT_NE(texture_slots, nullptr);
+
+    std::unordered_map<std::string, WBE::RUMaterial::TextureSlot*> texture_slots_by_key;
+    for (size_t i = 0; i < captured_material->texture_count; ++i) {
+        texture_slots_by_key[std::string(texture_slots[i].texture_key->text_data.get())] = &texture_slots[i];
+    }
+    ASSERT_TRUE(texture_slots_by_key.contains("normal"));
+    ASSERT_TRUE(texture_slots_by_key.contains("albedo"));
+    EXPECT_EQ(texture_slots_by_key["normal"]->texture.get(), referenced_texture_ref.get());
+    EXPECT_EQ(texture_slots_by_key["albedo"]->texture->width, 16U);
+    EXPECT_EQ(texture_slots_by_key["albedo"]->texture->height, 16U);
+    EXPECT_EQ(texture_slots_by_key["albedo"]->texture->channel_count, 3U);
+    ASSERT_EQ(created_ref_keys.size(), 2U);
+    EXPECT_EQ(created_ref_keys[0], "main_pipeline");
+    EXPECT_EQ(created_ref_keys[1], "normal_texture");
+}
+
+TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
+    WBE::ResourceUnitLoaderMaterial loader;
+    WBE::StackAllocator stack_allocator(64 * 1024);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMaterial> captured_material;
+    WBE::RefRes<WBE::RUGraphicsPipeline> captured_pipeline;
+    std::vector<std::string> created_ref_keys;
+
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+
+    WBE::RUShader vertex_shader;
+    auto vertex_shader_ref = push_to_stack(sizeof(vertex_shader), &vertex_shader).reint_cast<WBE::RUShader>();
+    WBE::RUShader fragment_shader;
+    auto fragment_shader_ref = push_to_stack(sizeof(fragment_shader), &fragment_shader).reint_cast<WBE::RUShader>();
+    std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
+        {"vertex_shader", vertex_shader_ref.reint_cast<char>()},
+        {"fragment_shader", fragment_shader_ref.reint_cast<char>()},
+    };
+
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
+                             [&captured_material, &captured_pipeline, &push_to_stack](const std::string& p_res_key,
+                                 const void* p_res,
+                                 size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
+                                 if (p_res_key == "test_material_inline_pipeline") {
+                                     captured_material = saved_resource.reint_cast<WBE::RUMaterial>();
+                                 }
+                                 if (p_res_key == "inline_pipeline") {
+                                     captured_pipeline = saved_resource.reint_cast<WBE::RUGraphicsPipeline>();
+                                 }
+                                 return saved_resource;
+                             }))
+                         .set_create_ref_to_callback(std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)>(
+                             [&created_ref_keys, &reference_resources](std::function<void(WBE::RefRes<char>)> p_assign_ref,
+                                 const std::string& p_key) {
+                                 created_ref_keys.push_back(p_key);
+                                 auto found_resource = reference_resources.find(p_key);
+                                 ASSERT_NE(found_resource, reference_resources.end());
+                                 p_assign_ref(found_resource->second);
+                             }))
+                         .build(stream);
+
+    std::string json_buffer = R"(
+    {
+        "id": "test_material_inline_pipeline",
+        "type": "material",
+        "graphics_pipeline": {
+            "id": "inline_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "vertex_shader",
+            "fragment_stage_id": "fragment_shader",
+            "depth_test": false,
+            "depth_write": false
+        }
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+
+    loader.populate_scheme(*res_chunk, parser.get_data());
+
+    ASSERT_NE(captured_material, nullptr);
+    ASSERT_NE(captured_pipeline, nullptr);
+    EXPECT_EQ(captured_material->graphics_pipeline.get(), captured_pipeline.get());
+    EXPECT_EQ(captured_material->texture_count, 0U);
+    EXPECT_EQ(captured_pipeline->vertex_stage.get(), vertex_shader_ref.get());
+    EXPECT_EQ(captured_pipeline->fragment_stage.get(), fragment_shader_ref.get());
+    EXPECT_EQ(std::string(captured_pipeline->vertex_stage_entry.get()), "main");
+    EXPECT_EQ(std::string(captured_pipeline->fragment_stage_entry.get()), "main");
+    EXPECT_FALSE(captured_pipeline->depth_test);
+    EXPECT_FALSE(captured_pipeline->depth_write);
+    ASSERT_EQ(created_ref_keys.size(), 2U);
+    EXPECT_EQ(created_ref_keys[0], "vertex_shader");
+    EXPECT_EQ(created_ref_keys[1], "fragment_shader");
 }
 
 TEST_F(ResourcePopulatorTest, VideoResourceGeneral) {

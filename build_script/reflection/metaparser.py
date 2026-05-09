@@ -182,6 +182,8 @@ class WBEMetaparser:
         result.in_header = in_file
         result.name = cursor.spelling
         result.attribute = attributes
+        result.is_struct = cursor.kind == clang.cindex.CursorKind.STRUCT_DECL
+
         for field in cursor.get_children():
             if field.kind == clang.cindex.CursorKind.CXX_BASE_SPECIFIER:
                 result.extended_parents.append(field.spelling)

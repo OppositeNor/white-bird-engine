@@ -85,9 +85,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
 }
 
 void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
-    if (!p_scheme.material_id.empty()) {
-        p_res_chunk.create_ref_to(reinterpret_cast<void**>(&p_resource_unit.material), p_scheme.material_id);
-    } else {
+    if (p_scheme.material_id.empty()) {
         p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
     }
     auto vertices_data =
@@ -105,6 +103,12 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
     p_resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
     p_resource_unit.triangles_count = triangles.size();
+}
+
+void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemeSubmesh3D& p_scheme) {
+    if (!p_scheme.material_id.empty()) {
+        p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id);
+    }
 }
 
 template <typename LoaderType, typename SchemeType>
@@ -198,6 +202,7 @@ void ResourceUnitLoaderMesh::populate_scheme(IResourceChunk& p_res_chunk, const 
         resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
         auto saved_resource = p_res_chunk.push_res_unit("", submesh).reint_cast<RUSubmesh3D>();
         WBE_DEBUG_ASSERT(saved_resource != nullptr);
+        create_submesh_material_ref(p_res_chunk, *saved_resource, submesh_scheme);
         submeshes.push_back(saved_resource);
     }
     // TODO: resolve submesh id
@@ -225,7 +230,8 @@ void ResourceUnitLoaderSubmesh::populate_scheme(IResourceChunk& p_res_chunk, con
     }
     RUSubmesh3D resource_unit;
     resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUSubmesh3D>();
+    create_submesh_material_ref(p_res_chunk, *saved_resource, typed_scheme);
 }
 
 void ResourceUnitLoaderSubmesh::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {

@@ -144,7 +144,6 @@ public:
 private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::CameraInfoVKUBO camera_info{};
-    // double time_accumulator = 0.0;
     float aspect_ratio = 1.0F;
 };
 

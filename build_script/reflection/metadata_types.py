@@ -44,10 +44,12 @@ class WBEClassMetadata(BaseModel):
     """Class metadata.
 
     Attributes: 
+        is_struct: Is it declared as struct.
         class_name: The name of the class.
         fields: The fields of the class.
         methods: The methods of the class.
     """
+    is_struct : bool = False
     in_header : str = ""
     name : str = ""
     extended_parents : list[Any] = Field(default_factory=list[Any])
