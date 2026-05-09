@@ -16,9 +16,10 @@
 #define WBE_FILE_GRAPHICS_PIPELINE_COMPILER_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
@@ -26,6 +27,8 @@
 #include <string>
 
 namespace WhiteBirdEngine {
+
+class RendererVK;
 
 /**
  * @class GraphicsPipelineCompilerVKContext
@@ -48,21 +51,26 @@ struct GraphicsPipelineCompilerVKContext {
      * @brief Render pass used by the generated graphics pipeline.
      */
     Ref<RORenderPassVK> render_pass = MEM_NULL;
+    /**
+     * @brief Renderer used to execute the generated task's render graph.
+     */
+    RendererVK* renderer = nullptr;
 };
 
 /**
- * @brief Compile a graphics pipeline resource into a Vulkan pipeline descriptor.
+ * @brief Compile a graphics pipeline resource into a runnable render task.
  *
  * The compiler reuses registered shaders, descriptor set layouts, pipeline
  * layouts, and graphics pipelines when matching entries already exist in the
- * render database.
+ * render database. The returned task owns a one-task render graph and runs it
+ * when perform() is called.
  *
  * @param p_context Runtime compilation context.
  * @param p_resource_key Key of the graphics pipeline resource.
  * @param p_pipeline_resource Loaded graphics pipeline resource unit.
- * @return A render graph pipeline descriptor ready to register on RendererVK.
+ * @return A render task that runs the compiled graphics pipeline.
  */
-RendPipelineDescVK compile_graphics_pipeline_desc_vk(
+Unique<RenderTask> compile_graphics_pipeline_task_vk(
     const GraphicsPipelineCompilerVKContext& p_context, const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource);
 
 } // namespace WhiteBirdEngine

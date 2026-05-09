@@ -14,9 +14,11 @@
 */
 #ifndef WBE_FILE_RENDERER_DUMMY_H
 #define WBE_FILE_RENDERER_DUMMY_H
+#include "core/memory/unique.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include <functional>
 #include <string>
@@ -28,8 +30,18 @@ namespace WhiteBirdEngine {
  *
  */
 class RendererDummy final : public IRenderer {
+private:
+    struct RenderTaskDummy final : public RenderTask {
+        virtual void init() override {
+        }
+
+        virtual void perform(double p_delta) override {
+            (void)p_delta;
+        }
+    };
+
 public:
-    RendererDummy(RenderAllocator* p_allocator) : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+    RendererDummy(RenderAllocator* p_allocator) : allocator(p_allocator), dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
     }
 
     virtual ~RendererDummy() override = default;
@@ -45,8 +57,9 @@ public:
         return dummy_database;
     }
 
-    virtual void compile_graphics_pipeline(const std::string& p_resource_key) override {
+    virtual Unique<RenderTask> compile_graphics_pipeline(const std::string& p_resource_key) override {
         (void)p_resource_key;
+        return make_unique<RenderTaskDummy>(allocator);
     }
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {
@@ -61,6 +74,7 @@ public:
     }
 
 private:
+    RenderAllocator* allocator = nullptr;
     Ref<RenderDatabase> dummy_database;
 };
 

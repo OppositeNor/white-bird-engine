@@ -17,8 +17,10 @@
 
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_task.hh"
 #include "render_defs.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
@@ -51,12 +53,12 @@ public:
     virtual Ref<RenderDatabase> get_render_database() = 0;
 
     /**
-     * @brief Compile a graphics pipeline resource into render resources that
-     * the renderer can activate.
+    * @brief Compile a graphics pipeline resource into a render task.
      *
      * @param p_resource_key The graphics pipeline resource key.
+    * @return A render task whose perform() runs the compiled graphics pipeline.
      */
-    virtual void compile_graphics_pipeline(const std::string& p_resource_key) = 0;
+    virtual Unique<RenderTask> compile_graphics_pipeline(const std::string& p_resource_key) = 0;
 
     /**
      * @brief Activate a pipeline.

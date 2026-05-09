@@ -109,15 +109,26 @@ public:
     void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
 
     /**
-     * @brief Compile a graphics pipeline resource into Vulkan render objects.
+    * @brief Compile a graphics pipeline resource into a Vulkan render task.
      *
-     * The compiled pipeline descriptor is registered under the same resource key
-     * and can be activated with activate_pipeline(). Repeated calls reuse the
-     * existing compiled pipeline descriptor.
+    * The returned task owns the render graph needed to run the compiled
+    * graphics pipeline. Calling perform() executes that graph through this
+    * renderer without registering a named renderer pipeline.
      *
      * @param p_resource_key The key of a RUGraphicsPipeline resource.
      */
-    virtual void compile_graphics_pipeline(const std::string& p_resource_key) override;
+    virtual Unique<RenderTask> compile_graphics_pipeline(const std::string& p_resource_key) override;
+
+    /**
+    * @brief Execute a render graph through this renderer's swap-chain path.
+    *
+    * This is used by render tasks that own their own graph instead of going
+    * through the named pipeline registry.
+    *
+    * @param p_graph The graph to execute.
+    * @param p_delta The frame delta forwarded to graph tasks.
+    */
+    void execute_graph(Ref<RenderGraphVK> p_graph, double p_delta);
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override;
 
@@ -395,7 +406,8 @@ private:
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
     std::optional<uint32_t> tick_setup_pipeline();
     void run_delayed_calls();
-    void present(uint32_t p_image_index);
+    void set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph);
+    void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
 };
 
 } // namespace WhiteBirdEngine

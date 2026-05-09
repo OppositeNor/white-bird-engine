@@ -86,6 +86,10 @@ void RendererVK::tick(double p_delta) {
     // Run some jobs stored in the job buffer.
     run_stored_jobs();
 
+    execute_graph(active_graph, p_delta);
+}
+
+void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     // Setup pipeline.
     auto tick_frame_counter = tick_setup_pipeline();
     if (!tick_frame_counter.has_value()) {
@@ -95,7 +99,7 @@ void RendererVK::tick(double p_delta) {
     run_delayed_calls();
     uint32_t frame_counter = *tick_frame_counter;
 
-    if (active_graph == MEM_NULL) {
+    if (p_graph == MEM_NULL) {
         // No active render graph, nothing to do this frame.
         return;
     }
@@ -114,18 +118,19 @@ void RendererVK::tick(double p_delta) {
     // referencing REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK resolve to the correct
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
-    active_graph->set_resource(
+    p_graph->set_resource(
         REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffers[image_index], TypeUUID<ROFramebufferVK>::UUID);
+    set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
     VkSemaphoreSubmitInfo wait_info = image_available_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
     std::array<VkSemaphoreSubmitInfo, 1> wait_infos{wait_info};
     std::span<const VkSemaphoreSubmitInfo> extra_signals{};
-    active_graph->execute(
+    p_graph->execute(
         base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
-    present(image_index);
+    present(image_index, p_graph);
 
     // Clear pre-execute tasks queue.
     base_render_data.pre_execute_tasks_queue.clear();
@@ -967,11 +972,11 @@ void RendererVK::run_delayed_calls() {
     }
 }
 
-void RendererVK::present(uint32_t p_image_index) {
+void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    VkSemaphore terminal = active_graph->get_terminal_semaphore()->get_semaphore();
+    VkSemaphore terminal = p_graph->get_terminal_semaphore()->get_semaphore();
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores = &terminal;
 
@@ -994,12 +999,9 @@ void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipel
     pipelines[p_pipeline_name] = std::move(desc_ref);
 }
 
-void RendererVK::compile_graphics_pipeline(const std::string& p_resource_key) {
+Unique<RenderTask> RendererVK::compile_graphics_pipeline(const std::string& p_resource_key) {
     if (p_resource_key.empty()) {
         throw std::runtime_error("Failed to compile graphics pipeline: resource key is empty.");
-    }
-    if (pipelines.contains(p_resource_key)) {
-        return;
     }
     auto pipeline_resource = ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_key);
     if (pipeline_resource == nullptr) {
@@ -1013,8 +1015,9 @@ void RendererVK::compile_graphics_pipeline(const std::string& p_resource_key) {
         .render_data = &base_render_data,
         .render_database = render_database,
         .render_pass = get_swap_chain_render_pass(),
+        .renderer = this,
     };
-    register_pipeline(p_resource_key, compile_graphics_pipeline_desc_vk(compiler_context, p_resource_key, pipeline_resource));
+    return compile_graphics_pipeline_task_vk(compiler_context, p_resource_key, pipeline_resource);
 }
 
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
@@ -1034,20 +1037,24 @@ void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
     active_graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     active_graph->build_from_descriptor(*pipeline_entry->second);
 
-    // Re-inject the global static-opaque mesh buffers into the freshly-built
-    // graph so render tasks referencing the global resource IDs can resolve
-    // them without per-pipeline registration.
+    set_graph_static_opaque_resources(active_graph);
+}
+
+void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
+    if (p_graph == MEM_NULL) {
+        return;
+    }
+    // Re-inject the global static-opaque mesh buffers so render tasks
+    // referencing the global resource IDs can resolve them without per-pipeline
+    // registration.
     if (render_objects->static_opaque_vertices != MEM_NULL) {
-        active_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
+        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
     }
     if (render_objects->static_opaque_indices != MEM_NULL) {
-        active_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
+        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
     }
     if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-        active_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
+        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
     }
 }
 
@@ -1081,20 +1088,7 @@ void RendererVK::update_static_opaque_triangles() {
 
     // Publish the buffers under the global resource IDs so render tasks in the
     // active graph can resolve them without per-pipeline registration.
-    if (active_graph != MEM_NULL) {
-        if (render_objects->static_opaque_vertices != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
-        }
-        if (render_objects->static_opaque_indices != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
-        }
-        if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
-        }
-    }
+    set_graph_static_opaque_resources(active_graph);
 }
 
 void RendererVK::setup_render_resource() {

@@ -46,15 +46,39 @@
 namespace WhiteBirdEngine {
 namespace {
 
+class RTRunCompiledGraphicsPipelineVK final : public RenderTask {
+public:
+    RTRunCompiledGraphicsPipelineVK(
+        const BaseRenderDataVK* p_render_data, RendererVK* p_renderer, RendPipelineDescVK&& p_pipeline_desc)
+        : renderer(p_renderer), graph(make_ref<RenderGraphVK>(p_render_data->allocator, p_render_data)) {
+        if (renderer == nullptr) {
+            throw std::runtime_error("Failed to create compiled graphics pipeline task: renderer is null.");
+        }
+        graph->build_from_descriptor(p_pipeline_desc);
+    }
+
+    virtual void init() override {
+    }
+
+    virtual void perform(double p_delta) override {
+        renderer->execute_graph(graph, p_delta);
+    }
+
+private:
+    RendererVK* renderer = nullptr;
+    Ref<RenderGraphVK> graph;
+};
+
 class GraphicsPipelineCompilerVKImpl {
 public:
     GraphicsPipelineCompilerVKImpl(const GraphicsPipelineCompilerVKContext& p_context) : context(p_context) {
-        if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL || context.render_pass == MEM_NULL) {
+        if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL || context.render_pass == MEM_NULL ||
+            context.renderer == nullptr) {
             throw std::runtime_error("Failed to create graphics pipeline compiler: invalid context.");
         }
     }
 
-    RendPipelineDescVK compile(const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource) {
+    Unique<RenderTask> compile(const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource) {
         if (p_pipeline_resource->vertex_stage == nullptr || p_pipeline_resource->fragment_stage == nullptr) {
             throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': vertex and fragment stages are required.", p_resource_key));
         }
@@ -63,7 +87,8 @@ public:
         auto descriptor_set_layouts = compile_descriptor_set_layouts(p_resource_key, *p_pipeline_resource);
         auto pipeline_layout = compile_pipeline_layout(p_resource_key, descriptor_set_layouts);
         auto graphics_pipeline = compile_graphics_pipeline(p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, pipeline_layout);
-        return build_pipeline_desc(p_resource_key, graphics_pipeline);
+        auto pipeline_desc = build_pipeline_desc(p_resource_key, graphics_pipeline);
+        return make_unique<RTRunCompiledGraphicsPipelineVK>(context.allocator, context.render_data, context.renderer, std::move(pipeline_desc));
     }
 
 private:
@@ -165,7 +190,7 @@ private:
         RendTaskDescVK task_desc(context.allocator);
         task_desc.task_id = dynam_hash(std::format("{}#run_graphics_pipeline", p_resource_key));
         // Material descriptor sets are still supplied by future task wiring;
-        // the compiled pipeline descriptor currently owns the pipeline object.
+        // the generated task currently owns the compiled pipeline object.
         task_desc.create = [render_allocator = context.allocator,
                                render_data = context.render_data,
                                pipeline_res_id,
@@ -199,7 +224,7 @@ private:
 
 } // namespace
 
-RendPipelineDescVK compile_graphics_pipeline_desc_vk(
+Unique<RenderTask> compile_graphics_pipeline_task_vk(
     const GraphicsPipelineCompilerVKContext& p_context, const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource) {
     GraphicsPipelineCompilerVKImpl compiler(p_context);
     return compiler.compile(p_resource_key, p_pipeline_resource);
