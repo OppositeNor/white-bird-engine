@@ -29,7 +29,19 @@
 #include <vector>
 namespace WhiteBirdEngine {
 
-struct ResourceUnit {};
+/**
+ * @class ResourceUnit
+ * @brief Base type for manifest-loaded resource units.
+ */
+struct ResourceUnit {
+    /**
+     * @brief Stable key used to find this resource in its owning chunk.
+     *
+     * The string memory is owned by the resource chunk that stores this unit.
+     * Anonymous resources leave this as nullptr.
+     */
+    const char* resource_key = nullptr;
+};
 
 struct RUMaterial;
 

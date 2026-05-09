@@ -17,7 +17,6 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include <functional>
 #include <string>
@@ -37,6 +36,7 @@ public:
     WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
 
     virtual void tick(double p_delta) override {
+        (void)p_delta;
     }
 
     virtual Ref<RenderDatabase> get_render_database() override {
@@ -45,13 +45,19 @@ public:
         return dummy_database;
     }
 
+    virtual void compile_graphics_pipeline(const std::string& p_resource_key) override {
+        (void)p_resource_key;
+    }
+
     virtual void activate_pipeline(const std::string& p_pipeline_name) override {
+        (void)p_pipeline_name;
     }
 
     virtual void update_static_opaque_triangles() override {
     }
 
     virtual void add_job(std::function<void()> p_job) override {
+        (void)p_job;
     }
 
 private:

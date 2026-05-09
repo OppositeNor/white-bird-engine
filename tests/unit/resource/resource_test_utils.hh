@@ -18,6 +18,7 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -208,6 +209,14 @@ protected:
         if (push_res_unit_ptr_callback) {
             ret = push_res_unit_ptr_callback(p_res_key, p_res, p_size);
         }
+        if (!ret.is_null()) {
+            auto resource = ret.reint_cast<WBE::ResourceUnit>();
+            resource->resource_key = nullptr;
+            if (!p_res_key.empty()) {
+                resource_keys.push_back(p_res_key);
+                resource->resource_key = resource_keys.back().c_str();
+            }
+        }
         (*os) << "push_res_unit_ptr " << p_res_key << " p_res " << p_size << '\n';
         return ret;
     }
@@ -223,5 +232,6 @@ private:
     std::function<bool(const std::string&)> contains_callback;
     std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)> push_res_unit_ptr_callback;
     std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> create_ref_to_callback;
+    std::deque<std::string> resource_keys;
     std::ostream* os;
 };

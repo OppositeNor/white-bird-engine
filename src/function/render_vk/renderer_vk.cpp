@@ -24,9 +24,11 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_framebuffer_vk.hh"
@@ -37,6 +39,7 @@
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -188,6 +191,7 @@ void RendererVK::terminate() {
     // resources outlive vkDestroyDevice() and trigger validation leaks.
     active_graph = MEM_NULL;
     pipelines.clear();
+    render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
 
     // Drain every pending delayed call regardless of remaining frame countdown
@@ -988,6 +992,29 @@ void RendererVK::present(uint32_t p_image_index) {
 void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc) {
     auto desc_ref = make_ref<RendPipelineDescVK>(allocator, std::move(p_desc));
     pipelines[p_pipeline_name] = std::move(desc_ref);
+}
+
+void RendererVK::compile_graphics_pipeline(const std::string& p_resource_key) {
+    if (p_resource_key.empty()) {
+        throw std::runtime_error("Failed to compile graphics pipeline: resource key is empty.");
+    }
+    if (pipelines.contains(p_resource_key)) {
+        return;
+    }
+    auto pipeline_resource = ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_key);
+    if (pipeline_resource == nullptr) {
+        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource not found.", p_resource_key));
+    }
+    if (pipeline_resource->resource_key == nullptr || p_resource_key != pipeline_resource->resource_key) {
+        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource key was not propagated.", p_resource_key));
+    }
+    GraphicsPipelineCompilerVKContext compiler_context{
+        .allocator = allocator,
+        .render_data = &base_render_data,
+        .render_database = render_database,
+        .render_pass = get_swap_chain_render_pass(),
+    };
+    register_pipeline(p_resource_key, compile_graphics_pipeline_desc_vk(compiler_context, p_resource_key, pipeline_resource));
 }
 
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {

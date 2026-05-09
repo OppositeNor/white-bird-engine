@@ -120,12 +120,24 @@ protected:
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
+        // Store the resource key inside the same chunk so ResourceUnit can
+        // expose a stable, chunk-owned key without referencing manifest memory.
+        const char* resource_key = nullptr;
+        if (!p_res_key.empty()) {
+            total_size += p_res_key.size() + 1;
+            MemID resource_key_mem_id = allocator->allocate(p_res_key.size() + 1);
+            memcpy(allocator->get(resource_key_mem_id), p_res_key.c_str(), p_res_key.size() + 1);
+            resource_key = static_cast<const char*>(allocator->get(resource_key_mem_id));
+        }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
-        memcpy(allocator->get(result_mem_id), p_res, p_size);
+        auto* stored_resource = allocator->get(result_mem_id);
+        memcpy(stored_resource, p_res, p_size);
+        // Every manifest-backed resource unit derives from ResourceUnit.
+        static_cast<ResourceUnit*>(stored_resource)->resource_key = resource_key;
         RefRes<char> result(result_mem_id, allocator);
         if (!p_res_key.empty()) {
-            resource_map[p_res_key.c_str()] = result;
+            resource_map[p_res_key] = result;
         }
         return result;
     }

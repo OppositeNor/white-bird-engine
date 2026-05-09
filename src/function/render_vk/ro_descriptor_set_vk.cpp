@@ -16,6 +16,8 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +26,65 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+namespace {
+void write_buffer_info(VkDescriptorType p_descriptor_type,
+    VkWriteDescriptorSet& p_write_info,
+    const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
+    WBE_DEBUG_ASSERT(p_result_buffer_infos.empty());
+    p_write_info.descriptorType = p_descriptor_type;
+    p_result_buffer_infos.reserve(p_buffer_infos.size());
+    p_bound_object_it->second.reserve(p_buffer_infos.size());
+    for (const auto& buffer_info : p_buffer_infos) {
+        VkDescriptorBufferInfo vk_buffer_info{};
+        vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
+        vk_buffer_info.offset = buffer_info.offset;
+        vk_buffer_info.range = buffer_info.range;
+        p_result_buffer_infos.push_back(vk_buffer_info);
+        // Keep a reference to the buffer to prevent it from being destroyed.
+        p_bound_object_it->second.emplace_back(buffer_info.buffer);
+    }
+    p_write_info.descriptorCount = p_result_buffer_infos.size();
+    p_write_info.pBufferInfo = p_result_buffer_infos.data();
+}
+
+void write_image_info(VkDescriptorType p_descriptor_type,
+    VkWriteDescriptorSet& p_write_info,
+    const std::vector<RODescriptorSetVK::Writer::ImageInfo>& p_image_infos,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    std::vector<VkDescriptorImageInfo>& p_result_image_infos) {
+    WBE_DEBUG_ASSERT(p_result_image_infos.empty());
+    p_write_info.descriptorType = p_descriptor_type;
+    p_result_image_infos.reserve(p_image_infos.size());
+    p_bound_object_it->second.reserve(p_image_infos.size() * 2);
+    for (const auto& image_info : p_image_infos) {
+        VkDescriptorImageInfo vk_image_info{};
+        vk_image_info.imageLayout = image_info.image_layout;
+        if (p_descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLER) {
+            if (image_info.image_view == MEM_NULL) {
+                throw std::runtime_error("Failed to write descriptor set: image view is required.");
+            }
+            vk_image_info.imageView = image_info.image_view->get_image_view();
+            // Keep the image view alive for as long as this descriptor set uses it.
+            p_bound_object_it->second.emplace_back(image_info.image_view);
+        }
+        if (p_descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
+            if (image_info.sampler == MEM_NULL) {
+                throw std::runtime_error("Failed to write descriptor set: sampler is required.");
+            }
+            vk_image_info.sampler = image_info.sampler->get_sampler();
+            // Keep the sampler alive for as long as this descriptor set uses it.
+            p_bound_object_it->second.emplace_back(image_info.sampler);
+        }
+        p_result_image_infos.push_back(vk_image_info);
+    }
+    p_write_info.descriptorCount = p_result_image_infos.size();
+    p_write_info.pImageInfo = p_result_image_infos.data();
+}
+
+} // namespace
 
 VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkDescriptorSetAllocateInfo alloc_info{};
@@ -56,11 +117,6 @@ RODescriptorSetVK::~RODescriptorSetVK() {
     vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
 }
 
-static void write_buffer_info(VkDescriptorType p_descriptor_type,
-    VkWriteDescriptorSet& p_write_info,
-    const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
-    std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos);
 
 void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     // Make sure only one type of resource is being written.
@@ -71,7 +127,15 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     if (!p_writer.uniform_buffer_infos.empty()) {
         resource_type_count++;
     }
-    // TODO: Image view and texel buffer view
+    if (!p_writer.sampled_image_infos.empty()) {
+        resource_type_count++;
+    }
+    if (!p_writer.sampler_infos.empty()) {
+        resource_type_count++;
+    }
+    if (!p_writer.combined_image_sampler_infos.empty()) {
+        resource_type_count++;
+    }
     if (resource_type_count != 1) {
         throw std::runtime_error("Failed to write descriptor set: only one "
                                  "type of resource can be written at a time.");
@@ -96,30 +160,18 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     if (!p_writer.uniform_buffer_infos.empty()) {
         write_buffer_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, bound_object_it, buffer_infos);
     }
-    // TODO: Image view
+    std::vector<VkDescriptorImageInfo> image_infos;
+    if (!p_writer.sampled_image_infos.empty()) {
+        write_image_info(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, p_writer.sampled_image_infos, bound_object_it, image_infos);
+    }
+    if (!p_writer.sampler_infos.empty()) {
+        write_image_info(VK_DESCRIPTOR_TYPE_SAMPLER, write_info, p_writer.sampler_infos, bound_object_it, image_infos);
+    }
+    if (!p_writer.combined_image_sampler_infos.empty()) {
+        write_image_info(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, write_info, p_writer.combined_image_sampler_infos, bound_object_it, image_infos);
+    }
     // TODO: Texel buffer view
     vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
-}
-
-static void write_buffer_info(VkDescriptorType p_descriptor_type,
-    VkWriteDescriptorSet& p_write_info,
-    const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
-    std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
-    p_write_info.descriptorType = p_descriptor_type;
-    p_result_buffer_infos.reserve(p_buffer_infos.size());
-    p_bound_object_it->second.reserve(p_buffer_infos.size());
-    for (const auto& buffer_info : p_buffer_infos) {
-        VkDescriptorBufferInfo vk_buffer_info{};
-        vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
-        vk_buffer_info.offset = buffer_info.offset;
-        vk_buffer_info.range = buffer_info.range;
-        p_result_buffer_infos.push_back(vk_buffer_info);
-        // Keep a reference to the buffer to prevent it from being destroyed.
-        p_bound_object_it->second.emplace_back(buffer_info.buffer);
-    }
-    p_write_info.descriptorCount = p_result_buffer_infos.size();
-    p_write_info.pBufferInfo = p_result_buffer_infos.data();
 }
 
 } // namespace WhiteBirdEngine

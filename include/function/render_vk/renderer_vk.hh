@@ -108,6 +108,17 @@ public:
      */
     void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
 
+    /**
+     * @brief Compile a graphics pipeline resource into Vulkan render objects.
+     *
+     * The compiled pipeline descriptor is registered under the same resource key
+     * and can be activated with activate_pipeline(). Repeated calls reuse the
+     * existing compiled pipeline descriptor.
+     *
+     * @param p_resource_key The key of a RUGraphicsPipeline resource.
+     */
+    virtual void compile_graphics_pipeline(const std::string& p_resource_key) override;
+
     virtual void activate_pipeline(const std::string& p_pipeline_name) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {

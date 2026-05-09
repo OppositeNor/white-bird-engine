@@ -51,6 +51,14 @@ public:
     virtual Ref<RenderDatabase> get_render_database() = 0;
 
     /**
+     * @brief Compile a graphics pipeline resource into render resources that
+     * the renderer can activate.
+     *
+     * @param p_resource_key The graphics pipeline resource key.
+     */
+    virtual void compile_graphics_pipeline(const std::string& p_resource_key) = 0;
+
+    /**
      * @brief Activate a pipeline.
      *
      * @param p_pipeline_name The name of the pipeline to activate.

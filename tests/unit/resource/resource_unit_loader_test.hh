@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/parser/parser_json.hh"
 #include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "global/global.hh"
@@ -241,6 +242,8 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     loader.populate_scheme(*res_chunk, parser.get_data());
 
     ASSERT_NE(captured_material, nullptr);
+    ASSERT_NE(captured_material->resource_key, nullptr);
+    EXPECT_STREQ(captured_material->resource_key, "test_material");
     EXPECT_EQ(captured_material->graphics_pipeline.get(), graphics_pipeline_ref.get());
     ASSERT_EQ(captured_material->texture_count, 2U);
     auto* texture_slots = captured_material->textures.get();
@@ -330,6 +333,10 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
 
     ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_pipeline, nullptr);
+    ASSERT_NE(captured_material->resource_key, nullptr);
+    ASSERT_NE(captured_pipeline->resource_key, nullptr);
+    EXPECT_STREQ(captured_material->resource_key, "test_material_inline_pipeline");
+    EXPECT_STREQ(captured_pipeline->resource_key, "inline_pipeline");
     EXPECT_EQ(captured_material->graphics_pipeline.get(), captured_pipeline.get());
     EXPECT_EQ(captured_material->texture_count, 0U);
     EXPECT_EQ(captured_pipeline->vertex_stage.get(), vertex_shader_ref.get());
