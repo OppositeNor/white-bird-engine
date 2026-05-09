@@ -18,6 +18,7 @@
 #include "platform/file_system/directory.hh"
 #include "utils/utils.hh"
 #include <cstddef>
+#include <filesystem>
 #include <ostream>
 #include <string>
 #include <utility>

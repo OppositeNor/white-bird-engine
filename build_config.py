@@ -101,6 +101,9 @@ gen_info = {
         "WBE_SERIALIZABLE",
         "WBE_CONFIG_OPTION",
     ],
+    "cla_configurations" : [
+        "WBE_CLA_CONFIGURATION",
+    ],
 }
 
 gen_info["static_serializables"].extend(gen_info["serializables"])

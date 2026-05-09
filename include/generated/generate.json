@@ -32,5 +32,13 @@
         "data" : {
             "metadata" : ".metadata"
         }
+    },
+    {
+        "output_name" : "cla_configuration.gen.hh",
+        "template" : "cla_configuration.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "cla_configurations" : ".cla_configurations"
+        }
     }
 ]

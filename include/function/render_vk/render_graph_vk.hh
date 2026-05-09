@@ -54,7 +54,8 @@ struct RendResVK {
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {}
+        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {
+    }
     // The render task that should be performed during this node. Unique ownership.
     Unique<RenderTaskVK> render_task;
     // The execution process edge before this node. All of these need
