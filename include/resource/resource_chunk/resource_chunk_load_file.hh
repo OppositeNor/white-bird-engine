@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
