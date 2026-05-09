@@ -45,7 +45,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -250,7 +249,7 @@ private:
     Vector<Ref<SemaphoreVK>> image_available_semaphores;
 
     // Registered pipeline descriptors, keyed by name.
-    std::map<std::string, Ref<RendPipelineDescVK>> pipelines;
+    Map<std::string, Ref<RendPipelineDescVK>> pipelines;
     // The currently active render graph (rebuilt on every activate_pipeline()).
     Ref<RenderGraphVK> active_graph;
 

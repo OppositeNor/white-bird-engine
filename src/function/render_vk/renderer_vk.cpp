@@ -60,7 +60,7 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), base_render_data(p_allocator) {
+    image_available_semaphores(p_allocator), pipelines(p_allocator), base_render_data(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -987,7 +987,7 @@ void RendererVK::present(uint32_t p_image_index) {
 
 void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc) {
     auto desc_ref = make_ref<RendPipelineDescVK>(allocator, std::move(p_desc));
-    pipelines.insert_or_assign(p_pipeline_name, std::move(desc_ref));
+    pipelines[p_pipeline_name] = std::move(desc_ref);
 }
 
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {

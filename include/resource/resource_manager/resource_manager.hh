@@ -23,9 +23,9 @@
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <boost/container/flat_map.hpp>
 #include <cstddef>
 #include <format>
-#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -145,7 +145,7 @@ public:
     void add_resource_unit_loader(Ref<IResourceUnitLoader> p_resource_unit_loader) {
         for (const auto& resource_type : p_resource_unit_loader->get_supported_resource_types()) {
             if (!resource_unit_loaders.contains(resource_type)) {
-                resource_unit_loaders[resource_type] = p_resource_unit_loader;
+                resource_unit_loaders.emplace(resource_type, p_resource_unit_loader);
                 continue;
             }
             throw std::runtime_error(std::format("Failed to add resource loader: resource type '{}' "
@@ -167,7 +167,7 @@ public:
 private:
     ResourceChunkID global_res_chunk_id = RES_CHUNK_NULL;
     std::vector<Ref<IResourceChunk>> resource_chunks;
-    std::map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
+    boost::container::flat_map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
     Ref<IResourceChunk> find_resource_chunk_containing_resource(const std::string& p_id) const;

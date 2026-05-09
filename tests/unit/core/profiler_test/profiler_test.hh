@@ -36,7 +36,7 @@ TEST(WBEProfilerTest, Profiling) {
     uint32_t line_num = 0;
     {
         WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL, "Test profile");
-        line_num = __LINE__;
+        line_num = __LINE__ - 1;
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     const auto& profile_data = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_TEST_PROFILING_CHANNEL);
@@ -47,7 +47,7 @@ TEST(WBEProfilerTest, Profiling) {
     uint32_t line_num_1 = 0;
     {
         WBE_START_PROFILE(WBE::WBE_TEST_PROFILING_CHANNEL, "Test profile");
-        line_num_1 = __LINE__;
+        line_num_1 = __LINE__ - 1;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     ASSERT_EQ(profile_data.size(), 2);

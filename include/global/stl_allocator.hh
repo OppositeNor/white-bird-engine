@@ -17,10 +17,10 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
+#include <boost/container/flat_map.hpp>
 #include <cstddef>
 #include <deque>
 #include <functional>
-#include <map>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -161,7 +161,7 @@ template <typename T, typename AllocType = HeapAllocatorDefault>
 using Deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
 
 template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
-using Map = std::map<TKey, TVal, std::less<TKey>, STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
+using Map = boost::container::flat_map<TKey, TVal, std::less<TKey>, STLAllocator<std::pair<TKey, TVal>, AllocType, false, true, false>>;
 
 } // namespace WhiteBirdEngine
 // NOLINTEND
