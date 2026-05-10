@@ -161,6 +161,9 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "index": int(raw_binding.get("index", 0)),
             "count": int(raw_binding.get("count", raw_binding.get("used", 0))),
             "space": int(raw_binding.get("space", 0)),
+            "offset": int(raw_binding.get("offset", 0)),
+            "size": int(raw_binding.get("size", 0)),
+            "element_stride": int(raw_binding.get("elementStride", 0)),
         }
 
     def _transform_shader_type_atom(self, raw_type: dict[str, Any]) -> dict[str, Any]:

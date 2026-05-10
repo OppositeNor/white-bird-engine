@@ -182,6 +182,9 @@ void RenderGraphVK::allocate_command_buffers() {
 }
 
 void RenderGraphVK::free_command_buffers() {
+    if (!command_buffers.empty()) {
+        vkDeviceWaitIdle(render_data->logic_device);
+    }
     for (size_t i = 0; i < command_buffers.size(); ++i) {
         if (command_buffers[i] != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(render_data->logic_device, command_buffer_pools[i], 1, &command_buffers[i]);
@@ -190,6 +193,20 @@ void RenderGraphVK::free_command_buffers() {
     }
     command_buffers.clear();
     command_buffer_pools.clear();
+}
+
+uint32_t RenderGraphVK::terminal_semaphore_index() const {
+    if (terminal_semaphores.empty()) {
+        throw std::runtime_error("RenderGraphVK: terminal semaphores are not allocated.");
+    }
+    if (render_data->current_swap_chain_index >= terminal_semaphores.size()) {
+        throw std::runtime_error("RenderGraphVK: swap-chain image index exceeds terminal semaphore count.");
+    }
+    return render_data->current_swap_chain_index;
+}
+
+Ref<SemaphoreVK> RenderGraphVK::get_terminal_semaphore() const {
+    return terminal_semaphores[terminal_semaphore_index()];
 }
 
 void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
@@ -209,11 +226,12 @@ void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
 
     allocate_command_buffers();
 
-    // Allocate one terminal binary semaphore per frame-in-flight slot.
-    const uint32_t frames = std::max<uint32_t>(render_data->frames_in_flight, 1U);
+    // Allocate one terminal binary semaphore per swap-chain image. Presentation
+    // may retain the wait semaphore until that exact image is acquired again.
+    const uint32_t swap_chain_images = std::max<uint32_t>(render_data->swap_chain_images_count, 1U);
     terminal_semaphores.clear();
-    terminal_semaphores.reserve(frames);
-    for (uint32_t f = 0; f < frames; ++f) {
+    terminal_semaphores.reserve(swap_chain_images);
+    for (uint32_t i = 0; i < swap_chain_images; ++i) {
         terminal_semaphores.emplace_back(make_ref<SemaphoreVK>(render_data->allocator, render_data, true));
     }
 }
@@ -364,7 +382,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         }
 
         auto per_node_bound = build_per_node_bound(node);
-        record_node(node, command_buffer, per_node_bound, p_delta);
+        record_node(node, command_buffer, per_node_bound, p_delta, i == 0);
 
         // Build wait/signal semaphore lists from exec edges + extras.
         Vector<VkSemaphoreSubmitInfo, RenderAllocator> wait_infos(render_data->allocator);
@@ -382,9 +400,8 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
             for (const auto& signal_info : p_extra_signals_last_submit) {
                 signal_infos.push_back(signal_info);
             }
-            // Also signal the per-frame terminal binary semaphore.
-            signal_infos.push_back(
-                terminal_semaphores[render_data->current_frame_slot]->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT));
+            // Also signal the terminal binary semaphore for this swap-chain image.
+            signal_infos.push_back(get_terminal_semaphore()->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT));
         }
 
         // Last graphics submit signals the in-flight fence too, so the renderer
@@ -452,7 +469,11 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
 }
 
 void RenderGraphVK::record_node(
-    Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta) {
+    Ref<RGNode> p_node,
+    VkCommandBuffer p_command_buffer,
+    const Vector<RendResVK, RenderAllocator>& p_bound,
+    double p_delta,
+    bool p_record_pre_execute_tasks) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
@@ -482,6 +503,12 @@ void RenderGraphVK::record_node(
         dependency_info.memoryBarrierCount = static_cast<uint32_t>(mem_barriers.size());
         dependency_info.pMemoryBarriers = mem_barriers.data();
         vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
+    }
+
+    if (p_record_pre_execute_tasks) {
+        for (const auto& pre_execute_task : render_data->pre_execute_tasks_queue) {
+            pre_execute_task(p_command_buffer);
+        }
     }
 
     p_node->render_task->record(p_command_buffer, p_bound, p_delta);

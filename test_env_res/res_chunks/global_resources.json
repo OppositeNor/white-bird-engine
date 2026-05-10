@@ -6,7 +6,7 @@
         "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_shader.json",
         "assets/materials/default_material.json",
         "assets/shaders/draw_triangle/draw_triangle_shader.json",
-        "assets/shaders/draw_cube/draw_cube_shader.json"
+        "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.json"
     ],
     "resources": [
         {

@@ -185,8 +185,8 @@ public:
      * p_extra_signals_last_submit are attached to the first and last
      * graphics-queue submits, respectively (used to interlock with swap-chain
      * acquire/present). Additionally the last graphics-queue submit signals
-     * the graph's terminal binary semaphore, retrievable via
-     * get_terminal_semaphore().
+     * the graph's terminal binary semaphore for the acquired swap-chain image,
+     * retrievable via get_terminal_semaphore().
      *
      * @param p_frame_index The current frame counter (timeline base value).
      * @param p_delta       Frame delta forwarded to RenderTaskVK::record().
@@ -216,12 +216,11 @@ public:
     /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
      * queue submit of the most recent execute(). Caller waits on it at
-     * present time. One semaphore per frame-in-flight slot, since binary
-     * semaphores cannot be re-signaled while a previous wait is pending.
+     * present time. One semaphore is allocated per swap-chain image because
+     * presentation may still own the previous render-finished semaphore until
+     * that image is acquired again.
      */
-    Ref<SemaphoreVK> get_terminal_semaphore() const {
-        return terminal_semaphores[render_data->current_frame_slot];
-    }
+    Ref<SemaphoreVK> get_terminal_semaphore() const;
 
 private:
     const BaseRenderDataVK* render_data;
@@ -240,11 +239,12 @@ private:
     Vector<VkCommandPool, RenderAllocator> command_buffer_pools;
 
     // Binary semaphores signaled by the last graphics submit; consumed by
-    // present. One per frame-in-flight slot.
+    // present. One per swap-chain image.
     Vector<Ref<SemaphoreVK>, RenderAllocator> terminal_semaphores;
 
     void allocate_command_buffers();
     void free_command_buffers();
+    uint32_t terminal_semaphore_index() const;
     void topological_sort();
 
     Vector<Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
@@ -254,7 +254,11 @@ private:
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
-    void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta);
+    void record_node(Ref<RGNode> p_node,
+        VkCommandBuffer p_command_buffer,
+        const Vector<RendResVK, RenderAllocator>& p_bound,
+        double p_delta,
+        bool p_record_pre_execute_tasks);
     void collect_edge_semaphores(Ref<RGNode> p_node,
         uint64_t p_timeline_value,
         Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,

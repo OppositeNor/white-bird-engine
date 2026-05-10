@@ -17,7 +17,6 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <string>
@@ -106,8 +105,6 @@ struct RUShader : public ResourceUnit {
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.
     RefRes<char> metadata_path;
-    // The parsed shader reflection metadata.
-    ShaderMetadata metadata;
 };
 
 /**

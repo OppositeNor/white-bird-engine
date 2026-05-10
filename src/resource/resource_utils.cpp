@@ -39,6 +39,25 @@ static std::string remove_ppm_comments(std::string p_file_content) {
     return p_file_content;
 }
 
+static void write_ppm_pixel(uint8_t* p_data, size_t p_pixel_offset, uint32_t p_output_channels, uint8_t p_r, uint8_t p_g, uint8_t p_b) {
+    uint8_t luminance = static_cast<uint8_t>((static_cast<uint32_t>(p_r) * 77 + static_cast<uint32_t>(p_g) * 150 +
+                                                 static_cast<uint32_t>(p_b) * 29) >>
+                                             8);
+    if (p_output_channels == 1 || p_output_channels == 2) {
+        p_data[p_pixel_offset] = luminance;
+        if (p_output_channels == 2) {
+            p_data[p_pixel_offset + 1] = UINT8_MAX;
+        }
+        return;
+    }
+    p_data[p_pixel_offset + 0] = p_r;
+    p_data[p_pixel_offset + 1] = p_g;
+    p_data[p_pixel_offset + 2] = p_b;
+    if (p_output_channels == 4) {
+        p_data[p_pixel_offset + 3] = UINT8_MAX;
+    }
+}
+
 static std::unique_ptr<uint8_t> load_ppm_data(
     const Path& p_path, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels, uint32_t p_desired_channels = 0) {
     // Load manually if PPM3
@@ -73,15 +92,21 @@ static std::unique_ptr<uint8_t> load_ppm_data(
         double scaler;
         content >> scaler;
         scaler = 255.0 / scaler;
-        uint8_t* temp_data = new uint8_t[width * height * 3];
+        uint32_t output_channels = p_desired_channels == 0 ? 3 : p_desired_channels;
+        if (output_channels < 1 || output_channels > 4) {
+            throw std::runtime_error("Failed to load PPM file: desired channel count is not supported.");
+        }
+        uint8_t* temp_data = new uint8_t[width * height * output_channels];
         std::unique_ptr<uint8_t> result(temp_data);
         // texture should go in reverse order
         for (uint32_t i = 0; i < width * height; ++i) {
             int r, g, b;
             content >> r >> g >> b;
-            temp_data[i * 3 + 0] = static_cast<uint8_t>(static_cast<double>(r) * scaler);
-            temp_data[i * 3 + 1] = static_cast<uint8_t>(static_cast<double>(g) * scaler);
-            temp_data[i * 3 + 2] = static_cast<uint8_t>(static_cast<double>(b) * scaler);
+            uint8_t scaled_r = static_cast<uint8_t>(static_cast<double>(r) * scaler);
+            uint8_t scaled_g = static_cast<uint8_t>(static_cast<double>(g) * scaler);
+            uint8_t scaled_b = static_cast<uint8_t>(static_cast<double>(b) * scaler);
+            size_t pixel_offset = static_cast<size_t>(i) * output_channels;
+            write_ppm_pixel(temp_data, pixel_offset, output_channels, scaled_r, scaled_g, scaled_b);
         }
         p_width = width;
         p_height = height;
@@ -92,7 +117,7 @@ static std::unique_ptr<uint8_t> load_ppm_data(
 
 std::unique_ptr<uint8_t> load_image_data(
     const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels) {
-    auto result = load_ppm_data(p_path, p_width, p_height, p_file_channels);
+    auto result = load_ppm_data(p_path, p_width, p_height, p_file_channels, p_desired_channels);
     if (result == nullptr) {
         int width, height, file_channels;
         result = std::unique_ptr<uint8_t>(stbi_load(

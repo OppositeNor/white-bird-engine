@@ -25,6 +25,25 @@
 namespace WhiteBirdEngine {
 
 /**
+ * @class ShaderDescriptorFieldBindingVK
+ * @brief Reflected field inside a descriptor-backed shader struct.
+ */
+struct ShaderDescriptorFieldBindingVK {
+    /**
+     * @brief Field path relative to the shader parameter, e.g. "camera_info.view".
+     */
+    std::string field_path;
+    /**
+     * @brief Byte offset inside the descriptor buffer.
+     */
+    VkDeviceSize offset = 0;
+    /**
+     * @brief Byte size of the reflected field.
+     */
+    VkDeviceSize size = 0;
+};
+
+/**
  * @class ShaderDescriptorBindingVK
  * @brief Vulkan descriptor binding translated from shader reflection metadata.
  */
@@ -33,6 +52,18 @@ struct ShaderDescriptorBindingVK {
      * @brief Shader parameter name, used to match material texture slots.
      */
     std::string parameter_name;
+    /**
+     * @brief Reflected shader type name for this descriptor.
+     */
+    std::string type_name;
+    /**
+     * @brief Byte size of a descriptor-backed buffer.
+     */
+    VkDeviceSize buffer_size = 0;
+    /**
+     * @brief Reflected fields inside a descriptor-backed buffer.
+     */
+    std::vector<ShaderDescriptorFieldBindingVK> fields;
     /**
      * @brief Descriptor set index from the shader binding space.
      */
@@ -73,17 +104,19 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(const std::string& p
  * @brief Collect descriptor bindings used by one shader entry point.
  */
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
-    const RUShader& p_shader, const std::string& p_stage, const std::string& p_entry_name);
+    const ShaderMetadata& p_metadata, const std::string& p_stage, const std::string& p_entry_name);
 
 /**
  * @brief Collect and merge descriptor bindings from all supported graphics stages.
  */
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const RUGraphicsPipeline& p_pipeline);
+std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(
+    const RUGraphicsPipeline& p_pipeline, const ShaderMetadata& p_vertex_shader_metadata, const ShaderMetadata& p_fragment_shader_metadata);
 
 /**
  * @brief Build descriptor set layout inputs for a graphics pipeline resource.
  */
-std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(const RUGraphicsPipeline& p_pipeline);
+std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(
+    const std::vector<ShaderDescriptorBindingVK>& p_bindings);
 
 } // namespace WhiteBirdEngine
 

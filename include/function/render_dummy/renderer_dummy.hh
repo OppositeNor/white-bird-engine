@@ -14,13 +14,14 @@
 */
 #ifndef WBE_FILE_RENDERER_DUMMY_H
 #define WBE_FILE_RENDERER_DUMMY_H
-#include "core/memory/unique.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include <functional>
+#include <span>
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -41,7 +42,8 @@ private:
     };
 
 public:
-    RendererDummy(RenderAllocator* p_allocator) : allocator(p_allocator), dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+    RendererDummy(RenderAllocator* p_allocator)
+        : allocator(p_allocator), dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
     }
 
     virtual ~RendererDummy() override = default;
@@ -57,8 +59,10 @@ public:
         return dummy_database;
     }
 
-    virtual Unique<RenderTask> compile_graphics_pipeline(const std::string& p_resource_key) override {
+    virtual Unique<RenderTask> compile_graphics_pipeline(
+        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) override {
         (void)p_resource_key;
+        (void)p_uniform_bindings;
         return make_unique<RenderTaskDummy>(allocator);
     }
 

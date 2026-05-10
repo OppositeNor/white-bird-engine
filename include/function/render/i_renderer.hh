@@ -24,6 +24,7 @@
 #include "render_defs.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <span>
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -53,12 +54,14 @@ public:
     virtual Ref<RenderDatabase> get_render_database() = 0;
 
     /**
-    * @brief Compile a graphics pipeline resource into a render task.
+     * @brief Compile a graphics pipeline resource into a render task.
      *
      * @param p_resource_key The graphics pipeline resource key.
-    * @return A render task whose perform() runs the compiled graphics pipeline.
+     * @param p_uniform_bindings Caller-provided uniform field bindings.
+     * @return A render task whose perform() runs the compiled graphics pipeline.
      */
-    virtual Unique<RenderTask> compile_graphics_pipeline(const std::string& p_resource_key) = 0;
+    virtual Unique<RenderTask> compile_graphics_pipeline(
+        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) = 0;
 
     /**
      * @brief Activate a pipeline.

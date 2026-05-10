@@ -13,148 +13,96 @@
    limitations under the License.
 */
 #include "core/logging/log.hh"
-#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
-#include "function/function_utils.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_layout_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_shader_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "generated/type_uuid.gen.hh"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
-#include "render_test.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <array>
 #include <cstdlib>
 #include <exception>
 #include <format>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/vector_float4.hpp>
+#include <glm/trigonometric.hpp>
 #include <memory>
 #include <print>
 #include <span>
-#include <utility>
-#include <vector>
-#include <vulkan/vulkan_core.h>
+#include <stdexcept>
 
 namespace WBE = WhiteBirdEngine;
 
-namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+namespace {
+
+WBE::CameraInfoVKUBO default_camera_info(float p_aspect_ratio) {
+    WBE::CameraInfoVKUBO camera_info{
+        .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
+        .proj = glm::perspective(glm::radians(45.0F), p_aspect_ratio, 0.1F, 10.0F),
+    };
+    camera_info.proj[1][1] *= -1;
+    return camera_info;
 }
 
-class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
+} // namespace
+
+class ApplicationVulkanDrawCubeTest : public WBE::ApplicationGame {
 public:
     virtual void logic_update(double /* p_delta */) override {
     }
 
     virtual void render_update(double p_delta) override {
-        camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
-        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+        if (!draw_task.is_null()) {
+            draw_task->perform(p_delta);
+        }
     }
 
-    void setup_graphics_pipeline() {
-        auto* render_allocator = get_renderer_allocator().get();
-        auto* renderer = WBE::RendererVK::get_singleton();
-        auto* render_database = WBE::RenderDatabase::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+    void setup_draw_task() {
+        auto* resource_manager = WBE::ResourceManager::get_singleton();
+        auto cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("cube");
+        auto default_material = resource_manager->get_resource<WBE::RUMaterial>("default_material");
+        if (cube_mesh == nullptr) {
+            throw std::runtime_error("Failed to setup draw cube test: cube mesh resource was not found.");
+        }
+        if (default_material == nullptr || default_material->graphics_pipeline == nullptr ||
+            default_material->graphics_pipeline->resource_key == nullptr) {
+            throw std::runtime_error("Failed to setup draw cube test: default material has no compiled graphics pipeline key.");
+        }
 
-        // Setup cube's mesh
-        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
-        render_database->set_static_opaque_triangles(cube_mesh.get());
-        renderer->add_job([renderer]() {
-            renderer->update_static_opaque_triangles();
-        });
-
-        WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
-        // Setup shaders
-        auto vertex_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_vert").create_ref(base_render_data);
-        auto fragment_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_frag").create_ref(base_render_data);
-        shader_config.set_shaders(vertex_shader, fragment_shader);
-
-        // Setup graphics pipeline layout.
-        auto descriptor_set_layout = WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1).create_ref(base_render_data);
-        auto graphics_pipeline_layout =
-            WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout).create_ref(base_render_data);
-        auto render_pass = renderer->get_swap_chain_render_pass();
-        auto graphics_pipeline =
-            WBE::ROGraphicsPipelineVK::Builder()
-                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout, render_pass)
-                .create_ref(base_render_data);
-        aspect_ratio = base_render_data->swap_chain_aspect_ratio;
-        camera_info = WBE::CameraInfoVKUBO{
-            // Look at the origin from (2,2,2)
-            .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
-            .proj = glm::perspective(glm::radians(45.0F), aspect_ratio, 0.1F, 10.0F),
+        auto renderer = get_renderer();
+        auto* renderer_vk = WBE::RendererVK::get_singleton();
+        auto camera_info = default_camera_info(renderer_vk->get_base_render_data()->swap_chain_aspect_ratio);
+        std::array<WBE::RenderUniformBinding, 2> uniform_bindings{
+            WBE::RenderUniformBinding{.field_path = "camera_info.view", .data = &camera_info.view, .size = sizeof(camera_info.view)},
+            WBE::RenderUniformBinding{.field_path = "camera_info.proj", .data = &camera_info.proj, .size = sizeof(camera_info.proj)},
         };
-        // Inverse the y value since Vulkan makes y axis points downwards.
-        camera_info.proj[1][1] *= -1;
-        // Setup time UBO
-        camera_info_ubo = WBE::ROBufferVK::Builder()
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(WBE::CameraInfoVKUBO))
-                              .create_ref(base_render_data);
-        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
-        // Setup descriptor sets.
-        auto descriptor_set =
-            WBE::RODescriptorSetVK::Builder().add_descriptor_set_layout(descriptor_set_layout).create_ref(base_render_data);
-        descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(0).add_uniform_buffer_info(
-            WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = camera_info_ubo, .offset = 0}));
-        // Setup render task. The vertex/index data lives in the global static
-        // opaque mesh, populated by RendererVK::update_static_opaque_triangles()
-        // from the RenderDatabase, and exposed to render tasks under the
-        // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
-        std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
-        WBE::RendPipelineDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
-            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-            .res = graphics_pipeline});
-        WBE::RendTaskDescVK task_desc(render_allocator);
-        task_desc.task_id = WBE::RT_RUN_PIPELINE;
-        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
-            return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
-                base_render_data,
-                glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
-                WBE::REND_RES_TEST_DRAW_CUBUE_GRAPHICS_PIPELINE,
-                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
-        };
-        pipeline_desc.tasks.emplace_back(std::move(task_desc));
-        WBE::RendererVK::get_singleton()->register_pipeline("test_pipeline", std::move(pipeline_desc));
-        WBE::RendererVK::get_singleton()->activate_pipeline("test_pipeline");
+        WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
+        renderer->update_static_opaque_triangles();
+        draw_task = renderer->compile_graphics_pipeline(default_material->graphics_pipeline->resource_key,
+            std::span<const WBE::RenderUniformBinding>(uniform_bindings.data(), uniform_bindings.size()));
+        draw_task->init();
     }
 
 private:
-    WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    WBE::CameraInfoVKUBO camera_info{};
-    float aspect_ratio = 1.0F;
+    WBE::Unique<WBE::RenderTask> draw_task;
 };
 
 int main(int p_argc, char* p_argv[]) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     try {
         {
-            ApplicationVulkanDrawPipelineTest game_application;
+            ApplicationVulkanDrawCubeTest game_application;
             {
                 WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
-                game_application.setup_graphics_pipeline();
+                game_application.setup_draw_task();
                 game_application.run();
                 size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
                 size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();

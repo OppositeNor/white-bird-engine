@@ -20,6 +20,9 @@
 namespace WhiteBirdEngine {
 
 VkDeviceMemory RenderObjectVK::allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const {
+    if (p_memory_requirements.size == 0) {
+        throw std::runtime_error("Failed to allocate memory: memory requirement size is zero.");
+    }
     VkMemoryAllocateInfo allocate_info{};
     allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocate_info.allocationSize = p_memory_requirements.size;

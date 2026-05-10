@@ -82,6 +82,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
     p_resource_unit.height = height;
     p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
     p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+    p_resource_unit.config.set(RUImage::IS_HDR);
     auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), image_data.get());
     p_resource_unit.image_data = data;
 }
@@ -103,11 +104,8 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     auto file_path = get_resource_path(p_scheme.path);
     auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
     auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
-    ParserJSON metadata_parser;
-    metadata_parser.parse(get_resource_path(p_scheme.metadata));
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
-    resource_unit.metadata.deserialize(metadata_parser.get_data());
     resource_unit.data = data;
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUShader>();
@@ -149,7 +147,8 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     populate_pipeline_stage(p_res_chunk, resource_unit.vertex_stage, p_scheme.vertex_stage_id, p_scheme.vertex_stage, "vertex");
     populate_pipeline_stage(
         p_res_chunk, resource_unit.tessellation_stage, p_scheme.tessellation_stage_id, p_scheme.tessellation_stage, "tessellation", false);
-    populate_pipeline_stage(p_res_chunk, resource_unit.geometry_stage, p_scheme.geometry_stage_id, p_scheme.geometry_stage, "geometry", false);
+    populate_pipeline_stage(
+        p_res_chunk, resource_unit.geometry_stage, p_scheme.geometry_stage_id, p_scheme.geometry_stage, "geometry", false);
     populate_pipeline_stage(p_res_chunk, resource_unit.fragment_stage, p_scheme.fragment_stage_id, p_scheme.fragment_stage, "fragment");
     resource_unit.vertex_stage_entry = push_stage_entry(p_res_chunk, p_scheme.vertex_stage_entry);
     resource_unit.tessellation_stage_entry = push_stage_entry(p_res_chunk, p_scheme.tessellation_stage_entry);
@@ -177,9 +176,8 @@ RUSchemeMaterialTextureSlot parse_material_texture_slot(const std::string& p_tex
         texture_slot.texture.deserialize(p_texture_data);
         return texture_slot;
     }
-    throw std::runtime_error(std::format("Failed to populate material texture '{}': unsupported resource type '{}'.",
-        p_texture_key,
-        resource_type));
+    throw std::runtime_error(
+        std::format("Failed to populate material texture '{}': unsupported resource type '{}'.", p_texture_key, resource_type));
 }
 
 struct ParsedMaterialScheme {

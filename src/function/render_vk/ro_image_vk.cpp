@@ -188,11 +188,16 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
 
 ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
-    if (!exposed_fileds.is_swap_chain_image) {
+    if (!exposed_fileds.is_swap_chain_image &&
+        (exposed_fileds.image != VK_NULL_HANDLE || exposed_fileds.image_memory != VK_NULL_HANDLE)) {
         render_data->register_delayed_call(
             [render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
-                vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
-                vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
+                }
+                if (image_memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
+                }
             },
             render_data->frames_in_flight);
     }
@@ -201,18 +206,57 @@ ROImageVK::~ROImageVK() {
 void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.create_vk_object(render_data);
     exposed_fileds.queue_families = p_builder.queue_families;
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
-    // Images are only allowed to be allocated on device.
-    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
+    try {
+        VkMemoryRequirements memory_requirements;
+        vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
+        // Images are only allowed to be allocated on device.
+        exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
+        if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to bind vulkan image memory.");
+        }
+    } catch (...) {
+        if (exposed_fileds.image != VK_NULL_HANDLE) {
+            vkDestroyImage(render_data->logic_device, exposed_fileds.image, render_data->allocation_callbacks);
+            exposed_fileds.image = VK_NULL_HANDLE;
+        }
+        if (exposed_fileds.image_memory != VK_NULL_HANDLE) {
+            vkFreeMemory(render_data->logic_device, exposed_fileds.image_memory, render_data->allocation_callbacks);
+            exposed_fileds.image_memory = VK_NULL_HANDLE;
+        }
+        throw;
+    }
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {
-    MemoryBarrierBuilder barrier_builder;
-    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT).apply_barrier(p_command_buffer);
+    VkImageSubresourceRange subresource_range{.aspectMask = p_region_info.imageSubresource.aspectMask,
+        .baseMipLevel = p_region_info.imageSubresource.mipLevel,
+        .levelCount = 1,
+        .baseArrayLayer = p_region_info.imageSubresource.baseArrayLayer,
+        .layerCount = p_region_info.imageSubresource.layerCount};
+    auto apply_upload_barrier = [this, p_command_buffer, subresource_range](VkAccessFlags2 p_src_access, VkAccessFlags2 p_dst_access) {
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.srcAccessMask = p_src_access;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.dstAccessMask = p_dst_access;
+        barrier.oldLayout = exposed_fileds.image_layout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = exposed_fileds.image;
+        barrier.subresourceRange = subresource_range;
+        VkDependencyInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        info.imageMemoryBarrierCount = 1;
+        info.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(p_command_buffer, &info);
+        exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
+    };
+    apply_upload_barrier(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT);
     vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
     // After transfering the data, retrieve the original layout.
-    barrier_builder.set_image(this_ref.lock()).set_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT).apply_barrier(p_command_buffer);
+    apply_upload_barrier(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 }
 
 } // namespace WhiteBirdEngine

@@ -80,6 +80,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
     p_resource_unit.height = height;
     p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
     p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+    p_resource_unit.config.set(RUImage::IS_HDR);
     auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), image_data.get());
     p_resource_unit.image_data = data;
 }

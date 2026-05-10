@@ -60,9 +60,52 @@ VkDescriptorType descriptor_type_from_parameter(const ShaderMetadataParameter& p
     if (p_parameter.type.kind == "samplerState") {
         return VK_DESCRIPTOR_TYPE_SAMPLER;
     }
-    throw std::runtime_error(std::format("Failed to translate shader descriptor '{}': unsupported parameter type '{}'.",
-        p_parameter.name,
-        p_parameter.type.kind));
+    throw std::runtime_error(std::format(
+        "Failed to translate shader descriptor '{}': unsupported parameter type '{}'.", p_parameter.name, p_parameter.type.kind));
+}
+
+VkDeviceSize reflected_binding_size(const ShaderMetadataBinding& p_binding) {
+    return p_binding.size <= 0 ? 0 : static_cast<VkDeviceSize>(p_binding.size);
+}
+
+VkDeviceSize reflected_binding_offset(const ShaderMetadataBinding& p_binding) {
+    return p_binding.offset <= 0 ? 0 : static_cast<VkDeviceSize>(p_binding.offset);
+}
+
+std::string shader_parameter_type_name(const ShaderMetadataParameter& p_parameter) {
+    if (!p_parameter.type.element_type.name.empty()) {
+        return p_parameter.type.element_type.name;
+    }
+    return p_parameter.type.name;
+}
+
+std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(const ShaderMetadataParameter& p_parameter) {
+    std::vector<ShaderDescriptorFieldBindingVK> result;
+    result.reserve(p_parameter.type.fields.size());
+    for (const auto& field : p_parameter.type.fields) {
+        if (field.binding.kind.empty()) {
+            continue;
+        }
+        VkDeviceSize field_size = reflected_binding_size(field.binding);
+        if (field_size == 0) {
+            continue;
+        }
+        result.push_back(ShaderDescriptorFieldBindingVK{
+            .field_path = std::format("{}.{}", p_parameter.name, field.name),
+            .offset = reflected_binding_offset(field.binding),
+            .size = field_size,
+        });
+    }
+    return result;
+}
+
+VkDeviceSize descriptor_buffer_size(
+    const ShaderMetadataParameter& p_parameter, const std::vector<ShaderDescriptorFieldBindingVK>& p_fields) {
+    VkDeviceSize buffer_size = reflected_binding_size(p_parameter.binding);
+    for (const auto& field : p_fields) {
+        buffer_size = std::max(buffer_size, field.offset + field.size);
+    }
+    return buffer_size;
 }
 
 void merge_descriptor_binding(std::vector<ShaderDescriptorBindingVK>& p_bindings, const ShaderDescriptorBindingVK& p_binding) {
@@ -82,17 +125,31 @@ void merge_descriptor_binding(std::vector<ShaderDescriptorBindingVK>& p_bindings
             p_binding.layout_binding.binding));
     }
     existing->layout_binding.stageFlags |= p_binding.layout_binding.stageFlags;
+    if (existing->type_name.empty()) {
+        existing->type_name = p_binding.type_name;
+    }
+    existing->buffer_size = std::max(existing->buffer_size, p_binding.buffer_size);
+    for (const auto& field : p_binding.fields) {
+        auto existing_field = std::ranges::find_if(existing->fields, [&field](const ShaderDescriptorFieldBindingVK& p_existing) {
+            return p_existing.field_path == field.field_path;
+        });
+        if (existing_field == existing->fields.end()) {
+            existing->fields.push_back(field);
+            continue;
+        }
+        if (existing_field->offset != field.offset || existing_field->size != field.size) {
+            throw std::runtime_error(std::format("Conflicting shader descriptor field declarations for '{}'.", field.field_path));
+        }
+    }
 }
 
-void append_stage_descriptor_bindings(std::vector<ShaderDescriptorBindingVK>& p_bindings,
-    const RUShader* p_shader,
-    const char* p_entry_name,
-    const std::string& p_stage) {
-    if (p_shader == nullptr) {
+void append_stage_descriptor_bindings(
+    std::vector<ShaderDescriptorBindingVK>& p_bindings, const ShaderMetadata* p_metadata, const char* p_entry_name, const std::string& p_stage) {
+    if (p_metadata == nullptr) {
         return;
     }
     std::string entry_name = p_entry_name == nullptr ? std::string("main") : std::string(p_entry_name);
-    auto stage_bindings = collect_shader_descriptor_bindings(*p_shader, p_stage, entry_name);
+    auto stage_bindings = collect_shader_descriptor_bindings(*p_metadata, p_stage, entry_name);
     for (const auto& binding : stage_bindings) {
         merge_descriptor_binding(p_bindings, binding);
     }
@@ -102,9 +159,10 @@ void append_stage_descriptor_bindings(std::vector<ShaderDescriptorBindingVK>& p_
 
 const ShaderMetadataEntryPoint& find_shader_entry_point(
     const ShaderMetadata& p_metadata, const std::string& p_stage, const std::string& p_entry_name) {
-    auto entry_point = std::ranges::find_if(p_metadata.entry_points, [&p_stage, &p_entry_name](const ShaderMetadataEntryPoint& p_entry_point) {
-        return p_entry_point.stage == p_stage && p_entry_point.name == p_entry_name;
-    });
+    auto entry_point =
+        std::ranges::find_if(p_metadata.entry_points, [&p_stage, &p_entry_name](const ShaderMetadataEntryPoint& p_entry_point) {
+            return p_entry_point.stage == p_stage && p_entry_point.name == p_entry_name;
+        });
     if (entry_point == p_metadata.entry_points.end()) {
         throw std::runtime_error(std::format("Failed to find shader entry point '{}:{}'.", p_stage, p_entry_name));
     }
@@ -131,16 +189,19 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(const std::string& p
 }
 
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
-    const RUShader& p_shader, const std::string& p_stage, const std::string& p_entry_name) {
-    const auto& entry_point = find_shader_entry_point(p_shader.metadata, p_stage, p_entry_name);
+    const ShaderMetadata& p_metadata, const std::string& p_stage, const std::string& p_entry_name) {
+    const auto& entry_point = find_shader_entry_point(p_metadata, p_stage, p_entry_name);
     VkShaderStageFlagBits stage_flag = shader_stage_flag_from_metadata_stage(entry_point.stage);
     std::vector<ShaderDescriptorBindingVK> result;
-    for (const auto& parameter : p_shader.metadata.parameters) {
+    for (const auto& parameter : p_metadata.parameters) {
         if (!is_descriptor_binding(parameter.binding) || !entry_point_uses_binding(entry_point, parameter.binding)) {
             continue;
         }
         ShaderDescriptorBindingVK descriptor_binding;
         descriptor_binding.parameter_name = parameter.name;
+        descriptor_binding.type_name = shader_parameter_type_name(parameter);
+        descriptor_binding.fields = collect_descriptor_field_bindings(parameter);
+        descriptor_binding.buffer_size = descriptor_buffer_size(parameter, descriptor_binding.fields);
         descriptor_binding.set_index = static_cast<uint32_t>(parameter.binding.space);
         descriptor_binding.layout_binding = VkDescriptorSetLayoutBinding{
             .binding = static_cast<uint32_t>(parameter.binding.index),
@@ -153,33 +214,35 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     return result;
 }
 
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const RUGraphicsPipeline& p_pipeline) {
+std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const RUGraphicsPipeline& p_pipeline,
+    const ShaderMetadata& p_vertex_shader_metadata,
+    const ShaderMetadata& p_fragment_shader_metadata) {
     std::vector<ShaderDescriptorBindingVK> result;
     append_stage_descriptor_bindings(result,
-        p_pipeline.vertex_stage.get(),
+        p_pipeline.vertex_stage == nullptr ? nullptr : &p_vertex_shader_metadata,
         p_pipeline.vertex_stage_entry == nullptr ? nullptr : p_pipeline.vertex_stage_entry.get(),
         "vertex");
     append_stage_descriptor_bindings(result,
-        p_pipeline.fragment_stage.get(),
+        p_pipeline.fragment_stage == nullptr ? nullptr : &p_fragment_shader_metadata,
         p_pipeline.fragment_stage_entry == nullptr ? nullptr : p_pipeline.fragment_stage_entry.get(),
         "fragment");
     return result;
 }
 
-std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(const RUGraphicsPipeline& p_pipeline) {
-    auto bindings = collect_graphics_pipeline_descriptor_bindings(p_pipeline);
-    if (bindings.empty()) {
+std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(
+    const std::vector<ShaderDescriptorBindingVK>& p_bindings) {
+    if (p_bindings.empty()) {
         return {};
     }
     uint32_t max_set_index = 0;
-    for (const auto& binding : bindings) {
+    for (const auto& binding : p_bindings) {
         max_set_index = std::max(max_set_index, binding.set_index);
     }
     std::vector<ShaderDescriptorSetLayoutVK> result(max_set_index + 1);
     for (uint32_t i = 0; i < result.size(); ++i) {
         result[i].set_index = i;
     }
-    for (const auto& binding : bindings) {
+    for (const auto& binding : p_bindings) {
         result[binding.set_index].bindings.push_back(binding.layout_binding);
     }
     for (auto& set_layout : result) {

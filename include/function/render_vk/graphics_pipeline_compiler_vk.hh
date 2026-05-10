@@ -24,6 +24,7 @@
 #include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <span>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -68,10 +69,13 @@ struct GraphicsPipelineCompilerVKContext {
  * @param p_context Runtime compilation context.
  * @param p_resource_key Key of the graphics pipeline resource.
  * @param p_pipeline_resource Loaded graphics pipeline resource unit.
+ * @param p_uniform_bindings Caller-provided uniform field bindings.
  * @return A render task that runs the compiled graphics pipeline.
  */
-Unique<RenderTask> compile_graphics_pipeline_task_vk(
-    const GraphicsPipelineCompilerVKContext& p_context, const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource);
+Unique<RenderTask> compile_graphics_pipeline_task_vk(const GraphicsPipelineCompilerVKContext& p_context,
+    const std::string& p_resource_key,
+    RefRes<RUGraphicsPipeline> p_pipeline_resource,
+    std::span<const RenderUniformBinding> p_uniform_bindings = {});
 
 } // namespace WhiteBirdEngine
 

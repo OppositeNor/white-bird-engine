@@ -36,7 +36,7 @@ namespace WhiteBirdEngine {
  * @brief Image.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK, ThisRef<ROImageVK> {
+class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK {
     friend struct MemoryBarrierBuilder;
     friend class RendererVK;
 
@@ -201,8 +201,11 @@ public:
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The image to set barrier on.
         Ref<ROImageVK> image;
-        VkImageSubresourceRange subresource_range;
-        // TODO: sub-resource range
+        VkImageSubresourceRange subresource_range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1};
 
         /**
          * @brief Set the source access.
@@ -262,6 +265,32 @@ public:
         MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
+            return *this;
+        }
+
+        /**
+         * @brief Set the image subresource range covered by this barrier.
+         *
+         * @param p_subresource_range The image subresource range.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_subresource_range(VkImageSubresourceRange p_subresource_range) {
+            subresource_range = p_subresource_range;
+            return *this;
+        }
+
+        /**
+         * @brief Set the image subresource range from image copy layers.
+         *
+         * @param p_subresource_layers The image subresource layers.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_subresource_range(VkImageSubresourceLayers p_subresource_layers) {
+            subresource_range = VkImageSubresourceRange{.aspectMask = p_subresource_layers.aspectMask,
+                .baseMipLevel = p_subresource_layers.mipLevel,
+                .levelCount = 1,
+                .baseArrayLayer = p_subresource_layers.baseArrayLayer,
+                .layerCount = p_subresource_layers.layerCount};
             return *this;
         }
 

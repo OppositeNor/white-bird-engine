@@ -1,3 +1,4 @@
+// vertex
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +13,19 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "draw_cube_unshaded/draw_cube_unshaded_utils.slang"
+#include "defs.slang"
 
-#ifndef WBE_FILE_DRAW_CUBE_UTILS_SLANG
-#define WBE_FILE_DRAW_CUBE_UTILS_SLANG
-struct VSOutput {
-    float4 position : SV_Position;
-    float3 normal   : TEXCOORD0;
-    float2 uv       : TEXCOORD1;
-};
+[[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
 
-#endif
+VSOutput main(Vertex3DTexturedInput p_input) {
+    VSOutput output;
+    float4 pos = float4(p_input.position.xyz, 1.0);
+    output.position = mul(camera_info.proj, mul(camera_info.view, pos));
+    output.normal = p_input.normal;
+    output.uv = p_input.uv;
+
+    return output;
+}
+
+
