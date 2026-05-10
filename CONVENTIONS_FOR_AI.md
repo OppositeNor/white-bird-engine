@@ -119,3 +119,10 @@ Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw 
 - All C++ header code are scanned by `build_script/reflection/metaparser.py`.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.
+
+## Python Scripts
+
+- All function parameters and return values must have type annotations. Use `-> None` explicitly for procedures.
+- Prefer concrete generics (`list[str]`, `dict[str, Any]`) over bare `list` / `dict`. Use `from typing import Any, Callable` etc. when needed.
+- Annotate non-trivial local variables whose type cannot be obviously inferred (e.g. empty containers: `result: list[str] = []`).
+- Use PEP 604 unions (`X | None`) rather than `Optional[X]`.

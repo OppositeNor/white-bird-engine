@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import subprocess
 import shutil
-from typing import override
+from typing import Any, override
 from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
 import build_setup
 
@@ -119,7 +119,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
         raise RuntimeError("Failed to find valid slang compiler.")
 
     def _compile_slangc_slang(self, slangc_path: str, shader_file: Path,
-                              output_file: Path, shader_metadata_file: Path, shader_stage: str):
+                              output_file: Path, shader_metadata_file: Path, shader_stage: str) -> None:
         shader_stage = self._read_shader_stage(shader_file)
         cmd = [
             slangc_path,
@@ -148,14 +148,14 @@ class WBEACPCompilerShader(WBEACPCompiler):
         with open(shader_metadata_file, "w", encoding="utf-8") as metadata_file:
             json.dump(normalized_metadata, metadata_file, indent=4)
 
-    def _transform_shader_metadata(self, raw_metadata: dict) -> dict:
+    def _transform_shader_metadata(self, raw_metadata: dict[str, Any]) -> dict[str, Any]:
         return {
             "parameters": [self._transform_shader_parameter(parameter) for parameter in raw_metadata.get("parameters", [])],
             "entry_points": [self._transform_shader_entry_point(entry_point) for entry_point in raw_metadata.get("entryPoints", [])],
             "bindless_space_index": int(raw_metadata.get("bindlessSpaceIndex", 0)),
         }
 
-    def _transform_shader_binding(self, raw_binding: dict) -> dict:
+    def _transform_shader_binding(self, raw_binding: dict[str, Any]) -> dict[str, Any]:
         return {
             "kind": str(raw_binding.get("kind", "")),
             "index": int(raw_binding.get("index", 0)),
@@ -163,7 +163,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "space": int(raw_binding.get("space", 0)),
         }
 
-    def _transform_shader_type_atom(self, raw_type: dict) -> dict:
+    def _transform_shader_type_atom(self, raw_type: dict[str, Any]) -> dict[str, Any]:
         element_type = raw_type.get("elementType", {})
         if not isinstance(element_type, dict):
             element_type = {}
@@ -182,7 +182,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "element_scalar_type": str(element_scalar_type),
         }
 
-    def _transform_shader_type_field(self, raw_field: dict) -> dict:
+    def _transform_shader_type_field(self, raw_field: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": str(raw_field.get("name", "")),
             "type": self._transform_shader_type_atom(raw_field.get("type", {})),
@@ -192,7 +192,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "semantic_index": int(raw_field.get("semanticIndex", 0)),
         }
 
-    def _transform_shader_type(self, raw_type: dict) -> dict:
+    def _transform_shader_type(self, raw_type: dict[str, Any]) -> dict[str, Any]:
         kind = str(raw_type.get("kind", ""))
         element_type = raw_type.get("elementType", {})
         if not isinstance(element_type, dict):
@@ -211,7 +211,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "scalar_type": str(raw_type.get("scalarType", raw_type.get("baseShape", ""))),
         }
 
-    def _transform_shader_parameter(self, raw_parameter: dict) -> dict:
+    def _transform_shader_parameter(self, raw_parameter: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": str(raw_parameter.get("name", "")),
             "stage": str(raw_parameter.get("stage", "")),
@@ -221,7 +221,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "semantic_index": int(raw_parameter.get("semanticIndex", 0)),
         }
 
-    def _transform_shader_result(self, raw_result: dict) -> dict:
+    def _transform_shader_result(self, raw_result: dict[str, Any]) -> dict[str, Any]:
         return {
             "stage": str(raw_result.get("stage", "")),
             "binding": self._transform_shader_binding(raw_result.get("binding", {})),
@@ -230,7 +230,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "type": self._transform_shader_type(raw_result.get("type", {})),
         }
 
-    def _transform_shader_entry_point(self, raw_entry_point: dict) -> dict:
+    def _transform_shader_entry_point(self, raw_entry_point: dict[str, Any]) -> dict[str, Any]:
         bindings = raw_entry_point.get("bindings", [])
         if not isinstance(bindings, list):
             bindings = []

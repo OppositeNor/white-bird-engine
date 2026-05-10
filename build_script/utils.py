@@ -14,11 +14,11 @@
 import hashlib
 from pathlib import Path
 
-def to_uint32(x):
+def to_uint32(x: int) -> int:
     """Convert a uint64 integer to uint32 to match the usage in the C++ file.
 
     Args:
-        x (): The value to be converted.
+        x: The value to be converted.
 
     Returns:
         The converted value.
@@ -39,7 +39,7 @@ def hash_str(str_input : str) -> int:
     else:
         return 5381
 
-def hash_file(path : str):
+def hash_file(path : str) -> str:
     """Hash a file.
 
     Args:
@@ -66,20 +66,20 @@ def hash_str_sha256(str_input : str) -> str:
     hasher.update(str_input.encode("utf-8"))
     return hasher.hexdigest()
 
-def list_files(dir, ignore_dirs=None) -> list[str]:
+def list_files(dir: str | Path, ignore_dirs: list[str] | None = None) -> list[str]:
     """List all the file in a directory (recursivly).
 
     Args:
-        dir (): The directory to list.
-        ignore_dirs (): The directories to ignore.
+        dir: The directory to list.
+        ignore_dirs: The directories to ignore.
     """
     root = Path(dir)
-    ignore_dirs = set(ignore_dirs or [])
-    result = []
+    ignore_set: set[str] = set(ignore_dirs or [])
+    result: list[str] = []
     for path in root.rglob('*'):
         # Skip directories.
         # If any of the parent directories are ignored, ignore.
-        if any(ignored in path.parts for ignored in ignore_dirs):
+        if any(ignored in path.parts for ignored in ignore_set):
             continue
         if not path.is_dir():
             result.append(str(path))

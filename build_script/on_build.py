@@ -11,17 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from build_script.reflection.code_gen import WBEGenFileInfo
 from build_script.reflection.metaparser import WBEMetaparser
 from build_script.reflection.reflect import WBEReflector
 
-def reflect(metaparser_clang_args, metadata_path, metadata_cache, sources_indices, generate_infos):
+def reflect(metaparser_clang_args: list[str], metadata_path: str, metadata_cache: str,
+            sources_indices: list[str], generate_infos: list[WBEGenFileInfo]) -> None:
     """Run reflection.
 
     Args:
-        metaparser_clang_args (): The arguments for clang for the metaparser.
-        metadata_path (): The path to output metadata.
-        metadata_cache (): The path to the metadata cache.
-        sources_indices (): The pathes of the source files.
+        metaparser_clang_args: The arguments for clang for the metaparser.
+        metadata_path: The path to output metadata.
+        metadata_cache: The path to the metadata cache.
+        sources_indices: The pathes of the source files.
+        generate_infos: The list of code generation information.
     """
     reflector = WBEReflector(metadata_path, generate_infos)
     metaparser = WBEMetaparser(reflector, metaparser_clang_args, metadata_cache, sources_indices)

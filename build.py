@@ -16,22 +16,23 @@ import os
 from pathlib import Path
 import subprocess
 import traceback
+from typing import Any
 from build_script import on_build
 import shutil
 import build_config
 from build_script.reflection.code_gen import WBEGenFileInfo
 import build_setup
 
-metaparser_clang_args = [
+metaparser_clang_args: list[str] = [
     "-std=c++20",
     "-I./include",
     "-DWBE_REFLECTION_PARSER"
 ]
 
 # HELPER FUNCTIONS
-def _get_cmake_command_from_info(build_info):
+def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     """Helper function which converts the build info to cmake command"""
-    result = ["cmake"]
+    result: list[str] = ["cmake"]
     result.append("-B")
     result.append(build_setup.build_dir)
     result.append(f"-DWBE_BINARY_DIR={build_setup.binary_dir}")
@@ -52,7 +53,7 @@ def _get_cmake_command_from_info(build_info):
         result.append(build_info["additional-cmake-args"])
     return result
 
-def _gather_license():
+def _gather_license() -> None:
     # Get white bird engine license
     shutil.copyfile(os.path.join(build_setup.root_dir, "LICENSE"), os.path.join(build_setup.licenses_output_dir, "white-bird-engine_LICENSE"))
     # Get licenses from dependencies
@@ -84,8 +85,8 @@ def _gather_license():
                     print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
-def _gather_gen_infos():
-    gen_infos = []
+def _gather_gen_infos() -> list[WBEGenFileInfo]:
+    gen_infos: list[WBEGenFileInfo] = []
     for gen_info_file in build_config.gen_info_files:
         with open(gen_info_file) as f:
             data = json.load(f)

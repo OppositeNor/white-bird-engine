@@ -93,7 +93,7 @@ class WBEMetadata(BaseModel):
     labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
     classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
 
-    def sort(self):
+    def sort(self) -> None:
         """Sor the fields. This may gurantee the order it generates will always be the same,
         which is usefull not triggering the CMake and metaparser's compilation for the generated
         files.
