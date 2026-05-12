@@ -72,6 +72,7 @@ jobs:
         echo "build-output-dir=${{ github.workspace }}/build/${{ matrix.target }}" >> "$GITHUB_OUTPUT"
 
     -name: Install Vulkan SDK
+     id: install-vulkan-sdk
      uses: humbletim/install-vulkan-sdk@v1.2
      with:
        version: 1.4.309.0
