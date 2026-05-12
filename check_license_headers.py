@@ -27,9 +27,6 @@ def has_apache_license_header(file_pathes: list[str], max_lines: int | None = 30
     Args:
         file_pathes: The pathes of the files to check.
         max_lines: The maximum lines to check.
-
-    Returns:
-        The maximum lines to check.
     """
     failed_checks: list[str] = []
     for file_path in file_pathes:

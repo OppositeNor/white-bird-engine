@@ -99,7 +99,7 @@ class WBEMetaparser:
                 if dep is not None:
                     dep[0] += 1
             result.append(metadata)
-        sorted(result, key=lambda v: v[0], reverse=True)
+        result.sort(key=lambda v: v[0], reverse=True)
         return [item[1] for item in result]
 
     def _register_from_clang(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
@@ -121,6 +121,8 @@ class WBEMetaparser:
         return metadata
 
     def _register_metadata(self, tu: clang.cindex.TranslationUnit, metadata: WBEFileMetadata, in_file: str) -> None:
+        if tu.cursor is None:
+            return
         self._visit_attributes(metadata, tu.cursor, in_file)
 
     def _visit_attributes(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:

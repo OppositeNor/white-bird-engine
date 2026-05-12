@@ -26,9 +26,9 @@ jobs:
         target: [release, release-gcc]
         include:
           - os: ubuntu-latest
-            target: release
+            target: release-ninja
           - os: ubuntu-latest
-            target: release-gcc
+            target: release-gcc-ninja
           # - os: windows-latest
           #   c_compiler: cl
           #   cpp_compiler: cl
@@ -71,11 +71,11 @@ jobs:
       run: |
         echo "build-output-dir=${{ github.workspace }}/build/${{ matrix.target }}" >> "$GITHUB_OUTPUT"
 
-    - name: Install Vulkan SDK
-      uses: humbletim/install-vulkan-sdk@v1.2
-      with:
-        version: 1.4.309.0
-        cache: true
+    -name: Install Vulkan SDK
+     uses: humbletim/install-vulkan-sdk@v1.2
+     with:
+       version: 1.4.309.0
+       cache: true
 
     - name: Setup pip dependencies
       run: pip install -r requirements.txt
