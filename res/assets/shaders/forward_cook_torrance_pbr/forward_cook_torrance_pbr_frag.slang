@@ -28,6 +28,7 @@ float4 main(VSOutput p_input) : SV_Target0 {
     float3 diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / WBE_PI;
     float3 radiance = float3(4.0, 4.0, 4.0);
     float3 ambient = base_color * 0.03 * ambient_occlusion;
+    // TODO: apply lighting
     float3 color = ambient + (diffuse + specular) * radiance * ndotl;
     color = color / (color + float3(1.0));
     return float4(linear_to_srgb(color), 1.0);

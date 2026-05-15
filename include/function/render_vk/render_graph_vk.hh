@@ -229,9 +229,8 @@ private:
     Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
     Vector<Ref<RGResEdge>, RenderAllocator> res_edges;
     // All resources known to the graph (declared in the pipeline descriptor
-    // plus per-frame overrides set via set_resource()). Indexed by id when
-    // building per-node bindings.
-    Vector<Ref<RendResVK>, RenderAllocator> all_resources;
+    // plus per-frame overrides set via set_resource()), keyed by res_id.
+    Map<RendResID, Ref<RendResVK>, RenderAllocator> all_resources;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
@@ -247,10 +246,10 @@ private:
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
 
-    Vector<Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
+    Map<RendResID, Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
     Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendPipelineDescVK& p_desc);
     void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator>& p_resources);
+    void infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
