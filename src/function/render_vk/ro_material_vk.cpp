@@ -47,8 +47,9 @@ const ROMaterialVK::TextureBinding& find_texture_binding(
 
 // A default sampler lets materials omit one sampler slot while still binding
 // separate texture and sampler descriptors from Slang reflection metadata.
-Ref<ROSamplerVK> find_sampler_binding(
-    const std::vector<ROMaterialVK::SamplerBinding>& p_sampler_bindings, const std::string& p_sampler_key, Ref<ROSamplerVK> p_default_sampler) {
+Ref<ROSamplerVK> find_sampler_binding(const std::vector<ROMaterialVK::SamplerBinding>& p_sampler_bindings,
+    const std::string& p_sampler_key,
+    Ref<ROSamplerVK> p_default_sampler) {
     auto binding = std::ranges::find_if(p_sampler_bindings, [&p_sampler_key](const ROMaterialVK::SamplerBinding& p_binding) {
         return p_binding.sampler_key == p_sampler_key;
     });

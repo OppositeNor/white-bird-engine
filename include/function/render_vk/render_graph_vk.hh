@@ -253,11 +253,8 @@ private:
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
-    void record_node(Ref<RGNode> p_node,
-        VkCommandBuffer p_command_buffer,
-        const Vector<RendResVK, RenderAllocator>& p_bound,
-        double p_delta,
-        bool p_record_pre_execute_tasks);
+    void record_node(
+        Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta, bool p_record_pre_execute_tasks);
     void collect_edge_semaphores(Ref<RGNode> p_node,
         uint64_t p_timeline_value,
         Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,

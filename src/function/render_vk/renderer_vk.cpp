@@ -456,7 +456,7 @@ void RendererVK::create_swap_chain() { // NOLINT
                 frames_in_flight,
                 swap_chain_images_count,
                 swap_chain_images_count));
-            frames_in_flight = swap_chain_images_count;
+        frames_in_flight = swap_chain_images_count;
     }
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;

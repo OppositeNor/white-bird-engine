@@ -163,7 +163,9 @@ ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p
 
 ROSamplerVK::~ROSamplerVK() {
     render_data->register_delayed_call(
-        [render_data = render_data, sampler = sampler]() { vkDestroySampler(render_data->logic_device, sampler, render_data->allocation_callbacks); },
+        [render_data = render_data, sampler = sampler]() {
+            vkDestroySampler(render_data->logic_device, sampler, render_data->allocation_callbacks);
+        },
         render_data->frames_in_flight);
 }
 

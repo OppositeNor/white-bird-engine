@@ -13,11 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -117,7 +119,6 @@ RODescriptorSetVK::~RODescriptorSetVK() {
     vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
 }
 
-
 void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     // Make sure only one type of resource is being written.
     size_t resource_type_count = 0;
@@ -168,7 +169,8 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
         write_image_info(VK_DESCRIPTOR_TYPE_SAMPLER, write_info, p_writer.sampler_infos, bound_object_it, image_infos);
     }
     if (!p_writer.combined_image_sampler_infos.empty()) {
-        write_image_info(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, write_info, p_writer.combined_image_sampler_infos, bound_object_it, image_infos);
+        write_image_info(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, write_info, p_writer.combined_image_sampler_infos, bound_object_it, image_infos);
     }
     // TODO: Texel buffer view
     vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);

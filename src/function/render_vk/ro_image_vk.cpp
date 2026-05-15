@@ -188,8 +188,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
 
 ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
-    if (!exposed_fileds.is_swap_chain_image &&
-        (exposed_fileds.image != VK_NULL_HANDLE || exposed_fileds.image_memory != VK_NULL_HANDLE)) {
+    if (!exposed_fileds.is_swap_chain_image && (exposed_fileds.image != VK_NULL_HANDLE || exposed_fileds.image_memory != VK_NULL_HANDLE)) {
         render_data->register_delayed_call(
             [render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
                 if (image != VK_NULL_HANDLE) {

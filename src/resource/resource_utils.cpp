@@ -22,8 +22,8 @@
 #include <fstream>
 #include <ios>
 #include <memory>
-#include <sstream>
 #include <optional>
+#include <sstream>
 #include <stb_image.h>
 #include <stdexcept>
 #include <string>
@@ -42,9 +42,8 @@ static std::string remove_ppm_comments(std::string p_file_content) {
 }
 
 static void write_ppm_pixel(uint8_t* p_data, size_t p_pixel_offset, uint32_t p_output_channels, uint8_t p_r, uint8_t p_g, uint8_t p_b) {
-    uint8_t luminance = static_cast<uint8_t>((static_cast<uint32_t>(p_r) * 77 + static_cast<uint32_t>(p_g) * 150 +
-                                                 static_cast<uint32_t>(p_b) * 29) >>
-                                             8);
+    uint8_t luminance = static_cast<uint8_t>(
+        (static_cast<uint32_t>(p_r) * 77 + static_cast<uint32_t>(p_g) * 150 + static_cast<uint32_t>(p_b) * 29) >> 8);
     if (p_output_channels == 1 || p_output_channels == 2) {
         p_data[p_pixel_offset] = luminance;
         if (p_output_channels == 2) {

@@ -14,18 +14,22 @@
 */
 #include "function/render/render_database.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_vk_resource_unit.hh"
+#include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
@@ -51,7 +55,8 @@ void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_mate
     if (material_entry == p_registered_material_index.end()) {
         size_t material_index = p_material_mesh_infos.size();
         p_registered_material_index.insert({material.get(), material_index});
-        p_material_mesh_infos.push_back(MaterialMeshInfo{.material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
+        p_material_mesh_infos.push_back(
+            MaterialMeshInfo{.material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
         material_entry = p_registered_material_index.find(material.get());
     }
     p_material_mesh_infos[material_entry->second].submeshes.push_back(&p_submesh);
@@ -111,8 +116,7 @@ void RenderDatabase::register_compiled_render_resource(
         CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id}, p_render_object);
 }
 
-Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(
-    const std::string& p_resource_key, HashCode p_render_object_type_id) {
+Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) {
     auto entry = compiled_render_resources.find(
         CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id});
     if (entry == compiled_render_resources.end() || entry->second.is_null()) {

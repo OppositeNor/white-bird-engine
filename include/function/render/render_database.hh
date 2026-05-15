@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_DATABASE_HH
 #define WBE_FILE_RENDER_DATABASE_HH
 
+#include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/i_render_object.hh"

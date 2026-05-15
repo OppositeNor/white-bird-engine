@@ -21,6 +21,7 @@
 #include "function/game_config/game_config.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_dummy/renderer_dummy.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/window/i_window.hh"

@@ -75,7 +75,7 @@ public:
 
     /**
      * @class Builder
-    * @brief Builder for ROMaterialVK.
+     * @brief Builder for ROMaterialVK.
      */
     struct Builder {
         /**

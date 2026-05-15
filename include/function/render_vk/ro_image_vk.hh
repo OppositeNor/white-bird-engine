@@ -201,11 +201,8 @@ public:
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The image to set barrier on.
         Ref<ROImageVK> image;
-        VkImageSubresourceRange subresource_range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1};
+        VkImageSubresourceRange subresource_range{
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 
         /**
          * @brief Set the source access.

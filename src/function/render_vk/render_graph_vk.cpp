@@ -454,11 +454,7 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
 }
 
 void RenderGraphVK::record_node(
-    Ref<RGNode> p_node,
-    VkCommandBuffer p_command_buffer,
-    const Vector<RendResVK, RenderAllocator>& p_bound,
-    double p_delta,
-    bool p_record_pre_execute_tasks) {
+    Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta, bool p_record_pre_execute_tasks) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {

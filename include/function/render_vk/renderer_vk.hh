@@ -23,6 +23,7 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"

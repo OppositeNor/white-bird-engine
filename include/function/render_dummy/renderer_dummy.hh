@@ -18,6 +18,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
 #include <functional>

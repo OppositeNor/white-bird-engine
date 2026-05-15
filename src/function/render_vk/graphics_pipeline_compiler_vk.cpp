@@ -20,10 +20,12 @@
 #include "core/parser/parser_json.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -37,6 +39,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -400,7 +403,7 @@ private:
         auto upload_buffer = ROBufferVK::Builder()
                                  .set_domain(DeviceDomain::HOST)
                                  .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                     .set_size(upload_data.size())
+                                 .set_size(upload_data.size())
                                  .create_ref(context.render_data);
         upload_buffer->update_buffer(upload_data.data(), upload_data.size());
         context.renderer->add_pre_execute_task(
