@@ -18,7 +18,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/parser/parser_json.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
@@ -220,18 +220,22 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
         "id": "test_material",
         "type": "material",
         "graphics_pipeline_id": "main_pipeline",
-        "textures": {
-            "normal": {
-                "type": "resource_reference",
-                "id": "normal_texture"
+        "textures": [
+            {
+                "texture_key": "normal",
+                "texture_id": "normal_texture"
             },
-            "albedo": {
-                "type": "image",
-                "path": "assets/images/test_ppm3.ppm",
-                "color_space": "srgb",
-                "channel_count": 3
+            {
+                "texture_key": "albedo",
+                "texture": {
+                    "id": "albedo_texture",
+                    "type": "image",
+                    "path": "assets/images/test_ppm3.ppm",
+                    "color_space": "srgb",
+                    "channel_count": 3
+                }
             }
-        }
+        ]
     }
     )";
     WBE::ParserJSON parser;

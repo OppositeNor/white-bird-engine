@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 #define WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 
-#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include <cstdint>
 #include <string>

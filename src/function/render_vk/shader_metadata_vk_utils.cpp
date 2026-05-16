@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include <algorithm>
 #include <cstdint>

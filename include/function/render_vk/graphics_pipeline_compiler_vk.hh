@@ -20,9 +20,9 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
 #include "function/render_vk/ro_render_pass_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <span>

@@ -4,26 +4,35 @@
             "id": "default_material",
             "type": "material",
             "graphics_pipeline_id": "forward_cook_torrance_pbr",
-            "textures": {
-                "normal": {
-                    "type": "image",
-                    "file": "assets/images/default_normal.png",
-                    "color_space": "rgb",
-                    "channel_count": 3
+            "textures": [
+                {
+                    "texture_key": "normal",
+                    "texture": {
+                        "type": "image",
+                        "file": "assets/images/default_normal.png",
+                        "color_space": "rgb",
+                        "channel_count": 3
+                    }
                 },
-                "albedo": {
-                    "type": "image",
-                    "file": "assets/images/default_albedo.png",
-                    "color_space": "srgb",
-                    "channel_count": 3
+                {
+                    "texture_key": "albedo",
+                    "texture": {
+                        "type": "image",
+                        "file": "assets/images/default_albedo.png",
+                        "color_space": "srgb",
+                        "channel_count": 3
+                    }
                 },
-                "roughness_metallic_ao": {
-                    "type": "image",
-                    "file": "assets/images/default_rma.png",
-                    "color_space": "rgb",
-                    "channel_count": 3
+                {
+                    "texture_key": "roughness_metallic_ao",
+                    "texture": {
+                        "type": "image",
+                        "file": "assets/images/default_rma.png",
+                        "color_space": "rgb",
+                        "channel_count": 3
+                    }
                 }
-            }
+            ]
         }
     ]
 }

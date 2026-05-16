@@ -19,6 +19,7 @@
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/render_resource_unit.hh"
 #include "global/stl_allocator.hh"
 #include "render_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"

@@ -16,6 +16,7 @@
 #define WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 
 #include "core/parser/parser_json.hh"
+#include "function/render/render_resource_unit.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_unit/resource_unit.hh"

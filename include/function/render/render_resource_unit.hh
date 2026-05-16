@@ -12,14 +12,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
-#define WBE_FILE_RENDER_VK_RESOURCE_UNIT_HH
+#ifndef WBE_FILE_RENDER_RESOURCE_UNIT_HH
+#define WBE_FILE_RENDER_RESOURCE_UNIT_HH
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "core/surface/3d_primitive.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -85,6 +88,73 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     // Should enable depth write.
     WBE_META(WBE_REFLECT)
     bool depth_write = true;
+};
+
+/**
+ * @class RUSchemeMaterialTextureSlot
+ * @brief The scheme of one texture slot in RUMaterial.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeMaterialTextureSlot {
+    // The key used by the material shader to find this texture.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string texture_key;
+    // Inline texture data.
+    WBE_META(WBE_REFLECT)
+    RUSchemeImage texture;
+    // A string referencing an already populated texture.
+    WBE_META(WBE_REFLECT)
+    std::string texture_id;
+};
+
+/**
+ * @class RUSchemeMaterial
+ * @brief The scheme of RUMaterial.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeMaterial)
+    // The graphics pipeline used to render this material.
+    WBE_META(WBE_REFLECT)
+    std::string graphics_pipeline_id;
+    // The inline graphics pipeline used to render this material.
+    WBE_META(WBE_REFLECT)
+    RUSchemeGraphicsPipeline graphics_pipeline;
+    // The texture slots used by this material.
+    WBE_META(WBE_REFLECT)
+    std::vector<RUSchemeMaterialTextureSlot> textures;
+};
+
+/**
+ * @class RUSchemeSubmesh3D
+ * @brief The scheme of RUSubmesh3D.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeSubmesh3D)
+    // The material if it could be populated in place.
+    WBE_META(WBE_REFLECT)
+    RUSchemeMaterial material;
+    // A string referencing unpopulated material.
+    WBE_META(WBE_REFLECT)
+    std::string material_id;
+    // The vertices data.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<Vertex3DTextured> vertices_data;
+    // The indices data.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<uint32_t> indices_data;
+};
+
+/**
+ * @class RUSchemeMesh3D
+ * @brief The scheme of RUMesh3D.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
+    WBE_DECL_SERIALIZABLE(RUSchemeMesh3D)
+    // Submeshes that could be populated in place.
+    WBE_META(WBE_REFLECT)
+    std::vector<RUSchemeSubmesh3D> submeshes;
+    // Submesh ids referencing unpopulated submeshes.
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> submeshes_id;
 };
 
 /**
@@ -155,6 +225,35 @@ struct RUMaterial : public ResourceUnit {
     RefRes<TextureSlot> textures;
     // The number of texture slots.
     size_t texture_count = 0;
+};
+
+/**
+ * @class RUSubmesh3D
+ * @brief 3D submesh resource unit.
+ *
+ * The data should always be pushed before pushing this resource unit, and the
+ * release process should always be backwards (first release the resource unit,
+ * and then release the data) It is recommended to store the image data right
+ * before the text resource unit in a stack allocator.
+ */
+struct RUSubmesh3D : public ResourceUnit {
+    // A reference to the material.
+    RefRes<RUMaterial> material;
+    // The total number of triangles.
+    size_t triangles_count;
+    // The triangles instances.
+    RefRes<Triangle3DIndxTextured> triangles;
+};
+
+/**
+ * @class RUMesh3D
+ * @brief 3D mesh resource unit.
+ */
+struct RUMesh3D : public ResourceUnit {
+    // Number of submeshes.
+    size_t submesh_count;
+    // The submeshes.
+    RefRes<RefRes<RUSubmesh3D>> submeshes;
 };
 
 } // namespace WhiteBirdEngine

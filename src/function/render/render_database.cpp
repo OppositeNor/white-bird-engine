@@ -19,7 +19,7 @@
 #include "core/surface/3d_primitive.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render/render_resource_unit.hh"
 #include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
