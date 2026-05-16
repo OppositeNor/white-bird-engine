@@ -182,6 +182,9 @@ void RenderGraphVK::allocate_command_buffers() {
 }
 
 void RenderGraphVK::free_command_buffers() {
+    if (!command_buffers.empty()) {
+        vkDeviceWaitIdle(render_data->logic_device);
+    }
     for (size_t i = 0; i < command_buffers.size(); ++i) {
         if (command_buffers[i] != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(render_data->logic_device, command_buffer_pools[i], 1, &command_buffers[i]);
@@ -190,6 +193,20 @@ void RenderGraphVK::free_command_buffers() {
     }
     command_buffers.clear();
     command_buffer_pools.clear();
+}
+
+uint32_t RenderGraphVK::terminal_semaphore_index() const {
+    if (terminal_semaphores.empty()) {
+        throw std::runtime_error("RenderGraphVK: terminal semaphores are not allocated.");
+    }
+    if (render_data->current_swap_chain_index >= terminal_semaphores.size()) {
+        throw std::runtime_error("RenderGraphVK: swap-chain image index exceeds terminal semaphore count.");
+    }
+    return render_data->current_swap_chain_index;
+}
+
+Ref<SemaphoreVK> RenderGraphVK::get_terminal_semaphore() const {
+    return terminal_semaphores[terminal_semaphore_index()];
 }
 
 void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
@@ -209,41 +226,41 @@ void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
 
     allocate_command_buffers();
 
-    // Allocate one terminal binary semaphore per frame-in-flight slot.
-    const uint32_t frames = std::max<uint32_t>(render_data->frames_in_flight, 1U);
+    // Allocate one terminal binary semaphore per swap-chain image. Presentation
+    // may retain the wait semaphore until that exact image is acquired again.
+    const uint32_t swap_chain_images = std::max<uint32_t>(render_data->swap_chain_images_count, 1U);
     terminal_semaphores.clear();
-    terminal_semaphores.reserve(frames);
-    for (uint32_t f = 0; f < frames; ++f) {
+    terminal_semaphores.reserve(swap_chain_images);
+    for (uint32_t i = 0; i < swap_chain_images; ++i) {
         terminal_semaphores.emplace_back(make_ref<SemaphoreVK>(render_data->allocator, render_data, true));
     }
 }
 
 void RenderGraphVK::set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id) {
-    for (auto& resource_ref : all_resources) {
-        if (resource_ref->res_id == p_res_id) {
-            resource_ref->res = p_resource;
-            resource_ref->res_type_id = p_res_type_id;
-            return;
-        }
+    auto it = all_resources.find(p_res_id);
+    if (it != all_resources.end()) {
+        it->second->res = p_resource;
+        it->second->res_type_id = p_res_type_id;
+        return;
     }
     auto resource_ref = make_ref<RendResVK>(render_data->allocator);
     resource_ref->res_id = p_res_id;
     resource_ref->res_type_id = p_res_type_id;
     resource_ref->res = p_resource;
-    all_resources.emplace_back(resource_ref);
+    all_resources.emplace(p_res_id, std::move(resource_ref));
 }
 
-Vector<Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendPipelineDescVK& p_desc) {
-    Vector<Ref<RendResVK>, RenderAllocator> resources_by_position(render_data->allocator);
-    resources_by_position.reserve(p_desc.resources.size());
+Map<RendResID, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendPipelineDescVK& p_desc) {
+    Map<RendResID, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
+    resources_by_id.reserve(p_desc.resources.size());
     for (const auto& resource_desc : p_desc.resources) {
         auto resource_ref = make_ref<RendResVK>(render_data->allocator);
         resource_ref->res_id = resource_desc.res_id;
         resource_ref->res_type_id = resource_desc.res_type_id;
         resource_ref->res = resource_desc.res;
-        resources_by_position.emplace_back(resource_ref);
+        resources_by_id.emplace(resource_desc.res_id, std::move(resource_ref));
     }
-    return resources_by_position;
+    return resources_by_id;
 }
 
 Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendPipelineDescVK& p_desc) {
@@ -281,12 +298,11 @@ void RenderGraphVK::add_exec_edges_from_prev(const RendPipelineDescVK& p_desc, c
     }
 }
 
-void RenderGraphVK::infer_res_edges(const Vector<Ref<RendResVK>, RenderAllocator>& p_resources) {
+void RenderGraphVK::infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderAllocator>& p_resources) {
     auto find_res = [&](RendResID p_id) -> Ref<RendResVK> {
-        for (const auto& resource_ref : p_resources) {
-            if (resource_ref->res_id == p_id) {
-                return resource_ref;
-            }
+        auto it = p_resources.find(p_id);
+        if (it != p_resources.end()) {
+            return it->second;
         }
         return MEM_NULL;
     };
@@ -364,7 +380,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         }
 
         auto per_node_bound = build_per_node_bound(node);
-        record_node(node, command_buffer, per_node_bound, p_delta);
+        record_node(node, command_buffer, per_node_bound, p_delta, i == 0);
 
         // Build wait/signal semaphore lists from exec edges + extras.
         Vector<VkSemaphoreSubmitInfo, RenderAllocator> wait_infos(render_data->allocator);
@@ -382,9 +398,8 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
             for (const auto& signal_info : p_extra_signals_last_submit) {
                 signal_infos.push_back(signal_info);
             }
-            // Also signal the per-frame terminal binary semaphore.
-            signal_infos.push_back(
-                terminal_semaphores[render_data->current_frame_slot]->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT));
+            // Also signal the terminal binary semaphore for this swap-chain image.
+            signal_infos.push_back(get_terminal_semaphore()->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT));
         }
 
         // Last graphics submit signals the in-flight fence too, so the renderer
@@ -417,42 +432,29 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
     Vector<RendResVK, RenderAllocator> per_node_bound(render_data->allocator);
     per_node_bound.reserve(reads.size() + writes.size());
 
-    auto find_resource_for_id = [&](RendResID p_id) -> Ref<RendResVK> {
-        for (const auto& resource_ref : all_resources) {
-            if (resource_ref->res_id == p_id) {
-                return resource_ref;
-            }
-        }
-        for (const auto& edge : res_edges) {
-            if (edge->resource->res_id == p_id) {
-                return edge->resource;
-            }
-        }
-        return MEM_NULL;
-    };
-    auto append_acc = [&](const ResAccessVK& p_access) {
-        auto resource_ref = find_resource_for_id(p_access.res_id);
-        if (resource_ref != MEM_NULL) {
-            per_node_bound.push_back(*resource_ref);
+    auto append_access = [&](const ResAccessVK& p_access) {
+        auto resource_ref_iter = all_resources.find(p_access.res_id);
+        if (resource_ref_iter != all_resources.end()) {
+            per_node_bound.push_back(*resource_ref_iter->second);
         } else {
             // Resource may exist without any edges (single-task pipelines).
-            // The task author is responsible for ensuring res exists.
+            // The task creator is responsible for ensuring res exists.
             RendResVK empty{};
             empty.res_id = p_access.res_id;
             per_node_bound.push_back(empty);
         }
     };
     for (auto& access : reads) {
-        append_acc(access);
+        append_access(access);
     }
     for (auto& access : writes) {
-        append_acc(access);
+        append_access(access);
     }
     return per_node_bound;
 }
 
 void RenderGraphVK::record_node(
-    Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta) {
+    Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta, bool p_record_pre_execute_tasks) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
@@ -482,6 +484,12 @@ void RenderGraphVK::record_node(
         dependency_info.memoryBarrierCount = static_cast<uint32_t>(mem_barriers.size());
         dependency_info.pMemoryBarriers = mem_barriers.data();
         vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
+    }
+
+    if (p_record_pre_execute_tasks) {
+        for (const auto& pre_execute_task : render_data->pre_execute_tasks_queue) {
+            pre_execute_task(p_command_buffer);
+        }
     }
 
     p_node->render_task->record(p_command_buffer, p_bound, p_delta);

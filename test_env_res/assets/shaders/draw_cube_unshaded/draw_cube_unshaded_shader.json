@@ -1,0 +1,20 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "draw_cube_unshaded_vert",
+            "type": "shader",
+            "src": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_vert.slang",
+            "dst": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_vert.spv",
+            "metadata": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_vert.json"
+        },
+        {
+            "id": "draw_cube_unshaded_frag",
+            "type": "shader",
+            "src": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_frag.slang",
+            "dst": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_frag.spv",
+            "metadata": "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_frag.json"
+        }
+    ]
+}
+

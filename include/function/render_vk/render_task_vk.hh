@@ -15,11 +15,8 @@
 #ifndef WBE_FILE_RENDER_TASK_VK_HH
 #define WBE_FILE_RENDER_TASK_VK_HH
 
-#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
@@ -113,7 +110,8 @@ struct RenderTaskVK : public RenderTask {
      * Vulkan render graph drives execution via record(); perform() is kept
      * only to satisfy the abstract interface.
      */
-    virtual void perform(double /*p_delta*/) override {
+    virtual void perform(double p_delta) override {
+        (void)p_delta;
     }
 
     /**

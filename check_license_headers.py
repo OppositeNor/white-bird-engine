@@ -21,17 +21,14 @@ LICENSE_KEYWORDS = [
     "http://www.apache.org/licenses/LICENSE-2.0"
 ]
 
-def has_apache_license_header(file_pathes, max_lines=30):
+def has_apache_license_header(file_pathes: list[str], max_lines: int | None = 30) -> None:
     """Check if all files has an Apache 2.0 license header.
 
     Args:
-        file_pathes (): The pathes of the files to check.
-        max_lines (): The maximum lines to check.
-
-    Returns:
-        The maximum lines to check.
+        file_pathes: The pathes of the files to check.
+        max_lines: The maximum lines to check.
     """
-    failed_checks = []
+    failed_checks: list[str] = []
     for file_path in file_pathes:
         print(f"Checking {file_path}...")
         found = set()

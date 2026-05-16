@@ -40,12 +40,12 @@ class WBEGenFileInfo(BaseModel):
 
 class WBECodeGenerator:
     """The code generator."""
-    def __init__(self, attributes, generate_infos):
+    def __init__(self, attributes: dict[str, Any], generate_infos: list[WBEGenFileInfo]) -> None:
         """Constructor.
 
         Args:
-            attributes (): The attributes to replace the data starting with '.'.
-            generate_infos (): The generation infos.
+            attributes: The attributes to replace the data starting with '.'.
+            generate_infos: The generation infos.
         """
         self._attributes = attributes
         # Create a template environment in the root_dir
@@ -57,12 +57,12 @@ class WBECodeGenerator:
         )
         self._generate_infos = generate_infos
 
-    def generate(self):
+    def generate(self) -> None:
         """Generate."""
         for generate_info in self._generate_infos:
             self._generate(generate_info)
 
-    def _generate(self, generate_info):
+    def _generate(self, generate_info: WBEGenFileInfo) -> None:
         for key, value in generate_info.data.items():
             # If it starts with a '.', get the data from attributes.
             if value[0] == '.':

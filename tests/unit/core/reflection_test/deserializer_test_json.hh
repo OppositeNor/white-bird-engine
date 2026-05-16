@@ -1153,7 +1153,8 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
         }
         if (type_name == "TestInheritedGrandchild") {
             return std::make_unique<WBE::TestInheritedGrandchild>();
-        } else if (type_name == "TestVectorContainer") {
+        }
+        if (type_name == "TestVectorContainer") {
             return std::make_unique<WBE::TestVectorContainer>();
         }
         return nullptr;

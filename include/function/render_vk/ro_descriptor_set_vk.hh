@@ -23,6 +23,8 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "global/stl_allocator.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -99,7 +101,27 @@ public:
             VkDeviceSize range = VK_WHOLE_SIZE;
         };
 
-        // TODO: Image info
+        /**
+         * @class ImageInfo
+         * @brief Image and sampler state for image-family descriptor writes.
+         *
+         * SAMPLED_IMAGE writes require image_view, SAMPLER writes require
+         * sampler, and COMBINED_IMAGE_SAMPLER writes require both.
+         */
+        struct ImageInfo {
+            /**
+             * @brief Image view to bind for sampled-image descriptors.
+             */
+            Ref<ROImageViewVK> image_view = MEM_NULL;
+            /**
+             * @brief Sampler to bind for sampler descriptors.
+             */
+            Ref<ROSamplerVK> sampler = MEM_NULL;
+            /**
+             * @brief Image layout visible to the shader descriptor.
+             */
+            VkImageLayout image_layout = VK_IMAGE_LAYOUT_GENERAL;
+        };
 
         /**
          * @brief The storage buffer info to write.
@@ -110,6 +132,21 @@ public:
          * @brief The uniform buffer info to write.
          */
         std::vector<BufferInfo> uniform_buffer_infos;
+
+        /**
+         * @brief Sampled images to write to the binding.
+         */
+        std::vector<ImageInfo> sampled_image_infos;
+
+        /**
+         * @brief Samplers to write to the binding.
+         */
+        std::vector<ImageInfo> sampler_infos;
+
+        /**
+         * @brief Combined image samplers to write to the binding.
+         */
+        std::vector<ImageInfo> combined_image_sampler_infos;
 
         /**
          * @brief The binding to write to.
@@ -146,6 +183,39 @@ public:
          */
         Writer& add_uniform_buffer_info(const BufferInfo& p_buffer_info) {
             uniform_buffer_infos.push_back(p_buffer_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add sampled image information.
+         *
+         * @param p_image_info The image info to add.
+         * @return *this.
+         */
+        Writer& add_sampled_image_info(const ImageInfo& p_image_info) {
+            sampled_image_infos.push_back(p_image_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add sampler information.
+         *
+         * @param p_image_info The sampler info to add.
+         * @return *this.
+         */
+        Writer& add_sampler_info(const ImageInfo& p_image_info) {
+            sampler_infos.push_back(p_image_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add combined image sampler information.
+         *
+         * @param p_image_info The combined image sampler info to add.
+         * @return *this.
+         */
+        Writer& add_combined_image_sampler_info(const ImageInfo& p_image_info) {
+            combined_image_sampler_infos.push_back(p_image_info);
             return *this;
         }
     };

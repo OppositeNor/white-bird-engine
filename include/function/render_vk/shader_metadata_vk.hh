@@ -35,6 +35,12 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding final : public Serializa
     int32_t count = 0;
     WBE_META(WBE_REFLECT)
     int32_t space = 0;
+    WBE_META(WBE_REFLECT)
+    int32_t offset = 0;
+    WBE_META(WBE_REFLECT)
+    int32_t size = 0;
+    WBE_META(WBE_REFLECT)
+    int32_t element_stride = 0;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final : public Serializable {

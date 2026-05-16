@@ -16,6 +16,7 @@
 #define WBE_FILE_ALLOCATOR_VK_HH
 
 #include "function/render/i_renderer.hh"
+#include "function/render/render_defs.hh"
 #include "utils/defs.hh"
 #include <cstring>
 #include <vulkan/vulkan_core.h>

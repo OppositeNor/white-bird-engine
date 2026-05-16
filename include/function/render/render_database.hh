@@ -15,14 +15,20 @@
 #ifndef WBE_FILE_RENDER_DATABASE_HH
 #define WBE_FILE_RENDER_DATABASE_HH
 
+#include "core/memory/reference_strong.hh"
+#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render/render_resource_unit.hh"
 #include "global/stl_allocator.hh"
 #include "render_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -39,6 +45,8 @@ private:
     using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
     template <typename T>
     using Set = ::WhiteBirdEngine::Set<T, AllocType>;
+    template <typename TKey, typename TVal>
+    using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
 
 public:
     // Represents a subregion.
@@ -64,7 +72,7 @@ public:
         // Represents a material that is used.
         struct MaterialUnit {
             // The instance of the material.
-            // TODO
+            RefRes<RUMaterial> material;
             // The subregion of indices that this material is applying on.
             SubRegion sub_region;
         };
@@ -92,6 +100,31 @@ public:
     };
 
     static constexpr size_t CLEAN_DEAD_RO_WEAK_REFS_THREASHOLD = 128;
+
+    /**
+     * @class CompiledRenderResourceKey
+     * @brief Key for a backend-neutral compiled render resource registry entry.
+     *
+     * A resource key alone is not enough because one resource can compile into
+     * multiple backend objects, such as shaders, layouts, and pipelines.
+     */
+    struct CompiledRenderResourceKey {
+        /**
+         * @brief Manifest resource key or compiler-generated subresource key.
+         */
+        std::string resource_key;
+        /**
+         * @brief Runtime type id of the compiled render object.
+         */
+        HashCode render_object_type_id = 0;
+
+        bool operator<(const CompiledRenderResourceKey& p_other) const {
+            if (resource_key != p_other.resource_key) {
+                return resource_key < p_other.resource_key;
+            }
+            return render_object_type_id < p_other.render_object_type_id;
+        }
+    };
 
     virtual ~RenderDatabase() override {
         singleton = nullptr;
@@ -139,6 +172,33 @@ public:
         return dynamic_opaque;
     }
 
+    /**
+     * @brief Register or replace a compiled render object for a resource key.
+     *
+     * @param p_resource_key The source resource key or a derived compiler key.
+     * @param p_render_object_type_id The expected render object type id.
+     * @param p_render_object The compiled render object to keep weakly.
+     */
+    void register_compiled_render_resource(
+        const std::string& p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object);
+
+    /**
+     * @brief Get a compiled render object by resource key and object type.
+     *
+     * @return A reference, or null if no entry exists.
+     */
+    Ref<IRenderObject> get_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id);
+
+    /**
+     * @brief Check whether a live compiled render object is registered.
+     */
+    bool contains_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) const;
+
+    /**
+     * @brief Clear every compiled render object registry entry.
+     */
+    void clear_compiled_render_resources();
+
     static RenderDatabase* get_singleton() {
         return singleton;
     }
@@ -147,6 +207,8 @@ private:
     inline static RenderDatabase* singleton = nullptr;
 
     AllocType* allocator = nullptr;
+
+    Map<CompiledRenderResourceKey, RefWeak<IRenderObject>> compiled_render_resources;
 
     OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;

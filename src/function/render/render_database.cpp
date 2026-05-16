@@ -13,25 +13,126 @@
    limitations under the License.
 */
 #include "function/render/render_database.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "global/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
+namespace {
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator) : static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+struct MaterialMeshInfo {
+    RefRes<RUMaterial> material;
+    Vector<RUSubmesh3D*, RenderAllocator> submeshes;
+};
+
+// Group submeshes by material before flattening them. This lets the render
+// database record one contiguous index subregion per material.
+void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_material_mesh_infos,
+    std::unordered_map<RUMaterial*, size_t>& p_registered_material_index,
+    RUSubmesh3D& p_submesh,
+    RenderAllocator* p_allocator) {
+    auto& material = p_submesh.material;
+    if (material == nullptr) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh material should not be NULL.");
+    }
+    auto material_entry = p_registered_material_index.find(material.get());
+    if (material_entry == p_registered_material_index.end()) {
+        size_t material_index = p_material_mesh_infos.size();
+        p_registered_material_index.insert({material.get(), material_index});
+        p_material_mesh_infos.push_back(
+            MaterialMeshInfo{.material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
+        material_entry = p_registered_material_index.find(material.get());
+    }
+    p_material_mesh_infos[material_entry->second].submeshes.push_back(&p_submesh);
+}
+
+// Append one submesh into the linear static-opaque buffers while preserving its
+// local triangle indices as offsets into the merged vertex buffer.
+void append_submesh_triangles(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RUSubmesh3D& p_submesh, uint32_t p_obj_id) {
+    uint32_t max_index = 0;
+    size_t curr_index = p_triangles_info.vertices.size();
+    for (size_t i = 0; i < p_submesh.triangles_count; ++i) {
+        auto& triangle = p_submesh.triangles.get()[i];
+        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_1);
+        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_2);
+        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_3);
+        max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
+    }
+    p_triangles_info.obj_id.push_back(p_obj_id);
+    p_triangles_info.vertices.resize(curr_index + max_index + 1);
+    memcpy(&(p_triangles_info.vertices[curr_index]), p_submesh.triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
+}
+
+// Append all submeshes for one material and record the material's index range.
+void append_material_mesh_info(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, const MaterialMeshInfo& p_mesh_info) {
+    static std::atomic<uint32_t> obj_id_tracker = 0;
+    uint32_t curr_obj_id = obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
+    size_t material_mesh_start = p_triangles_info.indices.size();
+    for (auto* submesh : p_mesh_info.submeshes) {
+        append_submesh_triangles(p_triangles_info, *submesh, curr_obj_id);
+    }
+    p_triangles_info.materials.push_back(RenderDatabase::OpaqueTrianglesInfo::MaterialUnit{
+        .material = p_mesh_info.material,
+        .sub_region = {.starting_index = material_mesh_start, .size = p_triangles_info.indices.size() - material_mesh_start},
+    });
+}
+
+} // namespace
+
+RenderDatabase::RenderDatabase(AllocType* p_allocator)
+    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
     allocator = p_allocator;
+}
+
+void RenderDatabase::register_compiled_render_resource(
+    const std::string& p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object) {
+    if (p_resource_key.empty()) {
+        throw std::runtime_error("Failed to register compiled render resource: resource key is empty.");
+    }
+    if (p_render_object.is_null()) {
+        throw std::runtime_error("Failed to register compiled render resource: render object is null.");
+    }
+    compiled_render_resources.insert_or_assign(
+        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id}, p_render_object);
+}
+
+Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) {
+    auto entry = compiled_render_resources.find(
+        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id});
+    if (entry == compiled_render_resources.end() || entry->second.is_null()) {
+        return MEM_NULL;
+    }
+    return entry->second.lock();
+}
+
+bool RenderDatabase::contains_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) const {
+    auto entry = compiled_render_resources.find(
+        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id});
+    return entry != compiled_render_resources.end() && entry->second.is_valid();
+}
+
+void RenderDatabase::clear_compiled_render_resources() {
+    compiled_render_resources.clear();
 }
 
 void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh) {
@@ -46,66 +147,21 @@ void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangle
 
     p_triangles_info.reset();
 
-    struct MaterialMeshInfo {
-        Vector<RUSubmesh3D*> submeshes;
-    };
-
     // Record the submeshes for each material
     Vector<MaterialMeshInfo> material_mesh_infos(allocator);
     std::unordered_map<RUMaterial*, size_t> registered_material_index;
 
     size_t total_triangles = 0;
-    for (size_t i = 0; i < p_mesh->submesh_count; ++i) {
-        auto& submesh = p_mesh->submeshes.get()[i];
-        auto& material = submesh->material;
-        if (!registered_material_index.contains(material.get())) {
-            // If not registered before, register.
-            // TODO: Register material.
-            MaterialMeshInfo info = {.submeshes = Vector<RUSubmesh3D*>(allocator)};
-            registered_material_index.insert({material.get(), material_mesh_infos.size()});
-            material_mesh_infos.push_back(info);
-        }
-        // Register the submeshes to the corresponding mesh.
-        size_t material_index = registered_material_index[material.get()];
-        auto& material_mesh_info = material_mesh_infos[material_index];
-        material_mesh_info.submeshes.push_back(submesh.get());
+    std::span<RefRes<RUSubmesh3D>> submeshes(p_mesh->submeshes.get(), p_mesh->submesh_count);
+    for (auto& submesh : submeshes) {
+        register_material_submesh(material_mesh_infos, registered_material_index, *submesh, allocator);
         total_triangles += submesh->triangles_count;
     }
     p_triangles_info.obj_id.reserve(total_triangles);
     p_triangles_info.indices.reserve(total_triangles * 3);
 
-    // Process the triangles in the mesh, and record them in the vertices.
-    for (size_t i = 0; i < material_mesh_infos.size(); ++i) {
-        // Assign a unique ID for each submesh so they could be distinguished
-        // from other submeshes. This is useful for object edge detection or
-        // some per-object operations.
-        static std::atomic<uint32_t> obj_id_tracker = 0;
-        uint32_t curr_obj_id = obj_id_tracker.fetch_add(1, std::memory_order_acq_rel);
-        auto& mesh_info = material_mesh_infos[i];
-        // size_t material_mesh_start = p_triangles_info.indices.size();
-        (void)i;
-        for (auto& submesh : mesh_info.submeshes) {
-            uint32_t max_index = 0;
-            size_t curr_index = p_triangles_info.vertices.size();
-            for (size_t i = 0; i < submesh->triangles_count; ++i) {
-                auto& triangle = submesh->triangles.get()[i];
-                // Because we are merging the vertices into one array, the
-                // original indices should add the offset where this submesh's
-                // vertices is stored in the vertex array.
-                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_1);
-                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_2);
-                p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_3);
-                // We also record the maximum index to determine how much
-                // vertices are copied.
-                max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
-            }
-            // Assign an unique ID for each triangle to distinguish from other
-            p_triangles_info.obj_id.push_back(curr_obj_id);
-
-            p_triangles_info.vertices.resize(curr_index + max_index + 1);
-            memcpy(&(p_triangles_info.vertices[curr_index]), submesh->triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
-        }
-        // TODO: Setup subregion for the material.
+    for (const auto& mesh_info : material_mesh_infos) {
+        append_material_mesh_info(p_triangles_info, mesh_info);
     }
 }
 } // namespace WhiteBirdEngine

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from typing import Callable
 from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
@@ -29,22 +30,24 @@ class WBEMetaparser:
         clang_args: The arguments for clang.
         cache_dir: The cache directory.
     """
-    def __init__(self, reflector : WBEReflector, clang_args, cache_dir, sources):
+    def __init__(self, reflector: WBEReflector, clang_args: list[str], cache_dir: str,
+                 sources: list[str]) -> None:
         """Constructor.
 
         Args:
             reflector: The reflector for the metaparser.
             clang_args: Clang arguments for parsing.
             cache_dir: The cache directory.
+            sources: The list of source files being parsed.
         """
         self.reflector = reflector
         self.clang_args = clang_args
         self.cache_dir = cache_dir
         self.sources = sources
-        self._metadata = {}
-        self._class_table = {}
+        self._metadata: dict[str, WBEFileMetadata] = {}
+        self._class_table: dict[str, WBEClassMetadata] = {}
 
-    def parse(self, cpp_file_path : str):
+    def parse(self, cpp_file_path : str) -> None:
         """Parse the C++ file.
 
         Args:
@@ -53,7 +56,7 @@ class WBEMetaparser:
         file_cache_path = os.path.join(self.cache_dir, f"{hash_str_sha256(cpp_file_path)}.json")
         self._get_metadata(cpp_file_path, file_cache_path)
 
-    def export(self):
+    def export(self) -> None:
         """Export"""
         result_metadata = WBEMetadata()
         sorted_metadata = self._sorted_metadata_by_dependency()
@@ -62,7 +65,7 @@ class WBEMetaparser:
             result_metadata.classes.extend(metadata.classes)
         self.reflector.register_metadata(result_metadata)
 
-    def _get_metadata(self, cpp_file_path, cache_path):
+    def _get_metadata(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         preloaded = self._metadata.get(cpp_file_path)
         if preloaded is not None:
             result = preloaded
@@ -72,7 +75,7 @@ class WBEMetaparser:
             result = self._register_from_clang(cpp_file_path, cache_path)
         return result
 
-    def _register_from_cache(self, cpp_file_path, cache_path):
+    def _register_from_cache(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         try:
             with open(cache_path) as f:
                 data = json.load(f)
@@ -87,19 +90,19 @@ class WBEMetaparser:
             print("Retrying...")
             return self._register_from_clang(cpp_file_path, cache_path)
 
-    def _sorted_metadata_by_dependency(self):
-        result = []
-        metadata_with_depth = {key : [0, value] for key, value in self._metadata.items()}
+    def _sorted_metadata_by_dependency(self) -> list[WBEFileMetadata]:
+        result: list[list] = []
+        metadata_with_depth: dict[str, list] = {key : [0, value] for key, value in self._metadata.items()}
         for _, metadata in metadata_with_depth.items():
             deps = [metadata_with_depth.get(dep_metadata) for dep_metadata in metadata[1].deps]
             for dep in deps:
                 if dep is not None:
                     dep[0] += 1
             result.append(metadata)
-        sorted(result, key=lambda v: v[0], reverse=True)
+        result.sort(key=lambda v: v[0], reverse=True)
         return [item[1] for item in result]
 
-    def _register_from_clang(self, cpp_file_path, cache_path):
+    def _register_from_clang(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         print(f"WBEMetaparser: parsing {cpp_file_path}")
         index = clang.cindex.Index.create()
         tu = index.parse(
@@ -117,10 +120,12 @@ class WBEMetaparser:
             json.dump(metadata.model_dump(), f, indent=4)
         return metadata
 
-    def _register_metadata(self, tu, metadata : WBEFileMetadata, in_file):
+    def _register_metadata(self, tu: clang.cindex.TranslationUnit, metadata: WBEFileMetadata, in_file: str) -> None:
+        if tu.cursor is None:
+            return
         self._visit_attributes(metadata, tu.cursor, in_file)
 
-    def _visit_attributes(self, metadata, cursor, in_file):
+    def _visit_attributes(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:
         if cursor.kind == clang.cindex.CursorKind.VAR_DECL:
             self._handle_visit_var_decl(metadata, cursor)
         elif cursor.kind == clang.cindex.CursorKind.CLASS_DECL or cursor.kind == clang.cindex.CursorKind.STRUCT_DECL:
@@ -131,10 +136,10 @@ class WBEMetaparser:
                 self._visit_attributes(metadata, child, in_file)
 
     @staticmethod
-    def _is_in_namelist(name, namelist):
+    def _is_in_namelist(name: str, namelist: list) -> bool:
         return any(name == item.name for item in namelist)
 
-    def _handle_visit_var_decl(self, metadata, cursor):
+    def _handle_visit_var_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor) -> None:
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda curr_metadata:
@@ -143,7 +148,7 @@ class WBEMetaparser:
                     label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes)
                     metadata.labels.append(label_metadata)
 
-    def _handle_visit_class_decl(self, metadata, cursor, in_file):
+    def _handle_visit_class_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda curr_metadata:
@@ -152,22 +157,22 @@ class WBEMetaparser:
                     class_metadata = self._get_class_metadata(cursor, attributes, in_file)
                     metadata.classes.append(class_metadata)
 
-    def _read_from_cache(self, cpp_file_path, cache_path):
+    def _read_from_cache(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         with open(cache_path) as f:
             data = json.load(f)
         metadata = WBEFileMetadata(**data)
         self._metadata[cpp_file_path] = metadata
         return metadata
 
-    def _get_include_deps(self, tu):
-        deps = set()
+    def _get_include_deps(self, tu: clang.cindex.TranslationUnit) -> list[str]:
+        deps: set[str] = set()
         for inclusion in tu.get_includes():
             incl_path_abs = os.path.abspath(inclusion.include.name)
             if incl_path_abs in self.sources:
                 deps.add(incl_path_abs)
         return list(deps)
 
-    def _any_all(self, metadata, predicate):
+    def _any_all(self, metadata: WBEFileMetadata, predicate: Callable[[WBEFileMetadata], bool]) -> bool:
         if predicate(metadata):
             return True
         for dep in metadata.deps:
@@ -177,11 +182,14 @@ class WBEMetaparser:
                 return True
         return False
 
-    def _get_class_metadata(self, cursor, attributes, in_file):
+    def _get_class_metadata(self, cursor: clang.cindex.Cursor, attributes: list[str],
+                            in_file: str) -> WBEClassMetadata:
         result = WBEClassMetadata()
         result.in_header = in_file
         result.name = cursor.spelling
         result.attribute = attributes
+        result.is_struct = cursor.kind == clang.cindex.CursorKind.STRUCT_DECL
+
         for field in cursor.get_children():
             if field.kind == clang.cindex.CursorKind.CXX_BASE_SPECIFIER:
                 result.extended_parents.append(field.spelling)

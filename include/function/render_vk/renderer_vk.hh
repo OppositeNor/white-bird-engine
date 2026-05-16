@@ -23,6 +23,7 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -45,8 +46,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -108,6 +109,30 @@ public:
      * @param p_desc          The pipeline descriptor.
      */
     void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
+
+    /**
+     * @brief Compile a graphics pipeline resource into a Vulkan render task.
+     *
+     * The returned task owns the render graph needed to run the compiled
+     * graphics pipeline. Calling perform() executes that graph through this
+     * renderer without registering a named renderer pipeline.
+     *
+     * @param p_resource_key The key of a RUGraphicsPipeline resource.
+     * @param p_uniform_bindings Caller-provided uniform field bindings.
+     */
+    virtual Unique<RenderTask> compile_graphics_pipeline(
+        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) override;
+
+    /**
+     * @brief Execute a render graph through this renderer's swap-chain path.
+     *
+     * This is used by render tasks that own their own graph instead of going
+     * through the named pipeline registry.
+     *
+     * @param p_graph The graph to execute.
+     * @param p_delta The frame delta forwarded to graph tasks.
+     */
+    void execute_graph(Ref<RenderGraphVK> p_graph, double p_delta);
 
     virtual void activate_pipeline(const std::string& p_pipeline_name) override;
 
@@ -190,6 +215,9 @@ private:
     static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
     static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
+    static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 64;
+    static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 32;
+    static constexpr size_t MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT = 32;
     Ref<JobBufferRingSPSC> job_buffer;
 
     template <typename T>
@@ -250,7 +278,7 @@ private:
     Vector<Ref<SemaphoreVK>> image_available_semaphores;
 
     // Registered pipeline descriptors, keyed by name.
-    std::map<std::string, Ref<RendPipelineDescVK>> pipelines;
+    Map<std::string, Ref<RendPipelineDescVK>> pipelines;
     // The currently active render graph (rebuilt on every activate_pipeline()).
     Ref<RenderGraphVK> active_graph;
 
@@ -283,13 +311,30 @@ private:
         bool is_complete() const {
             return graphics.has_value() && compute.has_value() && present.has_value();
         }
+        uint32_t get_graphics() const {
+            return get_required_index(graphics, "graphics");
+        }
+        uint32_t get_compute() const {
+            return get_required_index(compute, "compute");
+        }
+        uint32_t get_present() const {
+            return get_required_index(present, "present");
+        }
         Set<uint32_t> get_unique_indices() const {
             WBE_DEBUG_ASSERT(is_complete());
             Set<uint32_t> result(allocator);
-            result.insert(graphics.value());
-            result.insert(compute.value());
-            result.insert(present.value());
+            result.insert(get_graphics());
+            result.insert(get_compute());
+            result.insert(get_present());
             return result;
+        }
+
+    private:
+        static uint32_t get_required_index(const std::optional<uint32_t>& p_index, const char* p_name) {
+            if (!p_index.has_value()) {
+                throw std::runtime_error(std::string("RendererVK: missing ") + p_name + " queue family index.");
+            }
+            return *p_index;
         }
     };
 
@@ -385,7 +430,8 @@ private:
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
     std::optional<uint32_t> tick_setup_pipeline();
     void run_delayed_calls();
-    void present(uint32_t p_image_index);
+    void set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph);
+    void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
 };
 
 } // namespace WhiteBirdEngine

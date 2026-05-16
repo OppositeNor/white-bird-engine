@@ -14,6 +14,7 @@
 import json
 import os
 import importlib.util
+from typing import Any, Callable
 from build_script.reflection.code_gen import WBECodeGenerator, WBEGenFileInfo
 from build_script.reflection.metadata_types import WBEMetadata
 from build_config import gen_info
@@ -59,7 +60,7 @@ class WBEReflector:
             spec.loader.exec_module(module_config)
             module_config.register(self)
 
-    def register_metadata(self, metadata) -> None:
+    def register_metadata(self, metadata: WBEMetadata) -> None:
         self.metadata = metadata
 
     def dump(self) -> None:
@@ -82,16 +83,17 @@ class WBEReflector:
         with open(path, "w+") as channel_file:
             channel_file.write(str_content)
 
-    def _check_redefinition(self, objs : list) -> None:
-        seen = set()
+    def _check_redefinition(self, objs: list[Any]) -> None:
+        seen: set[str] = set()
         for check in objs:
             if check.name in seen:
                 raise RuntimeError(f"\"{check.name}\" is redefined.")
             seen.add(check.name)
 
-    def _check_hashing_collision(self, dict_name : str, objs : list, hash_function) -> None:
-        hash_val_set = set()
-        dict_rev = dict()
+    def _check_hashing_collision(self, dict_name: str, objs: list[Any],
+                                 hash_function: Callable[[Any], int]) -> None:
+        hash_val_set: set[int] = set()
+        dict_rev: dict[int, Any] = dict()
         for check in objs:
             hash_code = hash_function(check)
             if hash_code in hash_val_set:

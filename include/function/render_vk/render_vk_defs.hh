@@ -17,8 +17,8 @@
 
 #include "core/surface/3d_primitive.hh"
 #include "function/function_utils.hh"
-#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 
 #include <array>
@@ -76,6 +76,8 @@ struct BaseRenderDataVK {
     // The current swap chain index. This is useful to trach which frame in
     // flight it is right now.
     uint32_t current_swap_chain_index = 0;
+    // The number of images owned by the current swap chain.
+    uint32_t swap_chain_images_count = 0;
     // The current frame-in-flight slot (matches `in_flight_fence` slot index).
     uint32_t current_frame_slot = 0;
     // Frames in flight.

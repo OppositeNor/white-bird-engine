@@ -26,7 +26,7 @@ class WBEACP:
     into the output resource directory.
     """
 
-    def __init__(self, res_dir: Path, res_output_dir: Path):
+    def __init__(self, res_dir: Path, res_output_dir: Path) -> None:
         self._res_dir = res_dir
         self._res_output_dir = res_output_dir
         self._compiler_map: dict[str, WBEACPCompiler] = {}
@@ -34,7 +34,7 @@ class WBEACP:
         self._processed_manifests: dict[str, dict[str, Any]] = {}
         self._seen_resource_ids: set[str] = set()
 
-    def add_compiler(self, compiler: WBEACPCompiler):
+    def add_compiler(self, compiler: WBEACPCompiler) -> None:
         """Register a compiler for one or more resource types.
 
         Args:
@@ -47,7 +47,7 @@ class WBEACP:
                 )
             self._compiler_map[resource_type] = compiler
 
-    def process_resources(self):
+    def process_resources(self) -> None:
         """Process manifests and generate runtime index files."""
         self._manifest_sources = self._load_manifest_sources()
         self._processed_manifests.clear()
@@ -92,7 +92,7 @@ class WBEACP:
             manifest_sources[relative_manifest_path] = data
         return manifest_sources
 
-    def _process_manifest(self, manifest_rel_path: str, include_stack: list[str]):
+    def _process_manifest(self, manifest_rel_path: str, include_stack: list[str]) -> None:
         if manifest_rel_path in self._processed_manifests:
             return
         if manifest_rel_path in include_stack:
@@ -134,7 +134,7 @@ class WBEACP:
         self._processed_manifests[manifest_rel_path] = processed_manifest
         include_stack.pop()
 
-    def _write_manifest(self, manifest_rel_path: str, manifest_data: dict[str, Any]):
+    def _write_manifest(self, manifest_rel_path: str, manifest_data: dict[str, Any]) -> None:
         output_path = Path.joinpath(self._res_output_dir, Path(manifest_rel_path))
         os.makedirs(output_path.parent, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as output_file:

@@ -1,4 +1,3 @@
-// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "draw_cube/draw_cube_utils.slang"
-#include "defs.slang"
 
-float4 main(VSOutput p_input) : SV_Target0 {
-    return float4(p_input.normal * 0.5 + 0.5, 1.0);
-}
+#ifndef WBE_FILE_DRAW_CUBE_UNSHADED_UTILS_SLANG
+#define WBE_FILE_DRAW_CUBE_UNSHADED_UTILS_SLANG
+struct VSOutput {
+    float4 position : SV_Position;
+    float3 normal   : TEXCOORD0;
+    float2 uv       : TEXCOORD1;
+};
 
+#endif

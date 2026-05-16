@@ -14,6 +14,15 @@
             "src": "assets/shaders/main_pipeline/main_pipeline_frag.slang",
             "dst": "assets/shaders/main_pipeline/main_pipeline_frag.spv",
             "metadata": "assets/shaders/main_pipeline/main_pipeline_frag.json"
+        },
+        {
+            "id": "main_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "main_shader_vert",
+            "fragment_stage_id": "main_shader_frag",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false
         }
     ]
 }

@@ -18,6 +18,7 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -39,7 +40,7 @@ public:
         std::function<std::vector<std::string>()> get_all_keys_callback = nullptr;
         std::function<bool(const std::string&)> contains_callback = nullptr;
         std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)> push_res_unit_ptr_callback = nullptr;
-        std::function<void(void**, const std::string&)> create_ref_to_callback = nullptr;
+        std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> create_ref_to_callback = nullptr;
 
         Builder& set_get_resource_callback(std::function<WBE::RefRes<char>(const std::string&)> p_callback) {
             get_resource_callback = p_callback;
@@ -86,7 +87,7 @@ public:
             return *this;
         }
 
-        Builder& set_create_ref_to_callback(std::function<void(void**, const std::string&)> p_callback) {
+        Builder& set_create_ref_to_callback(std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> p_callback) {
             create_ref_to_callback = p_callback;
             return *this;
         }
@@ -116,7 +117,7 @@ public:
         std::function<std::vector<std::string>()> p_get_all_keys_cb,
         std::function<bool(const std::string&)> p_contains_cb,
         std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)> p_push_res_unit_ptr_cb,
-        std::function<void(void**, const std::string&)> p_create_ref_to_cb,
+        std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> p_create_ref_to_cb,
         std::ostream& p_os)
         : get_resource_callback(p_get_resource_cb), get_size_callback(p_get_size_cb), push_data_callback(p_push_data_cb),
           register_object_callback(p_register_object_cb), get_data_callback(p_get_data_cb),
@@ -195,18 +196,26 @@ public:
         return ret;
     }
 
-    virtual void create_ref_to(void** p_ptr, const std::string& p_key) override {
+protected:
+    virtual void create_ref_to_resolver(std::function<void(WBE::RefRes<char>)> p_assign_ref, const std::string& p_key) override {
         if (create_ref_to_callback) {
-            create_ref_to_callback(p_ptr, p_key);
+            create_ref_to_callback(std::move(p_assign_ref), p_key);
         }
         (*os) << "create_ref_to p_ptr " << p_key << '\n';
     }
 
-protected:
     virtual WBE::RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
         WBE::RefRes<char> ret = WBE::MEM_NULL;
         if (push_res_unit_ptr_callback) {
             ret = push_res_unit_ptr_callback(p_res_key, p_res, p_size);
+        }
+        if (!ret.is_null()) {
+            auto resource = ret.reint_cast<WBE::ResourceUnit>();
+            resource->resource_key = nullptr;
+            if (!p_res_key.empty()) {
+                resource_keys.push_back(p_res_key);
+                resource->resource_key = resource_keys.back().c_str();
+            }
         }
         (*os) << "push_res_unit_ptr " << p_res_key << " p_res " << p_size << '\n';
         return ret;
@@ -222,6 +231,7 @@ private:
     std::function<std::vector<std::string>()> get_all_keys_callback;
     std::function<bool(const std::string&)> contains_callback;
     std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)> push_res_unit_ptr_callback;
-    std::function<void(void**, const std::string&)> create_ref_to_callback;
+    std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> create_ref_to_callback;
+    std::deque<std::string> resource_keys;
     std::ostream* os;
 };

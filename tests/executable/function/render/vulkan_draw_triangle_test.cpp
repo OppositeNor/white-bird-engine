@@ -73,8 +73,8 @@ public:
         WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
         // Setup shaders
         // Setup shaders
-        auto vertex_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_vert").create_ref(base_render_data);
-        auto fragment_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_frag").create_ref(base_render_data);
+        auto vertex_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_unshaded_vert").create_ref(base_render_data);
+        auto fragment_shader = WBE::ROShaderVK::Builder().set_code("draw_cube_unshaded_frag").create_ref(base_render_data);
         shader_config.set_shaders(vertex_shader, fragment_shader);
 
         // Setup graphics pipeline layout.

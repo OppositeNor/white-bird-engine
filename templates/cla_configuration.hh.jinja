@@ -47,7 +47,7 @@ public:
     static void add_options(boost::program_options::options_description& p_options) {
         p_options.add_options()
         {% for field in serializable.fields %}
-            ("{{ field.name }}", boost::program_options::value<{{ field.type }}>(), "Override {{ field.name }}.")
+            ("{{ field.name }}", boost::program_options::value<decltype({{ serializable.name }}::{{ field.name }})>(), "Override {{ field.name }}.")
         {% endfor %}
         ;
     }
@@ -55,7 +55,7 @@ public:
     static void apply(const boost::program_options::variables_map& p_arguments, {{ serializable.name }}& p_target) {
         {% for field in serializable.fields %}
         if (p_arguments.contains("{{ field.name }}")) {
-            p_target.{{ field.name }} = p_arguments["{{ field.name }}"].as<{{ field.type }}>();
+            p_target.{{ field.name }} = p_arguments["{{ field.name }}"].as<decltype(p_target.{{ field.name }})>();
         }
         {% endfor %}
     }

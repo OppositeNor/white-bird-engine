@@ -18,9 +18,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/render_vk_resource_unit.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <cstddef>

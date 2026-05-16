@@ -1,0 +1,28 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "forward_cook_torrance_pbr_vert",
+            "type": "shader",
+            "src": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_vert.slang",
+            "dst": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_vert.spv",
+            "metadata": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_vert.json"
+        },
+        {
+            "id": "forward_cook_torrance_pbr_frag",
+            "type": "shader",
+            "src": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_frag.slang",
+            "dst": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_frag.spv",
+            "metadata": "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_frag.json"
+        },
+        {
+            "id": "forward_cook_torrance_pbr",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "forward_cook_torrance_pbr_vert",
+            "fragment_stage_id": "forward_cook_torrance_pbr_frag",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false
+        }
+    ]
+}

@@ -23,7 +23,11 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -37,6 +41,7 @@
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -60,7 +65,7 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), base_render_data(p_allocator) {
+      image_available_semaphores(p_allocator), pipelines(p_allocator), base_render_data(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -83,6 +88,10 @@ void RendererVK::tick(double p_delta) {
     // Run some jobs stored in the job buffer.
     run_stored_jobs();
 
+    execute_graph(active_graph, p_delta);
+}
+
+void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     // Setup pipeline.
     auto tick_frame_counter = tick_setup_pipeline();
     if (!tick_frame_counter.has_value()) {
@@ -92,7 +101,7 @@ void RendererVK::tick(double p_delta) {
     run_delayed_calls();
     uint32_t frame_counter = *tick_frame_counter;
 
-    if (active_graph == MEM_NULL) {
+    if (p_graph == MEM_NULL) {
         // No active render graph, nothing to do this frame.
         return;
     }
@@ -111,18 +120,19 @@ void RendererVK::tick(double p_delta) {
     // referencing REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK resolve to the correct
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
-    active_graph->set_resource(
+    p_graph->set_resource(
         REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffers[image_index], TypeUUID<ROFramebufferVK>::UUID);
+    set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
     VkSemaphoreSubmitInfo wait_info = image_available_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
     std::array<VkSemaphoreSubmitInfo, 1> wait_infos{wait_info};
     std::span<const VkSemaphoreSubmitInfo> extra_signals{};
-    active_graph->execute(
+    p_graph->execute(
         base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
-    present(image_index);
+    present(image_index, p_graph);
 
     // Clear pre-execute tasks queue.
     base_render_data.pre_execute_tasks_queue.clear();
@@ -188,6 +198,7 @@ void RendererVK::terminate() {
     // resources outlive vkDestroyDevice() and trigger validation leaks.
     active_graph = MEM_NULL;
     pipelines.clear();
+    render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
 
     // Drain every pending delayed call regardless of remaining frame countdown
@@ -260,6 +271,7 @@ void RendererVK::setup_base_render_data() {
         base_render_data.in_flight_fence = VK_NULL_HANDLE;
     }
     base_render_data.current_swap_chain_index = 0;
+    base_render_data.swap_chain_images_count = swap_chain_images_count;
     base_render_data.queue_family_indices = queue_family_indices.get_unique_indices();
     base_render_data.find_memory_type = [this](uint32_t p_type_filter, DeviceDomain p_properties) -> uint32_t {
         return this->find_memory_type(p_type_filter, p_properties);
@@ -444,6 +456,7 @@ void RendererVK::create_swap_chain() { // NOLINT
                 frames_in_flight,
                 swap_chain_images_count,
                 swap_chain_images_count));
+        frames_in_flight = swap_chain_images_count;
     }
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
@@ -495,31 +508,33 @@ void RendererVK::create_command_pools() {
     VkCommandPoolCreateInfo graphics_pool_create_info{};
     graphics_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     graphics_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    graphics_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
+    graphics_pool_create_info.queueFamilyIndex = queue_family_indices.get_graphics();
     if (vkCreateCommandPool(logical_device, &graphics_pool_create_info, get_allocation_callbacks(), &graphics_command_pool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics command pool.");
     }
     VkCommandPoolCreateInfo compute_pool_create_info{};
     compute_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     compute_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    compute_pool_create_info.queueFamilyIndex = queue_family_indices.graphics.value();
+    compute_pool_create_info.queueFamilyIndex = queue_family_indices.get_compute();
     if (vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute command pool.");
     }
 }
 
 void RendererVK::create_descriptor_pool() {
-    // uniform buffer descriptor pool
-    VkDescriptorPoolSize pool_size{};
-    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_size.descriptorCount = MAX_UNIFORM_DESCRIPTOR_COUNT;
+    std::array<VkDescriptorPoolSize, 4> pool_sizes{
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = MAX_UNIFORM_DESCRIPTOR_COUNT},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = MAX_SAMPLER_DESCRIPTOR_COUNT},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT},
+    };
 
     VkDescriptorPoolCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     create_info.maxSets = MAX_DESCRIPTOR_SET_COUNT;
-    create_info.poolSizeCount = 1;
-    create_info.pPoolSizes = &pool_size;
+    create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+    create_info.pPoolSizes = pool_sizes.data();
     if (vkCreateDescriptorPool(logical_device, &create_info, get_allocation_callbacks(), &descriptor_pool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor pool.");
     }
@@ -655,9 +670,9 @@ void RendererVK::create_logical_device() {
     }
 
     // Get the device queues.
-    vkGetDeviceQueue(logical_device, queue_family_indices.graphics.value(), 0, &graphics_queue);
-    vkGetDeviceQueue(logical_device, queue_family_indices.compute.value(), 0, &compute_queue);
-    vkGetDeviceQueue(logical_device, queue_family_indices.present.value(), 0, &present_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_graphics(), 0, &graphics_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_compute(), 0, &compute_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_present(), 0, &present_queue);
 }
 
 bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
@@ -963,11 +978,11 @@ void RendererVK::run_delayed_calls() {
     }
 }
 
-void RendererVK::present(uint32_t p_image_index) {
+void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    VkSemaphore terminal = active_graph->get_terminal_semaphore()->get_semaphore();
+    VkSemaphore terminal = p_graph->get_terminal_semaphore()->get_semaphore();
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores = &terminal;
 
@@ -987,7 +1002,29 @@ void RendererVK::present(uint32_t p_image_index) {
 
 void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc) {
     auto desc_ref = make_ref<RendPipelineDescVK>(allocator, std::move(p_desc));
-    pipelines.insert_or_assign(p_pipeline_name, std::move(desc_ref));
+    pipelines[p_pipeline_name] = std::move(desc_ref);
+}
+
+Unique<RenderTask> RendererVK::compile_graphics_pipeline(
+    const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    if (p_resource_key.empty()) {
+        throw std::runtime_error("Failed to compile graphics pipeline: resource key is empty.");
+    }
+    auto pipeline_resource = ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_key);
+    if (pipeline_resource == nullptr) {
+        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource not found.", p_resource_key));
+    }
+    if (pipeline_resource->resource_key == nullptr || p_resource_key != pipeline_resource->resource_key) {
+        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource key was not propagated.", p_resource_key));
+    }
+    GraphicsPipelineCompilerVKContext compiler_context{
+        .allocator = allocator,
+        .render_data = &base_render_data,
+        .render_database = render_database,
+        .render_pass = get_swap_chain_render_pass(),
+        .renderer = this,
+    };
+    return compile_graphics_pipeline_task_vk(compiler_context, p_resource_key, pipeline_resource, p_uniform_bindings);
 }
 
 void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
@@ -1007,19 +1044,26 @@ void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
     active_graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     active_graph->build_from_descriptor(*pipeline_entry->second);
 
-    // Re-inject the global static-opaque mesh buffers into the freshly-built
-    // graph so render tasks referencing the global resource IDs can resolve
-    // them without per-pipeline registration.
+    set_graph_static_opaque_resources(active_graph);
+}
+
+void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
+    if (p_graph == MEM_NULL) {
+        return;
+    }
+    // Re-inject the global static-opaque mesh buffers so render tasks
+    // referencing the global resource IDs can resolve them without per-pipeline
+    // registration.
     if (render_objects->static_opaque_vertices != MEM_NULL) {
-        active_graph->set_resource(
+        p_graph->set_resource(
             REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
     }
     if (render_objects->static_opaque_indices != MEM_NULL) {
-        active_graph->set_resource(
+        p_graph->set_resource(
             REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
     }
     if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-        active_graph->set_resource(
+        p_graph->set_resource(
             REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
     }
 }
@@ -1054,20 +1098,7 @@ void RendererVK::update_static_opaque_triangles() {
 
     // Publish the buffers under the global resource IDs so render tasks in the
     // active graph can resolve them without per-pipeline registration.
-    if (active_graph != MEM_NULL) {
-        if (render_objects->static_opaque_vertices != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
-        }
-        if (render_objects->static_opaque_indices != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
-        }
-        if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-            active_graph->set_resource(
-                REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
-        }
-    }
+    set_graph_static_opaque_resources(active_graph);
 }
 
 void RendererVK::setup_render_resource() {

@@ -17,11 +17,14 @@
 
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_task.hh"
 #include "render_defs.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <span>
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -49,6 +52,16 @@ public:
      * @brief Get the instance of the render database.
      */
     virtual Ref<RenderDatabase> get_render_database() = 0;
+
+    /**
+     * @brief Compile a graphics pipeline resource into a render task.
+     *
+     * @param p_resource_key The graphics pipeline resource key.
+     * @param p_uniform_bindings Caller-provided uniform field bindings.
+     * @return A render task whose perform() runs the compiled graphics pipeline.
+     */
+    virtual Unique<RenderTask> compile_graphics_pipeline(
+        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) = 0;
 
     /**
      * @brief Activate a pipeline.

@@ -23,6 +23,7 @@
 #include "function/game_config/game_config_options.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/render/i_renderer.hh"
+#include "function/render/render_defs.hh"
 #include "function/window/i_window.hh"
 #include "utils/defs.hh"
 #include <atomic>

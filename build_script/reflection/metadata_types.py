@@ -44,10 +44,12 @@ class WBEClassMetadata(BaseModel):
     """Class metadata.
 
     Attributes: 
+        is_struct: Is it declared as struct.
         class_name: The name of the class.
         fields: The fields of the class.
         methods: The methods of the class.
     """
+    is_struct : bool = False
     in_header : str = ""
     name : str = ""
     extended_parents : list[Any] = Field(default_factory=list[Any])
@@ -91,7 +93,7 @@ class WBEMetadata(BaseModel):
     labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
     classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
 
-    def sort(self):
+    def sort(self) -> None:
         """Sor the fields. This may gurantee the order it generates will always be the same,
         which is usefull not triggering the CMake and metaparser's compilation for the generated
         files.

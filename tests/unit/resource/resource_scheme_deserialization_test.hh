@@ -16,6 +16,7 @@
 #define WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 
 #include "core/parser/parser_json.hh"
+#include "function/render/render_resource_unit.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -367,11 +368,27 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeVideo) {
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
-    // TODO: Expand this test once RUSchemeMaterial is fully implemented
     std::string json_buffer = R"(
     {
         "id": "test_material_01",
-        "type": "material"
+        "type": "material",
+        "graphics_pipeline_id": "main_pipeline",
+        "textures": [
+            {
+                "texture_key": "albedo",
+                "texture_id": "albedo_texture"
+            },
+            {
+                "texture_key": "normal",
+                "texture": {
+                    "id": "normal_texture",
+                    "type": "image",
+                    "path": "images/normal.png",
+                    "color_space": "rgb",
+                    "channel_count": 3
+                }
+            }
+        ]
     }
     )";
     WBE::ParserJSON parser;
@@ -380,6 +397,16 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_material_01");
     ASSERT_EQ(scheme.type, "material");
+    ASSERT_EQ(scheme.graphics_pipeline_id, "main_pipeline");
+    ASSERT_EQ(scheme.textures.size(), 2U);
+    ASSERT_EQ(scheme.textures[0].texture_key, "albedo");
+    ASSERT_EQ(scheme.textures[0].texture_id, "albedo_texture");
+    ASSERT_EQ(scheme.textures[1].texture_key, "normal");
+    ASSERT_EQ(scheme.textures[1].texture.id, "normal_texture");
+    ASSERT_EQ(scheme.textures[1].texture.type, "image");
+    ASSERT_EQ(scheme.textures[1].texture.path, "images/normal.png");
+    ASSERT_EQ(scheme.textures[1].texture.color_space, "rgb");
+    ASSERT_EQ(scheme.textures[1].texture.channel_count, 3U);
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingType) {

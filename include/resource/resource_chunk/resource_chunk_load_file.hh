@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -94,10 +95,6 @@ public:
         return resource_map.contains(p_res_key);
     }
 
-    virtual void create_ref_to(void** p_ptr, const std::string& p_id) override {
-        ref_map[p_ptr] = p_id;
-    }
-
     virtual std::vector<std::string> get_all_keys() const override {
         std::vector<std::string> result;
         result.reserve(resource_map.size());
@@ -110,24 +107,50 @@ public:
 protected:
     using ParserDataType = ParserResource::DataType;
 
+    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, const std::string& p_id) override {
+        auto entry = resource_map.find(p_id);
+        if (entry != resource_map.end()) {
+            p_assign_ref(entry->second);
+            return;
+        }
+        ref_map.push_back(ResourceReference{.assign_ref = std::move(p_assign_ref), .id = p_id});
+    }
+
     virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
+        // Store the resource key inside the same chunk so ResourceUnit can
+        // expose a stable, chunk-owned key without referencing manifest memory.
+        const char* resource_key = nullptr;
+        if (!p_res_key.empty()) {
+            total_size += p_res_key.size() + 1;
+            MemID resource_key_mem_id = allocator->allocate(p_res_key.size() + 1);
+            memcpy(allocator->get(resource_key_mem_id), p_res_key.c_str(), p_res_key.size() + 1);
+            resource_key = static_cast<const char*>(allocator->get(resource_key_mem_id));
+        }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
-        memcpy(allocator->get(result_mem_id), p_res, p_size);
+        auto* stored_resource = allocator->get(result_mem_id);
+        memcpy(stored_resource, p_res, p_size);
+        // Every manifest-backed resource unit derives from ResourceUnit.
+        static_cast<ResourceUnit*>(stored_resource)->resource_key = resource_key;
         RefRes<char> result(result_mem_id, allocator);
         if (!p_res_key.empty()) {
-            resource_map[p_res_key.c_str()] = result;
+            resource_map[p_res_key] = result;
         }
         return result;
     }
 
 private:
+    struct ResourceReference {
+        std::function<void(RefRes<char>)> assign_ref;
+        std::string id;
+    };
+
     size_t total_size = 0;
     std::unordered_map<std::string, RefRes<char>> resource_map;
-    std::unordered_map<void**, std::string> ref_map;
+    std::vector<ResourceReference> ref_map;
     // For resources that needs RAII support.
     std::vector<Unique<Object>> objects;
     StackAllocator* allocator;
@@ -136,14 +159,14 @@ private:
 
     void resolve_refs() {
         auto* resource_manager = ResourceManager::get_singleton();
-        for (auto& [ptr, key] : ref_map) {
-            auto entry = resource_map.find(key);
+        for (auto& resource_reference : ref_map) {
+            auto entry = resource_map.find(resource_reference.id);
             if (entry == resource_map.end()) {
                 // Not found in the current chunk, look for it in the next
                 // chunk.
-                *ptr = resource_manager->get_resource<char>(key).get();
+                resource_reference.assign_ref(resource_manager->get_resource<char>(resource_reference.id));
             } else {
-                *ptr = entry->second.get();
+                resource_reference.assign_ref(entry->second);
             }
         }
     }

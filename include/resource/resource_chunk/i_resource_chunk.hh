@@ -22,6 +22,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -110,10 +111,17 @@ public:
      * @brief Create a reference to a resource in the chunk.
      * This reference will be resolved after the resource chunk is loaded.
      *
-     * @param p_ptr The pointer to store the reference.
+     * @param p_ref The reference to store the resolved resource.
      * @param p_key The key of the resource to reference.
      */
-    virtual void create_ref_to(void** p_ptr, const std::string& p_key) = 0;
+    template <typename T>
+    void create_ref_to(RefRes<T>& p_ref, const std::string& p_key) {
+        create_ref_to_resolver(
+            [&p_ref](RefRes<char> p_resource) {
+                p_ref = p_resource.template reint_cast<T>();
+            },
+            p_key);
+    }
 
     /**
      * @brief Push a resource unit to the chunk.
@@ -154,6 +162,14 @@ public:
     }
 
 protected:
+    /**
+     * @brief Create a type-erased reference resolver.
+     *
+     * @param p_assign_ref The callback that writes the resolved resource.
+     * @param p_key The key of the resource to reference.
+     */
+    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, const std::string& p_key) = 0;
+
     /**
      * @brief Push the resource unit pointer to the chunk.
      *

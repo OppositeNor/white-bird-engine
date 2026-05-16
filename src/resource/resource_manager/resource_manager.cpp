@@ -32,8 +32,6 @@ ResourceManager::ResourceManager(size_t p_alloc_size) : stack_allocator(p_alloc_
     add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
     add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
 }
