@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <tuple>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -117,10 +118,9 @@ public:
      * @param p_uniform_bindings Caller-provided uniform field bindings.
      * @return Render task descriptor for the compiled graphics pipeline.
      */
-    std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>>
-        compile(const std::string& p_resource_key,
-                RefRes<RUGraphicsPipeline> p_pipeline_resource,
-                std::span<const RenderUniformBinding> p_uniform_bindings = {});
+    std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(const std::string& p_resource_key,
+        RefRes<RUGraphicsPipeline> p_pipeline_resource,
+        std::span<const RenderUniformBinding> p_uniform_bindings = {});
 
 private:
     struct CompiledPipelineObjects {

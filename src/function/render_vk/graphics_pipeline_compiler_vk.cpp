@@ -47,6 +47,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -218,11 +219,8 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
     }
 }
 
-
-std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>>
-GraphicsPipelineCompilerVK::compile(const std::string& p_resource_key,
-    RefRes<RUGraphicsPipeline> p_pipeline_resource,
-    std::span<const RenderUniformBinding> p_uniform_bindings) {
+std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> GraphicsPipelineCompilerVK::compile(
+    const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
     auto compiled = compile_pipeline_objects(p_resource_key, p_pipeline_resource, p_uniform_bindings);
     return {compiled.graphics_pipeline, compiled.descriptor_sets};
 }

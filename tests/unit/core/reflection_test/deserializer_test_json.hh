@@ -1144,17 +1144,17 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_PolymorphicContainer) {
 
 TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
     // Simulate runtime type resolution scenario
-    auto create_object = [](const std::string& type_name) -> std::unique_ptr<WBE::Serializable> {
-        if (type_name == "TestSerializable") {
+    auto create_object = [](const std::string& p_type_name) -> std::unique_ptr<WBE::Serializable> {
+        if (p_type_name == "TestSerializable") {
             return std::make_unique<WBE::TestSerializable>();
         }
-        if (type_name == "TestInheritedChild") {
+        if (p_type_name == "TestInheritedChild") {
             return std::make_unique<WBE::TestInheritedChild>();
         }
-        if (type_name == "TestInheritedGrandchild") {
+        if (p_type_name == "TestInheritedGrandchild") {
             return std::make_unique<WBE::TestInheritedGrandchild>();
         }
-        if (type_name == "TestVectorContainer") {
+        if (p_type_name == "TestVectorContainer") {
             return std::make_unique<WBE::TestVectorContainer>();
         }
         return nullptr;

@@ -13,16 +13,24 @@
    limitations under the License.
 */
 #include "core/logging/log.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
@@ -98,7 +106,8 @@ public:
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         std::array<VkClearValue, 1> clear_values{};
         clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
-        auto [graphics_pipeline, descriptor_sets] = WBE::GraphicsPipelineCompilerVK(compiler_context)
+        auto [graphics_pipeline, descriptor_sets] =
+            WBE::GraphicsPipelineCompilerVK(compiler_context)
                 .compile(default_material->graphics_pipeline->resource_key,
                     default_material->graphics_pipeline,
                     std::span<const WBE::RenderUniformBinding>(uniform_bindings.data(), uniform_bindings.size()));
