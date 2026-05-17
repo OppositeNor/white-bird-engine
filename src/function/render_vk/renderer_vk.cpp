@@ -639,8 +639,10 @@ void RendererVK::create_logical_device() {
     create_info.pQueueCreateInfos = queues_create_info.data();
 
     // Setup layers.
-    create_info.enabledLayerCount = enabled_layers.size();
-    create_info.ppEnabledLayerNames = enabled_layers.data();
+    // Device Layers have never worked since Vulkan 1.0 and only Instance Layers should be used instead:
+    // https://docs.vulkan.org/spec/latest/appendices/legacy.html#legacy-devicelayers.
+    create_info.enabledLayerCount = 0;
+    create_info.ppEnabledLayerNames = nullptr;
 
     // Setup logical device extensions.
     create_info.enabledExtensionCount = enabled_device_extensions.size();

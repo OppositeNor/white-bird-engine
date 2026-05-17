@@ -22,8 +22,10 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
@@ -41,6 +43,9 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
+namespace WhiteBirdEngine {
+WBE_LABEL(REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+}
 
 namespace {
 
@@ -64,6 +69,7 @@ public:
         auto* resource_manager = WBE::ResourceManager::get_singleton();
         auto cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("cube");
         auto default_material = resource_manager->get_resource<WBE::RUMaterial>("default_material");
+        const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
         if (cube_mesh == nullptr) {
             throw std::runtime_error("Failed to setup draw cube test: cube mesh resource was not found.");
         }
@@ -96,7 +102,22 @@ public:
                 .compile(default_material->graphics_pipeline->resource_key,
                     default_material->graphics_pipeline,
                     std::span<const WBE::RenderUniformBinding>(uniform_bindings.data(), uniform_bindings.size()));
-        // TODO: Register the graphics pipeline with the render task.
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
+            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            .res = graphics_pipeline});
+        WBE::RendTaskDescVK task_desc(render_allocator);
+        task_desc.task_id = WBE::RT_RUN_PIPELINE;
+        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+            return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
+                base_render_data,
+                glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
+                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
+                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
+                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
+        };
+        pipeline_desc.tasks.emplace_back(std::move(task_desc));
         renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
         renderer_vk->activate_render_graph("draw_cube_pipeline");
     }

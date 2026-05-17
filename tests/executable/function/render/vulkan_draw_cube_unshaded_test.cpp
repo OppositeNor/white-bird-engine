@@ -39,7 +39,6 @@
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
 #include <exception>
 #include <format>
