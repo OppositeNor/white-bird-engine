@@ -1,0 +1,19 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "deferred_albedo_debug_vert",
+            "type": "shader",
+            "src": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_vert.slang",
+            "dst": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_vert.spv",
+            "metadata": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_vert.json"
+        },
+        {
+            "id": "deferred_albedo_debug_frag",
+            "type": "shader",
+            "src": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_frag.slang",
+            "dst": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_frag.spv",
+            "metadata": "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_frag.json"
+        }
+    ]
+}

@@ -127,6 +127,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "-entry", "main",
             "-stage", shader_stage,
             "-I", str(self._shader_include_dir),
+            "-I", str(self._shader_include_dir / "utils"),
             "-o", str(output_file),
             "-reflection-json", str(shader_metadata_file),
             str(shader_file),

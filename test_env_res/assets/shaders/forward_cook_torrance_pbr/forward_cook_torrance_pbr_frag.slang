@@ -1,11 +1,28 @@
 // fragment
 #include "forward_cook_torrance_pbr/forward_cook_torrance_pbr_utils.slang"
 
+/**
+ * @brief Combined image+sampler texture providing the albedo material map.
+ */
 [[vk::binding(1, 0)]] Texture2D<float4> albedo;
+/**
+ * @brief Combined image+sampler texture providing the tangent-space normal map.
+ */
 [[vk::binding(2, 0)]] Texture2D<float4> normal;
+/**
+ * @brief Combined image+sampler texture providing the roughness (r), metallic (g), and ambient occlusion (b) channels packed together.
+ */
 [[vk::binding(3, 0)]] Texture2D<float4> roughness_metallic_ao;
+/**
+ * @brief Sampler used to read the material textures above.
+ */
 [[vk::binding(4, 0)]] SamplerState material_sampler;
 
+/**
+ * @brief Evaluate the Cook-Torrance BRDF for one forward-shaded fragment using a hard-coded directional light and camera position.
+ * @param p_input The interpolated vertex output.
+ * @return The sRGB-encoded shaded color with alpha = 1.0.
+ */
 float4 main(VSOutput p_input) : SV_Target0 {
     float3 base_color = srgb_to_linear(albedo.Sample(material_sampler, p_input.uv).rgb);
     float3 sampled_normal = normal.Sample(material_sampler, p_input.uv).rgb;
@@ -29,7 +46,7 @@ float4 main(VSOutput p_input) : SV_Target0 {
     float3 radiance = float3(4.0, 4.0, 4.0);
     float3 ambient = base_color * 0.03 * ambient_occlusion;
     float3 color = ambient + (diffuse + specular) * radiance * ndotl;
-    // TODO: apply lighting
     color = color / (color + float3(1.0));
+    // TODO: apply lighting
     return float4(linear_to_srgb(color), 1.0);
 }

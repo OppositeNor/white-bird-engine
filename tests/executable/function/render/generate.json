@@ -10,6 +10,10 @@
                     "sources" : ["vulkan_draw_cube_unshaded_test.cpp"]
                 },
                 {
+                    "name" : "vulkan_deferred_pbr_test",
+                    "sources" : ["vulkan_deferred_pbr_test.cpp"]
+                },
+                {
                     "name" : "vulkan_draw_cube_test",
                     "sources" : ["vulkan_draw_cube_test.cpp"]
                 },

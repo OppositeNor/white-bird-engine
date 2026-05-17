@@ -1,0 +1,28 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "deferred_gbuffer_vert",
+            "type": "shader",
+            "src": "assets/shaders/deferred_gbuffer/deferred_gbuffer_vert.slang",
+            "dst": "assets/shaders/deferred_gbuffer/deferred_gbuffer_vert.spv",
+            "metadata": "assets/shaders/deferred_gbuffer/deferred_gbuffer_vert.json"
+        },
+        {
+            "id": "deferred_gbuffer_frag",
+            "type": "shader",
+            "src": "assets/shaders/deferred_gbuffer/deferred_gbuffer_frag.slang",
+            "dst": "assets/shaders/deferred_gbuffer/deferred_gbuffer_frag.spv",
+            "metadata": "assets/shaders/deferred_gbuffer/deferred_gbuffer_frag.json"
+        },
+        {
+            "id": "deferred_gbuffer",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "deferred_gbuffer_vert",
+            "fragment_stage_id": "deferred_gbuffer_frag",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false
+        }
+    ]
+}

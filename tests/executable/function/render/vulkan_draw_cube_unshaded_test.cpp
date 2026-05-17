@@ -20,6 +20,7 @@
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -120,7 +121,7 @@ public:
         // from the RenderDatabase, and exposed to render tasks under the
         // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
-        WBE::RendPipelineDescVK pipeline_desc(render_allocator);
+        WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
             .res = graphics_pipeline});
@@ -137,8 +138,8 @@ public:
                 std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
-        WBE::RendererVK::get_singleton()->register_pipeline("test_pipeline", std::move(pipeline_desc));
-        WBE::RendererVK::get_singleton()->activate_pipeline("test_pipeline");
+        WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }
 
 private:

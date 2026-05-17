@@ -6,7 +6,7 @@ Tick render stages:
   next frame.
 
 - Run render tasks: The active `RenderGraphVK` (built from a
-  `RendPipelineDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
+  `RendGraphDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
   in topological order. Each `RenderTaskVK` records into its own primary
   command buffer; cross-submit ordering between tasks is enforced with timeline
   semaphores attached to the graph's execution edges, and per-resource hazards

@@ -16,9 +16,16 @@
 #include "draw_triangle/draw_triangle_utils.slang"
 #include "defs.slang"
 
+/**
+ * @brief Constant buffer providing the current application time.
+ */
 [[vk::binding(0, 0)]] ConstantBuffer<Time> time;
 
+/**
+ * @brief Output a green color whose intensity is animated as a sine of the application time.
+ * @param p_input The interpolated vertex output (unused).
+ * @return The animated opaque color.
+ */
 float4 main(VSOutput p_input) : SV_Target0 {
     return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }
-

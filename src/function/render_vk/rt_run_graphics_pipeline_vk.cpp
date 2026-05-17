@@ -43,8 +43,26 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::optional<RendResID> p_vertex_buffer_id,
     std::optional<RendResID> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
-    : render_data(p_render_data),
-      clear_value(VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}}),
+    : render_data(p_render_data), clear_values(p_render_data->allocator), framebuffer_id(p_framebuffer_id),
+      pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id), index_buffer_id(p_index_buffer_id),
+      descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
+      descriptor_sets_instances(p_render_data->allocator) {
+    clear_values.push_back(
+        VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}});
+    descriptor_sets_instances.reserve(descriptor_sets.size());
+    for (const auto& descriptor_set : descriptor_sets) {
+        descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
+    }
+}
+
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+    std::span<const VkClearValue> p_clear_values,
+    RendResID p_framebuffer_id,
+    RendResID p_pipeline_id,
+    std::optional<RendResID> p_vertex_buffer_id,
+    std::optional<RendResID> p_index_buffer_id,
+    std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
+    : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
       framebuffer_id(p_framebuffer_id), pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id),
       index_buffer_id(p_index_buffer_id),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
@@ -109,8 +127,8 @@ void RTRunGraphicsPipelineVK::record(
     render_pass_begin_info.renderArea.offset = {.x = 0, .y = 0};
     auto extent = framebuffer->fields().extent;
     render_pass_begin_info.renderArea.extent = {.width = extent.x, .height = extent.y};
-    render_pass_begin_info.clearValueCount = 1;
-    render_pass_begin_info.pClearValues = &clear_value;
+    render_pass_begin_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
+    render_pass_begin_info.pClearValues = clear_values.data();
     vkCmdBeginRenderPass(p_command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());

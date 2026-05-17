@@ -23,9 +23,6 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -41,7 +38,6 @@
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/stl_allocator.hh"
-#include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -65,7 +61,7 @@ namespace WhiteBirdEngine {
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), pipelines(p_allocator), base_render_data(p_allocator) {
+      image_available_semaphores(p_allocator), render_graphs(p_allocator), base_render_data(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -197,7 +193,7 @@ void RendererVK::terminate() {
     // We must drop them before draining the delayed-call list, otherwise the
     // resources outlive vkDestroyDevice() and trigger validation leaks.
     active_graph = MEM_NULL;
-    pipelines.clear();
+    render_graphs.clear();
     render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
 
@@ -1000,36 +996,14 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     }
 }
 
-void RendererVK::register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc) {
-    auto desc_ref = make_ref<RendPipelineDescVK>(allocator, std::move(p_desc));
-    pipelines[p_pipeline_name] = std::move(desc_ref);
+void RendererVK::register_render_graph(const std::string& p_graph_name, RendGraphDescVK p_desc) {
+    auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
+    render_graphs[p_graph_name] = std::move(desc_ref);
 }
 
-Unique<RenderTask> RendererVK::compile_graphics_pipeline(
-    const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings) {
-    if (p_resource_key.empty()) {
-        throw std::runtime_error("Failed to compile graphics pipeline: resource key is empty.");
-    }
-    auto pipeline_resource = ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_key);
-    if (pipeline_resource == nullptr) {
-        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource not found.", p_resource_key));
-    }
-    if (pipeline_resource->resource_key == nullptr || p_resource_key != pipeline_resource->resource_key) {
-        throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': resource key was not propagated.", p_resource_key));
-    }
-    GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = allocator,
-        .render_data = &base_render_data,
-        .render_database = render_database,
-        .render_pass = get_swap_chain_render_pass(),
-        .renderer = this,
-    };
-    return compile_graphics_pipeline_task_vk(compiler_context, p_resource_key, pipeline_resource, p_uniform_bindings);
-}
-
-void RendererVK::activate_pipeline(const std::string& p_pipeline_name) {
-    auto pipeline_entry = pipelines.find(p_pipeline_name);
-    if (pipeline_entry == pipelines.end()) {
+void RendererVK::activate_render_graph(const std::string& p_graph_name) {
+    auto pipeline_entry = render_graphs.find(p_graph_name);
+    if (pipeline_entry == render_graphs.end()) {
         throw std::runtime_error("Failed to activate pipeline: pipeline not found.");
     }
     // Defer-destroy any previous graph.

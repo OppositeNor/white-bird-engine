@@ -15,7 +15,11 @@
 */
 #include "main_pipeline/main_pipeline_utils.slang"
 
+/**
+ * @brief Visualize the interpolated uv coordinate as an RG color.
+ * @param p_input The interpolated vertex output.
+ * @return The uv coordinate packed into the rg channels with b = 0, a = 1.
+ */
 float4 main(VSOutput p_input) : SV_Target0 {
     return float4(p_input.uv, 0.0, 1.0);
 }
-

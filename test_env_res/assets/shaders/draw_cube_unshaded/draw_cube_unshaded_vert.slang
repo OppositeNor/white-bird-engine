@@ -16,8 +16,16 @@
 #include "draw_cube_unshaded/draw_cube_unshaded_utils.slang"
 #include "defs.slang"
 
+/**
+ * @brief Constant buffer providing the per-frame view and projection matrices.
+ */
 [[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
 
+/**
+ * @brief Transform a textured vertex into clip space and forward the normal and uv attributes to the fragment stage.
+ * @param p_input The incoming vertex attributes.
+ * @return The vertex output for the unshaded cube debug pass.
+ */
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
     float4 pos = float4(p_input.position.xyz, 1.0);
@@ -27,5 +35,3 @@ VSOutput main(Vertex3DTexturedInput p_input) {
 
     return output;
 }
-
-

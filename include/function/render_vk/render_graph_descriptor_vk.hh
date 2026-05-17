@@ -44,13 +44,13 @@ struct RendTaskDescVK {
 };
 
 /**
- * @class RendPipelineDescVK
+ * @class RendGraphDescVK
  * @brief A high-level Vulkan render pipeline descriptor. Resources are
  * concrete RendResVK (containing Ref<RenderObjectVK>), and tasks reference
  * each other by id.
  */
-struct RendPipelineDescVK {
-    RendPipelineDescVK(RenderAllocator* p_allocator) : tasks(p_allocator), resources(p_allocator) {
+struct RendGraphDescVK {
+    RendGraphDescVK(RenderAllocator* p_allocator) : tasks(p_allocator), resources(p_allocator) {
     }
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-
     // sorts them based on `prev` edges.

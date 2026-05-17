@@ -48,7 +48,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     WBE_R6_NDCD_DELETE_COPY_MOVE(RTRunGraphicsPipelineVK)
 
     /**
-     * @brief Constructor.
+     * @brief Constructor (single-color attachment convenience).
      *
      * @param p_render_data        Base render data.
      * @param p_clear_color        Clear color used in the render pass begin.
@@ -60,6 +60,30 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
+        RendResID p_framebuffer_id,
+        RendResID p_pipeline_id,
+        std::optional<RendResID> p_vertex_buffer_id,
+        std::optional<RendResID> p_index_buffer_id,
+        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
+
+    /**
+     * @brief Constructor (multi-attachment).
+     *
+     * Use this overload when the framebuffer has more than one attachment
+     * (e.g., MRT G-buffer with multiple color attachments and/or a depth
+     * attachment). The number and order of clear values must match the
+     * attachments in the render pass.
+     *
+     * @param p_render_data        Base render data.
+     * @param p_clear_values       Clear values, one per render-pass attachment.
+     * @param p_framebuffer_id     Resource id of the framebuffer (write).
+     * @param p_pipeline_id        Resource id of the graphics pipeline (read).
+     * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
+     * @param p_index_buffer_id    Optional resource id of the index buffer (read).
+     * @param p_descriptor_sets    Descriptor sets to bind in order.
+     */
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+        std::span<const VkClearValue> p_clear_values,
         RendResID p_framebuffer_id,
         RendResID p_pipeline_id,
         std::optional<RendResID> p_vertex_buffer_id,
@@ -78,7 +102,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    VkClearValue clear_value{};
+    Vector<VkClearValue, RenderAllocator> clear_values;
     RendResID framebuffer_id = 0;
     RendResID pipeline_id = 0;
     std::optional<RendResID> vertex_buffer_id;

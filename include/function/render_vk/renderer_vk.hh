@@ -47,7 +47,6 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -103,25 +102,11 @@ public:
 
     /**
      * @brief Register a Vulkan pipeline descriptor under the given name.
-     * Concrete-renderer non-virtual API: callers cast to RendererVK to use it.
      *
-     * @param p_pipeline_name The name to register under.
-     * @param p_desc          The pipeline descriptor.
+     * @param p_graph_name The name to register under.
+     * @param p_desc The pipeline descriptor.
      */
-    void register_pipeline(const std::string& p_pipeline_name, RendPipelineDescVK p_desc);
-
-    /**
-     * @brief Compile a graphics pipeline resource into a Vulkan render task.
-     *
-     * The returned task owns the render graph needed to run the compiled
-     * graphics pipeline. Calling perform() executes that graph through this
-     * renderer without registering a named renderer pipeline.
-     *
-     * @param p_resource_key The key of a RUGraphicsPipeline resource.
-     * @param p_uniform_bindings Caller-provided uniform field bindings.
-     */
-    virtual Unique<RenderTask> compile_graphics_pipeline(
-        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) override;
+    void register_render_graph(const std::string& p_graph_name, RendGraphDescVK p_desc);
 
     /**
      * @brief Execute a render graph through this renderer's swap-chain path.
@@ -134,7 +119,7 @@ public:
      */
     void execute_graph(Ref<RenderGraphVK> p_graph, double p_delta);
 
-    virtual void activate_pipeline(const std::string& p_pipeline_name) override;
+    virtual void activate_render_graph(const std::string& p_graph_name) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
@@ -277,9 +262,9 @@ private:
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
     Vector<Ref<SemaphoreVK>> image_available_semaphores;
 
-    // Registered pipeline descriptors, keyed by name.
-    Map<std::string, Ref<RendPipelineDescVK>> pipelines;
-    // The currently active render graph (rebuilt on every activate_pipeline()).
+    // Registered render graph descriptors, keyed by name.
+    Map<std::string, Ref<RendGraphDescVK>> render_graphs;
+    // The currently active render graph (rebuilt on every activate_render_graph()).
     Ref<RenderGraphVK> active_graph;
 
     std::vector<const char*> enabled_layers{

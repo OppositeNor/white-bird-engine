@@ -209,7 +209,7 @@ Ref<SemaphoreVK> RenderGraphVK::get_terminal_semaphore() const {
     return terminal_semaphores[terminal_semaphore_index()];
 }
 
-void RenderGraphVK::build_from_descriptor(const RendPipelineDescVK& p_desc) {
+void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     free_command_buffers();
     nodes.clear();
     exec_edges.clear();
@@ -250,7 +250,7 @@ void RenderGraphVK::set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resou
     all_resources.emplace(p_res_id, std::move(resource_ref));
 }
 
-Map<RendResID, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendPipelineDescVK& p_desc) {
+Map<RendResID, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
     Map<RendResID, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
     resources_by_id.reserve(p_desc.resources.size());
     for (const auto& resource_desc : p_desc.resources) {
@@ -263,7 +263,7 @@ Map<RendResID, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(c
     return resources_by_id;
 }
 
-Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendPipelineDescVK& p_desc) {
+Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {
     Vector<RendTaskID, RenderAllocator> task_ids(render_data->allocator);
     task_ids.reserve(p_desc.tasks.size());
     for (const auto& task_desc : p_desc.tasks) {
@@ -277,7 +277,7 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendP
     return task_ids;
 }
 
-void RenderGraphVK::add_exec_edges_from_prev(const RendPipelineDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids) {
+void RenderGraphVK::add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids) {
     auto node_by_task_id = [&](RendTaskID p_id) -> Ref<RGNode> {
         for (size_t i = 0; i < p_task_ids.size(); ++i) {
             if (p_task_ids[i] == p_id) {

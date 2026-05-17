@@ -16,6 +16,11 @@
 #include "draw_triangle/draw_triangle_utils.slang"
 #include "defs.slang"
 
+/**
+ * @brief Transform a textured vertex into a 2D triangle in clip space with the y axis flipped to match Vulkan conventions.
+ * @param p_input The incoming vertex attributes.
+ * @return The vertex output for the animated triangle debug pass.
+ */
 VSOutput main(Vertex3DTexturedInput p_input) {
     VSOutput output;
 
@@ -24,5 +29,3 @@ VSOutput main(Vertex3DTexturedInput p_input) {
 
     return output;
 }
-
-

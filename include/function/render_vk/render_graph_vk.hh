@@ -33,7 +33,7 @@
 
 namespace WhiteBirdEngine {
 
-struct RendPipelineDescVK;
+struct RendGraphDescVK;
 
 /**
  * @class RendResVK
@@ -123,7 +123,7 @@ struct RGResEdge {
  * resource accesses, and uses one timeline semaphore per execution edge to
  * sequence submits.
  *
- * The graph is built once from a RendPipelineDescVK; thereafter, execute()
+ * The graph is built once from a RendGraphDescVK; thereafter, execute()
  * may be called every frame.
  */
 class RenderGraphVK {
@@ -173,7 +173,7 @@ public:
      *
      * @param p_desc The pipeline descriptor.
      */
-    void build_from_descriptor(const RendPipelineDescVK& p_desc);
+    void build_from_descriptor(const RendGraphDescVK& p_desc);
 
     /**
      * @brief Execute every node in topological order, submitting each to the
@@ -246,9 +246,9 @@ private:
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
 
-    Map<RendResID, Ref<RendResVK>, RenderAllocator> index_resources(const RendPipelineDescVK& p_desc);
-    Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendPipelineDescVK& p_desc);
-    void add_exec_edges_from_prev(const RendPipelineDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
+    Map<RendResID, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
+    Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
+    void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
     void infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;

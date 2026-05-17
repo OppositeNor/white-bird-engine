@@ -15,6 +15,11 @@
 */
 #include "main_pipeline/main_pipeline_utils.slang"
 
+/**
+ * @brief Emit one vertex of a fullscreen triangle covering the viewport.
+ * @param p_vertex_id The SV_VertexID for the current vertex (0..2).
+ * @return The vertex output containing clip-space position and screen-space uv coordinates.
+ */
 VSOutput main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;
 
@@ -35,4 +40,3 @@ VSOutput main(uint p_vertex_id : SV_VertexID) {
 
     return output;
 }
-

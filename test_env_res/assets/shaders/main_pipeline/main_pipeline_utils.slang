@@ -15,8 +15,17 @@
 
 #ifndef WBE_FILE_MAIN_PIPELINE_UTILS_SLANG
 #define WBE_FILE_MAIN_PIPELINE_UTILS_SLANG
+/**
+ * @brief Vertex shader output / fragment shader input for the main pipeline fullscreen pass.
+ */
 struct VSOutput {
+    /**
+ * @brief Clip-space position.
+     */
     float4 position : SV_Position;
+    /**
+ * @brief Screen-space uv used by the fragment stage.
+     */
     float2 uv       : TEXCOORD0;
 };
 

@@ -20,23 +20,23 @@
  */
 struct Vertex3DTexturedInput {
     /**
-     * @brief The position of the vertex.
+ * @brief The position of the vertex.
      */
     [[vk::location(0)]] float3 position;
     /**
-     * @brief The normal of the vertex.
+ * @brief The normal of the vertex.
      */
     [[vk::location(1)]] float3 normal;
     /**
-     * @brief The tanglent vector of the vertex.
+ * @brief The tanglent vector of the vertex.
      */
     [[vk::location(2)]] float3 tangent;
     /**
-     * @brief The bitangent vector of the vertex.
+ * @brief The bitangent vector of the vertex.
      */
     [[vk::location(3)]] float3 bitangent;
     /**
-     * @brief The uv value.
+ * @brief The uv value.
      */
     [[vk::location(4)]] float2 uv;
 };
@@ -46,11 +46,11 @@ struct Vertex3DTexturedInput {
  */
 struct CameraInfo {
     /**
-     * @brief The view matrix.
+ * @brief The view matrix.
      */
     float4x4 view;
     /**
-     * @brief The projection matrix.
+ * @brief The projection matrix.
      */
     float4x4 proj;
 };
@@ -60,7 +60,7 @@ struct CameraInfo {
  */
 struct Time {
     /**
-     * @brief The duration from the start of the application until now.
+ * @brief The duration from the start of the application until now.
      */
     float duration_sec;
 };

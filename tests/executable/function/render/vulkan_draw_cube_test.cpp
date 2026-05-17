@@ -13,14 +13,13 @@
    limitations under the License.
 */
 #include "core/logging/log.hh"
-#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
-#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/render_task.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "global/global.hh"
@@ -38,6 +37,8 @@
 #include <print>
 #include <span>
 #include <stdexcept>
+#include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -59,12 +60,6 @@ public:
     virtual void logic_update(double /* p_delta */) override {
     }
 
-    virtual void render_update(double p_delta) override {
-        if (!draw_task.is_null()) {
-            draw_task->perform(p_delta);
-        }
-    }
-
     void setup_draw_task() {
         auto* resource_manager = WBE::ResourceManager::get_singleton();
         auto cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("cube");
@@ -77,7 +72,7 @@ public:
             throw std::runtime_error("Failed to setup draw cube test: default material has no compiled graphics pipeline key.");
         }
 
-        auto renderer = get_renderer();
+        auto* render_allocator = get_renderer_allocator().get();
         auto* renderer_vk = WBE::RendererVK::get_singleton();
         auto camera_info = default_camera_info(renderer_vk->get_base_render_data()->swap_chain_aspect_ratio);
         std::array<WBE::RenderUniformBinding, 2> uniform_bindings{
@@ -85,14 +80,26 @@ public:
             WBE::RenderUniformBinding{.field_path = "camera_info.proj", .data = &camera_info.proj, .size = sizeof(camera_info.proj)},
         };
         WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(cube_mesh.get());
-        renderer->update_static_opaque_triangles();
-        draw_task = renderer->compile_graphics_pipeline(default_material->graphics_pipeline->resource_key,
-            std::span<const WBE::RenderUniformBinding>(uniform_bindings.data(), uniform_bindings.size()));
-        draw_task->init();
-    }
+        renderer_vk->update_static_opaque_triangles();
 
-private:
-    WBE::Unique<WBE::RenderTask> draw_task;
+        WBE::GraphicsPipelineCompilerVKContext compiler_context{
+            .allocator = render_allocator,
+            .render_data = renderer_vk->get_base_render_data(),
+            .render_database = renderer_vk->get_render_database(),
+            .render_pass = renderer_vk->get_swap_chain_render_pass(),
+            .renderer = renderer_vk,
+        };
+        WBE::RendGraphDescVK pipeline_desc(render_allocator);
+        std::array<VkClearValue, 1> clear_values{};
+        clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
+        auto [graphics_pipeline, descriptor_sets] = WBE::GraphicsPipelineCompilerVK(compiler_context)
+                .compile(default_material->graphics_pipeline->resource_key,
+                    default_material->graphics_pipeline,
+                    std::span<const WBE::RenderUniformBinding>(uniform_bindings.data(), uniform_bindings.size()));
+        // TODO: Register the graphics pipeline with the render task.
+        renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
+        renderer_vk->activate_render_graph("draw_cube_pipeline");
+    }
 };
 
 int main(int p_argc, char* p_argv[]) {

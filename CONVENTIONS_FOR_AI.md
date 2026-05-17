@@ -64,7 +64,6 @@ Per-directory `CMakeLists.txt` use `file(GLOB *.cpp)`; just drop new files in.
 - `templates/` — Jinja templates consumed by `build_script/reflection/`.
 - `res/`, `test_env_res/` — runtime assets.
 - `dependencies/` — vendored third-party (do not modify).
-- `docs/` — design notes.
 - `todos/` — per-layer todo lists.
 
 Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_FILE_<UPPER_SNAKE>_HH`. One primary class per file; file name matches the class in `snake_case`.
@@ -113,6 +112,23 @@ Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw 
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
 - Prefer the engine's file system wrappers `Directory` / `Path` (in `platform/file_system/`) over raw `std::filesystem`. They are header-only thin wrappers around `std::filesystem` — use them in engine code; drop down to `std::filesystem` only inside their implementation or when an API genuinely requires it. Note: `Directory::get_dir_names()` returns by value, capture with `auto`.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.
+
+## API Design
+
+- **Prefer exposing classes and interfaces over free-function wrappers.** When a feature has internal state, a constructable context, or a small set of related operations, declare the class in the public header and expose its members. Do not hide it behind a file-local impl class wrapped by free functions in the .cpp. Internal helpers, anonymous-namespace utilities, and detail types stay in the `.cpp`.
+- **Name derived implementations with the interface (or its abbreviation) as a prefix.** For example, `RenderObject` → `ROImage`, `ROGraphicsPipelineVK`; `Renderer` → `RendererVK`; `RenderTask` → `RTRunGraphicsPipelineVK`. Pick a short, consistent abbreviation per interface and use it for all derived types.
+
+## Documentation
+
+- C++ (`.hh` / `.cpp`) and Slang (`.slang`) source files use **Doxygen** comments (`/** ... */`).
+- Documentation is **required** for:
+  - Publicly visible `struct`s and `class`es, and their `public` / `protected` fields.
+  - `public` and `protected` functions / methods (including free functions exposed in headers).
+- Documentation is **not required** for:
+  - `private` members.
+  - Derived overrides of `virtual` functions — document the virtual at its first declaration in the base class only. Overrides inherit the contract; add a doc comment only when behavior diverges in a way callers must know.
+  - File-local / anonymous-namespace helpers in `.cpp` files.
+- Keep comments terse and informative: describe contract (params, returns, ownership, threading, error/throw behavior) rather than restating the signature.
 
 ## Reflection / Codegen
 

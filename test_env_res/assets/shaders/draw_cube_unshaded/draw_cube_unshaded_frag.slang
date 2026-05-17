@@ -16,7 +16,11 @@
 #include "draw_cube_unshaded/draw_cube_unshaded_utils.slang"
 #include "defs.slang"
 
+/**
+ * @brief Visualize the interpolated surface normal as an RGB color, mapped from [-1, 1] to [0, 1].
+ * @param p_input The interpolated vertex output.
+ * @return The visualized normal as an opaque sRGB-ish color.
+ */
 float4 main(VSOutput p_input) : SV_Target0 {
     return float4(p_input.normal * 0.5 + 0.5, 1.0);
 }
-

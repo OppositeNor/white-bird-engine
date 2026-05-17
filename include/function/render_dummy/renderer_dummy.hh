@@ -32,19 +32,8 @@ namespace WhiteBirdEngine {
  *
  */
 class RendererDummy final : public IRenderer {
-private:
-    struct RenderTaskDummy final : public RenderTask {
-        virtual void init() override {
-        }
-
-        virtual void perform(double p_delta) override {
-            (void)p_delta;
-        }
-    };
-
 public:
-    RendererDummy(RenderAllocator* p_allocator)
-        : allocator(p_allocator), dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+    RendererDummy(RenderAllocator* p_allocator) : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
     }
 
     virtual ~RendererDummy() override = default;
@@ -60,14 +49,7 @@ public:
         return dummy_database;
     }
 
-    virtual Unique<RenderTask> compile_graphics_pipeline(
-        const std::string& p_resource_key, std::span<const RenderUniformBinding> p_uniform_bindings = {}) override {
-        (void)p_resource_key;
-        (void)p_uniform_bindings;
-        return make_unique<RenderTaskDummy>(allocator);
-    }
-
-    virtual void activate_pipeline(const std::string& p_pipeline_name) override {
+    virtual void activate_render_graph(const std::string& p_pipeline_name) override {
         (void)p_pipeline_name;
     }
 
@@ -79,7 +61,6 @@ public:
     }
 
 private:
-    RenderAllocator* allocator = nullptr;
     Ref<RenderDatabase> dummy_database;
 };
 

@@ -15,9 +15,21 @@
 
 #ifndef WBE_FILE_DRAW_CUBE_UNSHADED_UTILS_SLANG
 #define WBE_FILE_DRAW_CUBE_UNSHADED_UTILS_SLANG
+/**
+ * @brief Vertex shader output / fragment shader input for the unshaded cube debug pass.
+ */
 struct VSOutput {
+    /**
+ * @brief Clip-space position.
+     */
     float4 position : SV_Position;
+    /**
+ * @brief Object-space normal interpolated from the vertex attribute.
+     */
     float3 normal   : TEXCOORD0;
+    /**
+ * @brief Texture coordinate interpolated from the vertex attribute.
+     */
     float2 uv       : TEXCOORD1;
 };
 
