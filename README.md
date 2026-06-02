@@ -72,7 +72,7 @@ python ./build.py -t deploy         # Deploy target with GCC compiler
 ### Use of AI
 
 Use of AI assistants is allowed and encouraged for this project. At the start of every new AI session, please have the
-agent read [CONVENTIONS_FOR_AI.md](./CONVENTIONS_FOR_AI.md) first. That file is a compact, high-density reference written
+agent read [AGENTS.md](./AGENTS.md) first. That file is a compact, high-density reference written
 specifically for AI agents and covers the project's layered architecture, build workflow, test layout, memory model, and
 naming rules.
 
