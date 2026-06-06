@@ -18,7 +18,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "scene.hh"
 #include "utils/defs.hh"
 #include <stdexcept>

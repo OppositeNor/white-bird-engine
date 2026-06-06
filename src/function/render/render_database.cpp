@@ -20,7 +20,8 @@
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "global/stl_allocator.hh"
+#include "function/render/spot_light_info.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -96,12 +97,23 @@ void append_material_mesh_info(RenderDatabase::OpaqueTrianglesInfo& p_triangles_
 } // namespace
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+    : compiled_render_resources(p_allocator),
+      static_opaque(p_allocator),
+      dynamic_opaque(p_allocator),
+      static_spot_lights(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
     allocator = p_allocator;
+}
+
+void RenderDatabase::set_static_spot_lights(std::span<const ComponentSpotLight> p_spot_lights) {
+    static_spot_lights.clear();
+    static_spot_lights.reserve(p_spot_lights.size());
+    for (const auto& spot_light : p_spot_lights) {
+        static_spot_lights.push_back(make_spot_light_info(spot_light));
+    }
 }
 
 void RenderDatabase::register_compiled_render_resource(

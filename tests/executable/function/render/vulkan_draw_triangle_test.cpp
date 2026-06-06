@@ -134,31 +134,26 @@ private:
 };
 
 int main(int p_argc, char* p_argv[]) {
-    try {
-        std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
+    {
+        ApplicationVulkanDrawPipelineTest game_application;
+        // Setup triangle's mesh
+        auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
+        WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(triangle_mesh.get());
+        game_application.get_renderer()->update_static_opaque_triangles();
         {
-            ApplicationVulkanDrawPipelineTest game_application;
-            // Setup triangle's mesh
-            auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
-            WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(triangle_mesh.get());
-            game_application.get_renderer()->update_static_opaque_triangles();
-            {
-                WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
-                game_application.setup_graphics_pipeline();
-                game_application.run();
-                size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-                size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
-                WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
-                WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
-            }
+            WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
+            game_application.setup_graphics_pipeline();
+            game_application.run();
+            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
+            size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
+            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
-        const auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
-        for (const auto& profile : global_profiles) {
-            WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds", profile.message, profile.delta));
-        }
-    } catch (const std::exception& e) {
-        std::println("Exception caught in main: {}", e.what());
-        return EXIT_FAILURE;
+    }
+    const auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    for (const auto& profile : global_profiles) {
+        WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds", profile.message, profile.delta));
     }
     return EXIT_SUCCESS;
 }

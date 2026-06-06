@@ -54,9 +54,9 @@ public:
         : render_data(p_render_data), is_binary(p_binary) {
         VkSemaphoreCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkSemaphoreTypeCreateInfo type_create_info{};
         if (!p_binary) {
             // Create timeline semaphore
-            VkSemaphoreTypeCreateInfo type_create_info{};
             type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
             type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
             type_create_info.initialValue = 0;

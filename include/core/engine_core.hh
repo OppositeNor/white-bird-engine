@@ -14,6 +14,7 @@
 */
 #ifndef WBE_FILE_ENGINE_CORE_HH
 #define WBE_FILE_ENGINE_CORE_HH
+
 #include "core/allocator/stack_allocator.hh"
 #include "core/clock/clock.hh"
 #include "core/core_utils.hh"

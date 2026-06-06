@@ -16,7 +16,7 @@
 #define WBE_FILE_SCENE_MANAGER_HH
 
 #include "core/memory/reference_strong.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "i_scene_manager.hh"
 #include "scene.hh"
 #include "utils/defs.hh"

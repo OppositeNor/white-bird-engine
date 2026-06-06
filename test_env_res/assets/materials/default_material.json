@@ -31,6 +31,15 @@
                         "color_space": "rgb",
                         "channel_count": 3
                     }
+                },
+                {
+                    "texture_key": "shadowmap",
+                    "texture": {
+                        "type": "image",
+                        "file": "assets/images/default_normal.png",
+                        "color_space": "rgb",
+                        "channel_count": 3
+                    }
                 }
             ]
         }

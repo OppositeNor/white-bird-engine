@@ -16,7 +16,7 @@
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_HH
 
 #include "core/core_utils.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "job_buffer.hh"
 #include "utils/defs.hh"
 #include <atomic>

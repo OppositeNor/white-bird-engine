@@ -39,7 +39,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/window/i_window.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 
 #include <array>
@@ -80,7 +80,7 @@ public:
      * @brief The number of jobs that would be runned per frame.
      */
     static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 10;
-    static constexpr size_t MAX_DELAYED_CALLS = 32;
+    static constexpr size_t MAX_DELAYED_CALLS = 256;
 
     virtual ~RendererVK() override;
     RendererVK(const RendererVK&) = delete;

@@ -8,10 +8,10 @@ Layers, from upper to lower. Upper layers may depend on lower layers; the revers
 
 | # | Layer      | Role                                                                |
 |---|------------|---------------------------------------------------------------------|
-| 1 | `global`   | Engine-wide primitives, allocators, STL-allocator wrappers.         |
+| 1 | `global`   | Engine-wide primitives         |
 | 2 | `function` | High-level engine subsystems (e.g. ECS, gameplay glue).             |
 | 3 | `resource` | Resource units, asset loading, resource registry.                   |
-| 4 | `core`     | Memory model (`Ref`, `Unique`, ...), jobs, math/util building blocks. |
+| 4 | `core`     | Allocators, STL-allocator wrappers, Memory model (`Ref`, `Unique`, ...), jobs, math/util building blocks. |
 | 5 | `platform` | OS / windowing / file system / renderer backends.                   |
 
 Rules:
@@ -88,7 +88,7 @@ Ref<Foo> r = make_ref<Foo>(allocator, args...);
 Unique<Foo> u = make_unique<Foo>(allocator, args...);
 ```
 
-Containers: use `Vector<T>` etc. from `global/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
+Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
 
 ## Naming
 

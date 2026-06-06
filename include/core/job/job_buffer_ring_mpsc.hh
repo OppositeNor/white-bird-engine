@@ -17,7 +17,7 @@
 
 #include "core/core_utils.hh"
 #include "core/job/job_buffer.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>

@@ -89,5 +89,45 @@ struct WBE_META(WBE_COMPONENT) ComponentSceneTreeNode {
     EntityID parent = entt::null;
 };
 
+/**
+ * @class ComponentSpotLight
+ * @brief A spot light source. The spot light shines from `position` along
+ *        `direction` and is fully bright inside the inner cone, fades
+ *        smoothly to zero between the inner and outer cones, and is also
+ *        attenuated by distance up to `range`. Cone angles are stored as
+ *        cosines of the half-angle to keep shader evaluation cheap.
+ */
+struct WBE_META(WBE_COMPONENT) ComponentSpotLight {
+    // World-space position of the light source.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 position;
+    // World-space direction the light is pointing (unit vector).
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 direction;
+    // Linear-space light color.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::vec3 color;
+    // Scalar light intensity multiplier (radiant flux scale).
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float intensity;
+    // Cosine of the inner cone half-angle. Inside this cone the spot
+    // attenuation is 1.0.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float inner_cone_cos;
+    // Cosine of the outer cone half-angle. Outside this cone the spot
+    // attenuation is 0.0.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float outer_cone_cos;
+    // Maximum effective light distance. Intensity smoothly falls to zero
+    // as the surface-to-light distance approaches this value.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float range;
+    // Side length, in texels, of the square shadow map allocated for this
+    // light. Higher values give crisper shadows at the cost of more memory
+    // and longer shadow-pass render times.
+    WBE_META(WBE_REFLECT)
+    uint32_t shadow_map_resolution = 1024;
+};
+
 } // namespace WhiteBirdEngine
 #endif

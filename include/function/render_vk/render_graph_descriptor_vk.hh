@@ -20,7 +20,7 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include <functional>
 
 namespace WhiteBirdEngine {

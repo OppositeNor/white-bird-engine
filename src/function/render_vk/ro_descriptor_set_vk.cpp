@@ -19,7 +19,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>

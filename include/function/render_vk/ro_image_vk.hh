@@ -19,6 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/spot_light_info.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -44,6 +45,12 @@ public:
     // Builder for ROImageVK
     struct Builder {
         friend ROImageVK;
+        // Format used for the depth attachment of a spot light shadow map.
+        static constexpr VkFormat SHADOW_MAP_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
+        // Format used for the dummy color attachment that accompanies a
+        // spot light shadow map (the Vulkan render pass requires at least
+        // one color attachment, but its contents are ignored).
+        static constexpr VkFormat SHADOW_MAP_COLOR_FORMAT = VK_FORMAT_R8_UNORM;
         // Image type.
         Required<VkImageType> image_type;
         // Image format.
@@ -81,6 +88,16 @@ public:
         Builder& image_3d(glm::uvec3 p_size);
         // Make a 3D image.
         Builder& image_3d(VkExtent3D p_extent);
+        // Configure this image as the depth attachment of a spot light's
+        // shadow map: 2D, square, sized from the light's
+        // `shadow_map_resolution`, format `SHADOW_MAP_DEPTH_FORMAT`, usage
+        // depth-stencil attachment + sampled.
+        Builder& shadow_map_depth(const SpotLightInfo& p_spot_light);
+        // Configure this image as the dummy color attachment that pairs
+        // with `shadow_map_depth`: 2D, square, sized from the light's
+        // `shadow_map_resolution`, format `SHADOW_MAP_COLOR_FORMAT`, usage
+        // color attachment.
+        Builder& shadow_map_color(const SpotLightInfo& p_spot_light);
         // Make an RGB image with each element 8 bit wide.
         Builder& rgb();
         // Make an SRGB image with each element 8 bit wide.

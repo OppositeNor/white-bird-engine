@@ -24,27 +24,55 @@ struct VSOutput {
     /**
  * @brief Clip-space position.
      */
-    float4 position       : SV_Position;
+    float4 position         : SV_Position;
     /**
  * @brief World-space position of the fragment.
      */
-    float3 world_position : TEXCOORD0;
+    float3 world_position   : TEXCOORD0;
     /**
  * @brief Object-space normal interpolated from the vertex attribute.
      */
-    float3 normal         : TEXCOORD1;
+    float3 normal           : TEXCOORD1;
     /**
  * @brief Object-space tangent interpolated from the vertex attribute.
      */
-    float3 tangent        : TEXCOORD2;
+    float3 tangent          : TEXCOORD2;
     /**
  * @brief Object-space bitangent interpolated from the vertex attribute.
      */
-    float3 bitangent      : TEXCOORD3;
+    float3 bitangent        : TEXCOORD3;
     /**
  * @brief Texture coordinate interpolated from the vertex attribute.
      */
-    float2 uv             : TEXCOORD4;
+    float2 uv               : TEXCOORD4;
+    /**
+ * @brief Position of the fragment in the spot light's clip space, used to sample the shadow map.
+     */
+    float4 light_space_pos  : TEXCOORD5;
+};
+
+/**
+ * @brief Spot light parameters consumed by the forward Cook-Torrance PBR pass. Cone angles are stored as cosines for cheap evaluation.
+ */
+struct SpotLightInfo {
+    /// World-to-light view matrix used to sample the shadow map.
+    float4x4 view;
+    /// Light-space projection matrix used to sample the shadow map.
+    float4x4 proj;
+    /// World-space position of the spot light.
+    float3 position;
+    /// Scalar intensity multiplier.
+    float intensity;
+    /// World-space direction the spot is pointing (unit vector).
+    float3 direction;
+    /// Cosine of the inner cone half-angle (full intensity inside).
+    float inner_cone_cos;
+    /// Linear-space color of the spot light.
+    float3 color;
+    /// Cosine of the outer cone half-angle (zero intensity outside).
+    float outer_cone_cos;
+    /// Maximum effective light distance.
+    float range;
 };
 
 /**

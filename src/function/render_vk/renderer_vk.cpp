@@ -37,7 +37,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
-#include "global/stl_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -172,6 +172,12 @@ void RendererVK::init() {
     render_objects = make_unique<RenderObjects>(allocator, allocator);
     init_vulkan();
     setup_base_render_data();
+    // current_frame is a monotonic counter that drives the per-frame timeline
+    // semaphore values. It must be initialized exactly once here, NOT in
+    // setup_base_render_data() (which is also re-invoked on swap chain
+    // recreation) — otherwise the timeline value would regress and
+    // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
+    base_render_data.current_frame = 1;
     init_swap_chain_image_views();
     init_render_pass();
     init_swap_chain_framebuffers();
@@ -260,7 +266,6 @@ void RendererVK::setup_base_render_data() {
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.descriptor_pool = descriptor_pool;
-    base_render_data.current_frame = 1;
     if (!in_flight_fences.empty()) {
         base_render_data.in_flight_fence = in_flight_fences[0];
     } else {
