@@ -17,14 +17,10 @@
 
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_task.hh"
-#include "render_defs.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <span>
 #include <string>
 namespace WhiteBirdEngine {
 

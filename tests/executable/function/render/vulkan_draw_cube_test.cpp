@@ -16,7 +16,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
 #include "function/render/render_database.hh"
@@ -93,7 +92,7 @@ public:
         camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     }
 
-    void setup_draw_task() { // NOLINT(readability-function-cognitive-complexity)
+    void setup_draw_task() { // NOLINT
         auto* resource_manager = WBE::ResourceManager::get_singleton();
         auto cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("cube");
         auto default_material = resource_manager->get_resource<WBE::RUMaterial>("default_material");

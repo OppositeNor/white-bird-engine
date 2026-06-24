@@ -15,9 +15,6 @@
 #ifndef WBE_FILE_OS_HH
 #define WBE_FILE_OS_HH
 
-#ifdef __unix__
-#endif
-
 namespace WhiteBirdEngine {
 
 /**
