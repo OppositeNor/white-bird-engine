@@ -21,6 +21,7 @@
 #include "function/render/render_database.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
+#include <cstdint>
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -43,6 +44,13 @@ public:
      * function.
      */
     virtual void tick(double p_delta) = 0;
+
+    /**
+     * @brief Get number of workers working on rendering.
+     *
+     * @return The number of workers working on rendering.
+     */
+    virtual uint32_t get_worker_nums() = 0;
 
     /**
      * @brief Get the instance of the render database.

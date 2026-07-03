@@ -52,6 +52,7 @@ private:
         uint32_t p_width;
         uint32_t p_height;
         uint32_t row_pitch;
+        bool swizzle;
     };
 
     glm::uvec2 extent;

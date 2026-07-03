@@ -98,7 +98,24 @@ public:
      */
     RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer);
 
+    virtual uint32_t get_worker_nums() override {
+        return 1;
+    }
+
     virtual void tick(double p_delta) override;
+
+    virtual void activate_render_graph(const std::string& p_graph_name) override;
+
+    virtual Ref<RenderDatabase> get_render_database() override {
+        return render_database;
+    }
+
+    virtual void update_static_opaque_triangles() override;
+
+    virtual void add_job(std::function<void()> p_job) override {
+        job_buffer->add_job(std::move(p_job));
+    }
+
 
     /**
      * @brief Register a Vulkan pipeline descriptor under the given name.
@@ -118,18 +135,6 @@ public:
      * @param p_delta The frame delta forwarded to graph tasks.
      */
     void execute_graph(Ref<RenderGraphVK> p_graph, double p_delta);
-
-    virtual void activate_render_graph(const std::string& p_graph_name) override;
-
-    virtual Ref<RenderDatabase> get_render_database() override {
-        return render_database;
-    }
-
-    virtual void update_static_opaque_triangles() override;
-
-    virtual void add_job(std::function<void()> p_job) override {
-        job_buffer->add_job(std::move(p_job));
-    }
 
     /**
      * @brief Get the singleton instance.

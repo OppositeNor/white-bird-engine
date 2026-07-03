@@ -16,10 +16,12 @@
 #define WBE_FILE_RENDER_SOFTWARE_DEFS
 
 #include "function/render/render_defs.hh"
+#include <vector>
 namespace WhiteBirdEngine {
 
 struct BaseRenderDataSoftware {
-    RenderAllocator* allocator = nullptr;
+    RenderAllocator* main_allocator = nullptr;
+    std::vector<RenderAllocator> per_thread_allocator;
 };
 
 } // namespace WhiteBirdEngine

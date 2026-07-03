@@ -65,6 +65,14 @@ public:
         return resource_map.at(p_id);
     }
 
+    virtual RefRes<char> try_get_resource(const std::string& p_id) const override {
+        auto entry = resource_map.find(p_id);
+        if (entry == resource_map.end()) {
+            return MEM_NULL;
+        }
+        return entry->second;
+    }
+
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) override {
         total_size += p_res_size;
         MemID result_mem_id = allocator->allocate(p_res_size);
@@ -161,13 +169,18 @@ private:
         auto* resource_manager = ResourceManager::get_singleton();
         for (auto& resource_reference : ref_map) {
             auto entry = resource_map.find(resource_reference.id);
-            if (entry == resource_map.end()) {
-                // Not found in the current chunk, look for it in the next
-                // chunk.
-                resource_reference.assign_ref(resource_manager->get_resource<char>(resource_reference.id));
-            } else {
+            if (entry != resource_map.end()) {
                 resource_reference.assign_ref(entry->second);
+                continue;
             }
+            // Not found in the current chunk, search every other registered
+            // chunk so references can target resources owned globally.
+            RefRes<char> resolved = resource_manager->try_get_global_resource(resource_reference.id);
+            if (resolved.is_null()) {
+                throw std::runtime_error(
+                    std::format("Failed to resolve resource reference: no chunk contains key: {}.", resource_reference.id));
+            }
+            resource_reference.assign_ref(resolved);
         }
     }
 };
@@ -189,11 +202,22 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
         // Use generic scheme only for quick type/id extraction during dispatch.
         RUScheme resource_scheme;
         resource_scheme.deserialize(res);
-        if (resource_map.contains(resource_scheme.id)) {
-            // Already resolved before, ignore.
-            continue; // This might be a bit unsafe, but considered that C++
-                      // also kind of handles its inline function like this, so
-                      // I think this is fine. -- OppositeNor
+        if (!resource_scheme.id.empty()) {
+            if (resource_map.contains(resource_scheme.id)) {
+                // Already resolved before in this chunk, ignore.
+                continue; // This might be a bit unsafe, but considered that C++
+                          // also kind of handles its inline function like this,
+                          // so I think this is fine. -- OppositeNor
+            }
+            // Deduplicate globally: if a chunk that is already registered has
+            // loaded this resource, alias it into this chunk instead of loading
+            // a second copy. Anonymous resources (empty id) cannot be shared, so
+            // they always load locally.
+            RefRes<char> existing = ResourceManager::get_singleton()->try_get_global_resource(resource_scheme.id);
+            if (!existing.is_null()) {
+                resource_map[resource_scheme.id] = existing;
+                continue;
+            }
         }
         ResourceManager::get_singleton()->get_resource_unit_loader(resource_scheme.type)->populate_scheme(*this, res);
     }

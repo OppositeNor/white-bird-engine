@@ -15,8 +15,14 @@
 #ifndef WBE_FILE_RENDERER_SOFTWARE
 #define WBE_FILE_RENDERER_SOFTWARE
 
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_software/render_software_defs.hh"
+#include "function/render_software/render_stage_software.hh"
+#include <algorithm>
 #include <string>
 namespace WhiteBirdEngine {
 
@@ -27,18 +33,28 @@ namespace WhiteBirdEngine {
 class RendererSoftware final : public IRenderer {
 public:
 
-    RendererSoftware();
     virtual ~RendererSoftware() override;
     RendererSoftware(const RendererSoftware&) = delete;
     RendererSoftware(RendererSoftware&&) = delete;
     RendererSoftware& operator=(const RendererSoftware&) = delete;
     RendererSoftware& operator=(RendererSoftware&&) = delete;
 
+    RendererSoftware(Ref<RenderAllocator> p_allocator);
+
+    virtual uint32_t get_worker_nums() override {
+        // Leave one thread for logic and one thread for worker thread.
+        return std::max(std::thread::hardware_concurrency() - 2, 1U);
+    }
     virtual void tick(double p_delta) override;
     virtual Ref<RenderDatabase> get_render_database() override;
     virtual void activate_render_graph(const std::string& p_pipeline_name) override;
     virtual void update_static_opaque_triangles() override;
     virtual void add_job(std::function<void()> p_job) override;
+
+private:
+    Vector<Ref<RenderStageSoftware>> render_stages;
+
+    BaseRenderDataSoftware base_render_data;
 };
 } // namespace WhiteBirdEngine
 

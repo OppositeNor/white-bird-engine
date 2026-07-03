@@ -120,6 +120,20 @@ public:
     }
 
     /**
+     * @brief Look up a resource across every registered chunk without throwing.
+     *
+     * Searches all chunks currently registered with the manager and returns
+     * the resource owned by the first chunk that contains @p p_id. This enables
+     * global deduplication: a chunk being loaded can reuse a resource that an
+     * already-registered chunk loaded instead of allocating a second copy.
+     *
+     * @param p_id The identifier of the resource to look up.
+     * @return The resource reference, or a null reference when no registered
+     * chunk contains the resource.
+     */
+    RefRes<char> try_get_global_resource(const std::string& p_id) const;
+
+    /**
      * @brief Get a resource by its memory ID.
      *
      * @param p_memid The memory ID of the resource.

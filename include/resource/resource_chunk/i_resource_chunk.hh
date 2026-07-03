@@ -52,6 +52,18 @@ public:
     virtual RefRes<char> get_resource(const std::string& p_id) const = 0;
 
     /**
+     * @brief Look up a resource by key without throwing.
+     *
+     * Performs a single lookup and returns the resource if present, avoiding the
+     * need to call contains() followed by get_resource().
+     *
+     * @param p_id The identifier of the resource unit.
+     * @return The resource reference, or a null reference when the chunk does
+     * not contain the resource.
+     */
+    virtual RefRes<char> try_get_resource(const std::string& p_id) const = 0;
+
+    /**
      * @brief Get the total size of the chunk.
      *
      * @return The total size of the chunk.

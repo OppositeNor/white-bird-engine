@@ -13,10 +13,12 @@
    limitations under the License.
 */
 #include "resource/resource_manager/resource_manager.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include <cstddef>
 #include <format>
@@ -53,6 +55,16 @@ Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_resource(con
         }
     }
     throw std::runtime_error(std::format("Failed to find resource chunk containing key: {}.", p_id));
+}
+
+RefRes<char> ResourceManager::try_get_global_resource(const std::string& p_id) const {
+    for (const Ref<IResourceChunk>& chunk : resource_chunks) {
+        RefRes<char> resource = chunk->try_get_resource(p_id);
+        if (!resource.is_null()) {
+            return resource;
+        }
+    }
+    return MEM_NULL;
 }
 
 } // namespace WhiteBirdEngine

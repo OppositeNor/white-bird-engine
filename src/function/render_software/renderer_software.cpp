@@ -3,9 +3,6 @@
 
 namespace WhiteBirdEngine {
 
-RendererSoftware::RendererSoftware() {
-    // TODO
-}
 RendererSoftware::~RendererSoftware() {
     // TODO
 }

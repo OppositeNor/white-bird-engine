@@ -16,9 +16,9 @@
 #define WBE_FILE_TYPE_METADATA_TEST_HH
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <concepts>
 #include <cstdint>
 #include <gtest/gtest.h>
-#include <type_traits>
 
 struct TypeA {};
 
@@ -40,8 +40,8 @@ TEST(WBETypeMetadataTest, Hashing) {
 
 TEST(WBETypeMetadataTest, Metadata) {
     ASSERT_NE(WBE_TYPE_TO_ID(TypeA), WBE_TYPE_TO_ID(WBE::TypeB));
-    ASSERT_TRUE((std::is_same_v<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<TypeA>::TYPE_ID), TypeA>));
-    ASSERT_TRUE((std::is_same_v<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<WBE::TypeB>::TYPE_ID), WBE::TypeB>));
+    ASSERT_TRUE((std::same_as<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<TypeA>::TYPE_ID), TypeA>));
+    ASSERT_TRUE((std::same_as<WBE_TYPE_FROM_ID(WBE::TypeIDTrait<WBE::TypeB>::TYPE_ID), WBE::TypeB>));
     ASSERT_EQ(WBE_TYPE_ID_NAME(WBE_TYPE_TO_ID(TypeA)), std::string("TypeA"));
 }
 

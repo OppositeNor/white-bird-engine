@@ -39,6 +39,10 @@ public:
     virtual ~RendererDummy() override = default;
     WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
 
+    virtual uint32_t get_worker_nums() override {
+        return 1;
+    }
+
     virtual void tick(double p_delta) override {
         (void)p_delta;
     }

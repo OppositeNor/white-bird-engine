@@ -32,6 +32,7 @@ class MockResourceChunk final : public WBE::IResourceChunk {
 public:
     struct Builder {
         std::function<WBE::RefRes<char>(const std::string&)> get_resource_callback = nullptr;
+        std::function<WBE::RefRes<char>(const std::string&)> try_get_resource_callback = nullptr;
         std::function<size_t()> get_size_callback = nullptr;
         std::function<WBE::RefRes<char>(size_t, const void*)> push_data_callback = nullptr;
         std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> register_object_callback;
@@ -44,6 +45,11 @@ public:
 
         Builder& set_get_resource_callback(std::function<WBE::RefRes<char>(const std::string&)> p_callback) {
             get_resource_callback = p_callback;
+            return *this;
+        }
+
+        Builder& set_try_get_resource_callback(std::function<WBE::RefRes<char>(const std::string&)> p_callback) {
+            try_get_resource_callback = p_callback;
             return *this;
         }
 
@@ -94,6 +100,7 @@ public:
 
         std::unique_ptr<MockResourceChunk> build(std::ostream& p_os) {
             return std::make_unique<MockResourceChunk>(get_resource_callback,
+                try_get_resource_callback,
                 get_size_callback,
                 push_data_callback,
                 register_object_callback,
@@ -109,6 +116,7 @@ public:
 
     MockResourceChunk( // NOLINT
         std::function<WBE::RefRes<char>(const std::string&)> p_get_resource_cb,
+        std::function<WBE::RefRes<char>(const std::string&)> p_try_get_resource_cb,
         std::function<size_t()> p_get_size_cb,
         std::function<WBE::RefRes<char>(size_t, const void*)> p_push_data_cb,
         std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> p_register_object_cb,
@@ -119,7 +127,8 @@ public:
         std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)> p_push_res_unit_ptr_cb,
         std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)> p_create_ref_to_cb,
         std::ostream& p_os)
-        : get_resource_callback(p_get_resource_cb), get_size_callback(p_get_size_cb), push_data_callback(p_push_data_cb),
+        : get_resource_callback(p_get_resource_cb), try_get_resource_callback(p_try_get_resource_cb),
+          get_size_callback(p_get_size_cb), push_data_callback(p_push_data_cb),
           register_object_callback(p_register_object_cb), get_data_callback(p_get_data_cb),
           get_data_const_callback(p_get_data_const_cb), get_all_keys_callback(p_get_all_keys_cb), contains_callback(p_contains_cb),
           push_res_unit_ptr_callback(p_push_res_unit_ptr_cb), create_ref_to_callback(p_create_ref_to_cb), os(&p_os) {
@@ -131,6 +140,15 @@ public:
             ret = get_resource_callback(p_id);
         }
         (*os) << "get_resource " << p_id << '\n';
+        return ret;
+    }
+
+    virtual WBE::RefRes<char> try_get_resource(const std::string& p_id) const override {
+        WBE::RefRes<char> ret = WBE::MEM_NULL;
+        if (try_get_resource_callback) {
+            ret = try_get_resource_callback(p_id);
+        }
+        (*os) << "try_get_resource " << p_id << '\n';
         return ret;
     }
 
@@ -223,6 +241,7 @@ protected:
 
 private:
     std::function<WBE::RefRes<char>(const std::string&)> get_resource_callback;
+    std::function<WBE::RefRes<char>(const std::string&)> try_get_resource_callback;
     std::function<size_t()> get_size_callback;
     std::function<WBE::RefRes<char>(size_t, const void*)> push_data_callback;
     std::function<WBE::RefRes<WBE::Object>&(WBE::Unique<WBE::Object>)> register_object_callback;
