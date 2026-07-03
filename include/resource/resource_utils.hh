@@ -21,6 +21,7 @@
 #include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -147,7 +148,7 @@ std::vector<uint8_t> load_image_data(
  * file.
  * @return The image data.
  */
-std::vector<float> load_image_data_hdr(
+std::optional<std::vector<float>> load_image_data_hdr(
     const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
 /**
  * @brief Flip an hdr image horizontally.

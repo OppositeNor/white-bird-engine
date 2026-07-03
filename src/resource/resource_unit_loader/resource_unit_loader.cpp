@@ -20,7 +20,6 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <format>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -64,7 +63,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
     uint32_t width, height, file_channels;
     auto image_data =
         load_image_data_hdr(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-    if (image_data == nullptr) {
+    if (image_data.has_value()) {
         throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
     }
     p_resource_unit.width = width;
@@ -72,7 +71,7 @@ void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_
     p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
     p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
     p_resource_unit.config.set(RUImage::IS_HDR);
-    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), image_data.get());
+    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), (*image_data).data());
     p_resource_unit.image_data = data;
 }
 

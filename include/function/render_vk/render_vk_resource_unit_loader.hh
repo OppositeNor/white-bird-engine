@@ -46,6 +46,9 @@ public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
     virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
     virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+private:
+    ResourceUnitLoaderImage image_loader;
 };
 
 class ResourceUnitLoaderMesh final : public IResourceUnitLoader {
