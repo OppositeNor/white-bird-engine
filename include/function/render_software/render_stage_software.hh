@@ -2,12 +2,48 @@
 #define WBE_FILE_RENDER_STAGE_SOFTWARE
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_software/render_software_defs.hh"
+#include <cstdint>
+#include <span>
 namespace WhiteBirdEngine {
+
+struct VertexInputSoftware {
+    VertexInputSoftware(RenderAllocator* p_allocator) : layout(p_allocator) {
+    }
+    struct ElementDescription {
+        enum class Type {
+            FLOAT32,
+            INT8,
+        };
+        Type type{};
+        uint32_t element_stride = 0;
+        uint32_t element_count = 0;
+    };
+
+    std::span<uint8_t> buffer;
+    Vector<ElementDescription, RenderAllocator> layout;
+    uint32_t vertex_stride = 0;
+    uint32_t element_count = 0;
+};
+
+struct RenderPerThreadScreenSpaceJobSoftware {};
+
+struct RenderContextSoftware {
+    RenderContextSoftware(BaseRenderDataSoftware* p_render_data)
+        : base_render_data(p_render_data), vertex_input(p_render_data->main_allocator), input_buffer(p_render_data->main_allocator) {
+    }
+    BaseRenderDataSoftware* base_render_data;
+
+    VertexInputSoftware vertex_input;
+    std::span<uint32_t> indeices;
+    Vector<uint8_t, RenderAllocator> input_buffer;
+};
 
 class RenderStagesSoftware final {
 public:
-    using RenderStageType = void(*)(BaseRenderDataSoftware*);
+    using RenderStageType = void (*)(RenderContextSoftware*);
 
     struct Builder {
         Builder& set_vertex_shading_stage(RenderStageType p_stage) {
@@ -22,6 +58,10 @@ public:
             fragment_shading_stage = p_stage;
             return *this;
         }
+        Ref<RenderStagesSoftware> build_ref(BaseRenderDataSoftware* p_render_data) const {
+            return make_ref<RenderStagesSoftware>(
+                p_render_data->main_allocator, vertex_shading_stage, rasterization_stage, fragment_shading_stage);
+        }
         RenderStageType vertex_shading_stage = default_vertex_shading_stage;
         RenderStageType rasterization_stage = default_rasterization_stage;
         RenderStageType fragment_shading_stage = default_fragment_shading_stage;
@@ -34,18 +74,16 @@ public:
     RenderStagesSoftware& operator=(const RenderStagesSoftware&) = delete;
     RenderStagesSoftware& operator=(RenderStagesSoftware&&) = delete;
 
-    Vector<RenderStageType> get_graphics_pipeline(BaseRenderDataSoftware* p_render_data) const {
-        return Vector<RenderStageType>({
-                vertex_shading_stage,
-                rasterization_stage,
-                fragment_shading_stage},
-                p_render_data->main_allocator);
+    RenderStagesSoftware(RenderStageType p_vertex_shading_stage, RenderStageType p_rasterization_stage, RenderStageType p_fragment_shading_stage);
+
+    Vector<RenderStageType, RenderAllocator> get_graphics_pipeline(BaseRenderDataSoftware* p_render_context) const {
+        return Vector<RenderStageType>({vertex_shading_stage, rasterization_stage, fragment_shading_stage}, p_render_context->main_allocator);
     }
 
 private:
-    static void default_vertex_shading_stage(BaseRenderDataSoftware* p_render_data) noexcept;
-    static void default_rasterization_stage(BaseRenderDataSoftware* p_render_data) noexcept;
-    static void default_fragment_shading_stage(BaseRenderDataSoftware* p_render_data) noexcept;
+    static void default_vertex_shading_stage(RenderContextSoftware* p_render_context) noexcept;
+    static void default_rasterization_stage(RenderContextSoftware* p_render_context) noexcept;
+    static void default_fragment_shading_stage(RenderContextSoftware* p_render_context) noexcept;
 
     RenderStageType vertex_shading_stage;
     RenderStageType rasterization_stage;

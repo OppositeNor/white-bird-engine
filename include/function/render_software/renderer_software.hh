@@ -23,7 +23,10 @@
 #include "function/render_software/render_software_defs.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <string>
+#include <thread>
 namespace WhiteBirdEngine {
 
 /**
@@ -54,14 +57,13 @@ public:
 
 private:
     Ref<RenderAllocator> render_allocator;
-    Vector<Ref<RenderAllocator>> per_thread_allocators;
-    Vector<void(*)()> render_stages;
+    Vector<Ref<RenderAllocator>, RenderAllocator> per_thread_allocators;
+    Vector<void (*)()> render_stages;
 
     BaseRenderDataSoftware base_render_data;
 
     void init();
     void setup_base_render_data();
-
 };
 } // namespace WhiteBirdEngine
 

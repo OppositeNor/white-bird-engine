@@ -566,6 +566,27 @@ constexpr size_t ring_decrement(size_t p_i, size_t p_ring_size) {
     return ((p_i + p_ring_size) - 1) % p_ring_size;
 }
 
+/**
+ * @brief Morton Encoding
+ *
+ * @todo Test
+ * @param p_x x position.
+ * @param p_y y position.
+ * @return The encoded index.
+ */
+constexpr uint32_t morton_encode(uint32_t p_x, uint32_t p_y) {
+    p_x = (p_x | (p_x << 8)) & 0x00FF00FF;
+    p_x = (p_x | (p_x << 4)) & 0x0F0F0F0F;
+    p_x = (p_x | (p_x << 2)) & 0x33333333;
+    p_x = (p_x | (p_x << 1)) & 0x55555555;
+    p_y <<= 1;
+    p_y = (p_y | (p_y << 8)) & 0x00FF00FF;
+    p_y = (p_y | (p_y << 4)) & 0x0F0F0F0F;
+    p_y = (p_y | (p_y << 2)) & 0x33333333;
+    p_y = (p_y | (p_y << 1)) & 0x55555555;
+    return p_x | p_y;
+}
+
 WBE_DECL_CRTP_CONCEPT(BufferBase);
 
 } // namespace WhiteBirdEngine

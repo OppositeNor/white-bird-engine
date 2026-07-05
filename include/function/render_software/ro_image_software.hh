@@ -6,7 +6,10 @@
 #include "function/render/render_defs.hh"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/ext/vector_uint2.hpp"
+#include "utils/utils.hh"
+#include <cstddef>
 #include <cstdint>
+#include <span>
 namespace WhiteBirdEngine {
 
 /**
@@ -22,16 +25,12 @@ public:
     ROImageSoftware& operator=(const ROImageSoftware&) = delete;
     ROImageSoftware& operator=(ROImageSoftware&&) = delete;
 
-    enum Format {
+    enum class Format {
         R8G8B8A8_UNORM,
         R32_SFLOAT
     };
 
     ROImageSoftware(glm::uvec2 p_extent, uint32_t p_mipmap_lod = 1);
-
-    void write_pixel(glm::uvec2 p_pos, const glm::vec4& p_data, uint32_t p_mip_level) {
-        // TODO
-    }
 
     uint32_t get_row_pitch(uint32_t p_mip_level = 0) const noexcept {
         return mip_infos[p_mip_level].row_pitch;
@@ -45,20 +44,56 @@ public:
         return buffer.data();
     }
 
+    glm::vec4 fetch_pixel(glm::uvec2 p_pos, uint32_t p_mip_level) {
+        const auto& info = mip_infos[p_mip_level];
+        size_t offset = get_offset(p_pos, info);
+        const uint8_t* ptr = info.memory.data() + offset;
+        glm::vec4 color{};
+        switch (format) {
+            case Format::R8G8B8A8_UNORM:
+                color.r = static_cast<float>(ptr[0]) / 255.0F;
+                color.g = static_cast<float>(ptr[1]) / 255.0F;
+                color.b = static_cast<float>(ptr[2]) / 255.0F;
+                color.a = static_cast<float>(ptr[3]) / 255.0F;
+                break;
+            case Format::R32_SFLOAT:
+                color.r = *reinterpret_cast<const float*>(ptr);
+                break;
+        }
+        return color;
+    }
+
+    void write_pixel(glm::uvec2 p_pos, const glm::vec4& p_data, uint32_t p_mip_level) {
+        // TODO
+    }
+
+    void to_swizzle(uint32_t p_mip_level) noexcept {
+        // TODO
+    }
+
+    void to_linear(uint32_t p_mip_level) noexcept {
+        // TODO
+    }
+
 private:
+    static constexpr uint32_t BYTE_PER_PIXEL = 4;
 
     struct MipInfo {
-        uint32_t start_index;
-        uint32_t p_width;
-        uint32_t p_height;
+        std::span<uint8_t> memory;
+        glm::uvec2 extent;
         uint32_t row_pitch;
         bool swizzle;
     };
 
-    glm::uvec2 extent;
+    static size_t get_offset(const glm::uvec2& p_pos, const MipInfo& p_info) {
+        return p_info.swizzle ? morton_encode(p_pos.x, p_pos.y) * BYTE_PER_PIXEL
+            : p_pos.y * p_info.row_pitch + p_pos.x * BYTE_PER_PIXEL;
+    }
+
+    Format format;
     uint32_t mipmap_lod;
     Vector<uint8_t, RenderAllocator> buffer;
-    Vector<MipInfo> mip_infos;
+    Vector<MipInfo, RenderAllocator> mip_infos;
 
     template <typename T>
     T& get_pixel_at_lod() {

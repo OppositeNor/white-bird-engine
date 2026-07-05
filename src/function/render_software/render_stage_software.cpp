@@ -17,20 +17,25 @@
 namespace WhiteBirdEngine {
 
 RenderStagesSoftware::RenderStagesSoftware()
-    : vertex_shading_stage(default_vertex_shading_stage),
-    rasterization_stage(default_rasterization_stage),
-    fragment_shading_stage(default_fragment_shading_stage) {
+    : vertex_shading_stage(default_vertex_shading_stage), rasterization_stage(default_rasterization_stage),
+      fragment_shading_stage(default_fragment_shading_stage) {
 }
 
-void RenderStagesSoftware::default_vertex_shading_stage(BaseRenderDataSoftware* p_render_data) noexcept {
+RenderStagesSoftware::RenderStagesSoftware(
+    RenderStageType p_vertex_shading_stage, RenderStageType p_rasterization_stage, RenderStageType p_fragment_shading_stage)
+    : vertex_shading_stage(p_vertex_shading_stage), rasterization_stage(p_rasterization_stage),
+      fragment_shading_stage(p_fragment_shading_stage) {
+}
+
+void RenderStagesSoftware::default_vertex_shading_stage(RenderContextSoftware* p_render_context) noexcept {
     // TODO
 }
 
-void RenderStagesSoftware::default_rasterization_stage(BaseRenderDataSoftware* p_render_data) noexcept {
+void RenderStagesSoftware::default_rasterization_stage(RenderContextSoftware* p_render_context) noexcept {
     // TODO
 }
 
-void RenderStagesSoftware::default_fragment_shading_stage(BaseRenderDataSoftware* p_render_data) noexcept {
+void RenderStagesSoftware::default_fragment_shading_stage(RenderContextSoftware* p_render_context) noexcept {
     // TODO
 }
 
