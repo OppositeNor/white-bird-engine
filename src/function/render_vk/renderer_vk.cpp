@@ -15,7 +15,7 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
-#include "core/job/job_buffer_ring_spsc.hh"
+#include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -58,7 +58,7 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer)
+RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
       image_available_semaphores(p_allocator), render_graphs(p_allocator), base_render_data(p_allocator) {

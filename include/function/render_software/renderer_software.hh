@@ -21,7 +21,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_software/render_software_defs.hh"
-#include "function/render_software/render_stage_software.hh"
+#include "utils/defs.hh"
 #include <algorithm>
 #include <string>
 namespace WhiteBirdEngine {
@@ -32,8 +32,9 @@ namespace WhiteBirdEngine {
  */
 class RendererSoftware final : public IRenderer {
 public:
+    static constexpr uint32_t PER_THREAD_ALLOCATOR_SIZE = WBE_MiB(1);
 
-    virtual ~RendererSoftware() override;
+    virtual ~RendererSoftware() override = default;
     RendererSoftware(const RendererSoftware&) = delete;
     RendererSoftware(RendererSoftware&&) = delete;
     RendererSoftware& operator=(const RendererSoftware&) = delete;
@@ -52,9 +53,15 @@ public:
     virtual void add_job(std::function<void()> p_job) override;
 
 private:
-    Vector<Ref<RenderStageSoftware>> render_stages;
+    Ref<RenderAllocator> render_allocator;
+    Vector<Ref<RenderAllocator>> per_thread_allocators;
+    Vector<void(*)()> render_stages;
 
     BaseRenderDataSoftware base_render_data;
+
+    void init();
+    void setup_base_render_data();
+
 };
 } // namespace WhiteBirdEngine
 

@@ -15,13 +15,37 @@
 #ifndef WBE_FILE_RENDER_SOFTWARE_DEFS
 #define WBE_FILE_RENDER_SOFTWARE_DEFS
 
+#include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
-#include <vector>
+#include <cstdint>
 namespace WhiteBirdEngine {
 
+struct VertexInputSoftware {
+    VertexInputSoftware(RenderAllocator* p_allocator)
+        : buffer(p_allocator), layout(p_allocator) {}
+    struct ElementDescription {
+        enum class Type {
+            FLOAT32,
+            INT8,
+        };
+        Type type{};
+        uint32_t element_stride = 0;
+        uint32_t element_count = 0;
+    };
+
+    Vector<uint8_t> buffer;
+    Vector<ElementDescription> layout;
+    uint32_t vertex_stride = 0;
+    uint32_t element_count = 0;
+};
+
 struct BaseRenderDataSoftware {
+    BaseRenderDataSoftware(RenderAllocator* p_allocator)
+        : main_allocator(p_allocator), per_thread_allocators(p_allocator), vertex_input(p_allocator) {}
     RenderAllocator* main_allocator = nullptr;
-    std::vector<RenderAllocator> per_thread_allocator;
+    Vector<RenderAllocator*> per_thread_allocators;
+
+    VertexInputSoftware vertex_input;
 };
 
 } // namespace WhiteBirdEngine

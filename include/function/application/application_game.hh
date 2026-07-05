@@ -16,7 +16,7 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
-#include "core/job/job_buffer_ring_spsc.hh"
+#include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/application/i_application.hh"
 #include "function/audio/audio_renderer.hh"
@@ -91,7 +91,7 @@ private:
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
 
 protected:
-    Ref<JobBufferRingSPSC> render_job_buffer;
+    Ref<JobBufferRingMPSC> render_job_buffer;
     Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
     Ref<Worker> worker;

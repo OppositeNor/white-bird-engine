@@ -3,10 +3,6 @@
 
 namespace WhiteBirdEngine {
 
-RendererSoftware::~RendererSoftware() {
-    // TODO
-}
-
 void RendererSoftware::tick(double p_delta) {
     // TODO
 }

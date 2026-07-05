@@ -16,7 +16,7 @@
 #define WBE_FILE_RENDERER_VK_HH
 
 #include "core/core_utils.hh"
-#include "core/job/job_buffer_ring_spsc.hh"
+#include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -96,7 +96,7 @@ public:
      * @param p_job_buffer The render job buffer. Used for committing jobs for
      * the renderer to perform.
      */
-    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingSPSC> p_job_buffer);
+    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer);
 
     virtual uint32_t get_worker_nums() override {
         return 1;
@@ -208,7 +208,7 @@ private:
     static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 64;
     static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 32;
     static constexpr size_t MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT = 32;
-    Ref<JobBufferRingSPSC> job_buffer;
+    Ref<JobBufferRingMPSC> job_buffer;
 
     template <typename T>
     using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
