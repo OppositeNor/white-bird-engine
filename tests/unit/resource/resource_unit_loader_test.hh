@@ -241,7 +241,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
 
-    loader.populate_scheme(*res_chunk, parser.get_data());
+    loader.populate_scheme_from_data(*res_chunk, parser.get_data());
 
     ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_material->resource_key, nullptr);
@@ -330,7 +330,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
 
-    loader.populate_scheme(*res_chunk, parser.get_data());
+    loader.populate_scheme_from_data(*res_chunk, parser.get_data());
 
     ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_pipeline, nullptr);

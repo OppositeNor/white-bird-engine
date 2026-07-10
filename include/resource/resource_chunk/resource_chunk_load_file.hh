@@ -219,7 +219,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
                 continue;
             }
         }
-        ResourceManager::get_singleton()->get_resource_unit_loader(resource_scheme.type)->populate_scheme(*this, res);
+        ResourceManager::get_singleton()->get_resource_unit_loader(resource_scheme.type)->populate_scheme_from_data(*this, res);
     }
 
     if (parser.contains("include")) {

@@ -18,6 +18,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
+#include <any>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
@@ -43,67 +44,31 @@ RefRes<char> populate_text(IResourceChunk& p_res_chunk, const std::string& p_str
     return p_res_chunk.push_data(p_str.size() + 1, p_str.c_str());
 }
 
-void resolve_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) {
-    auto file_path = get_resource_path(p_scheme.path);
-    uint32_t width, height, file_channels;
-    auto image_data = load_image_data(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-    if (image_data.empty()) {
-        throw std::runtime_error(std::format("Failed to load image data from file: {}", static_cast<std::string>(file_path)));
-    }
-    p_resource_unit.width = width;
-    p_resource_unit.height = height;
-    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
-    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count, image_data.data());
-    p_resource_unit.image_data = data;
-}
-
-void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) {
-    auto file_path = get_resource_path(p_scheme.path);
-    uint32_t width, height, file_channels;
-    auto image_data =
-        load_image_data_hdr(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-    if (image_data.has_value()) {
-        throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
-    }
-    p_resource_unit.width = width;
-    p_resource_unit.height = height;
-    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
-    p_resource_unit.config.set(RUImage::IS_HDR);
-    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), (*image_data).data());
-    p_resource_unit.image_data = data;
-}
-
-template <typename LoaderType, typename SchemeType>
-void populate_from_parser_data(const LoaderType& p_loader, IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) {
-    SchemeType scheme;
-    scheme.deserialize(p_scheme_data);
-    p_loader.populate_scheme(p_res_chunk, scheme);
-}
-
 } // namespace
 
 std::vector<std::string> ResourceUnitLoaderAudio::get_supported_resource_types() const {
     return {"audio"};
 }
 
-void ResourceUnitLoaderAudio::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderAudio::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeAudio>(p_scheme, "audio");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
+    return std::any{};
 }
 
-void ResourceUnitLoaderAudio::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderAudio, RUSchemeAudio>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderAudio::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeAudio scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderBinary::get_supported_resource_types() const {
     return {"binary"};
 }
 
-void ResourceUnitLoaderBinary::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeBinary>(p_scheme, "binary");
     auto file_path = get_resource_path(typed_scheme.path);
     auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
@@ -111,52 +76,82 @@ void ResourceUnitLoaderBinary::populate_scheme(IResourceChunk& p_res_chunk, cons
     RUBinary resource_unit;
     resource_unit.data = data;
     resource_unit.size = file_content.size();
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUBinary>();
 }
 
-void ResourceUnitLoaderBinary::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderBinary, RUSchemeBinary>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderBinary::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeBinary scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderFont::get_supported_resource_types() const {
     return {"font"};
 }
 
-void ResourceUnitLoaderFont::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderFont::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeFont>(p_scheme, "font");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
+    return std::any{};
 }
 
-void ResourceUnitLoaderFont::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderFont, RUSchemeFont>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderFont::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeFont scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderImage::get_supported_resource_types() const {
     return {"image"};
 }
 
-void ResourceUnitLoaderImage::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeImage>(p_scheme, "image");
+    auto file_path = get_resource_path(typed_scheme.path);
+    uint32_t width, height, file_channels;
     RUImage resource_unit;
     if (typed_scheme.is_hdr) {
-        resolve_hdr_image_data(p_res_chunk, typed_scheme, resource_unit);
+        auto image_data =
+            load_image_data_hdr(file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
+        if (image_data.has_value()) {
+            throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
+        }
+        resource_unit.width = width;
+        resource_unit.height = height;
+        resource_unit.channel_count = typed_scheme.channel_count == 0 ? file_channels : typed_scheme.channel_count;
+        resource_unit.color_space = get_color_space_from_str(typed_scheme.color_space);
+        resource_unit.config.set(RUImage::IS_HDR);
+        auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count * sizeof(float), (*image_data).data());
+        resource_unit.image_data = data;
     } else {
-        resolve_image_data(p_res_chunk, typed_scheme, resource_unit);
+        auto image_data =
+            load_image_data(file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
+        if (image_data.empty()) {
+            throw std::runtime_error(std::format("Failed to load image data from file: {}", static_cast<std::string>(file_path)));
+        }
+        resource_unit.width = width;
+        resource_unit.height = height;
+        resource_unit.channel_count = typed_scheme.channel_count == 0 ? file_channels : typed_scheme.channel_count;
+        resource_unit.color_space = get_color_space_from_str(typed_scheme.color_space);
+        auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count, image_data.data());
+        resource_unit.image_data = data;
     }
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUImage>();
 }
 
-void ResourceUnitLoaderImage::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderImage, RUSchemeImage>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderImage::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeImage scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderText::get_supported_resource_types() const {
     return {"text"};
 }
 
-void ResourceUnitLoaderText::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeText>(p_scheme, "text");
     auto file_path = get_resource_path(typed_scheme.path);
     std::string file_content = load_text_file(static_cast<std::string>(file_path).c_str());
@@ -165,26 +160,31 @@ void ResourceUnitLoaderText::populate_scheme(IResourceChunk& p_res_chunk, const 
     resource_unit.text_data = data;
     resource_unit.size = file_content.size() + 1;
     resource_unit.encode_type = get_encode_type_from_str(typed_scheme.encode_type);
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUText>();
 }
 
-void ResourceUnitLoaderText::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderText, RUSchemeText>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderText::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeText scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderVideo::get_supported_resource_types() const {
     return {"video"};
 }
 
-void ResourceUnitLoaderVideo::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderVideo::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeVideo>(p_scheme, "video");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
+    return std::any{};
 }
 
-void ResourceUnitLoaderVideo::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderVideo, RUSchemeVideo>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderVideo::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeVideo scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 } // namespace WhiteBirdEngine

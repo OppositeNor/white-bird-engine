@@ -24,6 +24,7 @@
 #include "resource/resource_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <any>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -58,50 +59,13 @@ RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, const std::st
     return p_res_chunk.push_res_unit("", resource_unit).reint_cast<RUText>();
 }
 
-void resolve_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) {
-    // TODO: Remove this
-    auto file_path = get_resource_path(p_scheme.path);
-    uint32_t width, height, file_channels;
-    auto image_data = load_image_data(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-    if (image_data.empty()) {
-        throw std::runtime_error(std::format("Failed to load image data from file: {}", static_cast<std::string>(file_path)));
-    }
-    p_resource_unit.width = width;
-    p_resource_unit.height = height;
-    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
-    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count, image_data.data());
-    p_resource_unit.image_data = data;
-}
-
-void resolve_hdr_image_data(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme, RUImage& p_resource_unit) {
-    auto file_path = get_resource_path(p_scheme.path);
-    uint32_t width, height, file_channels;
-    auto image_data =
-        load_image_data_hdr(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-    if (image_data == std::nullopt) {
-        throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
-    }
-    p_resource_unit.width = width;
-    p_resource_unit.height = height;
-    p_resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-    p_resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
-    p_resource_unit.config.set(RUImage::IS_HDR);
-    auto data = p_res_chunk.push_data(width * height * p_resource_unit.channel_count * sizeof(float), (*image_data).data());
-    p_resource_unit.image_data = data;
-}
-
 RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) {
     if (p_scheme.path.empty()) {
         throw std::runtime_error("Failed to populate image resource: inline image requires path.");
     }
-    RUImage resource_unit;
-    if (p_scheme.is_hdr) {
-        resolve_hdr_image_data(p_res_chunk, p_scheme, resource_unit);
-    } else {
-        resolve_image_data(p_res_chunk, p_scheme, resource_unit);
-    }
-    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUImage>();
+    ResourceUnitLoaderImage image_loader;
+    return std::any_cast<RefRes<RUImage>>(
+        static_cast<const IResourceUnitLoader&>(image_loader).populate_scheme_ptr(p_res_chunk, p_scheme));
 }
 
 RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) {
@@ -246,59 +210,58 @@ void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_res
     }
 }
 
-template <typename LoaderType, typename SchemeType>
-void populate_from_parser_data(const LoaderType& p_loader, IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) {
-    SchemeType scheme;
-    scheme.deserialize(p_scheme_data);
-    p_loader.populate_scheme(p_res_chunk, scheme);
-}
-
 } // namespace
 
 std::vector<std::string> ResourceUnitLoaderShader::get_supported_resource_types() const {
     return {"shader"};
 }
 
-void ResourceUnitLoaderShader::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderShader::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeShader>(p_scheme, "shader");
-    populate_shader_resource(p_res_chunk, typed_scheme);
+    return populate_shader_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderShader::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderShader, RUSchemeShader>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderShader::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeShader scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderGraphicsPipeline::get_supported_resource_types() const {
     return {"graphics_pipeline"};
 }
 
-void ResourceUnitLoaderGraphicsPipeline::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeGraphicsPipeline>(p_scheme, "graphics_pipeline");
-    populate_graphics_pipeline_resource(p_res_chunk, typed_scheme);
+    return populate_graphics_pipeline_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderGraphicsPipeline::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderGraphicsPipeline, RUSchemeGraphicsPipeline>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeGraphicsPipeline scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderMaterial::get_supported_resource_types() const {
     return {"material"};
 }
 
-void ResourceUnitLoaderMaterial::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderMaterial::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeMaterial>(p_scheme, "material");
-    resolve_material(p_res_chunk, typed_scheme);
+    return resolve_material(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderMaterial::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderMaterial, RUSchemeMaterial>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderMaterial::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeMaterial scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderMesh::get_supported_resource_types() const {
     return {"mesh"};
 }
 
-void ResourceUnitLoaderMesh::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeMesh3D>(p_scheme, "mesh");
     RUMesh3D resource_unit;
     std::vector<RefRes<RUSubmesh3D>> submeshes;
@@ -316,18 +279,20 @@ void ResourceUnitLoaderMesh::populate_scheme(IResourceChunk& p_res_chunk, const 
     auto submesh_array = p_res_chunk.push_data(submesh_index_array_size_bytes, submeshes.data()).reint_cast<RefRes<RUSubmesh3D>>();
     resource_unit.submeshes = submesh_array;
     resource_unit.submesh_count = submeshes.size();
-    p_res_chunk.push_res_unit(typed_scheme.id, resource_unit);
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUMesh3D>();
 }
 
-void ResourceUnitLoaderMesh::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderMesh, RUSchemeMesh3D>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeMesh3D scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::vector<std::string> ResourceUnitLoaderSubmesh::get_supported_resource_types() const {
     return {"submesh"};
 }
 
-void ResourceUnitLoaderSubmesh::populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeSubmesh3D>(p_scheme, "submesh");
     if (typed_scheme.indices_data.size() % 3 != 0) {
         throw std::runtime_error(std::format("Failed to populate submesh resource unit: indices "
@@ -338,10 +303,13 @@ void ResourceUnitLoaderSubmesh::populate_scheme(IResourceChunk& p_res_chunk, con
     resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
     auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUSubmesh3D>();
     create_submesh_material_ref(p_res_chunk, *saved_resource, typed_scheme);
+    return saved_resource;
 }
 
-void ResourceUnitLoaderSubmesh::populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    populate_from_parser_data<ResourceUnitLoaderSubmesh, RUSchemeSubmesh3D>(*this, p_res_chunk, p_scheme_data);
+void ResourceUnitLoaderSubmesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemeSubmesh3D scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 void register_renderer_vk_resource_unit_loaders() {

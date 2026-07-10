@@ -19,6 +19,7 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
+#include <any>
 #include <string>
 #include <vector>
 
@@ -40,62 +41,85 @@ public:
     virtual std::vector<std::string> get_supported_resource_types() const = 0;
 
     /**
-     * @brief Populates a typed scheme into the input chunk.
+     * @brief Populates a scheme into the input chunk.
      *
-     * The implementation should dynamic-cast p_scheme to the expected derived
-     * resource scheme type and throw if the cast fails.
+     * @param p_res_chunk The resource chunk to populate the scheme into.
+     * @param p_scheme The scheme to populate.
      */
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const = 0;
+    void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+        (void)populate_scheme_ptr(p_res_chunk, p_scheme);
+    }
 
     /**
      * @brief Populates a parser node into the input chunk.
      *
-     * The implementation should deserialize parser data to its concrete
-     * scheme type, then call the typed populate method.
+     * @param p_res_chunk The resource chunk to populate the scheme into.
+     * @param p_scheme_data The parser node to populate.
      */
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const = 0;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const = 0;
+
+    /**
+     * @brief Populates a scheme into the input chunk and returns a type-erased reference to the result.
+     *
+     * @param p_res_chunk The resource chunk to populate the scheme into.
+     * @param p_scheme The scheme to populate.
+     * @return A type-erased reference to the resource unit in the chunk.
+     */
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const = 0;
 };
 
 class ResourceUnitLoaderAudio final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 class ResourceUnitLoaderBinary final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 class ResourceUnitLoaderFont final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 class ResourceUnitLoaderImage final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 class ResourceUnitLoaderText final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 class ResourceUnitLoaderVideo final : public IResourceUnitLoader {
 public:
     virtual std::vector<std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
-    virtual void populate_scheme(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
 };
 
 } // namespace WhiteBirdEngine
