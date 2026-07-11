@@ -184,15 +184,15 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     };
 
     WBE::RUGraphicsPipeline graphics_pipeline;
-    auto graphics_pipeline_ref = push_to_stack(sizeof(graphics_pipeline), &graphics_pipeline).reint_cast<WBE::RUGraphicsPipeline>();
+    auto graphics_pipeline_ref = push_to_stack(sizeof(graphics_pipeline), &graphics_pipeline).force_cast<WBE::RUGraphicsPipeline>();
     WBE::RUImage referenced_texture;
     referenced_texture.width = 4;
     referenced_texture.height = 4;
     referenced_texture.channel_count = 3;
-    auto referenced_texture_ref = push_to_stack(sizeof(referenced_texture), &referenced_texture).reint_cast<WBE::RUImage>();
+    auto referenced_texture_ref = push_to_stack(sizeof(referenced_texture), &referenced_texture).force_cast<WBE::RUImage>();
     std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
-        {"main_pipeline", graphics_pipeline_ref.reint_cast<char>()},
-        {"normal_texture", referenced_texture_ref.reint_cast<char>()},
+        {"main_pipeline", graphics_pipeline_ref.force_cast<char>()},
+        {"normal_texture", referenced_texture_ref.force_cast<char>()},
     };
 
     auto res_chunk =
@@ -202,7 +202,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
                 [&captured_material, &push_to_stack](const std::string& p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
                     WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
                     if (p_res_key == "test_material") {
-                        captured_material = saved_resource.reint_cast<WBE::RUMaterial>();
+                        captured_material = saved_resource.force_cast<WBE::RUMaterial>();
                     }
                     return saved_resource;
                 }))
@@ -281,12 +281,12 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     };
 
     WBE::RUShader vertex_shader;
-    auto vertex_shader_ref = push_to_stack(sizeof(vertex_shader), &vertex_shader).reint_cast<WBE::RUShader>();
+    auto vertex_shader_ref = push_to_stack(sizeof(vertex_shader), &vertex_shader).force_cast<WBE::RUShader>();
     WBE::RUShader fragment_shader;
-    auto fragment_shader_ref = push_to_stack(sizeof(fragment_shader), &fragment_shader).reint_cast<WBE::RUShader>();
+    auto fragment_shader_ref = push_to_stack(sizeof(fragment_shader), &fragment_shader).force_cast<WBE::RUShader>();
     std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
-        {"vertex_shader", vertex_shader_ref.reint_cast<char>()},
-        {"fragment_shader", fragment_shader_ref.reint_cast<char>()},
+        {"vertex_shader", vertex_shader_ref.force_cast<char>()},
+        {"fragment_shader", fragment_shader_ref.force_cast<char>()},
     };
 
     auto res_chunk =
@@ -297,10 +297,10 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
                     const std::string& p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
                     WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
                     if (p_res_key == "test_material_inline_pipeline") {
-                        captured_material = saved_resource.reint_cast<WBE::RUMaterial>();
+                        captured_material = saved_resource.force_cast<WBE::RUMaterial>();
                     }
                     if (p_res_key == "inline_pipeline") {
-                        captured_pipeline = saved_resource.reint_cast<WBE::RUGraphicsPipeline>();
+                        captured_pipeline = saved_resource.force_cast<WBE::RUGraphicsPipeline>();
                     }
                     return saved_resource;
                 }))

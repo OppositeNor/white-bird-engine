@@ -56,7 +56,7 @@ RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, const std::st
     RUText resource_unit;
     resource_unit.text_data = populate_text(p_res_chunk, p_str);
     resource_unit.size = p_str.size() + 1;
-    return p_res_chunk.push_res_unit("", resource_unit).reint_cast<RUText>();
+    return p_res_chunk.push_res_unit("", resource_unit).force_cast<RUText>();
 }
 
 RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) {
@@ -76,7 +76,7 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
     resource_unit.data = data;
     resource_unit.size = file_content.size();
-    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUShader>();
+    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
 }
 
 void populate_pipeline_stage(IResourceChunk& p_res_chunk,
@@ -124,7 +124,7 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     resource_unit.fragment_stage_entry = push_stage_entry(p_res_chunk, p_scheme.fragment_stage_entry);
     resource_unit.depth_test = p_scheme.depth_test;
     resource_unit.depth_write = p_scheme.depth_write;
-    auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).reint_cast<RUGraphicsPipeline>();
+    auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUGraphicsPipeline>();
     create_pipeline_stage_ref(p_res_chunk, saved_resource->vertex_stage, p_scheme.vertex_stage_id);
     create_pipeline_stage_ref(p_res_chunk, saved_resource->tessellation_stage, p_scheme.tessellation_stage_id);
     create_pipeline_stage_ref(p_res_chunk, saved_resource->geometry_stage, p_scheme.geometry_stage_id);
@@ -167,10 +167,10 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
     resource_unit.texture_count = texture_slots.size();
     if (!texture_slots.empty()) {
         auto texture_slot_data = p_res_chunk.push_data(texture_slots.size() * sizeof(RUMaterial::TextureSlot), texture_slots.data());
-        resource_unit.textures = texture_slot_data.reint_cast<RUMaterial::TextureSlot>();
+        resource_unit.textures = texture_slot_data.force_cast<RUMaterial::TextureSlot>();
     }
 
-    auto saved_resource = p_res_chunk.push_res_unit(p_material.id, resource_unit).reint_cast<RUMaterial>();
+    auto saved_resource = p_res_chunk.push_res_unit(p_material.id, resource_unit).force_cast<RUMaterial>();
     if (!p_material.graphics_pipeline_id.empty()) {
         p_res_chunk.create_ref_to(saved_resource->graphics_pipeline, p_material.graphics_pipeline_id);
     }
@@ -193,14 +193,14 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
     std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
     for (size_t i = 0; i < triangles.size(); ++i) {
         auto& triangle = triangles.at(i);
-        triangle.vert_array = vertices_data.reint_cast<Vertex3DTextured>();
+        triangle.vert_array = vertices_data.force_cast<Vertex3DTextured>();
         triangle.vertex_indices[0] = p_scheme.indices_data.at(i * 3);
         triangle.vertex_indices[1] = p_scheme.indices_data.at(i * 3 + 1);
         triangle.vertex_indices[2] = p_scheme.indices_data.at(i * 3 + 2);
     }
 
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
-    p_resource_unit.triangles = triangles_data.reint_cast<Triangle3DIndxTextured>();
+    p_resource_unit.triangles = triangles_data.force_cast<Triangle3DIndxTextured>();
     p_resource_unit.triangles_count = triangles.size();
 }
 
@@ -269,17 +269,17 @@ std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk
     for (const auto& submesh_scheme : typed_scheme.submeshes) {
         RUSubmesh3D submesh;
         resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
-        auto saved_resource = p_res_chunk.push_res_unit("", submesh).reint_cast<RUSubmesh3D>();
+        auto saved_resource = p_res_chunk.push_res_unit("", submesh).force_cast<RUSubmesh3D>();
         WBE_DEBUG_ASSERT(saved_resource != nullptr);
         create_submesh_material_ref(p_res_chunk, *saved_resource, submesh_scheme);
         submeshes.push_back(saved_resource);
     }
     // TODO: resolve submesh id
     size_t submesh_index_array_size_bytes = submeshes.size() * sizeof(RefRes<RUSubmesh3D>);
-    auto submesh_array = p_res_chunk.push_data(submesh_index_array_size_bytes, submeshes.data()).reint_cast<RefRes<RUSubmesh3D>>();
+    auto submesh_array = p_res_chunk.push_data(submesh_index_array_size_bytes, submeshes.data()).force_cast<RefRes<RUSubmesh3D>>();
     resource_unit.submeshes = submesh_array;
     resource_unit.submesh_count = submeshes.size();
-    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUMesh3D>();
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUMesh3D>();
 }
 
 void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
@@ -301,7 +301,7 @@ std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_ch
     }
     RUSubmesh3D resource_unit;
     resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
-    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUSubmesh3D>();
+    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUSubmesh3D>();
     create_submesh_material_ref(p_res_chunk, *saved_resource, typed_scheme);
     return saved_resource;
 }

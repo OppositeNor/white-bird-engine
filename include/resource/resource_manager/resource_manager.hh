@@ -116,7 +116,7 @@ public:
      */
     template <typename T>
     RefRes<T> get_resource(const std::string& p_id) const {
-        return find_resource_chunk_containing_resource(p_id)->get_resource(p_id).reint_cast<T>();
+        return find_resource_chunk_containing_resource(p_id)->get_resource(p_id).force_cast<T>();
     }
 
     /**

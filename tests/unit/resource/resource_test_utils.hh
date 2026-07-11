@@ -228,7 +228,7 @@ protected:
             ret = push_res_unit_ptr_callback(p_res_key, p_res, p_size);
         }
         if (!ret.is_null()) {
-            auto resource = ret.reint_cast<WBE::ResourceUnit>();
+            auto resource = ret.force_cast<WBE::ResourceUnit>();
             resource->resource_key = nullptr;
             if (!p_res_key.empty()) {
                 resource_keys.push_back(p_res_key);

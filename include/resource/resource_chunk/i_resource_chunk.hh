@@ -130,7 +130,7 @@ public:
     void create_ref_to(RefRes<T>& p_ref, const std::string& p_key) {
         create_ref_to_resolver(
             [&p_ref](RefRes<char> p_resource) {
-                p_ref = p_resource.template reint_cast<T>();
+                p_ref = p_resource.template force_cast<T>();
             },
             p_key);
     }

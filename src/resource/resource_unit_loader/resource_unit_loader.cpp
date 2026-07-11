@@ -76,7 +76,7 @@ std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chu
     RUBinary resource_unit;
     resource_unit.data = data;
     resource_unit.size = file_content.size();
-    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUBinary>();
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUBinary>();
 }
 
 void ResourceUnitLoaderBinary::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
@@ -138,7 +138,7 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
         auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count, image_data.data());
         resource_unit.image_data = data;
     }
-    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUImage>();
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUImage>();
 }
 
 void ResourceUnitLoaderImage::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
@@ -160,7 +160,7 @@ std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk
     resource_unit.text_data = data;
     resource_unit.size = file_content.size() + 1;
     resource_unit.encode_type = get_encode_type_from_str(typed_scheme.encode_type);
-    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).reint_cast<RUText>();
+    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUText>();
 }
 
 void ResourceUnitLoaderText::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {

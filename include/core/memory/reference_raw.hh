@@ -142,7 +142,7 @@ public:
      * @return The casted reference.
      */
     template <typename T1, typename AllocType1 = AllocType>
-    RefRaw<T1, AllocType1, AllowDestruct> reint_cast() {
+    RefRaw<T1, AllocType1, AllowDestruct> force_cast() {
         RefRaw<T1, AllocType1, AllowDestruct> result(mem_id, allocator);
         return result;
     }
