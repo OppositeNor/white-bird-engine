@@ -25,7 +25,8 @@ import build_setup
 
 metaparser_clang_args: list[str] = [
     "-std=c++20",
-    "-I./include",
+    f"-I{build_setup.include_dir}",
+    f"-I{os.path.join(build_setup.include_dir, build_setup.args.target)}",
     "-DWBE_REFLECTION_PARSER"
 ]
 
@@ -41,6 +42,8 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
         result.append("-G")
         result.append(build_info["generator"])
     result.append(f"-DCMAKE_BUILD_TYPE={build_info["cmake-build-type"]}")
+    result.append(f"-DWBE_BUILD_TARGET={build_setup.args.target}")
+    result.append(f"-DWBE_INCLUDE_DIR={build_setup.include_dir}")
     if build_info.get("cpp-compiler") is not None:
         result.append(f"-DCMAKE_CXX_COMPILER={build_info["cpp-compiler"]}")
     if build_info.get("c-compiler") is not None:
@@ -92,7 +95,8 @@ def _gather_gen_infos() -> list[WBEGenFileInfo]:
             data = json.load(f)
         file_infos = [WBEGenFileInfo(**info) for info in data]
         for file_info in file_infos:
-            file_info.out_dir = os.path.dirname(gen_info_file)
+            if not file_info.out_dir:
+                file_info.out_dir = os.path.dirname(gen_info_file)
         gen_infos.extend(file_infos)
     return gen_infos
 

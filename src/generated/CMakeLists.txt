@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-file(GLOB wbe_generated_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+file(GLOB wbe_generated_src ${CMAKE_SOURCE_DIR}/src/${WBE_BUILD_TARGET}/generated/*.cpp)
 
 set(WBE_SOURCES
     ${WBE_SOURCES}

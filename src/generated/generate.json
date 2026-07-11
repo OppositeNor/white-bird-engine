@@ -1,5 +1,6 @@
 [
     {
+        "out_dir" : "${source_dir}/${build_target}/generated",
         "output_name" : "serializable_impl.gen.cpp",
         "template" : "serializable_impl.cpp.jinja",
         "data" : {

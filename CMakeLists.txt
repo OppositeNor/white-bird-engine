@@ -116,7 +116,8 @@ add_definitions(-DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
 # Set include directories
 set(include_dirs 
     ${Vulkan_INCLUDE_DIR}
-    ${PROJECT_SOURCE_DIR}/include
+    ${WBE_INCLUDE_DIR}
+    ${WBE_INCLUDE_DIR}/${WBE_BUILD_TARGET}
     ${PROJECT_SOURCE_DIR}/dependencies/entt/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/glm
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include

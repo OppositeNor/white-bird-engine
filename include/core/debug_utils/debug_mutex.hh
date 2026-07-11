@@ -18,7 +18,7 @@
 #include <atomic>
 #include <thread>
 
-#include "boost/thread/pthread/shared_mutex.hpp"
+#include <boost/thread/pthread/shared_mutex.hpp>
 
 namespace WhiteBirdEngine {
 

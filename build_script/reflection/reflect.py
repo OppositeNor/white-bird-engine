@@ -15,8 +15,10 @@ import json
 import os
 import importlib.util
 from typing import Any, Callable
-from build_script.reflection.code_gen import WBECodeGenerator, WBEGenFileInfo
+from build_script.reflection.code_gen import WBECodeGenerator
 from build_script.reflection.metadata_types import WBEMetadata
+from build_script.reflection.gen_file_info import WBEGenFileInfo
+from build_script.reflection.parameter_resolver import WBEDictParameterSource
 from build_config import gen_info
 from build_script.utils import hash_str
 import build_setup
@@ -70,7 +72,19 @@ class WBEReflector:
             # Output metadata for debug purpose.
             self._write_to_file(build_setup.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
         # Generate code
-        generator = WBECodeGenerator(gen_info | {"metadata" : self.metadata}, self._gen_file_infos)
+        builtin_source = WBEDictParameterSource({
+            "build_target": build_setup.args.target,
+            "build_dir": build_setup.build_dir,
+            "binary_dir": build_setup.binary_dir,
+            "root_dir": build_setup.root_dir,
+            "include_dir": build_setup.include_dir,
+            "source_dir": build_setup.source_dir,
+        })
+        generator = WBECodeGenerator(
+            gen_info | {"metadata" : self.metadata},
+            self._gen_file_infos,
+            extra_sources=[builtin_source],
+        )
         generator.generate()
 
     def checks(self) -> None:
@@ -101,6 +115,3 @@ class WBEReflector:
                     f"and \"{dict_rev[hash_code]}\" are identical: {hash_code}")
             dict_rev[hash_code] = check
             hash_val_set.add(hash_code)
-
-
-

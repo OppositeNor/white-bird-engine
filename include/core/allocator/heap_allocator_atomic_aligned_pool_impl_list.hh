@@ -19,6 +19,8 @@
 #include "core/allocator/i_allocator.hh"
 #ifdef _DEBUG
 #include "core/debug_utils/debug_mutex.hh"
+#else
+#include <boost/thread/pthread/shared_mutex.hpp>
 #endif
 #include "utils/defs.hh"
 #include <boost/thread/lock_types.hpp>

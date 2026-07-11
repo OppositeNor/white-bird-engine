@@ -1,5 +1,6 @@
 [
     {
+        "out_dir" : "${include_dir}/${build_target}/generated",
         "output_name" : "serializables_sd.gen.hh",
         "template" : "serializables_sd.hh.jinja",
         "data" : {
@@ -9,6 +10,7 @@
         }
     },
     {
+        "out_dir" : "${include_dir}/${build_target}/generated",
         "output_name" : "serializables_access.gen.hh",
         "template" : "serializables_access.hh.jinja",
         "data" : {
@@ -18,6 +20,7 @@
         }
     },
     {
+        "out_dir" : "${include_dir}/${build_target}/generated",
         "output_name" : "label_manager.gen.hh",
         "template" : "label_manager.hh.jinja",
         "data" : {
@@ -27,6 +30,7 @@
         }
     },
     {
+        "out_dir" : "${include_dir}/${build_target}/generated",
         "output_name" : "type_uuid.gen.hh",
         "template" : "type_uuid.hh.jinja",
         "data" : {
@@ -34,6 +38,7 @@
         }
     },
     {
+        "out_dir" : "${include_dir}/${build_target}/generated",
         "output_name" : "cla_configuration.gen.hh",
         "template" : "cla_configuration.hh.jinja",
         "data" : {
