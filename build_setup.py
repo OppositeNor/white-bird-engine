@@ -38,6 +38,7 @@ build_target = build_config.target_info[args.target]
 root_dir = build_config.root_dir
 include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
+per_target_include_dir = os.path.join(include_dir, "per_target", args.target)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
 build_root_dir = os.path.join(root_dir, "build")

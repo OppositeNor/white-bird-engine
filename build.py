@@ -26,7 +26,7 @@ import build_setup
 metaparser_clang_args: list[str] = [
     "-std=c++20",
     f"-I{build_setup.include_dir}",
-    f"-I{os.path.join(build_setup.include_dir, build_setup.args.target)}",
+    f"-I{build_setup.per_target_include_dir}",
     "-DWBE_REFLECTION_PARSER"
 ]
 
@@ -44,6 +44,7 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     result.append(f"-DCMAKE_BUILD_TYPE={build_info["cmake-build-type"]}")
     result.append(f"-DWBE_BUILD_TARGET={build_setup.args.target}")
     result.append(f"-DWBE_INCLUDE_DIR={build_setup.include_dir}")
+    result.append(f"-DWBE_PER_TARGET_INCLUDE_DIR={build_setup.per_target_include_dir}")
     if build_info.get("cpp-compiler") is not None:
         result.append(f"-DCMAKE_CXX_COMPILER={build_info["cpp-compiler"]}")
     if build_info.get("c-compiler") is not None:
