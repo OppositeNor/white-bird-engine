@@ -19,12 +19,16 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_software/render_software_defs.hh"
+#include "function/render_software/ro_framebuffer_software.hh"
+#include "function/render_software/ro_image_software.hh"
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 #include <cstdint>
 #include <span>
 namespace WhiteBirdEngine {
 
-struct VertexInputSoftware {
-    VertexInputSoftware(RenderAllocator* p_allocator) : layout(p_allocator) {
+struct VertexDataSoftware {
+    VertexDataSoftware(RenderAllocator* p_allocator) : layout(p_allocator) {
     }
     struct ElementDescription {
         enum class Type {
@@ -42,17 +46,30 @@ struct VertexInputSoftware {
     uint32_t element_count = 0;
 };
 
+struct FragmentSoftware {
+    glm::uvec2 coordinate;
+    float depth;
+    glm::vec3 barycentric;
+};
+
 struct RenderPerThreadScreenSpaceJobSoftware {};
 
 struct RenderContextSoftware {
     RenderContextSoftware(BaseRenderDataSoftware* p_render_data)
-        : base_render_data(p_render_data), vertex_input(p_render_data->main_allocator), input_buffer(p_render_data->main_allocator) {
+        : base_render_data(p_render_data), input_buffer(p_render_data->main_allocator),
+        vertex_in(p_render_data->main_allocator), vertex_out(p_render_data->main_allocator) {
     }
     BaseRenderDataSoftware* base_render_data;
 
-    VertexInputSoftware vertex_input;
-    std::span<uint32_t> indeices;
     Vector<uint8_t, RenderAllocator> input_buffer;
+
+    VertexDataSoftware vertex_in;
+    std::span<uint32_t> indeices;
+    VertexDataSoftware vertex_out;
+    std::span<FragmentSoftware> fragments;
+
+    Ref<ROImageSoftware> depth;
+    Ref<ROImageSoftware> color;
 };
 
 class RenderStagesSoftware final {

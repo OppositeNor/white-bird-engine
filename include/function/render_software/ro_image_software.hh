@@ -58,7 +58,7 @@ public:
         return buffer.data();
     }
 
-    glm::vec4 fetch_pixel(glm::uvec2 p_pos, uint32_t p_mip_level) {
+    glm::vec4 fetch_pixel(glm::uvec2 p_pos, uint32_t p_mip_level) noexcept {
         const auto& info = mip_infos[p_mip_level];
         size_t offset = get_offset(p_pos, info);
         const uint8_t* ptr = info.memory.data() + offset;
@@ -77,7 +77,7 @@ public:
         return color;
     }
 
-    void write_pixel(glm::uvec2 p_pos, const glm::vec4& p_data, uint32_t p_mip_level) {
+    void write_pixel(glm::uvec2 p_pos, const glm::vec4& p_data, uint32_t p_mip_level) noexcept {
         // TODO
     }
 
