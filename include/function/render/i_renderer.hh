@@ -62,7 +62,7 @@ public:
      *
      * @param p_pipeline_name The name of the pipeline to activate.
      */
-    virtual void activate_render_graph(const std::string& p_pipeline_name) = 0;
+    virtual void activate_render_graph(std::string_view p_pipeline_name) = 0;
 
     /**
      * @brief Update the static opaque triangles data.

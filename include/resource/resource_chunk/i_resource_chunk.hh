@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -49,7 +50,7 @@ public:
      * @param p_id The identifier of the resource unit.
      * @return The resource reference of the resource.
      */
-    virtual RefRes<char> get_resource(const std::string& p_id) const = 0;
+    virtual RefRes<char> get_resource(std::string_view p_id) const = 0;
 
     /**
      * @brief Look up a resource by key without throwing.
@@ -61,7 +62,7 @@ public:
      * @return The resource reference, or a null reference when the chunk does
      * not contain the resource.
      */
-    virtual RefRes<char> try_get_resource(const std::string& p_id) const = 0;
+    virtual RefRes<char> try_get_resource(std::string_view p_id) const = 0;
 
     /**
      * @brief Get the total size of the chunk.
@@ -117,7 +118,7 @@ public:
      * @param p_res_key The key to check.
      * @return True if the chunk contains the resource, false otherwise.
      */
-    virtual bool contains(const std::string& p_res_key) const = 0;
+    virtual bool contains(std::string_view p_res_key) const = 0;
 
     /**
      * @brief Create a reference to a resource in the chunk.
@@ -127,7 +128,7 @@ public:
      * @param p_key The key of the resource to reference.
      */
     template <typename T>
-    void create_ref_to(RefRes<T>& p_ref, const std::string& p_key) {
+    void create_ref_to(RefRes<T>& p_ref, std::string_view p_key) {
         create_ref_to_resolver(
             [&p_ref](RefRes<char> p_resource) {
                 p_ref = p_resource.template force_cast<T>();
@@ -145,7 +146,7 @@ public:
      * @return The memory id of the pushed resource unit.
      */
     template <ResourceUnitConcept T>
-    RefRes<char> push_res_unit(const std::string& p_id, const T& p_res) {
+    RefRes<char> push_res_unit(std::string_view p_id, const T& p_res) {
         return push_res_unit_ptr(p_id, &p_res, sizeof(T));
     }
 
@@ -180,7 +181,7 @@ protected:
      * @param p_assign_ref The callback that writes the resolved resource.
      * @param p_key The key of the resource to reference.
      */
-    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, const std::string& p_key) = 0;
+    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, std::string_view p_key) = 0;
 
     /**
      * @brief Push the resource unit pointer to the chunk.
@@ -189,7 +190,7 @@ protected:
      * @param p_res The pointer to the resource unit.
      * @param p_size The size of the resource unit.
      */
-    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) = 0;
+    virtual RefRes<char> push_res_unit_ptr(std::string_view p_res_key, const void* p_res, size_t p_size) = 0;
 };
 
 } // namespace WhiteBirdEngine

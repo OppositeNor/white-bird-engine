@@ -23,6 +23,7 @@
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <future>
 #include <string>
@@ -92,10 +93,16 @@ public:
     /**
      * @brief Read a binary file.
      *
+     * @tparam T The type of the file's data.
      * @param p_promise The promise to retrieve result.
      * @param p_path The path to the file.
      */
-    void read_binary_file(std::promise<std::vector<char>>& p_promise, const Path& p_path);
+    template <typename T = uint8_t>
+    void read_binary_file(std::promise<std::vector<T>>& p_promise, const Path& p_path) {
+        add_job([&]() {
+            p_promise.set_value(load_binary_file<T>(static_cast<std::string>(p_path).c_str()));
+        });
+    }
 
     /**
      * @brief Stop.

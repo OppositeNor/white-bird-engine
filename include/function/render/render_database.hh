@@ -15,13 +15,14 @@
 #ifndef WBE_FILE_RENDER_DATABASE_HH
 #define WBE_FILE_RENDER_DATABASE_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
+#include "function/ecs/components.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/spot_light_info.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "render_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
@@ -31,6 +32,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -202,19 +204,19 @@ public:
      * @param p_render_object The compiled render object to keep weakly.
      */
     void register_compiled_render_resource(
-        const std::string& p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object);
+        std::string_view p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object);
 
     /**
      * @brief Get a compiled render object by resource key and object type.
      *
      * @return A reference, or null if no entry exists.
      */
-    Ref<IRenderObject> get_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id);
+    Ref<IRenderObject> get_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id);
 
     /**
      * @brief Check whether a live compiled render object is registered.
      */
-    bool contains_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) const;
+    bool contains_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id) const;
 
     /**
      * @brief Clear every compiled render object registry entry.

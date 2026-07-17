@@ -19,13 +19,14 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
 template <WBE::ParserConcept T>
 void test_parser_general(
-    WBE::Parser<T>& p_parser, const std::string& p_test_buff1, const std::string& p_test_buff2, const std::string& p_test_buff3) {
+    WBE::Parser<T>& p_parser, std::string_view p_test_buff1, std::string_view p_test_buff2, std::string_view p_test_buff3) {
     p_parser.parse_from_buffer(p_test_buff1);
     ASSERT_STREQ(p_parser.template get_value<std::string>("fruit").c_str(), "apple");
     ASSERT_STREQ(p_parser.template get_value<std::string>("vegetable").c_str(), "lettice");

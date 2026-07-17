@@ -20,33 +20,35 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
-#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <stdexcept>
-#include <string>
+#include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(const char* p_code, size_t p_code_size) {
-    code = p_code;
-    code_size = p_code_size;
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::span<uint32_t> p_code) {
+    code = std::vector<uint32_t>(p_code.begin(), p_code.end());
+    code_size = p_code.size();
     return *this;
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(const std::string& p_resource_id) {
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::string_view p_resource_id) {
     auto resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
     return set_code(resource);
 }
 
 ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) {
-    return set_code(p_resource->data.get(), p_resource->size);
+    return set_code(std::span(p_resource->data.get(), p_resource->size));
 }
 
 VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    create_info.pCode = reinterpret_cast<const uint32_t*>(WBE_REQUIRED(code));
+    WBE_REQUIRED(code);
+    create_info.pCode = reinterpret_cast<const uint32_t*>((*code).data());
     create_info.codeSize = WBE_REQUIRED(code_size);
 
     VkShaderModule result = VK_NULL_HANDLE;
@@ -61,7 +63,7 @@ ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder
     init(p_builder);
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id)
+ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, std::string_view p_resource_id)
     : RenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource_id);

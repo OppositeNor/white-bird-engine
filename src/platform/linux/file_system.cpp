@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -39,7 +40,7 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
     config_directory = resource_directory.combine(Directory({"config"}));
 }
 
-Directory FileSystem::parse_directory(const std::string& p_str) {
+Directory FileSystem::parse_directory(std::string_view p_str) {
     auto splitted = split_string(p_str, '/');
     if (splitted.empty()) {
         return Directory();
@@ -65,11 +66,11 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
     return static_cast<std::string>(p_directory);
 }
 
-std::string FileSystem::get_file_name(const std::string& p_path) {
+std::string FileSystem::get_file_name(std::string_view p_path) {
     return std::filesystem::path(p_path).filename().generic_string();
 }
 
-Directory FileSystem::get_file_dir(const std::string& p_path) {
+Directory FileSystem::get_file_dir(std::string_view p_path) {
     auto last_slash = p_path.find_last_of('/');
     if (last_slash == std::string::npos) {
         return Directory();

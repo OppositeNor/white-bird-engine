@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <limits>
@@ -27,6 +28,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -77,10 +79,9 @@ using TypeID = uint32_t;
  * @param p_str The string to hash.
  * @return The hash code of the string.
  */
-consteval HashCode static_hash(const char* p_str) {
-    // from
-    // https://stackoverflow.com/questions/2111667/compile-time-string-hashing
-    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * static_hash(p_str + 1) : 5381;
+consteval HashCode static_hash(std::string_view p_str) {
+    // from https://stackoverflow.com/questions/2111667/compile-time-string-hashing
+    return p_str.empty() ? 5381 : static_cast<uint32_t>(p_str[0]) + 33 * static_hash(p_str.substr(1));
 }
 
 /**
@@ -89,10 +90,9 @@ consteval HashCode static_hash(const char* p_str) {
  * @param p_str The string to hash.
  * @return The hash code of the string.
  */
-constexpr HashCode dynam_hash(const char* p_str) {
-    // from
-    // https://stackoverflow.com/questions/2111667/compile-time-string-hashing
-    return *p_str ? static_cast<uint32_t>(*p_str) + 33 * dynam_hash(p_str + 1) : 5381;
+constexpr HashCode dynam_hash(std::string_view p_str) {
+    // from https://stackoverflow.com/questions/2111667/compile-time-string-hashing
+    return p_str.empty() ? 5381 : static_cast<uint32_t>(p_str[0]) + 33 * dynam_hash(p_str.substr(1));
 }
 
 /**
@@ -102,8 +102,7 @@ constexpr HashCode dynam_hash(const char* p_str) {
  * @return The hash code of the value.
  */
 consteval HashCode static_hash(int32_t p_val) {
-    // from
-    // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
+    // from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key#12996028
     p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
     p_val = ((p_val >> 16) ^ p_val) * 0x45d9f3b;
     p_val = (p_val >> 16) ^ p_val;
@@ -215,16 +214,6 @@ constexpr HashCode dynam_hash(uint64_t p_val) {
     return p_val;
 }
 
-/**
- * @brief Hash a string.
- *
- * @param p_str The string to hash.
- * @return The hash code of the string.
- */
-constexpr HashCode dynam_hash(const std::string& p_str) {
-    return dynam_hash(p_str.c_str());
-}
-
 using TypeID = HashCode;
 using ConstID = HashCode;
 
@@ -257,13 +246,24 @@ inline std::vector<std::string> split_string(std::string p_str, char p_token) {
 }
 
 /**
+ * @brief Split the string with respect to a token.
+ *
+ * @param p_str The string to split.
+ * @param p_token The token.
+ * @return Array of strings.
+ */
+inline std::vector<std::string> split_string(std::string_view p_str, char p_token) {
+    return split_string(std::string(p_str), p_token);
+}
+
+/**
  * @brief Get the position that any of the tokens is first found in the string.
  *
  * @param p_str The string to find the token.
  * @param p_tokens The tokens to look for.
  * @return The index of the token that is first found.
  */
-inline size_t find_first_pos(const std::string& p_str, const std::string& p_tokens) {
+inline size_t find_first_pos(std::string_view p_str, std::string_view p_tokens) {
     if (p_tokens.empty()) {
         return std::string::npos;
     }
@@ -282,7 +282,7 @@ inline size_t find_first_pos(const std::string& p_str, const std::string& p_toke
  * @param p_token The list of tokens.
  * @return Array of strings.
  */
-inline std::vector<std::string> split_string(std::string p_str, const std::string& p_tokens) {
+inline std::vector<std::string> split_string(std::string p_str, std::string_view p_tokens) {
     std::vector<std::string> result;
     auto split_pos = find_first_pos(p_str, p_tokens);
     while (split_pos != std::string::npos) {
@@ -299,7 +299,7 @@ inline std::vector<std::string> split_string(std::string p_str, const std::strin
  * @param p_str The string to get the encode type.
  * @return The encode type.
  */
-inline EncodeType get_encode_type_from_str(const std::string& p_str) {
+inline EncodeType get_encode_type_from_str(std::string_view p_str) {
     if (p_str == "utf8") {
         return EncodeType::UTF8;
     }
@@ -345,23 +345,27 @@ inline std::string load_text_file(const char* p_path, EncodeType p_encode_type =
 }
 
 /**
- * @brief Load a binary file from a path.
+ * @brief Load a binary file from a path as a series of T. The file size is
+ * aligned up to a multiple of sizeof(T); any padding bytes are zero-initialized.
  *
  * @todo Test
- * @param p_path The path tot he binary file.
- * @return The content of the binary file.
+ * @tparam T The element type to interpret the file contents as.
+ * @param p_path The path to the binary file.
+ * @return The content of the binary file as a vector of T.
  */
-inline std::vector<char> load_binary_file(const char* p_path) {
+template <typename T = uint8_t>
+inline std::vector<T> load_binary_file(const char* p_path) {
     std::ifstream file_stream(p_path, std::ios::binary);
     if (!file_stream.is_open()) {
-        throw std::runtime_error("Failed to open file at path: " + std::string(p_path));
+        throw std::runtime_error(std::format("Failed to open file at path: {}.", std::string(p_path)));
     }
     file_stream.seekg(0, std::ios::end);
-    size_t size = file_stream.tellg();
+    size_t file_size = file_stream.tellg();
+    size_t aligned_size = get_align_size(file_size, sizeof(T));
     file_stream.seekg(0, std::ios::beg);
-    std::vector<char> content(size);
-    if (!file_stream.read(content.data(), static_cast<std::streamsize>(size))) {
-        throw std::runtime_error("Failed to read file at path: " + std::string(p_path));
+    std::vector<T> content(aligned_size / sizeof(T));
+    if (!file_stream.read(reinterpret_cast<char*>(content.data()), static_cast<std::streamsize>(file_size))) {
+        throw std::runtime_error(std::format("Failed to read file at path: {}.", std::string(p_path)));
     }
     return content;
 }
@@ -475,49 +479,49 @@ template <typename T>
 using Required = std::optional<T>; // What's optional is actually required...
 
 template <typename T>
-inline T required(const std::string& p_value_name, std::optional<T> p_optional_value) {
+inline T required(std::string_view p_value_name, std::optional<T> p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value.value();
 }
 
 template <typename T>
-inline std::optional<T>& requires_valid(const std::string& p_value_name, std::optional<T>& p_optional_value) {
+inline std::optional<T>& requires_valid(std::string_view p_value_name, std::optional<T>& p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::optional<T> requires_valid(const std::string& p_value_name, std::optional<T>&& p_optional_value) {
+inline std::optional<T> requires_valid(std::string_view p_value_name, std::optional<T>&& p_optional_value) {
     if (!p_optional_value.has_value()) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline T* requires_valid(const std::string& p_value_name, T* p_optional_value) {
+inline T* requires_valid(std::string_view p_value_name, T* p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::shared_ptr<T> requires_valid(const std::string& p_value_name, std::shared_ptr<T> p_optional_value) {
+inline std::shared_ptr<T> requires_valid(std::string_view p_value_name, std::shared_ptr<T> p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value;
 }
 
 template <typename T>
-inline std::unique_ptr<T> requires_valid(const std::string& p_value_name, std::unique_ptr<T> p_optional_value) {
+inline std::unique_ptr<T> requires_valid(std::string_view p_value_name, std::unique_ptr<T> p_optional_value) {
     if (p_optional_value == nullptr) {
-        throw std::runtime_error("Option \"" + p_value_name + "\" is required.");
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }
     return p_optional_value;
 }
@@ -588,6 +592,38 @@ constexpr uint32_t morton_encode(uint32_t p_x, uint32_t p_y) {
 }
 
 WBE_DECL_CRTP_CONCEPT(BufferBase);
+
+/**
+ * @brief Transparent string hash used for maps.
+ * @class TransparentStrHash
+ */
+struct TransparentStrHash {
+    using is_transparent = void; // NOLINT
+
+    size_t operator()(std::string_view p_str) const noexcept {
+        return std::hash<std::string_view>{}(p_str);
+    }
+
+    size_t operator()(const std::string& p_str) const noexcept {
+        return (*this)(std::string_view{p_str});
+    }
+
+    size_t operator()(const char* p_str) const noexcept {
+        return (*this)(std::string_view{p_str});
+    }
+};
+
+/**
+ * @brief Transparent string equal compare used for maps.
+ * @class TransparentEqual
+ */
+struct TransparentEqual {
+    using is_transparent = void; // NOLINT
+
+    bool operator()(std::string_view p_lhs, std::string_view p_rhs) const noexcept {
+        return p_lhs == p_rhs;
+    }
+};
 
 } // namespace WhiteBirdEngine
 #endif

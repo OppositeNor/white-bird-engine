@@ -28,6 +28,7 @@
 #include <format>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 namespace WhiteBirdEngine {
 
@@ -78,7 +79,7 @@ public:
      * @param p_key The key of the resource.
      */
     template <typename T>
-    T* get_resource(ResourceChunkID p_chunk_id, const std::string& p_id) {
+    T* get_resource(ResourceChunkID p_chunk_id, std::string_view p_id) {
         return reinterpret_cast<T*>(get_resource_chunk(p_chunk_id)->get_resource(p_id).get());
     }
 
@@ -115,7 +116,7 @@ public:
      * @return The resource chunk.
      */
     template <typename T>
-    RefRes<T> get_resource(const std::string& p_id) const {
+    RefRes<T> get_resource(std::string_view p_id) const {
         return find_resource_chunk_containing_resource(p_id)->get_resource(p_id).force_cast<T>();
     }
 
@@ -131,7 +132,7 @@ public:
      * @return The resource reference, or a null reference when no registered
      * chunk contains the resource.
      */
-    RefRes<char> try_get_global_resource(const std::string& p_id) const;
+    RefRes<char> try_get_global_resource(std::string_view p_id) const;
 
     /**
      * @brief Get a resource by its memory ID.
@@ -176,7 +177,7 @@ public:
         return it->second;
     }
 
-    void load_global_resource(const std::string& p_global_res_path);
+    void load_global_resource(std::string_view p_global_res_path);
 
 private:
     ResourceChunkID global_res_chunk_id = RES_CHUNK_NULL;
@@ -184,7 +185,7 @@ private:
     boost::container::flat_map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
-    Ref<IResourceChunk> find_resource_chunk_containing_resource(const std::string& p_id) const;
+    Ref<IResourceChunk> find_resource_chunk_containing_resource(std::string_view p_id) const;
 
     inline static ResourceManager* singleton = nullptr;
 };

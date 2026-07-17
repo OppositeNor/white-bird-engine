@@ -46,7 +46,7 @@ public:
      * to.
      * @param p_file_name The name of the file the path is referencing to.
      */
-    Path(const Directory& p_directory, const std::string& p_file_name) : directory(p_directory), file_name(p_file_name) {
+    Path(const Directory& p_directory, std::string_view p_file_name) : directory(p_directory), file_name(p_file_name) {
     }
 
     /**
@@ -56,8 +56,7 @@ public:
      * to.
      * @param p_file_name The name of the file the path is referencing to.
      */
-    Path(Directory&& p_directory, const std::string& p_file_name)
-        : directory(std::move(p_directory)), file_name(p_file_name) {
+    Path(Directory&& p_directory, std::string_view p_file_name) : directory(std::move(p_directory)), file_name(p_file_name) {
     }
 
     bool operator==(const Path& p_other) const {
@@ -118,7 +117,7 @@ public:
     }
 
     HashCode hash() const {
-        return dynam_hash(static_cast<std::string>(*this).c_str());
+        return dynam_hash(static_cast<std::string>(*this));
     }
 
     operator std::string() const {

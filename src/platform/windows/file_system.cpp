@@ -36,7 +36,7 @@ FileSystem::FileSystem(const Directory& p_root_dir) {
     resource_directory = root_directory.combine(Directory({"res"}));
 }
 
-Directory FileSystem::parse_directory(const std::string& p_str) {
+Directory FileSystem::parse_directory(std::string_view p_str) {
     auto splitted = split_string(p_str, "/\\");
     if (splitted.size() == 0) {
         return Directory();
@@ -74,7 +74,7 @@ std::string FileSystem::dir_to_string(const Directory& p_directory) {
     return ss.str();
 }
 
-size_t get_last_splitter_pos(const std::string& p_path) {
+size_t get_last_splitter_pos(std::string_view p_path) {
     size_t last_slash = p_path.find_last_of('/');
     size_t last_bslash = p_path.find_last_of('\\');
     if (last_slash < last_bslash) {
@@ -89,7 +89,7 @@ size_t get_last_splitter_pos(const std::string& p_path) {
     return last_slash;
 }
 
-std::string FileSystem::get_file_name(const std::string& p_path) {
+std::string FileSystem::get_file_name(std::string_view p_path) {
     // TODO: Test
     size_t target = get_last_splitter_pos(p_path);
     if (target == std::string::npos) {
@@ -98,7 +98,7 @@ std::string FileSystem::get_file_name(const std::string& p_path) {
     return p_path.substr(target);
 }
 
-Directory FileSystem::get_file_dir(const std::string& p_path) {
+Directory FileSystem::get_file_dir(std::string_view p_path) {
     // TODO: Test
     auto last_slash = get_last_splitter_pos(p_path);
     if (last_slash == std::string::npos) {

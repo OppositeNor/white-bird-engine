@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -61,7 +62,7 @@ public:
     }
 
 private:
-    CLAToken::Type get_token_type(const std::string& p_token_value) {
+    CLAToken::Type get_token_type(std::string_view p_token_value) {
         if (!p_token_value.empty() && p_token_value[0] == '-') {
             if (p_token_value.size() > 1 && p_token_value[1] == '-') {
                 return CLAToken::Type::OPTION_LONG;

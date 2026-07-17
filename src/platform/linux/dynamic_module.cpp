@@ -12,16 +12,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "platform/file_system/path.hh"
 #include "platform/module/dynamic_module.hh"
+#include "platform/file_system/path.hh"
 #include <dlfcn.h>
 #include <format>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
-DynamicModule::DynamicModule(const Path& p_module_path)
-    : module_path(p_module_path) {
+DynamicModule::DynamicModule(const Path& p_module_path) : module_path(p_module_path) {
     auto path_str = static_cast<std::string>(p_module_path);
     handle = dlopen(path_str.c_str(), RTLD_LAZY);
     if (handle == nullptr) {
@@ -33,14 +33,12 @@ DynamicModule::~DynamicModule() {
     dlclose(handle);
 }
 
-void* DynamicModule::get_function_helper(const std::string& p_function_symbol) {
-    auto* result = dlsym(handle, p_function_symbol.c_str());
+void* DynamicModule::get_function_helper(std::string_view p_function_symbol) {
+    auto* result = dlsym(handle, std::string(p_function_symbol).c_str());
     if (result == nullptr) {
-        throw std::runtime_error(std::format("Failed to load function with symobol: {} in module at path: {}",
-                    p_function_symbol, static_cast<std::string>(module_path)));
+        throw std::runtime_error(std::format(
+            "Failed to load function with symobol: {} in module at path: {}", p_function_symbol, static_cast<std::string>(module_path)));
     }
     return result;
 }
-
-
 } // namespace WhiteBirdEngine

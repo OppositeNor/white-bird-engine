@@ -20,6 +20,7 @@
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -51,7 +52,7 @@ public:
      *
      * @param p_scene_id
      */
-    virtual void change_scene(const std::string& p_scene_id) = 0;
+    virtual void change_scene(std::string_view p_scene_id) = 0;
 };
 
 } // namespace WhiteBirdEngine

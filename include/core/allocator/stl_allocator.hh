@@ -161,8 +161,7 @@ template <typename T, typename AllocType = HeapAllocatorDefault>
 using Deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
 
 template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
-using Map =
-    boost::container::flat_map<TKey, TVal, std::less<TKey>, STLAllocator<std::pair<TKey, TVal>, AllocType, false, true, false>>;
+using Map = boost::container::flat_map<TKey, TVal, std::less<>, STLAllocator<std::pair<TKey, TVal>, AllocType, false, true, false>>;
 
 } // namespace WhiteBirdEngine
 // NOLINTEND

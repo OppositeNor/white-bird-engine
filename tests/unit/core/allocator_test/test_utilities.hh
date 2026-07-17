@@ -18,12 +18,13 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 class WBEAllocPoolBehavTestClass {
 public:
-    WBEAllocPoolBehavTestClass(const std::string& p_pool_name, size_t p_total_size, size_t p_header_size)
+    WBEAllocPoolBehavTestClass(std::string_view p_pool_name, size_t p_total_size, size_t p_header_size)
         : pool_name(p_pool_name), total_size(p_total_size), header_size(p_header_size) {
     }
 

@@ -26,6 +26,7 @@
 #include <format>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -35,7 +36,7 @@ namespace {
 // Material texture keys are shader parameter names. This keeps manifest
 // material slots independent of backend descriptor binding numbers.
 const ROMaterialVK::TextureBinding& find_texture_binding(
-    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, const std::string& p_texture_key) {
+    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_texture_key) {
     auto binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key](const ROMaterialVK::TextureBinding& p_binding) {
         return p_binding.texture_key == p_texture_key;
     });
@@ -48,7 +49,7 @@ const ROMaterialVK::TextureBinding& find_texture_binding(
 // A default sampler lets materials omit one sampler slot while still binding
 // separate texture and sampler descriptors from Slang reflection metadata.
 Ref<ROSamplerVK> find_sampler_binding(const std::vector<ROMaterialVK::SamplerBinding>& p_sampler_bindings,
-    const std::string& p_sampler_key,
+    std::string_view p_sampler_key,
     Ref<ROSamplerVK> p_default_sampler) {
     auto binding = std::ranges::find_if(p_sampler_bindings, [&p_sampler_key](const ROMaterialVK::SamplerBinding& p_binding) {
         return p_binding.sampler_key == p_sampler_key;

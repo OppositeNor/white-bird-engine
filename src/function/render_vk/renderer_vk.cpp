@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/renderer_vk.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/logging/log.hh"
@@ -37,7 +38,6 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -1008,7 +1008,7 @@ void RendererVK::register_render_graph(const std::string& p_graph_name, RendGrap
     render_graphs[p_graph_name] = std::move(desc_ref);
 }
 
-void RendererVK::activate_render_graph(const std::string& p_graph_name) {
+void RendererVK::activate_render_graph(std::string_view p_graph_name) {
     auto pipeline_entry = render_graphs.find(p_graph_name);
     if (pipeline_entry == render_graphs.end()) {
         throw std::runtime_error("Failed to activate pipeline: pipeline not found.");

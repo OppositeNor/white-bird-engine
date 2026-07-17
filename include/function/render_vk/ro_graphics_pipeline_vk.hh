@@ -28,6 +28,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -68,8 +69,8 @@ public:
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                vertex_shader = {.entry_function = p_entry_function, .shader = p_shader};
+            ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
+                vertex_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader};
                 return *this;
             }
 
@@ -79,8 +80,8 @@ public:
              * @param p_shader The shader instance.
              * @return *this
              */
-            ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, const std::string& p_entry_function = "main") {
-                fragment_shader = {.entry_function = p_entry_function, .shader = p_shader};
+            ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
+                fragment_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader};
                 return *this;
             }
 
@@ -96,8 +97,8 @@ public:
              */
             ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
                 Ref<ROShaderVK> p_fragment_shader,
-                const std::string& p_vertex_entry_function = "main",
-                const std::string& p_fragment_entry_function = "main") {
+                std::string_view p_vertex_entry_function = "main",
+                std::string_view p_fragment_entry_function = "main") {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function);
                 set_fragment_shader(p_fragment_shader, p_fragment_entry_function);
                 return *this;

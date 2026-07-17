@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <string_view>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -155,7 +156,7 @@ TEST(StackAllocator, ComplexObjectLifecycle) {
 
     class ComplexClass {
     public:
-        ComplexClass(int p_val, const std::string& p_str) : value(p_val), text(p_str) {
+        ComplexClass(int p_val, std::string_view p_str) : value(p_val), text(p_str) {
         }
         ~ComplexClass() {
             value = -1;

@@ -14,6 +14,10 @@
 */
 #include "function/render_software/renderer_software.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_database.hh"
+#include <functional>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -23,7 +27,7 @@ void RendererSoftware::tick(double p_delta) {
 Ref<RenderDatabase> RendererSoftware::get_render_database() {
     return MEM_NULL; // TODO
 }
-void RendererSoftware::activate_render_graph(const std::string& p_pipeline_name) {
+void RendererSoftware::activate_render_graph(std::string_view p_pipeline_name) {
     // TODO
 }
 void RendererSoftware::update_static_opaque_triangles() {

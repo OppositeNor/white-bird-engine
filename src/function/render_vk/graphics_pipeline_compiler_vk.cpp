@@ -143,7 +143,7 @@ void validate_uniform_bindings(std::span<const RenderUniformBinding> p_uniform_b
     }
 }
 
-const RenderUniformBinding* find_uniform_binding(std::span<const RenderUniformBinding> p_uniform_bindings, const std::string& p_field_path) {
+const RenderUniformBinding* find_uniform_binding(std::span<const RenderUniformBinding> p_uniform_bindings, std::string_view p_field_path) {
     for (const auto& uniform_binding : p_uniform_bindings) {
         if (uniform_binding.field_path == p_field_path) {
             return &uniform_binding;
@@ -201,7 +201,7 @@ std::string get_stage_entry(RefRes<char> p_stage_entry) {
 
 template <typename RenderObjectType>
 Ref<RenderObjectType> get_registered_render_object(
-    Ref<RenderDatabase> p_render_database, const std::string& p_resource_key, HashCode p_render_object_type_id) {
+    Ref<RenderDatabase> p_render_database, std::string_view p_resource_key, HashCode p_render_object_type_id) {
     auto render_object = p_render_database->get_compiled_render_resource(p_resource_key, p_render_object_type_id);
     if (render_object == MEM_NULL) {
         return MEM_NULL;
@@ -220,13 +220,13 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
 }
 
 std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> GraphicsPipelineCompilerVK::compile(
-    const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
     auto compiled = compile_pipeline_objects(p_resource_key, p_pipeline_resource, p_uniform_bindings);
     return {compiled.graphics_pipeline, compiled.descriptor_sets};
 }
 
 GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::compile_pipeline_objects(
-    const std::string& p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
     validate_uniform_bindings(p_uniform_bindings);
     if (p_pipeline_resource->vertex_stage == nullptr || p_pipeline_resource->fragment_stage == nullptr) {
         throw std::runtime_error(
@@ -265,7 +265,7 @@ Ref<ROShaderVK> GraphicsPipelineCompilerVK::compile_shader(RefRes<RUShader> p_sh
 }
 
 std::vector<Ref<RODescriptorSetLayoutVK>> GraphicsPipelineCompilerVK::compile_descriptor_set_layouts(
-    const std::string& p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings) {
+    std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings) {
     std::vector<Ref<RODescriptorSetLayoutVK>> result;
     auto descriptor_set_layout_bindings = build_graphics_pipeline_descriptor_set_layout_bindings(p_descriptor_bindings);
     result.reserve(descriptor_set_layout_bindings.size());
@@ -291,7 +291,7 @@ std::vector<Ref<RODescriptorSetLayoutVK>> GraphicsPipelineCompilerVK::compile_de
 }
 
 Ref<ROPipelineLayoutVK> GraphicsPipelineCompilerVK::compile_pipeline_layout(
-    const std::string& p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts) {
+    std::string_view p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts) {
     std::string pipeline_layout_key = std::format("{}#pipeline_layout", p_resource_key);
     auto pipeline_layout = get_registered_render_object<ROPipelineLayoutVK>(
         context.render_database, pipeline_layout_key, TypeUUID<ROPipelineLayoutVK>::UUID);
@@ -308,7 +308,7 @@ Ref<ROPipelineLayoutVK> GraphicsPipelineCompilerVK::compile_pipeline_layout(
     return pipeline_layout;
 }
 
-Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(const std::string& p_resource_key,
+Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(std::string_view p_resource_key,
     const RUGraphicsPipeline& p_pipeline_resource,
     Ref<ROShaderVK> p_vertex_shader,
     Ref<ROShaderVK> p_fragment_shader,
@@ -342,7 +342,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     return graphics_pipeline;
 }
 
-std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descriptor_sets(const std::string& p_resource_key,
+std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descriptor_sets(std::string_view p_resource_key,
     const RUGraphicsPipeline& p_pipeline_resource,
     const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
     const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
@@ -372,7 +372,7 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
     return descriptor_sets;
 }
 
-Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_material_descriptor_set(const std::string& p_resource_key,
+Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_material_descriptor_set(std::string_view p_resource_key,
     RefRes<RUMaterial> p_material,
     Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
     const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
@@ -404,14 +404,15 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_material_descriptor_s
     return builder.create_ref(context.render_data)->get_descriptor_set();
 }
 
-Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(const std::string& p_resource_key, RefRes<RUImage> p_image_resource) {
+Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource) {
+    std::string formatted_resource_key = std::format("{}{}", p_resource_key, "#image_view");
     auto image_view = get_registered_render_object<ROImageViewVK>(
-        context.render_database, p_resource_key + "#image_view", TypeUUID<ROImageViewVK>::UUID);
+        context.render_database, formatted_resource_key, TypeUUID<ROImageViewVK>::UUID);
     if (image_view != MEM_NULL) {
         return image_view;
     }
     VkFormat image_format = image_format_from_resource(*p_image_resource);
-    auto image = compile_image(p_resource_key + "#image", p_image_resource, image_format);
+    auto image = compile_image(formatted_resource_key, p_image_resource, image_format);
     image_view =
         ROImageViewVK::Builder()
             .set_image(image)
@@ -421,12 +422,12 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(const std::str
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
             .create_ref(context.render_data);
     context.render_database->register_compiled_render_resource(
-        p_resource_key + "#image_view", TypeUUID<ROImageViewVK>::UUID, RefWeak<IRenderObject>(image_view));
+        formatted_resource_key, TypeUUID<ROImageViewVK>::UUID, RefWeak<IRenderObject>(image_view));
     return image_view;
 }
 
 Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
-    const std::string& p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format) {
+    std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format) {
     auto image = get_registered_render_object<ROImageVK>(context.render_database, p_resource_key, TypeUUID<ROImageVK>::UUID);
     if (image != MEM_NULL) {
         return image;

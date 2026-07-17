@@ -18,6 +18,7 @@
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
 #include <string>
+#include <string_view>
 #include <vector>
 namespace WhiteBirdEngine {
 
@@ -46,7 +47,7 @@ public:
      * @param p_value The value to set to.
      */
     template <typename T>
-    void set_value(const std::string& p_key, T&& p_value) {
+    void set_value(std::string_view p_key, T&& p_value) {
         static_cast<ChildType*>(this)->set_value(p_key, std::forward<T>(p_value));
     }
 
@@ -69,7 +70,7 @@ public:
      * @return The value of the key.
      */
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
     }
 
@@ -103,7 +104,7 @@ public:
      * @param p_value The value to write to.
      */
     template <typename T>
-    void get(const std::string& p_key, T& p_value) const {
+    void get(std::string_view p_key, T& p_value) const {
         return static_cast<const ChildType*>(this)->get(p_key, p_value);
     }
 
@@ -112,7 +113,7 @@ public:
      *
      * @return True if contains a key, false otherwise.
      */
-    bool contains(const std::string& p_key) const {
+    bool contains(std::string_view p_key) const {
         return static_cast<const ChildType*>(this)->contains(p_key);
     }
 };
@@ -134,8 +135,11 @@ template <typename ChildType>
 class Parser {
 public:
     Parser() = default;
-    ~Parser() {
-    }
+    ~Parser() = default;
+    Parser(const Parser&) = default;
+    Parser(Parser&&) = default;
+    Parser& operator=(const Parser&) = default;
+    Parser& operator=(Parser&&) = default;
 
     /**
      * @brief Parse a file from a path.
@@ -151,7 +155,7 @@ public:
      *
      * @param p_buffer The buffer to parse from.
      */
-    void parse_from_buffer(const std::string& p_buffer) {
+    void parse_from_buffer(std::string_view p_buffer) {
         return static_cast<ChildType*>(this)->parse_from_buffer(p_buffer);
     }
 
@@ -163,7 +167,7 @@ public:
      * @return The value of the key.
      */
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         return static_cast<const ChildType*>(this)->template get_value<T>(p_key);
     }
 
@@ -175,7 +179,7 @@ public:
      * @param p_val The output value of the key.
      */
     template <typename T>
-    void get_value(const std::string& p_key, T& p_val) const {
+    void get_value(std::string_view p_key, T& p_val) const {
         static_cast<const ChildType*>(this)->template get_value<T>(p_key, p_val);
     }
 
@@ -231,8 +235,8 @@ public:
      *
      * @return True if contains a key, false otherwise.
      */
-    bool contains(const std::string& p_key) const {
-        return static_cast<const ChildType*>(this)->contains();
+    bool contains(std::string_view p_key) const {
+        return static_cast<const ChildType*>(this)->contains(p_key);
     }
 
     /**
@@ -243,7 +247,7 @@ public:
      * @param p_value The value reference to be set.
      */
     template <typename T>
-    void get_value(std::string& p_key, T&& p_value) const {
+    void get_value(std::string_view p_key, T&& p_value) const {
         return static_cast<const ChildType*>(this)->get_value(p_key, std::forward<T>(p_value));
     }
 };

@@ -980,7 +980,7 @@ inline void dynamic_dispatch_test_multilevel_inheritance() {
     child_ptr->serialize(json_data_grandchild);
 
     // All should serialize the complete grandchild object due to dynamic dispatch
-    auto verify_complete_serialization = [&](const WBE::JSONData& p_data, const std::string& p_test_name) {
+    auto verify_complete_serialization = [&](const WBE::JSONData& p_data, std::string_view p_test_name) {
         EXPECT_TRUE(p_data.contains("base_id")) << "Missing base_id in " << p_test_name;
         EXPECT_TRUE(p_data.contains("base_name")) << "Missing base_name in " << p_test_name;
         EXPECT_TRUE(p_data.contains("base_value")) << "Missing base_value in " << p_test_name;
@@ -1030,7 +1030,7 @@ inline void dynamic_dispatch_test_multiple_inheritance() {
     b_ptr->serialize(json_data_b);
 
     // All should serialize the complete child object
-    auto verify_complete_multi_serialization = [&](const WBE::JSONData& p_data, const std::string& p_test_name) {
+    auto verify_complete_multi_serialization = [&](const WBE::JSONData& p_data, std::string_view p_test_name) {
         EXPECT_TRUE(p_data.contains("a_id")) << "Missing a_id in " << p_test_name;
         EXPECT_TRUE(p_data.contains("a_name")) << "Missing a_name in " << p_test_name;
         EXPECT_TRUE(p_data.contains("a_value")) << "Missing a_value in " << p_test_name;

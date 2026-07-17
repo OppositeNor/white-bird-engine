@@ -16,7 +16,7 @@
 #define WBE_FILE_MODULE_HH
 
 #include "platform/file_system/path.hh"
-#include <string>
+#include <string_view>
 namespace WhiteBirdEngine {
 
 class DynamicModule final {
@@ -29,19 +29,20 @@ public:
     DynamicModule& operator=(DynamicModule&&) = delete;
 
     template <typename FuncType>
-    FuncType get_function(const std::string& p_function_symbol) {
+    FuncType get_function(std::string_view p_function_symbol) {
         return FuncType(get_function_helper(p_function_symbol));
     }
+
 private:
 #ifdef __unix__
     using ModuleHandle = void*;
     static constexpr ModuleHandle MODULE_HANDLE_INVALID = nullptr;
 #else
-    #error "Module type not declared"
+#error "Module type not declared"
 #endif
     ModuleHandle handle = MODULE_HANDLE_INVALID;
     Path module_path;
-    void* get_function_helper(const std::string& p_function_symbol);
+    void* get_function_helper(std::string_view p_function_symbol);
 };
 
 } // namespace WhiteBirdEngine

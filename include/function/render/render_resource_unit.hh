@@ -169,8 +169,8 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
  *
  */
 struct RUShader : public ResourceUnit {
-    // The binary data.
-    RefRes<char> data;
+    // The shader source.
+    RefRes<uint32_t> data;
     // The size of the binary data.
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.

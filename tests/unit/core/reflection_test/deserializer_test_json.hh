@@ -1144,7 +1144,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_PolymorphicContainer) {
 
 TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
     // Simulate runtime type resolution scenario
-    auto create_object = [](const std::string& p_type_name) -> std::unique_ptr<WBE::Serializable> {
+    auto create_object = [](std::string_view p_type_name) -> std::unique_ptr<WBE::Serializable> {
         if (p_type_name == "TestSerializable") {
             return std::make_unique<WBE::TestSerializable>();
         }

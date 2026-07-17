@@ -15,12 +15,13 @@
 #ifndef WBE_FILE_SCENE_MANAGER_HH
 #define WBE_FILE_SCENE_MANAGER_HH
 
-#include "core/memory/reference_strong.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "i_scene_manager.hh"
 #include "scene.hh"
 #include "utils/defs.hh"
 #include <string>
+#include <string_view>
 namespace WhiteBirdEngine {
 
 /**
@@ -37,7 +38,7 @@ public:
 
     virtual Ref<const Scene> get_current_scene() const override;
 
-    virtual void change_scene(const std::string& p_scene_id) override;
+    virtual void change_scene(std::string_view p_scene_id) override;
 
 private:
     Map<std::string, Ref<Scene>> scene_map;

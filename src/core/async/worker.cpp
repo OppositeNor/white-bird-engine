@@ -19,7 +19,6 @@
 #include <future>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -39,12 +38,6 @@ void Worker::run() {
 void Worker::read_text_file(std::promise<std::string>& p_promise, const Path& p_path) {
     add_job([&]() {
         p_promise.set_value(load_text_file(static_cast<std::string>(p_path).c_str()));
-    });
-}
-
-void Worker::read_binary_file(std::promise<std::vector<char>>& p_promise, const Path& p_path) {
-    add_job([&]() {
-        p_promise.set_value(load_binary_file(static_cast<std::string>(p_path).c_str()));
     });
 }
 

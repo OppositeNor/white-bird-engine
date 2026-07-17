@@ -23,13 +23,14 @@
 #include <format>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
 namespace {
 
 template <typename SchemeType>
-const SchemeType& get_typed_scheme(const RUScheme& p_scheme, const std::string& p_expected_type) {
+const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_expected_type) {
     const auto* typed_scheme = dynamic_cast<const SchemeType*>(&p_scheme);
     if (typed_scheme == nullptr) {
         throw std::runtime_error(std::format("Failed to populate resource: expected typed scheme {} "
@@ -40,8 +41,10 @@ const SchemeType& get_typed_scheme(const RUScheme& p_scheme, const std::string& 
     return *typed_scheme;
 }
 
-RefRes<char> populate_text(IResourceChunk& p_res_chunk, const std::string& p_str) {
-    return p_res_chunk.push_data(p_str.size() + 1, p_str.c_str());
+RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) {
+    auto result = p_res_chunk.push_data(p_str.size() + 1, p_str.data());
+    result.get()[p_str.size()] = '\0';
+    return result;
 }
 
 } // namespace
@@ -113,8 +116,8 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
     uint32_t width, height, file_channels;
     RUImage resource_unit;
     if (typed_scheme.is_hdr) {
-        auto image_data =
-            load_image_data_hdr(file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
+        auto image_data = load_image_data_hdr(
+            file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
         if (image_data.has_value()) {
             throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", static_cast<std::string>(file_path)));
         }
@@ -126,8 +129,8 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
         auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count * sizeof(float), (*image_data).data());
         resource_unit.image_data = data;
     } else {
-        auto image_data =
-            load_image_data(file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
+        auto image_data = load_image_data(
+            file_path, typed_scheme.channel_count, typed_scheme.flip_h, typed_scheme.flip_v, width, height, file_channels);
         if (image_data.empty()) {
             throw std::runtime_error(std::format("Failed to load image data from file: {}", static_cast<std::string>(file_path)));
         }

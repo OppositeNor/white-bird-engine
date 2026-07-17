@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <thread>
 namespace WhiteBirdEngine {
 
@@ -51,7 +52,7 @@ public:
     }
     virtual void tick(double p_delta) override;
     virtual Ref<RenderDatabase> get_render_database() override;
-    virtual void activate_render_graph(const std::string& p_pipeline_name) override;
+    virtual void activate_render_graph(std::string_view p_pipeline_name) override;
     virtual void update_static_opaque_triangles() override;
     virtual void add_job(std::function<void()> p_job) override;
 

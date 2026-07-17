@@ -24,7 +24,10 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <cstddef>
-#include <string>
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -39,15 +42,15 @@ public:
     struct Builder {
         friend ROShaderVK;
         // The source code of the shader.
-        Required<const char*> code;
+        Required<std::vector<uint32_t>> code;
         // Size of the code.
         Required<size_t> code_size;
 
         // Set the shader source code.
-        Builder& set_code(const char* p_code, size_t p_code_size);
+        Builder& set_code(std::span<uint32_t> p_code);
 
         // Set from a resource ID.
-        Builder& set_code(const std::string& p_resource_id);
+        Builder& set_code(std::string_view p_resource_id);
 
         // Set from a resource.
         Builder& set_code(RefRes<RUShader> p_resource);
@@ -84,7 +87,7 @@ public:
      * @param p_base_render_data The base render data.
      * @param p_resource_id The resource ID.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const std::string& p_resource_id);
+    ROShaderVK(const BaseRenderDataVK* p_base_render_data, std::string_view p_resource_id);
     /**
      * @brief Constructor from a shader resource.
      *

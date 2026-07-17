@@ -14,14 +14,15 @@
 */
 #include "function/render/render_database.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
+#include "function/ecs/components.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/spot_light_info.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -32,6 +33,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 namespace WhiteBirdEngine {
@@ -97,9 +99,7 @@ void append_material_mesh_info(RenderDatabase::OpaqueTrianglesInfo& p_triangles_
 } // namespace
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : compiled_render_resources(p_allocator),
-      static_opaque(p_allocator),
-      dynamic_opaque(p_allocator),
+    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator),
       static_spot_lights(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
@@ -117,7 +117,7 @@ void RenderDatabase::set_static_spot_lights(std::span<const ComponentSpotLight> 
 }
 
 void RenderDatabase::register_compiled_render_resource(
-    const std::string& p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object) {
+    std::string_view p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object) {
     if (p_resource_key.empty()) {
         throw std::runtime_error("Failed to register compiled render resource: resource key is empty.");
     }
@@ -125,21 +125,22 @@ void RenderDatabase::register_compiled_render_resource(
         throw std::runtime_error("Failed to register compiled render resource: render object is null.");
     }
     compiled_render_resources.insert_or_assign(
-        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id}, p_render_object);
+        CompiledRenderResourceKey{.resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object_type_id},
+        p_render_object);
 }
 
-Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) {
+Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id) {
     auto entry = compiled_render_resources.find(
-        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id});
+        CompiledRenderResourceKey{.resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object_type_id});
     if (entry == compiled_render_resources.end() || entry->second.is_null()) {
         return MEM_NULL;
     }
     return entry->second.lock();
 }
 
-bool RenderDatabase::contains_compiled_render_resource(const std::string& p_resource_key, HashCode p_render_object_type_id) const {
+bool RenderDatabase::contains_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id) const {
     auto entry = compiled_render_resources.find(
-        CompiledRenderResourceKey{.resource_key = p_resource_key, .render_object_type_id = p_render_object_type_id});
+        CompiledRenderResourceKey{.resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object_type_id});
     return entry != compiled_render_resources.end() && entry->second.is_valid();
 }
 

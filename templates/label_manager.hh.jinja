@@ -92,12 +92,12 @@ public:
      * @param p_name The name of the label.
      * @return The label.
      */
-    HashCode get_label_from_name(const std::string& p_name) const {
+    HashCode get_label_from_name(std::string_view p_name) const {
         std::shared_lock lock(label_mutex);
         if (!name_to_label.contains(p_name)) {
             throw std::runtime_error(std::format("Failed to get label from name {}: Label not registered.", p_name));
         }
-        return name_to_label.at(p_name);
+        return name_to_label.at(std::string(p_name)); // waiting for C++26...
     }
 
     /**
@@ -105,9 +105,9 @@ public:
      *
      * @param p_name The name of the label to register.
      */
-    void register_label(const std::string& p_name) {
+    void register_label(std::string_view p_name) {
         std::unique_lock lock(label_mutex);
-        label_to_name.insert({dynam_hash(p_name), p_name});
+        label_to_name.insert({dynam_hash(p_name), std::string(p_name)});
     }
 
     /**
@@ -120,7 +120,7 @@ public:
 private:
     inline static LabelManager* singleton = nullptr;
     std::unordered_map<HashCode, std::string> label_to_name;
-    std::unordered_map<std::string, HashCode> name_to_label;
+    std::unordered_map<std::string, HashCode, TransparentStrHash, TransparentEqual> name_to_label;
     mutable std::shared_mutex label_mutex;
 };
 

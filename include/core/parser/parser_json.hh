@@ -32,6 +32,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -76,7 +77,7 @@ public:
     }
 
     template <typename T>
-    void set_value(const std::string& p_key, T&& p_value) {
+    void set_value(std::string_view p_key, T&& p_value) {
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, JSONData>) {
             data[p_key] = p_value.data;
@@ -157,7 +158,7 @@ public:
     }
 
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         T result;
         get_value<T>(p_key, result);
         return result;
@@ -208,7 +209,7 @@ public:
     }
 
     template <typename T>
-    void get_value(const std::string& p_key, T& p_value) const {
+    void get_value(std::string_view p_key, T& p_value) const {
         if constexpr (std::same_as<T, std::vector<JSONData>>) {
             std::vector<JSONData> result;
             for (const auto& elem : data.at(p_key)) {
@@ -263,7 +264,7 @@ public:
         return result;
     }
 
-    bool contains(const std::string& p_key) const {
+    bool contains(std::string_view p_key) const {
         return data.contains(p_key);
     }
 
@@ -320,7 +321,7 @@ public:
         }
     }
 
-    void parse_from_buffer(const std::string& p_buffer) {
+    void parse_from_buffer(std::string_view p_buffer) {
         try {
             data.data = Json::parse(p_buffer);
         } catch (const std::exception& e) {
@@ -329,7 +330,7 @@ public:
     }
 
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         return data.get_value<T>(p_key);
     }
 
@@ -366,7 +367,7 @@ public:
         return data;
     }
 
-    bool contains(const std::string& p_key) const {
+    bool contains(std::string_view p_key) const {
         return data.contains(p_key);
     }
 

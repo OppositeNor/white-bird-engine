@@ -21,6 +21,7 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_utils.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -28,16 +29,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
 namespace {
 
 template <typename SchemeType>
-const SchemeType& get_typed_scheme(const RUScheme& p_scheme, const std::string& p_expected_type) {
+const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_expected_type) {
     const auto* typed_scheme = dynamic_cast<const SchemeType*>(&p_scheme);
     if (typed_scheme == nullptr) {
         throw std::runtime_error(std::format("Failed to populate resource: expected typed scheme {} "
@@ -48,11 +49,13 @@ const SchemeType& get_typed_scheme(const RUScheme& p_scheme, const std::string& 
     return *typed_scheme;
 }
 
-RefRes<char> populate_text(IResourceChunk& p_res_chunk, const std::string& p_str) {
-    return p_res_chunk.push_data(p_str.size() + 1, p_str.c_str());
+RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) {
+    RefRes<char> result = p_res_chunk.push_data(p_str.size() + 1, p_str.data());
+    result.get()[p_str.size()] = '\0';
+    return result;
 }
 
-RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, const std::string& p_str) {
+RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, std::string_view p_str) {
     RUText resource_unit;
     resource_unit.text_data = populate_text(p_res_chunk, p_str);
     resource_unit.size = p_str.size() + 1;
@@ -70,20 +73,20 @@ RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSch
 
 RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) {
     auto file_path = get_resource_path(p_scheme.path);
-    auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
+    auto file_content = load_binary_file<uint32_t>(static_cast<std::string>(file_path).c_str());
     auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
-    resource_unit.data = data;
+    resource_unit.data = data.force_cast<uint32_t>();
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
 }
 
 void populate_pipeline_stage(IResourceChunk& p_res_chunk,
     RefRes<RUShader>& p_stage,
-    const std::string& p_stage_id,
+    std::string_view p_stage_id,
     const RUSchemeShader& p_stage_scheme,
-    const std::string& p_stage_name,
+    std::string_view p_stage_name,
     bool p_is_required = true) {
     if (!p_stage_id.empty()) {
         return;
@@ -99,15 +102,15 @@ void populate_pipeline_stage(IResourceChunk& p_res_chunk,
     p_stage = populate_shader_resource(p_res_chunk, p_stage_scheme);
 }
 
-void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_stage, const std::string& p_stage_id) {
+void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_stage, std::string_view p_stage_id) {
     if (!p_stage_id.empty()) {
         p_res_chunk.create_ref_to(p_stage, p_stage_id);
     }
 }
 
-RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, const std::string& p_entry) {
-    const std::string& stage_entry = p_entry.empty() ? std::string("main") : p_entry;
-    return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.c_str());
+RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, std::string_view p_entry) {
+    std::string_view stage_entry = p_entry.empty() ? "main" : p_entry;
+    return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.data());
 }
 
 RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemeGraphicsPipeline& p_scheme) {
@@ -236,7 +239,8 @@ std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk&
     return populate_graphics_pipeline_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(
+    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
     RUSchemeGraphicsPipeline scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);

@@ -20,6 +20,7 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 namespace WhiteBirdEngine {
 
@@ -34,8 +35,8 @@ namespace WhiteBirdEngine {
 class Profiler {
 public:
     using ProfileData = ProfilingManager::ProfileData;
-    Profiler(ChannelID p_channel, const std::string& p_message, const std::string& p_file, uint32_t p_line) {
-        profile_data = {.channel = p_channel, .message = p_message, .file = p_file, .line = p_line};
+    Profiler(ChannelID p_channel, std::string_view p_message, std::string_view p_file, uint32_t p_line) {
+        profile_data = {.channel = p_channel, .message = std::string(p_message), .file = std::string(p_file), .line = p_line};
         profile_data.start_time = EngineCore::get_singleton()->global_clock->get_duration();
     }
 

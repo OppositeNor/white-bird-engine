@@ -19,6 +19,7 @@
 #include "utils/utils.hh"
 #include <ostream>
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -54,11 +55,11 @@ public:
         return channel_id;
     }
 
-    virtual void message(const std::string& p_str) override;
+    virtual void message(std::string_view p_str) override;
 
-    virtual void warning(const std::string& p_str) override;
+    virtual void warning(std::string_view p_str) override;
 
-    virtual void error(const std::string& p_str) override;
+    virtual void error(std::string_view p_str) override;
 
 private:
     std::ostream* ostream;

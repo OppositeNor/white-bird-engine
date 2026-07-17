@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -118,7 +119,7 @@ public:
      * @param p_uniform_bindings Caller-provided uniform field bindings.
      * @return Render task descriptor for the compiled graphics pipeline.
      */
-    std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(const std::string& p_resource_key,
+    std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
         std::span<const RenderUniformBinding> p_uniform_bindings = {});
 
@@ -130,31 +131,31 @@ private:
 
     GraphicsPipelineCompilerVKContext context;
 
-    CompiledPipelineObjects compile_pipeline_objects(const std::string& p_resource_key,
+    CompiledPipelineObjects compile_pipeline_objects(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
         std::span<const RenderUniformBinding> p_uniform_bindings);
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
     std::vector<Ref<RODescriptorSetLayoutVK>> compile_descriptor_set_layouts(
-        const std::string& p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
+        std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
     Ref<ROPipelineLayoutVK> compile_pipeline_layout(
-        const std::string& p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts);
-    Ref<ROGraphicsPipelineVK> compile_graphics_pipeline(const std::string& p_resource_key,
+        std::string_view p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts);
+    Ref<ROGraphicsPipelineVK> compile_graphics_pipeline(std::string_view p_resource_key,
         const RUGraphicsPipeline& p_pipeline_resource,
         Ref<ROShaderVK> p_vertex_shader,
         Ref<ROShaderVK> p_fragment_shader,
         Ref<ROPipelineLayoutVK> p_pipeline_layout);
-    std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(const std::string& p_resource_key,
+    std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(std::string_view p_resource_key,
         const RUGraphicsPipeline& p_pipeline_resource,
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         std::span<const RenderUniformBinding> p_uniform_bindings);
-    Ref<RODescriptorSetVK> compile_material_descriptor_set(const std::string& p_resource_key,
+    Ref<RODescriptorSetVK> compile_material_descriptor_set(std::string_view p_resource_key,
         RefRes<RUMaterial> p_material,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index);
-    Ref<ROImageViewVK> compile_image_view(const std::string& p_resource_key, RefRes<RUImage> p_image_resource);
-    Ref<ROImageVK> compile_image(const std::string& p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
+    Ref<ROImageViewVK> compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource);
+    Ref<ROImageVK> compile_image(std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
     void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,

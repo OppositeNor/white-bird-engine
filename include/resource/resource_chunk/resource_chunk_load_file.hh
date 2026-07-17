@@ -23,12 +23,14 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <cstring>
 #include <format>
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -59,14 +61,14 @@ public:
      * @param p_path The resource path to the resource file.
      * @param p_parser The parser to get resource from.
      */
-    ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator);
+    ResourceChunkLoadFile(std::string_view p_path, StackAllocator& p_allocator);
 
-    virtual RefRes<char> get_resource(const std::string& p_id) const override {
-        return resource_map.at(p_id);
+    virtual RefRes<char> get_resource(std::string_view p_id) const override {
+        return resource_map.at(std::string(p_id));
     }
 
-    virtual RefRes<char> try_get_resource(const std::string& p_id) const override {
-        auto entry = resource_map.find(p_id);
+    virtual RefRes<char> try_get_resource(std::string_view p_id) const override {
+        auto entry = resource_map.find(std::string(p_id));
         if (entry == resource_map.end()) {
             return MEM_NULL;
         }
@@ -99,7 +101,7 @@ public:
         return allocator->get(p_mem_id);
     }
 
-    virtual bool contains(const std::string& p_res_key) const override {
+    virtual bool contains(std::string_view p_res_key) const override {
         return resource_map.contains(p_res_key);
     }
 
@@ -115,27 +117,28 @@ public:
 protected:
     using ParserDataType = ParserResource::DataType;
 
-    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, const std::string& p_id) override {
+    virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, std::string_view p_id) override {
         auto entry = resource_map.find(p_id);
         if (entry != resource_map.end()) {
             p_assign_ref(entry->second);
             return;
         }
-        ref_map.push_back(ResourceReference{.assign_ref = std::move(p_assign_ref), .id = p_id});
+        ref_map.push_back(ResourceReference{.assign_ref = std::move(p_assign_ref), .id = std::string(p_id)});
     }
 
-    virtual RefRes<char> push_res_unit_ptr(const std::string& p_res_key, const void* p_res, size_t p_size) override {
+    virtual RefRes<char> push_res_unit_ptr(std::string_view p_res_key, const void* p_res, size_t p_size) override {
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
         // Store the resource key inside the same chunk so ResourceUnit can
         // expose a stable, chunk-owned key without referencing manifest memory.
-        const char* resource_key = nullptr;
+        char* resource_key = nullptr;
         if (!p_res_key.empty()) {
             total_size += p_res_key.size() + 1;
             MemID resource_key_mem_id = allocator->allocate(p_res_key.size() + 1);
-            memcpy(allocator->get(resource_key_mem_id), p_res_key.c_str(), p_res_key.size() + 1);
-            resource_key = static_cast<const char*>(allocator->get(resource_key_mem_id));
+            resource_key = allocator->get_obj<char>(resource_key_mem_id);
+            memcpy(resource_key, p_res_key.data(), p_res_key.size() + 1);
+            resource_key[p_res_key.size()] = '\0';
         }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
@@ -145,7 +148,7 @@ protected:
         static_cast<ResourceUnit*>(stored_resource)->resource_key = resource_key;
         RefRes<char> result(result_mem_id, allocator);
         if (!p_res_key.empty()) {
-            resource_map[p_res_key] = result;
+            resource_map[std::string(p_res_key)] = result;
         }
         return result;
     }
@@ -157,13 +160,13 @@ private:
     };
 
     size_t total_size = 0;
-    std::unordered_map<std::string, RefRes<char>> resource_map;
+    std::unordered_map<std::string, RefRes<char>, TransparentStrHash, TransparentEqual> resource_map;
     std::vector<ResourceReference> ref_map;
     // For resources that needs RAII support.
     std::vector<Unique<Object>> objects;
     StackAllocator* allocator;
 
-    void resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path);
+    void resolve_load_resource(std::vector<std::string>& p_included_pathes, std::string_view p_res_chunk_path);
 
     void resolve_refs() {
         auto* resource_manager = ResourceManager::get_singleton();
@@ -185,13 +188,13 @@ private:
     }
 };
 
-inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string>& p_included_pathes, const std::string& p_res_chunk_path) {
+inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string>& p_included_pathes, std::string_view p_res_chunk_path) {
     if (std::any_of(p_included_pathes.begin(), p_included_pathes.end(), [&](const auto& p_str) {
             return p_str == p_res_chunk_path;
         })) {
         throw std::runtime_error(std::format("Include recursion found: {}", p_res_chunk_path));
     }
-    p_included_pathes.push_back(p_res_chunk_path);
+    p_included_pathes.emplace_back(p_res_chunk_path);
 
     auto rc_file_path = get_resource_path(p_res_chunk_path);
     ParserResource parser;
@@ -232,7 +235,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
     p_included_pathes.pop_back();
 }
 
-inline ResourceChunkLoadFile::ResourceChunkLoadFile(const std::string& p_path, StackAllocator& p_allocator) {
+inline ResourceChunkLoadFile::ResourceChunkLoadFile(std::string_view p_path, StackAllocator& p_allocator) {
     allocator = &p_allocator;
     std::vector<std::string> included_pathes;
     resolve_load_resource(included_pathes, p_path);

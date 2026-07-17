@@ -19,6 +19,7 @@
 #include "function/render_vk/shader_metadata_vk.hh"
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -93,18 +94,18 @@ struct ShaderDescriptorSetLayoutVK {
  * @brief Find a shader entry point by stage and entry function name.
  */
 const ShaderMetadataEntryPoint& find_shader_entry_point(
-    const ShaderMetadata& p_metadata, const std::string& p_stage, const std::string& p_entry_name);
+    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
 
 /**
  * @brief Convert a reflected shader stage string into a Vulkan stage flag.
  */
-VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(const std::string& p_stage);
+VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_stage);
 
 /**
  * @brief Collect descriptor bindings used by one shader entry point.
  */
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
-    const ShaderMetadata& p_metadata, const std::string& p_stage, const std::string& p_entry_name);
+    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
 
 /**
  * @brief Collect and merge descriptor bindings from all supported graphics stages.

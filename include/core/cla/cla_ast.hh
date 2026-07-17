@@ -59,7 +59,7 @@ public:
      *
      * @param p_utility_name The name of the utility.
      */
-    CLAASTNodeRoot(const std::string& p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
+    CLAASTNodeRoot(std::string_view p_utility_name, std::vector<Ref<CLAASTNode>>&& p_operations)
         : utility_name(p_utility_name), operations(std::move(p_operations)) {
     }
     virtual ~CLAASTNodeRoot() override = default;
@@ -103,7 +103,7 @@ public:
      * @param p_operation_name The name of the operation.
      * @param p_is_short Is the name a short notation.
      */
-    CLAASTNodeOperation(const std::string& p_operation_name, bool p_is_short)
+    CLAASTNodeOperation(std::string_view p_operation_name, bool p_is_short)
         : CLAASTNodeOperation(p_operation_name, {}, p_is_short) {
     }
     /**
@@ -113,7 +113,7 @@ public:
      * @param p_arguments The arguments of the operation.
      * @param p_is_short Is the name a short notation.
      */
-    CLAASTNodeOperation(const std::string& p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
+    CLAASTNodeOperation(std::string_view p_operation_name, std::vector<std::string>&& p_arguments, bool p_is_short)
         : is_short(p_is_short), operation_name(p_operation_name), arguments(std::move(p_arguments)) {
     }
 
@@ -146,7 +146,7 @@ public:
      *
      * @param p_argument The argument to be pushed.
      */
-    void push_argument(const std::string& p_argument) {
+    void push_argument(std::string_view p_argument) {
         arguments.push_back(p_argument);
     }
 
@@ -192,7 +192,7 @@ public:
      *
      * @param p_operand_name The name of the operand.
      */
-    CLAASTNodeRootOperand(const std::string& p_operand_name) : operand_name(p_operand_name) {
+    CLAASTNodeRootOperand(std::string_view p_operand_name) : operand_name(p_operand_name) {
     }
 
     virtual ~CLAASTNodeRootOperand() override = default;

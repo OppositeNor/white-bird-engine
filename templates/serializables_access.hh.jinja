@@ -67,7 +67,7 @@ public:
      * @return A reference to the field.
      */
     template <typename T>
-    T& get_field(SerializableType& p_serializable, const std::string& p_name) const {
+    T& get_field(SerializableType& p_serializable, std::string_view p_name) const {
         {% for field in serializable.fields %}
         if (p_name == "{{ field.name }}") {
             return p_serializable.{{ field.name }};
@@ -84,7 +84,7 @@ public:
      * @return A reference to the field.
      */
     template <typename T>
-    const T& get_field(const SerializableType& p_serializable, const std::string& p_name) const {
+    const T& get_field(const SerializableType& p_serializable, std::string_view p_name) const {
         {% for field in serializable.fields %}
         if (p_name == "{{ field.name }}") {
             return p_serializable.{{ field.name }};

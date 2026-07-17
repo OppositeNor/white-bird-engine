@@ -15,19 +15,20 @@
 #include "core/logging/log_stream.hh"
 #include "core/engine_core.hh"
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
-void LogStream::message(const std::string& p_str) {
+void LogStream::message(std::string_view p_str) {
     const auto& channel_name = EngineCore::get_singleton()->label_manager->get_label_name(channel_id);
     *ostream << "[" << channel_name << "] <Message>: " << p_str << '\n';
 }
 
-void LogStream::warning(const std::string& p_str) {
+void LogStream::warning(std::string_view p_str) {
     const auto& channel_name = EngineCore::get_singleton()->label_manager->get_label_name(channel_id);
     *ostream << "[" << channel_name << "] <Warning>: " << p_str << '\n';
 }
 
-void LogStream::error(const std::string& p_str) {
+void LogStream::error(std::string_view p_str) {
     const auto& channel_name = EngineCore::get_singleton()->label_manager->get_label_name(channel_id);
     *ostream << "[" << channel_name << "] <Error>: " << p_str << '\n';
 }

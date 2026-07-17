@@ -52,7 +52,7 @@ public:
      *
      * @param p_str The string of the command.
      */
-    virtual void deserialize(const std::string& p_str) = 0;
+    virtual void deserialize(std::string_view p_str) = 0;
 };
 
 } // namespace WhiteBirdEngine

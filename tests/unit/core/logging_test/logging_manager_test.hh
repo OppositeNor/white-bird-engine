@@ -37,7 +37,7 @@ WBE_LABEL(WBE_TEST_LABEL_3, WBE_CHANNEL)
 
 class LogTestMock : public WBE::ILog {
 public:
-    const std::string& get_channel_name(WBE::HashCode p_label) {
+    std::string_view get_channel_name(WBE::HashCode p_label) {
         return WBE::EngineCore::get_singleton()->label_manager->get_label_name(p_label);
     }
 
@@ -56,15 +56,15 @@ public:
         return channel_id;
     }
 
-    virtual void message(const std::string& p_str) override {
+    virtual void message(std::string_view p_str) override {
         *ostream << "Message " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 
-    virtual void warning(const std::string& p_str) override {
+    virtual void warning(std::string_view p_str) override {
         *ostream << "Warning " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 
-    virtual void error(const std::string& p_str) override {
+    virtual void error(std::string_view p_str) override {
         *ostream << "Error " << get_channel_name(channel_id) << " " << p_str << '\n';
     }
 };

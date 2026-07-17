@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
@@ -26,14 +27,18 @@
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_utils.hh"
 #include "resource_test_utils.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <gtest/gtest.h>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -77,17 +82,33 @@ Emoji 测试: 😃🚀✨🌍
 )txt";
 };
 
+class RefResHolder {
+public:
+    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KiB(4))), res(mem_id, WBE::global_allocator()) {
+    }
+    ~RefResHolder() {
+        WBE::global_allocator()->deallocate(mem_id);
+    }
+    RefResHolder(const RefResHolder&) = delete;
+    RefResHolder(RefResHolder&&) = delete;
+    RefResHolder& operator=(const RefResHolder&) = delete;
+    RefResHolder& operator=(RefResHolder&&) = delete;
+    WBE::MemID mem_id;
+    WBE::RefRes<char> res;
+};
+
 TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     WBE::ResourceUnitLoaderText loader;
     std::stringstream ss;
     std::string text_content_storage;
+    RefResHolder res_holder;
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
-                             [&text_content_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                             [&text_content_storage, &res_holder](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
                                  text_content_storage.resize(p_res_size - 1);
                                  std::memcpy(text_content_storage.data(), p_res, p_res_size - 1);
                                  EXPECT_EQ(static_cast<const char*>(p_res)[p_res_size - 1], '\0');
-                                 return WBE::MEM_NULL;
+                                 return res_holder.res;
                              }))
                          .build(ss);
     loader.populate_scheme(*res_chunk, text_scheme);
@@ -97,23 +118,22 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
 TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     WBE::ResourceUnitLoaderBinary loader;
     std::stringstream ss;
-    std::vector<char> binary_data_storage;
+    std::vector<uint8_t> binary_data_storage;
     WBE::RUBinary captured_ru_binary;
     WBE::RUSchemeBinary binary_scheme;
     binary_scheme.path = "test_text_files/test_file_utf8.txt";
     auto res_chunk = MockResourceChunk::Builder()
-                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
-                             [&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-                                 binary_data_storage.resize(p_res_size);
-                                 std::memcpy(binary_data_storage.data(), p_res, p_res_size);
-                                 return WBE::MEM_NULL;
-                             }))
-                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
-                             [&captured_ru_binary](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                         .set_push_data_callback([&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                             binary_data_storage.resize(p_res_size);
+                             std::memcpy(binary_data_storage.data(), p_res, p_res_size);
+                             return WBE::MEM_NULL;
+                         })
+                         .set_push_res_unit_ptr_callback(
+                             [&captured_ru_binary](std::string_view, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUBinary));
                                  std::memcpy(static_cast<void*>(&captured_ru_binary), p_res, p_size);
                                  return WBE::MEM_NULL;
-                             }))
+                             })
                          .build(ss);
 
     loader.populate_scheme(*res_chunk, binary_scheme);
@@ -139,8 +159,8 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
                                  std::memcpy(image_data_storage.data(), p_res, p_res_size);
                                  return WBE::MEM_NULL;
                              }))
-                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
-                             [&captured_ru_image](const std::string&, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)>(
+                             [&captured_ru_image](std::string_view, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUImage));
                                  std::memcpy(static_cast<void*>(&captured_ru_image), p_res, p_size);
                                  return WBE::MEM_NULL;
@@ -198,21 +218,21 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     auto res_chunk =
         MockResourceChunk::Builder()
             .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
-            .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
-                [&captured_material, &push_to_stack](const std::string& p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+            .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)>(
+                [&captured_material, &push_to_stack](std::string_view p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
                     WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
                     if (p_res_key == "test_material") {
                         captured_material = saved_resource.force_cast<WBE::RUMaterial>();
                     }
                     return saved_resource;
                 }))
-            .set_create_ref_to_callback(std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)>(
-                [&created_ref_keys, &reference_resources](std::function<void(WBE::RefRes<char>)> p_assign_ref, const std::string& p_key) {
-                    created_ref_keys.push_back(p_key);
-                    auto found_resource = reference_resources.find(p_key);
-                    ASSERT_NE(found_resource, reference_resources.end());
-                    p_assign_ref(found_resource->second);
-                }))
+            .set_create_ref_to_callback([&created_ref_keys, &reference_resources](
+                                            std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                created_ref_keys.emplace_back(p_key);
+                auto found_resource = reference_resources.find(created_ref_keys.back());
+                ASSERT_NE(found_resource, reference_resources.end());
+                p_assign_ref(found_resource->second);
+            })
             .build(stream);
 
     std::string json_buffer = R"(
@@ -289,29 +309,28 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
         {"fragment_shader", fragment_shader_ref.force_cast<char>()},
     };
 
-    auto res_chunk =
-        MockResourceChunk::Builder()
-            .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
-            .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(const std::string&, const void*, size_t)>(
-                [&captured_material, &captured_pipeline, &push_to_stack](
-                    const std::string& p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
-                    if (p_res_key == "test_material_inline_pipeline") {
-                        captured_material = saved_resource.force_cast<WBE::RUMaterial>();
-                    }
-                    if (p_res_key == "inline_pipeline") {
-                        captured_pipeline = saved_resource.force_cast<WBE::RUGraphicsPipeline>();
-                    }
-                    return saved_resource;
-                }))
-            .set_create_ref_to_callback(std::function<void(std::function<void(WBE::RefRes<char>)>, const std::string&)>(
-                [&created_ref_keys, &reference_resources](std::function<void(WBE::RefRes<char>)> p_assign_ref, const std::string& p_key) {
-                    created_ref_keys.push_back(p_key);
-                    auto found_resource = reference_resources.find(p_key);
-                    ASSERT_NE(found_resource, reference_resources.end());
-                    p_assign_ref(found_resource->second);
-                }))
-            .build(stream);
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)>(
+                             [&captured_material, &captured_pipeline, &push_to_stack](
+                                 std::string_view p_res_key, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::RefRes<char> saved_resource = push_to_stack(p_size, p_res);
+                                 if (p_res_key == "test_material_inline_pipeline") {
+                                     captured_material = saved_resource.force_cast<WBE::RUMaterial>();
+                                 }
+                                 if (p_res_key == "inline_pipeline") {
+                                     captured_pipeline = saved_resource.force_cast<WBE::RUGraphicsPipeline>();
+                                 }
+                                 return saved_resource;
+                             }))
+                         .set_create_ref_to_callback([&created_ref_keys, &reference_resources](
+                                                         std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                             created_ref_keys.emplace_back(p_key);
+                             auto found_resource = reference_resources.find(created_ref_keys.back());
+                             ASSERT_NE(found_resource, reference_resources.end());
+                             p_assign_ref(found_resource->second);
+                         })
+                         .build(stream);
 
     std::string json_buffer = R"(
     {

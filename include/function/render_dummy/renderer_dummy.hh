@@ -21,9 +21,11 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "utils/defs.hh"
+#include <cstdint>
 #include <functional>
 #include <span>
 #include <string>
+#include <string_view>
 namespace WhiteBirdEngine {
 
 /**
@@ -53,7 +55,7 @@ public:
         return dummy_database;
     }
 
-    virtual void activate_render_graph(const std::string& p_pipeline_name) override {
+    virtual void activate_render_graph(std::string_view p_pipeline_name) override {
         (void)p_pipeline_name;
     }
 

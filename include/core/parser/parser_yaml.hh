@@ -30,6 +30,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -74,7 +75,7 @@ public:
     }
 
     template <typename T>
-    void set_value(const std::string& p_key, T&& p_value) {
+    void set_value(std::string_view p_key, T&& p_value) {
         using Type = std::remove_cvref_t<T>;
         if constexpr (std::same_as<Type, YAMLData>) {
             node[p_key] = p_value.node;
@@ -166,7 +167,7 @@ public:
     }
 
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         T result;
         get_value<T>(p_key, result);
         return result;
@@ -214,7 +215,7 @@ public:
     }
 
     template <typename T>
-    void get_value(const std::string& p_key, T& p_value) const {
+    void get_value(std::string_view p_key, T& p_value) const {
         if constexpr (BufferBaseConcept<T>) {
             using BufferT = std::remove_cvref_t<T>;
             std::string result = node[p_key].as<std::string>();
@@ -256,7 +257,7 @@ public:
         return result;
     }
 
-    bool contains(const std::string& p_key) const {
+    bool contains(std::string_view p_key) const {
         return node[p_key].IsDefined();
     }
 
@@ -304,17 +305,17 @@ public:
         data.node = YAML::LoadFile(static_cast<std::string>(p_path));
     }
 
-    void parse_from_buffer(const std::string& p_buffer) {
-        data.node = YAML::Load(p_buffer);
+    void parse_from_buffer(std::string_view p_buffer) {
+        data.node = YAML::Load(std::string(p_buffer));
     }
 
     template <typename T>
-    T get_value(const std::string& p_key) const {
+    T get_value(std::string_view p_key) const {
         return data.get_value<T>(p_key);
     }
 
     template <typename T>
-    void get_value(const std::string& p_key, T& p_val) const {
+    void get_value(std::string_view p_key, T& p_val) const {
         data.get_value<T>(p_key, p_val);
     }
 
@@ -339,7 +340,7 @@ public:
         return data;
     }
 
-    bool contains(const std::string& p_key) const {
+    bool contains(std::string_view p_key) const {
         return data.contains(p_key);
     }
 

@@ -99,7 +99,7 @@ bool CLAASTVisitorAssembler::get_operation_arg_count(std::string& p_op_name, CLA
     return true;
 }
 
-void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, const std::string& p_op_name, int32_t p_arg_num) {
+void CLAASTVisitorAssembler::get_operation(CLAASTNodeOperation* p_node, std::string_view p_op_name, int32_t p_arg_num) {
     const auto& arguments = p_node->get_arguments();
     size_t input_arg_num = p_node->get_arguments().size();
     if (p_arg_num < 0) {

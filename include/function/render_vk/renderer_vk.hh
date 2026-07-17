@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDERER_VK_HH
 #define WBE_FILE_RENDERER_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
@@ -39,7 +40,6 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/window/i_window.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 
 #include <array>
@@ -104,7 +104,7 @@ public:
 
     virtual void tick(double p_delta) override;
 
-    virtual void activate_render_graph(const std::string& p_graph_name) override;
+    virtual void activate_render_graph(std::string_view p_graph_name) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
@@ -115,7 +115,6 @@ public:
     virtual void add_job(std::function<void()> p_job) override {
         job_buffer->add_job(std::move(p_job));
     }
-
 
     /**
      * @brief Register a Vulkan pipeline descriptor under the given name.
