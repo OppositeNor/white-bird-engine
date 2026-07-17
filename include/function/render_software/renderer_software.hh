@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
-#include <string>
 #include <string_view>
 #include <thread>
 namespace WhiteBirdEngine {

@@ -36,6 +36,7 @@ struct VertexDataSoftware {
             INT8,
         };
         Type type{};
+        uint32_t element_offset = 0;
         uint32_t element_stride = 0;
         uint32_t element_count = 0;
     };
