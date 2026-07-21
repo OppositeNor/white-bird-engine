@@ -788,28 +788,69 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
 RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) {
     QueueFamilyIndices indices{};
     indices.allocator = allocator;
+
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
     Vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
-    uint32_t i = 0;
-    for (auto& queue_family_property : queue_family_properties) {
-        if (queue_family_property.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphics = i;
-        }
-        if (queue_family_property.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+
+    // Gather present support for every queue family up front.
+    Vector<VkBool32> present_support(queue_family_count, allocator);
+    for (uint32_t i = 0; i < queue_family_count; ++i) {
+        present_support[i] = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR(p_device, i, surface, &present_support[i]);
+    }
+
+    // Pass 1: prefer dedicated queues.
+    //   Compute: COMPUTE without GRAPHICS  →  dedicated async-compute.
+    //   Graphics: GRAPHICS without COMPUTE  →  dedicated rasterisation.
+    for (uint32_t i = 0; i < queue_family_count; ++i) {
+        const VkQueueFlags flags = queue_family_properties[i].queueFlags;
+        const bool has_graphics  = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+        const bool has_compute   = (flags & VK_QUEUE_COMPUTE_BIT)  != 0;
+        if (has_compute && !has_graphics && !indices.compute.has_value()) {
             indices.compute = i;
         }
-        VkBool32 present_support = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(p_device, i, surface, &present_support);
-        if (present_support) {
+        if (has_graphics && !has_compute && !indices.graphics.has_value()) {
+            indices.graphics = i;
+        }
+    }
+
+    // Pass 2: fill in still-missing queues, preferring indices not already taken.
+    //   Present prefers the graphics queue family to avoid concurrent swapchain sharing.
+    for (uint32_t i = 0; i < queue_family_count; ++i) {
+        const VkQueueFlags flags = queue_family_properties[i].queueFlags;
+        if (!indices.graphics.has_value() && (flags & VK_QUEUE_GRAPHICS_BIT)) {
+            if (!indices.compute.has_value() || i != *indices.compute) {
+                indices.graphics = i;
+            }
+        }
+        if (!indices.compute.has_value() && (flags & VK_QUEUE_COMPUTE_BIT)) {
+            if (!indices.graphics.has_value() || i != *indices.graphics) {
+                indices.compute = i;
+            }
+        }
+        if (!indices.present.has_value() && present_support[i]) {
+            if (indices.graphics.has_value() && i == *indices.graphics) {
+                indices.present = i;
+            }
+        }
+    }
+
+    // Pass 3: last-resort fallback — accept any suitable queue with no uniqueness constraint.
+    for (uint32_t i = 0; i < queue_family_count; ++i) {
+        const VkQueueFlags flags = queue_family_properties[i].queueFlags;
+        if (!indices.graphics.has_value() && (flags & VK_QUEUE_GRAPHICS_BIT)) {
+            indices.graphics = i;
+        }
+        if (!indices.compute.has_value() && (flags & VK_QUEUE_COMPUTE_BIT)) {
+            indices.compute = i;
+        }
+        if (!indices.present.has_value() && present_support[i]) {
             indices.present = i;
         }
-        if (indices.is_complete()) {
-            break;
-        }
-        ++i;
     }
+
     return indices;
 }
 

@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_RO_IMAGE_VK_HH
 #define WBE_FILE_RO_IMAGE_VK_HH
 
-#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"

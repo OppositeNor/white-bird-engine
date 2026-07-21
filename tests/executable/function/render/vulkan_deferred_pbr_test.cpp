@@ -177,30 +177,10 @@ public:
         // Final layout for all attachments is SHADER_READ_ONLY_OPTIMAL so the
         // composition / albedo-debug pass can sample them.
         // -------------------------------------------------------------------
-        auto make_color_attachment = [](VkFormat p_format) {
-            VkAttachmentDescription attachment{};
-            attachment.format = p_format;
-            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            return attachment;
-        };
-        VkAttachmentDescription albedo_attachment = make_color_attachment(GBUFFER_ALBEDO_FORMAT);
-        VkAttachmentDescription normal_attachment = make_color_attachment(GBUFFER_NORMAL_FORMAT);
-        VkAttachmentDescription rma_attachment = make_color_attachment(GBUFFER_RMA_FORMAT);
-        VkAttachmentDescription depth_attachment{};
-        depth_attachment.format = GBUFFER_DEPTH_FORMAT;
-        depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depth_attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        VkAttachmentDescription albedo_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_ALBEDO_FORMAT).build();
+        VkAttachmentDescription normal_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_NORMAL_FORMAT).build();
+        VkAttachmentDescription rma_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_RMA_FORMAT).build();
+        VkAttachmentDescription depth_attachment = WBE::RORenderPassVK::AttachmentBuilder::depth(GBUFFER_DEPTH_FORMAT).build();
 
         std::array<VkAttachmentReference, 3> color_refs{
             VkAttachmentReference{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
