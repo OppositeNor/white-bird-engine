@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
+#include "core/allocator/heap_allocator_atomic_shared_mutex_aligned_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
@@ -33,7 +33,7 @@
 
 namespace WhiteBirdEngine {
 
-HeapAllocatorAtomicAlignedPool::HeapAllocatorAtomicAlignedPool(size_t p_size) : size(p_size) {
+HeapAllocatorAtomicSharedMutexAlignedPool::HeapAllocatorAtomicSharedMutexAlignedPool(size_t p_size) : size(p_size) {
     if (p_size > MAX_TOTAL_SIZE) {
         throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) +
                                  " exceeds maximum: " + std::to_string(MAX_TOTAL_SIZE) + ".");
@@ -49,7 +49,7 @@ HeapAllocatorAtomicAlignedPool::HeapAllocatorAtomicAlignedPool(size_t p_size) : 
     idle_chunks_count = 1;
 }
 
-HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
+HeapAllocatorAtomicSharedMutexAlignedPool::~HeapAllocatorAtomicSharedMutexAlignedPool() {
     if (!is_empty_unguarded()) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
     }
@@ -57,7 +57,7 @@ HeapAllocatorAtomicAlignedPool::~HeapAllocatorAtomicAlignedPool() {
     mem_chunk = nullptr;
 }
 
-MemID HeapAllocatorAtomicAlignedPool::allocate(size_t p_size, size_t p_alignment) {
+MemID HeapAllocatorAtomicSharedMutexAlignedPool::allocate(size_t p_size, size_t p_alignment) {
     if (p_alignment == 0) {
         throw std::runtime_error("Failed to allocate resource: allocation alignment must not be 0.");
     }
@@ -102,7 +102,7 @@ MemID HeapAllocatorAtomicAlignedPool::allocate(size_t p_size, size_t p_alignment
     throw std::runtime_error(err_msg);
 }
 
-void HeapAllocatorAtomicAlignedPool::deallocate(MemID p_mem) {
+void HeapAllocatorAtomicSharedMutexAlignedPool::deallocate(MemID p_mem) {
     // Share lock this when finding valid space for allocation, then unique lock
     // when found.
     boost::upgrade_lock lock(mutex);
@@ -120,7 +120,7 @@ void HeapAllocatorAtomicAlignedPool::deallocate(MemID p_mem) {
     insert_free_memory(insert_pos, data_loc, data_size);
 }
 
-void* HeapAllocatorAtomicAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {
+void* HeapAllocatorAtomicSharedMutexAlignedPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size) {
     WBE_DEBUG_ASSERT(p_mem_start >= p_node->mem_start);
     WBE_DEBUG_ASSERT(p_mem_start + p_mem_size <= p_node->mem_start + p_node->size);
     if (p_node->mem_start == p_mem_start) {
@@ -152,7 +152,7 @@ void* HeapAllocatorAtomicAlignedPool::acquire_memory(std::unique_ptr<IdleListNod
     return p_mem_start;
 }
 
-void HeapAllocatorAtomicAlignedPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
+void HeapAllocatorAtomicSharedMutexAlignedPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
     if (idle_list_head == nullptr) {
         idle_list_head = std::make_unique<IdleListNode>();
         ++idle_chunks_count;
@@ -181,7 +181,7 @@ void HeapAllocatorAtomicAlignedPool::insert_free_memory(IdleListNode* p_node_bef
     }
 }
 
-bool HeapAllocatorAtomicAlignedPool::combine_idle_with_next(IdleListNode* p_node) {
+bool HeapAllocatorAtomicSharedMutexAlignedPool::combine_idle_with_next(IdleListNode* p_node) {
     WBE_DEBUG_ASSERT(p_node != nullptr);
     if (p_node->next == nullptr || p_node->mem_start + p_node->size != p_node->next->mem_start) {
         return false;
@@ -192,7 +192,7 @@ bool HeapAllocatorAtomicAlignedPool::combine_idle_with_next(IdleListNode* p_node
     return true;
 }
 
-std::unique_ptr<HeapAllocatorAtomicAlignedPool::IdleListNode>& HeapAllocatorAtomicAlignedPool::get_idle_node_before(void* p_loc) {
+std::unique_ptr<HeapAllocatorAtomicSharedMutexAlignedPool::IdleListNode>& HeapAllocatorAtomicSharedMutexAlignedPool::get_idle_node_before(void* p_loc) {
     std::unique_ptr<IdleListNode>* curr = &idle_list_head;
     while (curr != nullptr) {
         if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {
@@ -203,7 +203,7 @@ std::unique_ptr<HeapAllocatorAtomicAlignedPool::IdleListNode>& HeapAllocatorAtom
     throw std::runtime_error("Unreachable code.");
 }
 
-size_t HeapAllocatorAtomicAlignedPool::get_remain_size() const {
+size_t HeapAllocatorAtomicSharedMutexAlignedPool::get_remain_size() const {
     boost::shared_lock lock(mutex);
     IdleListNode* node = idle_list_head.get();
     size_t total = 0;
@@ -214,7 +214,7 @@ size_t HeapAllocatorAtomicAlignedPool::get_remain_size() const {
     return total;
 }
 
-bool HeapAllocatorAtomicAlignedPool::unguard_is_in_pool(MemID p_mem_id) const {
+bool HeapAllocatorAtomicSharedMutexAlignedPool::unguard_is_in_pool(MemID p_mem_id) const {
     const IdleListNode* curr = idle_list_head.get();
     char* tracker = mem_chunk;
     while (tracker < mem_chunk + size) {
@@ -235,11 +235,11 @@ bool HeapAllocatorAtomicAlignedPool::unguard_is_in_pool(MemID p_mem_id) const {
     return false;
 }
 
-HeapAllocatorAtomicAlignedPool::operator std::string() const {
+HeapAllocatorAtomicSharedMutexAlignedPool::operator std::string() const {
     boost::shared_lock lock(mutex);
     std::stringstream ss;
     ss << "{";
-    ss << R"("type":"HeapAllocatorAtomicAlignedPool",)";
+    ss << R"("type":"HeapAllocatorAtomicSharedMutexAlignedPool",)";
     ss << R"("total_size":)" << get_total_size() << ",";
     ss << R"("free_chunk_layout":[)";
     IdleListNode* node = idle_list_head.get();

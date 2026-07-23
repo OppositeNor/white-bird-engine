@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_HH
-#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_HH
+#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_HH
+#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_HH
 
 #include "boost/thread/pthread/shared_mutex.hpp"
 #include "core/allocator/heap_allocator_aligned.hh"
@@ -29,8 +29,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicAlignedPool>);
+struct AllocatorTrait<class HeapAllocatorAtomicSharedMutexAlignedPool> final : public AllocatorTrait<HeapAllocatorAligned> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicSharedMutexAlignedPool>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = true;
@@ -42,16 +42,16 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPool> final : public Alloc
 };
 
 /**
- * @class HeapAllocatorAtomicAlignedPool
+ * @class HeapAllocatorAtomicSharedMutexAlignedPool
  * @brief Heap allocator aligned pool atomic version.
  *
  */
-class HeapAllocatorAtomicAlignedPool final : public HeapAllocatorAligned {
+class HeapAllocatorAtomicSharedMutexAlignedPool final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAtomicAlignedPool() : HeapAllocatorAtomicAlignedPool(WBE_KiB(64)) {
+    HeapAllocatorAtomicSharedMutexAlignedPool() : HeapAllocatorAtomicSharedMutexAlignedPool(WBE_KiB(64)) {
     }
-    virtual ~HeapAllocatorAtomicAlignedPool() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicAlignedPool)
+    virtual ~HeapAllocatorAtomicSharedMutexAlignedPool() override;
+    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicSharedMutexAlignedPool)
 
     using Header = uint64_t;
 
@@ -70,7 +70,7 @@ public:
      *
      * @param p_size The total size of the pool.
      */
-    HeapAllocatorAtomicAlignedPool(size_t p_size);
+    HeapAllocatorAtomicSharedMutexAlignedPool(size_t p_size);
 
     virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
 

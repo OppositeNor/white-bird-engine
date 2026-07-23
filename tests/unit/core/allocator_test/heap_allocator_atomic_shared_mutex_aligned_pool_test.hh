@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_TEST_HH
-#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_TEST_HH
+#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_TEST_HH
+#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_TEST_HH
 
-#include "core/allocator/heap_allocator_atomic_aligned_pool.hh"
+#include "core/allocator/heap_allocator_atomic_shared_mutex_aligned_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
@@ -29,9 +29,9 @@
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
-constexpr size_t AAAPT_HEADER_SIZE = WBE::HeapAllocatorAtomicAlignedPool::HEADER_SIZE;
+constexpr size_t AAAPT_HEADER_SIZE = WBE::HeapAllocatorAtomicSharedMutexAlignedPool::HEADER_SIZE;
 
-class WBEAllocAtomicAlignedPoolTest : public ::testing::Test {
+class WBEAllocAtomicSharedMutexAlignedPoolTest : public ::testing::Test {
 protected:
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
@@ -44,17 +44,17 @@ protected:
     std::unique_ptr<WBE::Global> global;
 };
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, TraitTest) {
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_POOL);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_LIMITED_SIZE);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_GURANTEED_CONTINUOUS);
-    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_ALLOC_FIXED_SIZE);
-    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicAlignedPool>::IS_ATOMIC);
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, TraitTest) {
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicSharedMutexAlignedPool>::IS_POOL);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicSharedMutexAlignedPool>::IS_LIMITED_SIZE);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicSharedMutexAlignedPool>::IS_GURANTEED_CONTINUOUS);
+    ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicSharedMutexAlignedPool>::IS_ALLOC_FIXED_SIZE);
+    ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicSharedMutexAlignedPool>::IS_ATOMIC);
 }
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationTest) {
     const size_t pool_size = WBE_MiB(1);
-    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;
     std::vector<std::thread> threads;
@@ -83,9 +83,9 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationGetPointerContentTest) {
     const size_t pool_size = WBE_MiB(1);
-    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;
     std::vector<std::thread> threads;
@@ -126,9 +126,9 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationGetPointerContentTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocTest) {
     const size_t pool_size = WBE_MiB(1);
-    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int ops_per_thread = 256;
     std::vector<std::thread> threads;
@@ -169,9 +169,9 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocTest) {
     ASSERT_EQ(dealloc_count, alloc_count);
 }
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocGetTest) {
     const size_t pool_size = WBE_MiB(1);
-    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int ops_per_thread = 2048;
     std::vector<std::thread> threads;
@@ -213,9 +213,9 @@ TEST_F(WBEAllocAtomicAlignedPoolTest, MixedAllocDeallocGetTest) {
     ASSERT_EQ(allocator.get_remain_size(), pool_size);
 }
 
-TEST_F(WBEAllocAtomicAlignedPoolTest, SynchronizationDeallocationTest) {
+TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationDeallocationTest) {
     const size_t pool_size = WBE_MiB(1);
-    WBE::HeapAllocatorAtomicAlignedPool allocator(pool_size);
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;
     std::vector<WBE::MemID> mem_ids(num_threads * allocs_per_thread);

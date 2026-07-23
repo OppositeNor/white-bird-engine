@@ -1,26 +1,12 @@
-/* Copyright 2025 OppositeNor
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_HH
-#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_HH
+#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_MUTEX_ALIGNED_POOL_IMPL_LIST_HH
+#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_MUTEX_ALIGNED_POOL_IMPL_LIST_HH
 
 #include "core/allocator/heap_allocator_aligned.hh"
 #include "core/allocator/i_allocator.hh"
 #ifdef _DEBUG
 #include "core/debug_utils/debug_mutex.hh"
 #else
-#include <boost/thread/pthread/shared_mutex.hpp>
+#include <boost/thread/mutex.hpp>
 #endif
 #include "utils/defs.hh"
 #include <boost/thread/lock_types.hpp>
@@ -29,17 +15,17 @@
 #include <limits>
 #include <string>
 
-#define WBE_HAAAPIL_GET_HEADER_SIZE(p_header) p_header& TOTAL_SIZE_MASK
-#define WBE_HAAAPIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
-#define WBE_HAAAPIL_SET_HEADER(p_header, p_head_type, p_size) (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
-#define WBE_HAAAPIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size)                                                               \
-    WBE_HAAAPIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
+#define WBE_HAAAPMIL_GET_HEADER_SIZE(p_header) p_header& TOTAL_SIZE_MASK
+#define WBE_HAAAPMIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAAPMIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))
+#define WBE_HAAAPMIL_SET_HEADER(p_header, p_head_type, p_size) (*(p_header) = (((Header)(p_head_type) << 60) | (p_size)))
+#define WBE_HAAAPMIL_SET_CHUNK_HEADER(p_chunk, p_type, p_size)                                                              \
+    WBE_HAAAPMIL_SET_HEADER(reinterpret_cast<Header*>(p_chunk), (p_type), (p_size))
 
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final : public AllocatorTrait<HeapAllocatorAligned> {
-    WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicAlignedPoolImplicitList>);
+struct AllocatorTrait<class HeapAllocatorAtomicMutexAlignedPoolImplicitList> final : public AllocatorTrait<HeapAllocatorAligned> {
+    WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicMutexAlignedPoolImplicitList>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
     static constexpr bool IS_LIMITED_SIZE = true;
@@ -51,22 +37,22 @@ struct AllocatorTrait<class HeapAllocatorAtomicAlignedPoolImplicitList> final : 
 };
 
 /**
- * @class HeapAllocatorAtomicAlignedPoolImplicitList
+ * @class HeapAllocatorAtomicMutexAlignedPoolImplicitList
  * @brief Heap allocator atomic pool with memory alignment support, with an
- * implicit list.
+ * implicit list and exclusive mutex locking.
  */
-class HeapAllocatorAtomicAlignedPoolImplicitList final : public HeapAllocatorAligned {
+class HeapAllocatorAtomicMutexAlignedPoolImplicitList final : public HeapAllocatorAligned {
 private:
     using Header = uint64_t;
 
 public:
-    HeapAllocatorAtomicAlignedPoolImplicitList() : HeapAllocatorAtomicAlignedPoolImplicitList(WBE_KiB(64)) {
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList() : HeapAllocatorAtomicMutexAlignedPoolImplicitList(WBE_KiB(64)) {
     }
-    virtual ~HeapAllocatorAtomicAlignedPoolImplicitList() override;
-    HeapAllocatorAtomicAlignedPoolImplicitList(const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(const HeapAllocatorAtomicAlignedPoolImplicitList&) = delete;
-    HeapAllocatorAtomicAlignedPoolImplicitList& operator=(HeapAllocatorAtomicAlignedPoolImplicitList&&) = delete;
+    virtual ~HeapAllocatorAtomicMutexAlignedPoolImplicitList() override;
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList(const HeapAllocatorAtomicMutexAlignedPoolImplicitList&) = delete;
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList(HeapAllocatorAtomicMutexAlignedPoolImplicitList&&) = delete;
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList& operator=(const HeapAllocatorAtomicMutexAlignedPoolImplicitList&) = delete;
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList& operator=(HeapAllocatorAtomicMutexAlignedPoolImplicitList&&) = delete;
 
     /**
      * @brief The size of the allocated memory header.
@@ -83,7 +69,7 @@ public:
      *
      * @param p_size The total size of the pool.
      */
-    HeapAllocatorAtomicAlignedPoolImplicitList(size_t p_size);
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList(size_t p_size);
 
     virtual MemID allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
 
@@ -98,20 +84,20 @@ public:
     }
 
     virtual bool is_empty() const override {
-        boost::shared_lock lock(mutex);
-        size_t remain_size = get_remain_size();
+        boost::unique_lock lock(mutex);
+        size_t remain_size = unguarded_get_remain_size();
         return remain_size == size;
     }
 
     virtual void clear() override {
         boost::unique_lock lock(mutex);
-        WBE_HAAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
+        WBE_HAAAPMIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
         possible_valid = mem_chunk;
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
-        boost::shared_lock lock(mutex);
-        return WBE_HAAAPIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)));
+        boost::unique_lock lock(mutex);
+        return WBE_HAAAPMIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)));
     }
 
     /**
@@ -120,7 +106,7 @@ public:
      * @return The total size of the allocator.
      */
     size_t get_total_size() const {
-        boost::shared_lock lock(mutex);
+        boost::unique_lock lock(mutex);
         return size;
     }
 
@@ -139,7 +125,7 @@ public:
      * @return The internal fragmentation tracker.
      */
     size_t get_internal_fragmentation_tracker() const {
-        boost::shared_lock lock(mutex);
+        boost::unique_lock lock(mutex);
         return internal_fragmentation_tracker;
     }
 
@@ -156,7 +142,7 @@ public:
      * broken.
      */
     void check_broken() const {
-        boost::shared_lock lock(mutex);
+        boost::unique_lock lock(mutex);
         unguarded_check_broken();
     }
 
@@ -165,9 +151,9 @@ private:
     char* mem_chunk;
     mutable char* possible_valid;
 #ifdef _DEBUG
-    mutable DebugSharedMutex mutex;
+    mutable DebugMutex mutex;
 #else
-    mutable boost::shared_mutex mutex;
+    mutable boost::mutex mutex;
 #endif
 
     size_t internal_fragmentation_tracker = 0;
@@ -191,6 +177,7 @@ private:
     void* acquire_memory(char* p_idle_chunk, char* p_mem_start, size_t p_mem_size);
     void insert_free_memory(char* p_insert_start, size_t p_insert_size);
 
+    size_t unguarded_get_remain_size() const;
     void coalesce_all() const;
     void coalesce_chunk(char* p_chunk) const;
     bool unguarded_is_in_pool(MemID p_mem_id) const;
@@ -200,9 +187,9 @@ private:
 
 } // namespace WhiteBirdEngine
 
-#undef WBE_HAAAPIL_GET_HEADER_SIZE
-#undef WBE_HAAAPIL_GET_CHUNK_SIZE
-#undef WBE_HAAAPIL_SET_HEADER
-#undef WBE_HAAAPIL_SET_CHUNK_HEADER
+#undef WBE_HAAAPMIL_GET_HEADER_SIZE
+#undef WBE_HAAAPMIL_GET_CHUNK_SIZE
+#undef WBE_HAAAPMIL_SET_HEADER
+#undef WBE_HAAAPMIL_SET_CHUNK_HEADER
 
 #endif

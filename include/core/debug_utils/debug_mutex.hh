@@ -18,11 +18,65 @@
 #include <atomic>
 #include <thread>
 
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/pthread/shared_mutex.hpp>
 
 namespace WhiteBirdEngine {
 
 #ifdef _DEBUG
+
+/**
+ * @class DebugMutex
+ * @brief A debugable exclusive mutex.
+ *
+ */
+class DebugMutex {
+public:
+    DebugMutex() = default;
+
+    /**
+     * @brief Lock.
+     */
+    void lock() {
+        mtx.lock();
+        unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
+    }
+
+    /**
+     * @brief Try lock.
+     *
+     * @return True if success, false otherwise.
+     */
+    bool try_lock() {
+        if (mtx.try_lock()) {
+            unique_owner.store(std::this_thread::get_id(), std::memory_order_release);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @brief Unlock.
+     */
+    void unlock() {
+        unique_owner.store(std::thread::id{}, std::memory_order_release);
+        mtx.unlock();
+    }
+
+    /**
+     * @brief Is the lock locked in current thread.
+     *
+     * @return True if yes, false otherwise.
+     */
+    bool is_unique_locked_by_current_thread() const {
+        return unique_owner == std::this_thread::get_id();
+    }
+
+private:
+    boost::mutex mtx;
+
+    std::atomic<std::thread::id> unique_owner;
+};
 
 /**
  * @class DebugSharedMutex

@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_TEST_HH
-#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_ALIGNED_POOL_IMPL_LIST_TEST_HH
+#ifndef WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_IMPL_LIST_TEST_HH
+#define WBE_FILE_HEAP_ALLOCATOR_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_IMPL_LIST_TEST_HH
 
-#include "core/allocator/heap_allocator_atomic_aligned_pool_impl_list.hh"
+#include "core/allocator/heap_allocator_atomic_shared_mutex_aligned_pool_impl_list.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
@@ -37,7 +37,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-class WBEHeapAllocAtomicAlignedPoolImplicitListTest : public ::testing::Test {
+class WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest : public ::testing::Test {
 protected:
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
@@ -49,11 +49,11 @@ protected:
 
     std::unique_ptr<WBE::Global> global;
 
-    static constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAtomicAlignedPoolImplicitList::HEADER_SIZE;
+    static constexpr size_t AAPILT_HEADER_SIZE = WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HEADER_SIZE;
 };
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(128);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallocated) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(128);
     ASSERT_EQ(pool.get_total_size(), 128);
     WBE::MemID mem1 = pool.allocate(16);
     WBE::MemID mem2 = pool.allocate(16);
@@ -69,14 +69,14 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, IsInPoolAllocatedAndDeallo
     ASSERT_FALSE(pool.is_in_pool(mem2));
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, AllocSizeTooLargeThrow) {
-    constexpr size_t TOO_LAGE_SIZE = WBE::HeapAllocatorAtomicAlignedPoolImplicitList::TOTAL_SIZE_MASK + 1;
-    ASSERT_THROW(WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(TOO_LAGE_SIZE), std::runtime_error);
-    ASSERT_THROW(WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(UINT64_MAX), std::runtime_error);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, AllocSizeTooLargeThrow) {
+    constexpr size_t TOO_LAGE_SIZE = WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::TOTAL_SIZE_MASK + 1;
+    ASSERT_THROW(WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(TOO_LAGE_SIZE), std::runtime_error);
+    ASSERT_THROW(WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(UINT64_MAX), std::runtime_error);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(128);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(128);
     ASSERT_FALSE(pool.is_in_pool(WBE::MEM_NULL));
     WBE::MemID mem = pool.allocate(16);
     uintptr_t fake_id = reinterpret_cast<uintptr_t>(mem) + 1024;
@@ -84,17 +84,17 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, IsInPoolNullAndOutOfRange)
     pool.deallocate(mem);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ZeroSizeAllocation) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(128);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ZeroSizeAllocation) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(128);
     WBE::MemID mem = pool.allocate(0);
     ASSERT_EQ(mem, WBE::MEM_NULL);
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, AlignmentTest) {
-    WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList allocator =
-        WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList(WBE_MiB(0.5));
-    constexpr size_t ALIGN_REQ = WhiteBirdEngine::HeapAllocatorAtomicAlignedPoolImplicitList::HEADER_SIZE;
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, AlignmentTest) {
+    WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList allocator =
+        WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(WBE_MiB(0.5));
+    constexpr size_t ALIGN_REQ = WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HEADER_SIZE;
     std::vector<WhiteBirdEngine::MemID> allocated;
     for (size_t i = 0; i < 1024; ++i) {
         WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
@@ -131,8 +131,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, AlignmentTest) {
     ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(256);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(256);
     WBE::MemID mem = pool.allocate(8, 128);
     ASSERT_NE(mem, WBE::MEM_NULL);
     ASSERT_EQ(mem % 128, 0);
@@ -140,15 +140,15 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
     ASSERT_EQ(pool.get_remain_size(), 256);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, FalseAlignment) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(256);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, FalseAlignment) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(256);
     ASSERT_THROW(pool.allocate(8, 3), std::runtime_error);
     ASSERT_THROW(pool.allocate(8, 0), std::runtime_error);
     ASSERT_EQ(pool.get_remain_size(), 256);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, SmallAllocationThenBigAllocation) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(256);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, SmallAllocationThenBigAllocation) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(256);
     std::vector<WBE::MemID> allocated;
     // First do small allocations and fill the pool
     while (pool.get_remain_size() > 16) {
@@ -168,8 +168,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, SmallAllocationThenBigAllo
     ASSERT_NO_THROW(pool.check_broken());
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ShouldThrowIfNoMoreSpaceLeft) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(256);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ShouldThrowIfNoMoreSpaceLeft) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(256);
     std::vector<WBE::MemID> allocated;
     // First do small allocations and fill the pool
     while (pool.get_remain_size() > 16) {
@@ -183,8 +183,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ShouldThrowIfNoMoreSpaceLe
     }
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, PoolReuseAfterClear) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(128);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, PoolReuseAfterClear) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(128);
     pool.allocate(32);
     pool.clear();
     ASSERT_EQ(pool.get_remain_size(), 128);
@@ -194,8 +194,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, PoolReuseAfterClear) {
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(128);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(128);
     WBE::MemID mem1 = pool.allocate(16);
     WBE::MemID mem2 = pool.allocate(16);
     WBE::MemID mem3 = pool.allocate(16);
@@ -206,8 +206,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, FragmentationAndCoalescing
     ASSERT_EQ(pool.get_remain_size(), 128);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(1));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(1));
     std::vector<WBE::MemID> mems;
     std::mt19937 rng(42); // NOLINT
     std::uniform_int_distribution<int> dist(8, 64);
@@ -225,8 +225,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressRandomAllocDealloc) 
     ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleFront) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(1024);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleFront) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -240,8 +240,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleFront) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleBack) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(1024);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleBack) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -255,8 +255,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleBack) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleMiddle) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(1024);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleMiddle) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -272,8 +272,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleMiddle) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, GetAllocatedDataSize) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(1024);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, GetAllocatedDataSize) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(4);
@@ -288,8 +288,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, GetAllocatedDataSize) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleEnd) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(1024);
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleEnd) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(1024);
     WBE::MemID mem1 = pool.allocate(4);
     WBE::MemID mem2 = pool.allocate(8);
     WBE::MemID mem3 = pool.allocate(pool.get_remain_size() - AAPILT_HEADER_SIZE);
@@ -301,8 +301,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, RemoveIdleEnd) {
     ASSERT_EQ(pool.get_remain_size(), 1024);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int STRESS_ITERATIONS = 800;
     std::mt19937 rng(300); // NOLINT
     std::uniform_int_distribution<int> size_dist(8, 256);
@@ -342,8 +342,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, StressAllocateWithAlignTes
     }
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentAllocations) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentAllocations) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int NUM_THREADS = 8;
     constexpr int ALLOCS_PER_THREAD = 100;
 
@@ -399,8 +399,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentAllocations) {
     }
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(2));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentDeallocations) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(2));
     constexpr int NUM_THREADS = 4;
     constexpr int ALLOCS_PER_THREAD = 50;
 
@@ -448,8 +448,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentDeallocations) {
     ASSERT_GE(pool.get_remain_size(), initial_remain);
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(8));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentMixedOperations) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(8));
     constexpr int NUM_THREADS = 6;
     constexpr int OPERATIONS_PER_THREAD = 200;
 
@@ -515,8 +515,8 @@ TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentMixedOperations)
     }
 }
 
-TEST_F(WBEHeapAllocAtomicAlignedPoolImplicitListTest, ConcurrentStressWithAlignment) {
-    WBE::HeapAllocatorAtomicAlignedPoolImplicitList pool(WBE_MiB(4));
+TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentStressWithAlignment) {
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
     constexpr int NUM_THREADS = 4;
     constexpr int STRESS_ITERATIONS = 100;
 

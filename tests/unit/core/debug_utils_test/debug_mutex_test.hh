@@ -45,6 +45,33 @@ protected:
     std::unique_ptr<WBE::Global> global;
 };
 
+TEST_F(WBEDebugMutexTest, ExclusiveMutexTracksUniqueOwner) {
+    WBE::DebugMutex mutex;
+
+    EXPECT_FALSE(mutex.is_unique_locked_by_current_thread());
+
+    boost::unique_lock lock(mutex);
+    EXPECT_TRUE(mutex.is_unique_locked_by_current_thread());
+}
+
+TEST_F(WBEDebugMutexTest, ExclusiveMutexTryLockWhenLocked) {
+    WBE::DebugMutex mutex;
+
+    boost::unique_lock lock(mutex);
+    EXPECT_TRUE(mutex.is_unique_locked_by_current_thread());
+
+    std::atomic<bool> try_lock_result{true};
+    std::atomic<bool> is_unique_locked{true};
+    std::thread thread([&]() {
+        try_lock_result = mutex.try_lock();
+        is_unique_locked = mutex.is_unique_locked_by_current_thread();
+    });
+    thread.join();
+
+    EXPECT_FALSE(try_lock_result);
+    EXPECT_FALSE(is_unique_locked);
+}
+
 TEST_F(WBEDebugMutexTest, IsCurrentTheadUniqueLocked) {
     WBE::DebugSharedMutex mutex;
     constexpr size_t THREAD_COUNT = 8;
