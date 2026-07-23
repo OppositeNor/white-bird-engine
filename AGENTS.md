@@ -60,7 +60,7 @@ Per-directory `CMakeLists.txt` use `file(GLOB *.cpp)`; just drop new files in.
 
 - `include/<layer>/...` — public headers (mirrors `src/`).
 - `src/<layer>/...` — implementation (`.cpp`).
-- `src/generated/`, `include/generated/` — output of the reflection metaparser; do not hand-edit.
+- `src/per_target/<target>/generated/`, `include/per_target/<target>/generated/` — per-target output of the reflection metaparser; do not hand-edit.
 - `templates/` — Jinja templates consumed by `build_script/reflection/`.
 - `res/`, `test_env_res/` — runtime assets.
 - `dependencies/` — vendored third-party (do not modify).
@@ -135,6 +135,7 @@ Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather t
 - All C++ header code are scanned by `build_script/reflection/metaparser.py`.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.
+- `generate.json` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, and `source_dir`.
 
 ## Python Scripts
 
