@@ -16,7 +16,7 @@
 #define WBE_FILE_CORE_UTILS_HH
 
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
-#include "core/allocator/heap_allocator_atomic_mutex_aligned_pool_impl_list.hh"
+#include "core/allocator/heap_allocator_atomic_arena_aligned_pool_impl_list.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
@@ -83,7 +83,7 @@ RefWeak<T> requires_valid(std::string_view p_name, RefWeak<T> p_ref) {
 }
 
 using HeapAllocatorDefault = HeapAllocatorAlignedPoolImplicitList;
-using HeapAllocatorAtomicDefault = HeapAllocatorAtomicMutexAlignedPoolImplicitList;
+using HeapAllocatorAtomicDefault = HeapAllocatorAtomicArenaAlignedPoolImplicitList;
 
 } // namespace WhiteBirdEngine
 
