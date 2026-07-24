@@ -40,7 +40,6 @@ HeapAllocatorFixedSizePool::~HeapAllocatorFixedSizePool() {
     if (obj_count() != 0) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorFixedSizePool not empty during destruction.");
     }
-    free(mem_chunk); // NOLINT
 }
 
 inline MemID HeapAllocatorFixedSizePool::allocate(size_t p_size) {

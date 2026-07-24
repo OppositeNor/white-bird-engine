@@ -34,15 +34,17 @@
 
 namespace WhiteBirdEngine {
 
-HeapAllocatorAlignedPool::HeapAllocatorAlignedPool(size_t p_size) : size(p_size) {
+HeapAllocatorAlignedPool::HeapAllocatorAlignedPool(size_t p_size)
+    : HeapAllocatorAlignedPool(MemoryChunk(p_size, HEADER_SIZE), 0, p_size) {
+}
+
+HeapAllocatorAlignedPool::HeapAllocatorAlignedPool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+    : memory_chunk(std::move(p_memory_chunk)), size(p_size) {
     if (p_size > MAX_TOTAL_SIZE) {
         throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) +
                                  " exceeds maximum: " + std::to_string(MAX_TOTAL_SIZE) + ".");
     }
-    mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT
-    if (mem_chunk == nullptr) {
-        throw std::runtime_error("Failed to create pool: malloc failed.");
-    }
+    mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
     // Trigger page fault to mmap from MMU.
     memset(mem_chunk, 0, p_size);
     idle_list_head = std::make_unique<IdleListNode>();
@@ -56,7 +58,6 @@ HeapAllocatorAlignedPool::~HeapAllocatorAlignedPool() {
     if (!is_empty()) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed.");
     }
-    free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 

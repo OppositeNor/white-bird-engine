@@ -55,15 +55,18 @@
 
 namespace WhiteBirdEngine {
 
-HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(size_t p_size) : size(p_size) {
+HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(size_t p_size)
+    : HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(MemoryChunk(p_size, HEADER_SIZE), 0, p_size) {
+}
+
+HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(
+    MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+    : memory_chunk(std::move(p_memory_chunk)), size(p_size) {
     if (p_size > TOTAL_SIZE_MASK) {
         throw std::runtime_error("Failed to create pool: size: " + std::to_string(p_size) +
                                  " exceeds maximum: " + std::to_string(TOTAL_SIZE_MASK) + ".");
     }
-    mem_chunk = static_cast<char*>(aligned_alloc(HEADER_SIZE, p_size));
-    if (mem_chunk == nullptr) {
-        throw std::runtime_error("Failed to create pool: malloc failed.");
-    }
+    mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
     memset(mem_chunk, 0, p_size);
     WBE_HAAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
     possible_valid = mem_chunk;
@@ -73,7 +76,6 @@ HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::~HeapAllocatorAtomicShare
     if (!is_empty()) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("Non-empty allocator destructed. Allocator status: " + static_cast<std::string>(*this));
     }
-    free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 

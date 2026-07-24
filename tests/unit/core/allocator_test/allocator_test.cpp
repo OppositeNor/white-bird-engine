@@ -21,5 +21,6 @@
 #include "heap_allocator_atomic_shared_mutex_aligned_pool_test.hh"
 #include "heap_allocator_fixed_size_pool_test.hh"
 #include "heap_allocator_pool_test.hh"
+#include "memory_chunk_test.hh"
 #include "stack_allocator_test.hh"
 // NOLINTEND

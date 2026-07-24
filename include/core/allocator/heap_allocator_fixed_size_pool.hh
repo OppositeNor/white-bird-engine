@@ -18,6 +18,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
 #include "heap_allocator.hh"
+#include "memory_chunk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -27,6 +28,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))
@@ -85,7 +87,19 @@ public:
      * MAX_OBJ maximum.
      */
     HeapAllocatorFixedSizePool(size_t p_element_size, uint32_t p_max_obj)
-        : max_obj(p_max_obj), element_size(p_element_size) {
+        : HeapAllocatorFixedSizePool(MemoryChunk(get_memory_size(p_element_size, p_max_obj)), 0, p_element_size, p_max_obj) {
+    }
+
+    /**
+     * @brief Constructor using a range inside a memory chunk.
+     *
+     * @param p_memory_chunk The memory chunk to reference.
+     * @param p_start_offset The pool start offset in the memory chunk.
+     * @param p_element_size The size of each object.
+     * @param p_max_obj The maximum objects this allocator could hold.
+     */
+    HeapAllocatorFixedSizePool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_element_size, uint32_t p_max_obj)
+        : max_obj(p_max_obj), memory_chunk(std::move(p_memory_chunk)), element_size(p_element_size) {
         if (get_align_size(p_element_size, WBE_DEFAULT_ALIGNMENT) != p_element_size) {
             stdout_log(WBE_CHANNEL_GLOBAL)
                 ->warning(std::format("Creating HeapAllocatorFixedSizePool with element size {} "
@@ -108,7 +122,7 @@ public:
         // InteralID. data space stores the data. Notice that when DataIndex or
         // InternalID is 0 it maps to MEM_NULL, so for offseting, the true
         // offset for the reverse data is internal id - 1.
-        mem_chunk = static_cast<char*>(malloc(element_size * max_obj + sizeof(DataIndex) * max_obj + sizeof(InternalID) * max_obj)); // NOLINT
+        mem_chunk = memory_chunk.get_occupied_start(p_start_offset, get_memory_size(element_size, max_obj));
         index_chunk_start = reinterpret_cast<DataIndex*>(mem_chunk + element_size * max_obj);
         index_chunk_rev_start = reinterpret_cast<InternalID*>(mem_chunk + element_size * max_obj + max_obj * sizeof(DataIndex));
         clear_indices();
@@ -174,11 +188,19 @@ public:
 
 private:
     DataIndex max_obj;
+    MemoryChunk memory_chunk;
     char* mem_chunk;
     DataIndex* index_chunk_start = nullptr;
     InternalID* index_chunk_rev_start = nullptr;
     DataIndex alloc_obj_count = 0;
     const size_t element_size;
+
+    static size_t get_memory_size(size_t p_element_size, uint32_t p_max_obj) {
+        if (p_max_obj > MAX_OBJ) {
+            throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
+        }
+        return p_element_size * p_max_obj + sizeof(DataIndex) * p_max_obj + sizeof(InternalID) * p_max_obj;
+    }
 
     DataIndex get_data_index(InternalID p_id) const {
         if (p_id > max_obj) {

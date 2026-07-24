@@ -32,18 +32,18 @@ HeapAllocatorPool::~HeapAllocatorPool() {
     if (!is_empty()) {
         stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocatorPool not empty during destruction.");
     }
-    free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 
-HeapAllocatorPool::HeapAllocatorPool(size_t p_size) : size(p_size) {
+HeapAllocatorPool::HeapAllocatorPool(size_t p_size) : HeapAllocatorPool(MemoryChunk(p_size), 0, p_size) {
+}
+
+HeapAllocatorPool::HeapAllocatorPool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+    : memory_chunk(std::move(p_memory_chunk)), size(p_size) {
     if (p_size > MAX_TOTAL_SIZE) {
         throw std::runtime_error(std::format("Failed to create pool: size: {} exceeds maximum: {}.", p_size, MAX_TOTAL_SIZE));
     }
-    mem_chunk = static_cast<char*>(malloc(p_size)); // NOLINT
-    if (mem_chunk == nullptr) {
-        throw std::runtime_error("Failed to create pool: malloc failed.");
-    }
+    mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
     idle_list_head = std::make_unique<IdleListNode>();
     idle_list_head->size = p_size;
     idle_list_head->next = nullptr;

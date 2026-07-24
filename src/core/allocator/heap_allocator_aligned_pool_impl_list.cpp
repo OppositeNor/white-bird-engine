@@ -54,14 +54,16 @@
 
 namespace WhiteBirdEngine {
 
-HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_t p_size) : size(p_size) {
+HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(size_t p_size)
+    : HeapAllocatorAlignedPoolImplicitList(MemoryChunk(p_size, HEADER_SIZE), 0, p_size) {
+}
+
+HeapAllocatorAlignedPoolImplicitList::HeapAllocatorAlignedPoolImplicitList(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+    : memory_chunk(std::move(p_memory_chunk)), size(p_size) {
     if (p_size > TOTAL_SIZE_MASK) {
         throw std::runtime_error(std::format("Failed to create pool: size: {}  exceeds maximum: {}.", p_size, TOTAL_SIZE_MASK));
     }
-    mem_chunk = static_cast<char*>(aligned_alloc(HEADER_SIZE, p_size));
-    if (mem_chunk == nullptr) {
-        throw std::runtime_error("Failed to create pool: malloc failed.");
-    }
+    mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
     memset(mem_chunk, 0, p_size);
     WBE_HAAPIL_SET_CHUNK_HEADER(mem_chunk, HeaderType::IDLE, size);
     possible_valid = mem_chunk;
@@ -72,7 +74,6 @@ HeapAllocatorAlignedPoolImplicitList::~HeapAllocatorAlignedPoolImplicitList() {
         stdout_log(WBE_CHANNEL_GLOBAL)
             ->warning(std::format("Non-empty allocator destructed. Allocator status: {}", static_cast<std::string>(*this)));
     }
-    free(mem_chunk); // NOLINT
     mem_chunk = nullptr;
 }
 
