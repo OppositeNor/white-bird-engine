@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_GRAPH_VK_HH
 #define WBE_FILE_RENDER_GRAPH_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
@@ -23,7 +24,6 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -202,8 +202,8 @@ public:
 
     /**
      * @brief Insert or override a runtime-bound resource by id. This lets the
-     * renderer inject per-frame resources (e.g., the current swap-chain
-     * framebuffer) whose identity is fixed by label but whose object changes
+     * renderer inject per-frame resources (e.g., the current swap-chain image
+     * view) whose identity is fixed by label but whose object changes
      * across frames. If a resource with the given id already exists, its
      * res / res_type_id are updated in place.
      *

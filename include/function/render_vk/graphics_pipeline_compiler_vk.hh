@@ -27,13 +27,11 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <span>
-#include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -61,19 +59,21 @@ struct GraphicsPipelineCompilerVKContext {
      */
     Ref<RenderDatabase> render_database = MEM_NULL;
     /**
-     * @brief Render pass used by the generated graphics pipeline.
-     */
-    Ref<RORenderPassVK> render_pass = MEM_NULL;
-    /**
      * @brief Renderer used to execute the generated task's render graph.
      */
     RendererVK* renderer = nullptr;
     /**
-     * @brief Number of color attachments declared by the render pass. The
-     *        compiled pipeline's color blend state will provide this many
-     *        default color attachment states. Defaults to 1.
+     * @brief Dynamic-rendering color attachment formats.
      */
-    uint32_t color_attachment_count = 1;
+    std::vector<VkFormat> color_attachment_formats;
+    /**
+     * @brief Dynamic-rendering depth attachment format.
+     */
+    VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED;
+    /**
+     * @brief Dynamic-rendering stencil attachment format.
+     */
+    VkFormat stencil_attachment_format = VK_FORMAT_UNDEFINED;
 };
 
 /**
@@ -100,16 +100,11 @@ public:
      *
      * The caller is responsible for pushing the returned task descriptor
      * into the pipeline descriptor's task list, and for adding any
-     * additional resources (framebuffer, attachment images, etc.)
-     * referenced by the task to the descriptor.
+     * additional resources referenced by the task to the descriptor.
      *
      * @param p_resource_key Key of the graphics pipeline resource.
      * @param p_pipeline_resource Loaded graphics pipeline resource unit.
      * @param p_descriptor Descriptor to append the pipeline render object resource to.
-     * @param p_target_framebuffer_res_id Render resource id of the framebuffer
-     * the task renders into.
-     * @param p_clear_values Clear values for each attachment of the
-     * framebuffer's render pass.
      * @param p_vertex_buffer_res_id Optional vertex buffer resource id. Pass
      * nullopt for pipelines with no vertex input (e.g. fullscreen
      * passes).

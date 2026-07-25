@@ -22,7 +22,6 @@
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
-#include <string>
 namespace WhiteBirdEngine {
 
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
@@ -68,9 +67,6 @@ public:
      * @brief Update the static opaque triangles data.
      */
     virtual void update_static_opaque_triangles() = 0;
-
-private:
-    void initialize_render_pass();
 };
 
 } // namespace WhiteBirdEngine

@@ -16,7 +16,6 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/defs.hh"
 #include <stdexcept>
@@ -75,9 +74,11 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     setup_depth_stencil_state_create_info(p_config, state_create_info);
     setup_color_blend_state_create_info(p_config, state_create_info);
     setup_dynamic_state_create_info(p_config, state_create_info);
+    setup_pipeline_rendering_create_info(p_config, state_create_info);
 
     VkGraphicsPipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    create_info.pNext = &(state_create_info.pipeline_rendering);
     create_info.stageCount = shader_stages.size();
     create_info.pStages = shader_stages.data();
     create_info.pVertexInputState = &(state_create_info.vertex_input_state);
@@ -92,11 +93,11 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.pColorBlendState = &(state_create_info.color_blend_state);
     create_info.pDynamicState = &(state_create_info.dynamic_state);
     create_info.layout = WBE_REQUIRED(p_config.pipeline_layout).get_pipeline_layout();
-    create_info.renderPass = WBE_REQUIRED(p_config.render_pass).get_render_pass();
+    // Using dynamic rendering.
+    create_info.renderPass = VK_NULL_HANDLE;
     create_info.subpass = p_config.subpass_index;
 
     exposed_fields.pipeline_layout = p_config.pipeline_layout;
-    exposed_fields.render_pass = p_config.render_pass;
 
     if (vkCreateGraphicsPipelines(
             render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline) != VK_SUCCESS) {
@@ -196,6 +197,17 @@ void ROGraphicsPipelineVK::setup_dynamic_state_create_info(const Config& p_confi
     create_info.dynamicStateCount = dynamic_state_config.dynamic_states.size();
     create_info.pDynamicStates = dynamic_state_config.dynamic_states.data();
     p_pipeline_create_infos.dynamic_state = create_info;
+}
+
+void ROGraphicsPipelineVK::setup_pipeline_rendering_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos) {
+    const auto& pipeline_rendering_create_info = p_config.attachment_config;
+    VkPipelineRenderingCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    create_info.colorAttachmentCount = pipeline_rendering_create_info.color_formats.size();
+    create_info.pColorAttachmentFormats = pipeline_rendering_create_info.color_formats.data();
+    create_info.depthAttachmentFormat = WBE_REQUIRED(pipeline_rendering_create_info.depth_formats);
+    create_info.stencilAttachmentFormat = WBE_REQUIRED(pipeline_rendering_create_info.stencil_formats);
+    p_pipeline_create_infos.pipeline_rendering = create_info;
 }
 
 } // namespace WhiteBirdEngine

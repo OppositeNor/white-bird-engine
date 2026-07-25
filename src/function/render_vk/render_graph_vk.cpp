@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/render_graph_vk.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
@@ -23,10 +24,10 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "core/allocator/stl_allocator.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <span>
 #include <stdexcept>
 #include <tuple>
@@ -166,6 +167,10 @@ void RenderGraphVK::allocate_command_buffers() {
     for (size_t i = 0; i < nodes.size(); ++i) {
         auto queue_family = static_cast<QueueFamilyVK>(nodes[i]->in_queue);
         VkCommandPool command_pool = pool_for(render_data, queue_family);
+        if (command_pool == VK_NULL_HANDLE) {
+            throw std::runtime_error(
+                std::format("Failed to create command pool for queue family: {}.", std::to_underlying(queue_family)));
+        }
         for (uint32_t f = 0; f < frames; ++f) {
             const size_t slot = static_cast<size_t>(f) * nodes.size() + i;
             command_buffer_pools[slot] = command_pool;

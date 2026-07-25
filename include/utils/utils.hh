@@ -472,6 +472,8 @@ enum class ColorSpace {
 
 /**
  * @brief A better name for the required field.
+ * We're using std::optional's valid check to check if a required field has passed in. However, "optional"
+ * is definitely not a good word for fields that are "required". So we're making an alias here.
  *
  * @tparam T The type of the required value.
  */

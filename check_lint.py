@@ -29,11 +29,11 @@ from git.exc import BadName, InvalidGitRepositoryError, NoSuchPathError
 
 def find_compile_commands_dir(root_dir: Path) -> Path | None:
     candidates = [
-        root_dir,
         root_dir / "build",
         root_dir / "build" / "debug",
         root_dir / "build" / "release",
         root_dir / "build" / "deploy",
+        root_dir,
         root_dir / "build-debug",
         root_dir / "build-release",
         root_dir / "build-deploy",

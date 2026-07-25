@@ -83,10 +83,9 @@ public:
             render_allocator, base_render_data, WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1));
         WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout = WBE::make_ref<WBE::ROPipelineLayoutVK>(
             render_allocator, base_render_data, WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
-        auto render_pass = renderer->get_swap_chain_render_pass();
         auto graphics_pipeline =
             WBE::ROGraphicsPipelineVK::Builder()
-                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout, render_pass)
+                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
                 .create_ref(base_render_data);
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
         // Setup time UBO
@@ -117,7 +116,8 @@ public:
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                base_render_data->swap_chain_extent,
+                WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
                 WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,

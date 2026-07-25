@@ -138,8 +138,10 @@ if __name__ == "__main__":
         if result.returncode != 0:
             raise RuntimeError("Failed to build with CMake.")
 
-        # For some reason my LSP only looks into build directory for compile_commands.json.
-        shutil.copy(os.path.join(build_setup.build_dir, "compile_commands.json"), "build")
+        # Keep compile database available in both conventional locations used by tooling.
+        compile_commands_path = os.path.join(build_setup.build_dir, "compile_commands.json")
+        shutil.copy(compile_commands_path, "build")
+        shutil.copy(compile_commands_path, "compile_commands.json")
         print("WBEBuilder: Finished!")
 
     except Exception as e:

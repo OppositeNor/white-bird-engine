@@ -26,10 +26,8 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -59,7 +57,10 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_FRAMEBUFFER, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, WBE_RENDER_RESOURCE);
 // TODO
 } // namespace WhiteBirdEngine
 
@@ -173,68 +174,6 @@ public:
                                  .create_ref(base_render_data);
 
         // -------------------------------------------------------------------
-        // G-buffer render pass: 3 color attachments + 1 depth attachment.
-        // Final layout for all attachments is SHADER_READ_ONLY_OPTIMAL so the
-        // composition / albedo-debug pass can sample them.
-        // -------------------------------------------------------------------
-        VkAttachmentDescription albedo_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_ALBEDO_FORMAT).build();
-        VkAttachmentDescription normal_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_NORMAL_FORMAT).build();
-        VkAttachmentDescription rma_attachment = WBE::RORenderPassVK::AttachmentBuilder::color(GBUFFER_RMA_FORMAT).build();
-        VkAttachmentDescription depth_attachment = WBE::RORenderPassVK::AttachmentBuilder::depth(GBUFFER_DEPTH_FORMAT).build();
-
-        std::array<VkAttachmentReference, 3> color_refs{
-            VkAttachmentReference{.attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-            VkAttachmentReference{.attachment = 1, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-            VkAttachmentReference{.attachment = 2, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-        };
-        VkAttachmentReference depth_ref{
-            .attachment = 3,
-            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        };
-        VkSubpassDescription subpass{};
-        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount = static_cast<uint32_t>(color_refs.size());
-        subpass.pColorAttachments = color_refs.data();
-        subpass.pDepthStencilAttachment = &depth_ref;
-
-        VkSubpassDependency dependency_in{};
-        dependency_in.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency_in.dstSubpass = 0;
-        dependency_in.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        dependency_in.srcAccessMask = 0;
-        dependency_in.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency_in.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        VkSubpassDependency dependency_out{};
-        dependency_out.srcSubpass = 0;
-        dependency_out.dstSubpass = VK_SUBPASS_EXTERNAL;
-        dependency_out.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        dependency_out.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        dependency_out.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        dependency_out.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        auto gbuffer_render_pass = WBE::RORenderPassVK::Builder()
-                                       .add_attachment(albedo_attachment)
-                                       .add_attachment(normal_attachment)
-                                       .add_attachment(rma_attachment)
-                                       .add_attachment(depth_attachment)
-                                       .add_subpass(subpass)
-                                       .add_dependency(dependency_in)
-                                       .add_dependency(dependency_out)
-                                       .create_ref(base_render_data);
-
-        // -------------------------------------------------------------------
-        // G-buffer framebuffer.
-        // -------------------------------------------------------------------
-        auto gbuffer_framebuffer = WBE::ROFramebufferVK::Builder()
-                                       .add_attachment(gbuffer_albedo_view)
-                                       .add_attachment(gbuffer_normal_view)
-                                       .add_attachment(gbuffer_rma_view)
-                                       .add_attachment(gbuffer_depth_view)
-                                       .set_extent(extent)
-                                       .set_render_pass(gbuffer_render_pass)
-                                       .create_ref(base_render_data);
-
-        // -------------------------------------------------------------------
         // Camera setup. Static for now (see render_update TODO).
         // -------------------------------------------------------------------
         const float aspect_ratio = base_render_data->swap_chain_aspect_ratio;
@@ -246,16 +185,25 @@ public:
         // Compose the render graph descriptor.
         //   1) G-buffer pass: compiled from the RUGraphicsPipeline resource
         //      "deferred_gbuffer" using the pipeline compiler. Renders the
-        //      cube into the manually-created G-buffer framebuffer.
+        //      cube into the G-buffer image-view attachments.
         //   2) Albedo-debug pass: hand-written task that samples the G-buffer
-        //      albedo attachment and writes it to the swap-chain framebuffer.
+        //      albedo attachment and writes it to the swap-chain image view.
         // TODO: replace the albedo-debug pass with the real PBR composition
         //       pass once a multi-pass pipeline compiler is available.
         // -------------------------------------------------------------------
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_FRAMEBUFFER,
-            .res_type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID,
-            .res = gbuffer_framebuffer});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = gbuffer_albedo_view});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = gbuffer_normal_view});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = gbuffer_rma_view});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = gbuffer_depth_view});
 
         // ---- (1) G-buffer pass: compiled from the resource system. -------
         auto gbuffer_pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("deferred_gbuffer");
@@ -267,9 +215,9 @@ public:
             .allocator = render_allocator,
             .render_data = base_render_data,
             .render_database = render_database_ref,
-            .render_pass = gbuffer_render_pass,
             .renderer = renderer,
-            .color_attachment_count = 3,
+            .color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT},
+            .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
         };
         std::array<WBE::RenderUniformBinding, 2> gbuffer_uniform_bindings{
             WBE::RenderUniformBinding{.field_path = "camera_info.view", .data = &camera_view, .size = sizeof(camera_view)},

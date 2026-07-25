@@ -21,7 +21,6 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -548,6 +547,83 @@ public:
             }
         };
 
+        /**
+         * @brief Configurations for attachments.
+         */
+        struct AttachmentConfig {
+            // Color attachments' formats.
+            std::vector<VkFormat> color_formats;
+            // Depth attachment's format.
+            Required<VkFormat> depth_formats;
+            // Stencil attachment's format.
+            Required<VkFormat> stencil_formats;
+            /**
+             * @brief Add a color format.
+             *
+             * @param p_format The format to add.
+             * @return *this
+             */
+            AttachmentConfig& add_color_format(VkFormat p_format) {
+                color_formats.push_back(p_format);
+                return *this;
+            }
+
+            /**
+             * @brief Add color formats.
+             *
+             * @param p_formats The formats to add.
+             * @return *this
+             */
+            AttachmentConfig& add_color_formats(std::span<const VkFormat> p_formats) {
+                color_formats.append_range(p_formats);
+                return *this;
+            }
+
+            /**
+             * @brief Set the color formats.
+             *
+             * @param p_formats The formats to set to.
+             * @return *this
+             */
+            AttachmentConfig& set_color_formats(const std::vector<VkFormat>& p_formats) {
+                color_formats = p_formats;
+                return *this;
+            }
+
+            /**
+             * @brief Set the color formats.
+             *
+             * @param p_formats The formats to set to.
+             * @return *this
+             */
+            AttachmentConfig& set_color_formats(std::vector<VkFormat>&& p_formats) {
+                color_formats = std::move(p_formats);
+                return *this;
+            }
+
+            /**
+             * @brief Set the depth format.
+             *
+             * @param p_format The format to set to.
+             * @return *this
+             */
+            AttachmentConfig& set_depth_format(VkFormat p_format) {
+                depth_formats = p_format;
+                return *this;
+            }
+
+            /**
+             * @brief Set the stencil format.
+             *
+             * @param p_format The format to set to.
+             * @return *this
+             */
+            AttachmentConfig& set_stencil_format(VkFormat p_format) {
+                stencil_formats = p_format;
+                return *this;
+            }
+        };
+
         // The input shaders. Manual setup needed!
         ShaderConfig shader{};
         // Vertex input stage configurations.
@@ -568,10 +644,10 @@ public:
         ColorBlendConfig color_blend{};
         // Dynamic state configuration.
         DynamicStateConfig dynamic_state{};
+        // Attachment configuration.
+        AttachmentConfig attachment_config{};
         // Pipeline layout. Manual setup needed!
         Ref<ROPipelineLayoutVK> pipeline_layout;
-        // Render pass. Manual setup needed!
-        Ref<RORenderPassVK> render_pass;
         // Indicate which subpass this graphics pipeline uses.
         uint32_t subpass_index = 0;
     };
@@ -612,19 +688,17 @@ public:
          * @brief Apply default opaque-rendering pipeline configuration.
          *
          * This helper configures textured vertex input, viewport/scissor from
-         * render data, pipeline layout/render pass bindings, a default color
-         * attachment state, and default dynamic states.
+         * render data, pipeline layout, a default color attachment state, swap
+         * chain color format, and default dynamic states.
          *
          * @param p_render_data Base render data for viewport/scissor defaults.
          * @param p_shader_config Shader stage configuration.
          * @param p_pipeline_layout Pipeline layout instance.
-         * @param p_render_pass Render pass instance.
          * @return *this.
          */
         Builder& default_render_opaque_configuration(const BaseRenderDataVK* p_render_data,
             const Config::ShaderConfig& p_shader_config,
-            Ref<ROPipelineLayoutVK> p_pipeline_layout,
-            Ref<RORenderPassVK> p_render_pass) {
+            Ref<ROPipelineLayoutVK> p_pipeline_layout) {
 
             ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
             vertex_input_config.add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION).add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
@@ -634,8 +708,10 @@ public:
             config.viewport.viewports = {p_render_data->viewport};
             config.viewport.scissors = {p_render_data->scissor};
             config.pipeline_layout = p_pipeline_layout;
-            config.render_pass = p_render_pass;
             config.color_blend.add_default_color_attachment();
+            config.attachment_config.add_color_format(p_render_data->swap_chain_format)
+                .set_depth_format(VK_FORMAT_UNDEFINED)
+                .set_stencil_format(VK_FORMAT_UNDEFINED);
             config.dynamic_state.add_default_dynamic_states();
             return *this;
         }
@@ -697,7 +773,6 @@ public:
         Ref<const ROShaderVK> fragment_shader;
         // TODO: TSC TSE geometry shaders
         Ref<const ROPipelineLayoutVK> pipeline_layout;
-        Ref<const RORenderPassVK> render_pass;
     };
 
     const ExposedFields& fields() const {
@@ -719,6 +794,7 @@ private:
         VkPipelineDepthStencilStateCreateInfo depth_stencil_state{};
         VkPipelineColorBlendStateCreateInfo color_blend_state{};
         VkPipelineDynamicStateCreateInfo dynamic_state{};
+        VkPipelineRenderingCreateInfo pipeline_rendering{};
     };
 
     void init(const Config& p_config);
@@ -732,6 +808,7 @@ private:
     void setup_depth_stencil_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_color_blend_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_dynamic_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
+    void setup_pipeline_rendering_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
 
     static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(
         VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);

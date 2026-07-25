@@ -31,10 +31,8 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
@@ -112,12 +110,12 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
 
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
-    // Inject the current swap-chain framebuffer into the active graph so tasks
-    // referencing REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK resolve to the correct
+    // Inject the current swap-chain image view into the active graph so tasks
+    // referencing REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK resolve to the correct
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
     p_graph->set_resource(
-        REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, render_objects->swap_chain_framebuffers[image_index], TypeUUID<ROFramebufferVK>::UUID);
+        REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK, render_objects->swap_chain_image_views[image_index], TypeUUID<ROImageViewVK>::UUID);
     set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
@@ -179,8 +177,6 @@ void RendererVK::init() {
     // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
     base_render_data.current_frame = 1;
     init_swap_chain_image_views();
-    init_render_pass();
-    init_swap_chain_framebuffers();
     setup_render_resource();
     image_available_semaphores.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
@@ -246,7 +242,6 @@ void RendererVK::recreate_swap_chain() {
     clean_up_swap_chain();
     create_swap_chain();
     init_swap_chain_image_views();
-    init_swap_chain_framebuffers();
     setup_base_render_data();
 }
 
@@ -281,19 +276,6 @@ void RendererVK::setup_base_render_data() {
         register_delay_call(std::move(p_function), p_delayed_frames);
     };
     base_render_data.frames_in_flight = frames_in_flight;
-}
-
-void RendererVK::init_swap_chain_framebuffers() {
-    render_objects->swap_chain_framebuffers.resize(swap_chain_images_count);
-    // Setup the framebuffer for each swap chain image view.
-    for (size_t i = 0; i < swap_chain_images_count; ++i) {
-        ROFramebufferVK::Builder builder;
-        builder.add_attachment(render_objects->swap_chain_image_views[i])
-            .set_render_pass(render_objects->result_render_pass)
-            .set_extent(swap_chain_extent)
-            .set_layers(1);
-        render_objects->swap_chain_framebuffers[i] = builder.create_ref(&base_render_data);
-    }
 }
 
 void RendererVK::create_instance() { // NOLINT
@@ -476,7 +458,6 @@ void RendererVK::create_swap_chain() { // NOLINT
 }
 
 void RendererVK::clean_up_swap_chain() {
-    render_objects->swap_chain_framebuffers.clear();
     render_objects->swap_chain_image_views.clear();
     render_objects->swap_chain_images.clear();
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -557,50 +538,6 @@ void RendererVK::create_async_objects() {
     }
 }
 
-void RendererVK::init_render_pass() {
-    // Setup color attachment
-    VkAttachmentDescription color_attachment{};
-    color_attachment.format = swap_chain_image_format;
-    // Disable multisample.
-    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    // Clear the color before every render pass.
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    // Store the color after every render pass (to render it on the viewport).
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // Don't care about the stencil images.
-    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    // The attachment's initial layout is not known.
-    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    // The attachment's final layout should be able to present on screen.
-    // Note that even though VK_KHR_unified_image_layouts_extension allows
-    // most images to have VK_IMAGE_LAYOUT_GENERAL as their image layouts,
-    // the color attachment should still remain VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
-    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Color attachment.
-    VkAttachmentReference color_attachment_reference{};
-    color_attachment_reference.attachment = 0;
-    color_attachment_reference.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_reference;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    RORenderPassVK::Builder render_pass_builder;
-    render_pass_builder.add_attachment(color_attachment).add_subpass(subpass).add_dependency(dependency);
-    render_objects->result_render_pass = render_pass_builder.create_ref(&base_render_data);
-}
-
 void RendererVK::create_physical_device() {
     // Enumerate all physical devices.
     uint32_t physical_device_count = 0;
@@ -666,6 +603,11 @@ void RendererVK::create_logical_device() {
     sync2_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
     sync2_features.synchronization2 = VK_TRUE;
     semaphore_features.pNext = &sync2_features;
+
+    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{};
+    dynamic_rendering_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamic_rendering_features.dynamicRendering = VK_TRUE;
+    sync2_features.pNext = &dynamic_rendering_features;
 
     // Create logical device.
     if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
@@ -785,7 +727,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     return true;
 }
 
-RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) {
+RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) { // NOLINT
     QueueFamilyIndices indices{};
     indices.allocator = allocator;
 
@@ -806,8 +748,8 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     //   Graphics: GRAPHICS without COMPUTE  →  dedicated rasterisation.
     for (uint32_t i = 0; i < queue_family_count; ++i) {
         const VkQueueFlags flags = queue_family_properties[i].queueFlags;
-        const bool has_graphics  = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
-        const bool has_compute   = (flags & VK_QUEUE_COMPUTE_BIT)  != 0;
+        const bool has_graphics = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+        const bool has_compute = (flags & VK_QUEUE_COMPUTE_BIT) != 0;
         if (has_compute && !has_graphics && !indices.compute.has_value()) {
             indices.compute = i;
         }

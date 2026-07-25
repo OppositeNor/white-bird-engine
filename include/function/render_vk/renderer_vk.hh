@@ -32,11 +32,9 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/window/i_window.hh"
@@ -55,7 +53,7 @@
 
 namespace WhiteBirdEngine {
 
-WBE_LABEL(REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK, WBE_RENDER_RESOURCE);
+WBE_LABEL(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, WBE_RENDER_RESOURCE);
 WBE_LABEL(REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, WBE_RENDER_RESOURCE);
@@ -189,15 +187,6 @@ public:
             }
         }
         throw std::runtime_error("Failed to register delay call: buffer overflow.");
-    }
-
-    /**
-     * @brief Get the render pass for rendering to the result swap chain.
-     *
-     * @return The render pass for rendering to the result swap chain.
-     */
-    Ref<RORenderPassVK> get_swap_chain_render_pass() {
-        return render_objects->result_render_pass;
     }
 
 private:
@@ -348,19 +337,14 @@ private:
 
     // Render objects for the renderer.
     struct RenderObjects {
-        RenderObjects(AllocType* p_allocator)
-            : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator), swap_chain_framebuffers(p_allocator) {
+        RenderObjects(AllocType* p_allocator) : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator) {
         }
-        // Render pass.
-        Ref<RORenderPassVK> result_render_pass;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain images
         Vector<Ref<ROImageVK>> swap_chain_images;
         // Swap chain image views.
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
-        // Framebuffers in the swap chain.
-        Vector<Ref<ROFramebufferVK>> swap_chain_framebuffers;
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
         // Global static-opaque mesh GPU buffers, populated by
@@ -380,8 +364,6 @@ private:
     void setup_base_render_data();
     void init_swap_chain_images();
     void init_swap_chain_image_views();
-    void init_render_pass();
-    void init_swap_chain_framebuffers();
     void setup_render_resource();
     void recreate_swap_chain();
 

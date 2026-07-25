@@ -30,11 +30,9 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_render_pass_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -140,19 +138,14 @@ public:
         const WBE::SpotLightInfo& spot_light = static_spot_lights[0];
 
         // ----- Shadow map images ---------------------------------------------
-        const VkExtent2D shadow_extent{
-            .width = spot_light.shadow_map_resolution, .height = spot_light.shadow_map_resolution};
+        const VkExtent2D shadow_extent{.width = spot_light.shadow_map_resolution, .height = spot_light.shadow_map_resolution};
         const std::set<uint32_t> queue_families(
             base_render_data->queue_family_indices.begin(), base_render_data->queue_family_indices.end());
 
-        shadow_depth_image = WBE::ROImageVK::Builder()
-                                 .shadow_map_depth(spot_light)
-                                 .set_queue_families(queue_families)
-                                 .create_ref(base_render_data);
-        shadow_color_image = WBE::ROImageVK::Builder()
-                                 .shadow_map_color(spot_light)
-                                 .set_queue_families(queue_families)
-                                 .create_ref(base_render_data);
+        shadow_depth_image =
+            WBE::ROImageVK::Builder().shadow_map_depth(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
+        shadow_color_image =
+            WBE::ROImageVK::Builder().shadow_map_color(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
 
         VkImageSubresourceRange depth_subresource{
             .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -186,77 +179,14 @@ public:
                              .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                              .create_ref(base_render_data);
 
-        // ----- Shadow map render pass / framebuffer --------------------------
-        VkAttachmentDescription shadow_color_attachment{};
-        shadow_color_attachment.format = SHADOWMAP_COLOR_FORMAT;
-        shadow_color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        shadow_color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        shadow_color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        shadow_color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        shadow_color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        shadow_color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        shadow_color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentDescription shadow_depth_attachment{};
-        shadow_depth_attachment.format = SHADOWMAP_DEPTH_FORMAT;
-        shadow_depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        shadow_depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        shadow_depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        shadow_depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        shadow_depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        shadow_depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        shadow_depth_attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        VkAttachmentReference shadow_color_ref{
-            .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-        VkAttachmentReference shadow_depth_ref{
-            .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-        VkSubpassDescription shadow_subpass{};
-        shadow_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        shadow_subpass.colorAttachmentCount = 1;
-        shadow_subpass.pColorAttachments = &shadow_color_ref;
-        shadow_subpass.pDepthStencilAttachment = &shadow_depth_ref;
-
-        VkSubpassDependency shadow_dependency_in{};
-        shadow_dependency_in.srcSubpass = VK_SUBPASS_EXTERNAL;
-        shadow_dependency_in.dstSubpass = 0;
-        shadow_dependency_in.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        shadow_dependency_in.srcAccessMask = 0;
-        shadow_dependency_in.dstStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        shadow_dependency_in.dstAccessMask =
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        VkSubpassDependency shadow_dependency_out{};
-        shadow_dependency_out.srcSubpass = 0;
-        shadow_dependency_out.dstSubpass = VK_SUBPASS_EXTERNAL;
-        shadow_dependency_out.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-        shadow_dependency_out.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        shadow_dependency_out.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        shadow_dependency_out.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        auto shadow_render_pass = WBE::RORenderPassVK::Builder()
-                                      .add_attachment(shadow_color_attachment)
-                                      .add_attachment(shadow_depth_attachment)
-                                      .add_subpass(shadow_subpass)
-                                      .add_dependency(shadow_dependency_in)
-                                      .add_dependency(shadow_dependency_out)
-                                      .create_ref(base_render_data);
-
-        auto shadow_framebuffer = WBE::ROFramebufferVK::Builder()
-                                      .add_attachment(shadow_color_view)
-                                      .add_attachment(shadow_depth_view)
-                                      .set_extent(shadow_extent)
-                                      .set_render_pass(shadow_render_pass)
-                                      .create_ref(base_render_data);
-
         // ----- Compile shadow pipeline ---------------------------------------
         WBE::GraphicsPipelineCompilerVKContext shadow_compiler_context{
             .allocator = render_allocator,
             .render_data = base_render_data,
             .render_database = renderer_vk->get_render_database(),
-            .render_pass = shadow_render_pass,
             .renderer = renderer_vk,
-            .color_attachment_count = 1,
+            .color_attachment_formats = {SHADOWMAP_COLOR_FORMAT},
+            .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
         };
         std::array<WBE::RenderUniformBinding, 2> shadow_uniform_bindings{
             WBE::RenderUniformBinding{
@@ -268,40 +198,29 @@ public:
             WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
                 .compile("shadowmap_spot",
                     shadow_pipeline_resource,
-                    std::span<const WBE::RenderUniformBinding>(
-                        shadow_uniform_bindings.data(), shadow_uniform_bindings.size()));
+                    std::span<const WBE::RenderUniformBinding>(shadow_uniform_bindings.data(), shadow_uniform_bindings.size()));
 
         // ----- Compile main forward-PBR pipeline -----------------------------
         camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
         std::array<WBE::RenderUniformBinding, 11> main_uniform_bindings{
-            WBE::RenderUniformBinding{
-                .field_path = "camera_info.view", .data = &camera_info.view, .size = sizeof(camera_info.view)},
-            WBE::RenderUniformBinding{
-                .field_path = "camera_info.proj", .data = &camera_info.proj, .size = sizeof(camera_info.proj)},
+            WBE::RenderUniformBinding{.field_path = "camera_info.view", .data = &camera_info.view, .size = sizeof(camera_info.view)},
+            WBE::RenderUniformBinding{.field_path = "camera_info.proj", .data = &camera_info.proj, .size = sizeof(camera_info.proj)},
             WBE::RenderUniformBinding{
                 .field_path = "spot_light_info.view", .data = &spot_light.view, .size = sizeof(spot_light.view)},
             WBE::RenderUniformBinding{
                 .field_path = "spot_light_info.proj", .data = &spot_light.proj, .size = sizeof(spot_light.proj)},
             WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.position",
-                .data = &spot_light.position,
-                .size = sizeof(spot_light.position)},
+                .field_path = "spot_light_info.position", .data = &spot_light.position, .size = sizeof(spot_light.position)},
             WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.intensity",
-                .data = &spot_light.intensity,
-                .size = sizeof(spot_light.intensity)},
+                .field_path = "spot_light_info.intensity", .data = &spot_light.intensity, .size = sizeof(spot_light.intensity)},
             WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.direction",
-                .data = &spot_light.direction,
-                .size = sizeof(spot_light.direction)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.inner_cone_cos",
+                .field_path = "spot_light_info.direction", .data = &spot_light.direction, .size = sizeof(spot_light.direction)},
+            WBE::RenderUniformBinding{.field_path = "spot_light_info.inner_cone_cos",
                 .data = &spot_light.inner_cone_cos,
                 .size = sizeof(spot_light.inner_cone_cos)},
             WBE::RenderUniformBinding{
                 .field_path = "spot_light_info.color", .data = &spot_light.color, .size = sizeof(spot_light.color)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.outer_cone_cos",
+            WBE::RenderUniformBinding{.field_path = "spot_light_info.outer_cone_cos",
                 .data = &spot_light.outer_cone_cos,
                 .size = sizeof(spot_light.outer_cone_cos)},
             WBE::RenderUniformBinding{
@@ -312,16 +231,14 @@ public:
             .allocator = render_allocator,
             .render_data = base_render_data,
             .render_database = renderer_vk->get_render_database(),
-            .render_pass = renderer_vk->get_swap_chain_render_pass(),
             .renderer = renderer_vk,
-            .color_attachment_count = 1,
+            .color_attachment_formats = {base_render_data->swap_chain_format},
         };
         auto [main_graphics_pipeline, main_descriptor_sets] =
             WBE::GraphicsPipelineCompilerVK(main_compiler_context)
                 .compile(default_material->graphics_pipeline->resource_key,
                     default_material->graphics_pipeline,
-                    std::span<const WBE::RenderUniformBinding>(
-                        main_uniform_bindings.data(), main_uniform_bindings.size()));
+                    std::span<const WBE::RenderUniformBinding>(main_uniform_bindings.data(), main_uniform_bindings.size()));
 
         // The compiler binds the placeholder shadowmap texture from the
         // material; overwrite it with the actual depth image rendered above.
@@ -337,73 +254,73 @@ public:
                               .create_ref(base_render_data);
         camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
         main_descriptor_sets[0]->write_descriptor_set(
-            WBE::RODescriptorSetVK::Writer().set_binding(0).add_uniform_buffer_info(
-                WBE::RODescriptorSetVK::Writer::BufferInfo{
-                    .buffer = camera_info_ubo,
-                    .offset = 0,
-                    .range = sizeof(WBE::CameraInfoVKUBO),
-                }));
+            WBE::RODescriptorSetVK::Writer().set_binding(0).add_uniform_buffer_info(WBE::RODescriptorSetVK::Writer::BufferInfo{
+                .buffer = camera_info_ubo,
+                .offset = 0,
+                .range = sizeof(WBE::CameraInfoVKUBO),
+            }));
         constexpr uint32_t SHADOWMAP_BINDING = 6;
         constexpr uint32_t SHADOWMAP_SAMPLER_BINDING = 7;
-        main_descriptor_sets[0]->write_descriptor_set(
-            WBE::RODescriptorSetVK::Writer().set_binding(SHADOWMAP_BINDING).add_sampled_image_info(
-                WBE::RODescriptorSetVK::Writer::ImageInfo{
+        main_descriptor_sets[0]->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
+                .set_binding(SHADOWMAP_BINDING)
+                .add_sampled_image_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
                     .image_view = shadow_depth_view,
                     .image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 }));
-        main_descriptor_sets[0]->write_descriptor_set(
-            WBE::RODescriptorSetVK::Writer().set_binding(SHADOWMAP_SAMPLER_BINDING).add_sampler_info(
-                WBE::RODescriptorSetVK::Writer::ImageInfo{
+        main_descriptor_sets[0]->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
+                .set_binding(SHADOWMAP_SAMPLER_BINDING)
+                .add_sampler_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
                     .sampler = shadow_sampler,
                 }));
 
         // ----- Build render graph: shadow pass -> main pass ------------------
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(
-            WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
-                .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-                .res = shadow_graphics_pipeline});
-        pipeline_desc.resources.emplace_back(
-            WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_FRAMEBUFFER,
-                .res_type_id = WBE::TypeUUID<WBE::ROFramebufferVK>::UUID,
-                .res = shadow_framebuffer});
-        pipeline_desc.resources.emplace_back(
-            WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
-                .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-                .res = main_graphics_pipeline});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
+            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            .res = shadow_graphics_pipeline});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = shadow_color_view});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .res = shadow_depth_view});
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
+            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            .res = main_graphics_pipeline});
 
         WBE::RendTaskDescVK shadow_task_desc(render_allocator);
         shadow_task_desc.task_id = WBE::RT_RUN_PIPELINE_SHADOWMAP;
         shadow_task_desc.create =
-            [render_allocator, base_render_data, shadow_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+            [render_allocator, base_render_data, shadow_extent, shadow_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
             std::array<VkClearValue, 2> shadow_clear_values{};
             shadow_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
             shadow_clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
+            std::array<WBE::RendResID, 1> shadow_color_attachment_ids{WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 std::span<const VkClearValue>(shadow_clear_values.data(), shadow_clear_values.size()),
-                WBE::REND_RES_TEST_SHADOWMAP_FRAMEBUFFER,
+                shadow_extent,
+                std::span<const WBE::RendResID>(shadow_color_attachment_ids.data(), shadow_color_attachment_ids.size()),
+                WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
                 WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(
-                    shadow_descriptor_sets.data(), shadow_descriptor_sets.size()));
+                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(shadow_descriptor_sets.data(), shadow_descriptor_sets.size()));
         };
 
         WBE::RendTaskDescVK main_task_desc(render_allocator);
         main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
         main_task_desc.prev.emplace_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
-        main_task_desc.create =
-            [render_allocator, base_render_data, main_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+        main_task_desc.create = [render_allocator, base_render_data, main_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                base_render_data->swap_chain_extent,
+                WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
                 WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(
-                    main_descriptor_sets.data(), main_descriptor_sets.size()));
+                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(main_descriptor_sets.data(), main_descriptor_sets.size()));
         };
 
         pipeline_desc.tasks.emplace_back(std::move(shadow_task_desc));
@@ -413,9 +330,8 @@ public:
     }
 
 private:
-    // Kept alive for the lifetime of the test because the framebuffer and
-    // the main pipeline's descriptor set reference these by raw
-    // VkImage/VkImageView/VkSampler handles without retaining ownership.
+    // Kept alive for the lifetime of the test because the graph resources and
+    // the main pipeline's descriptor set reference these by raw handles.
     WBE::Ref<WBE::ROImageVK> shadow_depth_image;
     WBE::Ref<WBE::ROImageVK> shadow_color_image;
     WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;

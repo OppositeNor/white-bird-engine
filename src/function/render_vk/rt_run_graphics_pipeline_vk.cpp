@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
@@ -22,9 +23,8 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_framebuffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -38,17 +38,20 @@ namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
     const glm::vec4& p_clear_color,
-    RendResID p_framebuffer_id,
+    VkExtent2D p_render_extent,
+    RendResID p_color_attachment_id,
     RendResID p_pipeline_id,
     std::optional<RendResID> p_vertex_buffer_id,
     std::optional<RendResID> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
-    : render_data(p_render_data), clear_values(p_render_data->allocator), framebuffer_id(p_framebuffer_id),
-      pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id), index_buffer_id(p_index_buffer_id),
+    : render_data(p_render_data), clear_values(p_render_data->allocator), render_extent(p_render_extent),
+      color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id),
+      index_buffer_id(p_index_buffer_id),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator) {
     clear_values.push_back(
         VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}});
+    color_attachment_ids.push_back(p_color_attachment_id);
     descriptor_sets_instances.reserve(descriptor_sets.size());
     for (const auto& descriptor_set : descriptor_sets) {
         descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
@@ -57,13 +60,17 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
     std::span<const VkClearValue> p_clear_values,
-    RendResID p_framebuffer_id,
+    VkExtent2D p_render_extent,
+    std::span<const RendResID> p_color_attachment_ids,
+    std::optional<RendResID> p_depth_attachment_id,
     RendResID p_pipeline_id,
     std::optional<RendResID> p_vertex_buffer_id,
     std::optional<RendResID> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
-      framebuffer_id(p_framebuffer_id), pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id),
+      render_extent(p_render_extent),
+      color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
+      depth_attachment_id(p_depth_attachment_id), pipeline_id(p_pipeline_id), vertex_buffer_id(p_vertex_buffer_id),
       index_buffer_id(p_index_buffer_id),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator) {
@@ -92,18 +99,23 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() c
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::write_resources() const {
     Vector<ResAccessVK, RenderAllocator> write_accesses(render_data->allocator);
-    write_accesses.push_back(
-        {.res_id = framebuffer_id, .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT});
+    write_accesses.reserve(color_attachment_ids.size() + (depth_attachment_id.has_value() ? 1 : 0));
+    for (RendResID color_attachment_id : color_attachment_ids) {
+        write_accesses.push_back({.res_id = color_attachment_id,
+            .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT});
+    }
+    if (depth_attachment_id.has_value()) {
+        write_accesses.push_back({.res_id = *depth_attachment_id,
+            .access = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT});
+    }
     return write_accesses;
 }
 
 void RTRunGraphicsPipelineVK::record(
     VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double /*p_delta*/) {
-    // Layout (matches read_resources() then write_resources()):
-    //   [0] graphics_pipeline
-    //   [1?] vertex_buffer
-    //   [2?] index_buffer
-    //   [last] framebuffer
+    // Layout matches read_resources() followed by write_resources().
     if (p_resources.size() < 2) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: insufficient bound resources.");
     }
@@ -117,25 +129,46 @@ void RTRunGraphicsPipelineVK::record(
     if (index_buffer_id.has_value()) {
         index_buffer = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROBufferVK>());
     }
-    auto framebuffer = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROFramebufferVK>());
 
-    // Begin render pass.
-    VkRenderPassBeginInfo render_pass_begin_info{};
-    render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_begin_info.renderPass = graphics_pipeline->get_config().render_pass->get_render_pass();
-    render_pass_begin_info.framebuffer = framebuffer->get_framebuffer();
-    render_pass_begin_info.renderArea.offset = {.x = 0, .y = 0};
-    auto extent = framebuffer->fields().extent;
-    render_pass_begin_info.renderArea.extent = {.width = extent.x, .height = extent.y};
-    render_pass_begin_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
-    render_pass_begin_info.pClearValues = clear_values.data();
-    vkCmdBeginRenderPass(p_command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    // Begin render.
+    VkRenderingInfo rendering_info{};
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    rendering_info.renderArea = {.offset = {.x = 0, .y = 0}, .extent = render_extent};
+    rendering_info.layerCount = 1;
+    const size_t color_attachment_count = graphics_pipeline->get_config().attachment_config.color_formats.size();
+    if (color_attachment_ids.size() != color_attachment_count) {
+        throw std::runtime_error("RTRunGraphicsPipelineVK: color attachment count does not match graphics pipeline.");
+    }
+    const size_t expected_clear_value_count = color_attachment_count + (depth_attachment_id.has_value() ? 1 : 0);
+    if (clear_values.size() < expected_clear_value_count) {
+        throw std::runtime_error("RTRunGraphicsPipelineVK: insufficient clear values for attachments.");
+    }
+    Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
+    color_attachments.reserve(color_attachment_count);
+    for (size_t i = 0; i < color_attachment_count; ++i) {
+        auto color_attachment = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROImageViewVK>());
+        color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
+                                        .set_clear_value(clear_values[i])
+                                        .build());
+    }
+    rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachments.size());
+    rendering_info.pColorAttachments = color_attachments.data();
+    VkRenderingAttachmentInfo depth_attachment_info{};
+    if (depth_attachment_id.has_value()) {
+        auto depth_attachment = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROImageViewVK>());
+        depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
+                                    .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)
+                                    .set_clear_value(clear_values[color_attachment_count])
+                                    .build();
+        rendering_info.pDepthAttachment = &depth_attachment_info;
+    }
+    vkCmdBeginRendering(p_command_buffer, &rendering_info);
 
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
     vkCmdSetViewport(p_command_buffer, 0, 1, &(render_data->viewport));
     VkRect2D scissor{};
     scissor.offset = {.x = 0, .y = 0};
-    scissor.extent = {.width = extent.x, .height = extent.y};
+    scissor.extent = render_extent;
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
 
     if (!descriptor_sets_instances.empty()) {
@@ -162,7 +195,7 @@ void RTRunGraphicsPipelineVK::record(
         vkCmdDraw(p_command_buffer, 3, 1, 0, 0);
     }
 
-    vkCmdEndRenderPass(p_command_buffer);
+    vkCmdEndRendering(p_command_buffer);
 }
 
 } // namespace WhiteBirdEngine

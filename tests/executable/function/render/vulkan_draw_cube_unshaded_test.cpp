@@ -90,10 +90,9 @@ public:
         auto descriptor_set_layout = WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1).create_ref(base_render_data);
         auto graphics_pipeline_layout =
             WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout).create_ref(base_render_data);
-        auto render_pass = renderer->get_swap_chain_render_pass();
         auto graphics_pipeline =
             WBE::ROGraphicsPipelineVK::Builder()
-                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout, render_pass)
+                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
                 .create_ref(base_render_data);
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
         camera_info = WBE::CameraInfoVKUBO{
@@ -130,7 +129,8 @@ public:
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                WBE::REND_RES_SWAP_CHAIN_FRAMEBUFFER_VK,
+                base_render_data->swap_chain_extent,
+                WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
                 WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,

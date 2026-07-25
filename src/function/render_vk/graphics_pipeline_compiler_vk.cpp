@@ -213,8 +213,8 @@ Ref<RenderObjectType> get_registered_render_object(
 
 GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context)
     : context(p_context) {
-    if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL ||
-        context.render_pass == MEM_NULL || context.renderer == nullptr) {
+    if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL || context.renderer == nullptr ||
+        context.color_attachment_formats.empty()) {
         throw std::runtime_error("Failed to create graphics pipeline compiler: invalid context.");
     }
 }
@@ -323,15 +323,14 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
         p_fragment_shader,
         get_stage_entry(p_pipeline_resource.vertex_stage_entry),
         get_stage_entry(p_pipeline_resource.fragment_stage_entry));
-    auto pipeline_builder = ROGraphicsPipelineVK::Builder().default_render_opaque_configuration(
-        context.render_data, shader_config, p_pipeline_layout, context.render_pass);
+    auto pipeline_builder =
+        ROGraphicsPipelineVK::Builder().default_render_opaque_configuration(context.render_data, shader_config, p_pipeline_layout);
+    pipeline_builder.config.attachment_config.set_color_formats(context.color_attachment_formats)
+        .set_depth_format(context.depth_attachment_format)
+        .set_stencil_format(context.stencil_attachment_format);
     // default_render_opaque_configuration adds one color attachment; add
-    // additional ones to match the render pass color attachment count.
-    if (context.color_attachment_count == 0) {
-        throw std::runtime_error(
-            std::format("Failed to compile graphics pipeline '{}': color_attachment_count must be at least 1.", p_resource_key));
-    }
-    for (uint32_t additional_index = 1; additional_index < context.color_attachment_count; ++additional_index) {
+    // additional ones to match the dynamic-rendering color attachment count.
+    for (uint32_t additional_index = 1; additional_index < context.color_attachment_formats.size(); ++additional_index) {
         pipeline_builder.config.color_blend.add_default_color_attachment();
     }
     pipeline_builder.config.depth_test.set_depth_test(p_pipeline_resource.depth_test ? VK_TRUE : VK_FALSE);
