@@ -103,7 +103,7 @@ TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, DeallocatesByMemoryOf
 }
 
 TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, HandlesAlignmentAndInvalidArenaInputs) {
-    WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(WBE_KiB(4), 4);
+    WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(WBE_KI_B(4), 4);
 
     WBE::MemID mem = allocator.allocate_in_arena(8, HEADER_SIZE * 4, 2);
     ASSERT_EQ(mem % (HEADER_SIZE * 4), 0);
@@ -116,11 +116,11 @@ TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, HandlesAlignmentAndIn
     ASSERT_THROW(WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(48, 4), std::runtime_error);
 
     allocator.deallocate(mem);
-    ASSERT_EQ(allocator.get_remain_size(), WBE_KiB(4));
+    ASSERT_EQ(allocator.get_remain_size(), WBE_KI_B(4));
 }
 
 TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, ConcurrentAllocationsProduceUniqueValidIds) {
-    WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(WBE_MiB(2), 8);
+    WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(WBE_MI_B(2), 8);
     constexpr int THREAD_COUNT = 8;
     constexpr int ALLOCS_PER_THREAD = 64;
 
@@ -170,7 +170,7 @@ TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, ConcurrentAllocations
         thread.join();
     }
 
-    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(2));
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MI_B(2));
     ASSERT_NO_THROW(allocator.check_broken());
 }
 

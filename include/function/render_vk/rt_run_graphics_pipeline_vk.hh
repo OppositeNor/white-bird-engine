@@ -45,7 +45,10 @@ namespace WhiteBirdEngine {
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
     virtual ~RTRunGraphicsPipelineVK() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RTRunGraphicsPipelineVK)
+    RTRunGraphicsPipelineVK(const RTRunGraphicsPipelineVK&) = delete;
+    RTRunGraphicsPipelineVK(RTRunGraphicsPipelineVK&&) noexcept = delete;
+    RTRunGraphicsPipelineVK& operator=(const RTRunGraphicsPipelineVK&) = delete;
+    RTRunGraphicsPipelineVK& operator=(RTRunGraphicsPipelineVK&&) noexcept = delete;
 
     /**
      * @brief Constructor (single-color attachment convenience).

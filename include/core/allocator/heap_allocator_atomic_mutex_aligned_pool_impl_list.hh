@@ -61,7 +61,7 @@ private:
     using Header = uint64_t;
 
 public:
-    HeapAllocatorAtomicMutexAlignedPoolImplicitList() : HeapAllocatorAtomicMutexAlignedPoolImplicitList(WBE_KiB(64)) {
+    HeapAllocatorAtomicMutexAlignedPoolImplicitList() : HeapAllocatorAtomicMutexAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAtomicMutexAlignedPoolImplicitList() override;
     HeapAllocatorAtomicMutexAlignedPoolImplicitList(const HeapAllocatorAtomicMutexAlignedPoolImplicitList&) = delete;

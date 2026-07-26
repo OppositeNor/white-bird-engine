@@ -32,7 +32,10 @@ class AllocatorVK {
 public:
     AllocatorVK() = delete;
     ~AllocatorVK() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(AllocatorVK)
+    AllocatorVK(const AllocatorVK&) = delete;
+    AllocatorVK(AllocatorVK&&) noexcept = delete;
+    AllocatorVK& operator=(const AllocatorVK&) = delete;
+    AllocatorVK& operator=(AllocatorVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_RENDER_TASK_VK_HH
 #define WBE_FILE_RENDER_TASK_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
@@ -66,7 +66,12 @@ struct ResAccessVK {
  * other tasks via the read/write resource declarations and execution edges.
  */
 struct RenderTaskVK : public RenderTask {
-    WBE_R6_DEFAULT_VIRTUAL(RenderTaskVK)
+    RenderTaskVK() = default;
+    virtual ~RenderTaskVK() = default;
+    RenderTaskVK(const RenderTaskVK&) = default;
+    RenderTaskVK(RenderTaskVK&&) noexcept = default;
+    RenderTaskVK& operator=(const RenderTaskVK&) = default;
+    RenderTaskVK& operator=(RenderTaskVK&&) noexcept = default;
 
     /**
      * @brief The queue family this task should run on. The render graph uses
@@ -129,7 +134,10 @@ struct RenderTaskVK : public RenderTask {
     public:
         RecordCommandBufferGuard() = delete;
         ~RecordCommandBufferGuard();
-        WBE_R6_NDCD_DELETE_COPY_MOVE(RecordCommandBufferGuard)
+        RecordCommandBufferGuard(const RecordCommandBufferGuard&) = delete;
+        RecordCommandBufferGuard(RecordCommandBufferGuard&&) noexcept = delete;
+        RecordCommandBufferGuard& operator=(const RecordCommandBufferGuard&) = delete;
+        RecordCommandBufferGuard& operator=(RecordCommandBufferGuard&&) noexcept = delete;
 
         /**
          * @brief Constructor.

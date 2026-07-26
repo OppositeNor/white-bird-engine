@@ -63,7 +63,10 @@ public:
     };
     ROPipelineLayoutVK() = delete;
     virtual ~ROPipelineLayoutVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROPipelineLayoutVK)
+    ROPipelineLayoutVK(const ROPipelineLayoutVK&) = delete;
+    ROPipelineLayoutVK(ROPipelineLayoutVK&&) noexcept = delete;
+    ROPipelineLayoutVK& operator=(const ROPipelineLayoutVK&) = delete;
+    ROPipelineLayoutVK& operator=(ROPipelineLayoutVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

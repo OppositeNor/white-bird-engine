@@ -32,7 +32,10 @@ class FileSystem final : public ISingleton<FileSystem> {
 public:
     FileSystem();
     ~FileSystem();
-    WBE_R6_NDCD_DELETE_COPY_MOVE(FileSystem)
+    FileSystem(const FileSystem&) = delete;
+    FileSystem(FileSystem&&) noexcept = delete;
+    FileSystem& operator=(const FileSystem&) = delete;
+    FileSystem& operator=(FileSystem&&) noexcept = delete;
 
     /**
      * @brief Constructor.

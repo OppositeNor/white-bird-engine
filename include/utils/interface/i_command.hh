@@ -30,7 +30,12 @@ using CommandID = uint64_t;
  */
 class ICommand {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(ICommand)
+    ICommand() = default;
+    virtual ~ICommand() = default;
+    ICommand(const ICommand&) = default;
+    ICommand(ICommand&&) noexcept = default;
+    ICommand& operator=(const ICommand&) = default;
+    ICommand& operator=(ICommand&&) noexcept = default;
 
     /**
      * @brief Invoke an operation.

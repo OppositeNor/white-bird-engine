@@ -190,7 +190,7 @@ public:
     }
 
 private:
-    static constexpr size_t STAGING_BUFFER_SIZE = WBE_MiB(0.1);
+    static constexpr size_t STAGING_BUFFER_SIZE = WBE_MI_B(0.1);
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
     static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
     static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 64;
@@ -260,7 +260,7 @@ private:
     // The currently active render graph (rebuilt on every activate_render_graph()).
     Ref<RenderGraphVK> active_graph;
 
-    std::vector<const char*> enabled_layers{
+    std::vector<const char*> enabled_layers {
 #ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
 #endif
@@ -274,12 +274,6 @@ private:
         // To make VK_IMAGE_LAYOUT_GENERAL works as well as other layouts.
         VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
     };
-
-#ifdef WBE_VK_ENABLE_VALIDATION
-    constexpr static bool ENABLE_VALIDATION_LAYER = true;
-#else
-    constexpr static bool ENABLE_VALIDATION_LAYER = false;
-#endif
 
     struct QueueFamilyIndices {
         AllocType* allocator = nullptr;

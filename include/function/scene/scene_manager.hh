@@ -31,7 +31,11 @@ namespace WhiteBirdEngine {
  */
 class SceneManager final : public ISceneManager {
 public:
-    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(SceneManager)
+    virtual ~SceneManager() override = default;
+    SceneManager(const SceneManager&) = delete;
+    SceneManager(SceneManager&&) noexcept = delete;
+    SceneManager& operator=(const SceneManager&) = delete;
+    SceneManager& operator=(SceneManager&&) noexcept = delete;
     SceneManager(Map<std::string, Ref<Scene>> p_scene_map);
 
     virtual Ref<Scene> get_current_scene() override;

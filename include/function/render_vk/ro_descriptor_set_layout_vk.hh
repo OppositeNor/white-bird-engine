@@ -80,7 +80,10 @@ public:
     };
 
     ~RODescriptorSetLayoutVK();
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RODescriptorSetLayoutVK)
+    RODescriptorSetLayoutVK(const RODescriptorSetLayoutVK&) = delete;
+    RODescriptorSetLayoutVK(RODescriptorSetLayoutVK&&) noexcept = delete;
+    RODescriptorSetLayoutVK& operator=(const RODescriptorSetLayoutVK&) = delete;
+    RODescriptorSetLayoutVK& operator=(RODescriptorSetLayoutVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

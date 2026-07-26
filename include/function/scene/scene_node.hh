@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_SCENE_NODE_HH
 #define WBE_FILE_SCENE_NODE_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "scene.hh"
 #include "utils/defs.hh"
 #include <stdexcept>

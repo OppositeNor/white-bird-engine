@@ -90,10 +90,9 @@ public:
         auto descriptor_set_layout = WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1).create_ref(base_render_data);
         auto graphics_pipeline_layout =
             WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout).create_ref(base_render_data);
-        auto graphics_pipeline =
-            WBE::ROGraphicsPipelineVK::Builder()
-                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
-                .create_ref(base_render_data);
+        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
+                                     .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
+                                     .create_ref(base_render_data);
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
         camera_info = WBE::CameraInfoVKUBO{
             // Look at the origin from (2,2,2)

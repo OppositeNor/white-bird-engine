@@ -64,15 +64,15 @@ public:
         const uint8_t* ptr = info.memory.data() + offset;
         glm::vec4 color{};
         switch (format) {
-            case Format::R8G8B8A8_UNORM:
-                color.r = static_cast<float>(ptr[0]) / 255.0F;
-                color.g = static_cast<float>(ptr[1]) / 255.0F;
-                color.b = static_cast<float>(ptr[2]) / 255.0F;
-                color.a = static_cast<float>(ptr[3]) / 255.0F;
-                break;
-            case Format::R32_SFLOAT:
-                color.r = *reinterpret_cast<const float*>(ptr);
-                break;
+        case Format::R8G8B8A8_UNORM:
+            color.r = static_cast<float>(ptr[0]) / 255.0F;
+            color.g = static_cast<float>(ptr[1]) / 255.0F;
+            color.b = static_cast<float>(ptr[2]) / 255.0F;
+            color.a = static_cast<float>(ptr[3]) / 255.0F;
+            break;
+        case Format::R32_SFLOAT:
+            color.r = *reinterpret_cast<const float*>(ptr);
+            break;
         }
         return color;
     }
@@ -100,8 +100,7 @@ private:
     };
 
     static size_t get_offset(const glm::uvec2& p_pos, const MipInfo& p_info) {
-        return p_info.swizzle ? morton_encode(p_pos.x, p_pos.y) * BYTE_PER_PIXEL
-            : p_pos.y * p_info.row_pitch + p_pos.x * BYTE_PER_PIXEL;
+        return p_info.swizzle ? morton_encode(p_pos.x, p_pos.y) * BYTE_PER_PIXEL : p_pos.y * p_info.row_pitch + p_pos.x * BYTE_PER_PIXEL;
     }
 
     Format format;

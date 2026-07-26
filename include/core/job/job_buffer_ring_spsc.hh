@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_HH
 
-#include "core/core_utils.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/core_utils.hh"
 #include "job_buffer.hh"
 #include "utils/defs.hh"
 #include <atomic>
@@ -35,7 +35,11 @@ namespace WhiteBirdEngine {
  */
 class JobBufferRingSPSC final : public JobBuffer<JobBufferRingSPSC> {
 public:
-    WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(JobBufferRingSPSC)
+    virtual ~JobBufferRingSPSC() override = default;
+    JobBufferRingSPSC(const JobBufferRingSPSC&) = delete;
+    JobBufferRingSPSC(JobBufferRingSPSC&&) noexcept = delete;
+    JobBufferRingSPSC& operator=(const JobBufferRingSPSC&) = delete;
+    JobBufferRingSPSC& operator=(JobBufferRingSPSC&&) noexcept = delete;
 
     /**
      * @brief Constructor.

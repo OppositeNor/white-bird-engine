@@ -34,7 +34,12 @@ WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
  */
 class IRenderer : public ISingleton<IRenderer>, public JobHandler {
 public:
-    WBE_R6_DELETE_COPY_MOVE_OVERRIDE(IRenderer)
+    IRenderer() = default;
+    virtual ~IRenderer() override = default;
+    IRenderer(const IRenderer&) = delete;
+    IRenderer(IRenderer&&) noexcept = delete;
+    IRenderer& operator=(const IRenderer&) = delete;
+    IRenderer& operator=(IRenderer&&) noexcept = delete;
 
     /**
      * @brief Called every frame.

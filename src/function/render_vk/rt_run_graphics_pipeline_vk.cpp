@@ -147,9 +147,8 @@ void RTRunGraphicsPipelineVK::record(
     color_attachments.reserve(color_attachment_count);
     for (size_t i = 0; i < color_attachment_count; ++i) {
         auto color_attachment = WBE_REQUIRES_VALID(p_resources[bound_index++].res.dynamic_cast_ref<ROImageViewVK>());
-        color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
-                                        .set_clear_value(clear_values[i])
-                                        .build());
+        color_attachments.push_back(
+            ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view()).set_clear_value(clear_values[i]).build());
     }
     rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachments.size());
     rendering_info.pColorAttachments = color_attachments.data();

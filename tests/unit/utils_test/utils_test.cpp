@@ -13,5 +13,6 @@
    limitations under the License.
 */
 // NOLINTBEGIN
-#include "type_metadata_test.hh"
+#include "required_test.hh"      // IWYU pragma: keep
+#include "type_metadata_test.hh" // IWYU pragma: keep
 // NOLINTEND

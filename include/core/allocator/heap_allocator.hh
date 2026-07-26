@@ -16,7 +16,6 @@
 #define WBE_FILE_HEAP_ALLOCATOR_HH
 
 #include "i_allocator.hh"
-#include "utils/defs.hh"
 #include <cstddef>
 #include <sstream>
 #include <string>
@@ -37,7 +36,10 @@ class HeapAllocator : public IAllocator {
 public:
     HeapAllocator() = default;
     virtual ~HeapAllocator() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocator)
+    HeapAllocator(const HeapAllocator&) = delete;
+    HeapAllocator(HeapAllocator&&) = delete;
+    HeapAllocator& operator=(const HeapAllocator&) = delete;
+    HeapAllocator& operator=(HeapAllocator&&) = delete;
 
     /**
      * @brief Allocate memory of a specific size.

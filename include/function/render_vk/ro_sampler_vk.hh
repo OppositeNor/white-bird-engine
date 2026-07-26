@@ -199,7 +199,10 @@ public:
 
     ROSamplerVK() = delete;
     virtual ~ROSamplerVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROSamplerVK)
+    ROSamplerVK(const ROSamplerVK&) = delete;
+    ROSamplerVK(ROSamplerVK&&) noexcept = delete;
+    ROSamplerVK& operator=(const ROSamplerVK&) = delete;
+    ROSamplerVK& operator=(ROSamplerVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

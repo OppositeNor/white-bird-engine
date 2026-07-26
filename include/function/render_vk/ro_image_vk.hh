@@ -24,7 +24,6 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <set>
@@ -124,7 +123,10 @@ public:
 
     ROImageVK() = delete;
     virtual ~ROImageVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageVK)
+    ROImageVK(const ROImageVK&) = delete;
+    ROImageVK(ROImageVK&&) noexcept = delete;
+    ROImageVK& operator=(const ROImageVK&) = delete;
+    ROImageVK& operator=(ROImageVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

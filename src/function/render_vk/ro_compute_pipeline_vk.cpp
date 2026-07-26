@@ -30,7 +30,10 @@ ROComputePipelineVK::~ROComputePipelineVK() {
 
 ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    auto shader_stage = WBE_REQUIRED(p_builder.shader_stage);
+    const auto& shader_stage = WBE_REQUIRED(p_builder.shader_stage);
+    if (p_builder.pipeline_layout == MEM_NULL) {
+        throw std::runtime_error("Failed to create compute pipeline: pipeline layout is missing.");
+    }
     VkPipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -39,10 +42,13 @@ ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, 
     VkComputePipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     create_info.stage = shader_stage_create_info;
-    if (vkCreateComputePipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {
+    create_info.layout = p_builder.pipeline_layout->get_pipeline_layout();
+    if (vkCreateComputePipelines(
+            render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute pipeline.");
     }
-
+    exposed_fields.compute_shader = shader_stage.shader;
+    exposed_fields.pipeline_layout = p_builder.pipeline_layout;
 }
 
 } // namespace WhiteBirdEngine

@@ -61,7 +61,7 @@ public:
     static constexpr size_t DEFAULT_ARENA_COUNT = 8;
 
     HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList()
-        : HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList(WBE_KiB(64)) {
+        : HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList() override;
     HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList(const HeapAllocatorAtomicThreadLocalArenaAlignedPoolImplicitList&) = delete;

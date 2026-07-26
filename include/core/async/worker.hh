@@ -43,14 +43,17 @@ public:
      */
     static constexpr size_t WORKER_MAX_TASK = 128;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(Worker);
+    Worker(const Worker&) = delete;
+    Worker(Worker&&) noexcept = delete;
+    Worker& operator=(const Worker&) = delete;
+    Worker& operator=(Worker&&) noexcept = delete;
 
     /**
      * @brief Constructor.
      *
      * @param p_allocator The allocator to allocate
      */
-    Worker() : allocator(WBE_MiB(0.5)) {
+    Worker() : allocator(WBE_MI_B(0.5)) {
         singleton = this;
         job_buffer = make_unique<JobBufferRingMPSC>(&allocator, &allocator, WORKER_MAX_TASK);
     }

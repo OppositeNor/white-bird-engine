@@ -69,7 +69,10 @@ class InputManager final : public ISingleton<InputManager> {
 public:
     InputManager();
     ~InputManager();
-    WBE_R6_NDCD_DELETE_COPY_MOVE(InputManager)
+    InputManager(const InputManager&) = delete;
+    InputManager(InputManager&&) noexcept = delete;
+    InputManager& operator=(const InputManager&) = delete;
+    InputManager& operator=(InputManager&&) noexcept = delete;
 
     /**
      * @brief Get the singleton instance.

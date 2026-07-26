@@ -32,7 +32,12 @@ WBE_LABEL(RT_UNDEFINED, WBE_RENDER_TASK);
  * @brief The abstract struct for render task.
  */
 struct RenderTask {
-    WBE_R6_DEFAULT_VIRTUAL(RenderTask)
+    RenderTask() = default;
+    virtual ~RenderTask() = default;
+    RenderTask(const RenderTask&) = default;
+    RenderTask(RenderTask&&) noexcept = default;
+    RenderTask& operator=(const RenderTask&) = default;
+    RenderTask& operator=(RenderTask&&) noexcept = default;
 
     /**
      * @brief Initialize the render task.

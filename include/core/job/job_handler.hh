@@ -26,7 +26,12 @@ namespace WhiteBirdEngine {
  */
 class JobHandler {
 public:
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(JobHandler)
+    JobHandler() = default;
+    virtual ~JobHandler() = default;
+    JobHandler(const JobHandler&) = delete;
+    JobHandler(JobHandler&&) noexcept = delete;
+    JobHandler& operator=(const JobHandler&) = delete;
+    JobHandler& operator=(JobHandler&&) noexcept = delete;
 
     /**
      * @brief Add a job to the handler.

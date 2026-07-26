@@ -696,9 +696,8 @@ public:
          * @param p_pipeline_layout Pipeline layout instance.
          * @return *this.
          */
-        Builder& default_render_opaque_configuration(const BaseRenderDataVK* p_render_data,
-            const Config::ShaderConfig& p_shader_config,
-            Ref<ROPipelineLayoutVK> p_pipeline_layout) {
+        Builder& default_render_opaque_configuration(
+            const BaseRenderDataVK* p_render_data, const Config::ShaderConfig& p_shader_config, Ref<ROPipelineLayoutVK> p_pipeline_layout) {
 
             ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
             vertex_input_config.add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION).add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
@@ -709,9 +708,7 @@ public:
             config.viewport.scissors = {p_render_data->scissor};
             config.pipeline_layout = p_pipeline_layout;
             config.color_blend.add_default_color_attachment();
-            config.attachment_config.add_color_format(p_render_data->swap_chain_format)
-                .set_depth_format(VK_FORMAT_UNDEFINED)
-                .set_stencil_format(VK_FORMAT_UNDEFINED);
+            config.attachment_config.add_color_format(p_render_data->swap_chain_format).set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
             config.dynamic_state.add_default_dynamic_states();
             return *this;
         }

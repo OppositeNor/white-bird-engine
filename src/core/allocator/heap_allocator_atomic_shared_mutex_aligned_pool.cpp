@@ -154,7 +154,8 @@ void* HeapAllocatorAtomicSharedMutexAlignedPool::acquire_memory(std::unique_ptr<
     return p_mem_start;
 }
 
-void HeapAllocatorAtomicSharedMutexAlignedPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
+void HeapAllocatorAtomicSharedMutexAlignedPool::insert_free_memory(
+    IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
     if (idle_list_head == nullptr) {
         idle_list_head = std::make_unique<IdleListNode>();
         ++idle_chunks_count;
@@ -194,7 +195,8 @@ bool HeapAllocatorAtomicSharedMutexAlignedPool::combine_idle_with_next(IdleListN
     return true;
 }
 
-std::unique_ptr<HeapAllocatorAtomicSharedMutexAlignedPool::IdleListNode>& HeapAllocatorAtomicSharedMutexAlignedPool::get_idle_node_before(void* p_loc) {
+std::unique_ptr<HeapAllocatorAtomicSharedMutexAlignedPool::IdleListNode>& HeapAllocatorAtomicSharedMutexAlignedPool::get_idle_node_before(
+    void* p_loc) {
     std::unique_ptr<IdleListNode>* curr = &idle_list_head;
     while (curr != nullptr) {
         if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {

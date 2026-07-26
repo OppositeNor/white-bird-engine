@@ -49,10 +49,13 @@ struct AllocatorTrait<class HeapAllocatorAtomicSharedMutexAlignedPool> final : p
  */
 class HeapAllocatorAtomicSharedMutexAlignedPool final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAtomicSharedMutexAlignedPool() : HeapAllocatorAtomicSharedMutexAlignedPool(WBE_KiB(64)) {
+    HeapAllocatorAtomicSharedMutexAlignedPool() : HeapAllocatorAtomicSharedMutexAlignedPool(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAtomicSharedMutexAlignedPool() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAtomicSharedMutexAlignedPool)
+    HeapAllocatorAtomicSharedMutexAlignedPool(const HeapAllocatorAtomicSharedMutexAlignedPool&) = delete;
+    HeapAllocatorAtomicSharedMutexAlignedPool(HeapAllocatorAtomicSharedMutexAlignedPool&&) noexcept = delete;
+    HeapAllocatorAtomicSharedMutexAlignedPool& operator=(const HeapAllocatorAtomicSharedMutexAlignedPool&) = delete;
+    HeapAllocatorAtomicSharedMutexAlignedPool& operator=(HeapAllocatorAtomicSharedMutexAlignedPool&&) noexcept = delete;
 
     using Header = uint64_t;
 

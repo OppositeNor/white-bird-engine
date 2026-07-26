@@ -16,6 +16,8 @@
 #define WBE_FILE_SPOT_LIGHT_INFO_HH
 
 #include "function/ecs/components.hh"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/vector_float3.hpp"
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>

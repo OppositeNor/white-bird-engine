@@ -17,7 +17,6 @@
 
 #include "core/allocator/heap_allocator_atomic_mutex_aligned_pool_impl_list.hh"
 #include "core/allocator/i_allocator.hh"
-#include "core/core_utils.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "utils/defs.hh"
@@ -31,7 +30,6 @@
 #include <set>
 #include <stdexcept>
 #include <thread>
-#include <type_traits>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -58,7 +56,6 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, TraitAndDefaultAliasT
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList>::IS_ALLOC_FIXED_SIZE);
     ASSERT_TRUE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList>::IS_ATOMIC);
     ASSERT_FALSE(WBE::AllocatorTrait<WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList>::WILL_ADDR_MOVE);
-    ASSERT_TRUE((std::is_same_v<WBE::HeapAllocatorAtomicDefault, WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList>));
 }
 
 TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, AllocatesAndDeallocates) {
@@ -84,7 +81,7 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, AllocatesAndDeallocat
 }
 
 TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, HandlesAlignmentAndInvalidAlignment) {
-    WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList pool(WBE_KiB(4));
+    WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList pool(WBE_KI_B(4));
 
     WBE::MemID mem1 = pool.allocate(8, HEADER_SIZE);
     WBE::MemID mem2 = pool.allocate(8, HEADER_SIZE * 4);
@@ -99,7 +96,7 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, HandlesAlignmentAndIn
     pool.deallocate(mem1);
     pool.deallocate(mem2);
     pool.deallocate(mem3);
-    ASSERT_EQ(pool.get_remain_size(), WBE_KiB(4));
+    ASSERT_EQ(pool.get_remain_size(), WBE_KI_B(4));
 }
 
 TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, CoalescesFragmentsAndCanClear) {
@@ -124,7 +121,7 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, CoalescesFragmentsAnd
 }
 
 TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, ConcurrentAllocationsProduceUniqueValidIds) {
-    WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList pool(WBE_MiB(4));
+    WBE::HeapAllocatorAtomicMutexAlignedPoolImplicitList pool(WBE_MI_B(4));
     constexpr int THREAD_COUNT = 8;
     constexpr int ALLOCS_PER_THREAD = 100;
 
@@ -171,7 +168,7 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, ConcurrentAllocations
             pool.deallocate(mem);
         }
     }
-    ASSERT_EQ(pool.get_remain_size(), WBE_MiB(4));
+    ASSERT_EQ(pool.get_remain_size(), WBE_MI_B(4));
 }
 
 #endif

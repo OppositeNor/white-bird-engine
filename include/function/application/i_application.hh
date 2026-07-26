@@ -26,7 +26,12 @@ namespace WhiteBirdEngine {
  */
 class IApplication {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(IApplication)
+    IApplication() = default;
+    virtual ~IApplication() = default;
+    IApplication(const IApplication&) = default;
+    IApplication(IApplication&&) noexcept = default;
+    IApplication& operator=(const IApplication&) = default;
+    IApplication& operator=(IApplication&&) noexcept = default;
 
     /**
      * @brief Run the application.

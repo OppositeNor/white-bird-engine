@@ -84,7 +84,7 @@ Emoji 测试: 😃🚀✨🌍
 
 class RefResHolder {
 public:
-    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KiB(4))), res(mem_id, WBE::global_allocator()) {
+    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KI_B(4))), res(mem_id, WBE::global_allocator()) {
     }
     ~RefResHolder() {
         WBE::global_allocator()->deallocate(mem_id);
@@ -340,7 +340,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
             "id": "inline_pipeline",
             "type": "graphics_pipeline",
             "vertex_stage_id": "vertex_shader",
+            "vertex_stage_entry": "",
             "fragment_stage_id": "fragment_shader",
+            "fragment_stage_entry": "",
             "depth_test": false,
             "depth_write": false
         }

@@ -260,15 +260,18 @@ public:
 
     ROImageViewVK() = delete;
     virtual ~ROImageViewVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROImageViewVK)
+    ROImageViewVK(const ROImageViewVK&) = delete;
+    ROImageViewVK(ROImageViewVK&&) noexcept = delete;
+    ROImageViewVK& operator=(const ROImageViewVK&) = delete;
+    ROImageViewVK& operator=(ROImageViewVK&&) noexcept = delete;
 
-        /**
-         * @brief Constructor.
-         *
-         * @param p_render_data The base render data.
-         * @param p_builder Configuration builder.
-         */
-        ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    /**
+     * @brief Constructor.
+     *
+     * @param p_render_data The base render data.
+     * @param p_builder Configuration builder.
+     */
+    ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the image view instance.

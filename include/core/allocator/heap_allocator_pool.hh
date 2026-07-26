@@ -49,7 +49,7 @@ struct AllocatorTrait<class HeapAllocatorPool> final : public AllocatorTrait<Hea
  */
 class HeapAllocatorPool final : public HeapAllocator {
 public:
-    HeapAllocatorPool() : HeapAllocatorPool(WBE_KiB(1)) {
+    HeapAllocatorPool() : HeapAllocatorPool(WBE_KI_B(1)) {
     }
     virtual ~HeapAllocatorPool() override;
     HeapAllocatorPool(const HeapAllocatorPool&) = delete;

@@ -63,7 +63,10 @@ public:
         : utility_name(p_utility_name), operations(std::move(p_operations)) {
     }
     virtual ~CLAASTNodeRoot() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRoot)
+    CLAASTNodeRoot(const CLAASTNodeRoot&) = delete;
+    CLAASTNodeRoot(CLAASTNodeRoot&&) noexcept = delete;
+    CLAASTNodeRoot& operator=(const CLAASTNodeRoot&) = delete;
+    CLAASTNodeRoot& operator=(CLAASTNodeRoot&&) noexcept = delete;
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -119,7 +122,10 @@ public:
 
     virtual ~CLAASTNodeOperation() override = default;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeOperation)
+    CLAASTNodeOperation(const CLAASTNodeOperation&) = delete;
+    CLAASTNodeOperation(CLAASTNodeOperation&&) noexcept = delete;
+    CLAASTNodeOperation& operator=(const CLAASTNodeOperation&) = delete;
+    CLAASTNodeOperation& operator=(CLAASTNodeOperation&&) noexcept = delete;
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 
@@ -197,7 +203,10 @@ public:
 
     virtual ~CLAASTNodeRootOperand() override = default;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTNodeRootOperand)
+    CLAASTNodeRootOperand(const CLAASTNodeRootOperand&) = delete;
+    CLAASTNodeRootOperand(CLAASTNodeRootOperand&&) noexcept = delete;
+    CLAASTNodeRootOperand& operator=(const CLAASTNodeRootOperand&) = delete;
+    CLAASTNodeRootOperand& operator=(CLAASTNodeRootOperand&&) noexcept = delete;
 
     virtual void accept(CLAASTVisitor* p_cla_ast_visitor) override;
 

@@ -93,7 +93,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ZeroSizeAllocat
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, AlignmentTest) {
     WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList allocator =
-        WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(WBE_MiB(0.5));
+        WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(WBE_MI_B(0.5));
     constexpr size_t ALIGN_REQ = WhiteBirdEngine::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList::HEADER_SIZE;
     std::vector<WhiteBirdEngine::MemID> allocated;
     for (size_t i = 0; i < 1024; ++i) {
@@ -128,7 +128,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, AlignmentTest) 
         allocator.deallocate(mem);
     }
 
-    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MI_B(0.5));
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
@@ -207,7 +207,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, FragmentationAn
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(1));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(1));
     std::vector<WBE::MemID> mems;
     std::mt19937 rng(42); // NOLINT
     std::uniform_int_distribution<int> dist(8, 64);
@@ -222,7 +222,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressRandomAll
     for (auto& mem : mems) {
         pool.deallocate(mem);
     }
-    ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
+    ASSERT_EQ(pool.get_remain_size(), WBE_MI_B(1));
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleFront) {
@@ -302,7 +302,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, RemoveIdleEnd) 
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(4));
     constexpr int STRESS_ITERATIONS = 800;
     std::mt19937 rng(300); // NOLINT
     std::uniform_int_distribution<int> size_dist(8, 256);
@@ -343,7 +343,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, StressAllocateW
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentAllocations) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(4));
     constexpr int NUM_THREADS = 8;
     constexpr int ALLOCS_PER_THREAD = 100;
 
@@ -400,7 +400,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentAlloc
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentDeallocations) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(2));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(2));
     constexpr int NUM_THREADS = 4;
     constexpr int ALLOCS_PER_THREAD = 50;
 
@@ -449,7 +449,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentDeall
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentMixedOperations) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(8));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(8));
     constexpr int NUM_THREADS = 6;
     constexpr int OPERATIONS_PER_THREAD = 200;
 
@@ -516,7 +516,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentMixed
 }
 
 TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentStressWithAlignment) {
-    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MiB(4));
+    WBE::HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList pool(WBE_MI_B(4));
     constexpr int NUM_THREADS = 4;
     constexpr int STRESS_ITERATIONS = 100;
 

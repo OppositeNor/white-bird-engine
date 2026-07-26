@@ -215,7 +215,7 @@ TEST_F(WBEAllocAlignedPoolTest, ConstructDestructCall) {
 }
 
 TEST_F(WBEAllocAlignedPoolTest, AlignmentTest) {
-    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(WBE_MiB(0.5));
+    WhiteBirdEngine::HeapAllocatorAlignedPool allocator = WhiteBirdEngine::HeapAllocatorAlignedPool(WBE_MI_B(0.5));
     constexpr size_t ALIGN_REQ = alignof(WhiteBirdEngine::HeapAllocatorAlignedPool::Header);
     WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
     ASSERT_EQ(mem1 % ALIGN_REQ, 0);
@@ -253,7 +253,7 @@ TEST_F(WBEAllocAlignedPoolTest, AlignmentTest) {
     allocator.deallocate(mem9);
     allocator.deallocate(mem10);
 
-    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MI_B(0.5));
 }
 
 TEST_F(WBEAllocAlignedPoolTest, ManySmallAllocations) {

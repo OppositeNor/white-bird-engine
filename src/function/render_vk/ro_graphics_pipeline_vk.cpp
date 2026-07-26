@@ -20,8 +20,10 @@
 #include "utils/defs.hh"
 #include <stdexcept>
 #include <string>
+#include <format>
 #include <vector>
 #include <vulkan/vulkan_core.h>
+#include <vulkan/vk_enum_string_helper.h>
 
 namespace WhiteBirdEngine {
 
@@ -53,15 +55,18 @@ VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_in
 }
 
 void ROGraphicsPipelineVK::init(const Config& p_config) {
+    const auto& vertex_stage = WBE_REQUIRED(p_config.shader.vertex_shader);
+    const auto& fragment_stage = WBE_REQUIRED(p_config.shader.fragment_shader);
+
     // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(4); // We can have a maximum of 4 shader stages
                               // (vertex, TSC, TSE, geometry, fragment)
-    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, WBE_REQUIRED(p_config.shader.vertex_shader)));
-    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, WBE_REQUIRED(p_config.shader.fragment_shader)));
+    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertex_stage));
+    shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_stage));
     // TODO: TSC, TSE and geometry shader
-    exposed_fields.vertex_shader = WBE_REQUIRED(p_config.shader.vertex_shader).shader;
-    exposed_fields.fragment_shader = WBE_REQUIRED(p_config.shader.fragment_shader).shader;
+    exposed_fields.vertex_shader = vertex_stage.shader;
+    exposed_fields.fragment_shader = fragment_stage.shader;
 
     // Setup create information for states.
     PipelineStateCreateInfo state_create_info;
@@ -99,9 +104,9 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
 
     exposed_fields.pipeline_layout = p_config.pipeline_layout;
 
-    if (vkCreateGraphicsPipelines(
-            render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create graphics pipeline.");
+    auto create_result = vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline);
+    if (create_result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create graphics pipeline: {}.", string_VkResult(create_result)));
     }
     config = p_config;
 }

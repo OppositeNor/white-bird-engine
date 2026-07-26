@@ -390,7 +390,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         auto per_node_bound = build_per_node_bound(node);
         const bool is_first_graphics = (i == first_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
         const bool is_last_graphics = (i == last_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
-    // The first/last graphics nodes bridge external acquire/present synchronization.
+        // The first/last graphics nodes bridge external acquire/present synchronization.
         record_node(node, command_buffer, per_node_bound, p_delta, i == 0, is_last_graphics);
 
         // Build wait/signal semaphore lists from exec edges + extras.
@@ -462,8 +462,7 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
     return per_node_bound;
 }
 
-void RenderGraphVK::record_node(
-    Ref<RGNode> p_node,
+void RenderGraphVK::record_node(Ref<RGNode> p_node,
     VkCommandBuffer p_command_buffer,
     const Vector<RendResVK, RenderAllocator>& p_bound,
     double p_delta,
@@ -522,8 +521,9 @@ void RenderGraphVK::record_node(
     }
 }
 
-void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound) {
-    // Dynamic rendering uses GENERAL, but images still need an explicit transition out of UNDEFINED/PRESENT.
+void RenderGraphVK::record_general_transition(
+    VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound) {
+    // We're already using unified shader layout, but we still need an explicit transition out of UNDEFINED/PRESENT.
     auto reads = p_node->render_task->read_resources();
     auto writes = p_node->render_task->write_resources();
     const size_t write_start = reads.size();
@@ -539,6 +539,7 @@ void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, 
         }
         Ref<ROImageVK> image = image_view->fields().image;
         if (image->fields().image_layout == VK_IMAGE_LAYOUT_GENERAL) {
+            // Filter out images that are already in general layout.
             continue;
         }
         ROImageVK::MemoryBarrierBuilder()
@@ -562,6 +563,7 @@ void RenderGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) 
         if (!image->fields().is_swap_chain_image) {
             continue;
         }
+        // For the swapchain image, apply a barrier that transfers it into VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
         ROImageVK::MemoryBarrierBuilder()
             .set_src_access(VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
             .set_dst_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
