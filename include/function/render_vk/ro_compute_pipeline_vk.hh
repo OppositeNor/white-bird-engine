@@ -57,7 +57,7 @@ public:
          * @return *this.
          */
         Builder& set_shader_stage(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
-            shader_stage.emplace(std::string(p_entry_function), p_shader);
+            shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader};
             return *this;
         }
 
@@ -121,7 +121,27 @@ public:
         return compute_pipeline;
     }
 
+    /**
+     * @class ExposedFields
+     * @brief Exposed fields of ROComputePipelineVK.
+     */
+    struct ExposedFields {
+        /**
+         * @brief Compute shader used by this pipeline.
+         */
+        Ref<const ROShaderVK> compute_shader;
+        /**
+         * @brief Pipeline layout used for descriptor set binding.
+         */
+        Ref<const ROPipelineLayoutVK> pipeline_layout;
+    };
+
+    const ExposedFields& fields() const {
+        return exposed_fields;
+    }
+
 private:
+    ExposedFields exposed_fields;
     VkPipeline compute_pipeline = VK_NULL_HANDLE;
 };
 

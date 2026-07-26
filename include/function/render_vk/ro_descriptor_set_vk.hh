@@ -26,7 +26,6 @@
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <vector>
