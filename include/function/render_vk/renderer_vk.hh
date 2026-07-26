@@ -261,9 +261,9 @@ private:
     Ref<RenderGraphVK> active_graph;
 
     std::vector<const char*> enabled_layers{
-#ifdef WBE_VK_ENABLE_VALIDATION
+// #ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
-#endif
+// #endif
     };
 
     const std::vector<const char*> enabled_instance_extensions;
@@ -274,12 +274,6 @@ private:
         // To make VK_IMAGE_LAYOUT_GENERAL works as well as other layouts.
         VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
     };
-
-#ifdef WBE_VK_ENABLE_VALIDATION
-    constexpr static bool ENABLE_VALIDATION_LAYER = true;
-#else
-    constexpr static bool ENABLE_VALIDATION_LAYER = false;
-#endif
 
     struct QueueFamilyIndices {
         AllocType* allocator = nullptr;

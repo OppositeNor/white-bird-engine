@@ -196,7 +196,10 @@ bool has_material_descriptor_bindings(const std::vector<ShaderDescriptorBindingV
 }
 
 std::string get_stage_entry(RefRes<char> p_stage_entry) {
-    return p_stage_entry == nullptr ? std::string("main") : std::string(p_stage_entry.get());
+    if (p_stage_entry == nullptr || p_stage_entry.get()[0] == '\0') {
+        return std::string("main");
+    }
+    return std::string(p_stage_entry.get());
 }
 
 template <typename RenderObjectType>

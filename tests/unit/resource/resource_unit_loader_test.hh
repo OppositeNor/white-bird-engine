@@ -340,7 +340,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
             "id": "inline_pipeline",
             "type": "graphics_pipeline",
             "vertex_stage_id": "vertex_shader",
+            "vertex_stage_entry": "",
             "fragment_stage_id": "fragment_shader",
+            "fragment_stage_entry": "",
             "depth_test": false,
             "depth_write": false
         }

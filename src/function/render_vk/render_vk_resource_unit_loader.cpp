@@ -109,8 +109,8 @@ void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_
 }
 
 RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, std::string_view p_entry) {
-    std::string_view stage_entry = p_entry.empty() ? "main" : p_entry;
-    return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.data());
+    std::string stage_entry(p_entry.empty() ? "main" : p_entry);
+    return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.c_str());
 }
 
 RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemeGraphicsPipeline& p_scheme) {

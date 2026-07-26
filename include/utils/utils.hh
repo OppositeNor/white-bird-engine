@@ -481,7 +481,15 @@ template <typename T>
 using Required = std::optional<T>; // What's optional is actually required...
 
 template <typename T>
-inline T required(std::string_view p_value_name, std::optional<T> p_optional_value) {
+inline T& required(std::string_view p_value_name, std::optional<T>& p_optional_value) {
+    if (!p_optional_value.has_value()) {
+        throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
+    }
+    return p_optional_value.value();
+}
+
+template <typename T>
+inline const T& required(std::string_view p_value_name, const std::optional<T>& p_optional_value) {
     if (!p_optional_value.has_value()) {
         throw std::runtime_error(std::format("Option \"{}\" is required.", p_value_name));
     }

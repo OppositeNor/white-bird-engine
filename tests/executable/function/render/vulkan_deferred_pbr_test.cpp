@@ -41,12 +41,10 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
-#include <exception>
 #include <format>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
-#include <print>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -229,7 +227,7 @@ public:
         gbuffer_clear_values[2].color = {.float32 = {0.0F, 0.0F, 0.0F, 0.0F}};
         gbuffer_clear_values[3].depthStencil = {.depth = 1.0F, .stencil = 0};
 
-        auto [graphics_pipeline, descriptor_sets] =
+        auto [graphics_pipeline, _] =
             WBE::GraphicsPipelineCompilerVK(compiler_context)
                 .compile("deferred_gbuffer",
                     gbuffer_pipeline_resource,
