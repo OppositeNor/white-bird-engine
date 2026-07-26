@@ -15,8 +15,6 @@
 #ifndef WBE_FILE_COMPONENTS_HH
 #define WBE_FILE_COMPONENTS_HH
 
-#include "core/allocator/heap_allocator_fixed_size_pool.hh"
-#include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -29,9 +27,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include <string_view>
 namespace WhiteBirdEngine {
-
-template <typename T>
-using RefComp = RefRaw<T, HeapAllocatorFixedSizePool>;
 
 /**
  * @class ComponentLabel
@@ -81,10 +76,10 @@ struct WBE_META(WBE_COMPONENT) ComponentTransformMats {
 };
 
 /**
- * @class ComponentSceneTreeNode
- * @brief Contains information of a component inside a tree node.
+ * @class ComponentHierarchy
+ * @brief Hierarchy relation for an entity.
  */
-struct WBE_META(WBE_COMPONENT) ComponentSceneTreeNode {
+struct WBE_META(WBE_COMPONENT) ComponentHierarchy {
     // The parent of this entity.
     EntityID parent = entt::null;
 };

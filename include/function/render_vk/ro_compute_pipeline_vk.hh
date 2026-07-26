@@ -49,6 +49,11 @@ public:
             Ref<ROShaderVK> shader;
         };
 
+        // Compute shader stage.
+        Required<ShaderStage> shader_stage;
+        // Pipeline layout.
+        Ref<ROPipelineLayoutVK> pipeline_layout;
+
         /**
          * @brief Set the compute shader stage.
          *
@@ -71,11 +76,6 @@ public:
             pipeline_layout = p_pipeline_layout;
             return *this;
         }
-
-        /** Compute shader stage. Manual setup needed! */
-        Required<ShaderStage> shader_stage;
-        /** Pipeline layout. Manual setup needed! */
-        Ref<ROPipelineLayoutVK> pipeline_layout;
 
         /**
          * @brief Create a reference-counted compute pipeline object.

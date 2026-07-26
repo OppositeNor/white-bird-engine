@@ -19,10 +19,9 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/function_utils.hh"
 #include "scene.hh"
-#include "utils/defs.hh"
-#include <stdexcept>
-#include <utility>
+#include "utils/utils.hh"
 namespace WhiteBirdEngine {
 /**
  * @class SceneNode
@@ -30,79 +29,67 @@ namespace WhiteBirdEngine {
  *
  * @todo Test
  */
-class WBE_META() SceneNode : public ThisRef<SceneNode> {
+class WBE_META() SceneNode final : public ThisRef<SceneNode> {
 protected:
 public:
     SceneNode() = delete;
-    virtual ~SceneNode() override = default;
+    virtual ~SceneNode() override;
     SceneNode(const SceneNode&) = delete;
-    SceneNode(SceneNode&& p_other) noexcept
-        : name(std::move(p_other.name)), parent(std::move(p_other.parent)), children(std::move(p_other.children)) {
-    }
+    SceneNode(SceneNode&& p_other) noexcept;
     SceneNode& operator=(const SceneNode&) = delete;
-    SceneNode& operator=(SceneNode&& p_other) noexcept {
-        parent = std::move(p_other.parent);
-        children = std::move(p_other.children);
-        return *this;
-    }
+    SceneNode& operator=(SceneNode&& p_other) noexcept;
+
+    /**
+     * @brief Set the reference referencing this instance.
+     *
+     * @param p_ref_of_this The reference referencing this instance.
+     */
+    void set_ref_of_this(Ref<SceneNode> p_ref_of_this);
 
     /**
      * @brief Constructor.
      *
      * @param p_scene The scene of this node lives in.
      */
-    SceneNode(Ref<Scene> p_scene) : name(p_scene->get_allocator()), children(p_scene->get_allocator()) {
+    SceneNode(Ref<Scene> p_scene);
+
+    /**
+     * @brief Get the entity instance owned by this node.
+     *
+     * @return The entity instance owned by this node.
+     */
+    EntityID get_entity() const {
+        return entity;
     }
 
     /**
-     * @brief Remove a node in chilid.
+     * @brief Remove a component from this node's entity.
      *
-     * @param p_node The node to be removed.
+     * @param p_component_type_id The component type id to remove.
      */
-    void remove_children(Ref<SceneNode> p_node) {
-        for (auto iter = children.begin(); iter != children.end(); ++iter) {
-            if (*iter == p_node) {
-                children.erase(iter);
-                return;
-            }
-        }
-        throw std::runtime_error("Children to be removed not found.");
-    }
+    void remove_component(TypeID p_component_type_id);
 
     /**
-     * @brief Check if a node contains a children.
+     * @brief Check if this node's entity has a component.
      *
-     * @param p_node The node to check.
-     * @return True if the node has the children, false otherwise.
+     * @param p_component_type_id The component type id to check.
+     * @return True if the node has the component type, false otherwise.
      */
-    bool has_children(Ref<SceneNode> p_node) const {
-        for (const auto& child : children) {
-            if (child == p_node) {
-                return true;
-            }
-        }
-        return false;
-    }
+    bool has_component(TypeID p_component_type_id);
 
     /**
-     * @brief Set the parent of this node.
+     * @brief Get this node's entity component type list.
      *
-     * @param p_parent The parent node to set to.
-     * @param p_ref_of_this The reference of this.
+     * @return This node's entity component type list.
      */
-    void set_parent(Ref<SceneNode> p_parent) {
-        WBE_DEBUG_ASSERT(!this_ref.is_null());
-        if (!parent.is_null()) {
-            parent.lock()->remove_children(this_ref.lock());
-        }
-        parent = p_parent;
-        p_parent->children.push_back(this_ref.lock());
-    }
+    Vector<TypeID> get_component_type_ids();
 
 private:
+    void destroy_entity();
+
     String<> name;
-    RefWeak<SceneNode> parent;
-    Vector<Ref<SceneNode>> children;
+    Ref<Scene> scene;
+    EntityID entity = entt::null;
 };
 
 } // namespace WhiteBirdEngine

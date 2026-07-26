@@ -24,6 +24,7 @@
 #include <set>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -142,6 +143,17 @@ using Set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  */
 template <typename T, typename AllocType = HeapAllocatorDefault>
 using HashSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
+
+/**
+ * @brief STL hash map that uses a custom allocator.
+ *
+ * @tparam TKey The type of the keys in the map.
+ * @tparam TVal The type of the values in the map.
+ * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
+ */
+template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
+using HashMap =
+    std::unordered_map<TKey, TVal, std::hash<TKey>, std::equal_to<TKey>, STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
 
 /**
  * @brief STL string that uses a custom allocator.
