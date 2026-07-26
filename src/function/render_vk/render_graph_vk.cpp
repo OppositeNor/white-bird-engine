@@ -390,7 +390,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         auto per_node_bound = build_per_node_bound(node);
         const bool is_first_graphics = (i == first_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
         const bool is_last_graphics = (i == last_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
-    // The first/last graphics nodes bridge external acquire/present synchronization.
+        // The first/last graphics nodes bridge external acquire/present synchronization.
         record_node(node, command_buffer, per_node_bound, p_delta, i == 0, is_last_graphics);
 
         // Build wait/signal semaphore lists from exec edges + extras.
@@ -462,8 +462,7 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
     return per_node_bound;
 }
 
-void RenderGraphVK::record_node(
-    Ref<RGNode> p_node,
+void RenderGraphVK::record_node(Ref<RGNode> p_node,
     VkCommandBuffer p_command_buffer,
     const Vector<RendResVK, RenderAllocator>& p_bound,
     double p_delta,
@@ -522,7 +521,8 @@ void RenderGraphVK::record_node(
     }
 }
 
-void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound) {
+void RenderGraphVK::record_general_transition(
+    VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound) {
     // Dynamic rendering uses GENERAL, but images still need an explicit transition out of UNDEFINED/PRESENT.
     auto reads = p_node->render_task->read_resources();
     auto writes = p_node->render_task->write_resources();

@@ -197,7 +197,8 @@ private:
 
     static size_t get_memory_size(size_t p_element_size, uint32_t p_max_obj) {
         if (p_max_obj > MAX_OBJ) {
-            throw std::runtime_error("Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
+            throw std::runtime_error(
+                "Failed to create allocator: allocator only allows a maximum of " + std::to_string(MAX_OBJ) + " objects");
         }
         return p_element_size * p_max_obj + sizeof(DataIndex) * p_max_obj + sizeof(InternalID) * p_max_obj;
     }

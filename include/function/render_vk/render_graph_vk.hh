@@ -130,7 +130,10 @@ class RenderGraphVK {
 public:
     RenderGraphVK() = delete;
     ~RenderGraphVK();
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderGraphVK)
+    RenderGraphVK(const RenderGraphVK&) = delete;
+    RenderGraphVK(RenderGraphVK&&) noexcept = delete;
+    RenderGraphVK& operator=(const RenderGraphVK&) = delete;
+    RenderGraphVK& operator=(RenderGraphVK&&) noexcept = delete;
 
     /**
      * @brief Construct an empty graph bound to the given Vulkan render data.
@@ -253,8 +256,7 @@ private:
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
-    void record_node(
-        Ref<RGNode> p_node,
+    void record_node(Ref<RGNode> p_node,
         VkCommandBuffer p_command_buffer,
         const Vector<RendResVK, RenderAllocator>& p_bound,
         double p_delta,

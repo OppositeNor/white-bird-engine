@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_MPSC_HH
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
@@ -36,7 +36,10 @@ class JobBufferRingMPSC final : public JobBuffer<JobBufferRingMPSC> {
 public:
     JobBufferRingMPSC() = delete;
     virtual ~JobBufferRingMPSC() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(JobBufferRingMPSC)
+    JobBufferRingMPSC(const JobBufferRingMPSC&) = delete;
+    JobBufferRingMPSC(JobBufferRingMPSC&&) noexcept = delete;
+    JobBufferRingMPSC& operator=(const JobBufferRingMPSC&) = delete;
+    JobBufferRingMPSC& operator=(JobBufferRingMPSC&&) noexcept = delete;
 
     /**
      * @brief Constructor.

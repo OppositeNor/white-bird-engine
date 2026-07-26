@@ -51,7 +51,7 @@ public:
         friend ROStagingBufferVK;
 
         // The size of the buffer.
-        size_t size = WBE_KiB(4UL);
+        size_t size = WBE_KI_B(4UL);
         // The usage of the buffer.
         Required<VkBufferUsageFlags> usage;
         // Queue families this buffer is going to be used across. Either this
@@ -135,7 +135,10 @@ public:
 
     ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROStagingBufferVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROStagingBufferVK)
+    ROStagingBufferVK(const ROStagingBufferVK&) = delete;
+    ROStagingBufferVK(ROStagingBufferVK&&) noexcept = delete;
+    ROStagingBufferVK& operator=(const ROStagingBufferVK&) = delete;
+    ROStagingBufferVK& operator=(ROStagingBufferVK&&) noexcept = delete;
 
     /**
      * @brief Get the exposed fields.

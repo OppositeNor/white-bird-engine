@@ -31,7 +31,7 @@
 namespace WBE = WhiteBirdEngine;
 
 constexpr size_t ALLOC_NUM = 1000;
-constexpr size_t POOL_SIZE = WBE_MiB(512UL);
+constexpr size_t POOL_SIZE = WBE_MI_B(512UL);
 constexpr size_t FREE_BATCH = 10000;
 
 template <typename Allocator>

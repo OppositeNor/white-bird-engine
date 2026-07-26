@@ -32,7 +32,10 @@ public:
     EngineResource();
     virtual ~EngineResource() override;
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineResource)
+    EngineResource(const EngineResource&) = delete;
+    EngineResource(EngineResource&&) noexcept = delete;
+    EngineResource& operator=(const EngineResource&) = delete;
+    EngineResource& operator=(EngineResource&&) noexcept = delete;
 
     Unique<ResourceManager> resource_manager = MEM_NULL;
 };

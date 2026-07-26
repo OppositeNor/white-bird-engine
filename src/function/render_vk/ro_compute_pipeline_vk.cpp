@@ -39,10 +39,10 @@ ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, 
     VkComputePipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     create_info.stage = shader_stage_create_info;
-    if (vkCreateComputePipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {
+    if (vkCreateComputePipelines(
+            render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute pipeline.");
     }
-
 }
 
 } // namespace WhiteBirdEngine

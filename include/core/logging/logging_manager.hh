@@ -47,7 +47,7 @@ public:
      * @param p_log_allocator_size The argument to input to the constructor of
      * the log object.
      */
-    LoggingManager(T& p_channel_argument, size_t p_log_allocator_size = WBE_KiB(1))
+    LoggingManager(T& p_channel_argument, size_t p_log_allocator_size = WBE_KI_B(1))
         : ISingleton<LoggingManager>(), channel_argument(&p_channel_argument), log_allocator(p_log_allocator_size) {
     }
 
@@ -59,7 +59,10 @@ public:
         log_allocator.clear();
     }
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(LoggingManager)
+    LoggingManager(const LoggingManager&) = delete;
+    LoggingManager(LoggingManager&&) noexcept = delete;
+    LoggingManager& operator=(const LoggingManager&) = delete;
+    LoggingManager& operator=(LoggingManager&&) noexcept = delete;
 
     /**
      * @brief Get the instance of a log object of a specific channel.

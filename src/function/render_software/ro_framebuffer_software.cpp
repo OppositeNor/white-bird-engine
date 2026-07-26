@@ -17,8 +17,6 @@
 
 namespace WhiteBirdEngine {
 
-ROFramebufferSoftware::ROFramebufferSoftware(Ref<ROImageSoftware> p_image)
-    : image(p_image) {
-
+ROFramebufferSoftware::ROFramebufferSoftware(Ref<ROImageSoftware> p_image) : image(p_image) {
 }
 } // namespace WhiteBirdEngine

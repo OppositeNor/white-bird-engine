@@ -52,7 +52,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPoolImplicitList> final : public
  */
 class HeapAllocatorAlignedPoolImplicitList final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAlignedPoolImplicitList() : HeapAllocatorAlignedPoolImplicitList(WBE_KiB(64)) {
+    HeapAllocatorAlignedPoolImplicitList() : HeapAllocatorAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAlignedPoolImplicitList() override;
     HeapAllocatorAlignedPoolImplicitList(const HeapAllocatorAlignedPoolImplicitList&) = delete;

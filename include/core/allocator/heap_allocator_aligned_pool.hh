@@ -48,7 +48,7 @@ struct AllocatorTrait<class HeapAllocatorAlignedPool> final : public AllocatorTr
  */
 class HeapAllocatorAlignedPool final : public HeapAllocatorAligned {
 public:
-    HeapAllocatorAlignedPool() : HeapAllocatorAlignedPool(WBE_KiB(64UL)) {
+    HeapAllocatorAlignedPool() : HeapAllocatorAlignedPool(WBE_KI_B(64UL)) {
     }
     virtual ~HeapAllocatorAlignedPool() override;
     HeapAllocatorAlignedPool(const HeapAllocatorAlignedPool&) = delete;

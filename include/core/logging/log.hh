@@ -29,7 +29,12 @@ WBE_LABEL(WBE_CHANNEL_DEBUG, WBE_CHANNEL)
 
 class ILog {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(ILog)
+    ILog() = default;
+    virtual ~ILog() = default;
+    ILog(const ILog&) = default;
+    ILog(ILog&&) noexcept = default;
+    ILog& operator=(const ILog&) = default;
+    ILog& operator=(ILog&&) noexcept = default;
 
     /**
      * @brief Get the channel of the log.

@@ -39,7 +39,8 @@
 namespace WhiteBirdEngine {
 
 template <>
-struct AllocatorTrait<class HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList> final : public AllocatorTrait<HeapAllocatorAligned> {
+struct AllocatorTrait<class HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList> final
+    : public AllocatorTrait<HeapAllocatorAligned> {
     WBE_TRAIT(AllocatorTrait<HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList>);
     static constexpr bool IS_POOL = true;
     static constexpr bool IS_GURANTEED_CONTINUOUS = false;
@@ -61,7 +62,8 @@ private:
     using Header = uint64_t;
 
 public:
-    HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList() : HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(WBE_KiB(64)) {
+    HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList()
+        : HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList() override;
     HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList(const HeapAllocatorAtomicSharedMutexAlignedPoolImplicitList&) = delete;

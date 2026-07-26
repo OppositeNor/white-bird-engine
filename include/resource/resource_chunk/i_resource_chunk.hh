@@ -42,7 +42,12 @@ constexpr ResourceChunkID RES_CHUNK_NULL = 0x0;
  */
 class IResourceChunk {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(IResourceChunk)
+    IResourceChunk() = default;
+    virtual ~IResourceChunk() = default;
+    IResourceChunk(const IResourceChunk&) = default;
+    IResourceChunk(IResourceChunk&&) noexcept = default;
+    IResourceChunk& operator=(const IResourceChunk&) = default;
+    IResourceChunk& operator=(IResourceChunk&&) noexcept = default;
 
     /**
      * @brief Get the resource from a key.

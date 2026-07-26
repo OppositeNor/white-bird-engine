@@ -34,7 +34,10 @@ class Global final : public ISingleton<Global> {
 public:
     Global() = delete;
     virtual ~Global() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(Global)
+    Global(const Global&) = delete;
+    Global(Global&&) noexcept = delete;
+    Global& operator=(const Global&) = delete;
+    Global& operator=(Global&&) noexcept = delete;
 
     /**
      * @brief Constructor.

@@ -84,7 +84,7 @@ Emoji 测试: 😃🚀✨🌍
 
 class RefResHolder {
 public:
-    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KiB(4))), res(mem_id, WBE::global_allocator()) {
+    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KI_B(4))), res(mem_id, WBE::global_allocator()) {
     }
     ~RefResHolder() {
         WBE::global_allocator()->deallocate(mem_id);

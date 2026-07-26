@@ -34,7 +34,10 @@ public:
     virtual ~GameConfig() override {
         singleton = nullptr;
     }
-    WBE_R6_NDCD_DELETE_COPY_MOVE(GameConfig)
+    GameConfig(const GameConfig&) = delete;
+    GameConfig(GameConfig&&) noexcept = delete;
+    GameConfig& operator=(const GameConfig&) = delete;
+    GameConfig& operator=(GameConfig&&) noexcept = delete;
 
     /**
      * @brief Constructor

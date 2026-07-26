@@ -21,9 +21,11 @@
 #include "function/render_software/render_software_defs.hh"
 #include "function/render_software/ro_framebuffer_software.hh"
 #include "function/render_software/ro_image_software.hh"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_uint2.hpp"
+#include <cstdint>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include <cstdint>
 #include <span>
 namespace WhiteBirdEngine {
 
@@ -58,7 +60,7 @@ struct RenderPerThreadScreenSpaceJobSoftware {};
 struct RenderContextSoftware {
     RenderContextSoftware(BaseRenderDataSoftware* p_render_data)
         : base_render_data(p_render_data), input_buffer(p_render_data->main_allocator),
-        vertex_in(p_render_data->main_allocator), vertex_out(p_render_data->main_allocator) {
+          vertex_in(p_render_data->main_allocator), vertex_out(p_render_data->main_allocator) {
     }
     BaseRenderDataSoftware* base_render_data;
 

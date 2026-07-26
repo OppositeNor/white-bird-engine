@@ -42,7 +42,10 @@ public:
         instance_count.fetch_sub(1, std::memory_order_acq_rel);
     }
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ISingleton)
+    ISingleton(const ISingleton&) = delete;
+    ISingleton(ISingleton&&) noexcept = delete;
+    ISingleton& operator=(const ISingleton&) = delete;
+    ISingleton& operator=(ISingleton&&) noexcept = delete;
 
 private:
     inline static std::atomic<uint8_t> instance_count = 0;

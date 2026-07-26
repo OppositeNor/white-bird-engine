@@ -33,7 +33,10 @@ class EngineFunction final : public ISingleton<EngineFunction> {
 public:
     EngineFunction() = delete;
     virtual ~EngineFunction() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineFunction)
+    EngineFunction(const EngineFunction&) = delete;
+    EngineFunction(EngineFunction&&) noexcept = delete;
+    EngineFunction& operator=(const EngineFunction&) = delete;
+    EngineFunction& operator=(EngineFunction&&) noexcept = delete;
 
     /**
      * @brief Constructor.

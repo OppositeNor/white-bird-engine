@@ -26,7 +26,12 @@ namespace WhiteBirdEngine {
  */
 class AudioRenderer : public ISingleton<AudioRenderer> {
 public:
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(AudioRenderer)
+    AudioRenderer() = default;
+    virtual ~AudioRenderer() = default;
+    AudioRenderer(const AudioRenderer&) = delete;
+    AudioRenderer(AudioRenderer&&) noexcept = delete;
+    AudioRenderer& operator=(const AudioRenderer&) = delete;
+    AudioRenderer& operator=(AudioRenderer&&) noexcept = delete;
 
     // TODO
 };

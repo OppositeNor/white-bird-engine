@@ -68,7 +68,10 @@ class CLAASTVisitorToString : public CLAASTVisitor {
 public:
     CLAASTVisitorToString() = default;
     virtual ~CLAASTVisitorToString() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTVisitorToString)
+    CLAASTVisitorToString(const CLAASTVisitorToString&) = delete;
+    CLAASTVisitorToString(CLAASTVisitorToString&&) noexcept = delete;
+    CLAASTVisitorToString& operator=(const CLAASTVisitorToString&) = delete;
+    CLAASTVisitorToString& operator=(CLAASTVisitorToString&&) noexcept = delete;
 
     virtual void visit(class CLAASTNodeRoot* p_node) override;
     virtual void visit(class CLAASTNodeRootOperand* p_node) override;
@@ -99,7 +102,10 @@ public:
     CLAASTVisitorAssembler() : root({}) {
     }
     virtual ~CLAASTVisitorAssembler() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(CLAASTVisitorAssembler)
+    CLAASTVisitorAssembler(const CLAASTVisitorAssembler&) = delete;
+    CLAASTVisitorAssembler(CLAASTVisitorAssembler&&) noexcept = delete;
+    CLAASTVisitorAssembler& operator=(const CLAASTVisitorAssembler&) = delete;
+    CLAASTVisitorAssembler& operator=(CLAASTVisitorAssembler&&) noexcept = delete;
 
     virtual void visit(class CLAASTNodeRoot* p_node) override;
     virtual void visit(class CLAASTNodeRootOperand* p_node) override;

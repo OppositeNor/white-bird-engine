@@ -33,7 +33,10 @@ class IResourceUnitLoader {
 public:
     IResourceUnitLoader() = default;
     virtual ~IResourceUnitLoader() = default;
-    WBE_R6_NDCD_DEFAULT_COPY_MOVE(IResourceUnitLoader)
+    IResourceUnitLoader(const IResourceUnitLoader&) = default;
+    IResourceUnitLoader(IResourceUnitLoader&&) noexcept = default;
+    IResourceUnitLoader& operator=(const IResourceUnitLoader&) = default;
+    IResourceUnitLoader& operator=(IResourceUnitLoader&&) noexcept = default;
 
     /**
      * @brief Gets all resource types supported by this loader.

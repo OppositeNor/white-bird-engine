@@ -16,6 +16,7 @@
 #define WBE_RO_DESCRIPTOR_SET_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -25,7 +26,6 @@
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -222,7 +222,10 @@ public:
 
     RODescriptorSetVK() = delete;
     virtual ~RODescriptorSetVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RODescriptorSetVK)
+    RODescriptorSetVK(const RODescriptorSetVK&) = delete;
+    RODescriptorSetVK(RODescriptorSetVK&&) noexcept = delete;
+    RODescriptorSetVK& operator=(const RODescriptorSetVK&) = delete;
+    RODescriptorSetVK& operator=(RODescriptorSetVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

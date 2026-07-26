@@ -31,7 +31,12 @@ namespace WhiteBirdEngine {
  */
 class ISceneManager : public ISingleton<ISceneManager> {
 public:
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(ISceneManager)
+    ISceneManager() = default;
+    virtual ~ISceneManager() = default;
+    ISceneManager(const ISceneManager&) = delete;
+    ISceneManager(ISceneManager&&) noexcept = delete;
+    ISceneManager& operator=(const ISceneManager&) = delete;
+    ISceneManager& operator=(ISceneManager&&) noexcept = delete;
 
     /**
      * @brief Get the current scene.

@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
  */
 class RendererSoftware final : public IRenderer {
 public:
-    static constexpr uint32_t PER_THREAD_ALLOCATOR_SIZE = WBE_MiB(1);
+    static constexpr uint32_t PER_THREAD_ALLOCATOR_SIZE = WBE_MI_B(1);
 
     virtual ~RendererSoftware() override = default;
     RendererSoftware(const RendererSoftware&) = delete;

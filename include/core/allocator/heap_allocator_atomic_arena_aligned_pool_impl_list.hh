@@ -58,7 +58,7 @@ public:
      */
     static constexpr size_t DEFAULT_ARENA_COUNT = 8;
 
-    HeapAllocatorAtomicArenaAlignedPoolImplicitList() : HeapAllocatorAtomicArenaAlignedPoolImplicitList(WBE_KiB(64)) {
+    HeapAllocatorAtomicArenaAlignedPoolImplicitList() : HeapAllocatorAtomicArenaAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
     virtual ~HeapAllocatorAtomicArenaAlignedPoolImplicitList() override;
     HeapAllocatorAtomicArenaAlignedPoolImplicitList(const HeapAllocatorAtomicArenaAlignedPoolImplicitList&) = delete;

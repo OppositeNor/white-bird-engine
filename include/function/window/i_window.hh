@@ -63,7 +63,10 @@ class IWindow {
 public:
     IWindow() = default;
     virtual ~IWindow() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(IWindow)
+    IWindow(const IWindow&) = delete;
+    IWindow(IWindow&&) noexcept = delete;
+    IWindow& operator=(const IWindow&) = delete;
+    IWindow& operator=(IWindow&&) noexcept = delete;
 
     /**
      * @brief Get the type of the window.

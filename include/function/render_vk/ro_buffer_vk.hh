@@ -58,7 +58,7 @@ public:
         friend ROBufferVK;
 
         // The size of the buffer.
-        size_t size = WBE_KiB(4UL);
+        size_t size = WBE_KI_B(4UL);
         // The usage of the buffer.
         Required<VkBufferUsageFlags> usage;
         // Queue families this buffer is going to be used across. Either this
@@ -311,7 +311,10 @@ public:
      */
     ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferVK)
+    ROBufferVK(const ROBufferVK&) = delete;
+    ROBufferVK(ROBufferVK&&) noexcept = delete;
+    ROBufferVK& operator=(const ROBufferVK&) = delete;
+    ROBufferVK& operator=(ROBufferVK&&) noexcept = delete;
 
     /**
      * @brief Get the buffer instance.

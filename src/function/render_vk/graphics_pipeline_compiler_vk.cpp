@@ -213,8 +213,8 @@ Ref<RenderObjectType> get_registered_render_object(
 
 GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context)
     : context(p_context) {
-    if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL || context.renderer == nullptr ||
-        context.color_attachment_formats.empty()) {
+    if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL ||
+        context.renderer == nullptr || context.color_attachment_formats.empty()) {
         throw std::runtime_error("Failed to create graphics pipeline compiler: invalid context.");
     }
 }

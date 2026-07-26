@@ -114,7 +114,10 @@ public:
      */
     ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
     virtual ~ROBufferViewVK() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROBufferViewVK)
+    ROBufferViewVK(const ROBufferViewVK&) = delete;
+    ROBufferViewVK(ROBufferViewVK&&) noexcept = delete;
+    ROBufferViewVK& operator=(const ROBufferViewVK&) = delete;
+    ROBufferViewVK& operator=(ROBufferViewVK&&) noexcept = delete;
 
     /**
      * @class ExposedFields

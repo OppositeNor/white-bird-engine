@@ -133,7 +133,10 @@ public:
     virtual ~RenderDatabase() override {
         singleton = nullptr;
     }
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderDatabase)
+    RenderDatabase(const RenderDatabase&) = delete;
+    RenderDatabase(RenderDatabase&&) noexcept = delete;
+    RenderDatabase& operator=(const RenderDatabase&) = delete;
+    RenderDatabase& operator=(RenderDatabase&&) noexcept = delete;
 
     /**
      * @brief Constructor.

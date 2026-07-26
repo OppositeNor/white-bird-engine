@@ -40,7 +40,10 @@ class ApplicationGame : public IApplication {
 public:
     ApplicationGame();
     virtual ~ApplicationGame() = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ApplicationGame)
+    ApplicationGame(const ApplicationGame&) = delete;
+    ApplicationGame(ApplicationGame&&) noexcept = delete;
+    ApplicationGame& operator=(const ApplicationGame&) = delete;
+    ApplicationGame& operator=(ApplicationGame&&) noexcept = delete;
 
     virtual void run() override;
 

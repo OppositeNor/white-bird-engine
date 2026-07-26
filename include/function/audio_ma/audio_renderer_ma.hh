@@ -30,7 +30,10 @@ class AudioRendererMA final : public AudioRenderer {
 public:
     AudioRendererMA();
     virtual ~AudioRendererMA() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(AudioRendererMA)
+    AudioRendererMA(const AudioRendererMA&) = delete;
+    AudioRendererMA(AudioRendererMA&&) noexcept = delete;
+    AudioRendererMA& operator=(const AudioRendererMA&) = delete;
+    AudioRendererMA& operator=(AudioRendererMA&&) noexcept = delete;
 
 private:
     ma_context context{};

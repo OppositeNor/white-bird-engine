@@ -41,7 +41,10 @@ public:
             render_data->frames_in_flight);
     }
 
-    WBE_R6_NDCD_DELETE_COPY_MOVE(SemaphoreVK)
+    SemaphoreVK(const SemaphoreVK&) = delete;
+    SemaphoreVK(SemaphoreVK&&) noexcept = delete;
+    SemaphoreVK& operator=(const SemaphoreVK&) = delete;
+    SemaphoreVK& operator=(SemaphoreVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

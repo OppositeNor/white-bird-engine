@@ -25,7 +25,12 @@ namespace WhiteBirdEngine {
  */
 class IRenderObject {
 public:
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(IRenderObject)
+    IRenderObject() = default;
+    virtual ~IRenderObject() = default;
+    IRenderObject(const IRenderObject&) = delete;
+    IRenderObject(IRenderObject&&) noexcept = delete;
+    IRenderObject& operator=(const IRenderObject&) = delete;
+    IRenderObject& operator=(IRenderObject&&) noexcept = delete;
 };
 
 } // namespace WhiteBirdEngine

@@ -28,7 +28,12 @@ namespace WhiteBirdEngine {
 template <typename ChildT>
 class JobBuffer {
 public:
-    WBE_R6_DELETE_COPY_MOVE_VIRTUAL(JobBuffer)
+    JobBuffer() = default;
+    virtual ~JobBuffer() = default;
+    JobBuffer(const JobBuffer&) = delete;
+    JobBuffer(JobBuffer&&) noexcept = delete;
+    JobBuffer& operator=(const JobBuffer&) = delete;
+    JobBuffer& operator=(JobBuffer&&) noexcept = delete;
 
     /**
      * @brief Retrieve a job.

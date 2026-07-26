@@ -108,7 +108,6 @@ Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather t
   - No short single-line forms: functions, lambdas, blocks, `if`, loops, `case`, `enum` all break to next line.
   - `AlwaysBreakTemplateDeclarations: Yes`.
   - `BreakStringLiterals: false` — long error-message string literals stay on one line.
-- Use `WBE_R6_NDC_DELETE_COPY_MOVE_OVERRIDE(ClassName)` etc. macros from `utils/defs.hh` for rule-of-N boilerplate.
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
 - Prefer the engine's file system wrappers `Directory` / `Path` (in `platform/file_system/`) over raw `std::filesystem`. They are header-only thin wrappers around `std::filesystem` — use them in engine code; drop down to `std::filesystem` only inside their implementation or when an API genuinely requires it. Note: `Directory::get_dir_names()` returns by value, capture with `auto`.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.

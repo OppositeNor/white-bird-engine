@@ -48,7 +48,10 @@ class HeapAllocatorRAM final : public HeapAllocator {
 public:
     HeapAllocatorRAM() = default;
     virtual ~HeapAllocatorRAM() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorRAM)
+    HeapAllocatorRAM(const HeapAllocatorRAM&) = delete;
+    HeapAllocatorRAM(HeapAllocatorRAM&&) noexcept = delete;
+    HeapAllocatorRAM& operator=(const HeapAllocatorRAM&) = delete;
+    HeapAllocatorRAM& operator=(HeapAllocatorRAM&&) noexcept = delete;
 
     virtual MemID allocate(size_t p_size) override;
 

@@ -44,7 +44,10 @@ class EngineCore : public ISingleton<EngineCore> {
 public:
     EngineCore() = delete;
     virtual ~EngineCore() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(EngineCore)
+    EngineCore(const EngineCore&) = delete;
+    EngineCore(EngineCore&&) noexcept = delete;
+    EngineCore& operator=(const EngineCore&) = delete;
+    EngineCore& operator=(EngineCore&&) noexcept = delete;
 
     /**
      * @brief Constructor.

@@ -87,7 +87,7 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, ZeroSizeAllocation) {
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, AlignmentTest) {
     WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList allocator =
-        WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList(WBE_MiB(0.5));
+        WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList(WBE_MI_B(0.5));
     constexpr size_t ALIGN_REQ = alignof(WhiteBirdEngine::HeapAllocatorAlignedPoolImplicitList::Header);
     WBE::MemID mem1 = allocator.allocate(1, ALIGN_REQ);
     ASSERT_EQ(mem1 % ALIGN_REQ, 0);
@@ -125,7 +125,7 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, AlignmentTest) {
     allocator.deallocate(mem9);
     allocator.deallocate(mem10);
 
-    ASSERT_EQ(allocator.get_remain_size(), WBE_MiB(0.5));
+    ASSERT_EQ(allocator.get_remain_size(), WBE_MI_B(0.5));
 }
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, MaxAlignmentAllocation) {
@@ -197,9 +197,9 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, FragmentationAndCoalescing) {
 }
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
-    WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MiB(1));
+    WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MI_B(1));
     std::vector<WBE::MemID> mems;
-    std::mt19937 rng(42);
+    std::mt19937 rng(42); // NOLINT
     std::uniform_int_distribution<int> dist(8, 64);
     for (int i = 0; i < 32; ++i) {
         int sz = dist(rng);
@@ -209,10 +209,10 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, StressRandomAllocDealloc) {
         }
     }
     std::shuffle(mems.begin(), mems.end(), rng);
-    for (unsigned long mem : mems) {
+    for (size_t mem : mems) {
         pool.deallocate(mem);
     }
-    ASSERT_EQ(pool.get_remain_size(), WBE_MiB(1));
+    ASSERT_EQ(pool.get_remain_size(), WBE_MI_B(1));
 }
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleFront) {
@@ -292,9 +292,9 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, RemoveIdleEnd) {
 }
 
 TEST_F(WBEAllocAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
-    WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MiB(4));
+    WBE::HeapAllocatorAlignedPoolImplicitList pool(WBE_MI_B(4));
     constexpr int STRESS_ITERATIONS = 800;
-    std::mt19937 rng(300);
+    std::mt19937 rng(300); // NOLINT
     std::uniform_int_distribution<int> size_dist(8, 256);
     std::vector<size_t> alignments = {1, 2, 4, 8, 16, 32, 64};
     std::uniform_int_distribution<size_t> align_dist(0, alignments.size() - 1);
@@ -322,7 +322,7 @@ TEST_F(WBEAllocAlignedPoolImplicitListTest, StressAllocateWithAlignTest) {
             std::uniform_int_distribution<size_t> idx_dist(0, mems.size() - 1);
             size_t idx = idx_dist(rng);
             pool.deallocate(mems[idx]);
-            mems.erase(mems.begin() + idx);
+            mems.erase(mems.begin() + static_cast<intptr_t>(idx));
         }
     }
 

@@ -27,7 +27,12 @@ namespace WhiteBirdEngine {
  */
 class Object {
 public:
-    WBE_R6_DEFAULT_VIRTUAL(Object);
+    Object() = default;
+    virtual ~Object() = default;
+    Object(const Object&) = default;
+    Object(Object&&) noexcept = default;
+    Object& operator=(const Object&) = default;
+    Object& operator=(Object&&) noexcept = default;
 
     /**
      * @brief Get the type of the object in string.

@@ -139,7 +139,10 @@ public:
 
     ROMaterialVK() = delete;
     virtual ~ROMaterialVK() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ROMaterialVK)
+    ROMaterialVK(const ROMaterialVK&) = delete;
+    ROMaterialVK(ROMaterialVK&&) noexcept = delete;
+    ROMaterialVK& operator=(const ROMaterialVK&) = delete;
+    ROMaterialVK& operator=(ROMaterialVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

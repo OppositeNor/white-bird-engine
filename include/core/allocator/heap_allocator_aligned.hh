@@ -39,7 +39,10 @@ class HeapAllocatorAligned : public HeapAllocator {
 public:
     HeapAllocatorAligned() = default;
     virtual ~HeapAllocatorAligned() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(HeapAllocatorAligned)
+    HeapAllocatorAligned(const HeapAllocatorAligned&) = delete;
+    HeapAllocatorAligned(HeapAllocatorAligned&&) noexcept = delete;
+    HeapAllocatorAligned& operator=(const HeapAllocatorAligned&) = delete;
+    HeapAllocatorAligned& operator=(HeapAllocatorAligned&&) noexcept = delete;
 
     /**
      * @brief Allocate memory of a specific size.

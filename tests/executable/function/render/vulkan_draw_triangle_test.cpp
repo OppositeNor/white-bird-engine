@@ -83,10 +83,9 @@ public:
             render_allocator, base_render_data, WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1));
         WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout = WBE::make_ref<WBE::ROPipelineLayoutVK>(
             render_allocator, base_render_data, WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
-        auto graphics_pipeline =
-            WBE::ROGraphicsPipelineVK::Builder()
-                .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
-                .create_ref(base_render_data);
+        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
+                                     .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
+                                     .create_ref(base_render_data);
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
         // Setup time UBO
         time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator,

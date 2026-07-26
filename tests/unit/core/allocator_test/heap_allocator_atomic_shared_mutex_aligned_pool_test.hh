@@ -53,7 +53,7 @@ TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, TraitTest) {
 }
 
 TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationTest) {
-    const size_t pool_size = WBE_MiB(1);
+    const size_t pool_size = WBE_MI_B(1);
     WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;
@@ -84,7 +84,7 @@ TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationTest) {
 }
 
 TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationGetPointerContentTest) {
-    const size_t pool_size = WBE_MiB(1);
+    const size_t pool_size = WBE_MI_B(1);
     WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;
@@ -127,7 +127,7 @@ TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationGetPointerConten
 }
 
 TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocTest) {
-    const size_t pool_size = WBE_MiB(1);
+    const size_t pool_size = WBE_MI_B(1);
     WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int ops_per_thread = 256;
@@ -170,7 +170,7 @@ TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocTest) {
 }
 
 TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocGetTest) {
-    const size_t pool_size = WBE_MiB(1);
+    const size_t pool_size = WBE_MI_B(1);
     WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int ops_per_thread = 2048;
@@ -214,7 +214,7 @@ TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, MixedAllocDeallocGetTest) {
 }
 
 TEST_F(WBEAllocAtomicSharedMutexAlignedPoolTest, SynchronizationDeallocationTest) {
-    const size_t pool_size = WBE_MiB(1);
+    const size_t pool_size = WBE_MI_B(1);
     WBE::HeapAllocatorAtomicSharedMutexAlignedPool allocator(pool_size);
     const int num_threads = 8;
     const int allocs_per_thread = 128;

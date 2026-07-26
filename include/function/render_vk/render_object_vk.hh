@@ -32,7 +32,10 @@ class RenderObjectVK : public IRenderObject {
 public:
     RenderObjectVK() = delete;
     virtual ~RenderObjectVK() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RenderObjectVK)
+    RenderObjectVK(const RenderObjectVK&) = delete;
+    RenderObjectVK(RenderObjectVK&&) noexcept = delete;
+    RenderObjectVK& operator=(const RenderObjectVK&) = delete;
+    RenderObjectVK& operator=(RenderObjectVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.

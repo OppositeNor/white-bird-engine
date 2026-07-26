@@ -39,7 +39,10 @@ public:
     }
 
     virtual ~RendererDummy() override = default;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(RendererDummy)
+    RendererDummy(const RendererDummy&) = delete;
+    RendererDummy(RendererDummy&&) noexcept = delete;
+    RendererDummy& operator=(const RendererDummy&) = delete;
+    RendererDummy& operator=(RendererDummy&&) noexcept = delete;
 
     virtual uint32_t get_worker_nums() override {
         return 1;

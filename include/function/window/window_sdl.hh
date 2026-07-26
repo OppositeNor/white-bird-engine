@@ -33,7 +33,10 @@ namespace WhiteBirdEngine {
 class WindowSDL final : public IWindow {
 public:
     virtual ~WindowSDL() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(WindowSDL)
+    WindowSDL(const WindowSDL&) = delete;
+    WindowSDL(WindowSDL&&) noexcept = delete;
+    WindowSDL& operator=(const WindowSDL&) = delete;
+    WindowSDL& operator=(WindowSDL&&) noexcept = delete;
 
     WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties);
 

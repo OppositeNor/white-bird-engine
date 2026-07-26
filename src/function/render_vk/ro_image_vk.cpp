@@ -93,8 +93,7 @@ ROImageVK::Builder& ROImageVK::Builder::image_3d(VkExtent3D p_extent) {
 ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const SpotLightInfo& p_spot_light) {
     image_type = VK_IMAGE_TYPE_2D;
     format = SHADOW_MAP_DEPTH_FORMAT;
-    extent = VkExtent3D{
-        .width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};
+    extent = VkExtent3D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};
     usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     return *this;
 }
@@ -102,8 +101,7 @@ ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const SpotLightInfo& p_
 ROImageVK::Builder& ROImageVK::Builder::shadow_map_color(const SpotLightInfo& p_spot_light) {
     image_type = VK_IMAGE_TYPE_2D;
     format = SHADOW_MAP_COLOR_FORMAT;
-    extent = VkExtent3D{
-        .width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};
+    extent = VkExtent3D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};
     usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     return *this;
 }

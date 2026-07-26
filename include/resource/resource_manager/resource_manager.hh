@@ -42,7 +42,10 @@ class ResourceManager : public ISingleton<ResourceManager> {
 public:
     ResourceManager() = delete;
     virtual ~ResourceManager() override;
-    WBE_R6_NDCD_DELETE_COPY_MOVE(ResourceManager)
+    ResourceManager(const ResourceManager&) = delete;
+    ResourceManager(ResourceManager&&) noexcept = delete;
+    ResourceManager& operator=(const ResourceManager&) = delete;
+    ResourceManager& operator=(ResourceManager&&) noexcept = delete;
 
     /**
      * @brief Constructor.
