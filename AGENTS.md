@@ -82,33 +82,31 @@ Manual-only checks: `python check_lint.py` for lint/format and `python check_lic
 
 ## Tests
 
-Located under `tests/` and mirror the `src/` layer structure:
-
-| Path                | Purpose                                                  |
-|---------------------|----------------------------------------------------------|
-| `tests/unit/`       | GoogleTest unit tests; one `*_test.hh` per subject file. |
-| `tests/integration/`| Cross-subsystem tests.                                   |
-| `tests/executable/` | Standalone test executables (renderer demos, etc.).     |
-| `tests/benchmark/`  | google-benchmark perf tests.                             |
+Tests mirror the src layer structure.
 
 Run:
 
-```sh
 ./build/debug/bin/wbe_unit_test
-./build/debug/bin/wbe_unit_test --gtest_filter='WBESomeTest*'
-```
 
-Per-directory `CMakeLists.txt` use `file(GLOB *.cpp)`; just drop new files in.
+Use:
+--gtest_filter='Pattern*'
+
+Per-directory CMakeLists.txt use `file(GLOB *.cpp)`; new test files are picked up automatically.
 
 ## File / Directory Layout
 
 - `include/<layer>/...` — public headers (mirrors `src/`).
 - `src/<layer>/...` — implementation (`.cpp`).
-- `src/per_target/<target>/generated/`, `include/per_target/<target>/generated/` — per-target output of the reflection metaparser; do not hand-edit.
 - `templates/` — Jinja templates consumed by `build_script/reflection/`.
 - `res/`, `test_env_res/` — runtime assets.
 - `dependencies/` — vendored third-party (do not modify).
 - `todos/` — per-layer todo lists.
+
+Generated files:
+- src/per_target/<target>/generated/
+- include/per_target/<target>/generated/
+
+Never edit generated files.
 
 Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_FILE_<UPPER_SNAKE>_HH`. One primary class per file; file name matches the class in `snake_case`.
 
@@ -196,15 +194,16 @@ Avoid placing complex logic, control flow, or dependency-heavy code in headers. 
 
 ## Documentation
 
-- C++ (`.hh` / `.cpp`) and Slang (`.slang`) source files use **Doxygen** comments (`/** ... */`).
-- Documentation is **required** for:
-  - Publicly visible `struct`s and `class`es, and their `public` / `protected` fields.
-  - `public` and `protected` functions / methods (including free functions exposed in headers).
-- Documentation is **not required** for:
-  - `private` members.
-  - Derived overrides of `virtual` functions — document the virtual at its first declaration in the base class only. Overrides inherit the contract; add a doc comment only when behavior diverges in a way callers must know.
-  - File-local / anonymous-namespace helpers in `.cpp` files.
-- Keep comments terse and informative: describe contract (params, returns, ownership, threading, error/throw behavior) rather than restating the signature.
+Use Doxygen for C++ and Slang.
+
+Required:
+- Public/protected classes, structs, fields, functions.
+
+Not required:
+- Private members.
+- Overrides unless behavior differs.
+
+Document contracts, ownership, threading, and errors; do not restate signatures.
 
 ## Reflection / Codegen
 
