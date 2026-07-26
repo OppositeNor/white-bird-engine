@@ -113,6 +113,32 @@ TEST_F(WBESceneTest, SceneReturnsComponentTypeIdsAttachedToEntity) {
         second_component_type_ids.end());
 }
 
+TEST_F(WBESceneTest, SceneReturnsEmptyComponentTypeIdsForEntityWithoutComponents) {
+    WBE::Scene scene(get_allocator());
+    WBE::EntityID entity = scene.get_entities().create();
+
+    WBE::Vector<WBE::TypeID> component_type_ids = scene.get_component_type_ids(entity);
+
+    EXPECT_TRUE(component_type_ids.empty());
+}
+
+TEST_F(WBESceneTest, SceneNodeLookupForUnknownOrDestroyedEntityReturnsNull) {
+    auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator());
+    WBE::EntityID unknown_entity = scene->get_entities().create();
+    WBE::EntityID node_entity = entt::null;
+
+    EXPECT_TRUE(scene->get_scene_node(unknown_entity).is_null());
+
+    {
+        auto node = WBE::make_ref<WBE::SceneNode>(get_allocator(), scene);
+        node_entity = node->get_entity();
+
+        EXPECT_TRUE(scene->get_scene_node(node_entity) == node);
+    }
+
+    EXPECT_TRUE(scene->get_scene_node(node_entity).is_null());
+}
+
 TEST_F(WBESceneTest, SceneNodeCreatesAndDestroysEntityInScene) {
     auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator());
     WBE::EntityID entity = entt::null;
@@ -148,6 +174,23 @@ TEST_F(WBESceneTest, SceneNodeUsesSceneComponentListsForComponentState) {
     EXPECT_FALSE(node->has_component(transform_type_id));
     EXPECT_FALSE(scene->get_entities().all_of<WBE::ComponentTransform>(node->get_entity()));
     EXPECT_THROW(node->remove_component(transform_type_id), std::runtime_error);
+}
+
+TEST_F(WBESceneTest, SceneNodeComponentQueriesHandleUnknownTypesAndRemovedComponents) {
+    auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator());
+    auto node = WBE::make_ref<WBE::SceneNode>(get_allocator(), scene);
+    const WBE::TypeID transform_type_id = get_component_type_id<WBE::ComponentTransform>();
+    const WBE::TypeID spot_light_type_id = get_component_type_id<WBE::ComponentSpotLight>();
+
+    EXPECT_FALSE(node->has_component(transform_type_id));
+    EXPECT_TRUE(node->get_component_type_ids().empty());
+    EXPECT_THROW(node->remove_component(spot_light_type_id), std::runtime_error);
+
+    scene->get_entities().emplace<WBE::ComponentTransform>(node->get_entity(), make_transform());
+    node->remove_component(transform_type_id);
+
+    EXPECT_FALSE(node->has_component(transform_type_id));
+    EXPECT_TRUE(node->get_component_type_ids().empty());
 }
 
 TEST_F(WBESceneTest, SceneNodeHierarchyIsTrackedByComponent) {

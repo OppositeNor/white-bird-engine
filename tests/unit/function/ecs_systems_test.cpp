@@ -113,3 +113,55 @@ TEST(WBETransformSystemTest, ChildWithMissingParentTransformIsTreatedAsRoot) {
     expect_mat_near(child_transform_mats.global_transform, expected_child_transform);
     EXPECT_EQ(child_transform_mats.version, 11);
 }
+
+TEST(WBETransformSystemTest, EntityWithNullHierarchyParentIsTreatedAsRoot) {
+    entt::registry registry;
+    WBE::EntityID entity = registry.create();
+    WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(8.0F, 9.0F, 10.0F));
+
+    registry.emplace<WBE::ComponentTransform>(entity, transform);
+    registry.emplace<WBE::ComponentTransformMats>(entity);
+    registry.emplace<WBE::ComponentHierarchy>(entity);
+
+    WBE::update_transform_mats(registry, 13);
+
+    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
+    glm::mat4 expected_transform = make_transform_mat(transform);
+    expect_mat_near(transform_mats.global_transform, expected_transform);
+    EXPECT_EQ(transform_mats.version, 13);
+}
+
+TEST(WBETransformSystemTest, RecursivelyUpdatesMultiLevelHierarchyOutOfOrder) {
+    entt::registry registry;
+    WBE::EntityID grandparent = registry.create();
+    WBE::EntityID parent = registry.create();
+    WBE::EntityID child = registry.create();
+    WBE::ComponentTransform grandparent_transform = make_transform(glm::vec3(1.0F), glm::vec3(1.0F, 0.0F, 0.0F));
+    WBE::ComponentTransform parent_transform = make_transform(glm::vec3(1.0F), glm::vec3(0.0F, 2.0F, 0.0F));
+    WBE::ComponentTransform child_transform = make_transform(glm::vec3(1.0F), glm::vec3(0.0F, 0.0F, 3.0F));
+
+    registry.emplace<WBE::ComponentTransform>(child, child_transform);
+    registry.emplace<WBE::ComponentTransformMats>(child);
+    registry.emplace<WBE::ComponentHierarchy>(child, parent);
+    registry.emplace<WBE::ComponentTransform>(parent, parent_transform);
+    registry.emplace<WBE::ComponentTransformMats>(parent);
+    registry.emplace<WBE::ComponentHierarchy>(parent, grandparent);
+    registry.emplace<WBE::ComponentTransform>(grandparent, grandparent_transform);
+    registry.emplace<WBE::ComponentTransformMats>(grandparent);
+
+    WBE::update_transform_mats(registry, 17);
+
+    const auto& grandparent_transform_mats = registry.get<WBE::ComponentTransformMats>(grandparent);
+    const auto& parent_transform_mats = registry.get<WBE::ComponentTransformMats>(parent);
+    const auto& child_transform_mats = registry.get<WBE::ComponentTransformMats>(child);
+    glm::mat4 expected_grandparent_transform = make_transform_mat(grandparent_transform);
+    glm::mat4 expected_parent_transform = make_transform_mat(parent_transform);
+    glm::mat4 expected_child_transform = make_transform_mat(child_transform);
+    expect_mat_near(grandparent_transform_mats.global_transform, expected_grandparent_transform);
+    expect_mat_near(parent_transform_mats.global_transform, expected_grandparent_transform * expected_parent_transform);
+    expect_mat_near(child_transform_mats.global_transform,
+        expected_grandparent_transform * expected_parent_transform * expected_child_transform);
+    EXPECT_EQ(grandparent_transform_mats.version, 17);
+    EXPECT_EQ(parent_transform_mats.version, 17);
+    EXPECT_EQ(child_transform_mats.version, 17);
+}
