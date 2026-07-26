@@ -43,11 +43,11 @@ public:
         friend ROShaderVK;
         // The source code of the shader.
         Required<std::vector<uint32_t>> code;
-        // Size of the code.
+        // Size of the code in SPIR-V words.
         Required<size_t> code_size;
 
         // Set the shader source code.
-        Builder& set_code(std::span<uint32_t> p_code);
+        Builder& set_code(std::span<const uint32_t> p_code);
 
         // Set from a resource ID.
         Builder& set_code(std::string_view p_resource_id);

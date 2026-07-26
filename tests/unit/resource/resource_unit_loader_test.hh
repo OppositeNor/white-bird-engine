@@ -121,7 +121,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     std::vector<uint8_t> binary_data_storage;
     WBE::RUBinary captured_ru_binary;
     WBE::RUSchemeBinary binary_scheme;
-    binary_scheme.path = "test_text_files/test_file_utf8.txt";
+    binary_scheme.path = "assets/images/default_albedo.png";
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback([&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
                              binary_data_storage.resize(p_res_size);

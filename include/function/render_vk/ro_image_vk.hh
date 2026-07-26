@@ -213,6 +213,8 @@ public:
         // VK_IMAGE_LAYOUT_UNDEFINED if you don't care about the existing image
         // data.
         VkImageLayout old_layout = VK_IMAGE_LAYOUT_GENERAL;
+        // The layout this barrier transitions the image into.
+        VkImageLayout new_layout = VK_IMAGE_LAYOUT_GENERAL;
         // The destination queue family to tranfer ownership.
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The image to set barrier on.
@@ -304,6 +306,19 @@ public:
                 .levelCount = 1,
                 .baseArrayLayer = p_subresource_layers.baseArrayLayer,
                 .layerCount = p_subresource_layers.layerCount};
+            return *this;
+        }
+
+        /**
+         * @brief Set the layout that the image should have after this barrier.
+         *
+         * This updates the tracked image layout when apply_barrier() records the transition.
+         *
+         * @param p_new_layout The target image layout.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_new_layout(VkImageLayout p_new_layout) {
+            new_layout = p_new_layout;
             return *this;
         }
 

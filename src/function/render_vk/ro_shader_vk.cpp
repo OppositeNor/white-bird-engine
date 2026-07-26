@@ -29,7 +29,7 @@
 
 namespace WhiteBirdEngine {
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::span<uint32_t> p_code) {
+ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::span<const uint32_t> p_code) {
     code = std::vector<uint32_t>(p_code.begin(), p_code.end());
     code_size = p_code.size();
     return *this;
@@ -41,6 +41,9 @@ ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::string_view p_resource_i
 }
 
 ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) {
+    if (p_resource == nullptr || p_resource->data == nullptr) {
+        throw std::runtime_error("Failed to set shader code: shader resource is missing binary data.");
+    }
     return set_code(std::span(p_resource->data.get(), p_resource->size));
 }
 
@@ -48,8 +51,8 @@ VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_r
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     WBE_REQUIRED(code);
-    create_info.pCode = reinterpret_cast<const uint32_t*>((*code).data());
-    create_info.codeSize = WBE_REQUIRED(code_size);
+    create_info.pCode = (*code).data();
+    create_info.codeSize = WBE_REQUIRED(code_size) * sizeof(decltype(*(*code).data()));
 
     VkShaderModule result = VK_NULL_HANDLE;
     if (vkCreateShaderModule(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {

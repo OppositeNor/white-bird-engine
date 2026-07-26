@@ -159,8 +159,8 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
 
 /**
  * @class RUShader
- * @brief Shader resource unit. contains a size (in bytes) and a MemID pointing
- * to the data chunk that stores the data of the binary data.
+ * @brief Shader resource unit. Contains a word count and a MemID pointing to
+ * the data chunk that stores the SPIR-V words.
  *
  * The data should always be pushed before pushing this resource unit, and the
  * release process should always be backwards (first release the resource unit,
@@ -169,9 +169,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
  *
  */
 struct RUShader : public ResourceUnit {
-    // The shader source.
+    // The shader SPIR-V words.
     RefRes<uint32_t> data;
-    // The size of the binary data.
+    // The number of SPIR-V words.
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.
     RefRes<char> metadata_path;

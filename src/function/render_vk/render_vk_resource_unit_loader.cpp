@@ -74,7 +74,7 @@ RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSch
 RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) {
     auto file_path = get_resource_path(p_scheme.path);
     auto file_content = load_binary_file<uint32_t>(static_cast<std::string>(file_path).c_str());
-    auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
+    auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
     resource_unit.data = data.force_cast<uint32_t>();

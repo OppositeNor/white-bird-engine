@@ -109,6 +109,7 @@ ROImageViewVK::~ROImageViewVK() {
 void ROImageViewVK::init(const Builder& p_builder) {
     image_view = p_builder.create_vk_object(render_data);
     exposed_fields.image = p_builder.image;
+    exposed_fields.subresource_range = p_builder.subresource_range;
 }
 
 } // namespace WhiteBirdEngine

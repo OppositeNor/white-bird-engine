@@ -289,6 +289,12 @@ public:
          * @brief The source image.
          */
         Ref<ROImageVK> image = MEM_NULL;
+        /**
+         * @brief The viewed image subresource range.
+         *
+         * Used by render-graph layout transitions so barriers cover the same image subresource this view exposes.
+         */
+        VkImageSubresourceRange subresource_range{.baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     };
 
     const ExposedFields& fields() const {

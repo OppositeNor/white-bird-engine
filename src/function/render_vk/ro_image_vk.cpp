@@ -146,7 +146,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     barrier.dstStageMask = dst_stage_mask;
     barrier.dstAccessMask = dst_access_mask;
     barrier.oldLayout = old_layout;
-    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = new_layout;
 
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -158,8 +158,8 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     info.imageMemoryBarrierCount = 1;
     info.pImageMemoryBarriers = &barrier;
     vkCmdPipelineBarrier2(p_command_buffer, &info);
-    // Update image's internal state.
-    image->exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
+    // Keep later graph barriers aligned with the layout this command buffer will establish.
+    image->exposed_fileds.image_layout = new_layout;
 }
 
 VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {

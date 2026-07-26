@@ -265,7 +265,7 @@ public:
                 .set_binding(SHADOWMAP_BINDING)
                 .add_sampled_image_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
                     .image_view = shadow_depth_view,
-                    .image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    .image_layout = VK_IMAGE_LAYOUT_GENERAL,
                 }));
         main_descriptor_sets[0]->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
                 .set_binding(SHADOWMAP_SAMPLER_BINDING)

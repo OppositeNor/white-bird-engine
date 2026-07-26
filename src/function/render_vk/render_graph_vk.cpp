@@ -23,6 +23,8 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <algorithm>
 #include <cstddef>
@@ -373,6 +375,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
     const uint64_t timeline_value = p_frame_index + 1;
     const auto [first_graphics_idx, last_graphics_idx] = find_graphics_range();
 
+    // Each graph node owns one command buffer per frame slot and is submitted independently.
     for (size_t i = 0; i < nodes.size(); ++i) {
         auto node = nodes[i];
         auto queue_family = static_cast<QueueFamilyVK>(node->in_queue);
@@ -385,15 +388,16 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         }
 
         auto per_node_bound = build_per_node_bound(node);
-        record_node(node, command_buffer, per_node_bound, p_delta, i == 0);
+        const bool is_first_graphics = (i == first_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
+        const bool is_last_graphics = (i == last_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
+    // The first/last graphics nodes bridge external acquire/present synchronization.
+        record_node(node, command_buffer, per_node_bound, p_delta, i == 0, is_last_graphics);
 
         // Build wait/signal semaphore lists from exec edges + extras.
         Vector<VkSemaphoreSubmitInfo, RenderAllocator> wait_infos(render_data->allocator);
         Vector<VkSemaphoreSubmitInfo, RenderAllocator> signal_infos(render_data->allocator);
         collect_edge_semaphores(node, timeline_value, wait_infos, signal_infos);
 
-        const bool is_first_graphics = (i == first_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
-        const bool is_last_graphics = (i == last_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
         if (is_first_graphics) {
             for (const auto& wait_info : p_extra_waits_first_submit) {
                 wait_infos.push_back(wait_info);
@@ -459,7 +463,13 @@ Vector<RendResVK, RenderAllocator> RenderGraphVK::build_per_node_bound(Ref<RGNod
 }
 
 void RenderGraphVK::record_node(
-    Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_bound, double p_delta, bool p_record_pre_execute_tasks) {
+    Ref<RGNode> p_node,
+    VkCommandBuffer p_command_buffer,
+    const Vector<RendResVK, RenderAllocator>& p_bound,
+    double p_delta,
+    bool p_record_pre_execute_tasks,
+    bool p_record_present_transition) {
+    // Record all barriers and task work for one node into its per-frame primary command buffer.
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
@@ -497,10 +507,69 @@ void RenderGraphVK::record_node(
         }
     }
 
+    record_general_transition(p_command_buffer, p_node, p_bound);
+
+    // The task receives resources in read-then-write order, matching build_per_node_bound().
     p_node->render_task->record(p_command_buffer, p_bound, p_delta);
+
+    if (p_record_present_transition) {
+        // Present waits on this node's terminal semaphore, so the present layout transition must be recorded before it is signaled.
+        record_present_transition(p_command_buffer);
+    }
 
     if (vkEndCommandBuffer(p_command_buffer) != VK_SUCCESS) {
         throw std::runtime_error("RenderGraphVK: failed to end command buffer.");
+    }
+}
+
+void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound) {
+    // Dynamic rendering uses GENERAL, but images still need an explicit transition out of UNDEFINED/PRESENT.
+    auto reads = p_node->render_task->read_resources();
+    auto writes = p_node->render_task->write_resources();
+    const size_t write_start = reads.size();
+    for (size_t i = 0; i < writes.size(); ++i) {
+        const size_t bound_index = write_start + i;
+        if (bound_index >= p_bound.size()) {
+            break;
+        }
+        const auto& bound_resource = p_bound[bound_index];
+        auto image_view = bound_resource.res.dynamic_cast_ref<ROImageViewVK>();
+        if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
+            continue;
+        }
+        Ref<ROImageVK> image = image_view->fields().image;
+        if (image->fields().image_layout == VK_IMAGE_LAYOUT_GENERAL) {
+            continue;
+        }
+        ROImageVK::MemoryBarrierBuilder()
+            .set_src_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
+            .set_dst_access(writes[i].access, writes[i].stage)
+            .set_subresource_range(image_view->fields().subresource_range)
+            .set_new_layout(VK_IMAGE_LAYOUT_GENERAL)
+            .set_image(image)
+            .apply_barrier(p_command_buffer);
+    }
+}
+
+void RenderGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) {
+    // WSI presentation still requires PRESENT_SRC_KHR even when unified image layouts are enabled.
+    for (const auto& [resource_id, resource] : all_resources) {
+        auto image_view = resource->res.dynamic_cast_ref<ROImageViewVK>();
+        if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
+            continue;
+        }
+        Ref<ROImageVK> image = image_view->fields().image;
+        if (!image->fields().is_swap_chain_image) {
+            continue;
+        }
+        ROImageVK::MemoryBarrierBuilder()
+            .set_src_access(VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
+            .set_dst_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
+            .set_subresource_range(image_view->fields().subresource_range)
+            .set_new_layout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+            .set_image(image)
+            .apply_barrier(p_command_buffer);
+        return;
     }
 }
 
