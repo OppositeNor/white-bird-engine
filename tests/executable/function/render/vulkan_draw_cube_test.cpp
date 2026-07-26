@@ -12,15 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/render_task.hh"
 #include "function/render/spot_light_info.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"

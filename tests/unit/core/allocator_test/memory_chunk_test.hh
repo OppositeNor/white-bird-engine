@@ -16,6 +16,7 @@
 #define WBE_FILE_MEMORY_CHUNK_TEST_HH
 
 #include "core/allocator/heap_allocator_atomic_mutex_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/memory_chunk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>

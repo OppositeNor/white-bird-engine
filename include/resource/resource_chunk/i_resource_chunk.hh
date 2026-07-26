@@ -19,7 +19,6 @@
 #include "core/memory/unique.hh"
 #include "core/object/object.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <functional>

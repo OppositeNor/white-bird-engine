@@ -19,7 +19,6 @@
 #include "core/memory/reference_strong.hh"
 #include "i_scene_manager.hh"
 #include "scene.hh"
-#include "utils/defs.hh"
 #include <string>
 #include <string_view>
 namespace WhiteBirdEngine {

@@ -18,12 +18,12 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/defs.hh"
+#include <format>
 #include <stdexcept>
 #include <string>
-#include <format>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 #include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -104,7 +104,8 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
 
     exposed_fields.pipeline_layout = p_config.pipeline_layout;
 
-    auto create_result = vkCreateGraphicsPipelines(render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline);
+    auto create_result = vkCreateGraphicsPipelines(
+        render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline);
     if (create_result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create graphics pipeline: {}.", string_VkResult(create_result)));
     }

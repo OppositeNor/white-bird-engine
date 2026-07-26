@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "utils/defs.hh"
 #include <stdexcept>

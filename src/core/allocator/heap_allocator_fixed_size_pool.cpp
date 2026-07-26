@@ -23,6 +23,7 @@
 #include <format>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 #define WBE_HAFSP_GET_DATA_INDEX(id) (*(index_chunk_start + (id) - 1))
 #define WBE_HAFSP_DATA_CHUNK_START (mem_chunk)

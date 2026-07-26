@@ -14,6 +14,8 @@
 */
 
 #include "function/render_software/ro_framebuffer_software.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render_software/ro_image_software.hh"
 
 namespace WhiteBirdEngine {
 

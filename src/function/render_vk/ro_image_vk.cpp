@@ -15,6 +15,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
+#include "function/render/spot_light_info.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"

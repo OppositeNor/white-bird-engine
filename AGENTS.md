@@ -2,6 +2,28 @@
 
 Compact reference for AI agents. High info density, low fluff.
 
+## Change Discipline
+
+- Make the smallest change that solves the problem.
+- Do not refactor unrelated code.
+- Do not rename existing APIs unless explicitly requested.
+- Do not modify generated files.
+- Do not modify dependencies.
+- Before editing multiple files, verify that each file is required.
+
+## Agent Workflow
+
+For non-trivial tasks:
+
+1. Inspect relevant files only.
+2. Identify the owner layer of the change.
+3. Check existing patterns before introducing new ones.
+4. Make the minimal implementation.
+5. Run the relevant build/test target.
+6. Report modified files and validation results.
+
+Do not provide large explanations unless requested.
+
 ## Layered Architecture
 
 Layers, from upper to lower. Upper layers may depend on lower layers; the reverse is **forbidden**.
@@ -18,6 +40,21 @@ Rules:
 - Templates are **forbidden in the exposed APIs** of `function` and any layer above it (i.e. `function` and `global`) — public headers, member functions, free functions, and types of these layers must not be templated. Internal helper functions / implementation details (e.g. file-local `static` helpers in a `.cpp`, anonymous-namespace utilities) **may** use templates. Templates are unrestricted in `resource`, `core`, and `platform`.
 - Do not catch exceptions outside tests. All engine errors are thrown as `std::runtime_error` and must crash the program.
 
+## Validation
+
+Use the validation wrapper for normal build and unit-test validation. It prints only short `WBEValidator:` status lines, writes detailed logs under `build/validation_logs/`, and stops at the first failed step.
+
+```sh
+python validation.py                         # debug build + full unit tests
+python validation.py -t release              # release build + full unit tests
+python validation.py -t debug-gcc            # GCC debug build + full unit tests
+python validation.py -t debug -- --gtest_filter='WBESomeTest*'
+```
+
+When gtest arguments are forwarded after `--`, the requested gtest run is executed first. If it passes, validation still runs the full unit test binary afterward.
+
+Do not include lint in validation. The user performs lint checks manually.
+
 ## Build
 
 Always use the Python build script — never invoke `cmake` directly.
@@ -33,8 +70,15 @@ python build.py -t release-gcc  # release with GCC
 
 Build outputs land in `build/<target>/`. Test binaries: `build/<target>/bin/`, e.g. `build/debug/bin/wbe_unit_test`.
 
-Lint / format check: `python check_lint.py` (runs clang-tidy + clang-format `--style=file`).
-License headers: `python check_license_headers.py`.
+## Build/Test Logs
+
+Build and test outputs can be large. Always check the end of the previous output first using `tail`.
+
+- Success: do not read the full log.
+- Failure: inspect only the relevant sections needed to diagnose the issue.
+- Do not dump or scan entire logs unless necessary.
+
+Manual-only checks: `python check_lint.py` for lint/format and `python check_license_headers.py` for license headers. Do not run these automatically as part of validation.
 
 ## Tests
 
@@ -72,6 +116,8 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 
 **Do not use `std::shared_ptr`, `std::weak_ptr`, `std::unique_ptr`, `std::make_shared`, `std::make_unique`, `std::allocator`** in engine code. Allowed only as short-lived locals inside a function body when interfacing with third-party APIs that require them.
 
+- Resource handles and allocator-aware objects must document whether they are copyable, movable, or neither.
+
 Engine equivalents (in `core/memory/`):
 
 | STL                  | Engine                                | Notes                                                       |
@@ -89,6 +135,26 @@ Unique<Foo> u = make_unique<Foo>(allocator, args...);
 ```
 
 Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
+
+## Special Member Functions (Rule of 6)
+
+Classes that manage resources, ownership, or non-trivial state must explicitly follow the Rule of 6:
+
+- Default constructor
+- Destructor
+- Copy constructor
+- Copy assignment operator
+- Move constructor
+- Move assignment operator
+
+Rules:
+- If a class owns a resource, define or delete copy/move operations explicitly.
+- Do not rely on compiler-generated copy/move operations for resource-owning types unless the behavior is verified to be correct.
+- Prefer move semantics for ownership transfer.
+- Copy operations must preserve ownership invariants and perform deep copies when required.
+- Move operations must leave the moved-from object in a valid destructible state.
+- Use `= delete` for unsupported operations instead of leaving accidental behavior.
+- Use `= default` only when the generated implementation matches the intended ownership semantics.
 
 ## Naming
 
@@ -111,6 +177,17 @@ Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather t
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
 - Prefer the engine's file system wrappers `Directory` / `Path` (in `platform/file_system/`) over raw `std::filesystem`. They are header-only thin wrappers around `std::filesystem` — use them in engine code; drop down to `std::filesystem` only inside their implementation or when an API genuinely requires it. Note: `Directory::get_dir_names()` returns by value, capture with `auto`.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.
+
+## Header / Source Separation
+
+Non-trivial method implementations must be placed in `.cpp` files.
+
+Allowed inline definitions in headers:
+- Simple getters/setters.
+- Trivial methods with a short, obvious implementation.
+- Functions that require header definitions (e.g. templates).
+
+Avoid placing complex logic, control flow, or dependency-heavy code in headers. Public headers should expose interfaces and declarations rather than implementation details.
 
 ## API Design
 

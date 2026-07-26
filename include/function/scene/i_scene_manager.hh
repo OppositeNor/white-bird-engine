@@ -17,9 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/scene/scene.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
-#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {

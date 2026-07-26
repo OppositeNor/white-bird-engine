@@ -21,7 +21,6 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <boost/container/flat_map.hpp>
 #include <cstddef>

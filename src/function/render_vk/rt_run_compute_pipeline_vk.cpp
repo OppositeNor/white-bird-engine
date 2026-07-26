@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -52,7 +53,8 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(const BaseRenderDataVK* p_render_
 Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::read_resources() const {
     Vector<ResAccessVK, RenderAllocator> read_accesses(render_data->allocator);
     read_accesses.reserve(additional_read_accesses.size() + 1);
-    read_accesses.push_back({.res_id = pipeline_id, .access = VK_ACCESS_2_SHADER_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT});
+    read_accesses.push_back(
+        {.res_id = pipeline_id, .access = VK_ACCESS_2_SHADER_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT});
     for (const auto& access : additional_read_accesses) {
         read_accesses.push_back(access);
     }

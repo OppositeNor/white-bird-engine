@@ -17,7 +17,6 @@
 
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <string>
 #include <string_view>

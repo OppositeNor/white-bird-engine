@@ -28,6 +28,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #define WBE_HAAAPMIL_GET_HEADER_SIZE(p_header) ((p_header) & TOTAL_SIZE_MASK)
 #define WBE_HAAAPMIL_GET_CHUNK_SIZE(p_chunk) WBE_HAAAPMIL_GET_HEADER_SIZE(*reinterpret_cast<Header*>(p_chunk))

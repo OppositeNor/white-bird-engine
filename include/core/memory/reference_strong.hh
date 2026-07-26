@@ -387,7 +387,7 @@ namespace std {
  * @return
  */
 template <typename T, typename AllocType>
-struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT(cert-dcl58-cpp)
+struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT
     size_t operator()(const ::WhiteBirdEngine::Ref<T, AllocType>& p_ref) const {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;

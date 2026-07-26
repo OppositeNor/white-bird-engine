@@ -102,8 +102,7 @@
 // Declare a CRTP concept for a CRTP base class.
 #define WBE_DECL_CRTP_CONCEPT(Base)                                                                                         \
     template <typename T>                                                                                                   \
-    concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>,                                             \
-            std::remove_cvref_t<T>>
+    concept Base##Concept = std::is_base_of_v<Base<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>
 // NOLINTEND
 
 // Labels an component. Used for reflection.

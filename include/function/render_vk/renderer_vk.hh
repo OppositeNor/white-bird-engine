@@ -260,7 +260,7 @@ private:
     // The currently active render graph (rebuilt on every activate_render_graph()).
     Ref<RenderGraphVK> active_graph;
 
-    std::vector<const char*> enabled_layers {
+    std::vector<const char*> enabled_layers{
 #ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
 #endif

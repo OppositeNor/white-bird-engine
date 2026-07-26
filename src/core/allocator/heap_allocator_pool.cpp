@@ -14,6 +14,7 @@
 */
 #include "core/allocator/heap_allocator_pool.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/allocator/memory_chunk.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include <algorithm>

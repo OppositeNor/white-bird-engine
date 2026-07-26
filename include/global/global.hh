@@ -20,7 +20,6 @@
 #include "function/engine_function.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/engine_resource.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
