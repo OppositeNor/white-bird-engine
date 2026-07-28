@@ -137,10 +137,10 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
 
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) {
     const bool has_inline_pipeline = !p_material.graphics_pipeline.type.empty();
-    if (p_material.graphics_pipeline_id.empty() && !has_inline_pipeline) {
-        throw std::runtime_error("Failed to populate material resource: graphics_pipeline_id or inline graphics_pipeline is required.");
+    if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
+        throw std::runtime_error("Failed to populate material resource: graphics_pipeline_ids or inline graphics_pipeline is required.");
     }
-    if (!p_material.graphics_pipeline_id.empty() && has_inline_pipeline) {
+    if (!p_material.graphics_pipeline_ids.empty() && has_inline_pipeline) {
         throw std::runtime_error("Failed to populate material resource: graphics pipeline is declared more than once.");
     }
 
@@ -174,8 +174,8 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
     }
 
     auto saved_resource = p_res_chunk.push_res_unit(p_material.id, resource_unit).force_cast<RUMaterial>();
-    if (!p_material.graphics_pipeline_id.empty()) {
-        p_res_chunk.create_ref_to(saved_resource->graphics_pipeline, p_material.graphics_pipeline_id);
+    if (!p_material.graphics_pipeline_ids.empty()) {
+        p_res_chunk.create_ref_to(saved_resource->graphics_pipeline, p_material.graphics_pipeline_ids.front());
     }
     auto* saved_texture_slots = saved_resource->textures.get();
     for (size_t i = 0; i < texture_ids.size(); ++i) {

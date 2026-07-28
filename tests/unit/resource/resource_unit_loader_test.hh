@@ -212,6 +212,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     auto referenced_texture_ref = push_to_stack(sizeof(referenced_texture), &referenced_texture).force_cast<WBE::RUImage>();
     std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
         {"main_pipeline", graphics_pipeline_ref.force_cast<char>()},
+        {"shadow_pipeline", graphics_pipeline_ref.force_cast<char>()},
         {"normal_texture", referenced_texture_ref.force_cast<char>()},
     };
 
@@ -239,7 +240,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     {
         "id": "test_material",
         "type": "material",
-        "graphics_pipeline_id": "main_pipeline",
+        "graphics_pipeline_ids": ["main_pipeline", "shadow_pipeline"],
         "textures": [
             {
                 "texture_key": "normal",

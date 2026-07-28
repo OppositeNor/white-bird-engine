@@ -19,7 +19,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
 namespace WhiteBirdEngine {

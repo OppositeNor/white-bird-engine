@@ -60,7 +60,7 @@ def main() -> int:
         _run_step("requested tests", [str(unit_test_path), *gtest_args], f"{parsed_args.target}_requested_tests.log")
 
     _run_step("full unit tests", [str(unit_test_path)], f"{parsed_args.target}_full_unit_tests.log")
-    print("WBEValidator: Finished!")
+    print("WBEValidator: Finished successfully!")
     return 0
 
 

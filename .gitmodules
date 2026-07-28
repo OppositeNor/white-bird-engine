@@ -37,3 +37,6 @@
 [submodule "dependencies/wbe-utils-mesh-compiler"]
 	path = dependencies/wbe-utils-mesh-compiler
 	url = https://github.com/OppositeNor/wbe-utils-mesh-compiler.git
+[submodule "dependencies/assimp"]
+	path = dependencies/assimp
+	url = https://github.com/assimp/assimp.git

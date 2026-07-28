@@ -16,7 +16,6 @@
 #define WBE_FILE_SEMAPHORE_VK_HH
 
 #include "function/render_vk/render_vk_defs.hh"
-#include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>

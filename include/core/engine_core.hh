@@ -25,7 +25,6 @@
 #include "generated/type_uuid.gen.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
 #include <ostream>

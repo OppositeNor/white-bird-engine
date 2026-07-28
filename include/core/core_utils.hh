@@ -82,8 +82,7 @@ RefWeak<T> requires_valid(std::string_view p_name, RefWeak<T> p_ref) {
     return p_ref;
 }
 
-using HeapAllocatorDefault = HeapAllocatorAlignedPoolImplicitList;
-using HeapAllocatorAtomicDefault = HeapAllocatorAtomicArenaAlignedPoolImplicitList;
+using HeapAllocatorDefault = HeapAllocatorAtomicArenaAlignedPoolImplicitList;
 
 } // namespace WhiteBirdEngine
 

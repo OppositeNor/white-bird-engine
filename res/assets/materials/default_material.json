@@ -3,7 +3,7 @@
         {
             "id": "default_material",
             "type": "material",
-            "graphics_pipeline_id": "forward_cook_torrance_pbr",
+            "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "textures": [
                 {
                     "texture_key": "normal",

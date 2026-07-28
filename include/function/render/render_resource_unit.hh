@@ -112,9 +112,9 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeMaterialTextureSlot {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
     WBE_DECL_SERIALIZABLE(RUSchemeMaterial)
-    // The graphics pipeline used to render this material.
+    // The graphics pipelines that can render this material.
     WBE_META(WBE_REFLECT)
-    std::string graphics_pipeline_id;
+    std::vector<std::string> graphics_pipeline_ids;
     // The inline graphics pipeline used to render this material.
     WBE_META(WBE_REFLECT)
     RUSchemeGraphicsPipeline graphics_pipeline;
