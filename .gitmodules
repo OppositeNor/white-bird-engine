@@ -34,6 +34,6 @@
 [submodule "dependencies/entt"]
 	path = dependencies/entt
 	url = https://github.com/skypjack/entt.git
-[submodule "dependencies/mesh-compiler"]
-	path = dependencies/mesh-compiler
+[submodule "dependencies/wbe-utils-mesh-compiler"]
+	path = dependencies/wbe-utils-mesh-compiler
 	url = https://github.com/OppositeNor/wbe-utils-mesh-compiler.git
