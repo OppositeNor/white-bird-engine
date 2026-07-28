@@ -58,7 +58,7 @@ public:
 private:
     Ref<RenderAllocator> render_allocator;
     Vector<Ref<RenderAllocator>, RenderAllocator> per_thread_allocators;
-    Vector<void (*)()> render_stages;
+    Vector<void (*)(), RenderAllocator> render_stages;
 
     BaseRenderDataSoftware base_render_data;
 

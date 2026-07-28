@@ -217,9 +217,9 @@ public:
             .color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT},
             .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
         };
-        std::array<WBE::RenderUniformBinding, 2> gbuffer_uniform_bindings{
-            WBE::RenderUniformBinding{.field_path = "camera_info.view", .data = &camera_view, .size = sizeof(camera_view)},
-            WBE::RenderUniformBinding{.field_path = "camera_info.proj", .data = &camera_proj, .size = sizeof(camera_proj)},
+        std::array<WBE::RenderBindpointDeclaration, 2> gbuffer_bindpoint_declarations{
+            WBE::RenderBindpointDeclaration{.field_path = "camera_info.view", .data = camera_view},
+            WBE::RenderBindpointDeclaration{.field_path = "camera_info.proj", .data = camera_proj},
         };
         std::array<VkClearValue, 4> gbuffer_clear_values{};
         gbuffer_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 0.0F}};
@@ -231,7 +231,8 @@ public:
             WBE::GraphicsPipelineCompilerVK(compiler_context)
                 .compile("deferred_gbuffer",
                     gbuffer_pipeline_resource,
-                    std::span<const WBE::RenderUniformBinding>(gbuffer_uniform_bindings.data(), gbuffer_uniform_bindings.size()));
+                    std::span<const WBE::RenderBindpointDeclaration>(
+                        gbuffer_bindpoint_declarations.data(), gbuffer_bindpoint_declarations.size()));
         // TODO: Register render task with graphics pipeline.
         // ---- (2) Albedo-debug pass: hand-written. -------------------------
         // TODO
@@ -261,8 +262,11 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_graphics_pipeline();
             game_application.run();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
-            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
+                WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
+                    ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));
+            }
             WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }

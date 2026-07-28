@@ -19,7 +19,6 @@
 #include "core/memory/reference_strong.hh"
 #include "function/input_manager/input_manager.hh"
 #include "i_window.hh"
-#include "utils/defs.hh"
 #include <atomic>
 #include <vulkan/vulkan_core.h>
 

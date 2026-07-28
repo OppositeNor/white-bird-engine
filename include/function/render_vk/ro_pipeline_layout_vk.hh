@@ -18,10 +18,10 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
-#include "utils/defs.hh"
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -98,7 +98,7 @@ public:
     struct ExposedFields {
         ExposedFields(const BaseRenderDataVK* p_render_data) : descriptor_set_layouts(p_render_data->allocator) {
         }
-        Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
+        Vector<Ref<RODescriptorSetLayoutVK>, RenderAllocator> descriptor_set_layouts;
     };
 
     const ExposedFields& fields() const {

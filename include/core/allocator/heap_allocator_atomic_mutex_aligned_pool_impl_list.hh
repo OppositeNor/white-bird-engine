@@ -96,6 +96,7 @@ public:
     HeapAllocatorAtomicMutexAlignedPoolImplicitList(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size);
 
     virtual MemID allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
+    virtual MemID try_allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
 
     virtual void deallocate(MemID p_mem) override;
 
@@ -104,6 +105,13 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual void* try_get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
         return reinterpret_cast<void*>(p_id);
     }
 

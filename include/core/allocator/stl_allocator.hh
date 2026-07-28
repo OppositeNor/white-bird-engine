@@ -16,7 +16,6 @@
 #define WBE_FILE_STL_ALLOCATOR_HH
 
 #include "core/allocator/i_allocator.hh"
-#include "core/core_utils.hh"
 #include <boost/container/flat_map.hpp>
 #include <cstddef>
 #include <deque>
@@ -123,7 +122,7 @@ struct STLAllocator {
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType = HeapAllocatorDefault>
+template <typename T, typename AllocType>
 using Vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
@@ -132,7 +131,7 @@ using Vector = std::vector<T, STLAllocator<T, AllocType, false, true, false>>;
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType = HeapAllocatorDefault>
+template <typename T, typename AllocType>
 using Set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
@@ -141,7 +140,7 @@ using Set = std::set<T, std::less<T>, STLAllocator<T, AllocType, false, true, fa
  * @tparam T The type of the values in the set.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType = HeapAllocatorDefault>
+template <typename T, typename AllocType>
 using HashSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocator<T, AllocType, false, true, false>>;
 
 /**
@@ -151,7 +150,7 @@ using HashSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>, STLAllocat
  * @tparam TVal The type of the values in the map.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
+template <typename TKey, typename TVal, typename AllocType>
 using HashMap =
     std::unordered_map<TKey, TVal, std::hash<TKey>, std::equal_to<TKey>, STLAllocator<std::pair<const TKey, TVal>, AllocType, false, true, false>>;
 
@@ -160,7 +159,7 @@ using HashMap =
  *
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename AllocType = HeapAllocatorDefault>
+template <typename AllocType>
 using String = std::basic_string<char, std::char_traits<char>, STLAllocator<char, AllocType, false, true, false>>;
 
 /**
@@ -169,10 +168,10 @@ using String = std::basic_string<char, std::char_traits<char>, STLAllocator<char
  * @tparam T The type of the values in the vector.
  * @tparam AllocType The type of the allocator. HeapAllocatorDefault by default.
  */
-template <typename T, typename AllocType = HeapAllocatorDefault>
+template <typename T, typename AllocType>
 using Deque = std::deque<T, STLAllocator<T, AllocType, false, true, false>>;
 
-template <typename TKey, typename TVal, typename AllocType = HeapAllocatorDefault>
+template <typename TKey, typename TVal, typename AllocType>
 using Map = boost::container::flat_map<TKey, TVal, std::less<>, STLAllocator<std::pair<TKey, TVal>, AllocType, false, true, false>>;
 
 } // namespace WhiteBirdEngine

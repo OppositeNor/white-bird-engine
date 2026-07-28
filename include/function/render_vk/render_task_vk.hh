@@ -18,7 +18,6 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
-#include "utils/defs.hh"
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 

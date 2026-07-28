@@ -16,14 +16,13 @@
 #define WBE_FILE_RO_BUFFER_VIEW_VK_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "ro_buffer_vk.hh"
-#include "utils/defs.hh"
-#include "utils/utils.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

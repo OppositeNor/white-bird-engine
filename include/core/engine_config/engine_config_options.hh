@@ -59,10 +59,10 @@ struct WBE_META(WBE_CONFIG_OPTION, WBE_CLA_CONFIGURATION) EngineConfigOptions fi
     WBE_META(WBE_REFLECT)
     size_t global_mem_pool_size = WBE_KI_B(128);
     /**
-     * @brief The size of the atomic global memory pool.
+        * @brief The number of arenas in the global memory pool.
      */
     WBE_META(WBE_REFLECT)
-    size_t global_atomic_mem_pool_size = WBE_KI_B(128);
+    size_t global_mem_pool_arena_count = 4;
     /**
      * @brief The size of the thread memory pool.
      */

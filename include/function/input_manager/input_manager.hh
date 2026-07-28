@@ -16,7 +16,6 @@
 #define WBE_FILE_INPUT_MANAGER_HH
 
 #include "function/input_manager/key_codes.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include <atomic>
 #include <cstdint>

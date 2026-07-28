@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -56,7 +57,7 @@ public:
     /**
      * @brief The default number of arenas.
      */
-    static constexpr size_t DEFAULT_ARENA_COUNT = 8;
+    static constexpr size_t DEFAULT_ARENA_COUNT = 4;
 
     HeapAllocatorAtomicArenaAlignedPoolImplicitList() : HeapAllocatorAtomicArenaAlignedPoolImplicitList(WBE_KI_B(64)) {
     }
@@ -82,6 +83,7 @@ public:
     HeapAllocatorAtomicArenaAlignedPoolImplicitList(size_t p_size, size_t p_arena_count);
 
     virtual MemID allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
+    virtual MemID try_allocate(size_t p_size, size_t p_alignment = HEADER_SIZE) override;
 
     /**
      * @brief Allocate memory from a specific arena.
@@ -104,6 +106,16 @@ public:
      */
     MemID allocate_in_arena(size_t p_size, size_t p_alignment, size_t p_arena_index);
 
+    /**
+     * @brief Try to allocate aligned memory from a specific arena.
+     *
+     * @param p_size The size to allocate.
+     * @param p_alignment Alignment.
+     * @param p_arena_index The arena index to allocate from.
+     * @return The memory ID of the allocated resource, or MEM_NULL if no space is available.
+     */
+    MemID try_allocate_in_arena(size_t p_size, size_t p_alignment, size_t p_arena_index);
+
     virtual void deallocate(MemID p_mem) override;
 
     virtual void* get(MemID p_id) const override {
@@ -111,6 +123,13 @@ public:
             return nullptr;
         }
         WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual void* try_get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
         return reinterpret_cast<void*>(p_id);
     }
 
@@ -153,6 +172,13 @@ public:
      * @return The total remaining size of all arenas.
      */
     size_t get_remain_size() const;
+
+    /**
+     * @brief Get the internal fragmentation tracker for each arena.
+     *
+     * @return One internal fragmentation tracker value per arena.
+     */
+    std::vector<size_t> get_internal_fragmentation_tracker() const;
 
     /**
      * @brief Check if a memory id belongs in any arena.

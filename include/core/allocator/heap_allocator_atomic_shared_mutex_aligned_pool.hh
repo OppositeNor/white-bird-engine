@@ -100,6 +100,13 @@ public:
         return reinterpret_cast<void*>(p_id);
     }
 
+    virtual void* try_get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        return reinterpret_cast<void*>(p_id);
+    }
+
     virtual bool is_empty() const override {
         boost::shared_lock lock(mutex);
         return is_empty_unguarded();

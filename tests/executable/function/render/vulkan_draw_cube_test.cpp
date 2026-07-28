@@ -189,43 +189,32 @@ public:
             .color_attachment_formats = {SHADOWMAP_COLOR_FORMAT},
             .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
         };
-        std::array<WBE::RenderUniformBinding, 2> shadow_uniform_bindings{
-            WBE::RenderUniformBinding{
-                .field_path = "light_camera_info.view", .data = &spot_light.view, .size = sizeof(spot_light.view)},
-            WBE::RenderUniformBinding{
-                .field_path = "light_camera_info.proj", .data = &spot_light.proj, .size = sizeof(spot_light.proj)},
+        std::array<WBE::RenderBindpointDeclaration, 2> shadow_bindpoint_declarations{
+            WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.view", .data = spot_light.view},
+            WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.proj", .data = spot_light.proj},
         };
         auto [shadow_graphics_pipeline, shadow_descriptor_sets] =
             WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
                 .compile("shadowmap_spot",
                     shadow_pipeline_resource,
-                    std::span<const WBE::RenderUniformBinding>(shadow_uniform_bindings.data(), shadow_uniform_bindings.size()));
+                    std::span<const WBE::RenderBindpointDeclaration>(
+                        shadow_bindpoint_declarations.data(), shadow_bindpoint_declarations.size()));
 
         // ----- Compile main forward-PBR pipeline -----------------------------
         camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
-        std::array<WBE::RenderUniformBinding, 11> main_uniform_bindings{
-            WBE::RenderUniformBinding{.field_path = "camera_info.view", .data = &camera_info.view, .size = sizeof(camera_info.view)},
-            WBE::RenderUniformBinding{.field_path = "camera_info.proj", .data = &camera_info.proj, .size = sizeof(camera_info.proj)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.view", .data = &spot_light.view, .size = sizeof(spot_light.view)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.proj", .data = &spot_light.proj, .size = sizeof(spot_light.proj)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.position", .data = &spot_light.position, .size = sizeof(spot_light.position)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.intensity", .data = &spot_light.intensity, .size = sizeof(spot_light.intensity)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.direction", .data = &spot_light.direction, .size = sizeof(spot_light.direction)},
-            WBE::RenderUniformBinding{.field_path = "spot_light_info.inner_cone_cos",
-                .data = &spot_light.inner_cone_cos,
-                .size = sizeof(spot_light.inner_cone_cos)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.color", .data = &spot_light.color, .size = sizeof(spot_light.color)},
-            WBE::RenderUniformBinding{.field_path = "spot_light_info.outer_cone_cos",
-                .data = &spot_light.outer_cone_cos,
-                .size = sizeof(spot_light.outer_cone_cos)},
-            WBE::RenderUniformBinding{
-                .field_path = "spot_light_info.range", .data = &spot_light.range, .size = sizeof(spot_light.range)},
+        std::array<WBE::RenderBindpointDeclaration, 12> main_bindpoint_declarations{
+            WBE::RenderBindpointDeclaration{.field_path = "camera_info.view", .data = camera_info.view},
+            WBE::RenderBindpointDeclaration{.field_path = "camera_info.proj", .data = camera_info.proj},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.view", .data = spot_light.view},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.proj", .data = spot_light.proj},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.position", .data = spot_light.position},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.intensity", .data = spot_light.intensity},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.direction", .data = spot_light.direction},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.inner_cone_cos", .data = spot_light.inner_cone_cos},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.color", .data = spot_light.color},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.outer_cone_cos", .data = spot_light.outer_cone_cos},
+            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.range", .data = spot_light.range},
+            WBE::RenderBindpointDeclaration{.data = default_material},
         };
 
         WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
@@ -239,7 +228,8 @@ public:
             WBE::GraphicsPipelineCompilerVK(main_compiler_context)
                 .compile(default_material->graphics_pipeline->resource_key,
                     default_material->graphics_pipeline,
-                    std::span<const WBE::RenderUniformBinding>(main_uniform_bindings.data(), main_uniform_bindings.size()));
+                    std::span<const WBE::RenderBindpointDeclaration>(
+                        main_bindpoint_declarations.data(), main_bindpoint_declarations.size()));
 
         // The compiler binds the placeholder shadowmap texture from the
         // material; overwrite it with the actual depth image rendered above.
@@ -351,8 +341,11 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_draw_task();
             game_application.run();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            size_t global_alloc_max = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
-            WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Global allocator max used: {}", global_alloc_max));
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
+                WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
+                    ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));
+            }
             WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }

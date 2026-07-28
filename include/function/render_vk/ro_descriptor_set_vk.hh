@@ -20,13 +20,13 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "utils/utils.hh"
 #include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -252,9 +252,9 @@ public:
 
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
-    Vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
+    Vector<Ref<RODescriptorSetLayoutVK>, RenderAllocator> descriptor_set_layouts;
     // Keep references to bound resources to prevent them from being destroyed.
-    Map<uint32_t, Vector<Ref<RenderObjectVK>>> bound_objects;
+    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator> bound_objects;
 };
 
 } // namespace WhiteBirdEngine

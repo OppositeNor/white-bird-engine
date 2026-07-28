@@ -82,12 +82,12 @@ public:
      *
      * @return This node's entity component type list.
      */
-    Vector<TypeID> get_component_type_ids();
+    Vector<TypeID, HeapAllocatorDefault> get_component_type_ids();
 
 private:
     void destroy_entity();
 
-    String<> name;
+    String<HeapAllocatorDefault> name;
     Ref<Scene> scene;
     EntityID entity = entt::null;
 };

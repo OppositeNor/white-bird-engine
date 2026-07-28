@@ -22,6 +22,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -57,15 +58,44 @@ HeapAllocatorAtomicArenaAlignedPoolImplicitList::~HeapAllocatorAtomicArenaAligne
 }
 
 MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
-    size_t arena_index = next_arena_index.fetch_add(1, std::memory_order_relaxed) % arena_count;
-    return allocate_in_arena(p_size, p_alignment, arena_index);
+    MemID result = try_allocate(p_size, p_alignment);
+    if (result != MEM_NULL || p_size == 0) {
+        return result;
+    }
+    throw std::runtime_error(std::format("Failed to allocate memory: not enough space in any arena.\nTrying to allocate: {} bytes.\nPool status: {}",
+        p_size,
+        static_cast<std::string>(*this)));
+}
+
+MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::try_allocate(size_t p_size, size_t p_alignment) {
+    size_t first_arena_index = next_arena_index.fetch_add(1, std::memory_order_relaxed) % arena_count;
+    for (size_t i = 0; i < arena_count; ++i) {
+        size_t arena_index = (first_arena_index + i) % arena_count;
+        MemID result = try_allocate_in_arena(p_size, p_alignment, arena_index);
+        if (result != MEM_NULL || p_size == 0) {
+            return result;
+        }
+    }
+    return MEM_NULL;
 }
 
 MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::allocate_in_arena(size_t p_size, size_t p_alignment, size_t p_arena_index) {
+    MemID result = try_allocate_in_arena(p_size, p_alignment, p_arena_index);
+    if (result != MEM_NULL || p_size == 0) {
+        return result;
+    }
+    throw std::runtime_error(std::format("Failed to allocate memory: not enough space in arena {}.\nTrying to allocate: {} bytes.\nPool status: {}",
+        p_arena_index,
+        p_size,
+        static_cast<std::string>(*this)));
+}
+
+MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::try_allocate_in_arena(
+    size_t p_size, size_t p_alignment, size_t p_arena_index) {
     if (p_arena_index >= arena_count) {
         throw std::runtime_error(std::format("Arena index {} exceeds arena count {}.", p_arena_index, arena_count));
     }
-    return get_arena(p_arena_index).allocate(p_size, p_alignment);
+    return get_arena(p_arena_index).try_allocate(p_size, p_alignment);
 }
 
 void HeapAllocatorAtomicArenaAlignedPoolImplicitList::deallocate(MemID p_mem) {
@@ -100,6 +130,15 @@ size_t HeapAllocatorAtomicArenaAlignedPoolImplicitList::get_remain_size() const 
         remain_size += get_arena(i).get_remain_size();
     }
     return remain_size;
+}
+
+std::vector<size_t> HeapAllocatorAtomicArenaAlignedPoolImplicitList::get_internal_fragmentation_tracker() const {
+    std::vector<size_t> result;
+    result.reserve(arena_count);
+    for (size_t i = 0; i < arena_count; ++i) {
+        result.push_back(get_arena(i).get_internal_fragmentation_tracker());
+    }
+    return result;
 }
 
 bool HeapAllocatorAtomicArenaAlignedPoolImplicitList::is_in_pool(MemID p_mem_id) const {

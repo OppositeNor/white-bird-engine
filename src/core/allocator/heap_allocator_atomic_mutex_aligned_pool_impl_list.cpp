@@ -81,6 +81,20 @@ HeapAllocatorAtomicMutexAlignedPoolImplicitList::~HeapAllocatorAtomicMutexAligne
 }
 
 MemID HeapAllocatorAtomicMutexAlignedPoolImplicitList::allocate(size_t p_size, size_t p_alignment) {
+    MemID result = try_allocate(p_size, p_alignment);
+    if (result != MEM_NULL || p_size == 0) {
+        return result;
+    }
+    std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
+                          "Trying to allocate: " +
+                          std::to_string(get_align_size(p_size, HEADER_SIZE) + HEADER_SIZE) +
+                          " bytes.\n"
+                          "Pool status: " +
+                          static_cast<std::string>(*this);
+    throw std::runtime_error(err_msg);
+}
+
+MemID HeapAllocatorAtomicMutexAlignedPoolImplicitList::try_allocate(size_t p_size, size_t p_alignment) {
     WBE_DEBUG_ASSERT(!(mutex.is_unique_locked_by_current_thread()));
     if (p_alignment == 0) {
         throw std::runtime_error("Allocation alignment must not be 0.");
@@ -97,19 +111,8 @@ MemID HeapAllocatorAtomicMutexAlignedPoolImplicitList::allocate(size_t p_size, s
     MemID result = find_valid_chunk<false>(aligned_size, p_alignment);
     if (result == MEM_NULL) {
         result = find_valid_chunk<true>(aligned_size, p_alignment);
-        if (result != MEM_NULL) {
-            return result;
-        }
-    } else {
-        return result;
     }
-    std::string err_msg = "Failed to allocate memory: not enough space for memory pool.\n"
-                          "Trying to allocate: " +
-                          std::to_string(aligned_size) +
-                          " bytes.\n"
-                          "Pool status: " +
-                          unguarded_to_string();
-    throw std::runtime_error(err_msg);
+    return result;
 }
 
 template <bool CoalesceEnabled>

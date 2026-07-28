@@ -68,7 +68,7 @@ bool SceneNode::has_component(TypeID p_component_type_id) {
     return component_list != nullptr && component_list->contains(entity);
 }
 
-Vector<TypeID> SceneNode::get_component_type_ids() {
+Vector<TypeID, HeapAllocatorDefault> SceneNode::get_component_type_ids() {
     return scene->get_component_type_ids(entity);
 }
 

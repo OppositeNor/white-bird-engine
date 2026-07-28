@@ -42,9 +42,9 @@ entt::sparse_set* Scene::get_component_list(TypeID p_component_type_id) {
     return component_list;
 }
 
-Vector<TypeID> Scene::get_component_type_ids(EntityID p_entity) {
+Vector<TypeID, HeapAllocatorDefault> Scene::get_component_type_ids(EntityID p_entity) {
     cache_component_lists();
-    Vector<TypeID> component_type_ids(allocator);
+    Vector<TypeID, HeapAllocatorDefault> component_type_ids(allocator);
     for (const auto& [component_type_id, component_list] : component_lists) {
         if (component_list->contains(p_entity)) {
             component_type_ids.push_back(component_type_id);

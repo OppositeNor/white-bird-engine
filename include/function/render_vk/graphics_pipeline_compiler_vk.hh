@@ -31,6 +31,12 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
+#include <glm/glm.hpp>
+#include <glm/ext/matrix_float3x3.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
 #include <span>
 #include <string_view>
 #include <tuple>
@@ -86,6 +92,8 @@ struct GraphicsPipelineCompilerVKContext {
  */
 class GraphicsPipelineCompilerVK {
 public:
+    using SupportedUniformDataTypes = std::tuple<float, int32_t, uint32_t, glm::vec2, glm::vec3, glm::vec4, glm::mat3, glm::mat4>;
+
     /**
      * @brief Construct a compiler with the given runtime context.
      *
@@ -110,13 +118,13 @@ public:
      * passes).
      * @param p_index_buffer_res_id Optional index buffer resource id. Pass
      * nullopt when not drawing indexed.
-     * @param p_prev_tasks Tasks the returned task depends on.
-     * @param p_uniform_bindings Caller-provided uniform field bindings.
+      * @param p_prev_tasks Tasks the returned task depends on.
+      * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
      * @return Render task descriptor for the compiled graphics pipeline.
      */
     std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
-        std::span<const RenderUniformBinding> p_uniform_bindings = {});
+                std::span<const RenderBindpointDeclaration> p_bindpoint_declarations = {});
 
 private:
     struct CompiledPipelineObjects {
@@ -128,7 +136,7 @@ private:
 
     CompiledPipelineObjects compile_pipeline_objects(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
-        std::span<const RenderUniformBinding> p_uniform_bindings);
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
     std::vector<Ref<RODescriptorSetLayoutVK>> compile_descriptor_set_layouts(
         std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
@@ -143,7 +151,7 @@ private:
         const RUGraphicsPipeline& p_pipeline_resource,
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        std::span<const RenderUniformBinding> p_uniform_bindings);
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
     Ref<RODescriptorSetVK> compile_material_descriptor_set(std::string_view p_resource_key,
         RefRes<RUMaterial> p_material,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
@@ -154,8 +162,7 @@ private:
     void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
-        std::span<const RenderUniformBinding> p_uniform_bindings) const;
-    RefRes<RUMaterial> find_material_for_pipeline(const RUGraphicsPipeline& p_pipeline_resource) const;
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) const;
 };
 
 } // namespace WhiteBirdEngine

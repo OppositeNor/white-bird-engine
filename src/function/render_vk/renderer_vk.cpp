@@ -24,6 +24,7 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -138,7 +139,7 @@ template <typename T>
 static void update_buffer(const BaseRenderDataVK* p_render_data,
     DeviceDomain p_domain,
     Ref<ROBufferVK>& p_buffer,
-    const Vector<T>& p_from_buffer,
+    const Vector<T, RenderAllocator>& p_from_buffer,
     VkBufferUsageFlags p_buffer_usage,
     Ref<ROStagingBufferVK> p_staging_buffer) {
     size_t size_in_bytes = p_from_buffer.size() * sizeof(T);

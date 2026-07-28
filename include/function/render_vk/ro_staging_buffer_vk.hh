@@ -15,12 +15,12 @@
 #ifndef WBE_RO_STAGING_BUFFER_VK_HH
 #define WBE_RO_STAGING_BUFFER_VK_HH
 
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
-#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <set>

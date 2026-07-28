@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RO_SHADER_VK_HH
 #define WBE_FILE_RO_SHADER_VK_HH
 
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -22,7 +23,6 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <span>

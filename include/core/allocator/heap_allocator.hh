@@ -53,6 +53,16 @@ public:
     virtual MemID allocate(size_t p_size) = 0;
 
     /**
+     * @brief Try to allocate memory of a specific size.
+     *
+     * @param p_size The size to allocate.
+     * @return The memory ID of the allocated resource, or MEM_NULL if no space is available.
+     */
+    virtual MemID try_allocate(size_t p_size) {
+        return allocate(p_size);
+    }
+
+    /**
      * @brief Deallocate memroy.
      *
      * @param p_mem The memory id to be deallocated.

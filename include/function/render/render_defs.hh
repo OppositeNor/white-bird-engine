@@ -16,29 +16,25 @@
 #define WBE_FILE_RENDER_DEFS_HH
 
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
-#include <cstddef>
+#include <any>
 #include <string>
 
 namespace WhiteBirdEngine {
 using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
 
 /**
- * @class RenderUniformBinding
- * @brief Caller-provided bytes for one reflected shader uniform field.
+ * @class RenderBindpointDeclaration
+ * @brief Caller-provided data for one reflected shader bindpoint.
  */
-struct RenderUniformBinding {
+struct RenderBindpointDeclaration {
     /**
-     * @brief Reflected shader field path, e.g. "camera_info.view".
+     * @brief Reflected shader field path, e.g. "camera_info.view". Empty for resource bindpoints such as materials.
      */
     std::string field_path;
     /**
-     * @brief Pointer to the source field data. Data is copied during compilation.
+     * @brief Typed source data. Data is copied during compilation.
      */
-    const void* data = nullptr;
-    /**
-     * @brief Byte size of the source field data.
-     */
-    size_t size = 0;
+    std::any data;
 };
 
 } // namespace WhiteBirdEngine

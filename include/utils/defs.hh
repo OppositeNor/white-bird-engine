@@ -115,12 +115,6 @@
 // Default alignment
 #define WBE_DEFAULT_ALIGNMENT 16 // TODO: set value according to the platform
 
-// Get a required optional value.
-#define WBE_REQUIRED(optional_value) WhiteBirdEngine::required(#optional_value, (optional_value))
-
-// Requires a pointer or reference to be non-null.
-#define WBE_REQUIRES_VALID(optional_value) WhiteBirdEngine::requires_valid(#optional_value, (optional_value))
-
 #define WBE_FLOAT_TOLARENCE 0.0000001
 
 // Avoiding two atomic variables be allocated into the same cacheline, causing

@@ -24,7 +24,6 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
-#include "utils/utils.hh"
 #include <cstdint>
 #include <set>
 #include <vulkan/vulkan_core.h>

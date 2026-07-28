@@ -63,7 +63,7 @@ public:
 
 private:
     std::counting_semaphore<> semaphore{0};
-    Vector<std::function<void()>> buffer;
+    Vector<std::function<void()>, HeapAllocatorDefault> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };

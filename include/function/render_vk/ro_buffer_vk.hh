@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RO_BUFFER_VK_HH
 #define WBE_FILE_RO_BUFFER_VK_HH
 
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -23,7 +24,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "utils/defs.hh"
-#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <set>

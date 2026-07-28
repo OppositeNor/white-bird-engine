@@ -15,8 +15,7 @@
 #ifndef WBE_FILE_REQUIRED_TEST_HH
 #define WBE_FILE_REQUIRED_TEST_HH
 
-#include "utils/defs.hh"
-#include "utils/utils.hh"
+#include "core/core_utils.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>

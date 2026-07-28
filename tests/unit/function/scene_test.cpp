@@ -100,8 +100,8 @@ TEST_F(WBESceneTest, SceneReturnsComponentTypeIdsAttachedToEntity) {
     scene.get_entities().emplace<WBE::ComponentLabel>(first_entity);
     scene.get_entities().emplace<WBE::ComponentLabel>(second_entity);
 
-    WBE::Vector<WBE::TypeID> first_component_type_ids = scene.get_component_type_ids(first_entity);
-    WBE::Vector<WBE::TypeID> second_component_type_ids = scene.get_component_type_ids(second_entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> first_component_type_ids = scene.get_component_type_ids(first_entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> second_component_type_ids = scene.get_component_type_ids(second_entity);
 
     EXPECT_NE(std::find(first_component_type_ids.begin(), first_component_type_ids.end(), transform_type_id),
         first_component_type_ids.end());
@@ -117,7 +117,7 @@ TEST_F(WBESceneTest, SceneReturnsEmptyComponentTypeIdsForEntityWithoutComponents
     WBE::Scene scene(get_allocator());
     WBE::EntityID entity = scene.get_entities().create();
 
-    WBE::Vector<WBE::TypeID> component_type_ids = scene.get_component_type_ids(entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> component_type_ids = scene.get_component_type_ids(entity);
 
     EXPECT_TRUE(component_type_ids.empty());
 }
@@ -166,7 +166,7 @@ TEST_F(WBESceneTest, SceneNodeUsesSceneComponentListsForComponentState) {
 
     EXPECT_TRUE(node->has_component(transform_type_id));
     EXPECT_NE(scene->get_component_list(transform_type_id), nullptr);
-    WBE::Vector<WBE::TypeID> component_type_ids = node->get_component_type_ids();
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> component_type_ids = node->get_component_type_ids();
     EXPECT_NE(std::find(component_type_ids.begin(), component_type_ids.end(), transform_type_id), component_type_ids.end());
 
     node->remove_component(transform_type_id);

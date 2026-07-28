@@ -90,7 +90,7 @@ public:
      * @param p_entity The entity to inspect.
      * @return The component type ids attached to the entity.
      */
-    Vector<TypeID> get_component_type_ids(EntityID p_entity);
+    Vector<TypeID, HeapAllocatorDefault> get_component_type_ids(EntityID p_entity);
 
     /**
      * @brief Register a scene node for entity lookup.
@@ -119,8 +119,8 @@ private:
 
     HeapAllocatorDefault* allocator;
     entt::registry entities;
-    HashMap<TypeID, entt::sparse_set*> component_lists;
-    HashMap<EntityID, RefWeak<SceneNode>> scene_nodes;
+    HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
+    HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
 };
 
 } // namespace WhiteBirdEngine

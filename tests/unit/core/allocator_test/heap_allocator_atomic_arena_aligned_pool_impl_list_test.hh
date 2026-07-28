@@ -120,6 +120,23 @@ TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, HandlesAlignmentAndIn
     ASSERT_EQ(allocator.get_remain_size(), WBE_KI_B(4));
 }
 
+TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, TracksInternalFragmentationPerArena) {
+    WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(1024, 4);
+
+    WBE::MemID arena_1_mem = allocator.allocate_in_arena(7, 1);
+    WBE::MemID arena_3_mem = allocator.allocate_in_arena(11, 3);
+
+    std::vector<size_t> trackers = allocator.get_internal_fragmentation_tracker();
+    ASSERT_EQ(trackers.size(), 4U);
+    EXPECT_EQ(trackers[0], 0U);
+    EXPECT_GT(trackers[1], 0U);
+    EXPECT_EQ(trackers[2], 0U);
+    EXPECT_GT(trackers[3], 0U);
+
+    allocator.deallocate(arena_1_mem);
+    allocator.deallocate(arena_3_mem);
+}
+
 TEST_F(WBEHeapAllocAtomicArenaAlignedPoolImplicitListTest, ConcurrentAllocationsProduceUniqueValidIds) {
     WBE::HeapAllocatorAtomicArenaAlignedPoolImplicitList allocator(WBE_MI_B(2), 8);
     constexpr int THREAD_COUNT = 8;

@@ -16,6 +16,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -33,7 +34,7 @@ namespace {
 void write_buffer_info(VkDescriptorType p_descriptor_type,
     VkWriteDescriptorSet& p_write_info,
     const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator>::iterator p_bound_object_it,
     std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
     WBE_DEBUG_ASSERT(p_result_buffer_infos.empty());
     p_write_info.descriptorType = p_descriptor_type;
@@ -55,7 +56,7 @@ void write_buffer_info(VkDescriptorType p_descriptor_type,
 void write_image_info(VkDescriptorType p_descriptor_type,
     VkWriteDescriptorSet& p_write_info,
     const std::vector<RODescriptorSetVK::Writer::ImageInfo>& p_image_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>>>::iterator p_bound_object_it,
+    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator>::iterator p_bound_object_it,
     std::vector<VkDescriptorImageInfo>& p_result_image_infos) {
     WBE_DEBUG_ASSERT(p_result_image_infos.empty());
     p_write_info.descriptorType = p_descriptor_type;
@@ -148,7 +149,7 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.dstArrayElement = 0;
     std::vector<VkDescriptorBufferInfo> buffer_infos;
     // Prepare buffer infos
-    auto emplace_result = bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>>(render_data->allocator));
+    auto emplace_result = bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
     auto bound_object_it = emplace_result.first;
     if (!emplace_result.second) {
         // If previously existed, clear the bound objects.

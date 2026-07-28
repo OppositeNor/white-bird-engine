@@ -39,10 +39,15 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
+#include <any>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <glm/ext/matrix_float3x3.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <span>
 #include <stdexcept>
@@ -138,35 +143,95 @@ ShaderMetadata load_shader_metadata(RefRes<RUShader> p_shader) {
     return metadata;
 }
 
-void validate_uniform_bindings(std::span<const RenderUniformBinding> p_uniform_bindings) {
+bool is_material_bindpoint(const RenderBindpointDeclaration& p_bindpoint_declaration) {
+    // Materials are supplied as bindpoint declarations rather than discovered from render resources.
+    return std::any_cast<RefRes<RUMaterial>>(&p_bindpoint_declaration.data) != nullptr;
+}
+
+RefRes<RUMaterial> find_material_bindpoint(std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
+    // Use the first material bindpoint declaration as the material source for this pipeline compilation.
+    for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
+        if (const auto* material = std::any_cast<RefRes<RUMaterial>>(&bindpoint_declaration.data)) {
+            if (*material != nullptr) {
+                return *material;
+            }
+        }
+    }
+    return MEM_NULL;
+}
+
+template <typename DataType>
+const void* try_get_uniform_data(const std::any& p_data) {
+    // std::any exposes data only through typed casts, so supported uniform value types are checked explicitly.
+    const auto* value = std::any_cast<DataType>(&p_data);
+    if (value == nullptr) {
+        return nullptr;
+    }
+    return value;
+}
+
+struct UniformDataView {
+    const void* data = nullptr;
+    size_t size = 0;
+};
+
+template <size_t TypeIndex = 0>
+UniformDataView get_supported_uniform_data(const std::any& p_data) {
+    // Walk the supported uniform value type list until std::any contains the reflected field's exact type and size.
+    using SupportedUniformDataTypes = GraphicsPipelineCompilerVK::SupportedUniformDataTypes;
+    if constexpr (TypeIndex >= std::tuple_size_v<SupportedUniformDataTypes>) {
+        return {};
+    } else {
+        using DataType = std::tuple_element_t<TypeIndex, SupportedUniformDataTypes>;
+        if (const void* data = try_get_uniform_data<DataType>(p_data)) {
+            return UniformDataView{.data = data, .size = sizeof(DataType)};
+        }
+        return get_supported_uniform_data<TypeIndex + 1>(p_data);
+    }
+}
+
+UniformDataView get_uniform_data(const RenderBindpointDeclaration& p_bindpoint_declaration) {
+    // The compiler copies supported scalar and GLM value types into reflected uniform buffers.
+    UniformDataView data_view = get_supported_uniform_data(p_bindpoint_declaration.data);
+    if (data_view.data != nullptr) {
+        return data_view;
+    }
+    throw std::runtime_error(std::format(
+        "Failed to bind uniform field '{}': unsupported std::any data type.", p_bindpoint_declaration.field_path));
+}
+
+void validate_bindpoint_declarations(std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Uniforms are optional, but every provided binding must be complete before descriptor writes begin.
-    if (p_uniform_bindings.empty()) {
+    if (p_bindpoint_declarations.empty()) {
         return;
     }
-    for (const auto& uniform_binding : p_uniform_bindings) {
-        // Validate the lookup key first so later errors can identify the shader field path reliably.
-        if (uniform_binding.field_path.empty()) {
-            throw std::runtime_error("Failed to compile graphics pipeline: uniform binding field path is empty.");
+    for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
+        if (!bindpoint_declaration.data.has_value()) {
+            throw std::runtime_error("Failed to compile graphics pipeline: bindpoint declaration has no data.");
         }
-        if (uniform_binding.data == nullptr || uniform_binding.size == 0) {
-            throw std::runtime_error(
-                std::format("Failed to compile graphics pipeline: uniform binding '{}' has no data.", uniform_binding.field_path));
+        if (is_material_bindpoint(bindpoint_declaration)) {
+            continue;
+        }
+        // Validate the lookup key first so later errors can identify the shader field path reliably.
+        if (bindpoint_declaration.field_path.empty()) {
+            throw std::runtime_error("Failed to compile graphics pipeline: uniform binding field path is empty.");
         }
     }
 }
 
-const RenderUniformBinding* find_uniform_binding(std::span<const RenderUniformBinding> p_uniform_bindings, std::string_view p_field_path) {
+const RenderBindpointDeclaration* find_uniform_binding(
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations, std::string_view p_field_path) {
     // The binding list is small and call-site ordered, so a linear scan keeps ownership and lifetime simple.
-    for (const auto& uniform_binding : p_uniform_bindings) {
-        if (uniform_binding.field_path == p_field_path) {
-            return &uniform_binding;
+    for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
+        if (!is_material_bindpoint(bindpoint_declaration) && bindpoint_declaration.field_path == p_field_path) {
+            return &bindpoint_declaration;
         }
     }
     return nullptr;
 }
 
 std::vector<uint8_t> build_uniform_data(
-    const ShaderDescriptorBindingVK& p_descriptor_binding, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    const ShaderDescriptorBindingVK& p_descriptor_binding, std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Pack caller-provided field values into a zero-initialized buffer matching the shader-reflected layout.
     if (p_descriptor_binding.buffer_size == 0) {
         throw std::runtime_error(std::format("Failed to compile uniform descriptor '{}': reflected buffer size is missing.",
@@ -179,15 +244,16 @@ std::vector<uint8_t> build_uniform_data(
     std::vector<uint8_t> uniform_data(p_descriptor_binding.buffer_size, 0);
     for (const auto& field : p_descriptor_binding.fields) {
         // Each reflected field must have a caller-provided binding with the exact byte size expected by the shader.
-        const auto* uniform_binding = find_uniform_binding(p_uniform_bindings, field.field_path);
-        if (uniform_binding == nullptr) {
+        const auto* bindpoint_declaration = find_uniform_binding(p_bindpoint_declarations, field.field_path);
+        if (bindpoint_declaration == nullptr) {
             throw std::runtime_error(
                 std::format("Failed to bind uniform field '{}': caller did not provide a binding.", field.field_path));
         }
-        if (uniform_binding->size != field.size) {
+        UniformDataView data_view = get_uniform_data(*bindpoint_declaration);
+        if (data_view.size != field.size) {
             throw std::runtime_error(std::format("Failed to bind uniform field '{}': program field size {} does not match shader field size {}.",
                 field.field_path,
-                uniform_binding->size,
+            data_view.size,
                 field.size));
         }
         if (field.offset + field.size > uniform_data.size()) {
@@ -195,7 +261,7 @@ std::vector<uint8_t> build_uniform_data(
                 "Failed to bind uniform field '{}': reflected field range exceeds uniform buffer size.", field.field_path));
         }
         // Copy into the reflected offset so padding and field ordering match the shader uniform block.
-        std::memcpy(uniform_data.data() + field.offset, uniform_binding->data, field.size);
+        std::memcpy(uniform_data.data() + field.offset, data_view.data, field.size);
     }
     return uniform_data;
 }
@@ -243,16 +309,20 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
 }
 
 std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> GraphicsPipelineCompilerVK::compile(
-    std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    std::string_view p_resource_key,
+    RefRes<RUGraphicsPipeline> p_pipeline_resource,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Keep the public API tuple-shaped while the internal path names the intermediate pipeline objects.
-    auto compiled = compile_pipeline_objects(p_resource_key, p_pipeline_resource, p_uniform_bindings);
+    auto compiled = compile_pipeline_objects(p_resource_key, p_pipeline_resource, p_bindpoint_declarations);
     return {compiled.graphics_pipeline, compiled.descriptor_sets};
 }
 
 GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::compile_pipeline_objects(
-    std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource, std::span<const RenderUniformBinding> p_uniform_bindings) {
+    std::string_view p_resource_key,
+    RefRes<RUGraphicsPipeline> p_pipeline_resource,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Compile order follows Vulkan dependencies: shaders and metadata first, then layouts, then pipeline and descriptor sets.
-    validate_uniform_bindings(p_uniform_bindings);
+    validate_bindpoint_declarations(p_bindpoint_declarations);
     if (p_pipeline_resource->vertex_stage == nullptr || p_pipeline_resource->fragment_stage == nullptr) {
         throw std::runtime_error(
             std::format("Failed to compile graphics pipeline '{}': vertex and fragment stages are required.", p_resource_key));
@@ -269,7 +339,7 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     result.graphics_pipeline =
         compile_graphics_pipeline(p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, pipeline_layout);
     result.descriptor_sets = compile_descriptor_sets(
-        p_resource_key, *p_pipeline_resource, descriptor_set_layouts, descriptor_bindings, p_uniform_bindings);
+        p_resource_key, *p_pipeline_resource, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     return result;
 }
 
@@ -376,19 +446,19 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
 }
 
 std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descriptor_sets(std::string_view p_resource_key,
-    const RUGraphicsPipeline& p_pipeline_resource,
+    const RUGraphicsPipeline& /*p_pipeline_resource*/,
     const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
     const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-    std::span<const RenderUniformBinding> p_uniform_bindings) {
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Pipelines with no descriptor sets need no descriptor allocation or material lookup.
     if (p_descriptor_set_layouts.empty()) {
         return {};
     }
-    RefRes<RUMaterial> material = find_material_for_pipeline(p_pipeline_resource);
+    RefRes<RUMaterial> material = find_material_bindpoint(p_bindpoint_declarations);
     if (material == nullptr && has_material_descriptor_bindings(p_descriptor_bindings)) {
         // Material image bindings are static today, so they must come from a material already registered in render data.
         throw std::runtime_error(
-            std::format("Failed to compile graphics pipeline '{}': no static opaque material uses it.", p_resource_key));
+            std::format("Failed to compile graphics pipeline '{}': no material bindpoint declaration was provided.", p_resource_key));
     }
 
     std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
@@ -402,8 +472,8 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
                       .create_ref(context.render_data)
                 : compile_material_descriptor_set(
                       p_resource_key, material, p_descriptor_set_layouts[set_index], p_descriptor_bindings, set_index);
-            // Uniform descriptors are written after material bindings so both sources can populate the same descriptor set.
-        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_uniform_bindings);
+              // Uniform descriptors are written after material bindings so both sources can populate the same descriptor set.
+              write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
         descriptor_sets.push_back(descriptor_set);
     }
     return descriptor_sets;
@@ -506,7 +576,7 @@ Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
 void GraphicsPipelineCompilerVK::write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
     const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
     uint32_t p_set_index,
-    std::span<const RenderUniformBinding> p_uniform_bindings) const {
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) const {
     // Scan all reflected bindings and write only uniform buffers belonging to this descriptor set index.
     for (const auto& descriptor_binding : p_descriptor_bindings) {
         if (descriptor_binding.set_index != p_set_index ||
@@ -519,7 +589,7 @@ void GraphicsPipelineCompilerVK::write_uniform_descriptors(Ref<RODescriptorSetVK
                 descriptor_binding.parameter_name));
         }
         // Allocate one host-visible buffer per reflected uniform descriptor and write it into the descriptor set.
-        auto uniform_data = build_uniform_data(descriptor_binding, p_uniform_bindings);
+        auto uniform_data = build_uniform_data(descriptor_binding, p_bindpoint_declarations);
         auto uniform_buffer = ROBufferVK::Builder()
                                   .set_domain(DeviceDomain::HOST_DEVICE)
                                   .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -534,18 +604,6 @@ void GraphicsPipelineCompilerVK::write_uniform_descriptors(Ref<RODescriptorSetVK
                     .range = uniform_data.size(),
                 }));
     }
-}
-
-RefRes<RUMaterial> GraphicsPipelineCompilerVK::find_material_for_pipeline(const RUGraphicsPipeline& p_pipeline_resource) const {
-    // Static opaque render data is the current source of materials available for descriptor-set compilation.
-    const auto& triangles_info = context.render_database->get_static_opaque_triangles_info();
-    for (const auto& material_unit : triangles_info.materials) {
-        // TODO: Materials can support multiple graphics pipelines; this currently finds only the default first pipeline.
-        if (material_unit.material != nullptr && material_unit.material->graphics_pipeline.get() == &p_pipeline_resource) {
-            return material_unit.material;
-        }
-    }
-    return MEM_NULL;
 }
 
 } // namespace WhiteBirdEngine

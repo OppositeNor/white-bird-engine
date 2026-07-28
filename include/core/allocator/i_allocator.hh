@@ -82,6 +82,16 @@ public:
      * @return The pointer of the resource.
      */
     virtual void* get(MemID p_id) const = 0;
+
+    /**
+     * @brief Try to get the pointer pointing to the resource without debug pool membership checks.
+     *
+     * @param p_id The resource id to get the pointer from.
+     * @return The pointer of the resource.
+     */
+    virtual void* try_get(MemID p_id) const {
+        return get(p_id);
+    }
 };
 
 } // namespace WhiteBirdEngine

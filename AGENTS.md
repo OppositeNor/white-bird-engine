@@ -134,7 +134,7 @@ Ref<Foo> r = make_ref<Foo>(allocator, args...);
 Unique<Foo> u = make_unique<Foo>(allocator, args...);
 ```
 
-Containers: use `Vector<T>` etc. from `core/allocator/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
+Containers: use `Vector<T, <HeapAllocatorType>>` etc. from `core/allocator/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
 
 ## Special Member Functions (Rule of 6)
 

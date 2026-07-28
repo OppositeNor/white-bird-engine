@@ -89,10 +89,10 @@ struct BaseRenderDataVK {
     uint64_t max_depth = 0;
 
     // The queue family indices.
-    Set<uint32_t> queue_family_indices;
+    Set<uint32_t, RenderAllocator> queue_family_indices;
 
     // Task to execute in the pre-execution task.
-    Vector<std::function<void(VkCommandBuffer)>> pre_execute_tasks_queue;
+    Vector<std::function<void(VkCommandBuffer)>, RenderAllocator> pre_execute_tasks_queue;
 
     // A function that finds a suitable memory type for a certain memory
     // property.
