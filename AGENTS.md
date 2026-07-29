@@ -22,7 +22,7 @@ For non-trivial tasks:
 5. Run the relevant build/test target.
 6. Report modified files and validation results.
 
-Do not create Python environments manually. Assume the current environment is capable for development; if it is not, pause, notify the user, and let the user resolve it.
+Do not create Python environments manually. Assume the current environment is capable for development. Please use it by directly calling `python` in your shell. If it is not capable, pause, notify the user, and let the user resolve it.
 
 Do not provide large explanations unless requested.
 

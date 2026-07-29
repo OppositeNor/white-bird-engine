@@ -154,6 +154,64 @@ struct CameraInfoVKUBO {
     glm::mat4 proj;
 };
 
+constexpr uint32_t MAX_SPOT_LIGHT_INFO_COUNT = 4;
+
+struct SpotLightInfoVKUBO {
+    /**
+     * @brief Light-space view matrix.
+     */
+    glm::mat4 view;
+    /**
+     * @brief Light-space projection matrix.
+     */
+    glm::mat4 proj;
+    /**
+     * @brief World-space position of the spot light.
+     */
+    glm::vec3 position;
+    /**
+     * @brief Scalar intensity multiplier.
+     */
+    float intensity = 0.0F;
+    /**
+     * @brief World-space direction the spot is pointing.
+     */
+    glm::vec3 direction;
+    /**
+     * @brief Cosine of the inner cone half-angle.
+     */
+    float inner_cone_cos = 0.0F;
+    /**
+     * @brief Linear-space color of the spot light.
+     */
+    glm::vec3 color;
+    /**
+     * @brief Cosine of the outer cone half-angle.
+     */
+    float outer_cone_cos = 0.0F;
+    /**
+     * @brief Maximum effective light distance.
+     */
+    float range = 0.0F;
+    /**
+     * @brief Padding to match the shader struct array stride.
+     */
+    std::array<uint32_t, 3> padding{};
+};
+
+static_assert(sizeof(SpotLightInfoVKUBO) == 192);
+
+struct SpotLightInfosVKUBO {
+    /**
+     * @brief Active spot light data consumed by the shader.
+     */
+    std::array<SpotLightInfoVKUBO, MAX_SPOT_LIGHT_INFO_COUNT> spot_light_info{};
+    /**
+     * @brief Number of active entries in spot_light_info.
+     */
+    uint32_t spot_light_count = 0;
+};
+
 /**
  * @brief Time information.
  */

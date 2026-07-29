@@ -151,11 +151,12 @@ private:
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
-    Ref<RODescriptorSetVK> compile_material_descriptor_set(std::string_view p_resource_key,
+    Ref<RODescriptorSetVK> compile_texture_descriptor_set(std::string_view p_resource_key,
         RefRes<RUMaterial> p_material,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        uint32_t p_set_index);
+        uint32_t p_set_index,
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
     Ref<ROImageViewVK> compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource);
     Ref<ROImageVK> compile_image(std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
     void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,

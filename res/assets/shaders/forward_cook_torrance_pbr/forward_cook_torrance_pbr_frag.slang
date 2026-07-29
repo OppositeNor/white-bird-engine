@@ -20,7 +20,7 @@
 /**
  * @brief Spot-light parameters consumed by the lighting evaluation and the shadow map sample.
  */
-[[vk::binding(5, 0)]] ConstantBuffer<SpotLightInfo> spot_light_info;
+[[vk::binding(5, 0)]] ConstantBuffer<SpotLightInfoBuffer> spot_light_infos;
 /**
  * @brief Depth texture rendered by the spot-light shadow map pass. Sampled in the spot light's clip space.
  */
@@ -76,34 +76,38 @@ float4 main(VSOutput p_input) : SV_Target0 {
     float3 n = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     float3 v = normalize(float3(0.0, 0.0, 3.0) - p_input.world_position);
 
-    // Spot light direction: from surface to light.
-    float3 to_light = spot_light_info.position - p_input.world_position;
-    float light_distance = length(to_light);
-    float3 l = to_light / max(light_distance, 0.0001);
-    float3 spot_axis = normalize(spot_light_info.direction);
-
-    float spot_cos = dot(-l, spot_axis);
-    float cone_falloff = saturate(
-        (spot_cos - spot_light_info.outer_cone_cos) /
-        max(spot_light_info.inner_cone_cos - spot_light_info.outer_cone_cos, 0.0001));
-    float distance_falloff = saturate(1.0 - light_distance / max(spot_light_info.range, 0.0001));
-    distance_falloff *= distance_falloff;
-
-    float3 h = normalize(v + l);
-    float ndotl = max(dot(n, l), 0.0);
-
     float3 f0 = lerp(float3(0.04), base_color, metallic);
-    float ndf = distribution_ggx(n, h, roughness);
-    float geometry = geometry_smith(n, v, l, roughness);
-    float3 fresnel = fresnel_schlick(max(dot(h, v), 0.0), f0);
-    float3 specular = ndf * geometry * fresnel / max(4.0 * max(dot(n, v), 0.0) * ndotl, 0.0001);
-    float3 diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / WBE_PI;
-
-    float3 radiance = spot_light_info.color * spot_light_info.intensity * cone_falloff * distance_falloff;
-    float shadow = compute_spot_shadow(p_input.light_space_pos);
 
     float3 ambient = base_color * 0.03 * ambient_occlusion;
-    float3 color = ambient + (diffuse + specular) * radiance * ndotl * shadow;
+    float3 color = ambient;
+    uint spot_light_count = min(spot_light_infos.spot_light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+    for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
+        SpotLightInfo spot_light_info = spot_light_infos.spot_light_info[spot_light_index];
+        // Spot light direction: from surface to light.
+        float3 to_light = spot_light_info.position - p_input.world_position;
+        float light_distance = length(to_light);
+        float3 l = to_light / max(light_distance, 0.0001);
+        float3 spot_axis = normalize(spot_light_info.direction);
+
+        float spot_cos = dot(-l, spot_axis);
+        float cone_falloff = saturate(
+            (spot_cos - spot_light_info.outer_cone_cos) /
+            max(spot_light_info.inner_cone_cos - spot_light_info.outer_cone_cos, 0.0001));
+        float distance_falloff = saturate(1.0 - light_distance / max(spot_light_info.range, 0.0001));
+        distance_falloff *= distance_falloff;
+
+        float3 h = normalize(v + l);
+        float ndotl = max(dot(n, l), 0.0);
+        float ndf = distribution_ggx(n, h, roughness);
+        float geometry = geometry_smith(n, v, l, roughness);
+        float3 fresnel = fresnel_schlick(max(dot(h, v), 0.0), f0);
+        float3 specular = ndf * geometry * fresnel / max(4.0 * max(dot(n, v), 0.0) * ndotl, 0.0001);
+        float3 diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / WBE_PI;
+
+        float3 radiance = spot_light_info.color * spot_light_info.intensity * cone_falloff * distance_falloff;
+        float shadow = spot_light_index == 0 ? compute_spot_shadow(p_input.light_space_pos) : 1.0;
+        color += (diffuse + specular) * radiance * ndotl * shadow;
+    }
     color = color / (color + float3(1.0));
     return float4(linear_to_srgb(color), 1.0);
 }

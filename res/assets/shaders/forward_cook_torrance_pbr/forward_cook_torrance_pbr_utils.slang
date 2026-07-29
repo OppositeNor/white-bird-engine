@@ -17,6 +17,8 @@
 
 #include "utils.slang"
 
+static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
+
 /**
  * @brief Vertex shader output / fragment shader input for the forward Cook-Torrance PBR pass.
  */
@@ -73,6 +75,16 @@ struct SpotLightInfo {
     float outer_cone_cos;
     /// Maximum effective light distance.
     float range;
+};
+
+/**
+ * @brief Spot light uniform payload consumed by the forward Cook-Torrance PBR pass.
+ */
+struct SpotLightInfoBuffer {
+    /// Active spot lights. Entries beyond spot_light_count are ignored.
+    SpotLightInfo spot_light_info[WBE_MAX_SPOT_LIGHT_COUNT];
+    /// Number of active spot light entries in spot_light_info.
+    uint spot_light_count;
 };
 
 /**

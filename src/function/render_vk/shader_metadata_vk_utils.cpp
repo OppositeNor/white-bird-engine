@@ -80,6 +80,10 @@ std::string shader_parameter_type_name(const ShaderMetadataParameter& p_paramete
     return p_parameter.type.name;
 }
 
+std::string descriptor_field_path(const ShaderMetadataParameter& p_parameter, const ShaderMetadataTypeField& p_field) {
+    return std::format("{}.{}", p_parameter.name, p_field.name);
+}
+
 std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(const ShaderMetadataParameter& p_parameter) {
     std::vector<ShaderDescriptorFieldBindingVK> result;
     result.reserve(p_parameter.type.fields.size());
@@ -92,7 +96,7 @@ std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(co
             continue;
         }
         result.push_back(ShaderDescriptorFieldBindingVK{
-            .field_path = std::format("{}.{}", p_parameter.name, field.name),
+            .field_path = descriptor_field_path(p_parameter, field),
             .offset = reflected_binding_offset(field.binding),
             .size = field_size,
         });
