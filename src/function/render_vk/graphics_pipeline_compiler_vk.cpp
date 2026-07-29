@@ -339,7 +339,7 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     result.graphics_pipeline =
         compile_graphics_pipeline(p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, pipeline_layout);
     result.descriptor_sets = compile_descriptor_sets(
-        p_resource_key, *p_pipeline_resource, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
+        p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     return result;
 }
 
@@ -446,7 +446,6 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
 }
 
 std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descriptor_sets(std::string_view p_resource_key,
-    const RUGraphicsPipeline& /*p_pipeline_resource*/,
     const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
     const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
     std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {

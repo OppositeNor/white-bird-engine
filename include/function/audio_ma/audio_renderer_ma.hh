@@ -16,7 +16,6 @@
 #define WBE_FILE_AUDIO_RENDERER_MA_HH
 
 #include "function/audio/audio_renderer.hh"
-#include "utils/defs.hh"
 #include <miniaudio.h>
 
 namespace WhiteBirdEngine {

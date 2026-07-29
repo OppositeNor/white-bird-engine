@@ -148,7 +148,6 @@ private:
         Ref<ROShaderVK> p_fragment_shader,
         Ref<ROPipelineLayoutVK> p_pipeline_layout);
     std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(std::string_view p_resource_key,
-        const RUGraphicsPipeline& p_pipeline_resource,
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);

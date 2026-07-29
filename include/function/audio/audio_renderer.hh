@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_AUDIO_RENDERER_HH
 #define WBE_FILE_AUDIO_RENDERER_HH
 
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 namespace WhiteBirdEngine {
 

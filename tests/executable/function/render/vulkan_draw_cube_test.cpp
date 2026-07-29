@@ -202,20 +202,20 @@ public:
 
         // ----- Compile main forward-PBR pipeline -----------------------------
         camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
-        std::array<WBE::RenderBindpointDeclaration, 12> main_bindpoint_declarations{
-            WBE::RenderBindpointDeclaration{.field_path = "camera_info.view", .data = camera_info.view},
-            WBE::RenderBindpointDeclaration{.field_path = "camera_info.proj", .data = camera_info.proj},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.view", .data = spot_light.view},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.proj", .data = spot_light.proj},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.position", .data = spot_light.position},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.intensity", .data = spot_light.intensity},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.direction", .data = spot_light.direction},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.inner_cone_cos", .data = spot_light.inner_cone_cos},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.color", .data = spot_light.color},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.outer_cone_cos", .data = spot_light.outer_cone_cos},
-            WBE::RenderBindpointDeclaration{.field_path = "spot_light_info.range", .data = spot_light.range},
-            WBE::RenderBindpointDeclaration{.data = default_material},
-        };
+        auto main_bindpoint_declarations = WBE::RenderBindpointDeclarationsBuilder()
+            .add_decleratoin("camera_info.view", camera_info.view)
+            .add_decleratoin("camera_info.proj", camera_info.proj)
+            .add_decleratoin("spot_light_info.view", spot_light.view)
+            .add_decleratoin("spot_light_info.proj", spot_light.proj)
+            .add_decleratoin("spot_light_info.position", spot_light.position)
+            .add_decleratoin("spot_light_info.intensity", spot_light.intensity)
+            .add_decleratoin("spot_light_info.direction", spot_light.direction)
+            .add_decleratoin("spot_light_info.inner_cone_cos", spot_light.inner_cone_cos)
+            .add_decleratoin("spot_light_info.color", spot_light.color)
+            .add_decleratoin("spot_light_info.outer_cone_cos", spot_light.outer_cone_cos)
+            .add_decleratoin("spot_light_info.range", spot_light.range)
+            .add_resource_bindpoint(default_material)
+            .build();
 
         WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
             .allocator = render_allocator,

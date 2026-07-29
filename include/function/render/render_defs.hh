@@ -18,6 +18,8 @@
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include <any>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace WhiteBirdEngine {
 using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
@@ -35,6 +37,51 @@ struct RenderBindpointDeclaration {
      * @brief Typed source data. Data is copied during compilation.
      */
     std::any data;
+};
+
+/**
+ * @class RenderBindpointDeclarationsBuilder
+ * @brief A helper builder to construct arrays of resource bindings.
+ */
+struct RenderBindpointDeclarationsBuilder {
+    /**
+     * @brief Add a decleration.
+     *
+     * @param Reflected shader field path, e.g. "camera_info.view". Empty for resource bindpoints such as materials.
+     * @param Typed source data. Data is copied during compilation.
+     * @return *this
+     */
+    RenderBindpointDeclarationsBuilder& add_decleratoin(std::string_view p_field_path, std::any p_data) {
+        declerations.push_back({
+            .field_path = std::string(p_field_path),
+            .data = p_data
+        });
+        return *this;
+    }
+    
+    /**
+     * @brief Add a resource bindpoint.
+     *
+     * @param p_data The resource.
+     * @return *this.
+     */
+    RenderBindpointDeclarationsBuilder& add_resource_bindpoint(std::any p_data) {
+        declerations.push_back({
+            .field_path = std::string(),
+            .data = p_data
+        });
+        return *this;
+    }
+    /**
+     * @brief Build the resource bindings.
+     *
+     * @return The resource bindings.
+     */
+    std::vector<RenderBindpointDeclaration> build() const {
+        return declerations;
+    }
+
+    std::vector<RenderBindpointDeclaration> declerations;
 };
 
 } // namespace WhiteBirdEngine
