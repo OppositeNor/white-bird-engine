@@ -2,6 +2,7 @@
     "include": [
         "assets/meshes/cube.json",
         "assets/meshes/triangle.json",
+        "assets/models/models.json",
         "assets/shaders/main_pipeline/main_pipeline_shader.json",
         "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_shader.json",
         "assets/shaders/shadowmap_spot/shadowmap_spot_shader.json",

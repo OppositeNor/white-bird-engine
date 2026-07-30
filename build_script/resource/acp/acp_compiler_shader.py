@@ -39,7 +39,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
 
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
-                res_dir: Path, res_output_dir: Path) -> ManifestResource:
+            res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
         metadata_rel_path = result.get("metadata")
         if not isinstance(metadata_rel_path, str) or not metadata_rel_path:
@@ -47,7 +47,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 f"Shader resource missing metadata path in {manifest_path}: {resource}."
             )
 
-        metadata_rel = self._normalize_rel_resource_path(metadata_rel_path, manifest_path)
+        metadata_rel = self._normalize_resource_path(metadata_rel_path, manifest_path)
         source_rel_path = result.get("src")
         # Preferred schema: compile source shader and emit normalized runtime fields.
         if isinstance(source_rel_path, str) and source_rel_path:
@@ -56,38 +56,28 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 raise RuntimeError(
                     f"Shader resource with src must also declare dst in {manifest_path}: {resource}."
                 )
-            src_rel = self._normalize_rel_resource_path(source_rel_path, manifest_path)
-            dst_rel = self._normalize_rel_resource_path(destination_rel_path, manifest_path)
-            self._compile_resource(src_rel, dst_rel, metadata_rel, res_dir, res_output_dir)
+            source_file_path, _ = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
+            dst_rel = self._normalize_resource_path(destination_rel_path, manifest_path)
+            self._compile_resource(source_file_path, dst_rel, metadata_rel, res_output_dir)
             result["path"] = dst_rel.as_posix()
             result["metadata"] = metadata_rel.as_posix()
             if "src" in result:
                 del result["src"]
             if "dst" in result:
                 del result["dst"]
-            return result
+            return [result]
 
         raise RuntimeError(
             f"Shader resource must provide src/dst fields in {manifest_path}: {resource}."
         )
 
-    def _normalize_rel_resource_path(self, resource_path: str, manifest_path: Path) -> Path:
-        # Keep resource references relative so they remain portable across build machines.
-        relative_path = Path(resource_path)
-        if relative_path.is_absolute():
-            raise RuntimeError(
-                f"Absolute resource path is not supported in {manifest_path}: {resource_path}."
-            )
-        return relative_path
-
-    def _compile_resource(self, source_rel_path: Path, destination_rel_path: Path,
-                          metadata_rel_path: Path, res_dir: Path, res_output_dir: Path) -> None:
-        source_file_path = Path.joinpath(res_dir, source_rel_path)
+    def _compile_resource(self, source_file_path: Path, destination_rel_path: Path,
+                          metadata_rel_path: Path, res_output_dir: Path) -> None:
         output_file_path = Path.joinpath(res_output_dir, destination_rel_path)
         shader_metadata_file_path = Path.joinpath(res_output_dir, metadata_rel_path)
 
         if not source_file_path.exists() or not source_file_path.is_file():
-            raise RuntimeError(f"Shader source file not found: {source_rel_path.as_posix()}.")
+            raise RuntimeError(f"Shader source file not found: {source_file_path.as_posix()}.")
 
         os.makedirs(output_file_path.parent, exist_ok=True)
         os.makedirs(shader_metadata_file_path.parent, exist_ok=True)

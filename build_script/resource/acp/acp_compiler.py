@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 ManifestResource = dict[str, Any]
+ManifestData = dict[str, Any]
 
 class WBEACPCompiler(abc.ABC):
     """The compiler interface for the ACP."""
@@ -30,8 +31,8 @@ class WBEACPCompiler(abc.ABC):
 
     @abc.abstractmethod
     def compile(self, resource: ManifestResource, manifest_path: Path,
-                res_dir: Path, res_output_dir: Path) -> ManifestResource:
-        """Compile or transform one resource from a manifest entry.
+            res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
+        """Compile or transform one resource into one or more resource entries.
 
         Args:
             resource: Input resource manifest entry.
@@ -40,6 +41,35 @@ class WBEACPCompiler(abc.ABC):
             res_output_dir: Root output resource directory.
 
         Returns:
-            The normalized resource entry to write to generated runtime index files.
+            Resource entries that replace the input entry in the owning manifest.
         """
         pass
+
+    def _normalize_resource_path(self, resource_path: str, manifest_path: Path) -> Path:
+        relative_path = Path(resource_path)
+        if relative_path.is_absolute():
+            raise RuntimeError(
+                f"Absolute resource path is not supported in {manifest_path}: {resource_path}."
+            )
+
+        normalized_path = Path(relative_path.as_posix())
+        if normalized_path.as_posix() == ".":
+            raise RuntimeError(
+                f"Resource path must be non-empty in {manifest_path}."
+            )
+        return normalized_path
+
+    def _resolve_resource_file_path(self, resource_path: str, manifest_path: Path, res_dir: Path) -> tuple[Path, Path]:
+        relative_path = self._normalize_resource_path(resource_path, manifest_path)
+        candidates = [Path.joinpath(res_dir, relative_path)]
+        manifest_relative_path = Path.joinpath(res_dir, manifest_path.parent, relative_path)
+        if manifest_relative_path != candidates[0]:
+            candidates.append(manifest_relative_path)
+
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return candidate.resolve(), candidate.relative_to(res_dir)
+
+        raise RuntimeError(
+            f"WBEACP: Resource file does not exist for {manifest_path}: {relative_path.as_posix()}."
+        )

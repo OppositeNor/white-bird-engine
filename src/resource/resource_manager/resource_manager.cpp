@@ -23,7 +23,6 @@
 #include <cstddef>
 #include <format>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {

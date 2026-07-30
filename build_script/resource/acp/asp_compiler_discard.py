@@ -23,9 +23,9 @@ class WBEACPCompilerDiscard(WBEACPCompiler):
 
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
-                res_dir: Path, res_output_dir: Path) -> ManifestResource:
+            res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         _ = manifest_path
         _ = res_dir
         _ = res_output_dir
-        return dict(resource)
+        return [dict(resource)]
 

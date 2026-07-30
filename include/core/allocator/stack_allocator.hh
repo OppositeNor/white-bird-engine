@@ -20,7 +20,10 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
+#include <cstdint>
+#include <format>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -86,6 +89,10 @@ public:
     MemID allocate(size_t p_size) {
         void* result = mem_chunk + stack_pointer;
         stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+        if (stack_pointer >= total_size) {
+            throw std::runtime_error(std::format("Failed to allocate memory: not enough space.\nTrying to allocate: {} bytes.\nPool status: {}",
+                        p_size, static_cast<std::string>(*this)));
+        }
         return reinterpret_cast<MemID>(result);
     }
 
@@ -164,7 +171,7 @@ public:
     operator std::string() const {
         std::stringstream ss;
         ss << R"({"type":"StackAllocator","total_size":)" << total_size << R"(,"stack_pointer":)" << stack_pointer
-           << R"(,"available":)" << (total_size - stack_pointer) << "}";
+           << R"(,"available":)" << (static_cast<int64_t>(total_size) - stack_pointer) << "}";
         return ss.str();
     }
 

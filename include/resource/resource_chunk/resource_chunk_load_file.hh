@@ -78,7 +78,8 @@ public:
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) override {
         total_size += p_res_size;
         MemID result_mem_id = allocator->allocate(p_res_size);
-        memcpy(allocator->get(result_mem_id), p_res, p_res_size);
+        auto* copy_to = allocator->get(result_mem_id);
+        memcpy(copy_to, p_res, p_res_size);
         RefRes<char> result(result_mem_id, allocator);
         return result;
     }

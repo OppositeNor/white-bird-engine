@@ -13,16 +13,17 @@
    limitations under the License.
 */
 #include "resource/engine_resource.hh"
+#include "core/engine_config/engine_config.hh"
 #include "core/engine_core.hh"
 #include "core/memory/unique.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "utils/defs.hh"
 
 namespace WhiteBirdEngine {
 
 EngineResource::EngineResource() {
-    resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, WBE_MI_B(0.5));
+    auto engine_config = EngineConfig::get_singleton()->get_config_options();
+    resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, engine_config.resource_mem_pool_size);;
 }
 
 EngineResource::~EngineResource() {

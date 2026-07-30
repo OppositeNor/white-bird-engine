@@ -112,6 +112,13 @@ Never edit generated files.
 
 Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_FILE_<UPPER_SNAKE>_HH`. One primary class per file; file name matches the class in `snake_case`.
 
+## Resource Pipeline / ACP
+
+- ACP root manifest discovery starts only from `res/res_chunks/**/*.json` and `test_env_res/res_chunks/**/*.json`.
+- Do not make ACP scan every JSON file under a resource tree; formats such as glTF are JSON and are not ACP manifests.
+- Manifest files outside `res_chunks` are processed only when reachable from a root chunk manifest through `include`.
+- `include` paths are resource-root-relative manifest paths. Included files must contain a `resources` array.
+
 ## Memory Model
 
 **Do not use `std::shared_ptr`, `std::weak_ptr`, `std::unique_ptr`, `std::make_shared`, `std::make_unique`, `std::allocator`** in engine code. Allowed only as short-lived locals inside a function body when interfacing with third-party APIs that require them.

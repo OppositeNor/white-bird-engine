@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from build_script.reflection.code_gen import WBECodeGenerator
 from build_script.reflection.gen_file_info import WBEGenFileInfo
 from build_script.reflection.metaparser import WBEMetaparser
 from build_script.reflection.reflect import WBEReflector

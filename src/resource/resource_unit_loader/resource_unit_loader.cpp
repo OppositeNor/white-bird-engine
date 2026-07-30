@@ -17,6 +17,7 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <any>
 #include <cstdint>
@@ -138,7 +139,8 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
         resource_unit.height = height;
         resource_unit.channel_count = typed_scheme.channel_count == 0 ? file_channels : typed_scheme.channel_count;
         resource_unit.color_space = get_color_space_from_str(typed_scheme.color_space);
-        auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count, image_data.data());
+        auto data = p_res_chunk.push_data(image_data.size(), image_data.data());
+        WBE_DEBUG_ASSERT(width * height * resource_unit.channel_count == image_data.size());
         resource_unit.image_data = data;
     }
     return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUImage>();

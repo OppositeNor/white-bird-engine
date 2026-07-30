@@ -1,0 +1,12 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "model_cube",
+            "type": "model",
+            "file": "assets/models/Cube/glTF/Cube.gltf",
+            "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
+            "texture_output_dir": "assets/images"
+        }
+    ]
+}

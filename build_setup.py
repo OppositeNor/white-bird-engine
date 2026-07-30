@@ -19,6 +19,7 @@ import sys
 import shutil
 import build_config
 from build_script.resource.acp.acp import WBEACP
+from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
 from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
 from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
 
@@ -53,6 +54,8 @@ resource_output_dir = os.path.join(binary_dir, "res")
 test_env_res_output_dir = os.path.join(test_env_dir, "res")
 config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
+test_env_config_dir = os.path.join(test_env_res_dir, "config")
+test_env_config_output_dir = os.path.join(test_env_res_output_dir, "config")
 shaders_incl_dir = os.path.join(resource_dir, "assets/shaders")
 test_env_shaders_incl_dir = os.path.join(test_env_res_dir, "assets/shaders")
 res_chunks_dir = os.path.join(resource_dir, "res_chunks")
@@ -68,13 +71,15 @@ os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
+shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
 acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
+acp.add_compiler(WBEACPCompilerModel())
 acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
 
 test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
 test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
+test_env_acp.add_compiler(WBEACPCompilerModel())
 test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-

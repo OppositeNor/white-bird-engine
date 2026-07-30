@@ -16,7 +16,9 @@
 #define WBE_FILE_ENGINE_CONFIG_HH
 
 #include "core/engine_config/engine_config_options.hh"
+#include "core/parser/parser_yaml.hh"
 #include "generated/cla_configuration.gen.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/i_singleton.hh"
 #include <boost/program_options/options_description.hpp>
@@ -33,7 +35,7 @@ namespace WhiteBirdEngine {
  * @brief Engine configuration class.
  *
  */
-class EngineConfig : public ISingleton<EngineConfig> {
+class EngineConfig final : public ISingleton<EngineConfig> {
 public:
     /**
      * @brief Constructor.
@@ -43,16 +45,28 @@ public:
      * @param p_argv argv
      */
     EngineConfig(const Path& p_config_file_path, uint32_t p_argc, char* p_argv[]) {
+        singleton = this;
         parse_config_file(p_config_file_path);
         if (p_argc > 0) {
             parse_cla(p_argc, p_argv);
         }
     }
-    virtual ~EngineConfig() = default;
+    virtual ~EngineConfig() {
+        singleton = nullptr;
+    }
     EngineConfig(const EngineConfig&) = delete;
     EngineConfig(EngineConfig&&) = delete;
     EngineConfig& operator=(const EngineConfig&) = delete;
     EngineConfig& operator=(EngineConfig&&) = delete;
+
+    /**
+     * @brief Get the configuration options.
+     *
+     * @return The configuration options.
+     */
+    static EngineConfig* get_singleton() {
+        return singleton;
+    }
 
     /**
      * @brief Get the configuration options.
@@ -65,6 +79,7 @@ public:
 
 private:
     EngineConfigOptions config_options;
+    inline static EngineConfig* singleton = nullptr;
 
     void parse_cla(uint32_t p_argc, char* p_argv[]) {
         if (p_argc == 0 || p_argv == nullptr) {
@@ -90,7 +105,9 @@ private:
     }
 
     void parse_config_file(const Path& p_path) {
-        // TODO
+        auto parser = ParserYAML();
+        parser.parse(p_path);
+        SerializableSD<EngineConfigOptions>::deserialize(parser.get_data(), config_options);
     }
 };
 } // namespace WhiteBirdEngine

@@ -31,31 +31,27 @@ class WBEACPCompilerFile(WBEACPCompiler):
 
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
-                res_dir: Path, res_output_dir: Path) -> ManifestResource:
+            res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
         resource_file = result.get("file")
         if not isinstance(resource_file, str) or not resource_file:
             raise RuntimeError(
-                f"File resource must declare a non-empty file field in {manifest_path}: {resource}."
+                f"File resource must declare a non-empty 'file' field in {manifest_path}: {resource}."
             )
 
-        relative_file = Path(resource_file)
-        if relative_file.is_absolute():
+        source_path, relative_file = self._resolve_resource_file_path(resource_file, manifest_path, res_dir)
+        output_file = result.get("path", relative_file.as_posix())
+        if not isinstance(output_file, str) or not output_file:
             raise RuntimeError(
-                f"Absolute resource path is not supported in {manifest_path}: {resource_file}."
+                f"File resource path must be a non-empty string in {manifest_path}: {resource}."
             )
+        relative_output_file = self._normalize_resource_path(output_file, manifest_path)
 
-        source_path = Path.joinpath(res_dir, relative_file)
-        if not source_path.exists() or not source_path.is_file():
-            raise RuntimeError(
-                f"WBEACP: File resource does not exist for {manifest_path}: {relative_file.as_posix()}."
-            )
-
-        output_path = Path.joinpath(res_output_dir, relative_file)
+        output_path = Path.joinpath(res_output_dir, relative_output_file)
         os.makedirs(output_path.parent, exist_ok=True)
         shutil.copyfile(source_path, output_path)
 
-        result["path"] = relative_file.as_posix()
+        result["path"] = relative_output_file.as_posix()
         if "file" in result:
             del result["file"]
-        return result
+        return [result]
