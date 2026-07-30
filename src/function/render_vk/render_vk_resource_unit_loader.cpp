@@ -26,8 +26,10 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <any>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -36,6 +38,208 @@
 
 namespace WhiteBirdEngine {
 namespace {
+
+struct GeometrySlotInfo {
+    std::string_view slot;
+    std::string_view type;
+    size_t component_count;
+    size_t component_size;
+    bool required;
+};
+
+constexpr std::array<GeometrySlotInfo, 6> GEOMETRY_SLOT_INFOS{{
+    {.slot = "position", .type = "vec3", .component_count = 3, .component_size = sizeof(float), .required = true},
+    {.slot = "normal", .type = "vec3", .component_count = 3, .component_size = sizeof(float), .required = false},
+    {.slot = "tangent", .type = "vec3", .component_count = 3, .component_size = sizeof(float), .required = false},
+    {.slot = "bitangent", .type = "vec3", .component_count = 3, .component_size = sizeof(float), .required = false},
+    {.slot = "uv", .type = "vec2", .component_count = 2, .component_size = sizeof(float), .required = false},
+    {.slot = "index", .type = "uint32", .component_count = 1, .component_size = sizeof(uint32_t), .required = true},
+}};
+
+const GeometrySlotInfo* get_geometry_slot_info(std::string_view p_slot) {
+    for (const auto& slot_info : GEOMETRY_SLOT_INFOS) {
+        if (slot_info.slot == p_slot) {
+            return &slot_info;
+        }
+    }
+    return nullptr;
+}
+
+size_t get_geometry_slot_index(const GeometrySlotInfo& p_slot_info) {
+    for (size_t i = 0; i < GEOMETRY_SLOT_INFOS.size(); ++i) {
+        if (GEOMETRY_SLOT_INFOS[i].slot == p_slot_info.slot) {
+            return i;
+        }
+    }
+    throw std::runtime_error(std::format("Failed to populate submesh resource unit: unknown geometry slot {}.", p_slot_info.slot));
+}
+
+size_t get_geometry_element_size(const GeometrySlotInfo& p_slot_info) {
+    return p_slot_info.component_count * p_slot_info.component_size;
+}
+
+size_t get_geometry_element_count(const RUSchemeSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info) {
+    return p_section.size / get_geometry_element_size(p_slot_info);
+}
+
+void validate_geometry_section_bounds(
+    const RUSchemeSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info, size_t p_geometry_size) {
+    if (p_section.start > p_geometry_size || p_section.size > p_geometry_size - p_section.start) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry section '{}' range [{}, {}) exceeds file size {}.",
+            p_section.slot,
+            p_section.start,
+            p_section.start + p_section.size,
+            p_geometry_size));
+    }
+
+    if (p_section.start % p_slot_info.component_size != 0) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry section '{}' starts at unaligned byte offset {}.",
+            p_section.slot,
+            p_section.start));
+    }
+
+    const size_t element_size = get_geometry_element_size(p_slot_info);
+    if (p_section.size % element_size != 0) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry section '{}' byte size {} is not a multiple of element size {}.",
+            p_section.slot,
+            p_section.size,
+            element_size));
+    }
+}
+
+std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> validate_geometry_sections(
+    const RUSchemeSubmesh3D& p_scheme, size_t p_geometry_size) {
+    std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> sections_by_slot{};
+    for (const auto& section : p_scheme.geometry_sections) {
+        const GeometrySlotInfo* slot_info = get_geometry_slot_info(section.slot);
+        if (slot_info == nullptr) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: unsupported geometry slot '{}'.", section.slot));
+        }
+        if (section.type != slot_info->type) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry slot '{}' expects type '{}' but got '{}'.",
+                section.slot,
+                slot_info->type,
+                section.type));
+        }
+
+        const size_t slot_index = get_geometry_slot_index(*slot_info);
+        if (sections_by_slot[slot_index] != nullptr) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: duplicate geometry section '{}'.", section.slot));
+        }
+        validate_geometry_section_bounds(section, *slot_info, p_geometry_size);
+        sections_by_slot[slot_index] = &section;
+    }
+
+    for (size_t i = 0; i < GEOMETRY_SLOT_INFOS.size(); ++i) {
+        if (GEOMETRY_SLOT_INFOS[i].required && sections_by_slot[i] == nullptr) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: missing required geometry section '{}'.",
+                GEOMETRY_SLOT_INFOS[i].slot));
+        }
+    }
+
+    const auto* position_section = sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("position"))];
+    const size_t vertex_count = get_geometry_element_count(*position_section, *get_geometry_slot_info("position"));
+    for (size_t i = 0; i < GEOMETRY_SLOT_INFOS.size(); ++i) {
+        if (sections_by_slot[i] == nullptr || GEOMETRY_SLOT_INFOS[i].slot == "position" || GEOMETRY_SLOT_INFOS[i].slot == "index") {
+            continue;
+        }
+        const size_t attribute_count = get_geometry_element_count(*sections_by_slot[i], GEOMETRY_SLOT_INFOS[i]);
+        if (attribute_count != vertex_count) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry section '{}' has {} elements but position has {}.",
+                GEOMETRY_SLOT_INFOS[i].slot,
+                attribute_count,
+                vertex_count));
+        }
+    }
+    return sections_by_slot;
+}
+
+std::array<float, 3> read_geometry_vec3(
+    const std::vector<uint8_t>& p_geometry_data, const RUSchemeSubmesh3DGeometrySection& p_section, size_t p_index) {
+    std::array<float, 3> value{};
+    std::memcpy(value.data(), p_geometry_data.data() + p_section.start + p_index * sizeof(value), sizeof(value));
+    return value;
+}
+
+std::array<float, 2> read_geometry_vec2(
+    const std::vector<uint8_t>& p_geometry_data, const RUSchemeSubmesh3DGeometrySection& p_section, size_t p_index) {
+    std::array<float, 2> value{};
+    std::memcpy(value.data(), p_geometry_data.data() + p_section.start + p_index * sizeof(value), sizeof(value));
+    return value;
+}
+
+void apply_geometry_vec3_section(const std::vector<uint8_t>& p_geometry_data,
+    const RUSchemeSubmesh3DGeometrySection* p_section,
+    std::vector<Vertex3DTextured>& p_vertices,
+    void (*p_assign)(Vertex3DTextured&, const std::array<float, 3>&)) {
+    if (p_section == nullptr) {
+        return;
+    }
+    for (size_t i = 0; i < p_vertices.size(); ++i) {
+        p_assign(p_vertices[i], read_geometry_vec3(p_geometry_data, *p_section, i));
+    }
+}
+
+void apply_geometry_vec2_section(const std::vector<uint8_t>& p_geometry_data,
+    const RUSchemeSubmesh3DGeometrySection* p_section,
+    std::vector<Vertex3DTextured>& p_vertices,
+    void (*p_assign)(Vertex3DTextured&, const std::array<float, 2>&)) {
+    if (p_section == nullptr) {
+        return;
+    }
+    for (size_t i = 0; i < p_vertices.size(); ++i) {
+        p_assign(p_vertices[i], read_geometry_vec2(p_geometry_data, *p_section, i));
+    }
+}
+
+std::vector<Vertex3DTextured> build_vertices_from_geometry_sections(const std::vector<uint8_t>& p_geometry_data,
+    const std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot) {
+    const auto* position_info = get_geometry_slot_info("position");
+    const auto* position_section = p_sections_by_slot[get_geometry_slot_index(*position_info)];
+    std::vector<Vertex3DTextured> vertices(get_geometry_element_count(*position_section, *position_info));
+    apply_geometry_vec3_section(p_geometry_data, position_section, vertices, [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) {
+        p_vertex.position = {p_value[0], p_value[1], p_value[2]};
+    });
+    apply_geometry_vec3_section(p_geometry_data,
+        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("normal"))],
+        vertices,
+        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.normal = {p_value[0], p_value[1], p_value[2]}; });
+    apply_geometry_vec3_section(p_geometry_data,
+        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("tangent"))],
+        vertices,
+        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.tangent = {p_value[0], p_value[1], p_value[2]}; });
+    apply_geometry_vec3_section(p_geometry_data,
+        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("bitangent"))],
+        vertices,
+        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.bitangent = {p_value[0], p_value[1], p_value[2]}; });
+    apply_geometry_vec2_section(p_geometry_data,
+        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("uv"))],
+        vertices,
+        [](Vertex3DTextured& p_vertex, const std::array<float, 2>& p_value) { p_vertex.uv = {p_value[0], p_value[1]}; });
+    return vertices;
+}
+
+std::vector<uint32_t> build_indices_from_geometry_sections(const std::vector<uint8_t>& p_geometry_data,
+    const std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot,
+    size_t p_vertex_count) {
+    const auto* index_info = get_geometry_slot_info("index");
+    const auto* index_section = p_sections_by_slot[get_geometry_slot_index(*index_info)];
+    std::vector<uint32_t> indices(get_geometry_element_count(*index_section, *index_info));
+    if (!indices.empty()) {
+        std::memcpy(indices.data(), p_geometry_data.data() + index_section->start, index_section->size);
+    }
+    if (indices.size() % 3 != 0) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: index count {} is not a multiple of 3.", indices.size()));
+    }
+    for (uint32_t index : indices) {
+        if (index >= p_vertex_count) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: index {} is out of range for {} vertices.",
+                index,
+                p_vertex_count));
+        }
+    }
+    return indices;
+}
 
 template <typename SchemeType>
 const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_expected_type) {
@@ -190,16 +394,25 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
     if (p_scheme.material_id.empty()) {
         p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
     }
-    auto vertices_data =
-        p_res_chunk.push_data(p_scheme.vertices_data.size() * sizeof(Vertex3DTextured), p_scheme.vertices_data.data());
 
-    std::vector<Triangle3DIndxTextured> triangles(p_scheme.indices_data.size() / 3);
+    if (p_scheme.geometry_path.empty()) {
+        throw std::runtime_error("Failed to populate submesh resource unit: geometry_path is required.");
+    }
+    auto geometry_path = get_resource_path(p_scheme.geometry_path);
+    auto geometry_data = load_binary_file<uint8_t>(static_cast<std::string>(geometry_path).c_str());
+    const auto sections_by_slot = validate_geometry_sections(p_scheme, geometry_data.size());
+    auto vertices = build_vertices_from_geometry_sections(geometry_data, sections_by_slot);
+    auto indices = build_indices_from_geometry_sections(geometry_data, sections_by_slot, vertices.size());
+
+    auto vertices_data = p_res_chunk.push_data(vertices.size() * sizeof(Vertex3DTextured), vertices.data());
+
+    std::vector<Triangle3DIndxTextured> triangles(indices.size() / 3);
     for (size_t i = 0; i < triangles.size(); ++i) {
         auto& triangle = triangles.at(i);
         triangle.vert_array = vertices_data.force_cast<Vertex3DTextured>();
-        triangle.vertex_indices[0] = p_scheme.indices_data.at(i * 3);
-        triangle.vertex_indices[1] = p_scheme.indices_data.at(i * 3 + 1);
-        triangle.vertex_indices[2] = p_scheme.indices_data.at(i * 3 + 2);
+        triangle.vertex_indices[0] = indices.at(i * 3);
+        triangle.vertex_indices[1] = indices.at(i * 3 + 1);
+        triangle.vertex_indices[2] = indices.at(i * 3 + 2);
     }
 
     auto triangles_data = p_res_chunk.push_data(triangles.size() * sizeof(Triangle3DIndxTextured), triangles.data());
@@ -298,11 +511,6 @@ std::vector<std::string> ResourceUnitLoaderSubmesh::get_supported_resource_types
 
 std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeSubmesh3D>(p_scheme, "submesh");
-    if (typed_scheme.indices_data.size() % 3 != 0) {
-        throw std::runtime_error(std::format("Failed to populate submesh resource unit: indices "
-                                             "data size {} is not a multiple of 3.",
-            typed_scheme.indices_data.size()));
-    }
     RUSubmesh3D resource_unit;
     resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
     auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUSubmesh3D>();

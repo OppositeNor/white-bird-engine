@@ -90,6 +90,8 @@ public:
         void* result = mem_chunk + stack_pointer;
         stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
         if (stack_pointer > total_size) {
+            // Decrease it back or else operator std::string is going to output weird numbers.
+            stack_pointer -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
             throw std::runtime_error(std::format("Failed to allocate memory: not enough space.\nTrying to allocate: {} bytes.\nPool status: {}",
                 p_size,
                 static_cast<std::string>(*this)));
@@ -172,7 +174,7 @@ public:
     operator std::string() const {
         std::stringstream ss;
         ss << R"({"type":"StackAllocator","total_size":)" << total_size << R"(,"stack_pointer":)" << stack_pointer
-           << R"(,"available":)" << (static_cast<int64_t>(total_size) - stack_pointer) << "}";
+           << R"(,"available":)" << total_size - stack_pointer << "}";
         return ss.str();
     }
 

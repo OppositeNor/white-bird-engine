@@ -15,13 +15,13 @@
 from pathlib import Path
 from typing import override
 from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
-from wbe_utils_model_compiler import WBEUtilsMeshCompiler
+from wbe_utils_model_compiler import WBEUtilsModelCompiler
 
 class WBEACPCompilerModel(WBEACPCompiler):
     """The model compiler.
     """
     def __init__(self) -> None:
-        self._utils_mesh_compiler = WBEUtilsMeshCompiler()
+        self._utils_mesh_compiler = WBEUtilsModelCompiler()
 
     @override
     def get_supported_resource_types(self) -> list[str]:

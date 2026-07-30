@@ -124,6 +124,25 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
 };
 
 /**
+ * @class RUSchemeSubmesh3DGeometrySection
+ * @brief Byte-addressed geometry section inside a submesh sidecar binary.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeSubmesh3DGeometrySection {
+    // The geometry slot stored by this section.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string slot;
+    // Byte offset from the beginning of the sidecar binary.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t start = 0;
+    // Byte length of this section.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t size = 0;
+    // The element type expected by the slot.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string type;
+};
+
+/**
  * @class RUSchemeSubmesh3D
  * @brief The scheme of RUSubmesh3D.
  */
@@ -135,12 +154,12 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
     std::string material_id;
-    // The vertices data.
+    // Resource-relative path to the sidecar geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<Vertex3DTextured> vertices_data;
-    // The indices data.
+    std::string geometry_path;
+    // Byte-addressed sections inside the geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<uint32_t> indices_data;
+    std::vector<RUSchemeSubmesh3DGeometrySection> geometry_sections;
 };
 
 /**

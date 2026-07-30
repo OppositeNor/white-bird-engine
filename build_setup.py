@@ -19,6 +19,7 @@ import sys
 import shutil
 import build_config
 from build_script.resource.acp.acp import WBEACP
+from build_script.resource.acp.acp_compiler_mesh import WBEACPCompilerMesh
 from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
 from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
 from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
@@ -77,9 +78,11 @@ shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=T
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
 acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
 acp.add_compiler(WBEACPCompilerModel())
+acp.add_compiler(WBEACPCompilerMesh())
 acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
 
 test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
 test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
 test_env_acp.add_compiler(WBEACPCompilerModel())
+test_env_acp.add_compiler(WBEACPCompilerMesh())
 test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))

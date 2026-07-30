@@ -57,6 +57,7 @@ Checks: >
   -hicpp-signed-bitwise,
   -hicpp-use-auto,
   -hicpp-move-const-arg,
+  -hicpp-static-assert,
   -modernize-use-trailing-return-type,
   -modernize-use-nodiscard,
   -modernize-use-override,

@@ -7,6 +7,14 @@
             "file": "assets/models/Cube/glTF/Cube.gltf",
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "texture_output_dir": "assets/images"
+        },
+        {
+            "id": "sponza",
+            "type": "model",
+            "file": "assets/models/Sponza/glTF/Sponza.gltf",
+            "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
+            "texture_output_dir": "assets/images"
         }
+
     ]
 }
