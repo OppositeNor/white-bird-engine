@@ -227,12 +227,11 @@ public:
         gbuffer_clear_values[2].color = {.float32 = {0.0F, 0.0F, 0.0F, 0.0F}};
         gbuffer_clear_values[3].depthStencil = {.depth = 1.0F, .stencil = 0};
 
-        auto [graphics_pipeline, _] =
-            WBE::GraphicsPipelineCompilerVK(compiler_context)
-                .compile("deferred_gbuffer",
-                    gbuffer_pipeline_resource,
-                    std::span<const WBE::RenderBindpointDeclaration>(
-                        gbuffer_bindpoint_declarations.data(), gbuffer_bindpoint_declarations.size()));
+        auto [graphics_pipeline, _] = WBE::GraphicsPipelineCompilerVK(compiler_context)
+                                          .compile("deferred_gbuffer",
+                                              gbuffer_pipeline_resource,
+                                              std::span<const WBE::RenderBindpointDeclaration>(
+                                                  gbuffer_bindpoint_declarations.data(), gbuffer_bindpoint_declarations.size()));
         // TODO: Register render task with graphics pipeline.
         // ---- (2) Albedo-debug pass: hand-written. -------------------------
         // TODO

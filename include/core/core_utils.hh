@@ -21,6 +21,8 @@
 #include "core/memory/reference_weak.hh"
 #include "utils/defs.hh"
 #include <format>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 

@@ -15,6 +15,7 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -149,7 +150,8 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.dstArrayElement = 0;
     std::vector<VkDescriptorBufferInfo> buffer_infos;
     // Prepare buffer infos
-    auto emplace_result = bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
+    auto emplace_result =
+        bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
     auto bound_object_it = emplace_result.first;
     if (!emplace_result.second) {
         // If previously existed, clear the bound objects.

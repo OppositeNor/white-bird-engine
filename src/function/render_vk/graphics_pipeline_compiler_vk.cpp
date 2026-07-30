@@ -165,8 +165,7 @@ RefRes<RUMaterial> find_material_bindpoint(std::span<const RenderBindpointDeclar
     return MEM_NULL;
 }
 
-RefRes<RUImage> find_texture_bindpoint(
-    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations, std::string_view p_texture_key) {
+RefRes<RUImage> find_texture_bindpoint(std::span<const RenderBindpointDeclaration> p_bindpoint_declarations, std::string_view p_texture_key) {
     // Raw texture bindings are matched by shader texture parameter name, independent of material texture slots.
     for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
         if (bindpoint_declaration.field_path == p_texture_key) {
@@ -216,8 +215,8 @@ UniformDataView get_uniform_data(const RenderBindpointDeclaration& p_bindpoint_d
     if (data_view.data != nullptr) {
         return data_view;
     }
-    throw std::runtime_error(std::format(
-        "Failed to bind uniform field '{}': unsupported std::any data type.", p_bindpoint_declaration.field_path));
+    throw std::runtime_error(
+        std::format("Failed to bind uniform field '{}': unsupported std::any data type.", p_bindpoint_declaration.field_path));
 }
 
 UniformDataView get_uniform_buffer_data(const RenderBindpointDeclaration& p_bindpoint_declaration) {
@@ -225,8 +224,8 @@ UniformDataView get_uniform_buffer_data(const RenderBindpointDeclaration& p_bind
     if (const auto* data = std::any_cast<std::vector<uint8_t>>(&p_bindpoint_declaration.data)) {
         return UniformDataView{.data = data->data(), .size = data->size()};
     }
-    throw std::runtime_error(std::format(
-        "Failed to bind uniform buffer '{}': unsupported std::any data type.", p_bindpoint_declaration.field_path));
+    throw std::runtime_error(
+        std::format("Failed to bind uniform buffer '{}': unsupported std::any data type.", p_bindpoint_declaration.field_path));
 }
 
 void validate_bindpoint_declarations(std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
@@ -266,8 +265,8 @@ const RenderBindpointDeclaration* find_uniform_binding(
     return nullptr;
 }
 
-std::vector<uint8_t> build_uniform_data(
-    const ShaderDescriptorBindingVK& p_descriptor_binding, std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
+std::vector<uint8_t> build_uniform_data(const ShaderDescriptorBindingVK& p_descriptor_binding,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Pack caller-provided field values into a zero-initialized buffer matching the shader-reflected layout.
     if (p_descriptor_binding.buffer_size == 0) {
         throw std::runtime_error(std::format("Failed to compile uniform descriptor '{}': reflected buffer size is missing.",
@@ -283,8 +282,7 @@ std::vector<uint8_t> build_uniform_data(
         // A declaration keyed by the descriptor parameter name replaces field-by-field packing for complex UBO layouts.
         UniformDataView data_view = get_uniform_buffer_data(*direct_bindpoint_declaration);
         if (data_view.size > uniform_data.size()) {
-            throw std::runtime_error(std::format(
-                "Failed to bind uniform buffer '{}': program buffer size {} exceeds shader buffer size {}.",
+            throw std::runtime_error(std::format("Failed to bind uniform buffer '{}': program buffer size {} exceeds shader buffer size {}.",
                 p_descriptor_binding.parameter_name,
                 data_view.size,
                 uniform_data.size()));
@@ -303,7 +301,7 @@ std::vector<uint8_t> build_uniform_data(
         if (data_view.size != field.size) {
             throw std::runtime_error(std::format("Failed to bind uniform field '{}': program field size {} does not match shader field size {}.",
                 field.field_path,
-            data_view.size,
+                data_view.size,
                 field.size));
         }
         if (field.offset + field.size > uniform_data.size()) {
@@ -347,8 +345,7 @@ void validate_texture_bindpoint_sources(std::string_view p_resource_key,
             continue;
         }
         if (find_texture_bindpoint(p_bindpoint_declarations, descriptor_binding.parameter_name) == nullptr) {
-            throw std::runtime_error(std::format(
-                "Failed to compile graphics pipeline '{}': no texture bindpoint declaration was provided for '{}'.",
+            throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': no texture bindpoint declaration was provided for '{}'.",
                 p_resource_key,
                 descriptor_binding.parameter_name));
         }
@@ -385,8 +382,7 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
     }
 }
 
-std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> GraphicsPipelineCompilerVK::compile(
-    std::string_view p_resource_key,
+std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> GraphicsPipelineCompilerVK::compile(std::string_view p_resource_key,
     RefRes<RUGraphicsPipeline> p_pipeline_resource,
     std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Keep the public API tuple-shaped while the internal path names the intermediate pipeline objects.
@@ -394,8 +390,7 @@ std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> Graph
     return {compiled.graphics_pipeline, compiled.descriptor_sets};
 }
 
-GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::compile_pipeline_objects(
-    std::string_view p_resource_key,
+GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::compile_pipeline_objects(std::string_view p_resource_key,
     RefRes<RUGraphicsPipeline> p_pipeline_resource,
     std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     // Compile order follows Vulkan dependencies: shaders and metadata first, then layouts, then pipeline and descriptor sets.
@@ -415,8 +410,8 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     CompiledPipelineObjects result;
     result.graphics_pipeline =
         compile_graphics_pipeline(p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, pipeline_layout);
-    result.descriptor_sets = compile_descriptor_sets(
-        p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
+    result.descriptor_sets =
+        compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     return result;
 }
 
@@ -542,14 +537,10 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
                 ? RODescriptorSetVK::Builder()
                       .add_descriptor_set_layout(p_descriptor_set_layouts[set_index])
                       .create_ref(context.render_data)
-                : compile_texture_descriptor_set(p_resource_key,
-                      material,
-                      p_descriptor_set_layouts[set_index],
-                      p_descriptor_bindings,
-                      set_index,
-                      p_bindpoint_declarations);
-              // Uniform descriptors are written after material bindings so both sources can populate the same descriptor set.
-              write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
+                : compile_texture_descriptor_set(
+                      p_resource_key, material, p_descriptor_set_layouts[set_index], p_descriptor_bindings, set_index, p_bindpoint_declarations);
+        // Uniform descriptors are written after material bindings so both sources can populate the same descriptor set.
+        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
         descriptor_sets.push_back(descriptor_set);
     }
     return descriptor_sets;
@@ -584,8 +575,7 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
         }
         builder.add_texture_binding(ROMaterialVK::TextureBinding{
             .texture_key = bindpoint_declaration.field_path,
-            .image_view =
-                compile_image_view(std::format("{}#texture_{}", p_resource_key, bindpoint_declaration.field_path), texture),
+            .image_view = compile_image_view(std::format("{}#texture_{}", p_resource_key, bindpoint_declaration.field_path), texture),
             .image_layout = VK_IMAGE_LAYOUT_GENERAL,
         });
     }
@@ -595,8 +585,8 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
             // Texture keys connect material slots to shader-reflected descriptor binding names.
             std::string texture_key = text_resource_value(texture_slot.texture_key);
             if (texture_slot.texture == nullptr) {
-                throw std::runtime_error(
-                    std::format("Failed to compile material '{}': texture '{}' is missing.", p_material->resource_key, texture_key));
+                throw std::runtime_error(std::format(
+                    "Failed to compile material '{}': texture '{}' is missing.", p_material->resource_key, texture_key));
             }
             // Compile or reuse the texture image view before adding the binding to the material descriptor set builder.
             builder.add_texture_binding(ROMaterialVK::TextureBinding{

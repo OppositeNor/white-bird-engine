@@ -31,12 +31,12 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
-#include <glm/glm.hpp>
 #include <glm/ext/matrix_float3x3.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
+#include <glm/glm.hpp>
 #include <span>
 #include <string_view>
 #include <tuple>
@@ -118,13 +118,13 @@ public:
      * passes).
      * @param p_index_buffer_res_id Optional index buffer resource id. Pass
      * nullopt when not drawing indexed.
-      * @param p_prev_tasks Tasks the returned task depends on.
-      * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
+     * @param p_prev_tasks Tasks the returned task depends on.
+     * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
      * @return Render task descriptor for the compiled graphics pipeline.
      */
     std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
-                std::span<const RenderBindpointDeclaration> p_bindpoint_declarations = {});
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations = {});
 
 private:
     struct CompiledPipelineObjects {

@@ -50,8 +50,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
-#include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
@@ -318,11 +318,11 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
 void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
     camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
     auto main_bindpoint_declarations = WBE::RenderBindpointDeclarationsBuilder()
-        .add_decleratoin("camera_info.view", camera_info.view)
-        .add_decleratoin("camera_info.proj", camera_info.proj)
-        .add_decleratoin("spot_light_infos", build_spot_light_infos_uniform_data(spot_light))
-        .add_resource_bindpoint(default_material)
-        .build();
+                                           .add_decleratoin("camera_info.view", camera_info.view)
+                                           .add_decleratoin("camera_info.proj", camera_info.proj)
+                                           .add_decleratoin("spot_light_infos", build_spot_light_infos_uniform_data(spot_light))
+                                           .add_resource_bindpoint(default_material)
+                                           .build();
 
     WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
         .allocator = render_allocator,

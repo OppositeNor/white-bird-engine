@@ -20,6 +20,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/vector_float3.hpp"
 
 #include <array>
 #include <cstddef>

@@ -23,7 +23,8 @@ namespace WhiteBirdEngine {
 
 EngineResource::EngineResource() {
     auto engine_config = EngineConfig::get_singleton()->get_config_options();
-    resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, engine_config.resource_mem_pool_size);;
+    resource_manager = make_unique<ResourceManager>(EngineCore::get_singleton()->pool_allocator, engine_config.resource_mem_pool_size);
+    ;
 }
 
 EngineResource::~EngineResource() {

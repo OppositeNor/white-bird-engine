@@ -52,13 +52,10 @@ struct RenderBindpointDeclarationsBuilder {
      * @return *this
      */
     RenderBindpointDeclarationsBuilder& add_decleratoin(std::string_view p_field_path, std::any p_data) {
-        declerations.push_back({
-            .field_path = std::string(p_field_path),
-            .data = p_data
-        });
+        declerations.push_back({.field_path = std::string(p_field_path), .data = p_data});
         return *this;
     }
-    
+
     /**
      * @brief Add a resource bindpoint.
      *
@@ -66,10 +63,7 @@ struct RenderBindpointDeclarationsBuilder {
      * @return *this.
      */
     RenderBindpointDeclarationsBuilder& add_resource_bindpoint(std::any p_data) {
-        declerations.push_back({
-            .field_path = std::string(),
-            .data = p_data
-        });
+        declerations.push_back({.field_path = std::string(), .data = p_data});
         return *this;
     }
     /**

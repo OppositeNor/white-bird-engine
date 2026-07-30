@@ -90,8 +90,7 @@ MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::allocate_in_arena(size_t 
         static_cast<std::string>(*this)));
 }
 
-MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::try_allocate_in_arena(
-    size_t p_size, size_t p_alignment, size_t p_arena_index) {
+MemID HeapAllocatorAtomicArenaAlignedPoolImplicitList::try_allocate_in_arena(size_t p_size, size_t p_alignment, size_t p_arena_index) {
     if (p_arena_index >= arena_count) {
         throw std::runtime_error(std::format("Arena index {} exceeds arena count {}.", p_arena_index, arena_count));
     }

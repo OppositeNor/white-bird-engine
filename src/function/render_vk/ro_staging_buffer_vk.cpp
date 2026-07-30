@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "core/core_utils.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"

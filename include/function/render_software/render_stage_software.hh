@@ -111,7 +111,8 @@ public:
     RenderStagesSoftware(RenderStageType p_vertex_shading_stage, RenderStageType p_rasterization_stage, RenderStageType p_fragment_shading_stage);
 
     Vector<RenderStageType, RenderAllocator> get_graphics_pipeline(BaseRenderDataSoftware* p_render_context) const {
-        return Vector<RenderStageType, RenderAllocator>({vertex_shading_stage, rasterization_stage, fragment_shading_stage}, p_render_context->main_allocator);
+        return Vector<RenderStageType, RenderAllocator>(
+            {vertex_shading_stage, rasterization_stage, fragment_shading_stage}, p_render_context->main_allocator);
     }
 
 private:

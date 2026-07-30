@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
 #include "function/render/spot_light_info.hh"
