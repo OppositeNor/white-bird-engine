@@ -1,0 +1,11 @@
+{
+    "resources": [
+        {
+            "type": "image",
+            "file": "assets/images/test_ppm3.ppm",
+            "color_space": "rgb",
+            "channel_count": 3
+        }
+    ]
+}
+

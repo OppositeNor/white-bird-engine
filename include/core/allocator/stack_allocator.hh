@@ -89,7 +89,7 @@ public:
     MemID allocate(size_t p_size) {
         void* result = mem_chunk + stack_pointer;
         stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
-        if (stack_pointer >= total_size) {
+        if (stack_pointer > total_size) {
             throw std::runtime_error(std::format("Failed to allocate memory: not enough space.\nTrying to allocate: {} bytes.\nPool status: {}",
                         p_size, static_cast<std::string>(*this)));
         }

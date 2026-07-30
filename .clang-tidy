@@ -80,7 +80,8 @@ Checks: >
   -performance-no-int-to-ptr,
   -performance-enum-size,
   -misc-use-internal-linkage,
-  -misc-misplaced-const
+  -misc-misplaced-const,
+  -misc-static-assert
 
 CheckOptions:
   # Include order: local headers with quotes first, then system headers with angle brackets
