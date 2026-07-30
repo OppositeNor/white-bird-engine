@@ -3,4 +3,4 @@ GitPython
 Jinja2
 pydantic
 matplotlib
-./dependencies/wbe-utils-mesh-compiler
+./dependencies/wbe-utils-model-compiler

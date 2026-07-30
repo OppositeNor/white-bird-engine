@@ -15,16 +15,17 @@
 from pathlib import Path
 from typing import override
 from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
+from wbe_utils_model_compiler import WBEUtilsMeshCompiler
 
 class WBEACPCompilerShader(WBEACPCompiler):
     """The shader compiler.
     """
     def __init__(self) -> None:
-        pass # TODO
+        self._utils_mesh_compiler = WBEUtilsMeshCompiler()
 
     @override
     def get_supported_resource_types(self) -> list[str]:
-        return ["mesh_raw"]
+        return self._utils_mesh_compiler.get_supported_resource_types()
 
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
