@@ -78,12 +78,10 @@ ROBufferVK::~ROBufferVK() {
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
     if (exposed_fields.domain != DeviceDomain::HOST && exposed_fields.domain != DeviceDomain::HOST_DEVICE) {
-        throw std::runtime_error("Failed to update buffer: the domain of the device must be "
-                                 "declared as host to update buffer from host memory.");
+        throw std::runtime_error("Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
     }
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
-        throw std::runtime_error(std::format("Failed to update buffer: trying to map a region ({} "
-                                             "to {}) onto a buffer with capacity {}.",
+        throw std::runtime_error(std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
             p_dst_offset,
             p_dst_offset + p_size,
             exposed_fields.buffer_size));
@@ -93,15 +91,13 @@ void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
-        throw std::runtime_error(std::format("Failed to update buffer: trying to map a region ({} "
-                                             "to {}) onto a buffer with capacity {}.",
+        throw std::runtime_error(std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
             p_dst_offset,
             p_dst_offset + p_size,
             exposed_fields.buffer_size));
     }
     if (p_src_offset + p_size > p_data->exposed_fields.buffer_size) {
-        throw std::runtime_error(std::format("Failed to update buffer: trying to read a region ({} "
-                                             "to {}) from a buffer with capacity {}.",
+        throw std::runtime_error(std::format("Failed to update buffer: trying to read a region ({} to {}) from a buffer with capacity {}.",
             p_src_offset,
             p_src_offset + p_size,
             p_data->exposed_fields.buffer_size));
