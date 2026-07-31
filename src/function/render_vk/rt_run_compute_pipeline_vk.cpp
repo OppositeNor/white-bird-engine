@@ -26,12 +26,14 @@
 #include <cstdint>
 #include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 RTRunComputePipelineVK::RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
-    RendResID p_pipeline_id,
+    std::string_view p_pipeline_id,
     VkExtent3D p_dispatch_group_count,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
     std::span<const ResAccessVK> p_read_accesses,

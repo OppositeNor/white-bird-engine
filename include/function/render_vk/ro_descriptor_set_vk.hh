@@ -187,6 +187,19 @@ public:
         }
 
         /**
+         * @brief Add a uniform_buffer info.
+         *
+         * @param p_buffer The buffer instance.
+         * @param p_offset The offset in the buffer.
+         * @param p_range The range of the buffer.
+         * @return *this.
+         */
+        Writer& add_uniform_buffer_info(Ref<ROBufferVK> p_buffer, VkDeviceSize p_offset, VkDeviceSize p_range) {
+            uniform_buffer_infos.push_back({.buffer = p_buffer, .offset = p_offset, .range = p_range});
+            return *this;
+        }
+
+        /**
          * @brief Add sampled image information.
          *
          * @param p_image_info The image info to add.

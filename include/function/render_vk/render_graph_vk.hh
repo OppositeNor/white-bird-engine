@@ -27,6 +27,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <vulkan/vulkan_core.h>
 
@@ -40,7 +42,7 @@ struct RendGraphDescVK;
  */
 struct RendResVK {
     // The id used to look this resource up.
-    RendResID res_id = 0;
+    std::string res_id;
     // The runtime type id of the underlying resource (TypeUUID<T>::UUID).
     RendResTID res_type_id = 0;
     // The resource instance.
@@ -213,7 +215,7 @@ public:
      * @param p_resource    The resource instance.
      * @param p_res_type_id The runtime type id of the resource.
      */
-    void set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+    void set_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
 
     /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
@@ -232,7 +234,7 @@ private:
     Vector<Ref<RGResEdge>, RenderAllocator> res_edges;
     // All resources known to the graph (declared in the pipeline descriptor
     // plus per-frame overrides set via set_resource()), keyed by res_id.
-    Map<RendResID, Ref<RendResVK>, RenderAllocator> all_resources;
+    Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
@@ -248,10 +250,10 @@ private:
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
 
-    Map<RendResID, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
+    Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
     void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderAllocator>& p_resources);
+    void infer_res_edges(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;

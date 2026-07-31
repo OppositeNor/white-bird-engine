@@ -16,7 +16,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
@@ -42,6 +41,8 @@
 #include <glm/ext/vector_float4.hpp>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -49,7 +50,7 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE = "REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE";
 }
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
@@ -102,7 +103,7 @@ public:
         // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE),
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
             .res = graphics_pipeline});
         WBE::RendTaskDescVK task_desc(render_allocator);

@@ -22,8 +22,8 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "utils/interface/i_singleton.hh"
-#include <boost/container/flat_map.hpp>
 #include <cstddef>
+#include <flat_map>
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -184,7 +184,7 @@ public:
 private:
     ResourceChunkID global_res_chunk_id = RES_CHUNK_NULL;
     std::vector<Ref<IResourceChunk>> resource_chunks;
-    boost::container::flat_map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
+    std::flat_map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
     StackAllocator stack_allocator;
 
     Ref<IResourceChunk> find_resource_chunk_containing_resource(std::string_view p_id) const;

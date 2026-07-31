@@ -15,7 +15,6 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
@@ -48,6 +47,8 @@
 #include <set>
 #include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -55,10 +56,10 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, WBE_RENDER_RESOURCE);
-WBE_LABEL(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, WBE_RENDER_RESOURCE);
+inline constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW";
+inline constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW";
+inline constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW";
+inline constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW";
 // TODO
 } // namespace WhiteBirdEngine
 
@@ -190,16 +191,16 @@ public:
         //       pass once a multi-pass pipeline compiler is available.
         // -------------------------------------------------------------------
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .res = gbuffer_albedo_view});
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .res = gbuffer_normal_view});
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .res = gbuffer_rma_view});
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW,
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .res = gbuffer_depth_view});
 

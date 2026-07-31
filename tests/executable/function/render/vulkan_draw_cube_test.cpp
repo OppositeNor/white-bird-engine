@@ -23,7 +23,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/render_task.hh"
 #include "function/render/spot_light_info.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -62,6 +61,7 @@
 #include <set>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -382,16 +382,16 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph() {
 }
 
 void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
+    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
         .res = shadow_graphics_pipeline});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
+    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .res = shadow_color_view});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
+    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .res = shadow_depth_view});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
+    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
         .res = main_graphics_pipeline});
 }
@@ -406,12 +406,12 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
         std::array<VkClearValue, 2> shadow_clear_values{};
         shadow_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
         shadow_clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
-        std::array<WBE::RendResID, 1> shadow_color_attachment_ids{WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
+        std::array<std::string_view, 1> shadow_color_attachment_ids{WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             std::span<const VkClearValue>(shadow_clear_values.data(), shadow_clear_values.size()),
             task_shadow_extent,
-            std::span<const WBE::RendResID>(shadow_color_attachment_ids.data(), shadow_color_attachment_ids.size()),
+            std::span<const std::string_view>(shadow_color_attachment_ids.data(), shadow_color_attachment_ids.size()),
             WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
             WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
             WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,

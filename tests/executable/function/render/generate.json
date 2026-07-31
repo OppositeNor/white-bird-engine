@@ -20,7 +20,12 @@
                 {
                     "name" : "vulkan_draw_triangle_test",
                     "sources" : ["vulkan_draw_triangle_test.cpp"]
+                },
+                {
+                    "name" : "vulkan_draw_sponza_test",
+                    "sources" : ["vulkan_draw_sponza_test.cpp"]
                 }
+
             ]
         }
     }

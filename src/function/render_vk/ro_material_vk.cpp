@@ -25,7 +25,6 @@
 #include <cstdint>
 #include <format>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>

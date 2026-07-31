@@ -18,6 +18,7 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <string>
 
@@ -95,6 +96,12 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
      */
     WBE_META(WBE_REFLECT)
     std::string audio_device;
+
+    /**
+     * @brief The size of the render allocator.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t render_mem_pool_size = WBE_MI_B(64);
 };
 
 } // namespace WhiteBirdEngine

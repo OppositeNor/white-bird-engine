@@ -19,7 +19,6 @@
 #include "game_config_options.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 
 namespace WhiteBirdEngine {
