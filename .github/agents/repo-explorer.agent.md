@@ -1,7 +1,8 @@
 ---
 name: repo-explorer
 description: Quickly explores a repository, locates relevant files, and summarizes project structure without deep analysis or code changes.
-model: gpt-4.1-mini
+model: GPT-4.1 mini (openai)
+tools: [read, search]
 ---
 
 # Repository Explorer Agent

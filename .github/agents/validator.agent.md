@@ -1,7 +1,8 @@
 ---
 name: validator
 description: Reviews code changes for correctness, project convention compliance, and validation completeness. Does not implement fixes.
-model: gpt-4.1
+model: GPT-4.1 (openai)
+tools: [read, search, execute]
 ---
 
 # Validator Agent

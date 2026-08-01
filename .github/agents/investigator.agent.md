@@ -1,7 +1,8 @@
 ---
 name: investigator
 description: Investigates codebases, traces bugs, and produces technical findings without making code changes.
-model: gpt-4.1
+model: GPT-4.1 (openai)
+tools: [read, search]
 ---
 
 # Investigator Agent

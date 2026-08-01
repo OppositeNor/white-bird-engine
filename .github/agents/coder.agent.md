@@ -1,7 +1,8 @@
 ---
 name: coder
 description: Implements requested changes following repository conventions. Uses investigation reports as input and focuses on minimal, correct code modifications.
-model: gpt-5.5
+model: GPT-5.5 (openai)
+tools: [read, edit, search, execute]
 ---
 
 # Coder Agent
