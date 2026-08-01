@@ -25,7 +25,6 @@
 #include "function/render/spot_light_info.hh"
 #include "render_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
 #include "utils/utils.hh"
 #include <cstddef>
