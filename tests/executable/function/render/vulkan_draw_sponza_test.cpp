@@ -100,13 +100,18 @@ WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::SpotLightInfo& p_spo
         .range = p_spot_light.range};
 }
 
-std::vector<uint8_t> build_spot_light_infos_uniform_data(const WBE::SpotLightInfo& p_spot_light) {
-    WBE::SpotLightInfosVKUBO spot_light_infos{};
-    spot_light_infos.spot_light_info[0] = make_spot_light_info_ubo(p_spot_light);
-    spot_light_infos.spot_light_count = 1;
+std::vector<uint8_t> build_spot_light_info_uniform_data(const WBE::SpotLightInfo& p_spot_light) {
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(p_spot_light);
 
-    std::vector<uint8_t> result(sizeof(spot_light_infos));
-    std::memcpy(result.data(), &spot_light_infos, result.size());
+    std::vector<uint8_t> result(sizeof(spot_light_info));
+    std::memcpy(result.data(), &spot_light_info, result.size());
+    return result;
+}
+
+std::vector<uint8_t> build_spot_light_count_uniform_data() {
+    uint32_t spot_light_count = 1;
+    std::vector<uint8_t> result(sizeof(spot_light_count));
+    std::memcpy(result.data(), &spot_light_count, result.size());
     return result;
 }
 
@@ -123,6 +128,7 @@ private:
     struct GraphicsPipeline {
         WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline;
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets;
+        WBE::GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
     };
     void setup_render_context();
     void load_resources();
@@ -131,8 +137,7 @@ private:
     void create_shadow_map_resources();
     void gather_sponza_materials();
     void compile_shadow_pipeline();
-    std::tuple<WBE::Ref<WBE::ROGraphicsPipelineVK>, std::vector<WBE::Ref<WBE::RODescriptorSetVK>>>
-        compile_main_pipeline(WBE::RefRes<WBE::RUMaterial> p_material);
+    GraphicsPipeline compile_main_pipeline(WBE::RefRes<WBE::RUMaterial> p_material);
     void write_main_dynamic_descriptors(GraphicsPipeline& p_pipeline);
     void register_draw_sponza_render_graph();
     void add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc, uint32_t p_graphics_pipeline_index) const;
@@ -207,8 +212,7 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
     gather_sponza_materials();
     compile_shadow_pipeline();
     for (auto& material : sponza_materials) {
-        auto [pipeline, descriptor_sets] = compile_main_pipeline(material);
-        main_graphics_pipelines.push_back({.graphics_pipeline = pipeline, .descriptor_sets = descriptor_sets});
+        main_graphics_pipelines.push_back(compile_main_pipeline(material));
     }
     for (auto& graphics_pipeline : main_graphics_pipelines) {
         write_main_dynamic_descriptors(graphics_pipeline);
@@ -327,24 +331,26 @@ void ApplicationVulkanDrawSponzaTest::compile_shadow_pipeline() {
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.view", .data = spot_light.view},
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.proj", .data = spot_light.proj},
     };
-    auto [compiled_graphics_pipeline, compiled_descriptor_sets] =
-        WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
-            .compile("shadowmap_spot",
-                shadow_pipeline_resource,
-                std::span<const WBE::RenderBindpointDeclaration>(
-                    shadow_bindpoint_declarations.data(), shadow_bindpoint_declarations.size()));
-    shadow_graphics_pipeline = compiled_graphics_pipeline;
-    shadow_descriptor_sets = std::move(compiled_descriptor_sets);
+    auto compiled = WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
+                        .compile("shadowmap_spot",
+                            shadow_pipeline_resource,
+                            std::span<const WBE::RenderBindpointDeclaration>(
+                                shadow_bindpoint_declarations.data(), shadow_bindpoint_declarations.size()));
+    shadow_graphics_pipeline = compiled.graphics_pipeline;
+    shadow_descriptor_sets = std::move(compiled.descriptor_sets);
 }
 
-std::tuple<WBE::Ref<WBE::ROGraphicsPipelineVK>, std::vector<WBE::Ref<WBE::RODescriptorSetVK>>>
-ApplicationVulkanDrawSponzaTest::compile_main_pipeline(WBE::RefRes<WBE::RUMaterial> p_material) {
+ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTest::compile_main_pipeline(
+    WBE::RefRes<WBE::RUMaterial> p_material) {
     camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
     auto main_bindpoint_declarations = WBE::RenderBindpointDeclarationsBuilder()
                                            .add_decleratoin("camera_info.view", camera_info.view)
                                            .add_decleratoin("camera_info.proj", camera_info.proj)
-                                           .add_decleratoin("spot_light_infos", build_spot_light_infos_uniform_data(spot_light))
-                                           .add_resource_bindpoint(p_material)
+                                           .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
+                                           .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
+                                           .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
+                                           .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
+                                           .add_decleratoin("material", p_material)
                                            .build();
 
     WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
@@ -354,13 +360,14 @@ ApplicationVulkanDrawSponzaTest::compile_main_pipeline(WBE::RefRes<WBE::RUMateri
         .renderer = renderer_vk,
         .color_attachment_formats = {base_render_data->swap_chain_format},
     };
-    auto [compiled_graphics_pipeline, compiled_descriptor_sets] =
-        WBE::GraphicsPipelineCompilerVK(main_compiler_context)
-            .compile(p_material->graphics_pipeline->resource_key,
-                p_material->graphics_pipeline,
-                std::span<const WBE::RenderBindpointDeclaration>(
-                    main_bindpoint_declarations.data(), main_bindpoint_declarations.size()));
-    return {compiled_graphics_pipeline, compiled_descriptor_sets};
+    auto compiled = WBE::GraphicsPipelineCompilerVK(main_compiler_context)
+                        .compile(p_material->graphics_pipeline->resource_key,
+                            p_material->graphics_pipeline,
+                            std::span<const WBE::RenderBindpointDeclaration>(
+                                main_bindpoint_declarations.data(), main_bindpoint_declarations.size()));
+    return {.graphics_pipeline = compiled.graphics_pipeline,
+        .descriptor_sets = std::move(compiled.descriptor_sets),
+        .descriptor_set_bindings = std::move(compiled.descriptor_set_bindings)};
 }
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(GraphicsPipeline& p_pipeline) {
@@ -373,24 +380,9 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(GraphicsPip
                           .set_size(sizeof(WBE::CameraInfoVKUBO))
                           .create_ref(base_render_data);
     camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
-    p_pipeline.descriptor_sets[0]->write_descriptor_set(
-            WBE::RODescriptorSetVK::Writer()
-            .set_binding(0)
-            .add_uniform_buffer_info(camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO))
-            );
-    constexpr uint32_t SHADOWMAP_BINDING = 6;
-    constexpr uint32_t SHADOWMAP_SAMPLER_BINDING = 7;
-    p_pipeline.descriptor_sets[0]->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
-            .set_binding(SHADOWMAP_BINDING)
-            .add_sampled_image_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
-                .image_view = shadow_depth_view,
-                .image_layout = VK_IMAGE_LAYOUT_GENERAL,
-            }));
-    p_pipeline.descriptor_sets[0]->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
-            .set_binding(SHADOWMAP_SAMPLER_BINDING)
-            .add_sampler_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
-                .sampler = shadow_sampler,
-            }));
+    auto [set, binding] = p_pipeline.descriptor_set_bindings.at("camera_info");
+    p_pipeline.descriptor_sets[set]->write_descriptor_set(
+        WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
 }
 
 void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph() {
@@ -406,7 +398,8 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph() {
     renderer_vk->activate_render_graph("draw_sponza_pipeline");
 }
 
-void ApplicationVulkanDrawSponzaTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc, uint32_t p_graphics_pipeline_index) const {
+void ApplicationVulkanDrawSponzaTest::add_render_graph_resources(
+    WBE::RendGraphDescVK& p_pipeline_desc, uint32_t p_graphics_pipeline_index) const {
     p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
         .res = shadow_graphics_pipeline});
@@ -416,10 +409,10 @@ void ApplicationVulkanDrawSponzaTest::add_render_graph_resources(WBE::RendGraphD
     p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .res = shadow_depth_view});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{
-            .res_id = std::format("{}.{}", WBE::REND_RES_TEST_DRAW_SPONZA_GRAPHICS_PIPELINE, p_graphics_pipeline_index),
-        .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-        .res = main_graphics_pipelines[p_graphics_pipeline_index].graphics_pipeline});
+    p_pipeline_desc.resources.emplace_back(
+        WBE::RendResVK{.res_id = std::format("{}.{}", WBE::REND_RES_TEST_DRAW_SPONZA_GRAPHICS_PIPELINE, p_graphics_pipeline_index),
+            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            .res = main_graphics_pipelines[p_graphics_pipeline_index].graphics_pipeline});
 }
 
 WBE::RendTaskDescVK ApplicationVulkanDrawSponzaTest::create_shadow_task_desc() const {
@@ -452,20 +445,18 @@ WBE::RendTaskDescVK ApplicationVulkanDrawSponzaTest::create_main_task_desc(uint3
     main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
     main_task_desc.prev.emplace_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
     main_task_desc.create = [task_render_allocator = render_allocator,
-        task_base_render_data = base_render_data,
-        task_main_descriptor_sets = main_graphics_pipelines[p_pipeline_index].descriptor_sets,
-        p_pipeline_index]()
-            -> WBE::Unique<WBE::RenderTaskVK> {
-                return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
-                        task_base_render_data,
-                        glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                        task_base_render_data->swap_chain_extent,
-                        WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
-                        std::format("{}.{}", WBE::REND_RES_TEST_DRAW_SPONZA_GRAPHICS_PIPELINE, p_pipeline_index),
-                        WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-                        WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                        std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_main_descriptor_sets.data(), task_main_descriptor_sets.size()));
-            };
+                                task_base_render_data = base_render_data,
+                                task_main_descriptor_sets = main_graphics_pipelines[p_pipeline_index].descriptor_sets,
+                                p_pipeline_index]() -> WBE::Unique<WBE::RenderTaskVK> {
+        return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
+            task_base_render_data,
+            glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
+            task_base_render_data->swap_chain_extent,
+            WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
+            std::format("{}.{}", WBE::REND_RES_TEST_DRAW_SPONZA_GRAPHICS_PIPELINE, p_pipeline_index),
+            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
+            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_main_descriptor_sets.data(), task_main_descriptor_sets.size()));
+    };
     return main_task_desc;
 }
-

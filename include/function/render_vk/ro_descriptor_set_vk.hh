@@ -152,6 +152,10 @@ public:
          * @brief The binding to write to.
          */
         Required<uint32_t> binding;
+        /**
+         * @brief First array element to write within the binding.
+         */
+        uint32_t dst_array_element = 0;
 
         /**
          * @brief Set the binding.
@@ -161,6 +165,17 @@ public:
          */
         Writer& set_binding(uint32_t p_binding) {
             binding = p_binding;
+            return *this;
+        }
+
+        /**
+         * @brief Set the first array element to write.
+         *
+         * @param p_dst_array_element The first array element to write.
+         * @return *this.
+         */
+        Writer& set_dst_array_element(uint32_t p_dst_array_element) {
+            dst_array_element = p_dst_array_element;
             return *this;
         }
 

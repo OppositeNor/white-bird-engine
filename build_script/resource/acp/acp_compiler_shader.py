@@ -157,6 +157,35 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "element_stride": int(raw_binding.get("elementStride", 0)),
         }
 
+    def _shader_type_shape(self, raw_type: dict[str, Any]) -> str:
+        kind = raw_type.get("kind", "")
+        if kind == "array":
+            element_type = raw_type.get("elementType", {})
+            if isinstance(element_type, dict):
+                return self._shader_type_shape(element_type)
+        scalar_type = raw_type.get("scalarType")
+        if isinstance(scalar_type, str):
+            return scalar_type
+        base_shape = raw_type.get("baseShape")
+        if isinstance(base_shape, str):
+            return base_shape
+        return str(kind)
+
+    def _shader_buffer_size(self, raw_type: dict[str, Any]) -> int:
+        if raw_type.get("kind") == "array":
+            element_type = raw_type.get("elementType", {})
+            if isinstance(element_type, dict):
+                return self._shader_buffer_size(element_type)
+        element_var_layout = raw_type.get("elementVarLayout", {})
+        if isinstance(element_var_layout, dict):
+            binding = element_var_layout.get("binding", {})
+            if isinstance(binding, dict):
+                return int(binding.get("size", 0))
+        binding = raw_type.get("binding", {})
+        if isinstance(binding, dict):
+            return int(binding.get("size", 0))
+        return 0
+
     def _transform_shader_type_atom(self, raw_type: dict[str, Any]) -> dict[str, Any]:
         element_type = raw_type.get("elementType", {})
         if not isinstance(element_type, dict):
@@ -164,10 +193,8 @@ class WBEACPCompilerShader(WBEACPCompiler):
         result_type = raw_type.get("resultType", {})
         if not isinstance(result_type, dict):
             result_type = {}
-        scalar_type = raw_type.get("scalarType")
-        if not isinstance(scalar_type, str):
-            scalar_type = raw_type.get("baseShape", raw_type.get("kind", ""))
-        element_scalar_type = element_type.get("scalarType", result_type.get("scalarType", ""))
+        scalar_type = self._shader_type_shape(raw_type)
+        element_scalar_type = self._shader_type_shape(element_type) if element_type else self._shader_type_shape(result_type)
         return {
             "kind": str(raw_type.get("kind", "")),
             "scalar_type": str(scalar_type),
@@ -177,14 +204,63 @@ class WBEACPCompilerShader(WBEACPCompiler):
         }
 
     def _transform_shader_type_field(self, raw_field: dict[str, Any]) -> dict[str, Any]:
+        raw_type = raw_field.get("type", {})
+        if not isinstance(raw_type, dict):
+            raw_type = {}
         return {
             "name": str(raw_field.get("name", "")),
-            "type": self._transform_shader_type_atom(raw_field.get("type", {})),
+            "type": self._transform_shader_type_atom(raw_type),
             "stage": str(raw_field.get("stage", "")),
             "binding": self._transform_shader_binding(raw_field.get("binding", {})),
+            "buffer_size": self._shader_buffer_size(raw_type),
             "semantic_name": str(raw_field.get("semanticName", "")),
             "semantic_index": int(raw_field.get("semanticIndex", 0)),
         }
+
+    def _flatten_shader_type_fields(self, raw_fields: list[Any]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for raw_field in raw_fields:
+            if not isinstance(raw_field, dict):
+                continue
+            raw_type = raw_field.get("type", {})
+            raw_binding = raw_field.get("binding", {})
+            if not isinstance(raw_type, dict) or not isinstance(raw_binding, dict):
+                result.append(raw_field)
+                continue
+            element_type = raw_type.get("elementType", {})
+            element_fields = element_type.get("fields", []) if isinstance(element_type, dict) else []
+            if raw_type.get("kind") != "array" or element_type.get("kind") != "struct" or not isinstance(element_fields, list):
+                result.append(raw_field)
+                continue
+            base_binding_index = int(raw_binding.get("index", 0))
+            element_count = int(raw_type.get("elementCount", 0))
+            flattened_any = False
+            for element_field in element_fields:
+                if not isinstance(element_field, dict):
+                    continue
+                element_binding = element_field.get("binding", {})
+                element_field_type = element_field.get("type", {})
+                if not isinstance(element_binding, dict) or element_binding.get("kind") != "descriptorTableSlot":
+                    continue
+                if not isinstance(element_field_type, dict):
+                    element_field_type = {}
+                flattened_field = dict(element_field)
+                flattened_field["name"] = f"{raw_field.get('name', '')}.{element_field.get('name', '')}"
+                flattened_field["type"] = {
+                    "kind": "array",
+                    "elementCount": element_count,
+                    "elementType": element_field_type,
+                }
+                flattened_field["binding"] = {
+                    **element_binding,
+                    "index": base_binding_index + int(element_binding.get("index", 0)),
+                    "count": element_count,
+                }
+                result.append(flattened_field)
+                flattened_any = True
+            if not flattened_any:
+                result.append(raw_field)
+        return result
 
     def _transform_shader_type(self, raw_type: dict[str, Any]) -> dict[str, Any]:
         kind = str(raw_type.get("kind", ""))
@@ -194,8 +270,15 @@ class WBEACPCompilerShader(WBEACPCompiler):
         fields = raw_type.get("fields", [])
         if not isinstance(fields, list):
             fields = []
-        if kind == "constantBuffer" and isinstance(element_type, dict):
-            fields = element_type.get("fields", []) if isinstance(element_type.get("fields", []), list) else []
+        element_var_layout = raw_type.get("elementVarLayout", {})
+        element_layout_type = {}
+        if isinstance(element_var_layout, dict) and isinstance(element_var_layout.get("type"), dict):
+            element_layout_type = element_var_layout["type"]
+        if kind in {"constantBuffer", "parameterBlock"}:
+            field_source = element_layout_type if element_layout_type else element_type
+            fields = field_source.get("fields", []) if isinstance(field_source.get("fields", []), list) else []
+            if kind == "parameterBlock":
+                fields = self._flatten_shader_type_fields(fields)
         return {
             "kind": kind,
             "name": str(raw_type.get("name", "")),

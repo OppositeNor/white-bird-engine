@@ -1,6 +1,6 @@
 ---
 name: validator
-description: Reviews code changes for correctness, project convention compliance, and validation completeness. Does not implement fixes.
+description: Reviews code changes for correctness, project convention compliance, and validation completeness. Runs repository validation without artificial timeouts. Does not implement fixes.
 model: GPT-4.1 (openai)
 tools: [read, search, execute]
 ---
@@ -49,6 +49,9 @@ You should focus on correctness and risk, not style preferences.
 Assume the repository development environment is already configured.
 
 Use existing project tooling directly.
+
+When running repository validation scripts, do not set artificial timeouts.
+Let validation commands finish naturally, even when debug builds or full test runs take a long time.
 
 Do not:
 

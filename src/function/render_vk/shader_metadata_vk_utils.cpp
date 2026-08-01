@@ -65,6 +65,22 @@ VkDescriptorType descriptor_type_from_parameter(const ShaderMetadataParameter& p
         "Failed to translate shader descriptor '{}': unsupported parameter type '{}'.", p_parameter.name, p_parameter.type.kind));
 }
 
+VkDescriptorType descriptor_type_from_field(std::string_view p_field_path, const ShaderMetadataTypeField& p_field) {
+    if (p_field.type.kind == "constantBuffer" || (p_field.type.kind == "array" && p_field.type.element_scalar_type == "constantBuffer")) {
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    }
+    if ((p_field.type.kind == "resource" && p_field.type.scalar_type.starts_with("texture")) ||
+        (p_field.type.kind == "array" && p_field.type.element_scalar_type.starts_with("texture"))) {
+        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    }
+    if (p_field.type.kind == "samplerState" || (p_field.type.kind == "array" && p_field.type.element_scalar_type == "samplerState")) {
+        return VK_DESCRIPTOR_TYPE_SAMPLER;
+    }
+    throw std::runtime_error(std::format("Failed to translate shader descriptor '{}': unsupported parameter-block field type '{}'.",
+        p_field_path,
+        p_field.type.kind));
+}
+
 VkDeviceSize reflected_binding_size(const ShaderMetadataBinding& p_binding) {
     return p_binding.size <= 0 ? 0 : static_cast<VkDeviceSize>(p_binding.size);
 }
@@ -82,6 +98,10 @@ std::string shader_parameter_type_name(const ShaderMetadataParameter& p_paramete
 
 std::string descriptor_field_path(const ShaderMetadataParameter& p_parameter, const ShaderMetadataTypeField& p_field) {
     return std::format("{}.{}", p_parameter.name, p_field.name);
+}
+
+std::string descriptor_field_path(std::string_view p_parameter_name, const ShaderMetadataTypeField& p_field) {
+    return std::format("{}.{}", p_parameter_name, p_field.name);
 }
 
 std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(const ShaderMetadataParameter& p_parameter) {
@@ -102,6 +122,34 @@ std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(co
         });
     }
     return result;
+}
+
+uint32_t descriptor_count_from_field(const ShaderMetadataTypeField& p_field) {
+    if (p_field.type.kind == "array") {
+        return static_cast<uint32_t>(std::max(p_field.type.element_count, 1));
+    }
+    return static_cast<uint32_t>(std::max(p_field.binding.count, 1));
+}
+
+ShaderDescriptorBindingVK make_parameter_block_field_binding(
+    const ShaderMetadataParameter& p_parameter, const ShaderMetadataTypeField& p_field, VkShaderStageFlagBits p_stage_flag) {
+    if (!is_descriptor_binding(p_field.binding)) {
+        throw std::runtime_error(std::format(
+            "Failed to translate parameter block '{}': field '{}' is not descriptor-backed.", p_parameter.name, p_field.name));
+    }
+    std::string field_path = descriptor_field_path(p_parameter.name, p_field);
+    ShaderDescriptorBindingVK descriptor_binding;
+    descriptor_binding.parameter_name = field_path;
+    descriptor_binding.type_name = p_field.type.name;
+    descriptor_binding.buffer_size = static_cast<VkDeviceSize>(std::max(p_field.buffer_size, 0));
+    descriptor_binding.set_index = static_cast<uint32_t>(std::max(p_parameter.binding.index, 0));
+    descriptor_binding.layout_binding = VkDescriptorSetLayoutBinding{
+        .binding = static_cast<uint32_t>(std::max(p_field.binding.index, 0)),
+        .descriptorType = descriptor_type_from_field(field_path, p_field),
+        .descriptorCount = descriptor_count_from_field(p_field),
+        .stageFlags = p_stage_flag,
+    };
+    return descriptor_binding;
 }
 
 VkDeviceSize descriptor_buffer_size(
@@ -199,6 +247,16 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     VkShaderStageFlagBits stage_flag = shader_stage_flag_from_metadata_stage(entry_point.stage);
     std::vector<ShaderDescriptorBindingVK> result;
     for (const auto& parameter : p_metadata.parameters) {
+        if (parameter.type.kind == "parameterBlock") {
+            if (parameter.binding.kind != "subElementRegisterSpace") {
+                throw std::runtime_error(std::format(
+                    "Failed to translate parameter block '{}': expected subElementRegisterSpace binding.", parameter.name));
+            }
+            for (const auto& field : parameter.type.fields) {
+                merge_descriptor_binding(result, make_parameter_block_field_binding(parameter, field, stage_flag));
+            }
+            continue;
+        }
         if (!is_descriptor_binding(parameter.binding) || !entry_point_uses_binding(entry_point, parameter.binding)) {
             continue;
         }

@@ -248,11 +248,10 @@ public:
     bool operator<(const RefRaw<T1, AllocType1, AllowDestruct1>& p_other) const {
         const void* allocator_address = static_cast<const void*>(allocator);
         const void* other_allocator_address = static_cast<const void*>(p_other.allocator);
-        std::less<const void*> address_less;
-        if (address_less(allocator_address, other_allocator_address)) {
+        if (allocator_address < other_allocator_address) {
             return true;
         }
-        if (address_less(other_allocator_address, allocator_address)) {
+        if (other_allocator_address < allocator_address) {
             return false;
         }
         return mem_id < p_other.mem_id;

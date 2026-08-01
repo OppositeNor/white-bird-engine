@@ -70,6 +70,8 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Seriali
     WBE_META(WBE_REFLECT)
     ShaderMetadataBinding binding;
     WBE_META(WBE_REFLECT)
+    int32_t buffer_size = 0;
+    WBE_META(WBE_REFLECT)
     std::string semantic_name;
     WBE_META(WBE_REFLECT)
     int32_t semantic_index = 0;
