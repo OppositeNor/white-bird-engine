@@ -27,6 +27,8 @@ For tasks:
 3. Use main agent for implementation decisions.
 4. Use validator before considering work complete.
 
+Please utilize them as much as possible.
+
 ---
 
 ## Architecture

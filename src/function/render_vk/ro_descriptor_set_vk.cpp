@@ -22,9 +22,11 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include <vulkan/vk_enum_string_helper.h>
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -101,11 +103,12 @@ VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDat
     }
     alloc_info.descriptorSetCount = static_cast<uint32_t>(layouts.size());
     alloc_info.pSetLayouts = layouts.data();
-    VkDescriptorSet result;
-    if (vkAllocateDescriptorSets(p_render_data->logic_device, &alloc_info, &result) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor set.");
+    VkDescriptorSet result_descriptor_set;
+    VkResult allocate_result = vkAllocateDescriptorSets(p_render_data->logic_device, &alloc_info, &result_descriptor_set);
+    if (allocate_result) {
+        throw std::runtime_error(std::format("Failed to allocate descriptor set: {}.", string_VkResult(allocate_result)));
     }
-    return result;
+    return result_descriptor_set;
 }
 
 RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)

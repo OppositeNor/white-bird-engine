@@ -309,11 +309,12 @@ void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::gather_sponza_materials() {
+    sponza_materials.clear();
     // Gather all the submeshes' materials.
     std::set<WBE::RefRes<WBE::RUMaterial>> materials;
     for (size_t i = 0; i < sponza_mesh->submesh_count; ++i) {
-        auto submesh = sponza_mesh->submeshes->get()[i];
-        materials.insert(submesh.material);
+        auto submesh = sponza_mesh->submeshes.get()[i];
+        materials.insert(submesh->material);
     }
     sponza_materials.append_range(materials);
 }
@@ -331,6 +332,7 @@ void ApplicationVulkanDrawSponzaTest::compile_shadow_pipeline() {
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.view", .data = spot_light.view},
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.proj", .data = spot_light.proj},
     };
+    // TODO: Fix material 12
     auto compiled = WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
                         .compile("shadowmap_spot",
                             shadow_pipeline_resource,

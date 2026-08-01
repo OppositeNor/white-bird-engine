@@ -190,8 +190,7 @@ public:
     }
 
 private:
-    static constexpr size_t STAGING_BUFFER_SIZE = WBE_MI_B(0.1);
-    static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 32;
+    static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 1024;
     static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
     static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 64;
     static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 32;

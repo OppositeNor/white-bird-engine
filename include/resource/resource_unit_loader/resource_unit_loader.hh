@@ -18,7 +18,6 @@
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include <any>
 #include <string>
 #include <vector>

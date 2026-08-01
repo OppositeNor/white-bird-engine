@@ -20,7 +20,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
-#include <cstdint>
+#include <cstring>
 #include <format>
 #include <sstream>
 #include <stdexcept>
@@ -78,6 +78,7 @@ public:
     StackAllocator(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
         : total_size(p_size), stack_pointer(0), memory_chunk(std::move(p_memory_chunk)) {
         mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
+        std::memset(mem_chunk, 0, p_size);
     }
 
     /**
