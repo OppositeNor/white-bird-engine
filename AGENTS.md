@@ -20,7 +20,7 @@ Follow repository conventions and existing patterns.
 
 ## Agent Workflow
 
-For non-trivial tasks:
+For tasks:
 
 1. Use repo-explorer when repository context is unclear.
 2. Use investigator for debugging and root cause analysis.
