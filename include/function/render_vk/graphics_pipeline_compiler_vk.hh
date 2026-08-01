@@ -40,6 +40,8 @@
 #include <span>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -93,6 +95,14 @@ struct GraphicsPipelineCompilerVKContext {
 class GraphicsPipelineCompilerVK {
 public:
     using SupportedUniformDataTypes = std::tuple<float, int32_t, uint32_t, glm::vec2, glm::vec3, glm::vec4, glm::mat3, glm::mat4>;
+    using DescriptorSetBinding = std::pair<uint32_t, uint32_t>;
+    using DescriptorSetBindings = std::unordered_map<std::string, DescriptorSetBinding>;
+
+    struct CompileResult {
+        Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
+        std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
+        DescriptorSetBindings descriptor_set_bindings;
+    };
 
     /**
      * @brief Construct a compiler with the given runtime context.
@@ -102,27 +112,14 @@ public:
     explicit GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context);
 
     /**
-     * @brief Compile a graphics pipeline resource into a render task
-     * descriptor, appending the generated pipeline render object to
-     * the supplied pipeline descriptor's resource list.
-     *
-     * The caller is responsible for pushing the returned task descriptor
-     * into the pipeline descriptor's task list, and for adding any
-     * additional resources referenced by the task to the descriptor.
+    * @brief Compile a graphics pipeline resource into Vulkan render objects and reflected descriptor binding locations.
      *
      * @param p_resource_key Key of the graphics pipeline resource.
      * @param p_pipeline_resource Loaded graphics pipeline resource unit.
-     * @param p_descriptor Descriptor to append the pipeline render object resource to.
-     * @param p_vertex_buffer_res_id Optional vertex buffer resource id. Pass
-     * nullopt for pipelines with no vertex input (e.g. fullscreen
-     * passes).
-     * @param p_index_buffer_res_id Optional index buffer resource id. Pass
-     * nullopt when not drawing indexed.
-     * @param p_prev_tasks Tasks the returned task depends on.
      * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
-     * @return Render task descriptor for the compiled graphics pipeline.
+    * @return Compiled pipeline objects and a descriptor-scope name to set/binding map.
      */
-    std::tuple<Ref<ROGraphicsPipelineVK>, std::vector<Ref<RODescriptorSetVK>>> compile(std::string_view p_resource_key,
+    CompileResult compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations = {});
 
@@ -130,6 +127,7 @@ private:
     struct CompiledPipelineObjects {
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
         std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
+        DescriptorSetBindings descriptor_set_bindings;
     };
 
     GraphicsPipelineCompilerVKContext context;
@@ -152,7 +150,6 @@ private:
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
     Ref<RODescriptorSetVK> compile_texture_descriptor_set(std::string_view p_resource_key,
-        RefRes<RUMaterial> p_material,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,

@@ -26,6 +26,8 @@
 #include <glm/ext/vector_float4.hpp>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -64,10 +66,10 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
         VkExtent2D p_render_extent,
-        RendResID p_color_attachment_id,
-        RendResID p_pipeline_id,
-        std::optional<RendResID> p_vertex_buffer_id,
-        std::optional<RendResID> p_index_buffer_id,
+        std::string_view p_color_attachment_id,
+        std::string_view p_pipeline_id,
+        std::optional<std::string_view> p_vertex_buffer_id,
+        std::optional<std::string_view> p_index_buffer_id,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
 
     /**
@@ -90,11 +92,11 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         std::span<const VkClearValue> p_clear_values,
         VkExtent2D p_render_extent,
-        std::span<const RendResID> p_color_attachment_ids,
-        std::optional<RendResID> p_depth_attachment_id,
-        RendResID p_pipeline_id,
-        std::optional<RendResID> p_vertex_buffer_id,
-        std::optional<RendResID> p_index_buffer_id,
+        std::span<const std::string_view> p_color_attachment_ids,
+        std::optional<std::string_view> p_depth_attachment_id,
+        std::string_view p_pipeline_id,
+        std::optional<std::string_view> p_vertex_buffer_id,
+        std::optional<std::string_view> p_index_buffer_id,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
 
     virtual QueueFamilyVK queue_family() const override {
@@ -111,11 +113,11 @@ private:
     const BaseRenderDataVK* render_data = nullptr;
     Vector<VkClearValue, RenderAllocator> clear_values;
     VkExtent2D render_extent{};
-    Vector<RendResID, RenderAllocator> color_attachment_ids;
-    std::optional<RendResID> depth_attachment_id;
-    RendResID pipeline_id = 0;
-    std::optional<RendResID> vertex_buffer_id;
-    std::optional<RendResID> index_buffer_id;
+    Vector<std::string, RenderAllocator> color_attachment_ids;
+    std::optional<std::string> depth_attachment_id;
+    std::string pipeline_id;
+    std::optional<std::string> vertex_buffer_id;
+    std::optional<std::string> index_buffer_id;
     Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
     Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
 };

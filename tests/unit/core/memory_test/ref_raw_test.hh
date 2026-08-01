@@ -18,6 +18,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "mock_heap_allocator_aligned.hh"
+#include <functional>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <utility>
@@ -289,6 +290,24 @@ TEST(WBERefRawTest, ComparisonExceptions) {
     ASSERT_THROW(ref.operator==(non_null_id), std::runtime_error);
 
     ASSERT_EQ(TestObject::instance_count, 0);
+}
+
+TEST(WBERefRawTest, LessOperatorOrdersByAllocatorThenMemID) {
+    WBE::MockHeapAllocatorAligned allocator1(1024);
+    WBE::MockHeapAllocatorAligned allocator2(1024);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> lower_mem_id_ref(1, &allocator1);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> higher_mem_id_ref(2, &allocator1);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> other_allocator_ref(0, &allocator2);
+
+    ASSERT_TRUE(lower_mem_id_ref < higher_mem_id_ref);
+    ASSERT_FALSE(higher_mem_id_ref < lower_mem_id_ref);
+    ASSERT_FALSE(lower_mem_id_ref < lower_mem_id_ref);
+
+    const void* allocator1_address = static_cast<const void*>(&allocator1);
+    const void* allocator2_address = static_cast<const void*>(&allocator2);
+    std::less<> address_less;
+    ASSERT_EQ(lower_mem_id_ref < other_allocator_ref, address_less(allocator1_address, allocator2_address));
+    ASSERT_EQ(other_allocator_ref < lower_mem_id_ref, address_less(allocator2_address, allocator1_address));
 }
 
 // Helper classes for template conversion testing

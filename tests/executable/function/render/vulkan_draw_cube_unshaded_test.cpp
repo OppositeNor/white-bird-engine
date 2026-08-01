@@ -16,7 +16,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
@@ -52,7 +51,7 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-WBE_LABEL(REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE, WBE_RENDER_RESOURCE);
+inline constexpr char REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE[] = "REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE";
 }
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {

@@ -147,7 +147,7 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_info.dstSet = descriptor_set;
     write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
-    write_info.dstArrayElement = 0;
+    write_info.dstArrayElement = p_writer.dst_array_element;
     std::vector<VkDescriptorBufferInfo> buffer_infos;
     // Prepare buffer infos
     auto emplace_result =

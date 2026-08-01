@@ -244,6 +244,19 @@ public:
         return allocator == p_other.allocator && mem_id == p_other.mem_id;
     }
 
+    template <typename T1, typename AllocType1, bool AllowDestruct1>
+    bool operator<(const RefRaw<T1, AllocType1, AllowDestruct1>& p_other) const {
+        const void* allocator_address = static_cast<const void*>(allocator);
+        const void* other_allocator_address = static_cast<const void*>(p_other.allocator);
+        if (allocator_address < other_allocator_address) {
+            return true;
+        }
+        if (other_allocator_address < allocator_address) {
+            return false;
+        }
+        return mem_id < p_other.mem_id;
+    }
+
     bool operator==(std::nullptr_t) const {
         return is_null();
     }

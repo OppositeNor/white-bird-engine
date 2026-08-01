@@ -45,6 +45,7 @@ Checks: >
   -cppcoreguidelines-init-variables,
   -cppcoreguidelines-macro-usage,
   -cert-err58-cpp,
+  -cert-dcl03-c,
   -google-readability-avoid-underscore-in-googletest-name,
   -google-explicit-constructor,
   -google-readability-todo,

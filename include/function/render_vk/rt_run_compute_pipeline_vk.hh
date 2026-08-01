@@ -24,6 +24,8 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include <span>
+#include <string>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -57,7 +59,7 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
      * @param p_write_accesses Additional resources written by the compute shader.
      */
     RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
-        RendResID p_pipeline_id,
+        std::string_view p_pipeline_id,
         VkExtent3D p_dispatch_group_count,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets = {},
         std::span<const ResAccessVK> p_read_accesses = {},
@@ -75,7 +77,7 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    RendResID pipeline_id = 0;
+    std::string pipeline_id;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
     Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
     Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;

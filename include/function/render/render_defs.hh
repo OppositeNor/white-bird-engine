@@ -30,7 +30,7 @@ using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
  */
 struct RenderBindpointDeclaration {
     /**
-     * @brief Reflected shader field path, e.g. "camera_info.view". Empty for resource bindpoints such as materials.
+    * @brief Reflected shader field path, e.g. "camera_info.view" or descriptor scope such as "material".
      */
     std::string field_path;
     /**
@@ -47,7 +47,7 @@ struct RenderBindpointDeclarationsBuilder {
     /**
      * @brief Add a decleration.
      *
-     * @param Reflected shader field path, e.g. "camera_info.view". Empty for resource bindpoints such as materials.
+        * @param Reflected shader field path, e.g. "camera_info.view" or descriptor scope such as "material".
      * @param Typed source data. Data is copied during compilation.
      * @return *this
      */
@@ -56,16 +56,6 @@ struct RenderBindpointDeclarationsBuilder {
         return *this;
     }
 
-    /**
-     * @brief Add a resource bindpoint.
-     *
-     * @param p_data The resource.
-     * @return *this.
-     */
-    RenderBindpointDeclarationsBuilder& add_resource_bindpoint(std::any p_data) {
-        declerations.push_back({.field_path = std::string(), .data = p_data});
-        return *this;
-    }
     /**
      * @brief Build the resource bindings.
      *

@@ -16,12 +16,10 @@
 #define WBE_FILE_RENDER_TASK_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 
-using RendResID = HashCode;
 using RendResTID = HashCode;
 using RendTaskID = HashCode;
 

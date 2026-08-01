@@ -32,6 +32,8 @@
 #include <format>
 #include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vulkan/vulkan_core.h>
@@ -243,22 +245,23 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     }
 }
 
-void RenderGraphVK::set_resource(RendResID p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id) {
-    auto it = all_resources.find(p_res_id);
+void RenderGraphVK::set_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id) {
+    std::string resource_id(p_res_id);
+    auto it = all_resources.find(resource_id);
     if (it != all_resources.end()) {
         it->second->res = p_resource;
         it->second->res_type_id = p_res_type_id;
         return;
     }
     auto resource_ref = make_ref<RendResVK>(render_data->allocator);
-    resource_ref->res_id = p_res_id;
+    resource_ref->res_id = resource_id;
     resource_ref->res_type_id = p_res_type_id;
     resource_ref->res = p_resource;
-    all_resources.emplace(p_res_id, std::move(resource_ref));
+    all_resources.emplace(std::move(resource_id), std::move(resource_ref));
 }
 
-Map<RendResID, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
-    Map<RendResID, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
+Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
+    Map<std::string, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
     resources_by_id.reserve(p_desc.resources.size());
     for (const auto& resource_desc : p_desc.resources) {
         auto resource_ref = make_ref<RendResVK>(render_data->allocator);
@@ -305,8 +308,8 @@ void RenderGraphVK::add_exec_edges_from_prev(const RendGraphDescVK& p_desc, cons
     }
 }
 
-void RenderGraphVK::infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderAllocator>& p_resources) {
-    auto find_res = [&](RendResID p_id) -> Ref<RendResVK> {
+void RenderGraphVK::infer_res_edges(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources) {
+    auto find_res = [&](const std::string& p_id) -> Ref<RendResVK> {
         auto it = p_resources.find(p_id);
         if (it != p_resources.end()) {
             return it->second;
@@ -316,7 +319,7 @@ void RenderGraphVK::infer_res_edges(const Map<RendResID, Ref<RendResVK>, RenderA
 
     // last_writer[res_id] = (node, write access, write stage)
     struct WriteInfo {
-        RendResID id;
+        std::string id;
         Ref<RGNode> node;
         VkAccessFlags2 access;
         VkPipelineStageFlags2 stage;

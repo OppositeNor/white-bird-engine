@@ -48,6 +48,14 @@ public:
          */
         std::string texture_key;
         /**
+         * @brief Index inside a descriptor array, when this binding targets one array element.
+         */
+        uint32_t array_index = 0;
+        /**
+         * @brief Whether array_index is valid.
+         */
+        bool has_array_index = false;
+        /**
          * @brief Image view to bind for this texture parameter.
          */
         Ref<ROImageViewVK> image_view;
@@ -66,6 +74,14 @@ public:
          * @brief Name of the shader sampler parameter.
          */
         std::string sampler_key;
+        /**
+         * @brief Index inside a descriptor array, when this binding targets one array element.
+         */
+        uint32_t array_index = 0;
+        /**
+         * @brief Whether array_index is valid.
+         */
+        bool has_array_index = false;
         /**
          * @brief Sampler to bind for this parameter.
          */

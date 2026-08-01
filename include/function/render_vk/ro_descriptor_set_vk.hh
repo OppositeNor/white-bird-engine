@@ -152,6 +152,10 @@ public:
          * @brief The binding to write to.
          */
         Required<uint32_t> binding;
+        /**
+         * @brief First array element to write within the binding.
+         */
+        uint32_t dst_array_element = 0;
 
         /**
          * @brief Set the binding.
@@ -161,6 +165,17 @@ public:
          */
         Writer& set_binding(uint32_t p_binding) {
             binding = p_binding;
+            return *this;
+        }
+
+        /**
+         * @brief Set the first array element to write.
+         *
+         * @param p_dst_array_element The first array element to write.
+         * @return *this.
+         */
+        Writer& set_dst_array_element(uint32_t p_dst_array_element) {
+            dst_array_element = p_dst_array_element;
             return *this;
         }
 
@@ -183,6 +198,19 @@ public:
          */
         Writer& add_uniform_buffer_info(const BufferInfo& p_buffer_info) {
             uniform_buffer_infos.push_back(p_buffer_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add a uniform_buffer info.
+         *
+         * @param p_buffer The buffer instance.
+         * @param p_offset The offset in the buffer.
+         * @param p_range The range of the buffer.
+         * @return *this.
+         */
+        Writer& add_uniform_buffer_info(Ref<ROBufferVK> p_buffer, VkDeviceSize p_offset, VkDeviceSize p_range) {
+            uniform_buffer_infos.push_back({.buffer = p_buffer, .offset = p_offset, .range = p_range});
             return *this;
         }
 

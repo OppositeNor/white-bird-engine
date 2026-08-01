@@ -87,6 +87,24 @@ struct SpotLightInfoBuffer {
     uint spot_light_count;
 };
 
+struct MaterialParams {
+    Texture2D<float4> albedo;
+    Texture2D<float4> normal;
+    Texture2D<float4> roughness_metallic_ao;
+    SamplerState material_sampler;
+};
+
+struct LightParam {
+    ConstantBuffer<SpotLightInfo> info;
+    Texture2D<float> shadowmap;
+    SamplerState shadowmap_sampler;
+};
+
+struct LightParams {
+    LightParam lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    ConstantBuffer<uint> light_count;
+};
+
 /**
  * @brief GGX/Trowbridge-Reitz normal distribution function.
  * @param p_normal The surface normal (unit vector).

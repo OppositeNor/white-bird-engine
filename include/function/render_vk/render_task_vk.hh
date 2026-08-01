@@ -19,6 +19,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include <cstdint>
+#include <string>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -49,7 +50,7 @@ struct RendResVK;
  */
 struct ResAccessVK {
     // The id of the resource consumed/produced by the task.
-    RendResID res_id = 0;
+    std::string res_id;
     // Combined access flags for this access (read or write side as
     // appropriate).
     VkAccessFlags2 access = VK_ACCESS_2_NONE;
