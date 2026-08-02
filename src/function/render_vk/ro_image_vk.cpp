@@ -22,8 +22,6 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
-#include "utils/defs.hh"
-#include "utils/utils.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <set>
@@ -175,14 +173,16 @@ VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_da
     create_info.usage = WBE_REQUIRED(usage);
     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    std::vector<uint32_t> initial_queues(queue_families.begin(), queue_families.end());
-    if (initial_queues.size() > 1) {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.pQueueFamilyIndices = initial_queues.data();
-        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
-    } else {
-        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    std::vector<uint32_t> initial_queues;
+    if (queue_families.empty()) {
+        initial_queues = std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
     }
+    else {
+        initial_queues = std::vector<uint32_t>(queue_families.begin(), queue_families.end());
+    }
+    create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    create_info.pQueueFamilyIndices = initial_queues.data();
+    create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
 
     VkImage result;
     if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {

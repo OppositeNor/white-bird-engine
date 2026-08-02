@@ -33,14 +33,16 @@ VkBuffer ROBufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = size;
     create_info.usage = WBE_REQUIRED(usage);
-    if (queue_family_indices.size() > 1) {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        std::vector<uint32_t> vec_queue_family_indices(queue_family_indices.begin(), queue_family_indices.end());
-        create_info.queueFamilyIndexCount = vec_queue_family_indices.size();
-        create_info.pQueueFamilyIndices = vec_queue_family_indices.data();
-    } else {
-        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    std::vector<uint32_t> initial_queues;
+    if (queue_family_indices.empty()) {
+        initial_queues = std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
     }
+    else {
+        initial_queues = std::vector<uint32_t>(queue_family_indices.begin(), queue_family_indices.end());
+    }
+    create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    create_info.pQueueFamilyIndices = initial_queues.data();
+    create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
     VkBuffer result;
     if (vkCreateBuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create buffer.");
