@@ -156,8 +156,9 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     auto emplace_result =
         bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
     auto bound_object_it = emplace_result.first;
-    if (!emplace_result.second) {
-        // If previously existed, clear the bound objects.
+    if (!emplace_result.second && p_writer.dst_array_element == 0) {
+        // Rewriting a binding from the first array element replaces the entire binding's retained resources.
+        // Partial array writes for later elements must keep earlier references alive.
         bound_object_it->second.clear();
     }
 

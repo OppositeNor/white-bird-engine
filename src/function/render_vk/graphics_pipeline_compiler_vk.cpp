@@ -56,7 +56,6 @@
 #include <string>
 #include <string_view>
 #include <tuple>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -499,11 +498,39 @@ void validate_texture_bindpoint_sources(std::string_view p_resource_key,
 }
 
 std::string get_stage_entry(RefRes<char> p_stage_entry) {
-    // Empty resource data means the shader stage should use the conventional SPIR-V entry point.
+    // Empty resource data means the pipeline should resolve the stage entry from reflected shader metadata.
     if (p_stage_entry == nullptr || p_stage_entry.get()[0] == '\0') {
-        return std::string("main");
+        return {};
     }
     return std::string(p_stage_entry.get());
+}
+
+std::string get_shader_resource_stage_entry(RefRes<RUShader> p_shader, std::string_view p_stage) {
+    if (p_shader == nullptr) {
+        return {};
+    }
+    RefRes<char> stage_entry;
+    if (p_stage == "vertex") {
+        stage_entry = p_shader->vertex_entry;
+    } else if (p_stage == "fragment") {
+        stage_entry = p_shader->fragment_entry;
+    } else if (p_stage == "geometry") {
+        stage_entry = p_shader->geometry_entry;
+    } else if (p_stage == "tesscontrol" || p_stage == "tesseval") {
+        stage_entry = p_shader->tessellation_entry;
+    } else if (p_stage == "compute") {
+        stage_entry = p_shader->compute_entry;
+    }
+    return get_stage_entry(stage_entry);
+}
+
+std::string resolve_pipeline_stage_entry(
+    RefRes<RUShader> p_shader, const ShaderMetadata& p_metadata, std::string_view p_stage, RefRes<char> p_stage_entry) {
+    std::string resolved_stage_entry = get_stage_entry(p_stage_entry);
+    if (resolved_stage_entry.empty()) {
+        resolved_stage_entry = get_shader_resource_stage_entry(p_shader, p_stage);
+    }
+    return std::string(resolve_shader_stage_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
 }
 
 template <typename RenderObjectType>
@@ -560,13 +587,17 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     auto fragment_shader = compile_shader(p_pipeline_resource->fragment_stage);
     auto vertex_shader_metadata = load_shader_metadata(p_pipeline_resource->vertex_stage);
     auto fragment_shader_metadata = load_shader_metadata(p_pipeline_resource->fragment_stage);
-    auto descriptor_bindings =
-        collect_graphics_pipeline_descriptor_bindings(*p_pipeline_resource, vertex_shader_metadata, fragment_shader_metadata);
+    std::string vertex_stage_entry =
+        resolve_pipeline_stage_entry(p_pipeline_resource->vertex_stage, vertex_shader_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
+    std::string fragment_stage_entry =
+        resolve_pipeline_stage_entry(p_pipeline_resource->fragment_stage, fragment_shader_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
+    auto descriptor_bindings = collect_graphics_pipeline_descriptor_bindings(
+        vertex_shader_metadata, vertex_stage_entry, fragment_shader_metadata, fragment_stage_entry);
     auto descriptor_set_layouts = compile_descriptor_set_layouts(p_resource_key, descriptor_bindings);
     auto pipeline_layout = compile_pipeline_layout(p_resource_key, descriptor_set_layouts);
     CompiledPipelineObjects result;
-    result.graphics_pipeline =
-        compile_graphics_pipeline(p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, pipeline_layout);
+    result.graphics_pipeline = compile_graphics_pipeline(
+        p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, vertex_stage_entry, fragment_stage_entry, pipeline_layout);
     result.descriptor_sets =
         compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     result.descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings);
@@ -642,6 +673,8 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     const RUGraphicsPipeline& p_pipeline_resource,
     Ref<ROShaderVK> p_vertex_shader,
     Ref<ROShaderVK> p_fragment_shader,
+    std::string_view p_vertex_stage_entry,
+    std::string_view p_fragment_stage_entry,
     Ref<ROPipelineLayoutVK> p_pipeline_layout) {
     auto graphics_pipeline = get_registered_render_object<ROGraphicsPipelineVK>(
         context.render_database, p_resource_key, TypeUUID<ROGraphicsPipelineVK>::UUID);
@@ -653,8 +686,8 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
     shader_config.set_shaders(p_vertex_shader,
         p_fragment_shader,
-        get_stage_entry(p_pipeline_resource.vertex_stage_entry),
-        get_stage_entry(p_pipeline_resource.fragment_stage_entry));
+        p_vertex_stage_entry,
+        p_fragment_stage_entry);
     auto pipeline_builder =
         ROGraphicsPipelineVK::Builder().default_render_opaque_configuration(context.render_data, shader_config, p_pipeline_layout);
     pipeline_builder.config.attachment_config.set_color_formats(context.color_attachment_formats)
@@ -714,49 +747,73 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
         .set_set_index(p_set_index)
         .set_descriptor_bindings(p_descriptor_bindings)
         .set_default_sampler(default_sampler);
+    add_direct_texture_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
+    add_direct_sampler_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
+    add_material_texture_bindpoints(p_resource_key, builder, p_descriptor_bindings, p_set_index, p_bindpoint_declarations);
+    return builder.create_ref(context.render_data)->get_descriptor_set();
+}
+
+void GraphicsPipelineCompilerVK::add_direct_texture_bindpoints(std::string_view p_resource_key,
+    ROMaterialVK::Builder& p_builder,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
-        if (is_texture_bindpoint(bindpoint_declaration)) {
-            // Add raw texture bindpoints before material slots so explicit per-compile inputs win on duplicate texture keys.
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            ROMaterialVK::TextureBinding texture_binding{
-                .texture_key = indexed_path.field_path,
-                .array_index = indexed_path.array_index.value_or(0),
-                .has_array_index = indexed_path.array_index.has_value(),
-                .image_layout = VK_IMAGE_LAYOUT_GENERAL,
-            };
-            if (const auto* texture = std::any_cast<RefRes<RUImage>>(&bindpoint_declaration.data)) {
-                if (*texture == nullptr) {
-                    throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': texture '{}' is missing.",
-                        p_resource_key,
-                        bindpoint_declaration.field_path));
-                }
-                texture_binding.image_view =
-                    compile_image_view(std::format("{}#texture_{}", p_resource_key, bindpoint_declaration.field_path), *texture);
-            } else if (const auto* image_view = std::any_cast<Ref<ROImageViewVK>>(&bindpoint_declaration.data)) {
-                if (*image_view == MEM_NULL) {
-                    throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': image view texture '{}' is missing.",
-                        p_resource_key,
-                        bindpoint_declaration.field_path));
-                }
-                texture_binding.image_view = *image_view;
-            }
-            builder.add_texture_binding(texture_binding);
+        if (!is_texture_bindpoint(bindpoint_declaration)) {
             continue;
         }
-        if (is_sampler_bindpoint(bindpoint_declaration)) {
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            auto sampler = std::any_cast<Ref<ROSamplerVK>>(bindpoint_declaration.data);
-            if (sampler == MEM_NULL) {
-                throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': sampler '{}' is missing.",
+        // Add raw texture bindpoints before material slots so explicit per-compile inputs win on duplicate texture keys.
+        IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
+        ROMaterialVK::TextureBinding texture_binding{
+            .texture_key = indexed_path.field_path,
+            .array_index = indexed_path.array_index.value_or(0),
+            .has_array_index = indexed_path.array_index.has_value(),
+            .image_layout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+        if (const auto* texture = std::any_cast<RefRes<RUImage>>(&bindpoint_declaration.data)) {
+            if (*texture == nullptr) {
+                throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': texture '{}' is missing.",
                     p_resource_key,
                     bindpoint_declaration.field_path));
             }
-            builder.add_sampler_binding(ROMaterialVK::SamplerBinding{.sampler_key = indexed_path.field_path,
-                .array_index = indexed_path.array_index.value_or(0),
-                .has_array_index = indexed_path.array_index.has_value(),
-                .sampler = sampler});
+            texture_binding.image_view =
+                compile_image_view(std::format("{}#texture_{}", p_resource_key, bindpoint_declaration.field_path), *texture);
+        } else if (const auto* image_view = std::any_cast<Ref<ROImageViewVK>>(&bindpoint_declaration.data)) {
+            if (*image_view == MEM_NULL) {
+                throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': image view texture '{}' is missing.",
+                    p_resource_key,
+                    bindpoint_declaration.field_path));
+            }
+            texture_binding.image_view = *image_view;
         }
+        p_builder.add_texture_binding(texture_binding);
     }
+}
+
+void GraphicsPipelineCompilerVK::add_direct_sampler_bindpoints(std::string_view p_resource_key,
+    ROMaterialVK::Builder& p_builder,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
+    for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
+        if (!is_sampler_bindpoint(bindpoint_declaration)) {
+            continue;
+        }
+        IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
+        auto sampler = std::any_cast<Ref<ROSamplerVK>>(bindpoint_declaration.data);
+        if (sampler == MEM_NULL) {
+            throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': sampler '{}' is missing.",
+                p_resource_key,
+                bindpoint_declaration.field_path));
+        }
+        p_builder.add_sampler_binding(ROMaterialVK::SamplerBinding{.sampler_key = indexed_path.field_path,
+            .array_index = indexed_path.array_index.value_or(0),
+            .has_array_index = indexed_path.array_index.has_value(),
+            .sampler = sampler});
+    }
+}
+
+void GraphicsPipelineCompilerVK::add_material_texture_bindpoints(std::string_view p_resource_key,
+    ROMaterialVK::Builder& p_builder,
+    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
+    uint32_t p_set_index,
+    std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations) {
         if (!is_material_bindpoint(bindpoint_declaration)) {
             continue;
@@ -785,12 +842,11 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
                     "Failed to compile material '{}': texture '{}' is missing.", material->resource_key, texture_key));
             }
             std::string scoped_texture_key = std::format("{}.{}", bindpoint_declaration.field_path, texture_key);
-            builder.add_texture_binding(ROMaterialVK::TextureBinding{.texture_key = scoped_texture_key,
+            p_builder.add_texture_binding(ROMaterialVK::TextureBinding{.texture_key = scoped_texture_key,
                 .image_view = compile_image_view(std::format("{}#texture_{}", material->resource_key, scoped_texture_key), texture_slot.texture),
                 .image_layout = VK_IMAGE_LAYOUT_GENERAL});
         }
     }
-    return builder.create_ref(context.render_data)->get_descriptor_set();
 }
 
 Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource) {

@@ -19,7 +19,7 @@
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
-[[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
+ConstantBuffer<CameraInfo> camera_info;
 
 /**
  * @brief Transform a textured vertex into clip space and pass per-vertex attributes through to the fragment stage.

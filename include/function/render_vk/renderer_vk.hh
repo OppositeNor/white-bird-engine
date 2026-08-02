@@ -192,8 +192,8 @@ public:
 private:
     static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 1024;
     static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
-    static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 64;
-    static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 32;
+    static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 256;
+    static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 256;
     static constexpr size_t MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT = 32;
     Ref<JobBufferRingMPSC> job_buffer;
 

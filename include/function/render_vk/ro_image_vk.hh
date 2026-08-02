@@ -61,7 +61,8 @@ public:
         uint32_t layers_count = 1;
         // Image usages.
         Required<VkImageUsageFlags> usage;
-        // The queue families this image will be used in.
+        // The queue families this image will be used in. If not set, it will set to
+        // all queue families used in the graphics renderer.
         std::set<uint32_t> queue_families;
 
         // Set the image type.

@@ -38,13 +38,11 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
-#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
-#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -90,8 +88,6 @@ public:
         auto render_database_ref = renderer->get_render_database();
         const auto* base_render_data = renderer->get_base_render_data();
         const VkExtent2D extent = base_render_data->swap_chain_extent;
-        const std::set<uint32_t> queue_families(
-            base_render_data->queue_family_indices.begin(), base_render_data->queue_family_indices.end());
 
         // Setup cube's mesh and inject its static-opaque buffers into the graph.
         auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
@@ -107,26 +103,22 @@ public:
                                         .set_image_type(VK_IMAGE_TYPE_2D)
                                         .set_format(GBUFFER_ALBEDO_FORMAT)
                                         .image_2d(extent)
-                                        .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                        .set_queue_families(queue_families);
+                                        .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
         auto normal_image_builder = WBE::ROImageVK::Builder()
                                         .set_image_type(VK_IMAGE_TYPE_2D)
                                         .set_format(GBUFFER_NORMAL_FORMAT)
                                         .image_2d(extent)
-                                        .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                        .set_queue_families(queue_families);
+                                        .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
         auto rma_image_builder = WBE::ROImageVK::Builder()
                                      .set_image_type(VK_IMAGE_TYPE_2D)
                                      .set_format(GBUFFER_RMA_FORMAT)
                                      .image_2d(extent)
-                                     .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                     .set_queue_families(queue_families);
+                                     .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
         auto depth_image_builder = WBE::ROImageVK::Builder()
                                        .set_image_type(VK_IMAGE_TYPE_2D)
                                        .set_format(GBUFFER_DEPTH_FORMAT)
                                        .image_2d(extent)
-                                       .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                       .set_queue_families(queue_families);
+                                       .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
         gbuffer_albedo_image = albedo_image_builder.create_ref(base_render_data);
         gbuffer_normal_image = normal_image_builder.create_ref(base_render_data);

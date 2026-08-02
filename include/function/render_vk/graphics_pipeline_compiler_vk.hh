@@ -26,6 +26,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_material_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -144,6 +145,8 @@ private:
         const RUGraphicsPipeline& p_pipeline_resource,
         Ref<ROShaderVK> p_vertex_shader,
         Ref<ROShaderVK> p_fragment_shader,
+        std::string_view p_vertex_stage_entry,
+        std::string_view p_fragment_stage_entry,
         Ref<ROPipelineLayoutVK> p_pipeline_layout);
     std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(std::string_view p_resource_key,
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
@@ -151,6 +154,17 @@ private:
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
     Ref<RODescriptorSetVK> compile_texture_descriptor_set(std::string_view p_resource_key,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
+        const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
+        uint32_t p_set_index,
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+    void add_direct_texture_bindpoints(std::string_view p_resource_key,
+        ROMaterialVK::Builder& p_builder,
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+    void add_direct_sampler_bindpoints(std::string_view p_resource_key,
+        ROMaterialVK::Builder& p_builder,
+        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+    void add_material_texture_bindpoints(std::string_view p_resource_key,
+        ROMaterialVK::Builder& p_builder,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
         std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);

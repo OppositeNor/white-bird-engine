@@ -19,7 +19,7 @@
 /**
  * @brief Constant buffer providing the current application time.
  */
-[[vk::binding(0, 0)]] ConstantBuffer<Time> time;
+ConstantBuffer<Time> time;
 
 /**
  * @brief Output a green color whose intensity is animated as a sine of the application time.

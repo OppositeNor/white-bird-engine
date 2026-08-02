@@ -91,6 +91,12 @@ struct ShaderDescriptorSetLayoutVK {
 };
 
 /**
+ * @brief Resolve a stage entry point, falling back to the only reflected entry for that stage.
+ */
+const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
+    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
+
+/**
  * @brief Find a shader entry point by stage and entry function name.
  */
 const ShaderMetadataEntryPoint& find_shader_entry_point(
@@ -111,7 +117,10 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
  * @brief Collect and merge descriptor bindings from all supported graphics stages.
  */
 std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(
-    const RUGraphicsPipeline& p_pipeline, const ShaderMetadata& p_vertex_shader_metadata, const ShaderMetadata& p_fragment_shader_metadata);
+    const ShaderMetadata& p_vertex_shader_metadata,
+    std::string_view p_vertex_stage_entry,
+    const ShaderMetadata& p_fragment_shader_metadata,
+    std::string_view p_fragment_stage_entry);
 
 /**
  * @brief Build descriptor set layout inputs for a graphics pipeline resource.

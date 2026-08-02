@@ -281,6 +281,11 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
+    resource_unit.vertex_entry = populate_text(p_res_chunk, p_scheme.vertex_entry);
+    resource_unit.tessellation_entry = populate_text(p_res_chunk, p_scheme.tessellation_entry);
+    resource_unit.geometry_entry = populate_text(p_res_chunk, p_scheme.geometry_entry);
+    resource_unit.fragment_entry = populate_text(p_res_chunk, p_scheme.fragment_entry);
+    resource_unit.compute_entry = populate_text(p_res_chunk, p_scheme.compute_entry);
     resource_unit.data = data.force_cast<uint32_t>();
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
@@ -313,7 +318,7 @@ void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_
 }
 
 RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, std::string_view p_entry) {
-    std::string stage_entry(p_entry.empty() ? "main" : p_entry);
+    std::string stage_entry(p_entry);
     return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.c_str());
 }
 

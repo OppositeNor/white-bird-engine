@@ -38,6 +38,21 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
     // The path to the shader's metadata file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string metadata;
+    // Default vertex entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_entry;
+    // Default tessellation entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::string tessellation_entry;
+    // Default geometry entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::string geometry_entry;
+    // Default fragment entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::string fragment_entry;
+    // Default compute entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::string compute_entry;
 };
 
 /**
@@ -51,7 +66,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::string vertex_stage_id;
     // Entry function for the vertex stage.
     WBE_META(WBE_REFLECT)
-    std::string vertex_stage_entry = "main";
+    std::string vertex_stage_entry;
     // The vertex shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader vertex_stage;
@@ -60,7 +75,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::string tessellation_stage_id;
     // Entry function for the tessellation stage.
     WBE_META(WBE_REFLECT)
-    std::string tessellation_stage_entry = "main";
+    std::string tessellation_stage_entry;
     // The tessellation shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader tessellation_stage;
@@ -69,7 +84,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::string geometry_stage_id;
     // Entry function for the geometry stage.
     WBE_META(WBE_REFLECT)
-    std::string geometry_stage_entry = "main";
+    std::string geometry_stage_entry;
     // The geometry shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader geometry_stage;
@@ -78,7 +93,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::string fragment_stage_id;
     // Entry function for the fragment stage.
     WBE_META(WBE_REFLECT)
-    std::string fragment_stage_entry = "main";
+    std::string fragment_stage_entry;
     // The fragment shader of the pipeline.
     WBE_META(WBE_REFLECT)
     RUSchemeShader fragment_stage;
@@ -194,6 +209,16 @@ struct RUShader : public ResourceUnit {
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.
     RefRes<char> metadata_path;
+    // Default vertex entry for this shader module.
+    RefRes<char> vertex_entry;
+    // Default tessellation entry for this shader module.
+    RefRes<char> tessellation_entry;
+    // Default geometry entry for this shader module.
+    RefRes<char> geometry_entry;
+    // Default fragment entry for this shader module.
+    RefRes<char> fragment_entry;
+    // Default compute entry for this shader module.
+    RefRes<char> compute_entry;
 };
 
 /**

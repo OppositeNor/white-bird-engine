@@ -31,7 +31,7 @@ struct VSOutput {
 /**
  * @brief Combined image+sampler for the G-buffer albedo attachment.
  */
-[[vk::binding(0, 0)]] Sampler2D albedo_sampler;
+Sampler2D albedo_sampler;
 
 /**
  * @brief Output the sampled G-buffer albedo color as an opaque pixel.

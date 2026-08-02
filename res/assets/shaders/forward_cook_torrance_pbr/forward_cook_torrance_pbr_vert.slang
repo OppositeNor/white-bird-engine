@@ -19,12 +19,16 @@
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
-[[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> camera_info;
+ConstantBuffer<CameraInfo> camera_info;
+
+// Keep standalone global buffers declared in the same order across stages so
+// Slang's automatic binding assigns stable bindings for pipeline merging.
+ConstantBuffer<MaterialParams> material_params;
 
 /**
  * @brief Spot-light parameter block. The vertex stage uses the first view/proj matrices to compute the light-space position consumed by the fragment stage for shadow mapping.
  */
-[[vk::binding(0, 1)]] ParameterBlock<LightParams> light;
+ParameterBlock<LightParams> light;
 
 /**
  * @brief Transform a textured vertex into clip space and pass per-vertex attributes through to the fragment stage.

@@ -39,6 +39,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
+#include "material_bindpoint_test_utils.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -149,6 +150,7 @@ private:
     WBE::RenderAllocator* render_allocator = nullptr;
     WBE::RenderDatabase* render_database = nullptr;
     WBE::RefRes<WBE::RUMesh3D> sponza_mesh;
+    WBE::RefRes<WBE::RUMaterial> default_material;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
 
     // Kept alive for the lifetime of the test because the graph resources and
@@ -162,6 +164,7 @@ private:
     WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;
     WBE::Ref<WBE::ROImageViewVK> shadow_color_view;
     WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
+    WBE::Ref<WBE::ROSamplerVK> material_sampler;
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::SpotLightInfo spot_light{};
     VkExtent2D shadow_extent{};
@@ -233,6 +236,10 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
     if (sponza_mesh == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: sponza mesh resource was not found.");
     }
+    default_material = resource_manager->get_resource<WBE::RUMaterial>("default_material");
+    if (default_material == nullptr) {
+        throw std::runtime_error("Failed to setup draw sponza test: default material resource was not found.");
+    }
     shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
     if (shadow_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: 'shadowmap_spot' graphics pipeline resource not found.");
@@ -267,13 +274,10 @@ void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
 }
 
 void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
-    const std::set<uint32_t> queue_families(
-        base_render_data->queue_family_indices.begin(), base_render_data->queue_family_indices.end());
-
     shadow_depth_image =
-        WBE::ROImageVK::Builder().shadow_map_depth(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
+        WBE::ROImageVK::Builder().shadow_map_depth(spot_light).create_ref(base_render_data);
     shadow_color_image =
-        WBE::ROImageVK::Builder().shadow_map_color(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
+        WBE::ROImageVK::Builder().shadow_map_color(spot_light).create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -306,6 +310,10 @@ void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
                          .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                          .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                          .create_ref(base_render_data);
+    material_sampler = WBE::ROSamplerVK::Builder()
+                           .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                           .set_address_mode(VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                           .create_ref(base_render_data);
 }
 
 void ApplicationVulkanDrawSponzaTest::gather_sponza_materials() {
@@ -332,7 +340,6 @@ void ApplicationVulkanDrawSponzaTest::compile_shadow_pipeline() {
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.view", .data = spot_light.view},
         WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.proj", .data = spot_light.proj},
     };
-    // TODO: Fix material 12
     auto compiled = WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
                         .compile("shadowmap_spot",
                             shadow_pipeline_resource,
@@ -345,15 +352,16 @@ void ApplicationVulkanDrawSponzaTest::compile_shadow_pipeline() {
 ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTest::compile_main_pipeline(
     WBE::RefRes<WBE::RUMaterial> p_material) {
     camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
-    auto main_bindpoint_declarations = WBE::RenderBindpointDeclarationsBuilder()
-                                           .add_decleratoin("camera_info.view", camera_info.view)
-                                           .add_decleratoin("camera_info.proj", camera_info.proj)
-                                           .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
-                                           .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
-                                           .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
-                                           .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
-                                           .add_decleratoin("material", p_material)
-                                           .build();
+    WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
+    bindpoint_builder.add_decleratoin("camera_info.view", camera_info.view)
+        .add_decleratoin("camera_info.proj", camera_info.proj)
+        .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
+        .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
+        .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
+        .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
+        .add_decleratoin(
+            "material_params", WBE::add_material_texture_bindings(bindpoint_builder, default_material, p_material, material_sampler));
+    auto main_bindpoint_declarations = bindpoint_builder.build();
 
     WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
         .allocator = render_allocator,

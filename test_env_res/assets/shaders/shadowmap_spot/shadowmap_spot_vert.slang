@@ -26,7 +26,7 @@ struct ShadowVSOutput {
 /**
  * @brief Constant buffer providing the spot light's view and projection matrices.
  */
-[[vk::binding(0, 0)]] ConstantBuffer<CameraInfo> light_camera_info;
+ConstantBuffer<CameraInfo> light_camera_info;
 
 /**
  * @brief Transform a vertex into the spot light's clip space for depth-only rendering.

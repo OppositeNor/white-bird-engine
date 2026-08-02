@@ -201,7 +201,7 @@ void append_stage_descriptor_bindings(
     if (p_metadata == nullptr) {
         return;
     }
-    std::string entry_name = p_entry_name == nullptr ? std::string("main") : std::string(p_entry_name);
+    std::string entry_name = p_entry_name == nullptr ? std::string() : std::string(p_entry_name);
     auto stage_bindings = collect_shader_descriptor_bindings(*p_metadata, p_stage, entry_name);
     for (const auto& binding : stage_bindings) {
         merge_descriptor_binding(p_bindings, binding);
@@ -209,6 +209,29 @@ void append_stage_descriptor_bindings(
 }
 
 } // namespace
+
+const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
+    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
+    if (!p_entry_name.empty()) {
+        return find_shader_entry_point(p_metadata, p_stage, p_entry_name);
+    }
+    const ShaderMetadataEntryPoint* matched_entry_point = nullptr;
+    for (const auto& entry_point : p_metadata.entry_points) {
+        if (entry_point.stage != p_stage) {
+            continue;
+        }
+        if (matched_entry_point != nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to resolve shader entry point for stage '{}': multiple reflected entries exist, so the pipeline must specify one.",
+                p_stage));
+        }
+        matched_entry_point = &entry_point;
+    }
+    if (matched_entry_point == nullptr) {
+        throw std::runtime_error(std::format("Failed to find shader entry point for stage '{}'.", p_stage));
+    }
+    return *matched_entry_point;
+}
 
 const ShaderMetadataEntryPoint& find_shader_entry_point(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
@@ -243,7 +266,7 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    const auto& entry_point = find_shader_entry_point(p_metadata, p_stage, p_entry_name);
+    const auto& entry_point = resolve_shader_stage_entry_point(p_metadata, p_stage, p_entry_name);
     VkShaderStageFlagBits stage_flag = shader_stage_flag_from_metadata_stage(entry_point.stage);
     std::vector<ShaderDescriptorBindingVK> result;
     for (const auto& parameter : p_metadata.parameters) {
@@ -277,17 +300,19 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     return result;
 }
 
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const RUGraphicsPipeline& p_pipeline,
+std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(
     const ShaderMetadata& p_vertex_shader_metadata,
-    const ShaderMetadata& p_fragment_shader_metadata) {
+    std::string_view p_vertex_stage_entry,
+    const ShaderMetadata& p_fragment_shader_metadata,
+    std::string_view p_fragment_stage_entry) {
     std::vector<ShaderDescriptorBindingVK> result;
     append_stage_descriptor_bindings(result,
-        p_pipeline.vertex_stage == nullptr ? nullptr : &p_vertex_shader_metadata,
-        p_pipeline.vertex_stage_entry == nullptr ? nullptr : p_pipeline.vertex_stage_entry.get(),
+        &p_vertex_shader_metadata,
+        p_vertex_stage_entry.data(),
         "vertex");
     append_stage_descriptor_bindings(result,
-        p_pipeline.fragment_stage == nullptr ? nullptr : &p_fragment_shader_metadata,
-        p_pipeline.fragment_stage_entry == nullptr ? nullptr : p_pipeline.fragment_stage_entry.get(),
+        &p_fragment_shader_metadata,
+        p_fragment_stage_entry.data(),
         "fragment");
     return result;
 }

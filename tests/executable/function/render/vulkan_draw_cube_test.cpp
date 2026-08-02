@@ -39,6 +39,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
+#include "material_bindpoint_test_utils.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -58,10 +59,10 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
-#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -152,6 +153,7 @@ private:
     WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;
     WBE::Ref<WBE::ROImageViewVK> shadow_color_view;
     WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
+    WBE::Ref<WBE::ROSamplerVK> material_sampler;
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::SpotLightInfo spot_light{};
     VkExtent2D shadow_extent{};
@@ -257,13 +259,11 @@ void ApplicationVulkanDrawCubeTest::setup_spot_light() {
 }
 
 void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
-    const std::set<uint32_t> queue_families(
-        base_render_data->queue_family_indices.begin(), base_render_data->queue_family_indices.end());
 
     shadow_depth_image =
-        WBE::ROImageVK::Builder().shadow_map_depth(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
+        WBE::ROImageVK::Builder().shadow_map_depth(spot_light).create_ref(base_render_data);
     shadow_color_image =
-        WBE::ROImageVK::Builder().shadow_map_color(spot_light).set_queue_families(queue_families).create_ref(base_render_data);
+        WBE::ROImageVK::Builder().shadow_map_color(spot_light).create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -296,6 +296,10 @@ void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
                          .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                          .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                          .create_ref(base_render_data);
+    material_sampler = WBE::ROSamplerVK::Builder()
+                           .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                           .set_address_mode(VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                           .create_ref(base_render_data);
 }
 
 void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
@@ -322,15 +326,17 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
 
 void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
     camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
-    auto main_bindpoint_declarations = WBE::RenderBindpointDeclarationsBuilder()
-                                           .add_decleratoin("camera_info.view", camera_info.view)
-                                           .add_decleratoin("camera_info.proj", camera_info.proj)
-                                           .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
-                                           .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
-                                           .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
-                                           .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
-                                           .add_decleratoin("material", default_material)
-                                           .build();
+    WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
+    bindpoint_builder.add_decleratoin("camera_info.view", camera_info.view)
+        .add_decleratoin("camera_info.proj", camera_info.proj)
+        .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
+        .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
+        .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
+        .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
+        .add_decleratoin("material_params",
+            WBE::add_material_texture_bindings(
+                bindpoint_builder, default_material, default_material, material_sampler));
+    auto main_bindpoint_declarations = bindpoint_builder.build();
 
     WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
         .allocator = render_allocator,

@@ -33,27 +33,27 @@ struct CompositionCamera {
 /**
  * @brief Constant buffer providing the per-frame composition camera data.
  */
-[[vk::binding(0, 0)]] ConstantBuffer<CompositionCamera> camera_info;
+ConstantBuffer<CompositionCamera> camera_info;
 /**
  * @brief G-buffer albedo target: rgb = base color, a = material id.
  */
-[[vk::binding(1, 0)]] Texture2D<float4> gbuffer_albedo;
+Texture2D<float4> gbuffer_albedo;
 /**
  * @brief G-buffer normal target: rg = octahedron-encoded normal.
  */
-[[vk::binding(2, 0)]] Texture2D<float2> gbuffer_octa_normal;
+Texture2D<float2> gbuffer_octa_normal;
 /**
  * @brief G-buffer material parameter target: r = roughness, g = metallic, b = ambient occlusion, a = flags.
  */
-[[vk::binding(3, 0)]] Texture2D<float4> gbuffer_rma;
+Texture2D<float4> gbuffer_rma;
 /**
  * @brief G-buffer depth target.
  */
-[[vk::binding(4, 0)]] Texture2D<float>  gbuffer_depth;
+Texture2D<float>  gbuffer_depth;
 /**
  * @brief Sampler used to read all G-buffer attachments above.
  */
-[[vk::binding(5, 0)]] SamplerState gbuffer_sampler;
+SamplerState gbuffer_sampler;
 
 /**
  * @brief Evaluate the deferred lighting equation for one screen pixel using the G-buffer attachments and a hard-coded directional light.
