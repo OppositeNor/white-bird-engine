@@ -66,11 +66,11 @@ inline void add_material_texture_family_bindings(RenderBindpointDeclarationsBuil
     RefRes<RUImage> p_default_texture,
     RefRes<RUImage> p_material_texture,
     Ref<ROSamplerVK> p_sampler) {
-    p_builder.add_decleratoin(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_default_texture)
-        .add_decleratoin(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_sampler);
+    p_builder.add_image_decleration(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_default_texture)
+        .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_sampler);
     if (p_material_texture != nullptr) {
-        p_builder.add_decleratoin(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_material_texture)
-            .add_decleratoin(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_sampler);
+        p_builder.add_image_decleration(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_material_texture)
+            .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_sampler);
     }
 }
 

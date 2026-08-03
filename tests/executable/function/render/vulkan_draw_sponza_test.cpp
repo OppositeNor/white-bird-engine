@@ -89,33 +89,6 @@ WBE::CameraInfoVKUBO default_camera_info(float p_aspect_ratio) {
     return camera_info;
 }
 
-WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::SpotLightInfo& p_spot_light) {
-    return WBE::SpotLightInfoVKUBO{.view = p_spot_light.view,
-        .proj = p_spot_light.proj,
-        .position = p_spot_light.position,
-        .intensity = p_spot_light.intensity,
-        .direction = p_spot_light.direction,
-        .inner_cone_cos = p_spot_light.inner_cone_cos,
-        .color = p_spot_light.color,
-        .outer_cone_cos = p_spot_light.outer_cone_cos,
-        .range = p_spot_light.range};
-}
-
-std::vector<uint8_t> build_spot_light_info_uniform_data(const WBE::SpotLightInfo& p_spot_light) {
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(p_spot_light);
-
-    std::vector<uint8_t> result(sizeof(spot_light_info));
-    std::memcpy(result.data(), &spot_light_info, result.size());
-    return result;
-}
-
-std::vector<uint8_t> build_spot_light_count_uniform_data() {
-    uint32_t spot_light_count = 1;
-    std::vector<uint8_t> result(sizeof(spot_light_count));
-    std::memcpy(result.data(), &spot_light_count, result.size());
-    return result;
-}
-
 } // namespace
 
 class ApplicationVulkanDrawSponzaTest : public WBE::ApplicationGame {
@@ -336,15 +309,12 @@ void ApplicationVulkanDrawSponzaTest::compile_shadow_pipeline() {
         .color_attachment_formats = {SHADOWMAP_COLOR_FORMAT},
         .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
     };
-    std::array<WBE::RenderBindpointDeclaration, 2> shadow_bindpoint_declarations{
-        WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.view", .data = spot_light.view},
-        WBE::RenderBindpointDeclaration{.field_path = "light_camera_info.proj", .data = spot_light.proj},
-    };
+    WBE::RenderBindpointDeclarationsBuilder shadow_bindpoint_builder;
+    shadow_bindpoint_builder.add_buffer_decleration("light_camera_info.view", &spot_light.view, sizeof(spot_light.view))
+        .add_buffer_decleration("light_camera_info.proj", &spot_light.proj, sizeof(spot_light.proj));
+    auto shadow_bindpoint_declarations = shadow_bindpoint_builder.build();
     auto compiled = WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
-                        .compile("shadowmap_spot",
-                            shadow_pipeline_resource,
-                            std::span<const WBE::RenderBindpointDeclaration>(
-                                shadow_bindpoint_declarations.data(), shadow_bindpoint_declarations.size()));
+                        .compile("shadowmap_spot", shadow_pipeline_resource, shadow_bindpoint_declarations);
     shadow_graphics_pipeline = compiled.graphics_pipeline;
     shadow_descriptor_sets = std::move(compiled.descriptor_sets);
 }
@@ -353,14 +323,24 @@ ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTes
     WBE::RefRes<WBE::RUMaterial> p_material) {
     camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
     WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-    bindpoint_builder.add_decleratoin("camera_info.view", camera_info.view)
-        .add_decleratoin("camera_info.proj", camera_info.proj)
-        .add_decleratoin("light.lights[0].info", build_spot_light_info_uniform_data(spot_light))
-        .add_decleratoin("light.light_count", build_spot_light_count_uniform_data())
-        .add_decleratoin("light.lights[0].shadowmap", shadow_depth_view)
-        .add_decleratoin("light.lights[0].shadowmap_sampler", shadow_sampler)
-        .add_decleratoin(
-            "material_params", WBE::add_material_texture_bindings(bindpoint_builder, default_material, p_material, material_sampler));
+    WBE::SpotLightInfoVKUBO spot_light_info = WBE::SpotLightInfoVKUBO{.view = spot_light.view,
+        .proj = spot_light.proj,
+        .position = spot_light.position,
+        .intensity = spot_light.intensity,
+        .direction = spot_light.direction,
+        .inner_cone_cos = spot_light.inner_cone_cos,
+        .color = spot_light.color,
+        .outer_cone_cos = spot_light.outer_cone_cos,
+        .range = spot_light.range};
+    uint32_t spot_light_count = 1;
+    auto material_params = WBE::add_material_texture_bindings(bindpoint_builder, default_material, p_material, material_sampler);
+    bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_info.view, sizeof(camera_info.view))
+        .add_buffer_decleration("camera_info.proj", &camera_info.proj, sizeof(camera_info.proj))
+        .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
+        .add_buffer_decleration("light.light_count", &spot_light_count, sizeof(spot_light_count))
+        .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
+        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
+        .add_buffer_decleration("material_params", material_params.data(), material_params.size());
     auto main_bindpoint_declarations = bindpoint_builder.build();
 
     WBE::GraphicsPipelineCompilerVKContext main_compiler_context{
@@ -371,10 +351,7 @@ ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTes
         .color_attachment_formats = {base_render_data->swap_chain_format},
     };
     auto compiled = WBE::GraphicsPipelineCompilerVK(main_compiler_context)
-                        .compile(p_material->graphics_pipeline->resource_key,
-                            p_material->graphics_pipeline,
-                            std::span<const WBE::RenderBindpointDeclaration>(
-                                main_bindpoint_declarations.data(), main_bindpoint_declarations.size()));
+                        .compile(p_material->graphics_pipeline->resource_key, p_material->graphics_pipeline, main_bindpoint_declarations);
     return {.graphics_pipeline = compiled.graphics_pipeline,
         .descriptor_sets = std::move(compiled.descriptor_sets),
         .descriptor_set_bindings = std::move(compiled.descriptor_set_bindings)};

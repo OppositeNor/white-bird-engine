@@ -15,8 +15,14 @@
 #ifndef WBE_FILE_RENDER_DEFS_HH
 #define WBE_FILE_RENDER_DEFS_HH
 
+#include "core/memory/reference_strong.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
-#include <any>
+#include "function/render/i_render_object.hh"
+#include "function/render/render_resource_unit.hh"
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,18 +31,66 @@ namespace WhiteBirdEngine {
 using RenderAllocator = HeapAllocatorAlignedPoolImplicitList;
 
 /**
- * @class RenderBindpointDeclaration
- * @brief Caller-provided data for one reflected shader bindpoint.
+ * @class RenderBindpointBufferDeclaration
+ * @brief Byte range for one caller-provided reflected shader bindpoint.
  */
-struct RenderBindpointDeclaration {
+struct RenderBindpointBufferDeclaration {
     /**
-    * @brief Reflected shader field path, e.g. "camera_info.view" or descriptor scope such as "material".
+     * @brief Reflected shader field path, e.g. "camera_info.view" or descriptor scope such as "material".
      */
     std::string field_path;
     /**
-     * @brief Typed source data. Data is copied during compilation.
+     * @brief Byte offset into the owning packed bindpoint buffer.
      */
-    std::any data;
+    size_t offset = 0;
+    /**
+     * @brief Byte size inside the owning packed bindpoint buffer.
+     */
+    size_t size = 0;
+};
+
+/**
+ * @class RenderBindpointImageDeclaration
+ * @brief Caller-provided image bindpoint resolved from either a resource unit or a render object.
+ */
+struct RenderBindpointImageDeclaration {
+    std::string field_path;
+    RefRes<RUImage> image_resource = MEM_NULL;
+    Ref<IRenderObject> image_render_object = MEM_NULL;
+};
+
+/**
+ * @class RenderBindpointSamplerDeclaration
+ * @brief Caller-provided sampler bindpoint resolved from an already-built render object.
+ */
+struct RenderBindpointSamplerDeclaration {
+    std::string field_path;
+    Ref<IRenderObject> sampler_render_object = MEM_NULL;
+};
+
+/**
+ * @class RenderBindpointMaterialDeclaration
+ * @brief Caller-provided material bindpoint resolved from a material resource unit.
+ */
+struct RenderBindpointMaterialDeclaration {
+    std::string field_path;
+    RefRes<RUMaterial> material_resource = MEM_NULL;
+};
+
+/**
+ * @class RenderBindpointDeclarations
+ * @brief Aggregated caller-provided bindpoint data.
+ */
+struct RenderBindpointDeclarations {
+    std::vector<uint8_t> buffer_data;
+    std::vector<RenderBindpointBufferDeclaration> buffer_declerations;
+    std::vector<RenderBindpointImageDeclaration> image_declerations;
+    std::vector<RenderBindpointSamplerDeclaration> sampler_declerations;
+    std::vector<RenderBindpointMaterialDeclaration> material_declerations;
+
+    std::span<const uint8_t> get_buffer_data(const RenderBindpointBufferDeclaration& p_decleration) const {
+        return std::span<const uint8_t>(buffer_data.data() + p_decleration.offset, p_decleration.size);
+    }
 };
 
 /**
@@ -45,14 +99,67 @@ struct RenderBindpointDeclaration {
  */
 struct RenderBindpointDeclarationsBuilder {
     /**
-     * @brief Add a decleration.
+     * @brief Add a buffer decleration.
      *
-        * @param Reflected shader field path, e.g. "camera_info.view" or descriptor scope such as "material".
-     * @param Typed source data. Data is copied during compilation.
+     * @param p_field_path Reflected shader field path, e.g. "camera_info.view".
+     * @param p_data Typed source data copied into the packed byte buffer.
      * @return *this
      */
-    RenderBindpointDeclarationsBuilder& add_decleratoin(std::string_view p_field_path, std::any p_data) {
-        declerations.push_back({.field_path = std::string(p_field_path), .data = p_data});
+    RenderBindpointDeclarationsBuilder& add_buffer_decleration(std::string_view p_field_path, std::span<const uint8_t> p_data) {
+        RenderBindpointBufferDeclaration decleration{
+            .field_path = std::string(p_field_path),
+            .offset = declerations.buffer_data.size(),
+            .size = p_data.size(),
+        };
+        declerations.buffer_data.resize(declerations.buffer_data.size() + p_data.size());
+        if (!p_data.empty()) {
+            std::memcpy(declerations.buffer_data.data() + decleration.offset, p_data.data(), p_data.size());
+        }
+        declerations.buffer_declerations.push_back(decleration);
+        return *this;
+    }
+
+    /**
+     * @brief Add a buffer decleration from raw bytes.
+     */
+    RenderBindpointDeclarationsBuilder& add_buffer_decleration(std::string_view p_field_path, const void* p_data, size_t p_size) {
+        return add_buffer_decleration(
+            p_field_path, std::span<const uint8_t>(static_cast<const uint8_t*>(p_data), p_size));
+    }
+
+    /**
+     * @brief Add an image decleration backed by a resource unit.
+     */
+    RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, RefRes<RUImage> p_image_resource) {
+        declerations.image_declerations.push_back(
+            {.field_path = std::string(p_field_path), .image_resource = p_image_resource, .image_render_object = MEM_NULL});
+        return *this;
+    }
+
+    /**
+     * @brief Add an image decleration backed by a render object.
+     */
+    RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, Ref<IRenderObject> p_image_render_object) {
+        declerations.image_declerations.push_back(
+            {.field_path = std::string(p_field_path), .image_resource = MEM_NULL, .image_render_object = p_image_render_object});
+        return *this;
+    }
+
+    /**
+     * @brief Add a sampler decleration.
+     */
+    RenderBindpointDeclarationsBuilder& add_sampler_decleration(std::string_view p_field_path, Ref<IRenderObject> p_sampler_render_object) {
+        declerations.sampler_declerations.push_back(
+            {.field_path = std::string(p_field_path), .sampler_render_object = p_sampler_render_object});
+        return *this;
+    }
+
+    /**
+     * @brief Add a material decleration.
+     */
+    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, RefRes<RUMaterial> p_material_resource) {
+        declerations.material_declerations.push_back(
+            {.field_path = std::string(p_field_path), .material_resource = p_material_resource});
         return *this;
     }
 
@@ -61,11 +168,11 @@ struct RenderBindpointDeclarationsBuilder {
      *
      * @return The resource bindings.
      */
-    std::vector<RenderBindpointDeclaration> build() const {
+    RenderBindpointDeclarations build() const {
         return declerations;
     }
 
-    std::vector<RenderBindpointDeclaration> declerations;
+    RenderBindpointDeclarations declerations;
 };
 
 } // namespace WhiteBirdEngine

@@ -38,7 +38,6 @@
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/glm.hpp>
-#include <span>
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
@@ -122,7 +121,7 @@ public:
      */
     CompileResult compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations = {});
+        const RenderBindpointDeclarations& p_bindpoint_declarations = {});
 
 private:
     struct CompiledPipelineObjects {
@@ -135,7 +134,7 @@ private:
 
     CompiledPipelineObjects compile_pipeline_objects(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
     std::vector<Ref<RODescriptorSetLayoutVK>> compile_descriptor_set_layouts(
         std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
@@ -151,29 +150,29 @@ private:
     std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(std::string_view p_resource_key,
         const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     Ref<RODescriptorSetVK> compile_texture_descriptor_set(std::string_view p_resource_key,
         Ref<RODescriptorSetLayoutVK> p_descriptor_set_layout,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_direct_texture_bindpoints(std::string_view p_resource_key,
         ROMaterialVK::Builder& p_builder,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_direct_sampler_bindpoints(std::string_view p_resource_key,
         ROMaterialVK::Builder& p_builder,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_material_texture_bindpoints(std::string_view p_resource_key,
         ROMaterialVK::Builder& p_builder,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations);
+        const RenderBindpointDeclarations& p_bindpoint_declarations);
     Ref<ROImageViewVK> compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource);
     Ref<ROImageVK> compile_image(std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
     void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
-        std::span<const RenderBindpointDeclaration> p_bindpoint_declarations) const;
+        const RenderBindpointDeclarations& p_bindpoint_declarations) const;
 };
 
 } // namespace WhiteBirdEngine

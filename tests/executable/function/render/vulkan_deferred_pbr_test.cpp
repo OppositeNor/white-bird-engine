@@ -43,7 +43,6 @@
 #include <glm/ext/vector_float4.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -210,10 +209,10 @@ public:
             .color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT},
             .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
         };
-        std::array<WBE::RenderBindpointDeclaration, 2> gbuffer_bindpoint_declarations{
-            WBE::RenderBindpointDeclaration{.field_path = "camera_info.view", .data = camera_view},
-            WBE::RenderBindpointDeclaration{.field_path = "camera_info.proj", .data = camera_proj},
-        };
+        WBE::RenderBindpointDeclarationsBuilder gbuffer_bindpoint_builder;
+        gbuffer_bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_view, sizeof(camera_view))
+            .add_buffer_decleration("camera_info.proj", &camera_proj, sizeof(camera_proj));
+        auto gbuffer_bindpoint_declarations = gbuffer_bindpoint_builder.build();
         std::array<VkClearValue, 4> gbuffer_clear_values{};
         gbuffer_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 0.0F}};
         gbuffer_clear_values[1].color = {.float32 = {0.0F, 0.0F, 0.0F, 0.0F}};
@@ -221,10 +220,7 @@ public:
         gbuffer_clear_values[3].depthStencil = {.depth = 1.0F, .stencil = 0};
 
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
-                            .compile("deferred_gbuffer",
-                                gbuffer_pipeline_resource,
-                                std::span<const WBE::RenderBindpointDeclaration>(
-                                    gbuffer_bindpoint_declarations.data(), gbuffer_bindpoint_declarations.size()));
+                            .compile("deferred_gbuffer", gbuffer_pipeline_resource, gbuffer_bindpoint_declarations);
         auto graphics_pipeline = compiled.graphics_pipeline;
         // TODO: Register render task with graphics pipeline.
         // ---- (2) Albedo-debug pass: hand-written. -------------------------
