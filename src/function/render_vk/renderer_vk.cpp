@@ -390,16 +390,18 @@ void RendererVK::create_swap_chain() { // NOLINT
     create_info.imageArrayLayers = 1;
     create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     auto unique_indices = queue_family_indices.get_unique_indices();
+    Vector<uint32_t> swap_chain_queue_family_indices_array(allocator);
 
     // If we have to use the image between multiple queue families, we have to
     // specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we
         // don't have to explicitly transfer ownership.
-        Vector<uint32_t> unique_indices_array(unique_indices.begin(), unique_indices.end(), allocator);
+        swap_chain_queue_family_indices_array =
+            Vector<uint32_t>(unique_indices.begin(), unique_indices.end(), allocator);
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
-        create_info.pQueueFamilyIndices = unique_indices_array.data();
+        create_info.pQueueFamilyIndices = swap_chain_queue_family_indices_array.data();
     } else {
         // Images cannot share ownership. If other queue families want to access
         // we have to explicitly transfer ownership.

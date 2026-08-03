@@ -173,16 +173,23 @@ VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_da
     create_info.usage = WBE_REQUIRED(usage);
     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    std::vector<uint32_t> queue_families_data;
+    Vector<uint32_t, RenderAllocator> queue_families_data(p_render_data->allocator);
     if (queue_families.empty()) {
-        queue_families_data = std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
+        queue_families_data = Vector<uint32_t, RenderAllocator>(
+            p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end(), p_render_data->allocator);
+    } else {
+        queue_families_data = Vector<uint32_t, RenderAllocator>(queue_families.begin(), queue_families.end(), p_render_data->allocator);
     }
-    else {
-        queue_families_data = std::vector<uint32_t>(queue_families.begin(), queue_families.end());
+
+    if (queue_families_data.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = queue_families_data.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families_data.size());
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.pQueueFamilyIndices = nullptr;
+        create_info.queueFamilyIndexCount = 0;
     }
-    create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-    create_info.pQueueFamilyIndices = queue_families_data.data();
-    create_info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families_data.size());
 
     VkImage result;
     if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
@@ -223,24 +230,12 @@ ROImageVK::~ROImageVK() {
 void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.image = p_builder.create_vk_object(render_data);
     exposed_fileds.queue_families = p_builder.queue_families;
-    try {
-        VkMemoryRequirements memory_requirements;
-        vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
-        // Images are only allowed to be allocated on device.
-        exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
-        if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to bind vulkan image memory.");
-        }
-    } catch (...) {
-        if (exposed_fileds.image != VK_NULL_HANDLE) {
-            vkDestroyImage(render_data->logic_device, exposed_fileds.image, render_data->allocation_callbacks);
-            exposed_fileds.image = VK_NULL_HANDLE;
-        }
-        if (exposed_fileds.image_memory != VK_NULL_HANDLE) {
-            vkFreeMemory(render_data->logic_device, exposed_fileds.image_memory, render_data->allocation_callbacks);
-            exposed_fileds.image_memory = VK_NULL_HANDLE;
-        }
-        throw;
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
+    // Images are only allowed to be allocated on device.
+    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
+    if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to bind vulkan image memory.");
     }
 }
 
