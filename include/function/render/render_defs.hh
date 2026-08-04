@@ -74,7 +74,7 @@ struct RenderBindpointSamplerDeclaration {
  */
 struct RenderBindpointMaterialDeclaration {
     std::string field_path;
-    RefRes<RUMaterial> material_resource = MEM_NULL;
+    std::string material_key;
 };
 
 /**
@@ -157,9 +157,21 @@ struct RenderBindpointDeclarationsBuilder {
     /**
      * @brief Add a material decleration.
      */
-    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, RefRes<RUMaterial> p_material_resource) {
+    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, std::string_view p_material_key) {
         declerations.material_declerations.push_back(
-            {.field_path = std::string(p_field_path), .material_resource = p_material_resource});
+            {.field_path = std::string(p_field_path), .material_key = std::string(p_material_key)});
+        return *this;
+    }
+
+    /**
+     * @brief Add a material decleration from a resource unit.
+     */
+    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, RefRes<RUMaterial> p_material_resource) {
+        if (p_material_resource == nullptr || p_material_resource->resource_key == nullptr) {
+            throw std::runtime_error("Failed to add material declaration: material resource key was not propagated.");
+        }
+        declerations.material_declerations.push_back(
+            {.field_path = std::string(p_field_path), .material_key = std::string(p_material_resource->resource_key)});
         return *this;
     }
 

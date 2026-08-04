@@ -18,7 +18,6 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -31,6 +30,12 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+struct IndexedDrawRegionVK {
+    uint32_t first_index = 0;
+    uint32_t index_count = 0;
+    int32_t vertex_offset = 0;
+};
 
 /**
  * @class RTRunGraphicsPipelineVK
@@ -70,7 +75,8 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         std::string_view p_pipeline_id,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
+        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
+        std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt);
 
     /**
      * @brief Constructor (multi-attachment).
@@ -97,7 +103,8 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         std::string_view p_pipeline_id,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets);
+        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
+        std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -118,6 +125,7 @@ private:
     std::string pipeline_id;
     std::optional<std::string> vertex_buffer_id;
     std::optional<std::string> index_buffer_id;
+    std::optional<IndexedDrawRegionVK> indexed_draw_region;
     Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
     Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
 };

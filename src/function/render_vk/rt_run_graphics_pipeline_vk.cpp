@@ -40,15 +40,17 @@ namespace WhiteBirdEngine {
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
     const glm::vec4& p_clear_color,
     VkExtent2D p_render_extent,
-        std::string_view p_color_attachment_id,
-        std::string_view p_pipeline_id,
-        std::optional<std::string_view> p_vertex_buffer_id,
-        std::optional<std::string_view> p_index_buffer_id,
-    std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
+    std::string_view p_color_attachment_id,
+    std::string_view p_pipeline_id,
+    std::optional<std::string_view> p_vertex_buffer_id,
+    std::optional<std::string_view> p_index_buffer_id,
+    std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region)
     : render_data(p_render_data), clear_values(p_render_data->allocator), render_extent(p_render_extent),
-            color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
-            vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
-            index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
+      color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
+      vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
+      index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
+      indexed_draw_region(p_indexed_draw_region),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator) {
     clear_values.push_back(
@@ -61,23 +63,25 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
 }
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
-        std::span<const VkClearValue> p_clear_values,
-        VkExtent2D p_render_extent,
-        std::span<const std::string_view> p_color_attachment_ids,
-        std::optional<std::string_view> p_depth_attachment_id,
-        std::string_view p_pipeline_id,
-        std::optional<std::string_view> p_vertex_buffer_id,
-        std::optional<std::string_view> p_index_buffer_id,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets)
+    std::span<const VkClearValue> p_clear_values,
+    VkExtent2D p_render_extent,
+    std::span<const std::string_view> p_color_attachment_ids,
+    std::optional<std::string_view> p_depth_attachment_id,
+    std::string_view p_pipeline_id,
+    std::optional<std::string_view> p_vertex_buffer_id,
+    std::optional<std::string_view> p_index_buffer_id,
+    std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
-        render_extent(p_render_extent),
-        color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
-        depth_attachment_id(p_depth_attachment_id.has_value() ? std::optional<std::string>(*p_depth_attachment_id) : std::nullopt),
-        pipeline_id(p_pipeline_id),
-        vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
-        index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
-        descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
-        descriptor_sets_instances(p_render_data->allocator) {
+      render_extent(p_render_extent),
+      color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
+      depth_attachment_id(p_depth_attachment_id.has_value() ? std::optional<std::string>(*p_depth_attachment_id) : std::nullopt),
+      pipeline_id(p_pipeline_id),
+      vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
+      index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
+      indexed_draw_region(p_indexed_draw_region),
+      descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
+      descriptor_sets_instances(p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
     for (const auto& descriptor_set : descriptor_sets) {
         descriptor_sets_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
@@ -191,8 +195,19 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &offset);
         vkCmdBindIndexBuffer(p_command_buffer, index_buffer_handle, 0, VK_INDEX_TYPE_UINT32);
-        size_t index_count = index_buffer->fields().buffer_size / sizeof(uint32_t);
-        vkCmdDrawIndexed(p_command_buffer, static_cast<uint32_t>(index_count), 1, 0, 0, 0);
+        uint32_t full_index_count = static_cast<uint32_t>(index_buffer->fields().buffer_size / sizeof(uint32_t));
+        uint32_t first_index = 0;
+        uint32_t index_count = full_index_count;
+        int32_t vertex_offset = 0;
+        if (indexed_draw_region.has_value()) {
+            first_index = indexed_draw_region->first_index;
+            index_count = indexed_draw_region->index_count;
+            vertex_offset = indexed_draw_region->vertex_offset;
+            if (first_index > full_index_count || index_count > full_index_count - first_index) {
+                throw std::runtime_error("RTRunGraphicsPipelineVK: indexed draw region exceeds index buffer bounds.");
+            }
+        }
+        vkCmdDrawIndexed(p_command_buffer, index_count, 1, first_index, vertex_offset, 0);
     } else {
         // Screen-triangle / no vertex binding case.
         vkCmdDraw(p_command_buffer, 3, 1, 0, 0);

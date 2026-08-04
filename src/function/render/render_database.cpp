@@ -40,6 +40,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 struct MaterialMeshInfo {
+    std::string_view material_key;
     RefRes<RUMaterial> material;
     Vector<RUSubmesh3D*, RenderAllocator> submeshes;
 };
@@ -47,20 +48,26 @@ struct MaterialMeshInfo {
 // Group submeshes by material before flattening them. This lets the render
 // database record one contiguous index subregion per material.
 void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_material_mesh_infos,
-    std::unordered_map<RUMaterial*, size_t>& p_registered_material_index,
+    std::unordered_map<std::string_view, size_t>& p_registered_material_index,
     RUSubmesh3D& p_submesh,
     RenderAllocator* p_allocator) {
     auto& material = p_submesh.material;
     if (material == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: submesh material should not be NULL.");
     }
-    auto material_entry = p_registered_material_index.find(material.get());
+    if (material->resource_key == nullptr) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh material resource key should not be NULL.");
+    }
+    std::string_view material_key = material->resource_key;
+    auto material_entry = p_registered_material_index.find(material_key);
     if (material_entry == p_registered_material_index.end()) {
         size_t material_index = p_material_mesh_infos.size();
-        p_registered_material_index.insert({material.get(), material_index});
+        p_registered_material_index.insert({material_key, material_index});
         p_material_mesh_infos.push_back(
-            MaterialMeshInfo{.material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
-        material_entry = p_registered_material_index.find(material.get());
+            MaterialMeshInfo{.material_key = material_key,
+                .material = material,
+                .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
+        material_entry = p_registered_material_index.find(material_key);
     }
     p_material_mesh_infos[material_entry->second].submeshes.push_back(&p_submesh);
 }
@@ -94,6 +101,17 @@ void append_material_mesh_info(RenderDatabase::OpaqueTrianglesInfo& p_triangles_
         .material = p_mesh_info.material,
         .sub_region = {.starting_index = material_mesh_start, .size = p_triangles_info.indices.size() - material_mesh_start},
     });
+}
+
+const RenderDatabase::OpaqueTrianglesInfo::MaterialUnit* find_material_unit(
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, std::string_view p_material_key) {
+    for (const auto& material_unit : p_triangles_info.materials) {
+        if (material_unit.material != nullptr && material_unit.material->resource_key != nullptr &&
+            std::string_view(material_unit.material->resource_key) == p_material_key) {
+            return &material_unit;
+        }
+    }
+    return nullptr;
 }
 
 } // namespace
@@ -148,6 +166,13 @@ void RenderDatabase::clear_compiled_render_resources() {
     compiled_render_resources.clear();
 }
 
+const RenderDatabase::OpaqueTrianglesInfo::MaterialUnit* RenderDatabase::find_opaque_material(std::string_view p_material_key) const {
+    if (const auto* static_material = find_material_unit(static_opaque, p_material_key); static_material != nullptr) {
+        return static_material;
+    }
+    return find_material_unit(dynamic_opaque, p_material_key);
+}
+
 void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh) {
     if (p_mesh == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: mesh "
@@ -162,7 +187,7 @@ void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangle
 
     // Record the submeshes for each material
     Vector<MaterialMeshInfo> material_mesh_infos(allocator);
-    std::unordered_map<RUMaterial*, size_t> registered_material_index;
+    std::unordered_map<std::string_view, size_t> registered_material_index;
 
     size_t total_triangles = 0;
     std::span<RefRes<RUSubmesh3D>> submeshes(p_mesh->submeshes.get(), p_mesh->submesh_count);

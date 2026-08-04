@@ -322,6 +322,22 @@ RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, std::string_view p_en
     return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.c_str());
 }
 
+std::string_view resolve_pipeline_stage_entry(std::string_view p_stage_entry, bool p_stage_present) {
+    if (!p_stage_entry.empty()) {
+        return p_stage_entry;
+    }
+    if (!p_stage_present) {
+        return {};
+    }
+    // Leave the pipeline entry unset so compile-time resolution can fall back to the shader resource defaults
+    // or to the sole reflected entry point for the stage.
+    return {};
+}
+
+bool scheme_has_pipeline_stage(std::string_view p_stage_id, const RUSchemeShader& p_stage_scheme) {
+    return !p_stage_id.empty() || !p_stage_scheme.path.empty();
+}
+
 RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemeGraphicsPipeline& p_scheme) {
     RUGraphicsPipeline resource_unit;
     populate_pipeline_stage(p_res_chunk, resource_unit.vertex_stage, p_scheme.vertex_stage_id, p_scheme.vertex_stage, "vertex");
@@ -330,10 +346,20 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     populate_pipeline_stage(
         p_res_chunk, resource_unit.geometry_stage, p_scheme.geometry_stage_id, p_scheme.geometry_stage, "geometry", false);
     populate_pipeline_stage(p_res_chunk, resource_unit.fragment_stage, p_scheme.fragment_stage_id, p_scheme.fragment_stage, "fragment");
-    resource_unit.vertex_stage_entry = push_stage_entry(p_res_chunk, p_scheme.vertex_stage_entry);
-    resource_unit.tessellation_stage_entry = push_stage_entry(p_res_chunk, p_scheme.tessellation_stage_entry);
-    resource_unit.geometry_stage_entry = push_stage_entry(p_res_chunk, p_scheme.geometry_stage_entry);
-    resource_unit.fragment_stage_entry = push_stage_entry(p_res_chunk, p_scheme.fragment_stage_entry);
+    resource_unit.vertex_stage_entry =
+        push_stage_entry(p_res_chunk, resolve_pipeline_stage_entry(
+                                        p_scheme.vertex_stage_entry, scheme_has_pipeline_stage(p_scheme.vertex_stage_id, p_scheme.vertex_stage)));
+    resource_unit.tessellation_stage_entry = push_stage_entry(
+        p_res_chunk,
+        resolve_pipeline_stage_entry(
+            p_scheme.tessellation_stage_entry, scheme_has_pipeline_stage(p_scheme.tessellation_stage_id, p_scheme.tessellation_stage)));
+    resource_unit.geometry_stage_entry =
+        push_stage_entry(p_res_chunk, resolve_pipeline_stage_entry(
+                                        p_scheme.geometry_stage_entry, scheme_has_pipeline_stage(p_scheme.geometry_stage_id, p_scheme.geometry_stage)));
+    resource_unit.fragment_stage_entry = push_stage_entry(
+        p_res_chunk,
+        resolve_pipeline_stage_entry(
+            p_scheme.fragment_stage_entry, scheme_has_pipeline_stage(p_scheme.fragment_stage_id, p_scheme.fragment_stage)));
     resource_unit.depth_test = p_scheme.depth_test;
     resource_unit.depth_write = p_scheme.depth_write;
     auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUGraphicsPipeline>();

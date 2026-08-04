@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include <algorithm>
 #include <cstdint>
@@ -197,11 +196,11 @@ void merge_descriptor_binding(std::vector<ShaderDescriptorBindingVK>& p_bindings
 }
 
 void append_stage_descriptor_bindings(
-    std::vector<ShaderDescriptorBindingVK>& p_bindings, const ShaderMetadata* p_metadata, const char* p_entry_name, std::string_view p_stage) {
+    std::vector<ShaderDescriptorBindingVK>& p_bindings, const ShaderMetadata* p_metadata, std::string_view p_entry_name, std::string_view p_stage) {
     if (p_metadata == nullptr) {
         return;
     }
-    std::string entry_name = p_entry_name == nullptr ? std::string() : std::string(p_entry_name);
+    std::string entry_name = p_entry_name.data() == nullptr ? std::string() : std::string(p_entry_name);
     auto stage_bindings = collect_shader_descriptor_bindings(*p_metadata, p_stage, entry_name);
     for (const auto& binding : stage_bindings) {
         merge_descriptor_binding(p_bindings, binding);
@@ -308,11 +307,11 @@ std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bind
     std::vector<ShaderDescriptorBindingVK> result;
     append_stage_descriptor_bindings(result,
         &p_vertex_shader_metadata,
-        p_vertex_stage_entry.data(),
+        p_vertex_stage_entry,
         "vertex");
     append_stage_descriptor_bindings(result,
         &p_fragment_shader_metadata,
-        p_fragment_stage_entry.data(),
+        p_fragment_stage_entry,
         "fragment");
     return result;
 }

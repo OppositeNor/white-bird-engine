@@ -198,15 +198,15 @@ bool descriptor_name_matches_bindpoint_scope(std::string_view p_descriptor_name,
     return p_descriptor_name[p_bindpoint_scope.size()] == '.';
 }
 
-RefRes<RUMaterial> find_material_bindpoint(
+const RenderBindpointMaterialDeclaration* find_material_bindpoint(
     const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_descriptor_name) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.material_declerations) {
-        if (bindpoint_declaration.material_resource != nullptr &&
+        if (!bindpoint_declaration.material_key.empty() &&
             descriptor_name_matches_bindpoint_scope(p_descriptor_name, bindpoint_declaration.field_path)) {
-            return bindpoint_declaration.material_resource;
+            return &bindpoint_declaration;
         }
     }
-    return MEM_NULL;
+    return nullptr;
 }
 
 bool has_texture_bindpoint(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_texture_key) {
@@ -738,11 +738,14 @@ void GraphicsPipelineCompilerVK::add_material_texture_bindpoints(std::string_vie
     uint32_t p_set_index,
     const RenderBindpointDeclarations& p_bindpoint_declarations) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.material_declerations) {
-        auto material = bindpoint_declaration.material_resource;
-        if (material == nullptr || material->resource_key == nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to compile graphics pipeline '{}': material resource key was not propagated.", p_resource_key));
+        const auto* material_unit = context.render_database->find_opaque_material(bindpoint_declaration.material_key);
+        if (material_unit == nullptr || material_unit->material == nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to compile graphics pipeline '{}': material '{}' was not found in the render database.",
+                p_resource_key,
+                bindpoint_declaration.material_key));
         }
+        auto material = material_unit->material;
         bool material_used_by_set = false;
         for (const auto& descriptor_binding : p_descriptor_bindings) {
             if (descriptor_binding.set_index == p_set_index && requires_texture_image(descriptor_binding) &&
