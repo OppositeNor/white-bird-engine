@@ -17,6 +17,7 @@
 #include "function/function_utils.hh"
 #include <cstdint>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 namespace WhiteBirdEngine {
@@ -70,6 +71,14 @@ void update_transform_mats(entt::registry& p_registry, int64_t p_version) {
     auto global_transform_iterate_view = p_registry.view<ComponentTransformMats>();
     for (auto [entity, transform_mats] : global_transform_iterate_view.each()) {
         update_global_transform(p_registry, entity, transform_mats, p_version);
+    }
+}
+
+void update_camera_views(entt::registry& p_registry) {
+    auto camera_iterate_view = p_registry.view<ComponentCamera, const ComponentTransformMats>();
+    for (auto [entity, camera, transform_mats] : camera_iterate_view.each()) {
+        glm::mat4 camera_world_transform = transform_mats.global_transform * camera.local_transform;
+        camera.view = glm::inverse(camera_world_transform);
     }
 }
 

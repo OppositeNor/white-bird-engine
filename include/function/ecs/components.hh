@@ -76,6 +76,28 @@ struct WBE_META(WBE_COMPONENT) ComponentTransformMats {
 };
 
 /**
+ * @class ComponentCamera
+ * @brief Render-facing camera component mirror used by gameplay code.
+ *
+ * This mirrors the Vulkan camera UBO payload and adds a placeholder dirty
+ * bit for future scene synchronization.
+ */
+struct WBE_META(WBE_COMPONENT) ComponentCamera {
+    // The camera-local transform relative to the owning entity.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 local_transform = glm::mat4(1);
+    // The view matrix.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 view = glm::mat4(1);
+    // The projection matrix.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 proj = glm::mat4(1);
+    // Placeholder dirty bit for future scene synchronization.
+    WBE_META(WBE_REFLECT)
+    bool is_dirty = false;
+};
+
+/**
  * @class ComponentHierarchy
  * @brief Hierarchy relation for an entity.
  */

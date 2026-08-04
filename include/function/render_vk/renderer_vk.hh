@@ -77,7 +77,7 @@ public:
     /**
      * @brief The number of jobs that would be runned per frame.
      */
-    static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 10;
+    static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 32;
     static constexpr size_t MAX_DELAYED_CALLS = 256;
 
     virtual ~RendererVK() override;

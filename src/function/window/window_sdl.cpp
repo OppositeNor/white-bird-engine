@@ -56,7 +56,7 @@ void WindowSDL::tick_render() {
     // Do nothing.
 }
 
-void WindowSDL::tick_logic() {
+void WindowSDL::tick_logic() { // NOLINT
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {

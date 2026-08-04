@@ -19,7 +19,9 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/input_manager/input_manager.hh"
 #include "function/function_utils.hh"
+#include "function/input_manager/key_codes.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -44,6 +46,7 @@
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -78,15 +81,6 @@ namespace {
 
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
 constexpr VkFormat SHADOWMAP_COLOR_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
-
-WBE::CameraInfoVKUBO default_camera_info(float p_aspect_ratio) {
-    WBE::CameraInfoVKUBO camera_info{
-        .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
-        .proj = glm::perspective(glm::radians(45.0F), p_aspect_ratio, 0.1F, 10.0F),
-    };
-    camera_info.proj[1][1] *= -1;
-    return camera_info;
-}
 
 } // namespace
 
@@ -139,7 +133,10 @@ private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::SpotLightInfo spot_light{};
     VkExtent2D shadow_extent{};
-    WBE::CameraInfoVKUBO camera_info{};
+    WBE::ComponentCamera camera_component{};
+    glm::vec3 camera_position = WBE::TEST_DEFAULT_CAMERA_POSITION;
+    float camera_yaw = WBE::default_test_camera_yaw();
+    float camera_pitch = WBE::default_test_camera_pitch();
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -166,15 +163,64 @@ int main(int p_argc, char* p_argv[]) {
     return EXIT_SUCCESS;
 }
 
-void ApplicationVulkanDrawSponzaTest::logic_update(double /* p_delta */) {
-}
-
-void ApplicationVulkanDrawSponzaTest::render_update(double p_delta) {
-    if (camera_info_ubo == WBE::MEM_NULL) {
+void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) {
+    WBE::InputManager* input_manager = WBE::InputManager::get_singleton();
+    if (input_manager == nullptr) {
         return;
     }
-    camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
-    camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+
+    float delta = static_cast<float>(p_delta);
+    if (input_manager->get_input_status(WBE::KEYCODE_LEFT).is_down()) {
+        camera_yaw -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_RIGHT).is_down()) {
+        camera_yaw += WBE::TEST_CAMERA_TURN_SPEED * delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_UP).is_down()) {
+        camera_pitch += WBE::TEST_CAMERA_TURN_SPEED * delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_DOWN).is_down()) {
+        camera_pitch -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+    }
+    camera_pitch = std::clamp(camera_pitch, -WBE::TEST_CAMERA_PITCH_LIMIT, WBE::TEST_CAMERA_PITCH_LIMIT);
+
+    glm::vec3 forward = WBE::test_camera_forward(camera_yaw, camera_pitch);
+    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0F, 1.0F, 0.0F)));
+    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+    float move_delta = WBE::TEST_CAMERA_MOVE_SPEED * delta;
+
+    if (input_manager->get_input_status(WBE::KEYCODE_W).is_down()) {
+        camera_position += forward * move_delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_S).is_down()) {
+        camera_position -= forward * move_delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_D).is_down()) {
+        camera_position += right * move_delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_A).is_down()) {
+        camera_position -= right * move_delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_E).is_down()) {
+        camera_position += up * move_delta;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_Q).is_down()) {
+        camera_position -= up * move_delta;
+    }
+
+    camera_component.view = WBE::test_camera_view(camera_position, camera_yaw, camera_pitch);
+
+    WBE::ROBufferVK* camera_info_buffer = camera_info_ubo.get();
+    if (camera_info_buffer == nullptr) {
+        return;
+    }
+    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
+    add_render_job([camera_info, camera_info_buffer]() {
+        camera_info_buffer->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+    });
+}
+
+void ApplicationVulkanDrawSponzaTest::render_update(double /* p_delta */) {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
@@ -314,7 +360,7 @@ ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTes
     if (p_material_unit.material == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: material batch resource was not propagated to the render database.");
     }
-    camera_info = default_camera_info(base_render_data->swap_chain_aspect_ratio);
+    camera_component = WBE::make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio);
     WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
     WBE::SpotLightInfoVKUBO spot_light_info = WBE::SpotLightInfoVKUBO{.view = spot_light.view,
         .proj = spot_light.proj,
@@ -327,8 +373,8 @@ ApplicationVulkanDrawSponzaTest::GraphicsPipeline ApplicationVulkanDrawSponzaTes
         .range = spot_light.range};
     uint32_t spot_light_count = 1;
     auto material_params = WBE::add_material_texture_bindings(bindpoint_builder, default_material, p_material_unit.material, material_sampler);
-    bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_info.view, sizeof(camera_info.view))
-        .add_buffer_decleration("camera_info.proj", &camera_info.proj, sizeof(camera_info.proj))
+    bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_component.view, sizeof(camera_component.view))
+        .add_buffer_decleration("camera_info.proj", &camera_component.proj, sizeof(camera_component.proj))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
         .add_buffer_decleration("light.light_count", &spot_light_count, sizeof(spot_light_count))
         .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
@@ -362,6 +408,7 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(GraphicsPip
                           .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                           .set_size(sizeof(WBE::CameraInfoVKUBO))
                           .create_ref(base_render_data);
+    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
     camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     auto [set, binding] = p_pipeline.descriptor_set_bindings.at("camera_info");
     p_pipeline.descriptor_sets[set]->write_descriptor_set(

@@ -20,6 +20,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
@@ -164,4 +165,39 @@ TEST(WBETransformSystemTest, RecursivelyUpdatesMultiLevelHierarchyOutOfOrder) {
     EXPECT_EQ(grandparent_transform_mats.version, 17);
     EXPECT_EQ(parent_transform_mats.version, 17);
     EXPECT_EQ(child_transform_mats.version, 17);
+}
+
+TEST(WBECameraSystemTest, CameraViewUsesEntityGlobalTransformInverse) {
+    entt::registry registry;
+    WBE::EntityID entity = registry.create();
+    WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(3.0F, 4.0F, 5.0F));
+
+    registry.emplace<WBE::ComponentTransform>(entity, transform);
+    registry.emplace<WBE::ComponentTransformMats>(entity);
+    registry.emplace<WBE::ComponentCamera>(entity);
+
+    WBE::update_transform_mats(registry, 23);
+    WBE::update_camera_views(registry);
+
+    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
+    const auto& camera = registry.get<WBE::ComponentCamera>(entity);
+    expect_mat_near(camera.view, glm::inverse(transform_mats.global_transform));
+}
+
+TEST(WBECameraSystemTest, CameraLocalTransformParticipatesInViewMatrix) {
+    entt::registry registry;
+    WBE::EntityID entity = registry.create();
+    WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(2.0F, 0.0F, 0.0F));
+    glm::mat4 camera_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(0.0F, 1.5F, -2.0F));
+
+    registry.emplace<WBE::ComponentTransform>(entity, transform);
+    registry.emplace<WBE::ComponentTransformMats>(entity);
+    registry.emplace<WBE::ComponentCamera>(entity, WBE::ComponentCamera{.local_transform = camera_local_transform});
+
+    WBE::update_transform_mats(registry, 29);
+    WBE::update_camera_views(registry);
+
+    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
+    const auto& camera = registry.get<WBE::ComponentCamera>(entity);
+    expect_mat_near(camera.view, glm::inverse(transform_mats.global_transform * camera_local_transform));
 }

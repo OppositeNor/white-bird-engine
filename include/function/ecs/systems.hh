@@ -28,6 +28,17 @@ namespace WhiteBirdEngine {
  */
 void update_transform_mats(entt::registry& p_registry, int64_t p_version);
 
+/**
+ * @brief Update camera view matrices from entity transform matrices.
+ *
+ * For every entity containing both `ComponentCamera` and
+ * `ComponentTransformMats`, the camera view matrix becomes the inverse of the
+ * entity global transform combined with the camera-local transform.
+ *
+ * @param p_registry The registry of the entities and components.
+ */
+void update_camera_views(entt::registry& p_registry);
+
 } // namespace WhiteBirdEngine
 
 #endif

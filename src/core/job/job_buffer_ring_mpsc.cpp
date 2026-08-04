@@ -40,7 +40,7 @@ void JobBufferRingMPSC::add_job(std::function<void()> p_job) {
         head_l = head.load(std::memory_order_relaxed);
         next = ring_increment(head_l, buffer.size());
         if (next == tail.load(std::memory_order_acquire)) {
-            throw std::runtime_error("Buffer overflow.");
+            throw std::runtime_error("Job buffer overflow.");
         }
         if (head.compare_exchange_weak(head_l, next, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;

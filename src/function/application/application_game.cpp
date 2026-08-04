@@ -28,10 +28,17 @@
 #include "function/window/window_sdl.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <atomic>
+#include <chrono>
 #include <format>
 #include <thread>
 
 namespace WhiteBirdEngine {
+
+namespace {
+
+constexpr double LOGIC_FRAME_INTERVAL_SEC = 1.0 / 60.0;
+
+} // namespace
 
 ApplicationGame::ApplicationGame() {
     init();
@@ -91,16 +98,22 @@ void ApplicationGame::run_render() {
 
 void ApplicationGame::run_logic() {
     bool local_should_close = false;
-    auto* global_clock = EngineCore::get_singleton()->global_clock;
-    double start_time, end_time;
+    using LogicClock = std::chrono::steady_clock;
+    const auto logic_frame_interval = std::chrono::duration<double>(LOGIC_FRAME_INTERVAL_SEC);
     while (!local_should_close) {
-        start_time = global_clock->get_duration();
+        LogicClock::time_point frame_start = LogicClock::now();
         local_should_close = window->should_close();
         should_close.store(local_should_close, std::memory_order_release);
         window->tick_logic();
         logic_update(logic_delta.load(std::memory_order_relaxed));
-        end_time = global_clock->get_duration();
-        logic_delta.store(end_time - start_time, std::memory_order_release);
+        LogicClock::time_point frame_end = LogicClock::now();
+        auto frame_duration = frame_end - frame_start;
+        if (frame_duration < logic_frame_interval) {
+            std::this_thread::sleep_until(frame_start + logic_frame_interval);
+            frame_end = LogicClock::now();
+            frame_duration = frame_end - frame_start;
+        }
+        logic_delta.store(std::chrono::duration<double>(frame_duration).count(), std::memory_order_release);
     }
     // The logic thread is responsible for ending the worker thread.
     worker->stop();
