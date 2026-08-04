@@ -178,7 +178,6 @@ void RendererVK::init() {
     // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
     base_render_data.current_frame = 1;
     init_swap_chain_image_views();
-    setup_render_resource();
     image_available_semaphores.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
@@ -1067,10 +1066,4 @@ void RendererVK::update_static_opaque_triangles() {
     // active graph can resolve them without per-pipeline registration.
     set_graph_static_opaque_resources(active_graph);
 }
-
-void RendererVK::setup_render_resource() {
-    // TODO: Re-introduce engine-default resource setup on top of the new
-    // render-graph pipeline.
-}
-
 } // namespace WhiteBirdEngine

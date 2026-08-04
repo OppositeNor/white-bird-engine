@@ -357,7 +357,6 @@ private:
     void setup_base_render_data();
     void init_swap_chain_images();
     void init_swap_chain_image_views();
-    void setup_render_resource();
     void recreate_swap_chain();
 
     void create_instance();
