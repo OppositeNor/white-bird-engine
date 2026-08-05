@@ -19,9 +19,9 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
-#include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -291,10 +291,8 @@ void ApplicationVulkanDrawCubeTest::setup_spot_light() {
 
 void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
 
-    shadow_depth_image =
-        WBE::ROImageVK::Builder().shadow_map_depth(spot_light).create_ref(base_render_data);
-    shadow_color_image =
-        WBE::ROImageVK::Builder().shadow_map_color(spot_light).create_ref(base_render_data);
+    shadow_depth_image = WBE::ROImageVK::Builder().shadow_map_depth(spot_light).create_ref(base_render_data);
+    shadow_color_image = WBE::ROImageVK::Builder().shadow_map_color(spot_light).create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -346,8 +344,8 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
     shadow_bindpoint_builder.add_buffer_decleration("light_camera_info.view", &spot_light.view, sizeof(spot_light.view))
         .add_buffer_decleration("light_camera_info.proj", &spot_light.proj, sizeof(spot_light.proj));
     auto shadow_bindpoint_declarations = shadow_bindpoint_builder.build();
-    auto compiled = WBE::GraphicsPipelineCompilerVK(shadow_compiler_context)
-                        .compile("shadowmap_spot", shadow_pipeline_resource, shadow_bindpoint_declarations);
+    auto compiled =
+        WBE::GraphicsPipelineCompilerVK(shadow_compiler_context).compile("shadowmap_spot", shadow_pipeline_resource, shadow_bindpoint_declarations);
     shadow_graphics_pipeline = compiled.graphics_pipeline;
     shadow_descriptor_sets = std::move(compiled.descriptor_sets);
 }
@@ -404,23 +402,23 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
 void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph() {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
-    pipeline_desc.tasks.emplace_back(create_shadow_task_desc());
-    pipeline_desc.tasks.emplace_back(create_main_task_desc());
+    pipeline_desc.tasks.push_back(create_shadow_task_desc());
+    pipeline_desc.tasks.push_back(create_main_task_desc());
     renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
     renderer_vk->activate_render_graph("draw_cube_pipeline");
 }
 
 void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
+    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
         .res = shadow_graphics_pipeline});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
+    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .res = shadow_color_view});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
+    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .res = shadow_depth_view});
-    p_pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE),
+    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
         .res = main_graphics_pipeline});
 }
@@ -453,7 +451,7 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
 WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const {
     WBE::RendTaskDescVK main_task_desc(render_allocator);
     main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
-    main_task_desc.prev.emplace_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
+    main_task_desc.prev.push_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
     main_task_desc.create = [task_render_allocator = render_allocator,
                                 task_base_render_data = base_render_data,
                                 task_main_descriptor_sets = main_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
