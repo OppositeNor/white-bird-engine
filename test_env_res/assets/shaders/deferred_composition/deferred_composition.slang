@@ -1,4 +1,3 @@
-// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,34 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 #include "defs.slang"
+
+/**
+ * @brief Emit one vertex of a fullscreen triangle covering the viewport for the deferred composition pass.
+ * @param p_vertex_id The SV_VertexID for the current vertex (0..2).
+ * @return The vertex output containing clip-space position and screen-space uv coordinates.
+ */
+[shader("vertex")]
+VSOutput vertex_main(uint p_vertex_id : SV_VertexID) {
+    VSOutput output;
+
+    // Fullscreen triangle covering the entire viewport.
+    float2 positions[3] = {
+        float2(-1.0, -1.0),
+        float2(-1.0,  3.0),
+        float2( 3.0, -1.0)
+    };
+
+    float2 uvs[3] = {
+        float2(0.0, 0.0),
+        float2(0.0, 2.0),
+        float2(2.0, 0.0)
+    };
+
+    output.position = float4(positions[p_vertex_id], 0.0, 1.0);
+    output.uv       = uvs[p_vertex_id];
+
+    return output;
+}
 
 /**
  * @brief Per-frame camera data used by the deferred composition pass to reconstruct world-space positions from depth and evaluate view directions.
@@ -60,7 +87,8 @@ SamplerState gbuffer_sampler;
  * @param p_input The interpolated vertex output from the fullscreen triangle.
  * @return The sRGB-encoded shaded color with alpha = 1.0. Pixels whose depth is at or past the far plane are replaced with a constant background.
  */
-float4 main(VSOutput p_input) : SV_Target0 {
+[shader("fragment")]
+float4 fragment_main(VSOutput p_input) : SV_Target0 {
     float depth = gbuffer_depth.Sample(gbuffer_sampler, p_input.uv);
     if (depth >= 1.0) {
         // Background: sky-style clear color.

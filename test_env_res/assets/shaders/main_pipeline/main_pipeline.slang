@@ -1,4 +1,3 @@
-// vertex
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +12,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "deferred_composition/deferred_composition_utils.slang"
+#include "main_pipeline/main_pipeline_utils.slang"
 
 /**
- * @brief Emit one vertex of a fullscreen triangle covering the viewport for the deferred composition pass.
+ * @brief Emit one vertex of a fullscreen triangle covering the viewport.
  * @param p_vertex_id The SV_VertexID for the current vertex (0..2).
  * @return The vertex output containing clip-space position and screen-space uv coordinates.
  */
-VSOutput main(uint p_vertex_id : SV_VertexID) {
+[shader("vertex")]
+VSOutput vertex_main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;
 
-    // Fullscreen triangle covering the entire viewport.
     float2 positions[3] = {
         float2(-1.0, -1.0),
         float2(-1.0,  3.0),
@@ -40,4 +39,14 @@ VSOutput main(uint p_vertex_id : SV_VertexID) {
     output.uv       = uvs[p_vertex_id];
 
     return output;
+}
+
+/**
+ * @brief Visualize the interpolated uv coordinate as an RG color.
+ * @param p_input The interpolated vertex output.
+ * @return The uv coordinate packed into the rg channels with b = 0, a = 1.
+ */
+[shader("fragment")]
+float4 fragment_main(VSOutput p_input) : SV_Target0 {
+    return float4(p_input.uv, 0.0, 1.0);
 }

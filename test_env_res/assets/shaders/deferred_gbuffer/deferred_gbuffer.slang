@@ -1,4 +1,3 @@
-// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,29 @@
 */
 #include "deferred_gbuffer/deferred_gbuffer_utils.slang"
 #include "defs.slang"
+
+/**
+ * @brief Constant buffer providing the per-frame view and projection matrices.
+ */
+ConstantBuffer<CameraInfo> camera_info;
+
+/**
+ * @brief Transform a textured vertex into clip space and pass per-vertex attributes through to the fragment stage.
+ * @param p_input The incoming vertex attributes.
+ * @return The vertex output for the deferred G-buffer pass.
+ */
+[shader("vertex")]
+VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+    VSOutput output;
+    float4 world_position = float4(p_input.position.xyz, 1.0);
+    output.position       = mul(camera_info.proj, mul(camera_info.view, world_position));
+    output.world_position = p_input.position;
+    output.normal         = p_input.normal;
+    output.tangent        = p_input.tangent;
+    output.bitangent      = p_input.bitangent;
+    output.uv             = p_input.uv;
+    return output;
+}
 
 /**
  * @brief Multi-render-target output written by the deferred G-buffer pass.
@@ -39,7 +61,8 @@ struct GBufferOutput {
  * @param p_input The interpolated vertex output.
  * @return The packed G-buffer attachments for this fragment.
  */
-GBufferOutput main(VSOutput p_input) {
+[shader("fragment")]
+GBufferOutput fragment_main(VSOutput p_input) {
     GBufferOutput output;
 
     // Test material: simple colored albedo derived from uv, material id 1.

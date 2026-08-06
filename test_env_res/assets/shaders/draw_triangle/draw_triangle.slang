@@ -1,4 +1,3 @@
-// fragment
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,10 +21,26 @@
 ConstantBuffer<Time> time;
 
 /**
+ * @brief Transform a textured vertex into a 2D triangle in clip space with the y axis flipped to match Vulkan conventions.
+ * @param p_input The incoming vertex attributes.
+ * @return The vertex output for the animated triangle debug pass.
+ */
+[shader("vertex")]
+VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+    VSOutput output;
+
+    output.position = float4(p_input.position.x, -1.0 * p_input.position.y, 1.0, 1.0);
+    output.uv = p_input.uv;
+
+    return output;
+}
+
+/**
  * @brief Output a green color whose intensity is animated as a sine of the application time.
  * @param p_input The interpolated vertex output (unused).
  * @return The animated opaque color.
  */
-float4 main(VSOutput p_input) : SV_Target0 {
+[shader("fragment")]
+float4 fragment_main(VSOutput p_input) : SV_Target0 {
     return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }

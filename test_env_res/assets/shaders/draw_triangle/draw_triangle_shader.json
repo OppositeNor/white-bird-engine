@@ -2,18 +2,11 @@
     "include": [],
     "resources": [
         {
-            "id": "draw_triangle_vert",
+            "id": "draw_triangle_shader",
             "type": "shader",
-            "src": "assets/shaders/draw_triangle/draw_triangle_vert.slang",
-            "dst": "assets/shaders/draw_triangle/draw_triangle_vert.spv",
-            "metadata": "assets/shaders/draw_triangle/draw_triangle_vert.json"
-        },
-        {
-            "id": "draw_triangle_frag",
-            "type": "shader",
-            "src": "assets/shaders/draw_triangle/draw_triangle_frag.slang",
-            "dst": "assets/shaders/draw_triangle/draw_triangle_frag.spv",
-            "metadata": "assets/shaders/draw_triangle/draw_triangle_frag.json"
+            "src": "assets/shaders/draw_triangle/draw_triangle.slang",
+            "dst": "assets/shaders/draw_triangle/draw_triangle.spv",
+            "metadata": "assets/shaders/draw_triangle/draw_triangle.json"
         }
     ]
 }

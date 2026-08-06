@@ -2,24 +2,17 @@
     "include": [],
     "resources": [
         {
-            "id": "main_shader_vert",
+            "id": "main_pipeline_shader",
             "type": "shader",
-            "src": "assets/shaders/main_pipeline/main_pipeline_vert.slang",
-            "dst": "assets/shaders/main_pipeline/main_pipeline_vert.spv",
-            "metadata": "assets/shaders/main_pipeline/main_pipeline_vert.json"
-        },
-        {
-            "id": "main_shader_frag",
-            "type": "shader",
-            "src": "assets/shaders/main_pipeline/main_pipeline_frag.slang",
-            "dst": "assets/shaders/main_pipeline/main_pipeline_frag.spv",
-            "metadata": "assets/shaders/main_pipeline/main_pipeline_frag.json"
+            "src": "assets/shaders/main_pipeline/main_pipeline.slang",
+            "dst": "assets/shaders/main_pipeline/main_pipeline.spv",
+            "metadata": "assets/shaders/main_pipeline/main_pipeline.json"
         },
         {
             "id": "main_pipeline",
             "type": "graphics_pipeline",
-            "vertex_stage_id": "main_shader_vert",
-            "fragment_stage_id": "main_shader_frag",
+            "vertex_stage_id": "main_pipeline_shader",
+            "fragment_stage_id": "main_pipeline_shader",
             "depth_test": true,
             "depth_write": true,
             "color_blend": false

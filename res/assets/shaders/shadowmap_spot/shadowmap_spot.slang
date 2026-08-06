@@ -1,4 +1,3 @@
-// vertex
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,7 @@
 #include "defs.slang"
 
 /**
- * @brief Vertex shader output for the spot-light shadow map pass. Only clip-space position is written.
+ * @brief Vertex shader output / fragment shader input for the spot-light shadow map pass.
  */
 struct ShadowVSOutput {
     /// Clip-space position of the vertex in light space.
@@ -33,9 +32,20 @@ ConstantBuffer<CameraInfo> light_camera_info;
  * @param p_input The incoming vertex attributes.
  * @return The clip-space vertex output for the shadow map pass.
  */
-ShadowVSOutput main(Vertex3DTexturedInput p_input) {
+[shader("vertex")]
+ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input) {
     ShadowVSOutput output;
     float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position = mul(light_camera_info.proj, mul(light_camera_info.view, world_position));
     return output;
+}
+
+/**
+ * @brief Depth-only fragment stage. Writes a constant value into the dummy color attachment; the depth attachment is the real output.
+ * @param p_input Interpolated vertex output.
+ * @return Dummy color value (never read).
+ */
+[shader("fragment")]
+float4 fragment_main(ShadowVSOutput p_input) : SV_Target0 {
+    return float4(0.0, 0.0, 0.0, 1.0);
 }

@@ -2,24 +2,17 @@
     "include": [],
     "resources": [
         {
-            "id": "shadowmap_spot_vert",
+            "id": "shadowmap_spot_shader",
             "type": "shader",
-            "src": "assets/shaders/shadowmap_spot/shadowmap_spot_vert.slang",
-            "dst": "assets/shaders/shadowmap_spot/shadowmap_spot_vert.spv",
-            "metadata": "assets/shaders/shadowmap_spot/shadowmap_spot_vert.json"
-        },
-        {
-            "id": "shadowmap_spot_frag",
-            "type": "shader",
-            "src": "assets/shaders/shadowmap_spot/shadowmap_spot_frag.slang",
-            "dst": "assets/shaders/shadowmap_spot/shadowmap_spot_frag.spv",
-            "metadata": "assets/shaders/shadowmap_spot/shadowmap_spot_frag.json"
+            "src": "assets/shaders/shadowmap_spot/shadowmap_spot.slang",
+            "dst": "assets/shaders/shadowmap_spot/shadowmap_spot.spv",
+            "metadata": "assets/shaders/shadowmap_spot/shadowmap_spot.json"
         },
         {
             "id": "shadowmap_spot",
             "type": "graphics_pipeline",
-            "vertex_stage_id": "shadowmap_spot_vert",
-            "fragment_stage_id": "shadowmap_spot_frag",
+            "vertex_stage_id": "shadowmap_spot_shader",
+            "fragment_stage_id": "shadowmap_spot_shader",
             "depth_test": true,
             "depth_write": true,
             "color_blend": false

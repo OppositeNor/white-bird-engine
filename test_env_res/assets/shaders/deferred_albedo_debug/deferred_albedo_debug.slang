@@ -1,4 +1,3 @@
-// vertex
 /* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +12,28 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.slang"
+
+/**
+ * @brief Vertex shader output / fragment shader input for the deferred albedo debug fullscreen pass.
+ */
+struct VSOutput {
+    /**
+ * @brief Clip-space position of the fullscreen triangle vertex.
+     */
+    float4 position : SV_Position;
+    /**
+ * @brief Screen-space uv used to sample the G-buffer albedo target.
+     */
+    float2 uv       : TEXCOORD0;
+};
 
 /**
  * @brief Emit one vertex of a fullscreen triangle covering the viewport.
  * @param p_vertex_id The SV_VertexID for the current vertex (0..2).
  * @return The vertex output containing clip-space position and screen-space uv coordinates.
  */
-VSOutput main(uint p_vertex_id : SV_VertexID) {
+[shader("vertex")]
+VSOutput vertex_main(uint p_vertex_id : SV_VertexID) {
     VSOutput output;
 
     float2 positions[3] = {
@@ -28,7 +41,6 @@ VSOutput main(uint p_vertex_id : SV_VertexID) {
         float2(-1.0,  3.0),
         float2( 3.0, -1.0)
     };
-
     float2 uvs[3] = {
         float2(0.0, 0.0),
         float2(0.0, 2.0),
@@ -37,6 +49,21 @@ VSOutput main(uint p_vertex_id : SV_VertexID) {
 
     output.position = float4(positions[p_vertex_id], 0.0, 1.0);
     output.uv       = uvs[p_vertex_id];
-
     return output;
+}
+
+/**
+ * @brief Combined image+sampler for the G-buffer albedo attachment.
+ */
+Sampler2D albedo_sampler;
+
+/**
+ * @brief Output the sampled G-buffer albedo color as an opaque pixel.
+ * @param p_input The interpolated vertex output from the fullscreen triangle.
+ * @return The albedo color with alpha forced to 1.0.
+ */
+[shader("fragment")]
+float4 fragment_main(VSOutput p_input) : SV_Target0 {
+    float3 albedo = albedo_sampler.Sample(p_input.uv).rgb;
+    return float4(albedo, 1.0);
 }

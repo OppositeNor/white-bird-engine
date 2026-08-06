@@ -2,18 +2,11 @@
     "include": [],
     "resources": [
         {
-            "id": "deferred_composition_vert",
+            "id": "deferred_composition_shader",
             "type": "shader",
-            "src": "assets/shaders/deferred_composition/deferred_composition_vert.slang",
-            "dst": "assets/shaders/deferred_composition/deferred_composition_vert.spv",
-            "metadata": "assets/shaders/deferred_composition/deferred_composition_vert.json"
-        },
-        {
-            "id": "deferred_composition_frag",
-            "type": "shader",
-            "src": "assets/shaders/deferred_composition/deferred_composition_frag.slang",
-            "dst": "assets/shaders/deferred_composition/deferred_composition_frag.spv",
-            "metadata": "assets/shaders/deferred_composition/deferred_composition_frag.json"
+            "src": "assets/shaders/deferred_composition/deferred_composition.slang",
+            "dst": "assets/shaders/deferred_composition/deferred_composition.spv",
+            "metadata": "assets/shaders/deferred_composition/deferred_composition.json"
         }
     ]
 }

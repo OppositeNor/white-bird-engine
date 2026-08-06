@@ -341,9 +341,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
             "id": "inline_pipeline",
             "type": "graphics_pipeline",
             "vertex_stage_id": "vertex_shader",
-            "vertex_stage_entry": "",
+            "vertex_stage_entry": "vertex_main",
             "fragment_stage_id": "fragment_shader",
-            "fragment_stage_entry": "",
+            "fragment_stage_entry": "fragment_main",
             "depth_test": false,
             "depth_write": false
         }
@@ -364,8 +364,8 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     EXPECT_EQ(captured_material->texture_count, 0U);
     EXPECT_EQ(captured_pipeline->vertex_stage.get(), vertex_shader_ref.get());
     EXPECT_EQ(captured_pipeline->fragment_stage.get(), fragment_shader_ref.get());
-    EXPECT_EQ(std::string(captured_pipeline->vertex_stage_entry.get()), "main");
-    EXPECT_EQ(std::string(captured_pipeline->fragment_stage_entry.get()), "main");
+    EXPECT_STREQ(captured_pipeline->vertex_stage_entry.get(), "vertex_main");
+    EXPECT_STREQ(captured_pipeline->fragment_stage_entry.get(), "fragment_main");
     EXPECT_FALSE(captured_pipeline->depth_test);
     EXPECT_FALSE(captured_pipeline->depth_write);
     ASSERT_EQ(created_ref_keys.size(), 2U);
