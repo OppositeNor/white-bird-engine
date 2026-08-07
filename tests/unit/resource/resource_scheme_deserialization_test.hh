@@ -56,7 +56,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextGeneral) {
     ASSERT_EQ(scheme.id, "test_text_01");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_01.txt");
-    ASSERT_EQ(scheme.encode_type, "utf8");
+    ASSERT_TRUE(scheme.encode_type.has_value());
+    ASSERT_EQ(scheme.encode_type.value(), "utf8");
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
@@ -74,7 +75,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
     ASSERT_EQ(scheme.id, "test_text_02");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_02.txt");
-    ASSERT_EQ(scheme.encode_type, "utf8"); // Default value
+    ASSERT_FALSE(scheme.encode_type.has_value());
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
@@ -148,7 +149,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 4U);
-    ASSERT_EQ(scheme.color_space, "rgb");
+    ASSERT_TRUE(scheme.color_space.has_value());
+    ASSERT_EQ(scheme.color_space.value(), "rgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
 }
@@ -171,7 +173,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 3U);
-    ASSERT_EQ(scheme.color_space, "rgb");
+    ASSERT_TRUE(scheme.color_space.has_value());
+    ASSERT_EQ(scheme.color_space.value(), "rgb");
     ASSERT_TRUE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
 }
@@ -193,7 +196,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     ASSERT_EQ(scheme.channel_count, 0);
     ASSERT_EQ(scheme.flip_h, false);
     ASSERT_EQ(scheme.flip_v, false);
-    ASSERT_EQ(scheme.color_space, "srgb");
+    ASSERT_FALSE(scheme.color_space.has_value());
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }
@@ -240,9 +243,11 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DGeneral) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_submesh_01");
     ASSERT_EQ(scheme.type, "submesh3d");
-    ASSERT_EQ(scheme.material.id, "material_01");
-    ASSERT_EQ(scheme.material.type, "material");
-    ASSERT_EQ(scheme.material_id, "mat_ref_01");
+    ASSERT_TRUE(scheme.material.has_value());
+    ASSERT_EQ(scheme.material.value().id, "material_01");
+    ASSERT_EQ(scheme.material.value().type, "material");
+    ASSERT_TRUE(scheme.material_id.has_value());
+    ASSERT_EQ(scheme.material_id.value(), "mat_ref_01");
     ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_01.bin");
     ASSERT_EQ(scheme.geometry_sections.size(), 4U);
     ASSERT_EQ(scheme.geometry_sections[0].slot, "position");
@@ -272,7 +277,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DMinimal) {
     ASSERT_EQ(scheme.type, "submesh3d");
     ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_minimal.bin");
     ASSERT_TRUE(scheme.geometry_sections.empty());
-    ASSERT_TRUE(scheme.material_id.empty());
+    ASSERT_FALSE(scheme.material_id.has_value());
+    ASSERT_FALSE(scheme.material.has_value());
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshGeneral) {
@@ -396,13 +402,17 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
     ASSERT_EQ(scheme.graphics_pipeline_ids[1], "shadow_pipeline");
     ASSERT_EQ(scheme.textures.size(), 2U);
     ASSERT_EQ(scheme.textures[0].texture_key, "albedo");
-    ASSERT_EQ(scheme.textures[0].texture_id, "albedo_texture");
+    ASSERT_TRUE(scheme.textures[0].texture_id.has_value());
+    ASSERT_EQ(scheme.textures[0].texture_id.value(), "albedo_texture");
+    ASSERT_FALSE(scheme.textures[0].texture.has_value());
     ASSERT_EQ(scheme.textures[1].texture_key, "normal");
-    ASSERT_EQ(scheme.textures[1].texture.id, "normal_texture");
-    ASSERT_EQ(scheme.textures[1].texture.type, "image");
-    ASSERT_EQ(scheme.textures[1].texture.path, "images/normal.png");
-    ASSERT_EQ(scheme.textures[1].texture.color_space, "rgb");
-    ASSERT_EQ(scheme.textures[1].texture.channel_count, 3U);
+    ASSERT_FALSE(scheme.textures[1].texture_id.has_value());
+    ASSERT_TRUE(scheme.textures[1].texture.has_value());
+    ASSERT_EQ(scheme.textures[1].texture.value().id, "normal_texture");
+    ASSERT_EQ(scheme.textures[1].texture.value().type, "image");
+    ASSERT_EQ(scheme.textures[1].texture.value().path, "images/normal.png");
+    ASSERT_EQ(scheme.textures[1].texture.value().color_space, "rgb");
+    ASSERT_EQ(scheme.textures[1].texture.value().channel_count, 3U);
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingType) {

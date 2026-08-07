@@ -23,6 +23,7 @@
 #include <bitset>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <type_traits>
 namespace WhiteBirdEngine {
@@ -136,7 +137,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeImage : public RUScheme {
     bool flip_v = false;
     // The color space of the image.
     WBE_META(WBE_REFLECT)
-    std::string color_space = "srgb";
+    std::optional<std::string> color_space;
     // The path to the image file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
@@ -153,7 +154,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeText : public RUScheme {
     std::string path;
     // The encoding type. UTF8 by default.
     WBE_META(WBE_REFLECT)
-    std::string encode_type = "utf8";
+    std::optional<std::string> encode_type;
 };
 
 /**

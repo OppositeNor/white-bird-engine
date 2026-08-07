@@ -21,6 +21,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -40,19 +41,19 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
     std::string metadata;
     // Default vertex entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
-    std::string vertex_entry;
+    std::optional<std::string> vertex_entry;
     // Default tessellation entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
-    std::string tessellation_entry;
+    std::optional<std::string> tessellation_entry;
     // Default geometry entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
-    std::string geometry_entry;
+    std::optional<std::string> geometry_entry;
     // Default fragment entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
-    std::string fragment_entry;
+    std::optional<std::string> fragment_entry;
     // Default compute entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
-    std::string compute_entry;
+    std::optional<std::string> compute_entry;
 };
 
 /**
@@ -63,40 +64,40 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     WBE_DECL_SERIALIZABLE(RUSchemeGraphicsPipeline)
     // The resource ID of the vertex shader.
     WBE_META(WBE_REFLECT)
-    std::string vertex_stage_id;
+    std::optional<std::string> vertex_stage_id;
     // Entry function for the vertex stage.
     WBE_META(WBE_REFLECT)
-    std::string vertex_stage_entry;
+    std::optional<std::string> vertex_stage_entry;
     // The vertex shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    RUSchemeShader vertex_stage;
+    std::optional<RUSchemeShader> vertex_stage;
     // The resource ID of the tessellation shader.
     WBE_META(WBE_REFLECT)
-    std::string tessellation_stage_id;
+    std::optional<std::string> tessellation_stage_id;
     // Entry function for the tessellation stage.
     WBE_META(WBE_REFLECT)
-    std::string tessellation_stage_entry;
+    std::optional<std::string> tessellation_stage_entry;
     // The tessellation shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    RUSchemeShader tessellation_stage;
+    std::optional<RUSchemeShader> tessellation_stage;
     // The resource ID of the geometry shader.
     WBE_META(WBE_REFLECT)
-    std::string geometry_stage_id;
+    std::optional<std::string> geometry_stage_id;
     // Entry function for the geometry stage.
     WBE_META(WBE_REFLECT)
-    std::string geometry_stage_entry;
+    std::optional<std::string> geometry_stage_entry;
     // The geometry shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    RUSchemeShader geometry_stage;
+    std::optional<RUSchemeShader> geometry_stage;
     // The resource ID of the fragment shader.
     WBE_META(WBE_REFLECT)
-    std::string fragment_stage_id;
+    std::optional<std::string> fragment_stage_id;
     // Entry function for the fragment stage.
     WBE_META(WBE_REFLECT)
-    std::string fragment_stage_entry;
+    std::optional<std::string> fragment_stage_entry;
     // The fragment shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    RUSchemeShader fragment_stage;
+    std::optional<RUSchemeShader> fragment_stage;
     // Should enable depth test.
     WBE_META(WBE_REFLECT)
     bool depth_test = true;
@@ -115,10 +116,10 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeMaterialTextureSlot {
     std::string texture_key;
     // Inline texture data.
     WBE_META(WBE_REFLECT)
-    RUSchemeImage texture;
+    std::optional<RUSchemeImage> texture;
     // A string referencing an already populated texture.
     WBE_META(WBE_REFLECT)
-    std::string texture_id;
+    std::optional<std::string> texture_id;
 };
 
 /**
@@ -132,7 +133,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
     std::vector<std::string> graphics_pipeline_ids;
     // The inline graphics pipeline used to render this material.
     WBE_META(WBE_REFLECT)
-    RUSchemeGraphicsPipeline graphics_pipeline;
+    std::optional<RUSchemeGraphicsPipeline> graphics_pipeline;
     // The texture slots used by this material.
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemeMaterialTextureSlot> textures;
@@ -165,10 +166,10 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
     WBE_DECL_SERIALIZABLE(RUSchemeSubmesh3D)
     // The material if it could be populated in place.
     WBE_META(WBE_REFLECT)
-    RUSchemeMaterial material;
+    std::optional<RUSchemeMaterial> material;
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
-    std::string material_id;
+    std::optional<std::string> material_id;
     // Resource-relative path to the sidecar geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string geometry_path;

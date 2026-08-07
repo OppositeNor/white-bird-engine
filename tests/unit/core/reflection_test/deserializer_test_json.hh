@@ -56,6 +56,7 @@ protected:
                                               R"("vec3_test" : {"x": 1, "y": -2, "z": 3},)"
                                               R"("vec4_test" : {"x": 1, "y": -2, "z": 3, "w": -4},)"
                                               R"("str_test" : "Hello!",)"
+                                              R"("optional_str_test" : "Optional hello!",)"
                                               R"("buffer_test" : "how are you?")"
                                               R"(})";
     std::string test_serialize_json_zeros = R"({)"
@@ -68,6 +69,7 @@ protected:
                                             R"("vec3_test" : {"x": 0, "y": 0, "z": 0},)"
                                             R"("vec4_test" : {"x": 0, "y": 0, "z": 0, "w": 0},)"
                                             R"("str_test" : "",)"
+                                            R"("optional_str_test" : "",)"
                                             R"("buffer_test" : "")"
                                             R"(})";
     std::string test_serialize_json_nesting = R"({)"
@@ -112,6 +114,8 @@ TEST_F(WBEDeserializerJSONTest, General) {
     EXPECT_EQ(test_obj.vec3_test, glm::vec3(1, -2, 3));
     EXPECT_EQ(test_obj.vec4_test, glm::vec4(1, -2, 3, -4));
     EXPECT_EQ(test_obj.str_test, "Hello!");
+    ASSERT_TRUE(test_obj.optional_str_test.has_value());
+    EXPECT_EQ(test_obj.optional_str_test.value(), "Optional hello!");
     EXPECT_TRUE(strcmp(test_obj.buffer_test.buffer, "how are you?") == 0);
 }
 
@@ -131,6 +135,8 @@ TEST_F(WBEDeserializerJSONTest, ZerosAndStrings) {
     EXPECT_EQ(test_obj.vec3_test, glm::vec3(0, 0, 0));
     EXPECT_EQ(test_obj.vec4_test, glm::vec4(0, 0, 0, 0));
     EXPECT_EQ(test_obj.str_test, std::string(""));
+    ASSERT_TRUE(test_obj.optional_str_test.has_value());
+    EXPECT_EQ(test_obj.optional_str_test.value(), std::string(""));
     EXPECT_STREQ(test_obj.buffer_test.buffer, "");
 }
 
@@ -142,6 +148,8 @@ TEST_F(WBEDeserializerJSONTest, StringsAndBufferContent) {
     WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
 
     EXPECT_EQ(test_obj.str_test, std::string("Hello!"));
+    ASSERT_TRUE(test_obj.optional_str_test.has_value());
+    EXPECT_EQ(test_obj.optional_str_test.value(), std::string("Optional hello!"));
     EXPECT_STREQ(test_obj.buffer_test.buffer, "how are you?");
 }
 
@@ -179,6 +187,24 @@ TEST_F(WBEDeserializerJSONTest, PartialUpdateOnlyOneField) {
     EXPECT_EQ(test_obj.si64_test, 200);
     EXPECT_EQ(test_obj.ui32_test, 300U);
     EXPECT_EQ(test_obj.str_test, std::string("orig"));
+    EXPECT_FALSE(test_obj.optional_str_test.has_value());
+}
+
+TEST_F(WBEDeserializerJSONTest, OptionalFieldPresentAndMissing) {
+    WBE::TestSerializable test_obj;
+    WBE::ParserJSON parser;
+
+    parser.parse_from_buffer(R"({ "optional_str_test": "Jason" })");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
+
+    ASSERT_TRUE(test_obj.optional_str_test.has_value());
+    EXPECT_EQ(test_obj.optional_str_test.value(), "Jason");
+
+    test_obj.optional_str_test = "stale";
+    parser.parse_from_buffer(R"({ })");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializable>::deserialize(parser.get_data(), test_obj);
+
+    EXPECT_FALSE(test_obj.optional_str_test.has_value());
 }
 
 TEST_F(WBEDeserializerJSONTest, NestingGeneral) {

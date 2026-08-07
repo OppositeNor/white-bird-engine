@@ -182,6 +182,31 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     EXPECT_EQ(static_cast<unsigned char>(image_data_storage.at(5)), 0);
 }
 
+TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
+    WBE::ResourceUnitLoaderImage loader;
+    std::stringstream ss;
+    std::vector<char> image_data_storage;
+    WBE::RUImage captured_ru_image;
+    WBE::RUSchemeImage image_scheme;
+    image_scheme.path = "assets/images/test_ppm3.ppm";
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
+                             [&image_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                                 image_data_storage.resize(p_res_size);
+                                 std::memcpy(image_data_storage.data(), p_res, p_res_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)>(
+                             [&captured_ru_image](std::string_view, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(p_size, sizeof(WBE::RUImage));
+                                 std::memcpy(static_cast<void*>(&captured_ru_image), p_res, p_size);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .build(ss);
+    loader.populate_scheme(*res_chunk, image_scheme);
+    EXPECT_EQ(captured_ru_image.color_space, WBE::get_color_space_from_str("srgb"));
+}
+
 TEST_F(ResourcePopulatorTest, AudioResourceGeneral) {
     // TODO: loader is not implemented yet.
 }
@@ -371,6 +396,43 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     ASSERT_EQ(created_ref_keys.size(), 2U);
     EXPECT_EQ(created_ref_keys[0], "vertex_shader");
     EXPECT_EQ(created_ref_keys[1], "fragment_shader");
+}
+
+TEST_F(ResourcePopulatorTest, InlineTextureOrReferenceIsRequired) {
+    WBE::ResourceUnitLoaderMaterial loader;
+    WBE::StackAllocator stack_allocator(64 * 1024);
+    std::stringstream stream;
+
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)>(
+                             [&push_to_stack](std::string_view, const void* p_res, size_t p_size) -> WBE::RefRes<char> {
+                                 return push_to_stack(p_size, p_res);
+                             }))
+                         .build(stream);
+
+    std::string json_buffer = R"(
+    {
+        "id": "test_material_missing_texture_binding",
+        "type": "material",
+        "graphics_pipeline_ids": ["main_pipeline"],
+        "textures": [
+            {
+                "texture_key": "albedo"
+            }
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, parser.get_data()), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, VideoResourceGeneral) {

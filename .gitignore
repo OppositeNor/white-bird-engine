@@ -10,3 +10,4 @@ vgcore*
 *.gen*
 
 compile_commands.json
+other/

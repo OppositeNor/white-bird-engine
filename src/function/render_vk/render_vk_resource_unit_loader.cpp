@@ -281,11 +281,11 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
-    resource_unit.vertex_entry = populate_text(p_res_chunk, p_scheme.vertex_entry);
-    resource_unit.tessellation_entry = populate_text(p_res_chunk, p_scheme.tessellation_entry);
-    resource_unit.geometry_entry = populate_text(p_res_chunk, p_scheme.geometry_entry);
-    resource_unit.fragment_entry = populate_text(p_res_chunk, p_scheme.fragment_entry);
-    resource_unit.compute_entry = populate_text(p_res_chunk, p_scheme.compute_entry);
+    resource_unit.vertex_entry = populate_text(p_res_chunk, p_scheme.vertex_entry.value_or(""));
+    resource_unit.tessellation_entry = populate_text(p_res_chunk, p_scheme.tessellation_entry.value_or(""));
+    resource_unit.geometry_entry = populate_text(p_res_chunk, p_scheme.geometry_entry.value_or(""));
+    resource_unit.fragment_entry = populate_text(p_res_chunk, p_scheme.fragment_entry.value_or(""));
+    resource_unit.compute_entry = populate_text(p_res_chunk, p_scheme.compute_entry.value_or(""));
     resource_unit.data = data.force_cast<uint32_t>();
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
@@ -293,14 +293,14 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
 
 void populate_pipeline_stage(IResourceChunk& p_res_chunk,
     RefRes<RUShader>& p_stage,
-    std::string_view p_stage_id,
-    const RUSchemeShader& p_stage_scheme,
+    const std::optional<std::string>& p_stage_id,
+    const std::optional<RUSchemeShader>& p_stage_scheme,
     std::string_view p_stage_name,
     bool p_is_required = true) {
-    if (!p_stage_id.empty()) {
+    if (p_stage_id.has_value()) {
         return;
     }
-    if (p_stage_scheme.path.empty()) {
+    if (!p_stage_scheme.has_value()) {
         if (!p_is_required) {
             return;
         }
@@ -308,12 +308,12 @@ void populate_pipeline_stage(IResourceChunk& p_res_chunk,
                                              "requires either stage id or inline shader path.",
             p_stage_name));
     }
-    p_stage = populate_shader_resource(p_res_chunk, p_stage_scheme);
+    p_stage = populate_shader_resource(p_res_chunk, p_stage_scheme.value());
 }
 
-void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_stage, std::string_view p_stage_id) {
-    if (!p_stage_id.empty()) {
-        p_res_chunk.create_ref_to(p_stage, p_stage_id);
+void create_pipeline_stage_ref(IResourceChunk& p_res_chunk, RefRes<RUShader>& p_stage, const std::optional<std::string>& p_stage_id) {
+    if (p_stage_id.has_value()) {
+        p_res_chunk.create_ref_to(p_stage, p_stage_id.value());
     }
 }
 
@@ -322,9 +322,9 @@ RefRes<char> push_stage_entry(IResourceChunk& p_res_chunk, std::string_view p_en
     return p_res_chunk.push_data(stage_entry.size() + 1, stage_entry.c_str());
 }
 
-std::string_view resolve_pipeline_stage_entry(std::string_view p_stage_entry, bool p_stage_present) {
-    if (!p_stage_entry.empty()) {
-        return p_stage_entry;
+std::string_view resolve_pipeline_stage_entry(const std::optional<std::string>& p_stage_entry, bool p_stage_present) {
+    if (p_stage_entry.has_value()) {
+        return p_stage_entry.value();
     }
     if (!p_stage_present) {
         return {};
@@ -334,8 +334,8 @@ std::string_view resolve_pipeline_stage_entry(std::string_view p_stage_entry, bo
     return {};
 }
 
-bool scheme_has_pipeline_stage(std::string_view p_stage_id, const RUSchemeShader& p_stage_scheme) {
-    return !p_stage_id.empty() || !p_stage_scheme.path.empty();
+bool scheme_has_pipeline_stage(const std::optional<std::string>& p_stage_id, const std::optional<RUSchemeShader>& p_stage_scheme) {
+    return p_stage_id.has_value() || p_stage_scheme.has_value();
 }
 
 RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemeGraphicsPipeline& p_scheme) {
@@ -371,7 +371,7 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
 }
 
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) {
-    const bool has_inline_pipeline = !p_material.graphics_pipeline.type.empty();
+    const bool has_inline_pipeline = p_material.graphics_pipeline.has_value();
     if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
         throw std::runtime_error("Failed to populate material resource: graphics_pipeline_ids or inline graphics_pipeline is required.");
     }
@@ -381,7 +381,7 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
 
     RUMaterial resource_unit;
     if (has_inline_pipeline) {
-        resource_unit.graphics_pipeline = populate_graphics_pipeline_resource(p_res_chunk, p_material.graphics_pipeline);
+        resource_unit.graphics_pipeline = populate_graphics_pipeline_resource(p_res_chunk, p_material.graphics_pipeline.value());
     }
     std::vector<RUMaterial::TextureSlot> texture_slots;
     std::vector<std::string> texture_ids;
@@ -393,10 +393,13 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
         }
         RUMaterial::TextureSlot texture_slot;
         texture_slot.texture_key = populate_text_resource(p_res_chunk, texture_scheme.texture_key);
-        if (!texture_scheme.texture_id.empty()) {
-            texture_ids.push_back(texture_scheme.texture_id);
+        if (texture_scheme.texture_id.has_value()) {
+            texture_ids.push_back(texture_scheme.texture_id.value());
         } else {
-            texture_slot.texture = populate_image_resource(p_res_chunk, texture_scheme.texture);
+            if (!texture_scheme.texture.has_value()) {
+                throw std::runtime_error("Failed to populate material resource: texture slot requires either texture_id or inline texture.");
+            }
+            texture_slot.texture = populate_image_resource(p_res_chunk, texture_scheme.texture.value());
             texture_ids.emplace_back();
         }
         texture_slots.push_back(texture_slot);
@@ -422,8 +425,11 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
 }
 
 void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
-    if (p_scheme.material_id.empty()) {
-        p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material);
+    if (!p_scheme.material_id.has_value()) {
+        if (!p_scheme.material.has_value()) {
+            throw std::runtime_error("Failed to populate submesh resource unit: material_id or inline material is required.");
+        }
+        p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material.value());
     }
 
     if (p_scheme.geometry_path.empty()) {
@@ -452,8 +458,8 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
 }
 
 void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemeSubmesh3D& p_scheme) {
-    if (!p_scheme.material_id.empty()) {
-        p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id);
+    if (p_scheme.material_id.has_value()) {
+        p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id.value());
     }
 }
 

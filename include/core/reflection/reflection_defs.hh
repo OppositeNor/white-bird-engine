@@ -29,7 +29,31 @@
 
 #endif
 
+#include <optional>
+#include <type_traits>
+
 namespace WhiteBirdEngine {
+template <typename T>
+struct IsStdOptional : std::false_type {
+};
+
+template <typename T>
+struct IsStdOptional<std::optional<T>> : std::true_type {
+};
+
+template <typename T>
+constexpr bool IS_STD_OPTIONAL = IsStdOptional<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept StdOptionalConcept = IS_STD_OPTIONAL<T>;
+
+template <typename T>
+constexpr void reset_if_optional(T& p_value) {
+    if constexpr (StdOptionalConcept<T>) {
+        p_value.reset();
+    }
+}
+
 /**
  * @class SerializableSD
  * @brief Serializer/deserializer for genenral types.
@@ -60,6 +84,26 @@ public:
     template <typename ParserDataType>
     static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
         p_data.template get<ObjType>(p_serializable);
+    }
+};
+
+template <typename T>
+class SerializableSD<std::optional<T>> {
+public:
+    using ObjType = std::optional<T>;
+
+    template <typename ParserDataType>
+    static void serialize(ParserDataType& p_data, const ObjType& p_serializable) {
+        if (p_serializable.has_value()) {
+            SerializableSD<T>::serialize(p_data, p_serializable.value());
+        }
+    }
+
+    template <typename ParserDataType>
+    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
+        T result{};
+        SerializableSD<T>::deserialize(p_data, result);
+        p_serializable = std::move(result);
     }
 };
 

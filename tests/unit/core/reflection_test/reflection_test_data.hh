@@ -23,6 +23,7 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,8 @@ struct WBE_META(WBE_SERIALIZABLE) TestSerializable final : public Serializable {
     glm::vec4 vec4_test = glm::vec4(0.0F);
     WBE_META(WBE_REFLECT)
     std::string str_test;
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> optional_str_test;
     WBE_META(WBE_REFLECT)
     Buffer<16> buffer_test;
 };

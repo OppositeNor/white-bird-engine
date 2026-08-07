@@ -124,9 +124,17 @@ void SerializableSD<{{ serializable.name }}>::serialize(ParserDataType& p_data, 
     {% endfor %}
     ParserDataType result{};
     {% for field in serializable.fields %}
+    {% if "std::optional<" in field.type %}
+    if (p_serializable.{{ field.name }}.has_value()) {
+        SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
+        p_data.set_value("{{ field.name }}", result);
+        result = ParserDataType();
+    }
+    {% else %}
     SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
     p_data.set_value("{{ field.name }}", result);
     result = ParserDataType();
+    {% endif %}
     {% endfor %}
 }
 
@@ -144,6 +152,8 @@ void SerializableSD<{{ serializable.name }}>::deserialize(const ParserDataType& 
     if (p_data.contains("{{ field.name }}")) {
         SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
                 p_data.template get_value<ParserDataType>("{{ field.name }}"), p_serializable.{{ field.name }});
+    } else {
+        reset_if_optional(p_serializable.{{ field.name }});
     }
     {% endif %}
     {% endfor %}

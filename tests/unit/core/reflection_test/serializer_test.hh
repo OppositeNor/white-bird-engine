@@ -62,6 +62,7 @@ inline void serializer_test_default_construct(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("vec3_test"));
     EXPECT_TRUE(p_data.contains("vec4_test"));
     EXPECT_TRUE(p_data.contains("str_test"));
+    EXPECT_FALSE(p_data.contains("optional_str_test"));
     EXPECT_TRUE(p_data.contains("buffer_test"));
     EXPECT_EQ(p_data.template get_value<int32_t>("si32_test"), 0);
     EXPECT_EQ(p_data.template get_value<int64_t>("si64_test"), 0);
@@ -87,6 +88,7 @@ inline void serializer_test_general(ParserDataType p_data) {
     serializable.vec3_test = glm::vec3(1, -2, 3);
     serializable.vec4_test = glm::vec4(1, -2, 3, -4);
     serializable.str_test = "Hello!";
+    serializable.optional_str_test = "Optional hello!";
     strcpy(serializable.buffer_test.buffer, "how are you?");
 
     WBE::SerializableSD<WBE::TestSerializable> sd;
@@ -102,6 +104,7 @@ inline void serializer_test_general(ParserDataType p_data) {
     EXPECT_TRUE(p_data.contains("vec3_test"));
     EXPECT_TRUE(p_data.contains("vec4_test"));
     EXPECT_TRUE(p_data.contains("str_test"));
+    EXPECT_TRUE(p_data.contains("optional_str_test"));
     EXPECT_TRUE(p_data.contains("buffer_test"));
 
     EXPECT_EQ(p_data.template get_value<int32_t>("si32_test"), 3);
@@ -113,6 +116,7 @@ inline void serializer_test_general(ParserDataType p_data) {
     EXPECT_EQ(p_data.template get_value<glm::vec3>("vec3_test"), glm::vec3(1, -2, 3));
     EXPECT_EQ(p_data.template get_value<glm::vec4>("vec4_test"), glm::vec4(1, -2, 3, -4));
     EXPECT_EQ(p_data.template get_value<std::string>("str_test"), std::string("Hello!"));
+    EXPECT_EQ(p_data.template get_value<std::string>("optional_str_test"), std::string("Optional hello!"));
     EXPECT_EQ(p_data.template get_value<std::string>("buffer_test"), std::string("how are you?"));
 }
 
