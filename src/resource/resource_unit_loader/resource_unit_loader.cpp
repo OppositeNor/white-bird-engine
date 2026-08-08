@@ -114,7 +114,6 @@ std::vector<std::string> ResourceUnitLoaderImage::get_supported_resource_types()
 std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemeImage>(p_scheme, "image");
     auto file_path = get_resource_path(typed_scheme.path);
-    std::string color_space = typed_scheme.color_space.value_or("srgb");
     uint32_t width, height, file_channels;
     RUImage resource_unit;
     if (typed_scheme.is_hdr) {
@@ -126,7 +125,7 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
         resource_unit.width = width;
         resource_unit.height = height;
         resource_unit.channel_count = typed_scheme.channel_count == 0 ? file_channels : typed_scheme.channel_count;
-        resource_unit.color_space = get_color_space_from_str(color_space);
+        resource_unit.color_space = get_color_space_from_str(typed_scheme.color_space);
         resource_unit.config.set(RUImage::IS_HDR);
         auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count * sizeof(float), (*image_data).data());
         resource_unit.image_data = data;
@@ -139,7 +138,7 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
         resource_unit.width = width;
         resource_unit.height = height;
         resource_unit.channel_count = typed_scheme.channel_count == 0 ? file_channels : typed_scheme.channel_count;
-        resource_unit.color_space = get_color_space_from_str(color_space);
+        resource_unit.color_space = get_color_space_from_str(typed_scheme.color_space);
         auto data = p_res_chunk.push_data(image_data.size(), image_data.data());
         WBE_DEBUG_ASSERT(width * height * resource_unit.channel_count == image_data.size());
         resource_unit.image_data = data;
@@ -165,7 +164,7 @@ std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk
     RUText resource_unit;
     resource_unit.text_data = data;
     resource_unit.size = file_content.size() + 1;
-    resource_unit.encode_type = get_encode_type_from_str(typed_scheme.encode_type.value_or("utf8"));
+    resource_unit.encode_type = get_encode_type_from_str(typed_scheme.encode_type);
     return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUText>();
 }
 

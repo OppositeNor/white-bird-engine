@@ -396,8 +396,7 @@ void RendererVK::create_swap_chain() { // NOLINT
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we
         // don't have to explicitly transfer ownership.
-        swap_chain_queue_family_indices_array =
-            Vector<uint32_t>(unique_indices.begin(), unique_indices.end(), allocator);
+        swap_chain_queue_family_indices_array = Vector<uint32_t>(unique_indices.begin(), unique_indices.end(), allocator);
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = swap_chain_queue_family_indices_array.data();
@@ -658,8 +657,8 @@ bool RendererVK::check_layer_support() {
 void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
-    int32_t pick_device_index = game_config.render_device_index;
-    if (pick_device_index >= 0) {
+    if (game_config.render_device_index.has_value()) {
+        uint32_t pick_device_index = game_config.render_device_index.value();
         // The refered device index is provided, use the index to pick device.
         // If failed to pick, fall back to automatic picking.
         if (std::cmp_greater_equal(pick_device_index, p_physical_devices.size())) {

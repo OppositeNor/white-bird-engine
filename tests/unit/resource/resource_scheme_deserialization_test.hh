@@ -56,8 +56,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextGeneral) {
     ASSERT_EQ(scheme.id, "test_text_01");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_01.txt");
-    ASSERT_TRUE(scheme.encode_type.has_value());
-    ASSERT_EQ(scheme.encode_type.value(), "utf8");
+    ASSERT_EQ(scheme.encode_type, "utf8");
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
@@ -75,7 +74,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
     ASSERT_EQ(scheme.id, "test_text_02");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_02.txt");
-    ASSERT_FALSE(scheme.encode_type.has_value());
+    ASSERT_EQ(scheme.encode_type, "utf8");
 }
 
 TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
@@ -149,8 +148,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 4U);
-    ASSERT_TRUE(scheme.color_space.has_value());
-    ASSERT_EQ(scheme.color_space.value(), "rgb");
+    ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
 }
@@ -173,8 +171,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 3U);
-    ASSERT_TRUE(scheme.color_space.has_value());
-    ASSERT_EQ(scheme.color_space.value(), "rgb");
+    ASSERT_EQ(scheme.color_space, "rgb");
     ASSERT_TRUE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
 }
@@ -196,7 +193,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     ASSERT_EQ(scheme.channel_count, 0);
     ASSERT_EQ(scheme.flip_h, false);
     ASSERT_EQ(scheme.flip_v, false);
-    ASSERT_FALSE(scheme.color_space.has_value());
+    ASSERT_EQ(scheme.color_space, "srgb");
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }

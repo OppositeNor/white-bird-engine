@@ -20,6 +20,7 @@
 #include "core/reflection/serializable.hh"
 #include "utils/defs.hh"
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace WhiteBirdEngine {
@@ -67,11 +68,11 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
     uint32_t frames_in_flight = 2;
     /**
      * @brief The index of the render device.
-     * -1 if not specified, and white bird engine will automatically
-     *  choose the most optimal one.
+     * If not specified, white bird engine will automatically choose the most
+     * optimal one.
      */
     WBE_META(WBE_REFLECT)
-    int32_t render_device_index = -1;
+    std::optional<uint32_t> render_device_index;
 
     WBE_META(WBE_REFLECT)
     std::string render_api;
