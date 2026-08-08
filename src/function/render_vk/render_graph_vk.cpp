@@ -418,7 +418,7 @@ void RenderGraphVK::infer_res_edges(const Map<std::string, Ref<RendResVK>, Rende
                 if (last_writer.id == read_access.res_id) {
                     auto resource = find_res(read_access.res_id);
                     if (resource == MEM_NULL) {
-                        throw std::runtime_error("RenderGraphVK: read resource not declared in pipeline.");
+                        throw std::runtime_error(std::format("RenderGraphVK: read resource: {} not declared in pipeline.", read_access.res_id));
                     }
                     add_res_edge(resource,
                         last_writer.node,

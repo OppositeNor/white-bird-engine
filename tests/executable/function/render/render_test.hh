@@ -18,10 +18,11 @@
 #include "function/ecs/components.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/utils.hh"
+#include <algorithm>
 #include <cmath>
 #include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
@@ -64,10 +65,10 @@ inline glm::mat4 test_camera_view(const glm::vec3& p_position, float p_yaw, floa
     return glm::lookAt(p_position, p_position + forward, up);
 }
 
-inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio) {
+inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_far_plane = 10.0F) {
     ComponentCamera camera_component{
         .view = test_camera_view(TEST_DEFAULT_CAMERA_POSITION, default_test_camera_yaw(), default_test_camera_pitch()),
-        .proj = glm::perspective(glm::radians(45.0F), p_aspect_ratio, 0.1F, 10.0F),
+        .proj = glm::perspective(glm::radians(45.0F), p_aspect_ratio, 0.1F, p_far_plane),
         .is_dirty = false,
     };
     camera_component.proj[1][1] *= -1;
@@ -76,6 +77,39 @@ inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio) 
 
 inline CameraInfoVKUBO make_camera_info_ubo(const ComponentCamera& p_camera_component) {
     return CameraInfoVKUBO{.view = p_camera_component.view, .proj = p_camera_component.proj};
+}
+
+inline ComponentSpotLight make_default_test_spot_light_component(float p_intensity) {
+    ComponentSpotLight spot_light_component{
+        .position = glm::vec3(2.5F, 3.5F, 2.5F),
+        .direction = glm::normalize(glm::vec3(-1.0F, -1.4F, -1.0F)),
+        .color = glm::vec3(1.0F, 0.95F, 0.85F),
+        .intensity = p_intensity,
+        .inner_cone_cos = std::cos(glm::radians(18.0F)),
+        .outer_cone_cos = std::cos(glm::radians(28.0F)),
+        .range = 12.0F,
+    };
+
+    glm::vec3 up = std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
+    spot_light_component.view =
+        glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, up);
+    float outer_half_angle = std::acos(std::clamp(spot_light_component.outer_cone_cos, -1.0F, 1.0F));
+    float far_plane = std::max(spot_light_component.range, 0.2F);
+    spot_light_component.proj = glm::perspective(2.0F * outer_half_angle, 1.0F, 0.1F, far_plane);
+    spot_light_component.proj[1][1] *= -1.0F;
+    return spot_light_component;
+}
+
+inline SpotLightInfoVKUBO make_spot_light_info_ubo(const ComponentSpotLight& p_spot_light_component) {
+    return SpotLightInfoVKUBO{.view = p_spot_light_component.view,
+        .proj = p_spot_light_component.proj,
+        .position = p_spot_light_component.position,
+        .intensity = p_spot_light_component.intensity,
+        .direction = p_spot_light_component.direction,
+        .inner_cone_cos = p_spot_light_component.inner_cone_cos,
+        .color = p_spot_light_component.color,
+        .outer_cone_cos = p_spot_light_component.outer_cone_cos,
+        .range = p_spot_light_component.range};
 }
 
 } // namespace WhiteBirdEngine

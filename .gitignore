@@ -11,3 +11,5 @@ vgcore*
 
 compile_commands.json
 other/
+
+imgui.ini

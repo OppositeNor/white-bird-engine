@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/spot_light_info.hh"
+#include "function/ecs/components.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -91,12 +91,12 @@ public:
         // shadow map: 2D, square, sized from the light's
         // `shadow_map_resolution`, format `SHADOW_MAP_DEPTH_FORMAT`, usage
         // depth-stencil attachment + sampled.
-        Builder& shadow_map_depth(const SpotLightInfo& p_spot_light);
+        Builder& shadow_map_depth(const ComponentSpotLight& p_spot_light);
         // Configure this image as the dummy color attachment that pairs
         // with `shadow_map_depth`: 2D, square, sized from the light's
         // `shadow_map_resolution`, format `SHADOW_MAP_COLOR_FORMAT`, usage
         // color attachment.
-        Builder& shadow_map_color(const SpotLightInfo& p_spot_light);
+        Builder& shadow_map_color(const ComponentSpotLight& p_spot_light);
         // Make an RGB image with each element 8 bit wide.
         Builder& rgb();
         // Make an SRGB image with each element 8 bit wide.

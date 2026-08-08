@@ -25,7 +25,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/spot_light_info.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -77,18 +76,6 @@ namespace {
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
 constexpr VkFormat SHADOWMAP_COLOR_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
 
-WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::SpotLightInfo& p_spot_light) {
-    return WBE::SpotLightInfoVKUBO{.view = p_spot_light.view,
-        .proj = p_spot_light.proj,
-        .position = p_spot_light.position,
-        .intensity = p_spot_light.intensity,
-        .direction = p_spot_light.direction,
-        .inner_cone_cos = p_spot_light.inner_cone_cos,
-        .color = p_spot_light.color,
-        .outer_cone_cos = p_spot_light.outer_cone_cos,
-        .range = p_spot_light.range};
-}
-
 } // namespace
 
 class ApplicationVulkanDrawCubeTest : public WBE::ApplicationGame {
@@ -134,7 +121,7 @@ private:
     WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
     WBE::Ref<WBE::ROSamplerVK> material_sampler;
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    WBE::SpotLightInfo spot_light{};
+    WBE::ComponentSpotLight spot_light_component{};
     VkExtent2D shadow_extent{};
     WBE::ComponentCamera camera_component{};
     glm::vec3 camera_position = WBE::TEST_DEFAULT_CAMERA_POSITION;
@@ -268,31 +255,17 @@ void ApplicationVulkanDrawCubeTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDrawCubeTest::setup_spot_light() {
-    std::array<WBE::ComponentSpotLight, 1> source_spot_lights{
-        WBE::ComponentSpotLight{
-            .position = glm::vec3(2.5F, 3.5F, 2.5F),
-            .direction = glm::normalize(glm::vec3(-1.0F, -1.4F, -1.0F)),
-            .color = glm::vec3(1.0F, 0.95F, 0.85F),
-            .intensity = 8.0F,
-            .inner_cone_cos = std::cos(glm::radians(18.0F)),
-            .outer_cone_cos = std::cos(glm::radians(28.0F)),
-            .range = 12.0F,
-        },
+    spot_light_component = WBE::make_default_test_spot_light_component(8.0F);
+    shadow_extent = VkExtent2D{
+        .width = spot_light_component.shadow_map_resolution,
+        .height = spot_light_component.shadow_map_resolution,
     };
-    render_database->set_static_spot_lights(
-        std::span<const WBE::ComponentSpotLight>(source_spot_lights.data(), source_spot_lights.size()));
-    const auto& static_spot_lights = render_database->get_static_spot_lights();
-    if (static_spot_lights.empty()) {
-        throw std::runtime_error("Failed to setup draw cube test: no spot lights registered.");
-    }
-    spot_light = static_spot_lights[0];
-    shadow_extent = VkExtent2D{.width = spot_light.shadow_map_resolution, .height = spot_light.shadow_map_resolution};
 }
 
 void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
 
-    shadow_depth_image = WBE::ROImageVK::Builder().shadow_map_depth(spot_light).create_ref(base_render_data);
-    shadow_color_image = WBE::ROImageVK::Builder().shadow_map_color(spot_light).create_ref(base_render_data);
+    shadow_depth_image = WBE::ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
+    shadow_color_image = WBE::ROImageVK::Builder().shadow_map_color(spot_light_component).create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -341,8 +314,9 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
         .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
     };
     WBE::RenderBindpointDeclarationsBuilder shadow_bindpoint_builder;
-    shadow_bindpoint_builder.add_buffer_decleration("light_camera_info.view", &spot_light.view, sizeof(spot_light.view))
-        .add_buffer_decleration("light_camera_info.proj", &spot_light.proj, sizeof(spot_light.proj));
+    shadow_bindpoint_builder
+        .add_buffer_decleration("light_camera_info.view", &spot_light_component.view, sizeof(spot_light_component.view))
+        .add_buffer_decleration("light_camera_info.proj", &spot_light_component.proj, sizeof(spot_light_component.proj));
     auto shadow_bindpoint_declarations = shadow_bindpoint_builder.build();
     auto compiled =
         WBE::GraphicsPipelineCompilerVK(shadow_compiler_context).compile("shadowmap_spot", shadow_pipeline_resource, shadow_bindpoint_declarations);
@@ -353,7 +327,7 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
 void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
     camera_component = WBE::make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio);
     WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light);
+    WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
     uint32_t spot_light_count = 1;
     auto material_params = WBE::add_material_texture_bindings(bindpoint_builder, default_material, default_material, material_sampler);
     bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_component.view, sizeof(camera_component.view))

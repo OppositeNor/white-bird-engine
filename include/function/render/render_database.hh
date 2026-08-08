@@ -19,17 +19,14 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
-#include "function/ecs/components.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/spot_light_info.hh"
 #include "render_defs.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/i_singleton.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string>
 #include <string_view>
 
@@ -189,26 +186,6 @@ public:
     const OpaqueTrianglesInfo::MaterialUnit* find_opaque_material(std::string_view p_material_key) const;
 
     /**
-     * @brief Replace the static spot light set.
-     *
-     * Each component is converted to a render-side `SpotLightInfo` via
-     * `make_spot_light_info`, so the renderer can consume the resulting
-     * records directly without rederiving light-space matrices.
-     *
-     * @param p_spot_lights The spot lights, captured by value.
-     */
-    void set_static_spot_lights(std::span<const ComponentSpotLight> p_spot_lights);
-
-    /**
-     * @brief Get the current static spot light records.
-     *
-     * @return The static spot light records.
-     */
-    const Vector<SpotLightInfo>& get_static_spot_lights() const {
-        return static_spot_lights;
-    }
-
-    /**
      * @brief Register or replace a compiled render object for a resource key.
      *
      * @param p_resource_key The source resource key or a derived compiler key.
@@ -248,8 +225,6 @@ private:
 
     OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;
-    Vector<SpotLightInfo> static_spot_lights;
-
     void set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh);
 };
 

@@ -13,10 +13,12 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/ecs/components.hh"
 #include "function/function_utils.hh"
-#include "function/render/spot_light_info.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -90,7 +92,7 @@ ROImageVK::Builder& ROImageVK::Builder::image_3d(VkExtent3D p_extent) {
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const SpotLightInfo& p_spot_light) {
+ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const ComponentSpotLight& p_spot_light) {
     image_type = VK_IMAGE_TYPE_2D;
     format = SHADOW_MAP_DEPTH_FORMAT;
     extent = VkExtent3D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};
@@ -98,7 +100,7 @@ ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const SpotLightInfo& p_
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::shadow_map_color(const SpotLightInfo& p_spot_light) {
+ROImageVK::Builder& ROImageVK::Builder::shadow_map_color(const ComponentSpotLight& p_spot_light) {
     image_type = VK_IMAGE_TYPE_2D;
     format = SHADOW_MAP_COLOR_FORMAT;
     extent = VkExtent3D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution, .depth = 1};

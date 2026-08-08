@@ -18,11 +18,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "core/surface/3d_primitive.hh"
-#include "function/ecs/components.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/spot_light_info.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -63,10 +61,8 @@ void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_mate
     if (material_entry == p_registered_material_index.end()) {
         size_t material_index = p_material_mesh_infos.size();
         p_registered_material_index.insert({material_key, material_index});
-        p_material_mesh_infos.push_back(
-            MaterialMeshInfo{.material_key = material_key,
-                .material = material,
-                .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
+        p_material_mesh_infos.push_back(MaterialMeshInfo{
+            .material_key = material_key, .material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
         material_entry = p_registered_material_index.find(material_key);
     }
     p_material_mesh_infos[material_entry->second].submeshes.push_back(&p_submesh);
@@ -117,21 +113,12 @@ const RenderDatabase::OpaqueTrianglesInfo::MaterialUnit* find_material_unit(
 } // namespace
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator),
-      static_spot_lights(p_allocator) {
+    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
     }
     allocator = p_allocator;
-}
-
-void RenderDatabase::set_static_spot_lights(std::span<const ComponentSpotLight> p_spot_lights) {
-    static_spot_lights.clear();
-    static_spot_lights.reserve(p_spot_lights.size());
-    for (const auto& spot_light : p_spot_lights) {
-        static_spot_lights.push_back(make_spot_light_info(spot_light));
-    }
 }
 
 void RenderDatabase::register_compiled_render_resource(

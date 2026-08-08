@@ -42,4 +42,8 @@ class WBEACPCompilerModel(WBEACPCompiler):
         resolved_manifest_path = Path.joinpath(res_dir, manifest_path)
         mesh_resource = self._utils_mesh_compiler.compile_mesh(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
         material_resources = self._utils_mesh_compiler.compile_materials(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
+        # Assimp converts imported UVs to a bottom-left origin, so generated textures must use the same convention.
+        for material_resource in material_resources:
+            for texture_binding in material_resource.get("textures", []):
+                texture_binding["texture"]["flip_v"] = True
         return [mesh_resource] + material_resources

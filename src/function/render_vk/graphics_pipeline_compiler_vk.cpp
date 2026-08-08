@@ -44,6 +44,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <functional>
 #include <glm/ext/matrix_float3x3.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
@@ -699,8 +700,10 @@ void GraphicsPipelineCompilerVK::add_direct_texture_bindpoints(std::string_view 
             .image_layout = VK_IMAGE_LAYOUT_GENERAL,
         };
         if (bindpoint_declaration.image_resource != nullptr) {
-            texture_binding.image_view = compile_image_view(
-                std::format("{}#texture_{}", p_resource_key, bindpoint_declaration.field_path), bindpoint_declaration.image_resource);
+            size_t image_resource_hash = std::hash<RefRes<RUImage>>{}(bindpoint_declaration.image_resource);
+            std::string image_view_resource_key =
+                std::format("{}#texture_{}#resource_{}", p_resource_key, bindpoint_declaration.field_path, image_resource_hash);
+            texture_binding.image_view = compile_image_view(image_view_resource_key, bindpoint_declaration.image_resource);
         } else {
             auto image_view = bindpoint_declaration.image_render_object.dynamic_cast_ref<ROImageViewVK>();
             if (image_view == MEM_NULL) {

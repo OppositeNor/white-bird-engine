@@ -167,6 +167,12 @@ struct WBE_META(WBE_COMPONENT) ComponentDriver {
  *        cosines of the half-angle to keep shader evaluation cheap.
  */
 struct WBE_META(WBE_COMPONENT) ComponentSpotLight {
+    /** @brief Light-space view matrix (world to light view space). */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 view = glm::mat4(1);
+    /** @brief Light-space projection matrix (light view space to clip space). */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 proj = glm::mat4(1);
     // World-space position of the light source.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     glm::vec3 position;

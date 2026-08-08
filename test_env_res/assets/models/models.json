@@ -12,6 +12,7 @@
             "id": "sponza",
             "type": "model",
             "file": "assets/models/Sponza/glTF/Sponza.gltf",
+            "scale_vertex_pos": 0.01,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "texture_output_dir": "assets/images"
         }

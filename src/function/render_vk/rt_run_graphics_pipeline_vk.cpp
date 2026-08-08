@@ -45,8 +45,10 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::optional<std::string_view> p_vertex_buffer_id,
     std::optional<std::string_view> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
-    std::optional<IndexedDrawRegionVK> p_indexed_draw_region)
-    : render_data(p_render_data), clear_values(p_render_data->allocator), render_extent(p_render_extent),
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+    VkAttachmentLoadOp p_color_attachment_load_op)
+    : render_data(p_render_data), clear_values(p_render_data->allocator),
+      color_attachment_load_op(p_color_attachment_load_op), render_extent(p_render_extent),
       color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
       vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
       index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
@@ -71,8 +73,11 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::optional<std::string_view> p_vertex_buffer_id,
     std::optional<std::string_view> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
-    std::optional<IndexedDrawRegionVK> p_indexed_draw_region)
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VkAttachmentLoadOp p_depth_attachment_load_op)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
+      color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
       render_extent(p_render_extent),
       color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
       depth_attachment_id(p_depth_attachment_id.has_value() ? std::optional<std::string>(*p_depth_attachment_id) : std::nullopt),
@@ -93,6 +98,18 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() c
     read_accesses.push_back({.res_id = pipeline_id,
         .access = VK_ACCESS_2_SHADER_READ_BIT,
         .stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT});
+    if (color_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
+        for (const std::string& color_attachment_id : color_attachment_ids) {
+            read_accesses.push_back({.res_id = color_attachment_id,
+                .access = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+                .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT});
+        }
+    }
+    if (depth_attachment_id.has_value() && depth_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
+        read_accesses.push_back({.res_id = *depth_attachment_id,
+            .access = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+            .stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT});
+    }
     if (vertex_buffer_id.has_value()) {
         read_accesses.push_back({.res_id = *vertex_buffer_id,
             .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
@@ -152,8 +169,10 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     color_attachments.reserve(color_attachment_count);
     for (size_t i = 0; i < color_attachment_count; ++i) {
         auto color_attachment = WBE_REQUIRES_VALID(p_resources.get(color_attachment_ids[i]).res.dynamic_cast_ref<ROImageViewVK>());
-        color_attachments.push_back(
-            ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view()).set_clear_value(clear_values[i]).build());
+        color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
+                                        .set_load_op(color_attachment_load_op)
+                                        .set_clear_value(clear_values[i])
+                                        .build());
     }
     rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachments.size());
     rendering_info.pColorAttachments = color_attachments.data();
@@ -161,6 +180,7 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     if (depth_attachment_id.has_value()) {
         auto depth_attachment = WBE_REQUIRES_VALID(p_resources.get(*depth_attachment_id).res.dynamic_cast_ref<ROImageViewVK>());
         depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
+                                    .set_load_op(depth_attachment_load_op)
                                     .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)
                                     .set_clear_value(clear_values[color_attachment_count])
                                     .build();

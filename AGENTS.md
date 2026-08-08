@@ -26,8 +26,7 @@ For non-trivial implementation tasks:
 1. Use repo-explorer when repository context is unclear.
 2. Use investigator first for debugging, root cause analysis, and other investigation work.
 3. Start implementation only after the investigation findings are clear.
-4. If the implementation is large, pass it to the coder agent.
-5. Validate completed changes with the validator agent before considering the task done.
+4. Validate completed changes with the validator agent before considering the task done.
 
 ---
 
