@@ -25,10 +25,12 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_graph_resource_binding.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -128,6 +130,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
     present(image_index, p_graph);
+    p_graph->reset_transient_resources();
 
     // Clear pre-execute tasks queue.
     base_render_data.pre_execute_tasks_queue.clear();
@@ -189,7 +192,7 @@ void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
     render_objects.reset();
 
-    // Release the active render graph and any registered pipeline descriptors.
+    // Release the active render graph and any registered render graph descriptors.
     // These hold Refs to render-object resources (buffers, images, etc.) whose
     // destructors enqueue device-object cleanup via register_delayed_call.
     // We must drop them before draining the delayed-call list, otherwise the
@@ -987,29 +990,84 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     }
 }
 
-void RendererVK::register_render_graph(const std::string& p_graph_name, RendGraphDescVK p_desc) {
+void RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc) {
+    if (render_graphs.contains(p_resource_key)) {
+        throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
+    }
+
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
-    render_graphs[p_graph_name] = std::move(desc_ref);
+    auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
+    graph->build_from_descriptor(*desc_ref);
+    set_graph_static_opaque_resources(graph);
+
+    render_graphs.emplace(std::string(p_resource_key),
+        RegisteredRenderGraph{
+            .descriptor = std::move(desc_ref),
+            .graph = std::move(graph),
+            .reference_count = 1,
+        });
 }
 
-void RendererVK::activate_render_graph(std::string_view p_graph_name) {
-    auto pipeline_entry = render_graphs.find(p_graph_name);
-    if (pipeline_entry == render_graphs.end()) {
-        throw std::runtime_error("Failed to activate pipeline: pipeline not found.");
+void RendererVK::register_render_graph(std::string_view p_resource_key) {
+    auto graph_entry = render_graphs.find(p_resource_key);
+    if (graph_entry == render_graphs.end()) {
+        throw std::runtime_error(std::format("Render graph resource key was not loaded: {}.", p_resource_key));
     }
-    // Defer-destroy any previous graph.
-    if (active_graph != MEM_NULL) {
-        Ref<RenderGraphVK> previous_graph = active_graph;
-        register_delay_call(
-            [previous_graph]() mutable {
-                previous_graph = MEM_NULL;
-            },
-            frames_in_flight);
-    }
-    active_graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
-    active_graph->build_from_descriptor(*pipeline_entry->second);
+    ++graph_entry->second.reference_count;
+}
 
+void RendererVK::unregister_render_graph(std::string_view p_resource_key) {
+    auto graph_entry = render_graphs.find(p_resource_key);
+    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
+        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
+    }
+
+    --graph_entry->second.reference_count;
+    if (graph_entry->second.reference_count > 0) {
+        return;
+    }
+
+    Ref<RenderGraphVK> released_graph = graph_entry->second.graph;
+    Ref<RendGraphDescVK> released_descriptor = graph_entry->second.descriptor;
+    if (active_graph == released_graph) {
+        active_graph = MEM_NULL;
+    }
+    render_graphs.erase(graph_entry);
+    register_delay_call(
+        [released_graph, released_descriptor]() mutable {
+            released_graph = MEM_NULL;
+            released_descriptor = MEM_NULL;
+        },
+        frames_in_flight);
+}
+
+void RendererVK::activate_render_graph(std::string_view p_resource_key) {
+    auto graph_entry = render_graphs.find(p_resource_key);
+    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
+        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
+    }
+
+    active_graph = graph_entry->second.graph;
     set_graph_static_opaque_resources(active_graph);
+}
+
+void RendererVK::update_render_graph_resources(
+    std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) {
+    auto graph_entry = render_graphs.find(p_resource_key);
+    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
+        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
+    }
+    if (p_bindings == nullptr && p_binding_count != 0) {
+        throw std::runtime_error("Render graph resource bindings are null.");
+    }
+
+    for (size_t i = 0; i < p_binding_count; ++i) {
+        Ref<RenderObjectVK> resource = p_bindings[i].resource.dynamic_cast_ref<RenderObjectVK>();
+        if (resource == MEM_NULL) {
+            throw std::runtime_error(std::format("Render graph resource is not compatible with Vulkan: {}.", p_bindings[i].resource_id));
+        }
+        graph_entry->second.graph->set_transient_resource(p_bindings[i].resource_id, std::move(resource), p_bindings[i].resource_type_id);
+    }
 }
 
 void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {

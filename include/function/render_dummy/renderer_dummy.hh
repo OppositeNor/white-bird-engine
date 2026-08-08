@@ -15,22 +15,21 @@
 #ifndef WBE_FILE_RENDERER_DUMMY_H
 #define WBE_FILE_RENDERER_DUMMY_H
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
-#include "utils/defs.hh"
+#include "function/render/render_graph_resource_binding.hh"
+#include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 namespace WhiteBirdEngine {
 
 /**
  * @class RendererDummy
- * @brief A dummy renderer that omits all operations.
+ * @brief A dummy renderer that omits rendering and does not support render graphs.
  *
  */
 class RendererDummy final : public IRenderer {
@@ -58,8 +57,24 @@ public:
         return dummy_database;
     }
 
-    virtual void activate_render_graph(std::string_view p_pipeline_name) override {
-        (void)p_pipeline_name;
+    virtual void register_render_graph(std::string_view p_resource_key) override {
+        throw std::runtime_error(std::string("RendererDummy does not support render graph registration: ") + std::string(p_resource_key));
+    }
+
+    virtual void unregister_render_graph(std::string_view p_resource_key) override {
+        throw std::runtime_error(std::string("RendererDummy does not support render graph unregistration: ") + std::string(p_resource_key));
+    }
+
+    virtual void activate_render_graph(std::string_view p_resource_key) override {
+        throw std::runtime_error(std::string("RendererDummy does not support render graph activation: ") + std::string(p_resource_key));
+    }
+
+    virtual void update_render_graph_resources(
+        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override {
+        (void)p_bindings;
+        (void)p_binding_count;
+        throw std::runtime_error(
+            std::string("RendererDummy does not support render graph resource updates: ") + std::string(p_resource_key));
     }
 
     virtual void update_static_opaque_triangles() override {

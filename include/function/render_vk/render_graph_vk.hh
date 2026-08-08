@@ -50,6 +50,44 @@ struct RendResVK {
 };
 
 /**
+ * @class RendResViewVK
+ * @brief Read-only resource lookup for a Vulkan render graph.
+ */
+class RendResViewVK {
+public:
+    RendResViewVK() = delete;
+
+    /**
+     * @brief Construct a view over a graph resource map.
+     *
+     * The map is non-owning and must outlive this view.
+     *
+     * @param p_resources The resource map to view.
+     */
+    RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources) : resources(p_resources) {
+    }
+
+    /**
+     * @brief Check whether a resource is bound under an id.
+     *
+     * @param p_resource_id The resource id to query.
+     * @return True when the resource is bound, otherwise false.
+     */
+    bool contains(std::string_view p_resource_id) const;
+
+    /**
+     * @brief Get a resource binding by id.
+     *
+     * @param p_resource_id The resource id to query.
+     * @return The resource binding stored under the id.
+     */
+    const RendResVK& get(std::string_view p_resource_id) const;
+
+private:
+    const Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
+};
+
+/**
  * @class RGNode
  * @brief A node of the render graph.
  */
@@ -175,7 +213,7 @@ public:
      * sequence them with execution edges based on `prev`. After this call,
      * the graph is ready to execute().
      *
-     * @param p_desc The pipeline descriptor.
+     * @param p_desc The render graph descriptor.
      */
     void build_from_descriptor(const RendGraphDescVK& p_desc);
 
@@ -205,11 +243,10 @@ public:
         std::span<const VkSemaphoreSubmitInfo> p_extra_signals_last_submit);
 
     /**
-     * @brief Insert or override a runtime-bound resource by id. This lets the
-     * renderer inject per-frame resources (e.g., the current swap-chain image
-     * view) whose identity is fixed by label but whose object changes
-     * across frames. If a resource with the given id already exists, its
-     * res / res_type_id are updated in place.
+     * @brief Insert or override a persistent runtime-bound resource by id.
+     *
+     * If a transient override exists, this updates the value restored after
+     * execution without replacing the current override.
      *
      * @param p_res_id      The resource id (label).
      * @param p_resource    The resource instance.
@@ -218,11 +255,27 @@ public:
     void set_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
 
     /**
+     * @brief Insert or override a resource until the graph next executes.
+     *
+     * @param p_res_id The resource id to override.
+     * @param p_resource The transient resource instance.
+     * @param p_res_type_id The runtime type id of the resource.
+     */
+    void set_transient_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+
+    /**
+     * @brief Restore descriptor defaults after transient resource overrides.
+     */
+    void reset_transient_resources();
+
+    /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
      * queue submit of the most recent execute(). Caller waits on it at
      * present time. One semaphore is allocated per swap-chain image because
      * presentation may still own the previous render-finished semaphore until
      * that image is acquired again.
+     *
+     * @return The terminal semaphore for the current swap-chain image.
      */
     Ref<SemaphoreVK> get_terminal_semaphore() const;
 
@@ -232,9 +285,16 @@ private:
     Vector<Ref<RGNode>, RenderAllocator> nodes;
     Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
     Vector<Ref<RGResEdge>, RenderAllocator> res_edges;
-    // All resources known to the graph (declared in the pipeline descriptor
-    // plus per-frame overrides set via set_resource()), keyed by res_id.
+    // All resources known to the graph, keyed by res_id.
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
+
+    struct TransientResourceDefault {
+        std::string resource_id;
+        bool existed = false;
+        RendResTID resource_type_id = 0;
+        Ref<RenderObjectVK> resource;
+    };
+    Vector<TransientResourceDefault, RenderAllocator> transient_resource_defaults;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
@@ -256,14 +316,13 @@ private:
     void infer_res_edges(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources);
 
     std::tuple<size_t, size_t> find_graphics_range() const;
-    Vector<RendResVK, RenderAllocator> build_per_node_bound(Ref<RGNode> p_node) const;
     void record_node(Ref<RGNode> p_node,
         VkCommandBuffer p_command_buffer,
-        const Vector<RendResVK, RenderAllocator>& p_bound,
+        const RendResViewVK& p_resources,
         double p_delta,
         bool p_record_pre_execute_tasks,
         bool p_record_present_transition);
-    void record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const Vector<RendResVK, RenderAllocator>& p_bound);
+    void record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const RendResViewVK& p_resources);
     void record_present_transition(VkCommandBuffer p_command_buffer);
     void collect_edge_semaphores(Ref<RGNode> p_node,
         uint64_t p_timeline_value,

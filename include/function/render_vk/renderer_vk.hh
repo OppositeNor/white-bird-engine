@@ -25,6 +25,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -47,6 +48,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -91,6 +93,7 @@ public:
      *
      * @param p_allocator The allocator that the render resources will be
      * allocated on. This will also be the allocator for Vulkan.
+     * @param p_window The window whose surface and swap chain are rendered.
      * @param p_job_buffer The render job buffer. Used for committing jobs for
      * the renderer to perform.
      */
@@ -102,7 +105,14 @@ public:
 
     virtual void tick(double p_delta) override;
 
-    virtual void activate_render_graph(std::string_view p_graph_name) override;
+    virtual void register_render_graph(std::string_view p_resource_key) override;
+
+    virtual void unregister_render_graph(std::string_view p_resource_key) override;
+
+    virtual void activate_render_graph(std::string_view p_resource_key) override;
+
+    virtual void update_render_graph_resources(
+        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
@@ -115,12 +125,12 @@ public:
     }
 
     /**
-     * @brief Register a Vulkan pipeline descriptor under the given name.
+     * @brief Register a Vulkan render graph descriptor under a resource key.
      *
-     * @param p_graph_name The name to register under.
-     * @param p_desc The pipeline descriptor.
+     * @param p_resource_key The resource key to register under.
+     * @param p_desc The render graph descriptor.
      */
-    void register_render_graph(const std::string& p_graph_name, RendGraphDescVK p_desc);
+    void register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
 
     /**
      * @brief Execute a render graph through this renderer's swap-chain path.
@@ -254,9 +264,15 @@ private:
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
     Vector<Ref<SemaphoreVK>> image_available_semaphores;
 
-    // Registered render graph descriptors, keyed by name.
-    Map<std::string, Ref<RendGraphDescVK>> render_graphs;
-    // The currently active render graph (rebuilt on every activate_render_graph()).
+    struct RegisteredRenderGraph {
+        Ref<RendGraphDescVK> descriptor;
+        Ref<RenderGraphVK> graph;
+        uint32_t reference_count = 0;
+    };
+
+    // Registered compiled render graphs, keyed by resource key.
+    Map<std::string, RegisteredRenderGraph> render_graphs;
+    // The currently active cached render graph.
     Ref<RenderGraphVK> active_graph;
 
     std::vector<const char*> enabled_layers{

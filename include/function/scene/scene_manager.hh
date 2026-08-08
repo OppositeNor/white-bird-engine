@@ -16,11 +16,13 @@
 #define WBE_FILE_SCENE_MANAGER_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "i_scene_manager.hh"
 #include "scene.hh"
 #include <string>
 #include <string_view>
+
 namespace WhiteBirdEngine {
 
 /**
@@ -30,21 +32,35 @@ namespace WhiteBirdEngine {
  */
 class SceneManager final : public ISceneManager {
 public:
-    virtual ~SceneManager() override = default;
+    /** @brief Tear down the current scene before releasing it. */
+    virtual ~SceneManager() override;
     SceneManager(const SceneManager&) = delete;
     SceneManager(SceneManager&&) noexcept = delete;
     SceneManager& operator=(const SceneManager&) = delete;
     SceneManager& operator=(SceneManager&&) noexcept = delete;
-    SceneManager(Map<std::string, Ref<Scene>> p_scene_map);
+
+    /**
+     * @brief Construct a manager over the supplied scenes.
+     *
+     * @param p_scene_map Strong scene references indexed by scene id; ownership is transferred to the manager.
+     */
+    SceneManager(Map<std::string, Ref<Scene>, HeapAllocatorGlobal> p_scene_map);
 
     virtual Ref<Scene> get_current_scene() override;
 
     virtual Ref<const Scene> get_current_scene() const override;
 
+    /**
+     * @brief Tear down the current scene, then set up and ready the requested scene.
+     *
+     * @param p_scene_id The id of the scene to activate.
+     */
     virtual void change_scene(std::string_view p_scene_id) override;
 
 private:
-    Map<std::string, Ref<Scene>> scene_map;
+    Map<std::string, Ref<Scene>, HeapAllocatorGlobal> scene_map;
+    String<HeapAllocatorGlobal> current_scene_id;
+    Ref<Scene> current_scene;
 };
 
 } // namespace WhiteBirdEngine

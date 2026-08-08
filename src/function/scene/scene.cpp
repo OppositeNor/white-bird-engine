@@ -13,66 +13,137 @@
    limitations under the License.
 */
 #include "function/scene/scene.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/reference_weak.hh"
-#include "function/function_utils.hh"
-#include "function/scene/scene_node.hh"
-#include "utils/utils.hh"
-#include <entt/entt.hpp>
+#include "function/ecs/systems.hh"
+#include "function/render/i_renderer.hh"
+#include "function/render/render_database.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/scene/world.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include <cstddef>
+#include <stdexcept>
+#include <string_view>
+#include <utility>
 
 namespace WhiteBirdEngine {
 
-Scene::Scene(HeapAllocatorDefault* p_allocator)
-    : allocator(p_allocator), component_lists(p_allocator), scene_nodes(p_allocator) {
+Scene::Scene(HeapAllocatorDefault* p_allocator, Ref<IRenderer> p_renderer, std::string_view p_resource_manifest_key)
+    : allocator(p_allocator), renderer(std::move(p_renderer)), worlds(p_allocator), resource_manifest_key(p_allocator) {
+    if (allocator == nullptr) {
+        throw std::runtime_error("Scene allocator cannot be null.");
+    }
+    if (renderer == MEM_NULL) {
+        throw std::runtime_error("Scene renderer cannot be null.");
+    }
+    resource_manifest_key.assign(p_resource_manifest_key);
 }
 
 Scene::~Scene() = default;
 
-entt::sparse_set* Scene::get_component_list(TypeID p_component_type_id) {
-    auto iter = component_lists.find(p_component_type_id);
-    if (iter != component_lists.end()) {
-        return iter->second;
+void Scene::add_world(Ref<World> p_world) {
+    if (lifecycle_state != LifecycleState::CONSTRUCTED) {
+        throw std::runtime_error("Worlds can only be added before scene setup.");
     }
-    auto* component_list = entities.storage(static_cast<entt::id_type>(p_component_type_id));
-    if (component_list != nullptr) {
-        component_lists.emplace(p_component_type_id, component_list);
+    if (p_world == MEM_NULL) {
+        throw std::runtime_error("Scene world cannot be null.");
     }
-    return component_list;
+    worlds.push_back(std::move(p_world));
 }
 
-Vector<TypeID, HeapAllocatorDefault> Scene::get_component_type_ids(EntityID p_entity) {
-    cache_component_lists();
-    Vector<TypeID, HeapAllocatorDefault> component_type_ids(allocator);
-    for (const auto& [component_type_id, component_list] : component_lists) {
-        if (component_list->contains(p_entity)) {
-            component_type_ids.push_back(component_type_id);
+Ref<World> Scene::get_world(size_t p_world_index) const {
+    if (p_world_index >= worlds.size()) {
+        throw std::runtime_error("Scene world index is out of range.");
+    }
+    return worlds[p_world_index];
+}
+
+void Scene::set_active_world(size_t p_world_index) {
+    if (p_world_index >= worlds.size()) {
+        throw std::runtime_error("Scene active world index is out of range.");
+    }
+    active_world_index = p_world_index;
+}
+
+Ref<World> Scene::get_active_world() const {
+    if (worlds.empty()) {
+        return Ref<World>();
+    }
+    return worlds[active_world_index];
+}
+
+void Scene::setup() {
+    if (lifecycle_state != LifecycleState::CONSTRUCTED && lifecycle_state != LifecycleState::TORN_DOWN) {
+        throw std::runtime_error("Scene setup requires a constructed or torn-down scene.");
+    }
+    for (size_t i = 0; i < worlds.size(); ++i) {
+        std::string_view graph_key = worlds[i]->get_render_graph_resource_key();
+        if (!graph_key.empty() && is_first_graph_key(i)) {
+            renderer->register_render_graph(graph_key);
+        }
+        system_driver_setup(*worlds[i]);
+    }
+    lifecycle_state = LifecycleState::SETUP;
+}
+
+void Scene::ready() {
+    if (lifecycle_state != LifecycleState::SETUP) {
+        throw std::runtime_error("Scene ready requires setup to complete first.");
+    }
+    for (auto& world : worlds) {
+        system_driver_ready(*world);
+    }
+    lifecycle_state = LifecycleState::READY;
+}
+
+void Scene::update(double p_delta) {
+    if (lifecycle_state != LifecycleState::READY) {
+        throw std::runtime_error("Scene update requires a ready scene.");
+    }
+
+    Ref<World> active_world = get_active_world();
+    if (active_world != MEM_NULL) {
+        std::string_view graph_key = active_world->get_render_graph_resource_key();
+        if (!graph_key.empty()) {
+            renderer->activate_render_graph(graph_key);
+        }
+        RefRes<RUMesh3D> static_opaque_mesh = active_world->get_static_opaque_mesh();
+        if (static_opaque_mesh != MEM_NULL) {
+            renderer->get_render_database()->set_static_opaque_triangles(static_opaque_mesh.get());
+            renderer->update_static_opaque_triangles();
         }
     }
-    return component_type_ids;
-}
 
-void Scene::register_scene_node(Ref<SceneNode> p_scene_node) {
-    scene_nodes.insert_or_assign(p_scene_node->get_entity(), RefWeak<SceneNode>(p_scene_node));
-}
-
-void Scene::unregister_scene_node(EntityID p_entity) {
-    scene_nodes.erase(p_entity);
-}
-
-Ref<SceneNode> Scene::get_scene_node(EntityID p_entity) {
-    auto iter = scene_nodes.find(p_entity);
-    if (iter == scene_nodes.end()) {
-        return Ref<SceneNode>();
+    for (auto& world : worlds) {
+        system_driver_update(*world, p_delta);
     }
-    return iter->second.lock();
 }
 
-void Scene::cache_component_lists() {
-    for (auto [component_type_id, component_list] : entities.storage()) {
-        component_lists.insert_or_assign(component_type_id, &component_list);
+void Scene::teardown() {
+    if (lifecycle_state != LifecycleState::SETUP && lifecycle_state != LifecycleState::READY) {
+        throw std::runtime_error("Scene teardown requires a setup or ready scene.");
     }
+    for (size_t i = worlds.size(); i > 0; --i) {
+        system_driver_teardown(*worlds[i - 1]);
+    }
+    for (size_t i = worlds.size(); i > 0; --i) {
+        std::string_view graph_key = worlds[i - 1]->get_render_graph_resource_key();
+        if (!graph_key.empty() && is_first_graph_key(i - 1)) {
+            renderer->unregister_render_graph(graph_key);
+        }
+    }
+    lifecycle_state = LifecycleState::TORN_DOWN;
+}
+
+bool Scene::is_first_graph_key(size_t p_world_index) const {
+    std::string_view graph_key = worlds[p_world_index]->get_render_graph_resource_key();
+    for (size_t i = 0; i < p_world_index; ++i) {
+        if (worlds[i]->get_render_graph_resource_key() == graph_key) {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace WhiteBirdEngine

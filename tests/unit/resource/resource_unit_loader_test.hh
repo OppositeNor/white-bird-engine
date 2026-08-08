@@ -21,6 +21,7 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
+#include "function/scene/scene_resource_unit_loader.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -30,6 +31,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -96,6 +98,64 @@ public:
     WBE::MemID mem_id;
     WBE::RefRes<char> res;
 };
+
+TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
+    WBE::ResourceUnitLoaderAudio audio_loader;
+    WBE::ResourceUnitLoaderBinary binary_loader;
+    WBE::ResourceUnitLoaderFont font_loader;
+    WBE::ResourceUnitLoaderImage image_loader;
+    WBE::ResourceUnitLoaderText text_loader;
+    WBE::ResourceUnitLoaderVideo video_loader;
+    WBE::ResourceUnitLoaderShader shader_loader;
+    WBE::ResourceUnitLoaderGraphicsPipeline graphics_pipeline_loader;
+    WBE::ResourceUnitLoaderMaterial material_loader;
+    WBE::ResourceUnitLoaderMesh mesh_loader;
+    WBE::ResourceUnitLoaderSubmesh submesh_loader;
+    WBE::ResourceUnitLoaderComponent component_loader;
+    WBE::ResourceUnitLoaderPrefab prefab_loader;
+    WBE::ResourceUnitLoaderWorld world_loader;
+    WBE::ResourceUnitLoaderScene scene_loader;
+    const std::array<const WBE::IResourceUnitLoader*, 15> loaders = {&audio_loader,
+        &binary_loader,
+        &font_loader,
+        &image_loader,
+        &text_loader,
+        &video_loader,
+        &shader_loader,
+        &graphics_pipeline_loader,
+        &material_loader,
+        &mesh_loader,
+        &submesh_loader,
+        &component_loader,
+        &prefab_loader,
+        &world_loader,
+        &scene_loader};
+    const std::array<std::string_view, 15> expected_resource_types = {"audio",
+        "binary",
+        "font",
+        "image",
+        "text",
+        "video",
+        "shader",
+        "graphics_pipeline",
+        "material",
+        "mesh",
+        "submesh",
+        "component",
+        "prefab",
+        "world",
+        "scene"};
+
+    for (size_t i = 0; i < loaders.size(); ++i) {
+        auto first_resource_types = loaders[i]->get_supported_resource_types();
+        auto second_resource_types = loaders[i]->get_supported_resource_types();
+        static_assert(std::is_const_v<typename decltype(first_resource_types)::element_type>);
+
+        ASSERT_EQ(first_resource_types.size(), 1);
+        EXPECT_EQ(first_resource_types.front(), expected_resource_types[i]);
+        EXPECT_EQ(first_resource_types.data(), second_resource_types.data());
+    }
+}
 
 TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     WBE::ResourceUnitLoaderText loader;

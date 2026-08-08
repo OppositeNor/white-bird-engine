@@ -20,8 +20,8 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
-#include "scene.hh"
 #include "utils/utils.hh"
+#include "world.hh"
 namespace WhiteBirdEngine {
 /**
  * @class SceneNode
@@ -49,9 +49,9 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_scene The scene of this node lives in.
+     * @param p_world The world this node lives in.
      */
-    SceneNode(Ref<Scene> p_scene);
+    SceneNode(Ref<World> p_world);
 
     /**
      * @brief Get the entity instance owned by this node.
@@ -60,6 +60,15 @@ public:
      */
     EntityID get_entity() const {
         return entity;
+    }
+
+    /**
+     * @brief Get the world this node lives in.
+     *
+     * @return The world owning this node's entity.
+     */
+    Ref<World> get_world() const {
+        return world;
     }
 
     /**
@@ -88,7 +97,7 @@ private:
     void destroy_entity();
 
     String<HeapAllocatorDefault> name;
-    Ref<Scene> scene;
+    Ref<World> world;
     EntityID entity = entt::null;
 };
 

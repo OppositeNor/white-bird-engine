@@ -17,7 +17,6 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -72,12 +71,8 @@ Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::write_resources() c
     return write_accesses;
 }
 
-void RTRunComputePipelineVK::record(
-    VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double /*p_delta*/) {
-    if (p_resources.empty()) {
-        throw std::runtime_error("RTRunComputePipelineVK: insufficient bound resources.");
-    }
-    auto compute_pipeline = p_resources[0].res.dynamic_cast_ref<ROComputePipelineVK>();
+void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
+    auto compute_pipeline = p_resources.get(pipeline_id).res.dynamic_cast_ref<ROComputePipelineVK>();
     if (compute_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline resource is missing.");
     }

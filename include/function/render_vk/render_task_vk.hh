@@ -41,6 +41,7 @@ enum class QueueFamilyVK : uint32_t {
  * subclasses can refer to it without including the render graph header).
  */
 struct RendResVK;
+class RendResViewVK;
 
 /**
  * @class ResAccessVK
@@ -86,6 +87,8 @@ struct RenderTaskVK : public RenderTask {
      * @brief The list of resources read by this task, with the access type and
      * stage at which they are read. Used by the graph to build pipeline
      * barriers from the producing task to this one.
+     *
+     * @return The resource access declarations for reads performed by this task.
      */
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const = 0;
 
@@ -93,6 +96,8 @@ struct RenderTaskVK : public RenderTask {
      * @brief The list of resources written by this task, with the access type
      * and stage at which they are written. Used by the graph to build pipeline
      * barriers from this task to its consumer(s).
+     *
+     * @return The resource access declarations for writes performed by this task.
      */
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const = 0;
 
@@ -104,11 +109,11 @@ struct RenderTaskVK : public RenderTask {
      * invoked.
      *
      * @param p_command_buffer The command buffer to record into.
-     * @param p_resources All bound resources for the active pipeline, indexed
-     *                    by resource id.
+     * @param p_resources All resources for the active graph, indexed by
+     *                    resource id.
      * @param p_delta     The frame delta in seconds.
      */
-    virtual void record(VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double p_delta) = 0;
+    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) = 0;
 
     /**
      * @brief Default no-op for the cross-API perform() entry point. The

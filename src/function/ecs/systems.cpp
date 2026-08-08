@@ -13,12 +13,17 @@
    limitations under the License.
 */
 #include "function/ecs/systems.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"
+#include "function/scene/scene_node.hh"
+#include "function/scene/world.hh"
+#include "glm/matrix.hpp"
 #include <cstdint>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
@@ -51,11 +56,19 @@ void update_global_transform(entt::registry& p_registry, EntityID p_entity, Comp
     // Update the version to newest.
     p_transform_mats.version = p_version;
 }
+
+Ref<SceneNode> require_scene_node(World& p_world, EntityID p_entity) {
+    Ref<SceneNode> scene_node = p_world.get_scene_node(p_entity);
+    if (scene_node.is_null()) {
+        throw std::runtime_error("ComponentDriver entity has no registered SceneNode.");
+    }
+    return scene_node;
+}
 } // namespace
 
-void update_transform_mats(entt::registry& p_registry, int64_t p_version) {
+void update_transform_mats(World& p_world, int64_t p_version) {
     // Update local transforms.
-    auto local_transform_iterate_view = p_registry.view<const ComponentTransform, ComponentTransformMats>();
+    auto local_transform_iterate_view = p_world.get_entities().view<const ComponentTransform, ComponentTransformMats>();
     for (auto [entity, transform, transform_mats] : local_transform_iterate_view.each()) {
         // Note that, for some reason, GLM decides to perform the transform
         // BEFORE the transform passed in (i.e. when declaring glm::translate(M,
@@ -68,17 +81,53 @@ void update_transform_mats(entt::registry& p_registry, int64_t p_version) {
     }
 
     // Update global transforms.
-    auto global_transform_iterate_view = p_registry.view<ComponentTransformMats>();
+    auto global_transform_iterate_view = p_world.get_entities().view<ComponentTransformMats>();
     for (auto [entity, transform_mats] : global_transform_iterate_view.each()) {
-        update_global_transform(p_registry, entity, transform_mats, p_version);
+        update_global_transform(p_world.get_entities(), entity, transform_mats, p_version);
     }
 }
 
-void update_camera_views(entt::registry& p_registry) {
-    auto camera_iterate_view = p_registry.view<ComponentCamera, const ComponentTransformMats>();
+void update_camera_views(World& p_world) {
+    auto camera_iterate_view = p_world.get_entities().view<ComponentCamera, const ComponentTransformMats>();
     for (auto [entity, camera, transform_mats] : camera_iterate_view.each()) {
         glm::mat4 camera_world_transform = transform_mats.global_transform * camera.local_transform;
         camera.view = glm::inverse(camera_world_transform);
+    }
+}
+
+void system_driver_setup(World& p_world) {
+    auto driver_view = p_world.get_entities().view<ComponentDriver>();
+    for (auto [entity, driver] : driver_view.each()) {
+        if (driver.setup != nullptr) {
+            driver.setup(require_scene_node(p_world, entity));
+        }
+    }
+}
+
+void system_driver_ready(World& p_world) {
+    auto driver_view = p_world.get_entities().view<ComponentDriver>();
+    for (auto [entity, driver] : driver_view.each()) {
+        if (driver.ready != nullptr) {
+            driver.ready(require_scene_node(p_world, entity));
+        }
+    }
+}
+
+void system_driver_update(World& p_world, double p_delta) {
+    auto driver_view = p_world.get_entities().view<ComponentDriver>();
+    for (auto [entity, driver] : driver_view.each()) {
+        if (driver.update != nullptr) {
+            driver.update(require_scene_node(p_world, entity), p_delta);
+        }
+    }
+}
+
+void system_driver_teardown(World& p_world) {
+    auto driver_view = p_world.get_entities().view<ComponentDriver>();
+    for (auto [entity, driver] : driver_view.each()) {
+        if (driver.teardown != nullptr) {
+            driver.teardown(require_scene_node(p_world, entity));
+        }
     }
 }
 

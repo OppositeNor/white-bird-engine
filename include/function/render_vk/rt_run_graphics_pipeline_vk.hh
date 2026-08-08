@@ -22,6 +22,7 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include <cstdint>
 #include <glm/ext/vector_float4.hpp>
 #include <optional>
 #include <span>
@@ -41,12 +42,7 @@ struct IndexedDrawRegionVK {
  * @class RTRunGraphicsPipelineVK
  * @brief Render task that runs a graphics pipeline and produces an image.
  *
- * Resource binding contract (declared in this exact order; the render graph
- * passes `bound_resources` to record() in the same order):
- *   reads:  [graphics_pipeline, (vertex_buffer?), (index_buffer?)]
- *   writes: [color_attachment..., (depth_attachment?)]
- * Therefore inside record(): index 0 = graphics_pipeline, then optionally
- * vertex_buffer and index_buffer, followed by attachments.
+ * Resources are retrieved by their declared ids from the active graph.
  */
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
@@ -114,7 +110,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    virtual void record(VkCommandBuffer p_command_buffer, const Vector<RendResVK, RenderAllocator>& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

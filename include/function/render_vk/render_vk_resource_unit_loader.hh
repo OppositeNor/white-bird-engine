@@ -20,15 +20,15 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include <any>
+#include <span>
 #include <string>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
 // TODO: Test
 class ResourceUnitLoaderShader final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -38,7 +38,7 @@ protected:
 // TODO: Test
 class ResourceUnitLoaderGraphicsPipeline final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -48,7 +48,7 @@ protected:
 // TODO: Test
 class ResourceUnitLoaderMaterial final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -60,7 +60,7 @@ private:
 
 class ResourceUnitLoaderMesh final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -69,7 +69,7 @@ protected:
 
 class ResourceUnitLoaderSubmesh final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:

@@ -12,10 +12,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
 #include "function/ecs/systems.hh"
 #include "function/function_utils.hh"
-#include <entt/entt.hpp>
+#include "function/scene/scene_node.hh"
+#include "function/scene/world.hh"
+#include "glm/matrix.hpp"
+#include "global/global.hh"
+#include "platform/file_system/directory.hh"
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
@@ -23,6 +29,8 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
+#include <memory>
+#include <stdexcept>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -51,42 +59,148 @@ void expect_mat_near(const glm::mat4& p_actual, const glm::mat4& p_expected) {
     }
 }
 
+struct DriverState {
+    int setup_count = 0;
+    int ready_count = 0;
+    int update_count = 0;
+    int teardown_count = 0;
+    double last_delta = 0.0;
+};
+
+DriverState& get_driver_state(WBE::Ref<WBE::SceneNode> p_self) {
+    auto& driver = p_self->get_world()->get_entities().get<WBE::ComponentDriver>(p_self->get_entity());
+    return *static_cast<DriverState*>(driver.local_data);
+}
+
+void driver_setup(WBE::Ref<WBE::SceneNode> p_self) {
+    ++get_driver_state(std::move(p_self)).setup_count;
+}
+
+void driver_ready(WBE::Ref<WBE::SceneNode> p_self) {
+    ++get_driver_state(std::move(p_self)).ready_count;
+}
+
+void driver_update(WBE::Ref<WBE::SceneNode> p_self, double p_delta) {
+    DriverState& state = get_driver_state(std::move(p_self));
+    ++state.update_count;
+    state.last_delta = p_delta;
+}
+
+void driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
+    ++get_driver_state(std::move(p_self)).teardown_count;
+}
+
+class WBEWorldSystemTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        world = WBE::make_ref<WBE::World>(global->engine_core->pool_allocator, global->engine_core->pool_allocator);
+    }
+
+    void TearDown() override {
+        world = WBE::MEM_NULL;
+        global.reset();
+    }
+
+    std::unique_ptr<WBE::Global> global;
+    WBE::Ref<WBE::World> world;
+};
+
+class WBEDriverSystemTest : public WBEWorldSystemTest {
+protected:
+    WBE::Ref<WBE::SceneNode> add_driver(DriverState* p_state) {
+        auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_allocator, world);
+        world->get_entities().emplace<WBE::ComponentDriver>(node->get_entity(),
+            WBE::ComponentDriver{
+                .setup = driver_setup,
+                .ready = driver_ready,
+                .update = driver_update,
+                .teardown = driver_teardown,
+                .local_data = p_state,
+            });
+        return node;
+    }
+};
+
+class WBETransformSystemTest : public WBEWorldSystemTest {
+};
+
+class WBECameraSystemTest : public WBEWorldSystemTest {
+};
+
 } // namespace
 
-TEST(WBETransformSystemTest, EntityWithoutHierarchyIsTreatedAsRoot) {
-    entt::registry registry;
-    WBE::EntityID entity = registry.create();
+TEST_F(WBEDriverSystemTest, RunsEveryDriverLifecycleCallback) {
+    DriverState first_state;
+    DriverState second_state;
+    auto first_node = add_driver(&first_state);
+    auto second_node = add_driver(&second_state);
+
+    WBE::system_driver_setup(*world);
+    WBE::system_driver_ready(*world);
+    WBE::system_driver_update(*world, 0.25);
+    WBE::system_driver_teardown(*world);
+
+    for (const DriverState* state : {&first_state, &second_state}) {
+        EXPECT_EQ(state->setup_count, 1);
+        EXPECT_EQ(state->ready_count, 1);
+        EXPECT_EQ(state->update_count, 1);
+        EXPECT_EQ(state->teardown_count, 1);
+        EXPECT_DOUBLE_EQ(state->last_delta, 0.25);
+    }
+}
+
+TEST_F(WBEDriverSystemTest, SkipsNullCallbacks) {
+    auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_allocator, world);
+    world->get_entities().emplace<WBE::ComponentDriver>(node->get_entity());
+
+    EXPECT_NO_THROW(WBE::system_driver_setup(*world));
+    EXPECT_NO_THROW(WBE::system_driver_ready(*world));
+    EXPECT_NO_THROW(WBE::system_driver_update(*world, 1.0));
+    EXPECT_NO_THROW(WBE::system_driver_teardown(*world));
+}
+
+TEST_F(WBEDriverSystemTest, ThrowsWhenCallbackEntityHasNoSceneNode) {
+    WBE::EntityID entity = world->get_entities().create();
+    world->get_entities().emplace<WBE::ComponentDriver>(entity, WBE::ComponentDriver{.setup = driver_setup});
+
+    EXPECT_THROW(WBE::system_driver_setup(*world), std::runtime_error);
+}
+
+TEST_F(WBETransformSystemTest, EntityWithoutHierarchyIsTreatedAsRoot) {
+    auto& entities = world->get_entities();
+    WBE::EntityID entity = entities.create();
     WBE::ComponentTransform transform = make_transform(glm::vec3(2.0F, 3.0F, 4.0F), glm::vec3(5.0F, 6.0F, 7.0F));
 
-    registry.emplace<WBE::ComponentTransform>(entity, transform);
-    registry.emplace<WBE::ComponentTransformMats>(entity);
+    entities.emplace<WBE::ComponentTransform>(entity, transform);
+    entities.emplace<WBE::ComponentTransformMats>(entity);
 
-    WBE::update_transform_mats(registry, 7);
+    WBE::update_transform_mats(*world, 7);
 
-    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
+    const auto& transform_mats = entities.get<WBE::ComponentTransformMats>(entity);
     glm::mat4 expected_transform = make_transform_mat(transform);
     expect_mat_near(transform_mats.local_transform, expected_transform);
     expect_mat_near(transform_mats.global_transform, expected_transform);
     EXPECT_EQ(transform_mats.version, 7);
 }
 
-TEST(WBETransformSystemTest, ChildUsesParentGlobalTransformFromHierarchyComponent) {
-    entt::registry registry;
-    WBE::EntityID parent = registry.create();
-    WBE::EntityID child = registry.create();
+TEST_F(WBETransformSystemTest, ChildUsesParentGlobalTransformFromHierarchyComponent) {
+    auto& entities = world->get_entities();
+    WBE::EntityID parent = entities.create();
+    WBE::EntityID child = entities.create();
     WBE::ComponentTransform parent_transform = make_transform(glm::vec3(1.0F), glm::vec3(10.0F, 0.0F, 0.0F));
     WBE::ComponentTransform child_transform = make_transform(glm::vec3(1.0F), glm::vec3(0.0F, 2.0F, 0.0F));
 
-    registry.emplace<WBE::ComponentTransform>(parent, parent_transform);
-    registry.emplace<WBE::ComponentTransformMats>(parent);
-    registry.emplace<WBE::ComponentTransform>(child, child_transform);
-    registry.emplace<WBE::ComponentTransformMats>(child);
-    registry.emplace<WBE::ComponentHierarchy>(child, parent);
+    entities.emplace<WBE::ComponentTransform>(parent, parent_transform);
+    entities.emplace<WBE::ComponentTransformMats>(parent);
+    entities.emplace<WBE::ComponentTransform>(child, child_transform);
+    entities.emplace<WBE::ComponentTransformMats>(child);
+    entities.emplace<WBE::ComponentHierarchy>(child, parent);
 
-    WBE::update_transform_mats(registry, 3);
+    WBE::update_transform_mats(*world, 3);
 
-    const auto& parent_transform_mats = registry.get<WBE::ComponentTransformMats>(parent);
-    const auto& child_transform_mats = registry.get<WBE::ComponentTransformMats>(child);
+    const auto& parent_transform_mats = entities.get<WBE::ComponentTransformMats>(parent);
+    const auto& child_transform_mats = entities.get<WBE::ComponentTransformMats>(child);
     glm::mat4 expected_parent_transform = make_transform_mat(parent_transform);
     glm::mat4 expected_child_local_transform = make_transform_mat(child_transform);
     expect_mat_near(parent_transform_mats.global_transform, expected_parent_transform);
@@ -96,65 +210,65 @@ TEST(WBETransformSystemTest, ChildUsesParentGlobalTransformFromHierarchyComponen
     EXPECT_EQ(child_transform_mats.version, 3);
 }
 
-TEST(WBETransformSystemTest, ChildWithMissingParentTransformIsTreatedAsRoot) {
-    entt::registry registry;
-    WBE::EntityID parent = registry.create();
-    WBE::EntityID child = registry.create();
+TEST_F(WBETransformSystemTest, ChildWithMissingParentTransformIsTreatedAsRoot) {
+    auto& entities = world->get_entities();
+    WBE::EntityID parent = entities.create();
+    WBE::EntityID child = entities.create();
     WBE::ComponentTransform child_transform = make_transform(glm::vec3(3.0F), glm::vec3(0.0F, 4.0F, 0.0F));
 
-    registry.emplace<WBE::ComponentTransform>(child, child_transform);
-    registry.emplace<WBE::ComponentTransformMats>(child);
-    registry.emplace<WBE::ComponentHierarchy>(child, parent);
+    entities.emplace<WBE::ComponentTransform>(child, child_transform);
+    entities.emplace<WBE::ComponentTransformMats>(child);
+    entities.emplace<WBE::ComponentHierarchy>(child, parent);
 
-    WBE::update_transform_mats(registry, 11);
+    WBE::update_transform_mats(*world, 11);
 
-    const auto& child_transform_mats = registry.get<WBE::ComponentTransformMats>(child);
+    const auto& child_transform_mats = entities.get<WBE::ComponentTransformMats>(child);
     glm::mat4 expected_child_transform = make_transform_mat(child_transform);
     expect_mat_near(child_transform_mats.local_transform, expected_child_transform);
     expect_mat_near(child_transform_mats.global_transform, expected_child_transform);
     EXPECT_EQ(child_transform_mats.version, 11);
 }
 
-TEST(WBETransformSystemTest, EntityWithNullHierarchyParentIsTreatedAsRoot) {
-    entt::registry registry;
-    WBE::EntityID entity = registry.create();
+TEST_F(WBETransformSystemTest, EntityWithNullHierarchyParentIsTreatedAsRoot) {
+    auto& entities = world->get_entities();
+    WBE::EntityID entity = entities.create();
     WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(8.0F, 9.0F, 10.0F));
 
-    registry.emplace<WBE::ComponentTransform>(entity, transform);
-    registry.emplace<WBE::ComponentTransformMats>(entity);
-    registry.emplace<WBE::ComponentHierarchy>(entity);
+    entities.emplace<WBE::ComponentTransform>(entity, transform);
+    entities.emplace<WBE::ComponentTransformMats>(entity);
+    entities.emplace<WBE::ComponentHierarchy>(entity);
 
-    WBE::update_transform_mats(registry, 13);
+    WBE::update_transform_mats(*world, 13);
 
-    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
+    const auto& transform_mats = entities.get<WBE::ComponentTransformMats>(entity);
     glm::mat4 expected_transform = make_transform_mat(transform);
     expect_mat_near(transform_mats.global_transform, expected_transform);
     EXPECT_EQ(transform_mats.version, 13);
 }
 
-TEST(WBETransformSystemTest, RecursivelyUpdatesMultiLevelHierarchyOutOfOrder) {
-    entt::registry registry;
-    WBE::EntityID grandparent = registry.create();
-    WBE::EntityID parent = registry.create();
-    WBE::EntityID child = registry.create();
+TEST_F(WBETransformSystemTest, RecursivelyUpdatesMultiLevelHierarchyOutOfOrder) {
+    auto& entities = world->get_entities();
+    WBE::EntityID grandparent = entities.create();
+    WBE::EntityID parent = entities.create();
+    WBE::EntityID child = entities.create();
     WBE::ComponentTransform grandparent_transform = make_transform(glm::vec3(1.0F), glm::vec3(1.0F, 0.0F, 0.0F));
     WBE::ComponentTransform parent_transform = make_transform(glm::vec3(1.0F), glm::vec3(0.0F, 2.0F, 0.0F));
     WBE::ComponentTransform child_transform = make_transform(glm::vec3(1.0F), glm::vec3(0.0F, 0.0F, 3.0F));
 
-    registry.emplace<WBE::ComponentTransform>(child, child_transform);
-    registry.emplace<WBE::ComponentTransformMats>(child);
-    registry.emplace<WBE::ComponentHierarchy>(child, parent);
-    registry.emplace<WBE::ComponentTransform>(parent, parent_transform);
-    registry.emplace<WBE::ComponentTransformMats>(parent);
-    registry.emplace<WBE::ComponentHierarchy>(parent, grandparent);
-    registry.emplace<WBE::ComponentTransform>(grandparent, grandparent_transform);
-    registry.emplace<WBE::ComponentTransformMats>(grandparent);
+    entities.emplace<WBE::ComponentTransform>(child, child_transform);
+    entities.emplace<WBE::ComponentTransformMats>(child);
+    entities.emplace<WBE::ComponentHierarchy>(child, parent);
+    entities.emplace<WBE::ComponentTransform>(parent, parent_transform);
+    entities.emplace<WBE::ComponentTransformMats>(parent);
+    entities.emplace<WBE::ComponentHierarchy>(parent, grandparent);
+    entities.emplace<WBE::ComponentTransform>(grandparent, grandparent_transform);
+    entities.emplace<WBE::ComponentTransformMats>(grandparent);
 
-    WBE::update_transform_mats(registry, 17);
+    WBE::update_transform_mats(*world, 17);
 
-    const auto& grandparent_transform_mats = registry.get<WBE::ComponentTransformMats>(grandparent);
-    const auto& parent_transform_mats = registry.get<WBE::ComponentTransformMats>(parent);
-    const auto& child_transform_mats = registry.get<WBE::ComponentTransformMats>(child);
+    const auto& grandparent_transform_mats = entities.get<WBE::ComponentTransformMats>(grandparent);
+    const auto& parent_transform_mats = entities.get<WBE::ComponentTransformMats>(parent);
+    const auto& child_transform_mats = entities.get<WBE::ComponentTransformMats>(child);
     glm::mat4 expected_grandparent_transform = make_transform_mat(grandparent_transform);
     glm::mat4 expected_parent_transform = make_transform_mat(parent_transform);
     glm::mat4 expected_child_transform = make_transform_mat(child_transform);
@@ -167,37 +281,37 @@ TEST(WBETransformSystemTest, RecursivelyUpdatesMultiLevelHierarchyOutOfOrder) {
     EXPECT_EQ(child_transform_mats.version, 17);
 }
 
-TEST(WBECameraSystemTest, CameraViewUsesEntityGlobalTransformInverse) {
-    entt::registry registry;
-    WBE::EntityID entity = registry.create();
+TEST_F(WBECameraSystemTest, CameraViewUsesEntityGlobalTransformInverse) {
+    auto& entities = world->get_entities();
+    WBE::EntityID entity = entities.create();
     WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(3.0F, 4.0F, 5.0F));
 
-    registry.emplace<WBE::ComponentTransform>(entity, transform);
-    registry.emplace<WBE::ComponentTransformMats>(entity);
-    registry.emplace<WBE::ComponentCamera>(entity);
+    entities.emplace<WBE::ComponentTransform>(entity, transform);
+    entities.emplace<WBE::ComponentTransformMats>(entity);
+    entities.emplace<WBE::ComponentCamera>(entity);
 
-    WBE::update_transform_mats(registry, 23);
-    WBE::update_camera_views(registry);
+    WBE::update_transform_mats(*world, 23);
+    WBE::update_camera_views(*world);
 
-    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
-    const auto& camera = registry.get<WBE::ComponentCamera>(entity);
+    const auto& transform_mats = entities.get<WBE::ComponentTransformMats>(entity);
+    const auto& camera = entities.get<WBE::ComponentCamera>(entity);
     expect_mat_near(camera.view, glm::inverse(transform_mats.global_transform));
 }
 
-TEST(WBECameraSystemTest, CameraLocalTransformParticipatesInViewMatrix) {
-    entt::registry registry;
-    WBE::EntityID entity = registry.create();
+TEST_F(WBECameraSystemTest, CameraLocalTransformParticipatesInViewMatrix) {
+    auto& entities = world->get_entities();
+    WBE::EntityID entity = entities.create();
     WBE::ComponentTransform transform = make_transform(glm::vec3(1.0F), glm::vec3(2.0F, 0.0F, 0.0F));
     glm::mat4 camera_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(0.0F, 1.5F, -2.0F));
 
-    registry.emplace<WBE::ComponentTransform>(entity, transform);
-    registry.emplace<WBE::ComponentTransformMats>(entity);
-    registry.emplace<WBE::ComponentCamera>(entity, WBE::ComponentCamera{.local_transform = camera_local_transform});
+    entities.emplace<WBE::ComponentTransform>(entity, transform);
+    entities.emplace<WBE::ComponentTransformMats>(entity);
+    entities.emplace<WBE::ComponentCamera>(entity, WBE::ComponentCamera{.local_transform = camera_local_transform});
 
-    WBE::update_transform_mats(registry, 29);
-    WBE::update_camera_views(registry);
+    WBE::update_transform_mats(*world, 29);
+    WBE::update_camera_views(*world);
 
-    const auto& transform_mats = registry.get<WBE::ComponentTransformMats>(entity);
-    const auto& camera = registry.get<WBE::ComponentCamera>(entity);
+    const auto& transform_mats = entities.get<WBE::ComponentTransformMats>(entity);
+    const auto& camera = entities.get<WBE::ComponentCamera>(entity);
     expect_mat_near(camera.view, glm::inverse(transform_mats.global_transform * camera_local_transform));
 }

@@ -17,7 +17,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/scene/scene.hh"
+#include "function/scene/world.hh"
 #include "utils/utils.hh"
 #include <entt/entt.hpp>
 #include <stdexcept>
@@ -30,17 +30,17 @@ SceneNode::~SceneNode() {
 }
 
 SceneNode::SceneNode(SceneNode&& p_other) noexcept
-    : name(std::move(p_other.name)), scene(std::move(p_other.scene)), entity(p_other.entity) {
+    : name(std::move(p_other.name)), world(std::move(p_other.world)), entity(p_other.entity) {
     p_other.entity = entt::null;
 }
 
 SceneNode& SceneNode::operator=(SceneNode&& p_other) noexcept {
     destroy_entity();
     name = std::move(p_other.name);
-    scene = std::move(p_other.scene);
+    world = std::move(p_other.world);
     entity = p_other.entity;
     if (!this_ref.is_null()) {
-        scene->register_scene_node(this_ref.lock());
+        world->register_scene_node(this_ref.lock());
     }
     p_other.entity = entt::null;
     return *this;
@@ -48,15 +48,15 @@ SceneNode& SceneNode::operator=(SceneNode&& p_other) noexcept {
 
 void SceneNode::set_ref_of_this(Ref<SceneNode> p_ref_of_this) {
     ThisRef<SceneNode>::set_ref_of_this(p_ref_of_this);
-    scene->register_scene_node(std::move(p_ref_of_this));
+    world->register_scene_node(std::move(p_ref_of_this));
 }
 
-SceneNode::SceneNode(Ref<Scene> p_scene)
-    : name(p_scene->get_allocator()), scene(std::move(p_scene)), entity(scene->get_entities().create()) {
+SceneNode::SceneNode(Ref<World> p_world)
+    : name(p_world->get_allocator()), world(std::move(p_world)), entity(world->get_entities().create()) {
 }
 
 void SceneNode::remove_component(TypeID p_component_type_id) {
-    auto* component_list = scene->get_component_list(p_component_type_id);
+    auto* component_list = world->get_component_list(p_component_type_id);
     if (component_list == nullptr || !component_list->contains(entity)) {
         throw std::runtime_error("Component to be removed not found.");
     }
@@ -64,21 +64,21 @@ void SceneNode::remove_component(TypeID p_component_type_id) {
 }
 
 bool SceneNode::has_component(TypeID p_component_type_id) {
-    const auto* component_list = scene->get_component_list(p_component_type_id);
+    const auto* component_list = world->get_component_list(p_component_type_id);
     return component_list != nullptr && component_list->contains(entity);
 }
 
 Vector<TypeID, HeapAllocatorDefault> SceneNode::get_component_type_ids() {
-    return scene->get_component_type_ids(entity);
+    return world->get_component_type_ids(entity);
 }
 
 void SceneNode::destroy_entity() {
-    if (scene.is_null() || entity == entt::null) {
+    if (world.is_null() || entity == entt::null) {
         return;
     }
-    auto& entities = scene->get_entities();
+    auto& entities = world->get_entities();
     if (entities.valid(entity)) {
-        scene->unregister_scene_node(entity);
+        world->unregister_scene_node(entity);
         entities.destroy(entity);
     }
     entity = entt::null;

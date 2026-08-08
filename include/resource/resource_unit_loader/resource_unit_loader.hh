@@ -19,8 +19,8 @@
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <any>
+#include <span>
 #include <string>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -39,8 +39,10 @@ public:
 
     /**
      * @brief Gets all resource types supported by this loader.
+     *
+     * @return A read-only view of the supported resource type names. The view remains valid for the lifetime of the program.
      */
-    virtual std::vector<std::string> get_supported_resource_types() const = 0;
+    virtual std::span<const std::string> get_supported_resource_types() const = 0;
 
     /**
      * @brief Populates a scheme into the input chunk.
@@ -72,7 +74,7 @@ public:
 
 class ResourceUnitLoaderAudio final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -81,7 +83,7 @@ protected:
 
 class ResourceUnitLoaderBinary final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -90,7 +92,7 @@ protected:
 
 class ResourceUnitLoaderFont final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -99,7 +101,7 @@ protected:
 
 class ResourceUnitLoaderImage final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -108,7 +110,7 @@ protected:
 
 class ResourceUnitLoaderText final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
@@ -117,7 +119,7 @@ protected:
 
 class ResourceUnitLoaderVideo final : public IResourceUnitLoader {
 public:
-    virtual std::vector<std::string> get_supported_resource_types() const override;
+    virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:

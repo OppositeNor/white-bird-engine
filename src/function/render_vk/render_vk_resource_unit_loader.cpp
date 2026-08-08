@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -465,8 +466,9 @@ void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_res
 
 } // namespace
 
-std::vector<std::string> ResourceUnitLoaderShader::get_supported_resource_types() const {
-    return {"shader"};
+std::span<const std::string> ResourceUnitLoaderShader::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"shader"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderShader::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -480,8 +482,9 @@ void ResourceUnitLoaderShader::populate_scheme_from_data(IResourceChunk& p_res_c
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderGraphicsPipeline::get_supported_resource_types() const {
-    return {"graphics_pipeline"};
+std::span<const std::string> ResourceUnitLoaderGraphicsPipeline::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"graphics_pipeline"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -496,8 +499,9 @@ void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderMaterial::get_supported_resource_types() const {
-    return {"material"};
+std::span<const std::string> ResourceUnitLoaderMaterial::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"material"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderMaterial::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -511,8 +515,9 @@ void ResourceUnitLoaderMaterial::populate_scheme_from_data(IResourceChunk& p_res
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderMesh::get_supported_resource_types() const {
-    return {"mesh"};
+std::span<const std::string> ResourceUnitLoaderMesh::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"mesh"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -542,8 +547,9 @@ void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chu
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderSubmesh::get_supported_resource_types() const {
-    return {"submesh"};
+std::span<const std::string> ResourceUnitLoaderSubmesh::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"submesh"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {

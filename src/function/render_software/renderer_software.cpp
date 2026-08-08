@@ -16,19 +16,43 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_graph_resource_binding.hh"
+#include <cstddef>
 #include <functional>
+#include <stdexcept>
 #include <string_view>
 
 namespace WhiteBirdEngine {
 
 void RendererSoftware::tick(double p_delta) {
+    (void)p_delta;
     // TODO
 }
 Ref<RenderDatabase> RendererSoftware::get_render_database() {
     return MEM_NULL; // TODO
 }
-void RendererSoftware::activate_render_graph(std::string_view p_pipeline_name) {
+void RendererSoftware::register_render_graph(std::string_view p_resource_key) {
+    (void)p_resource_key;
     // TODO
+    throw std::runtime_error("Not implemented.");
+}
+void RendererSoftware::unregister_render_graph(std::string_view p_resource_key) {
+    (void)p_resource_key;
+    // TODO
+    throw std::runtime_error("Not implemented.");
+}
+void RendererSoftware::activate_render_graph(std::string_view p_resource_key) {
+    (void)p_resource_key;
+    // TODO
+    throw std::runtime_error("Not implemented.");
+}
+void RendererSoftware::update_render_graph_resources(
+    std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) {
+    (void)p_resource_key;
+    (void)p_bindings;
+    (void)p_binding_count;
+    // TODO
+    throw std::runtime_error("Not implemented.");
 }
 void RendererSoftware::update_static_opaque_triangles() {
     // TODO

@@ -20,9 +20,11 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_graph_resource_binding.hh"
 #include "function/render_software/render_software_defs.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string_view>
@@ -31,7 +33,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RendererSoftware
- * @brief Software renderer.
+ * @brief Software renderer without render graph support.
  */
 class RendererSoftware final : public IRenderer {
 public:
@@ -51,7 +53,11 @@ public:
     }
     virtual void tick(double p_delta) override;
     virtual Ref<RenderDatabase> get_render_database() override;
-    virtual void activate_render_graph(std::string_view p_pipeline_name) override;
+    virtual void register_render_graph(std::string_view p_resource_key) override;
+    virtual void unregister_render_graph(std::string_view p_resource_key) override;
+    virtual void activate_render_graph(std::string_view p_resource_key) override;
+    virtual void update_render_graph_resources(
+        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override;
     virtual void update_static_opaque_triangles() override;
     virtual void add_job(std::function<void()> p_job) override;
 

@@ -18,22 +18,32 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/reference_weak.hh"
-#include "function/function_utils.hh"
-#include "utils/utils.hh"
-#include <entt/entt.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
-class SceneNode;
+class IRenderer;
+class World;
 
 /**
  * @class Scene
- * @brief Scene class.
+ * @brief Orchestrates the lifecycle and active render state of a set of worlds.
+ *
+ * The allocator must outlive the scene. The scene retains strong references to
+ * its renderer and worlds and is neither copyable nor movable.
  */
 class Scene {
 public:
-    Scene(HeapAllocatorDefault* p_allocator);
+    /**
+     * @brief Construct an empty scene.
+     *
+     * @param p_allocator Allocator used by scene-owned containers and strings.
+     * @param p_renderer Renderer receiving graph lifecycle and world render state.
+     * @param p_resource_manifest_key Resource manifest associated with this scene.
+     */
+    Scene(HeapAllocatorDefault* p_allocator, Ref<IRenderer> p_renderer, std::string_view p_resource_manifest_key = {});
     ~Scene();
     Scene(const Scene&) = delete;
     Scene(Scene&&) noexcept = delete;
@@ -41,86 +51,90 @@ public:
     Scene& operator=(Scene&&) noexcept = delete;
 
     /**
-     * @brief Get the allocator of the scene.
+     * @brief Add a world before scene setup.
      *
-     * @return The allocator of the scene.
+     * @param p_world The world to add to the scene.
      */
-    HeapAllocatorDefault* get_allocator() {
-        return allocator;
+    void add_world(Ref<World> p_world);
+
+    /**
+     * @brief Get the number of worlds owned by this scene.
+     *
+     * @return The number of worlds in the scene.
+     */
+    size_t get_world_count() const {
+        return worlds.size();
     }
 
     /**
-     * @brief Get the allocator of the scene.
+     * @brief Get a world by index.
      *
-     * @return The allocator of the scene.
+     * @param p_world_index The zero-based world index.
+     * @return The world at the requested index.
      */
-    const HeapAllocatorDefault* get_allocator() const {
-        return allocator;
+    Ref<World> get_world(size_t p_world_index) const;
+
+    /**
+     * @brief Select the world whose graph and static mesh are published by update.
+     *
+     * @param p_world_index The zero-based index of the world to select.
+     */
+    void set_active_world(size_t p_world_index);
+
+    /**
+     * @brief Get the selected world, or null when this scene has no worlds.
+     *
+     * @return The selected world, or null when the scene has no worlds.
+     */
+    Ref<World> get_active_world() const;
+
+    /**
+     * @brief Get the scene resource manifest key.
+     *
+     * @return The resource-root-relative manifest key associated with this scene.
+     */
+    std::string_view get_resource_manifest_key() const {
+        return resource_manifest_key;
     }
 
     /**
-     * @brief Get the registry of the scene entities.
-     *
-     * @return The registry of the scene entities.
+     * @brief Register world graphs and run every driver setup callback.
      */
-    entt::registry& get_entities() {
-        return entities;
-    }
+    void setup();
 
     /**
-     * @brief Get the registry of the scene entities.
-     *
-     * @return The registry of the scene entities.
+     * @brief Run every driver ready callback after setup completes.
      */
-    const entt::registry& get_entities() const {
-        return entities;
-    }
+    void ready();
 
     /**
-     * @brief Get the component list for a component type.
+     * @brief Publish active-world render state and update all world drivers.
      *
-     * @param p_component_type_id The component type id to find.
-     * @return The component list, or nullptr if the type has no component list.
+     * @param p_delta The elapsed time since the previous update, in seconds.
      */
-    entt::sparse_set* get_component_list(TypeID p_component_type_id);
+    void update(double p_delta);
 
     /**
-     * @brief Get the component type ids attached to an entity.
-     *
-     * @param p_entity The entity to inspect.
-     * @return The component type ids attached to the entity.
+     * @brief Run driver teardown and release registered world graphs.
      */
-    Vector<TypeID, HeapAllocatorDefault> get_component_type_ids(EntityID p_entity);
-
-    /**
-     * @brief Register a scene node for entity lookup.
-     *
-     * @param p_scene_node The scene node to register.
-     */
-    void register_scene_node(Ref<SceneNode> p_scene_node);
-
-    /**
-     * @brief Unregister the scene node of an entity.
-     *
-     * @param p_entity The entity to unregister.
-     */
-    void unregister_scene_node(EntityID p_entity);
-
-    /**
-     * @brief Get the scene node registered to an entity.
-     *
-     * @param p_entity The entity to query.
-     * @return The scene node registered to the entity, or null if none exists.
-     */
-    Ref<SceneNode> get_scene_node(EntityID p_entity);
+    void teardown();
 
 private:
-    void cache_component_lists();
+    enum class LifecycleState : uint8_t {
+        CONSTRUCTED,
+        SETUP,
+        READY,
+        TORN_DOWN,
+    };
+
+    bool is_first_graph_key(size_t p_world_index) const;
 
     HeapAllocatorDefault* allocator;
-    entt::registry entities;
-    HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
-    HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
+    Ref<IRenderer> renderer;
+    Vector<Ref<World>, HeapAllocatorDefault> worlds;
+    String<HeapAllocatorDefault> resource_manifest_key;
+    size_t active_world_index = 0;
+    LifecycleState lifecycle_state = LifecycleState::CONSTRUCTED;
 };
 
 } // namespace WhiteBirdEngine

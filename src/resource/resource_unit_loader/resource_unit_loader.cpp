@@ -20,12 +20,13 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <any>
+#include <array>
 #include <cstdint>
 #include <format>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace WhiteBirdEngine {
 namespace {
@@ -50,8 +51,9 @@ RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) 
 
 } // namespace
 
-std::vector<std::string> ResourceUnitLoaderAudio::get_supported_resource_types() const {
-    return {"audio"};
+std::span<const std::string> ResourceUnitLoaderAudio::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"audio"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderAudio::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -68,8 +70,9 @@ void ResourceUnitLoaderAudio::populate_scheme_from_data(IResourceChunk& p_res_ch
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderBinary::get_supported_resource_types() const {
-    return {"binary"};
+std::span<const std::string> ResourceUnitLoaderBinary::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"binary"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -89,8 +92,9 @@ void ResourceUnitLoaderBinary::populate_scheme_from_data(IResourceChunk& p_res_c
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderFont::get_supported_resource_types() const {
-    return {"font"};
+std::span<const std::string> ResourceUnitLoaderFont::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"font"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderFont::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -107,8 +111,9 @@ void ResourceUnitLoaderFont::populate_scheme_from_data(IResourceChunk& p_res_chu
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderImage::get_supported_resource_types() const {
-    return {"image"};
+std::span<const std::string> ResourceUnitLoaderImage::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"image"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -152,8 +157,9 @@ void ResourceUnitLoaderImage::populate_scheme_from_data(IResourceChunk& p_res_ch
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderText::get_supported_resource_types() const {
-    return {"text"};
+std::span<const std::string> ResourceUnitLoaderText::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"text"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
@@ -174,8 +180,9 @@ void ResourceUnitLoaderText::populate_scheme_from_data(IResourceChunk& p_res_chu
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
-std::vector<std::string> ResourceUnitLoaderVideo::get_supported_resource_types() const {
-    return {"video"};
+std::span<const std::string> ResourceUnitLoaderVideo::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"video"};
+    return supported_resource_types;
 }
 
 std::any ResourceUnitLoaderVideo::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {

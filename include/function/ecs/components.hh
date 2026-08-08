@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_COMPONENTS_HH
 #define WBE_FILE_COMPONENTS_HH
 
+#include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -27,6 +28,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <string_view>
 namespace WhiteBirdEngine {
+
+class SceneNode;
 
 /**
  * @class ComponentLabel
@@ -104,6 +107,55 @@ struct WBE_META(WBE_COMPONENT) ComponentCamera {
 struct WBE_META(WBE_COMPONENT) ComponentHierarchy {
     // The parent of this entity.
     EntityID parent = entt::null;
+};
+
+/**
+ * @class ComponentDriver
+ * @brief Connects an entity to its setup, ready, update, and teardown behavior.
+ *
+ * `local_data` is non-owning. A driver that allocates state must release it
+ * from its teardown callback.
+ */
+struct WBE_META(WBE_COMPONENT) ComponentDriver {
+    /**
+     * @brief Callback invoked while the owning world is being set up.
+     *
+     * @param p_self The scene node associated with the driver entity.
+     */
+    using Setup = void (*)(Ref<SceneNode> p_self);
+
+    /**
+     * @brief Callback invoked when the owning world becomes ready.
+     *
+     * @param p_self The scene node associated with the driver entity.
+     */
+    using Ready = void (*)(Ref<SceneNode> p_self);
+
+    /**
+     * @brief Callback invoked for each world update.
+     *
+     * @param p_self The scene node associated with the driver entity.
+     * @param p_delta The elapsed time since the previous update, in seconds.
+     */
+    using Update = void (*)(Ref<SceneNode> p_self, double p_delta);
+
+    /**
+     * @brief Callback invoked while the owning world is being torn down.
+     *
+     * @param p_self The scene node associated with the driver entity.
+     */
+    using Teardown = void (*)(Ref<SceneNode> p_self);
+
+    /** @brief Setup callback, or nullptr when no setup work is required. */
+    Setup setup = nullptr;
+    /** @brief Ready callback, or nullptr when no ready work is required. */
+    Ready ready = nullptr;
+    /** @brief Update callback, or nullptr when no update work is required. */
+    Update update = nullptr;
+    /** @brief Teardown callback, or nullptr when no teardown work is required. */
+    Teardown teardown = nullptr;
+    /** @brief Non-owning driver-specific data managed by the callbacks. */
+    void* local_data = nullptr;
 };
 
 /**
