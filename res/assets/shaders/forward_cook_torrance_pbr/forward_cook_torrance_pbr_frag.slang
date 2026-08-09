@@ -62,8 +62,7 @@ float4 main(VSOutput p_input) : SV_Target0 {
     uint normal_index = uint(material_params.normal_index >= 0 ? material_params.normal_index : 0);
     uint roughness_metallic_ao_index = uint(material_params.roughness_metallic_ao_index >= 0 ? material_params.roughness_metallic_ao_index : 0);
 
-    float3 base_color = srgb_to_linear(
-        material_textures.albedo[albedo_index].Sample(material_textures.albedo_sampler[albedo_index], p_input.uv).rgb);
+    float3 base_color = material_textures.albedo[albedo_index].Sample(material_textures.albedo_sampler[albedo_index], p_input.uv).rgb;
     float3 sampled_normal =
         material_textures.normal[normal_index].Sample(material_textures.normal_sampler[normal_index], p_input.uv).rgb;
     float3 rma = material_textures.roughness_metallic_ao[roughness_metallic_ao_index]
