@@ -26,19 +26,27 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
+#include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -596,6 +604,9 @@ void RendererVK::create_logical_device() {
     // Setup physical device features.
     VkPhysicalDeviceFeatures device_features{};
     device_features.depthClamp = VK_TRUE;
+    device_features.multiDrawIndirect = VK_TRUE;
+    device_features.drawIndirectFirstInstance = VK_TRUE;
+    device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     create_info.pEnabledFeatures = &device_features;
 
     VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features{};
@@ -724,6 +735,12 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     }
     SwapChainSupportDetails swap_chain_support_details = get_swap_chain_support_details(p_device);
     if (swap_chain_support_details.formats.empty() || swap_chain_support_details.present_modes.empty()) {
+        return false;
+    }
+    VkPhysicalDeviceFeatures device_features{};
+    vkGetPhysicalDeviceFeatures(p_device, &device_features);
+    if (device_features.depthClamp != VK_TRUE || device_features.multiDrawIndirect != VK_TRUE ||
+        device_features.drawIndirectFirstInstance != VK_TRUE || device_features.shaderSampledImageArrayDynamicIndexing != VK_TRUE) {
         return false;
     }
 
@@ -1089,9 +1106,258 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
         p_graph->set_resource(
             REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
     }
+    if (render_objects->static_opaque_indirect_commands != MEM_NULL) {
+        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK,
+            render_objects->static_opaque_indirect_commands,
+            TypeUUID<ROBufferVK>::UUID);
+    }
+    if (render_objects->static_opaque_graphics_pipeline != MEM_NULL) {
+        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK,
+            render_objects->static_opaque_graphics_pipeline,
+            TypeUUID<ROGraphicsPipelineVK>::UUID);
+    }
 }
 
 namespace {
+constexpr uint32_t STATIC_OPAQUE_MATERIAL_TABLE_SIZE = 32;
+
+struct alignas(16) StaticOpaqueMaterialParamsVK {
+    int32_t albedo_index = 0;
+    int32_t normal_index = 0;
+    int32_t roughness_metallic_ao_index = 0;
+    int32_t padding = 0;
+};
+
+struct StaticOpaqueMaterialParamsTableVK {
+    std::array<StaticOpaqueMaterialParamsVK, STATIC_OPAQUE_MATERIAL_TABLE_SIZE> materials{};
+};
+
+std::string get_material_texture_key(const RUMaterial::TextureSlot& p_texture_slot) {
+    if (p_texture_slot.texture_key == nullptr || p_texture_slot.texture_key->text_data == nullptr) {
+        throw std::runtime_error("Failed to compile static opaque triangles: material texture key is missing.");
+    }
+    return std::string(p_texture_slot.texture_key->text_data.get());
+}
+
+void add_static_opaque_material_bindings(RenderBindpointDeclarationsBuilder& p_builder,
+    RefRes<RUMaterial> p_material,
+    uint32_t p_material_index,
+    Ref<ROSamplerVK> p_sampler,
+    StaticOpaqueMaterialParamsVK& p_material_params) {
+    if (p_material == nullptr) {
+        throw std::runtime_error("Failed to compile static opaque triangles: material is missing.");
+    }
+    std::span<RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
+    for (const auto& texture_slot : texture_slots) {
+        if (texture_slot.texture == nullptr) {
+            continue;
+        }
+        std::string texture_key = get_material_texture_key(texture_slot);
+        p_builder
+            .add_image_decleration(std::format("material_textures.{}[{}]", texture_key, p_material_index), texture_slot.texture)
+            .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", texture_key, p_material_index), p_sampler);
+        if (texture_key == "albedo") {
+            p_material_params.albedo_index = static_cast<int32_t>(p_material_index);
+        } else if (texture_key == "normal") {
+            p_material_params.normal_index = static_cast<int32_t>(p_material_index);
+        } else if (texture_key == "roughness_metallic_ao") {
+            p_material_params.roughness_metallic_ao_index = static_cast<int32_t>(p_material_index);
+        }
+    }
+}
+
+RefRes<RUImage> find_default_material_image(RefRes<RUMaterial> p_material) {
+    if (p_material == nullptr) {
+        return MEM_NULL;
+    }
+    std::span<RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
+    for (const auto& texture_slot : texture_slots) {
+        if (texture_slot.texture != nullptr) {
+            return texture_slot.texture;
+        }
+    }
+    return MEM_NULL;
+}
+
+struct StaticOpaqueDrawDataVK {
+    explicit StaticOpaqueDrawDataVK(RenderAllocator* p_allocator) : indirect_commands(p_allocator) {
+    }
+
+    RefRes<RUGraphicsPipeline> graphics_pipeline = MEM_NULL;
+    std::string graphics_pipeline_key;
+    Vector<VkDrawIndexedIndirectCommand, RenderAllocator> indirect_commands;
+};
+
+StaticOpaqueDrawDataVK build_static_opaque_draw_data(
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RenderAllocator* p_allocator) {
+    if (p_triangles_info.vertices.empty() || p_triangles_info.indices.empty() || p_triangles_info.materials.empty()) {
+        throw std::runtime_error("Failed to compile static opaque triangles: the render database contains no drawable triangles.");
+    }
+    if (p_triangles_info.materials.size() >= STATIC_OPAQUE_MATERIAL_TABLE_SIZE) {
+        throw std::runtime_error(std::format("Failed to compile static opaque triangles: {} material batches exceed the supported maximum of {}.",
+            p_triangles_info.materials.size(),
+            STATIC_OPAQUE_MATERIAL_TABLE_SIZE - 1));
+    }
+
+    StaticOpaqueDrawDataVK result(p_allocator);
+    result.indirect_commands.reserve(p_triangles_info.materials.size());
+    for (uint32_t material_index = 0; material_index < p_triangles_info.materials.size(); ++material_index) {
+        const auto& material_unit = p_triangles_info.materials[material_index];
+        if (material_unit.material == nullptr || material_unit.material->graphics_pipeline == nullptr ||
+            material_unit.material->graphics_pipeline->resource_key == nullptr) {
+            throw std::runtime_error("Failed to compile static opaque triangles: a material or its graphics pipeline is missing.");
+        }
+        std::string_view material_pipeline_key(material_unit.material->graphics_pipeline->resource_key);
+        if (result.graphics_pipeline == nullptr) {
+            result.graphics_pipeline = material_unit.material->graphics_pipeline;
+            result.graphics_pipeline_key = material_pipeline_key;
+        } else if (result.graphics_pipeline != material_unit.material->graphics_pipeline &&
+                   result.graphics_pipeline_key != material_pipeline_key) {
+            throw std::runtime_error("Failed to compile static opaque triangles: all material batches must use one graphics pipeline.");
+        }
+        if (material_unit.sub_region.starting_index > p_triangles_info.indices.size() ||
+            material_unit.sub_region.size > p_triangles_info.indices.size() - material_unit.sub_region.starting_index ||
+            material_unit.sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
+            material_unit.sub_region.size > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("Failed to compile static opaque triangles: a material index range is invalid.");
+        }
+        result.indirect_commands.push_back(VkDrawIndexedIndirectCommand{
+            .indexCount = static_cast<uint32_t>(material_unit.sub_region.size),
+            .instanceCount = 1,
+            .firstIndex = static_cast<uint32_t>(material_unit.sub_region.starting_index),
+            .vertexOffset = 0,
+            .firstInstance = material_index + 1,
+        });
+    }
+    return result;
+}
+
+struct StaticOpaqueMaterialDataVK {
+    RenderBindpointDeclarations bindpoints;
+    RefRes<RUImage> default_image = MEM_NULL;
+};
+
+StaticOpaqueMaterialDataVK build_static_opaque_material_data(
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, const BaseRenderDataVK* p_render_data) {
+    auto* resource_manager = ResourceManager::get_singleton();
+    if (resource_manager == nullptr) {
+        throw std::runtime_error("Failed to compile static opaque triangles: resource manager is missing.");
+    }
+    RefRes<RUMaterial> default_material = resource_manager->get_resource<RUMaterial>("default_material");
+    RefRes<RUImage> default_image = find_default_material_image(default_material);
+    if (default_material == nullptr || default_image == nullptr) {
+        throw std::runtime_error("Failed to compile static opaque triangles: default_material must provide at least one texture.");
+    }
+    auto material_sampler = ROSamplerVK::Builder()
+                                .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                                .set_address_mode(VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                                .create_ref(p_render_data);
+    RenderBindpointDeclarationsBuilder bindpoint_builder;
+    StaticOpaqueMaterialParamsTableVK material_params;
+    add_static_opaque_material_bindings(bindpoint_builder, default_material, 0, material_sampler, material_params.materials[0]);
+    for (uint32_t material_index = 0; material_index < p_triangles_info.materials.size(); ++material_index) {
+        uint32_t table_index = material_index + 1;
+        add_static_opaque_material_bindings(bindpoint_builder,
+            p_triangles_info.materials[material_index].material,
+            table_index,
+            material_sampler,
+            material_params.materials[table_index]);
+    }
+    bindpoint_builder.add_buffer_decleration("material_params", &material_params, sizeof(material_params));
+    return StaticOpaqueMaterialDataVK{.bindpoints = bindpoint_builder.build(), .default_image = default_image};
+}
+
+struct StaticOpaqueAttachmentDataVK {
+    VkExtent2D render_extent{};
+    std::vector<std::string> color_attachment_ids;
+    std::vector<VkFormat> color_attachment_formats;
+    std::vector<VkClearValue> clear_values;
+};
+
+StaticOpaqueAttachmentDataVK build_static_opaque_attachment_data(
+    const StaticOpaqueTrianglesCompileConfigVK& p_config, const BaseRenderDataVK* p_render_data) {
+    StaticOpaqueAttachmentDataVK result{
+        .render_extent = p_config.render_extent,
+        .color_attachment_ids = p_config.color_attachment_ids,
+        .color_attachment_formats = p_config.color_attachment_formats,
+        .clear_values = p_config.clear_values,
+    };
+    if (result.color_attachment_ids.empty()) {
+        result.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK);
+    }
+    if (result.color_attachment_formats.empty()) {
+        result.color_attachment_formats.push_back(p_render_data->swap_chain_format);
+    }
+    if (result.color_attachment_ids.size() != result.color_attachment_formats.size()) {
+        throw std::runtime_error("Failed to compile static opaque triangles: color attachment ids and formats must have equal counts.");
+    }
+    if (p_config.depth_attachment_id.has_value() != (p_config.depth_attachment_format != VK_FORMAT_UNDEFINED)) {
+        throw std::runtime_error("Failed to compile static opaque triangles: depth attachment id and format must be provided together.");
+    }
+    if (result.render_extent.width == 0 || result.render_extent.height == 0) {
+        result.render_extent = p_render_data->swap_chain_extent;
+    }
+    while (result.clear_values.size() < result.color_attachment_ids.size()) {
+        result.clear_values.push_back(VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}});
+    }
+    if (p_config.depth_attachment_id.has_value() && result.clear_values.size() == result.color_attachment_ids.size()) {
+        result.clear_values.push_back(VkClearValue{.depthStencil = {.depth = 1.0F, .stencil = 0}});
+    }
+    return result;
+}
+
+std::string make_static_opaque_pipeline_key(
+    std::string_view p_resource_key, const std::vector<VkFormat>& p_color_formats, VkFormat p_depth_format, VkFormat p_stencil_format) {
+    std::string result = std::format("{}#static_opaque_indirect", p_resource_key);
+    for (VkFormat color_format : p_color_formats) {
+        result += std::format("#color_{}", static_cast<int32_t>(color_format));
+    }
+    result += std::format("#depth_{}#stencil_{}", static_cast<int32_t>(p_depth_format), static_cast<int32_t>(p_stencil_format));
+    return result;
+}
+
+std::function<Unique<RenderTaskVK>()> make_static_opaque_task_factory(RenderAllocator* p_allocator,
+    const BaseRenderDataVK* p_render_data,
+    StaticOpaqueAttachmentDataVK p_attachment_data,
+    std::optional<std::string> p_depth_attachment_id,
+    std::vector<Ref<RODescriptorSetVK>> p_descriptor_sets,
+    uint32_t p_draw_count,
+    VkAttachmentLoadOp p_color_load_op,
+    VkAttachmentLoadOp p_depth_load_op) { // NOLINT
+    return [task_allocator = p_allocator,
+               task_render_data = p_render_data,
+               task_attachment_data = std::move(p_attachment_data),
+               task_depth_attachment_id = std::move(p_depth_attachment_id),
+               task_descriptor_sets = std::move(p_descriptor_sets),
+               task_draw_count = p_draw_count,
+               task_color_load_op = p_color_load_op,
+               task_depth_load_op = p_depth_load_op]() -> Unique<RenderTaskVK> {
+        std::vector<std::string_view> color_attachment_id_views;
+        color_attachment_id_views.reserve(task_attachment_data.color_attachment_ids.size());
+        for (const std::string& color_attachment_id : task_attachment_data.color_attachment_ids) {
+            color_attachment_id_views.emplace_back(color_attachment_id);
+        }
+        std::optional<std::string_view> depth_attachment_id_view;
+        if (task_depth_attachment_id.has_value()) {
+            depth_attachment_id_view = *task_depth_attachment_id;
+        }
+        return make_unique<RTRunGraphicsPipelineIndirectVK>(task_allocator,
+            task_render_data,
+            std::span<const VkClearValue>(task_attachment_data.clear_values.data(), task_attachment_data.clear_values.size()),
+            task_attachment_data.render_extent,
+            std::span<const std::string_view>(color_attachment_id_views.data(), color_attachment_id_views.size()),
+            depth_attachment_id_view,
+            REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK,
+            REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
+            REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+            REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK,
+            task_draw_count,
+            std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
+            task_color_load_op,
+            task_depth_load_op);
+    };
+}
+
 template <typename T, typename SrcAlloc>
 Ref<ROBufferVK> build_or_resize_host_visible_buffer(
     const BaseRenderDataVK* p_render_data, Ref<ROBufferVK> p_existing, const Vector<T, SrcAlloc>& p_data, VkBufferUsageFlags p_usage) {
@@ -1122,5 +1388,53 @@ void RendererVK::update_static_opaque_triangles() {
     // Publish the buffers under the global resource IDs so render tasks in the
     // active graph can resolve them without per-pipeline registration.
     set_graph_static_opaque_resources(active_graph);
+}
+
+CompiledStaticOpaqueTrianglesVK RendererVK::compile_static_opaque_triangles(const StaticOpaqueTrianglesCompileConfigVK& p_config) {
+    const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+    auto draw_data = build_static_opaque_draw_data(triangles_info, allocator);
+    VkPhysicalDeviceProperties device_properties{};
+    vkGetPhysicalDeviceProperties(physical_device, &device_properties);
+    if (draw_data.indirect_commands.size() > device_properties.limits.maxDrawIndirectCount) {
+        throw std::runtime_error(std::format("Failed to compile static opaque triangles: {} draws exceed the device limit of {}.",
+            draw_data.indirect_commands.size(),
+            device_properties.limits.maxDrawIndirectCount));
+    }
+    auto material_data = build_static_opaque_material_data(triangles_info, &base_render_data);
+    auto attachment_data = build_static_opaque_attachment_data(p_config, &base_render_data);
+
+    GraphicsPipelineCompilerVKContext compiler_context{
+        .allocator = allocator,
+        .render_data = &base_render_data,
+        .render_database = render_database,
+        .renderer = this,
+        .default_image_resource = material_data.default_image,
+        .color_attachment_formats = attachment_data.color_attachment_formats,
+        .depth_attachment_format = p_config.depth_attachment_format,
+        .stencil_attachment_format = p_config.stencil_attachment_format,
+    };
+    std::string compiled_pipeline_key = make_static_opaque_pipeline_key(
+        draw_data.graphics_pipeline_key, attachment_data.color_attachment_formats, p_config.depth_attachment_format, p_config.stencil_attachment_format);
+    auto compiled_pipeline = GraphicsPipelineCompilerVK(compiler_context)
+                                 .compile(compiled_pipeline_key, draw_data.graphics_pipeline, material_data.bindpoints);
+    render_objects->static_opaque_graphics_pipeline = compiled_pipeline.graphics_pipeline;
+    render_objects->static_opaque_indirect_commands = build_or_resize_host_visible_buffer(
+        &base_render_data, render_objects->static_opaque_indirect_commands, draw_data.indirect_commands, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    update_static_opaque_triangles();
+
+    CompiledStaticOpaqueTrianglesVK result(allocator);
+    result.task.task_id = p_config.task_id;
+    result.descriptor_sets = std::move(compiled_pipeline.descriptor_sets);
+    result.descriptor_set_bindings = std::move(compiled_pipeline.descriptor_set_bindings);
+    result.task.create = make_static_opaque_task_factory(allocator,
+        &base_render_data,
+        std::move(attachment_data),
+        p_config.depth_attachment_id,
+        result.descriptor_sets,
+        static_cast<uint32_t>(draw_data.indirect_commands.size()),
+        p_config.color_attachment_load_op,
+        p_config.depth_attachment_load_op);
+    set_graph_static_opaque_resources(active_graph);
+    return result;
 }
 } // namespace WhiteBirdEngine

@@ -16,7 +16,7 @@
 #include "defs.slang"
 
 ConstantBuffer<CameraInfo> camera_info;
-ConstantBuffer<MaterialParams> material_params;
+ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<LightParams> light;
 ParameterBlock<MaterialTextures> material_textures;
 
@@ -26,11 +26,11 @@ ParameterBlock<MaterialTextures> material_textures;
  * @return The vertex output for the forward Cook-Torrance PBR pass.
  */
 [shader("vertex")]
-VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     VSOutput output;
     float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position = mul(camera_info.proj, mul(camera_info.view, world_position));
-    output.world_position = p_input.position;
+    output.world_position = float4(p_input.position, float(p_instance_id));
     output.normal = p_input.normal;
     output.tangent = p_input.tangent;
     output.bitangent = p_input.bitangent;
@@ -79,9 +79,14 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
  */
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
-    uint albedo_index = uint(material_params.albedo_index >= 0 ? material_params.albedo_index : 0);
-    uint normal_index = uint(material_params.normal_index >= 0 ? material_params.normal_index : 0);
-    uint roughness_metallic_ao_index = uint(material_params.roughness_metallic_ao_index >= 0 ? material_params.roughness_metallic_ao_index : 0);
+    // The instance id crosses the rasterizer in world_position.w. Round away interpolation error before using it as a table
+    // index.
+    uint material_index = uint(round(p_input.world_position.w));
+    MaterialParams active_material = material_params.materials[material_index];
+    uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
+    uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
+    uint roughness_metallic_ao_index =
+        uint(active_material.roughness_metallic_ao_index >= 0 ? active_material.roughness_metallic_ao_index : 0);
 
     float3 base_color = material_textures.albedo[albedo_index].Sample(material_textures.albedo_sampler[albedo_index], p_input.uv).rgb;
     float3 sampled_normal =
@@ -94,7 +99,7 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     float ambient_occlusion = clamp(rma.b, 0.0, 1.0);
 
     float3 n = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
-    float3 v = normalize(float3(0.0, 0.0, 3.0) - p_input.world_position);
+    float3 v = normalize(float3(0.0, 0.0, 3.0) - p_input.world_position.xyz);
 
     float3 f0 = lerp(float3(0.04), base_color, metallic);
 
@@ -103,7 +108,7 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
         SpotLightInfo spot_light_info = light.lights[spot_light_index].info;
-        float3 to_light = spot_light_info.position - p_input.world_position;
+        float3 to_light = spot_light_info.position - p_input.world_position.xyz;
         float light_distance = length(to_light);
         float3 l = to_light / max(light_distance, 0.0001);
         float3 spot_axis = normalize(spot_light_info.direction);

@@ -19,6 +19,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <algorithm>
@@ -35,8 +36,9 @@ namespace {
 
 // Material texture keys are shader parameter names. This keeps manifest
 // material slots independent of backend descriptor binding numbers.
-const ROMaterialVK::TextureBinding& find_texture_binding(
-    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_texture_key) {
+ROMaterialVK::TextureBinding find_texture_binding(const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings,
+    std::string_view p_texture_key,
+    const ROMaterialVK::TextureBinding& p_default_texture) {
     auto binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key](const ROMaterialVK::TextureBinding& p_binding) {
         return p_binding.texture_key == p_texture_key;
     });
@@ -49,7 +51,13 @@ const ROMaterialVK::TextureBinding& find_texture_binding(
             });
         }
     }
-    if (binding == p_texture_bindings.end() || binding->image_view == MEM_NULL) {
+    if (binding == p_texture_bindings.end()) {
+        if (p_default_texture.image_view != MEM_NULL) {
+            return p_default_texture;
+        }
+        throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_texture_key));
+    }
+    if (binding->image_view == MEM_NULL) {
         throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_texture_key));
     }
     return *binding;
@@ -175,7 +183,8 @@ void write_sampled_image_binding(Ref<RODescriptorSetVK> p_descriptor_set,
     const ROMaterialVK::Builder& p_builder,
     const ShaderDescriptorBindingVK& p_descriptor_binding) {
     if (p_descriptor_binding.layout_binding.descriptorCount == 1) {
-        const auto& texture_binding = find_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name);
+        const auto texture_binding =
+            find_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name, p_builder.default_texture);
         p_descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
                 .set_binding(p_descriptor_binding.layout_binding.binding)
                 .add_sampled_image_info(RODescriptorSetVK::Writer::ImageInfo{
@@ -190,9 +199,12 @@ void write_sampled_image_binding(Ref<RODescriptorSetVK> p_descriptor_set,
         const ROMaterialVK::TextureBinding* texture_binding =
             find_indexed_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name, i);
         if (texture_binding == nullptr) {
-            // Descriptor array default-fill: callers may bind only element 0 for resources with fewer active entries than the shader array size.
-            // Missing slots reuse element 0 so every descriptor remains valid for Vulkan validation.
+            // Descriptor array default-fill: callers may bind only element 0 for resources with fewer active entries than
+            // the shader array size. Missing slots reuse element 0 so every descriptor remains valid for Vulkan validation.
             texture_binding = find_indexed_texture_binding_fallback(p_builder.texture_bindings, p_descriptor_binding.parameter_name);
+        }
+        if (texture_binding == nullptr && p_builder.default_texture.image_view != MEM_NULL) {
+            texture_binding = &p_builder.default_texture;
         }
         if (texture_binding == nullptr) {
             throw std::runtime_error(std::format("Failed to bind material texture array '{}': no fallback binding at index 0.",
@@ -217,9 +229,12 @@ void write_indexed_sampler_bindings(Ref<RODescriptorSetVK> p_descriptor_set,
         Ref<ROSamplerVK> sampler =
             find_indexed_sampler_binding(p_builder.sampler_bindings, p_descriptor_binding.parameter_name, i, MEM_NULL);
         if (sampler == MEM_NULL) {
-            // Descriptor array default-fill: callers may bind only element 0 for resources with fewer active entries than the shader array size.
-            // Missing slots reuse element 0 so every descriptor remains valid for Vulkan validation.
+            // Descriptor array default-fill: callers may bind only element 0 for resources with fewer active entries than
+            // the shader array size. Missing slots reuse element 0 so every descriptor remains valid for Vulkan validation.
             sampler = find_indexed_sampler_binding_fallback(p_builder.sampler_bindings, p_descriptor_binding.parameter_name);
+        }
+        if (sampler == MEM_NULL) {
+            sampler = p_builder.default_sampler;
         }
         if (sampler == MEM_NULL) {
             throw std::runtime_error(std::format("Failed to bind material sampler array '{}': no fallback binding at index 0.",
@@ -250,7 +265,8 @@ void write_sampler_binding(Ref<RODescriptorSetVK> p_descriptor_set,
 void write_combined_image_sampler_binding(Ref<RODescriptorSetVK> p_descriptor_set,
     const ROMaterialVK::Builder& p_builder,
     const ShaderDescriptorBindingVK& p_descriptor_binding) {
-    const auto& texture_binding = find_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name);
+    const auto texture_binding =
+        find_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name, p_builder.default_texture);
     auto sampler = find_sampler_binding(p_builder.sampler_bindings, p_descriptor_binding.parameter_name, p_builder.default_sampler);
     RODescriptorSetVK::Writer writer;
     writer.set_binding(p_descriptor_binding.layout_binding.binding);
@@ -288,6 +304,12 @@ ROMaterialVK::Builder& ROMaterialVK::Builder::add_texture_binding(const TextureB
 
 ROMaterialVK::Builder& ROMaterialVK::Builder::add_sampler_binding(const SamplerBinding& p_sampler_binding) {
     sampler_bindings.push_back(p_sampler_binding);
+    return *this;
+}
+
+ROMaterialVK::Builder& ROMaterialVK::Builder::set_default_texture(Ref<ROImageViewVK> p_image_view, VkImageLayout p_image_layout) {
+    default_texture.image_view = p_image_view;
+    default_texture.image_layout = p_image_layout;
     return *this;
 }
 

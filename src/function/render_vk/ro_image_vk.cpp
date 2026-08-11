@@ -269,8 +269,8 @@ void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<R
     };
     apply_upload_barrier(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT);
     vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
-    // After transfering the data, retrieve the original layout.
-    apply_upload_barrier(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+    // Make the uploaded texels visible to shader sampling before the image is used by a draw.
+    apply_upload_barrier(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 }
 
 } // namespace WhiteBirdEngine

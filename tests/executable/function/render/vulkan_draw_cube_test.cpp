@@ -47,7 +47,6 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>

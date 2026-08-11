@@ -29,9 +29,9 @@ struct VSOutput {
      */
     float4 position         : SV_Position;
     /**
- * @brief World-space position of the fragment.
+ * @brief World-space position in xyz. The w component stores the draw instance id used as the material table location.
      */
-    float3 world_position   : TEXCOORD0;
+    float4 world_position   : TEXCOORD0;
     /**
  * @brief Object-space normal interpolated from the vertex attribute.
      */
@@ -101,6 +101,10 @@ struct MaterialParams {
     int albedo_index;
     int normal_index;
     int roughness_metallic_ao_index;
+};
+
+struct MaterialParamsBuffer {
+    MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
 struct LightParam {

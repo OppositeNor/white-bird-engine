@@ -38,6 +38,7 @@
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/glm.hpp>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
@@ -70,6 +71,10 @@ struct GraphicsPipelineCompilerVKContext {
      * @brief Renderer used to execute the generated task's render graph.
      */
     RendererVK* renderer = nullptr;
+    /**
+     * @brief Optional valid image used for sampled-image descriptors that the caller leaves unset.
+     */
+    RefRes<RUImage> default_image_resource = MEM_NULL;
     /**
      * @brief Dynamic-rendering color attachment formats.
      */
@@ -112,12 +117,12 @@ public:
     explicit GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context);
 
     /**
-    * @brief Compile a graphics pipeline resource into Vulkan render objects and reflected descriptor binding locations.
+     * @brief Compile a graphics pipeline resource into Vulkan render objects and reflected descriptor binding locations.
      *
      * @param p_resource_key Key of the graphics pipeline resource.
      * @param p_pipeline_resource Loaded graphics pipeline resource unit.
      * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
-    * @return Compiled pipeline objects and a descriptor-scope name to set/binding map.
+     * @return Compiled pipeline objects and a descriptor-scope name to set/binding map.
      */
     CompileResult compile(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
@@ -156,12 +161,10 @@ private:
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
         uint32_t p_set_index,
         const RenderBindpointDeclarations& p_bindpoint_declarations);
-    void add_direct_texture_bindpoints(std::string_view p_resource_key,
-        ROMaterialVK::Builder& p_builder,
-        const RenderBindpointDeclarations& p_bindpoint_declarations);
-    void add_direct_sampler_bindpoints(std::string_view p_resource_key,
-        ROMaterialVK::Builder& p_builder,
-        const RenderBindpointDeclarations& p_bindpoint_declarations);
+    void add_direct_texture_bindpoints(
+        std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
+    void add_direct_sampler_bindpoints(
+        std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_material_texture_bindpoints(std::string_view p_resource_key,
         ROMaterialVK::Builder& p_builder,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,

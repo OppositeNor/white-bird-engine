@@ -28,11 +28,14 @@
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/allocator_vk.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
@@ -59,8 +62,73 @@ inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK = "REND_RES_
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK";
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK";
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK";
+inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK =
+    "REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK";
+inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK =
+    "REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK";
 
 WBE_LABEL(RT_PRE_EXECUTE_PIPELINE_VK, WBE_RENDER_TASK);
+WBE_LABEL(RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, WBE_RENDER_TASK);
+
+/**
+ * @class StaticOpaqueTrianglesCompileConfigVK
+ * @brief Attachment configuration for compiling the renderer's static opaque triangles into one indirect task.
+ */
+struct StaticOpaqueTrianglesCompileConfigVK {
+    StaticOpaqueTrianglesCompileConfigVK() = default;
+    ~StaticOpaqueTrianglesCompileConfigVK() = default;
+    StaticOpaqueTrianglesCompileConfigVK(const StaticOpaqueTrianglesCompileConfigVK&) = default;
+    StaticOpaqueTrianglesCompileConfigVK(StaticOpaqueTrianglesCompileConfigVK&&) noexcept = default;
+    StaticOpaqueTrianglesCompileConfigVK& operator=(const StaticOpaqueTrianglesCompileConfigVK&) = default;
+    StaticOpaqueTrianglesCompileConfigVK& operator=(StaticOpaqueTrianglesCompileConfigVK&&) noexcept = default;
+
+    /** Task id assigned to the compiled graph descriptor. */
+    RendTaskID task_id = RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK;
+    /** Render area. A zero extent uses the current swap-chain extent. */
+    VkExtent2D render_extent{};
+    /** Color attachment resource ids. An empty list targets the current swap-chain image. */
+    std::vector<std::string> color_attachment_ids;
+    /** Optional depth attachment resource id. */
+    std::optional<std::string> depth_attachment_id;
+    /** Color formats in the same order as color_attachment_ids. Empty uses the swap-chain format. */
+    std::vector<VkFormat> color_attachment_formats;
+    /** Depth format used to compile the graphics pipeline. */
+    VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED;
+    /** Stencil format used to compile the graphics pipeline. */
+    VkFormat stencil_attachment_format = VK_FORMAT_UNDEFINED;
+    /** Clear values for all color attachments followed by depth when present. Missing entries use zero/depth-one defaults. */
+    std::vector<VkClearValue> clear_values;
+    /** Load operation used for every color attachment. */
+    VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    /** Load operation used for the depth attachment. */
+    VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+};
+
+/**
+ * @class CompiledStaticOpaqueTrianglesVK
+ * @brief Graph-ready indirect task and descriptor handles for updating zero-initialized runtime values.
+ *
+ * Descriptor sets own every compiled uniform buffer, image view, and sampler used by the task.
+ */
+struct CompiledStaticOpaqueTrianglesVK {
+    CompiledStaticOpaqueTrianglesVK() = delete;
+    ~CompiledStaticOpaqueTrianglesVK() = default;
+    CompiledStaticOpaqueTrianglesVK(const CompiledStaticOpaqueTrianglesVK&) = delete;
+    CompiledStaticOpaqueTrianglesVK(CompiledStaticOpaqueTrianglesVK&&) noexcept = default;
+    CompiledStaticOpaqueTrianglesVK& operator=(const CompiledStaticOpaqueTrianglesVK&) = delete;
+    CompiledStaticOpaqueTrianglesVK& operator=(CompiledStaticOpaqueTrianglesVK&&) noexcept = default;
+
+    /** Construct an empty result using the render allocator required by the task descriptor. */
+    explicit CompiledStaticOpaqueTrianglesVK(RenderAllocator* p_allocator) : task(p_allocator) {
+    }
+
+    /** Task descriptor ready to append to a RendGraphDescVK. */
+    RendTaskDescVK task;
+    /** Descriptor sets exposed so defaulted uniforms can be replaced before graph execution. */
+    std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
+    /** Reflected descriptor name to set/binding lookup. */
+    GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
+};
 
 /**
  * @class RendererVK
@@ -119,6 +187,19 @@ public:
     }
 
     virtual void update_static_opaque_triangles() override;
+
+    /**
+     * @brief Compile all static opaque material batches into one indexed-indirect render task.
+     *
+     * Geometry and material texture bindings are gathered from the render database. Uniforms unrelated to geometry/materials
+     * are zero-initialized and can be replaced through the returned descriptor sets and binding lookup.
+     *
+     * @param p_config Output attachment and render-area configuration.
+     * @return A graph-ready task descriptor and its updateable descriptor handles.
+     * @throws std::runtime_error When no static triangles exist, materials use different pipelines, required defaults are
+     * absent, or the material count exceeds the shader table capacity.
+     */
+    CompiledStaticOpaqueTrianglesVK compile_static_opaque_triangles(const StaticOpaqueTrianglesCompileConfigVK& p_config = {});
 
     virtual void add_job(std::function<void()> p_job) override {
         job_buffer->add_job(std::move(p_job));
@@ -363,6 +444,8 @@ private:
         Ref<ROBufferVK> static_opaque_vertices;
         Ref<ROBufferVK> static_opaque_indices;
         Ref<ROBufferVK> static_opaque_obj_ids;
+        Ref<ROBufferVK> static_opaque_indirect_commands;
+        Ref<ROGraphicsPipelineVK> static_opaque_graphics_pipeline;
     };
     Unique<RenderObjects> render_objects;
 

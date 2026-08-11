@@ -114,6 +114,10 @@ public:
          */
         std::vector<SamplerBinding> sampler_bindings;
         /**
+         * @brief Fallback texture when a shader image parameter has no explicit binding.
+         */
+        TextureBinding default_texture;
+        /**
          * @brief Fallback sampler when a shader sampler parameter has no explicit binding.
          */
         Ref<ROSamplerVK> default_sampler;
@@ -138,6 +142,10 @@ public:
          * @brief Add a sampler binding keyed by shader parameter name.
          */
         Builder& add_sampler_binding(const SamplerBinding& p_sampler_binding);
+        /**
+         * @brief Set the fallback texture.
+         */
+        Builder& set_default_texture(Ref<ROImageViewVK> p_image_view, VkImageLayout p_image_layout = VK_IMAGE_LAYOUT_GENERAL);
         /**
          * @brief Set the fallback sampler.
          */
