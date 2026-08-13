@@ -51,6 +51,10 @@ public:
          * @brief The descriptor set layouts.
          */
         std::vector<Ref<RODescriptorSetLayoutVK>> descriptor_set_layouts;
+        /**
+         * @brief Actual descriptor count for the variable-count binding, or zero when the layout has no such binding.
+         */
+        uint32_t variable_descriptor_count = 0;
 
         /**
          * @brief Add a descriptor set layout.
@@ -60,6 +64,17 @@ public:
          */
         Builder& add_descriptor_set_layout(const Ref<RODescriptorSetLayoutVK>& p_descriptor_set_layout) {
             descriptor_set_layouts.push_back(p_descriptor_set_layout);
+            return *this;
+        }
+
+        /**
+         * @brief Set the actual descriptor count allocated for the layout's variable-count binding.
+         *
+         * @param p_descriptor_count The non-zero descriptor count to allocate.
+         * @return *this.
+         */
+        Builder& set_variable_descriptor_count(uint32_t p_descriptor_count) {
+            variable_descriptor_count = p_descriptor_count;
             return *this;
         }
 
@@ -282,8 +297,8 @@ public:
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
     Vector<Ref<RODescriptorSetLayoutVK>, RenderAllocator> descriptor_set_layouts;
-    // Keep references to bound resources to prevent them from being destroyed.
-    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator> bound_objects;
+    // Keep references per binding and array element to prevent bound resources from being destroyed.
+    Map<uint64_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator> bound_objects;
 };
 
 } // namespace WhiteBirdEngine

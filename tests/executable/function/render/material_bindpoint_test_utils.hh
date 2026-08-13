@@ -27,14 +27,17 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr uint32_t MATERIAL_TEXTURE_DESCRIPTOR_COUNT = 32;
-inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_INDEX = 0;
-inline constexpr int32_t MATERIAL_TEXTURE_BOUND_INDEX = 1;
+inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_ALBEDO_INDEX = 0;
+inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_NORMAL_INDEX = 1;
+inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_ROUGHNESS_METALLIC_AO_INDEX = 2;
+inline constexpr int32_t MATERIAL_TEXTURE_BOUND_ALBEDO_INDEX = 3;
+inline constexpr int32_t MATERIAL_TEXTURE_BOUND_NORMAL_INDEX = 4;
+inline constexpr int32_t MATERIAL_TEXTURE_BOUND_ROUGHNESS_METALLIC_AO_INDEX = 5;
 
 struct MaterialParamsUBO {
-    int32_t albedo_index = -1;
-    int32_t normal_index = -1;
-    int32_t roughness_metallic_ao_index = -1;
+    int32_t albedo_index = MATERIAL_TEXTURE_DEFAULT_ALBEDO_INDEX;
+    int32_t normal_index = MATERIAL_TEXTURE_DEFAULT_NORMAL_INDEX;
+    int32_t roughness_metallic_ao_index = MATERIAL_TEXTURE_DEFAULT_ROUGHNESS_METALLIC_AO_INDEX;
 };
 
 inline RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, std::string_view p_texture_key) {
@@ -56,21 +59,20 @@ inline RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, std:
 inline RefRes<RUImage> require_material_texture(RefRes<RUMaterial> p_material, std::string_view p_texture_key) {
     RefRes<RUImage> texture = find_material_texture(p_material, p_texture_key);
     if (texture == nullptr) {
-        throw std::runtime_error(std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_key));
+        throw std::runtime_error(
+            std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_key));
     }
     return texture;
 }
 
-inline void add_material_texture_family_bindings(RenderBindpointDeclarationsBuilder& p_builder,
-    std::string_view p_texture_name,
+inline void add_material_texture_binding(RenderBindpointDeclarationsBuilder& p_builder,
+    int32_t p_default_index,
+    int32_t p_bound_index,
     RefRes<RUImage> p_default_texture,
-    RefRes<RUImage> p_material_texture,
-    Ref<ROSamplerVK> p_sampler) {
-    p_builder.add_image_decleration(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_default_texture)
-        .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_DEFAULT_INDEX), p_sampler);
+    RefRes<RUImage> p_material_texture) {
+    p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_default_index), p_default_texture);
     if (p_material_texture != nullptr) {
-        p_builder.add_image_decleration(std::format("material_textures.{}[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_material_texture)
-            .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", p_texture_name, MATERIAL_TEXTURE_BOUND_INDEX), p_sampler);
+        p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_bound_index), p_material_texture);
     }
 }
 
@@ -88,13 +90,18 @@ inline std::vector<uint8_t> add_material_texture_bindings(RenderBindpointDeclara
     RefRes<RUImage> normal_texture = find_material_texture(p_material, "normal");
     RefRes<RUImage> rma_texture = find_material_texture(p_material, "roughness_metallic_ao");
 
-    add_material_texture_family_bindings(p_builder, "albedo", default_albedo, albedo_texture, p_sampler);
-    add_material_texture_family_bindings(p_builder, "normal", default_normal, normal_texture, p_sampler);
-    add_material_texture_family_bindings(p_builder, "roughness_metallic_ao", default_rma, rma_texture, p_sampler);
+    p_builder.add_sampler_decleration("material_textures.material_sampler", p_sampler);
+    add_material_texture_binding(
+        p_builder, MATERIAL_TEXTURE_DEFAULT_ALBEDO_INDEX, MATERIAL_TEXTURE_BOUND_ALBEDO_INDEX, default_albedo, albedo_texture);
+    add_material_texture_binding(
+        p_builder, MATERIAL_TEXTURE_DEFAULT_NORMAL_INDEX, MATERIAL_TEXTURE_BOUND_NORMAL_INDEX, default_normal, normal_texture);
+    add_material_texture_binding(
+        p_builder, MATERIAL_TEXTURE_DEFAULT_ROUGHNESS_METALLIC_AO_INDEX, MATERIAL_TEXTURE_BOUND_ROUGHNESS_METALLIC_AO_INDEX, default_rma, rma_texture);
 
-    material_params.albedo_index = albedo_texture != nullptr ? MATERIAL_TEXTURE_BOUND_INDEX : -1;
-    material_params.normal_index = normal_texture != nullptr ? MATERIAL_TEXTURE_BOUND_INDEX : -1;
-    material_params.roughness_metallic_ao_index = rma_texture != nullptr ? MATERIAL_TEXTURE_BOUND_INDEX : -1;
+    material_params.albedo_index = albedo_texture != nullptr ? MATERIAL_TEXTURE_BOUND_ALBEDO_INDEX : MATERIAL_TEXTURE_DEFAULT_ALBEDO_INDEX;
+    material_params.normal_index = normal_texture != nullptr ? MATERIAL_TEXTURE_BOUND_NORMAL_INDEX : MATERIAL_TEXTURE_DEFAULT_NORMAL_INDEX;
+    material_params.roughness_metallic_ao_index = rma_texture != nullptr ? MATERIAL_TEXTURE_BOUND_ROUGHNESS_METALLIC_AO_INDEX
+                                                                         : MATERIAL_TEXTURE_DEFAULT_ROUGHNESS_METALLIC_AO_INDEX;
 
     std::vector<uint8_t> result(sizeof(MaterialParamsUBO));
     std::memcpy(result.data(), &material_params, result.size());

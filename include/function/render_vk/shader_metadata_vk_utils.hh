@@ -72,6 +72,10 @@ struct ShaderDescriptorBindingVK {
      * @brief Vulkan layout binding for this parameter.
      */
     VkDescriptorSetLayoutBinding layout_binding{};
+    /**
+     * @brief Whether this binding is a runtime array allocated with a variable descriptor count.
+     */
+    bool variable_descriptor_count = false;
 };
 
 /**
@@ -87,6 +91,10 @@ struct ShaderDescriptorSetLayoutVK {
      * @brief Sorted bindings that belong to this set.
      */
     std::vector<VkDescriptorSetLayoutBinding> bindings;
+    /**
+     * @brief Descriptor indexing flags aligned with bindings.
+     */
+    std::vector<VkDescriptorBindingFlags> binding_flags;
 };
 
 /**
@@ -115,8 +123,7 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
 /**
  * @brief Collect and merge descriptor bindings from all supported graphics stages.
  */
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(
-    const ShaderMetadata& p_vertex_shader_metadata,
+std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const ShaderMetadata& p_vertex_shader_metadata,
     std::string_view p_vertex_stage_entry,
     const ShaderMetadata& p_fragment_shader_metadata,
     std::string_view p_fragment_stage_entry);
@@ -126,6 +133,17 @@ std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bind
  */
 std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(
     const std::vector<ShaderDescriptorBindingVK>& p_bindings);
+
+/**
+ * @brief Assign a stable upper bound shared by all variable-count bindings in the pipeline layouts.
+ *
+ * Fixed descriptors are reserved first. The remaining descriptor budget is divided between variable bindings so the declared
+ * layout maxima remain within the supplied device/engine resource cap.
+ *
+ * @param p_set_layouts Descriptor set layouts to update.
+ * @param p_max_descriptor_count Maximum descriptor resource budget available to the pipeline.
+ */
+void set_variable_descriptor_count_upper_bounds(std::vector<ShaderDescriptorSetLayoutVK>& p_set_layouts, uint32_t p_max_descriptor_count);
 
 } // namespace WhiteBirdEngine
 

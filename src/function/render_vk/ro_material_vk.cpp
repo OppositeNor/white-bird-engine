@@ -110,6 +110,33 @@ void validate_indexed_texture_bindings(
     }
 }
 
+uint32_t get_variable_sampled_image_descriptor_count(const ROMaterialVK::Builder& p_builder) {
+    uint32_t descriptor_count = 0;
+    for (const auto& descriptor_binding : p_builder.descriptor_bindings) {
+        if (descriptor_binding.set_index != p_builder.set_index || !descriptor_binding.variable_descriptor_count) {
+            continue;
+        }
+        if (descriptor_binding.layout_binding.descriptorType != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
+            throw std::runtime_error("Failed to bind runtime descriptor array: only sampled images are supported.");
+        }
+        if (descriptor_count != 0) {
+            throw std::runtime_error("Failed to bind runtime descriptor array: only one variable-count binding is allowed per set.");
+        }
+        descriptor_count = 1;
+        for (const auto& texture_binding : p_builder.texture_bindings) {
+            if (texture_binding.texture_key != descriptor_binding.parameter_name) {
+                continue;
+            }
+            if (!texture_binding.has_array_index) {
+                throw std::runtime_error(std::format("Failed to bind runtime texture array '{}': array index must be specified with [].",
+                    descriptor_binding.parameter_name));
+            }
+            descriptor_count = std::max(descriptor_count, texture_binding.array_index + 1);
+        }
+    }
+    return descriptor_count;
+}
+
 // A default sampler lets materials omit one sampler slot while still binding
 // separate texture and sampler descriptors from Slang reflection metadata.
 Ref<ROSamplerVK> find_sampler_binding(const std::vector<ROMaterialVK::SamplerBinding>& p_sampler_bindings,
@@ -182,7 +209,10 @@ void validate_indexed_sampler_bindings(
 void write_sampled_image_binding(Ref<RODescriptorSetVK> p_descriptor_set,
     const ROMaterialVK::Builder& p_builder,
     const ShaderDescriptorBindingVK& p_descriptor_binding) {
-    if (p_descriptor_binding.layout_binding.descriptorCount == 1) {
+    uint32_t descriptor_count = p_descriptor_binding.variable_descriptor_count
+                                    ? get_variable_sampled_image_descriptor_count(p_builder)
+                                    : p_descriptor_binding.layout_binding.descriptorCount;
+    if (descriptor_count == 1 && !p_descriptor_binding.variable_descriptor_count) {
         const auto texture_binding =
             find_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name, p_builder.default_texture);
         p_descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
@@ -193,9 +223,8 @@ void write_sampled_image_binding(Ref<RODescriptorSetVK> p_descriptor_set,
                 }));
         return;
     }
-    validate_indexed_texture_bindings(
-        p_builder.texture_bindings, p_descriptor_binding.parameter_name, p_descriptor_binding.layout_binding.descriptorCount);
-    for (uint32_t i = 0; i < p_descriptor_binding.layout_binding.descriptorCount; ++i) {
+    validate_indexed_texture_bindings(p_builder.texture_bindings, p_descriptor_binding.parameter_name, descriptor_count);
+    for (uint32_t i = 0; i < descriptor_count; ++i) {
         const ROMaterialVK::TextureBinding* texture_binding =
             find_indexed_texture_binding(p_builder.texture_bindings, p_descriptor_binding.parameter_name, i);
         if (texture_binding == nullptr) {
@@ -322,7 +351,19 @@ ROMaterialVK::ROMaterialVK(const BaseRenderDataVK* p_render_data, const Builder&
     if (p_builder.descriptor_set_layout == MEM_NULL) {
         throw std::runtime_error("Failed to create ROMaterialVK: descriptor set layout is missing.");
     }
-    descriptor_set = RODescriptorSetVK::Builder().add_descriptor_set_layout(p_builder.descriptor_set_layout).create_ref(p_render_data);
+    uint32_t variable_descriptor_count = get_variable_sampled_image_descriptor_count(p_builder);
+    uint32_t variable_descriptor_count_upper_bound = p_builder.descriptor_set_layout->get_variable_descriptor_count_upper_bound();
+    if (variable_descriptor_count != 0 && variable_descriptor_count > variable_descriptor_count_upper_bound) {
+        throw std::runtime_error(std::format("Failed to create ROMaterialVK: runtime texture count {} exceeds the supported maximum of {}.",
+            variable_descriptor_count,
+            variable_descriptor_count_upper_bound));
+    }
+    RODescriptorSetVK::Builder descriptor_set_builder;
+    descriptor_set_builder.add_descriptor_set_layout(p_builder.descriptor_set_layout);
+    if (variable_descriptor_count != 0) {
+        descriptor_set_builder.set_variable_descriptor_count(variable_descriptor_count);
+    }
+    descriptor_set = descriptor_set_builder.create_ref(p_render_data);
     descriptor_sets.push_back(descriptor_set);
     write_material_bindings(p_builder);
 }

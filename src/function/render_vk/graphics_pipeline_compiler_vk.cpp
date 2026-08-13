@@ -550,6 +550,8 @@ std::vector<Ref<RODescriptorSetLayoutVK>> GraphicsPipelineCompilerVK::compile_de
     // Descriptor set layouts are compiler-generated subresources derived from shader metadata.
     std::vector<Ref<RODescriptorSetLayoutVK>> result;
     auto descriptor_set_layout_bindings = build_graphics_pipeline_descriptor_set_layout_bindings(p_descriptor_bindings);
+    set_variable_descriptor_count_upper_bounds(
+        descriptor_set_layout_bindings, context.render_data->max_variable_sampled_image_descriptor_count);
     result.reserve(descriptor_set_layout_bindings.size());
     for (const auto& descriptor_set_layout_binding : descriptor_set_layout_bindings) {
         // Descriptor set layouts are compiler-generated subresources of the
@@ -561,8 +563,9 @@ std::vector<Ref<RODescriptorSetLayoutVK>> GraphicsPipelineCompilerVK::compile_de
         if (descriptor_set_layout == MEM_NULL) {
             // Missing cache entry: build the layout from every reflected binding in this set.
             RODescriptorSetLayoutVK::Builder builder;
-            for (const auto& binding : descriptor_set_layout_binding.bindings) {
-                builder.add_binding(binding);
+            for (size_t i = 0; i < descriptor_set_layout_binding.bindings.size(); ++i) {
+                VkDescriptorBindingFlags binding_flags = descriptor_set_layout_binding.binding_flags[i];
+                builder.add_binding(descriptor_set_layout_binding.bindings[i], binding_flags);
             }
             descriptor_set_layout = builder.create_ref(context.render_data);
             context.render_database->register_compiled_render_resource(

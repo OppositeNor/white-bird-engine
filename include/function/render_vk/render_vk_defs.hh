@@ -71,6 +71,12 @@ struct BaseRenderDataVK {
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
     // Descriptor pool.
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+    /**
+     * @brief Maximum sampled-image descriptors allowed for a variable-count binding.
+     *
+     * This is capped by both the renderer descriptor pool and the physical-device descriptor limits.
+     */
+    uint32_t max_variable_sampled_image_descriptor_count = 1;
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence = VK_NULL_HANDLE;

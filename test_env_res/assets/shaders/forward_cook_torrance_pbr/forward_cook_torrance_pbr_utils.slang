@@ -89,12 +89,8 @@ struct SpotLightInfoBuffer {
 };
 
 struct MaterialTextures {
-    Texture2D<float4> albedo[WBE_MAX_MATERIAL_COUNT];
-    SamplerState albedo_sampler[WBE_MAX_MATERIAL_COUNT];
-    Texture2D<float4> normal[WBE_MAX_MATERIAL_COUNT];
-    SamplerState normal_sampler[WBE_MAX_MATERIAL_COUNT];
-    Texture2D<float4> roughness_metallic_ao[WBE_MAX_MATERIAL_COUNT];
-    SamplerState roughness_metallic_ao_sampler[WBE_MAX_MATERIAL_COUNT];
+    SamplerState material_sampler;
+    Texture2D<float4> textures[];
 };
 
 struct MaterialParams {

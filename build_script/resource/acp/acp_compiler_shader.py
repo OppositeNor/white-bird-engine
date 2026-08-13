@@ -395,4 +395,3 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "result": self._transform_shader_result(raw_entry_point.get("result", {})),
             "bindings": [self._transform_shader_binding(binding.get("binding", binding)) for binding in bindings if isinstance(binding, dict)],
         }
-

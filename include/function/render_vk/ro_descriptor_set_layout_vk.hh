@@ -38,6 +38,8 @@ public:
         friend RODescriptorSetLayoutVK;
         // The descriptor set bindings.
         std::vector<VkDescriptorSetLayoutBinding> bindings;
+        // Descriptor indexing flags aligned with bindings.
+        std::vector<VkDescriptorBindingFlags> binding_flags;
 
         /**
          * @brief Set the bindings.
@@ -53,6 +55,14 @@ public:
          * @return *this.
          */
         Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding);
+        /**
+         * @brief Add a binding with descriptor indexing flags.
+         *
+         * @param p_binding The binding to add.
+         * @param p_binding_flags Descriptor indexing behavior for the binding.
+         * @return *this.
+         */
+        Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding, VkDescriptorBindingFlags p_binding_flags);
 
         /**
          * @brief Add a UBO binding.
@@ -101,8 +111,18 @@ public:
         return descriptor_set_layout;
     }
 
+    /**
+     * @brief Get the upper bound declared for this layout's variable-count binding.
+     *
+     * @return The upper bound, or zero when the layout has no variable-count binding.
+     */
+    uint32_t get_variable_descriptor_count_upper_bound() const {
+        return variable_descriptor_count_upper_bound;
+    }
+
 private:
     VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
+    uint32_t variable_descriptor_count_upper_bound = 0;
 
     void init(const Builder& p_builder);
 };

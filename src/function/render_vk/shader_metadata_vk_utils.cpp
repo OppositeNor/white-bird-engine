@@ -125,7 +125,7 @@ std::vector<ShaderDescriptorFieldBindingVK> collect_descriptor_field_bindings(co
 
 uint32_t descriptor_count_from_field(const ShaderMetadataTypeField& p_field) {
     if (p_field.type.kind == "array") {
-        return static_cast<uint32_t>(std::max(p_field.type.element_count, 1));
+        return static_cast<uint32_t>(std::max(p_field.type.element_count, 0));
     }
     return static_cast<uint32_t>(std::max(p_field.binding.count, 1));
 }
@@ -137,6 +137,12 @@ ShaderDescriptorBindingVK make_parameter_block_field_binding(
             "Failed to translate parameter block '{}': field '{}' is not descriptor-backed.", p_parameter.name, p_field.name));
     }
     std::string field_path = descriptor_field_path(p_parameter.name, p_field);
+    VkDescriptorType descriptor_type = descriptor_type_from_field(field_path, p_field);
+    bool variable_descriptor_count = p_field.type.kind == "array" && p_field.type.element_count == 0;
+    if (variable_descriptor_count && descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
+        throw std::runtime_error(std::format(
+            "Failed to translate runtime descriptor array '{}': only sampled-image arrays are supported.", field_path));
+    }
     ShaderDescriptorBindingVK descriptor_binding;
     descriptor_binding.parameter_name = field_path;
     descriptor_binding.type_name = p_field.type.name;
@@ -144,10 +150,11 @@ ShaderDescriptorBindingVK make_parameter_block_field_binding(
     descriptor_binding.set_index = static_cast<uint32_t>(std::max(p_parameter.binding.index, 0));
     descriptor_binding.layout_binding = VkDescriptorSetLayoutBinding{
         .binding = static_cast<uint32_t>(std::max(p_field.binding.index, 0)),
-        .descriptorType = descriptor_type_from_field(field_path, p_field),
+        .descriptorType = descriptor_type,
         .descriptorCount = descriptor_count_from_field(p_field),
         .stageFlags = p_stage_flag,
     };
+    descriptor_binding.variable_descriptor_count = variable_descriptor_count;
     return descriptor_binding;
 }
 
@@ -171,7 +178,8 @@ void merge_descriptor_binding(std::vector<ShaderDescriptorBindingVK>& p_bindings
     // Vertex and fragment stages can reference the same set/binding. In that
     // case the layout binding is shared and the stage flags are merged.
     if (existing->layout_binding.descriptorType != p_binding.layout_binding.descriptorType ||
-        existing->layout_binding.descriptorCount != p_binding.layout_binding.descriptorCount) {
+        existing->layout_binding.descriptorCount != p_binding.layout_binding.descriptorCount ||
+        existing->variable_descriptor_count != p_binding.variable_descriptor_count) {
         throw std::runtime_error(std::format("Conflicting shader descriptor declarations for set {}, binding {}.",
             p_binding.set_index,
             p_binding.layout_binding.binding));
@@ -220,8 +228,7 @@ const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
             continue;
         }
         if (matched_entry_point != nullptr) {
-            throw std::runtime_error(std::format(
-                "Failed to resolve shader entry point for stage '{}': multiple reflected entries exist, so the pipeline must specify one.",
+            throw std::runtime_error(std::format("Failed to resolve shader entry point for stage '{}': multiple reflected entries exist, so the pipeline must specify one.",
                 p_stage));
         }
         matched_entry_point = &entry_point;
@@ -299,20 +306,13 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     return result;
 }
 
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(
-    const ShaderMetadata& p_vertex_shader_metadata,
+std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const ShaderMetadata& p_vertex_shader_metadata,
     std::string_view p_vertex_stage_entry,
     const ShaderMetadata& p_fragment_shader_metadata,
     std::string_view p_fragment_stage_entry) {
     std::vector<ShaderDescriptorBindingVK> result;
-    append_stage_descriptor_bindings(result,
-        &p_vertex_shader_metadata,
-        p_vertex_stage_entry,
-        "vertex");
-    append_stage_descriptor_bindings(result,
-        &p_fragment_shader_metadata,
-        p_fragment_stage_entry,
-        "fragment");
+    append_stage_descriptor_bindings(result, &p_vertex_shader_metadata, p_vertex_stage_entry, "vertex");
+    append_stage_descriptor_bindings(result, &p_fragment_shader_metadata, p_fragment_stage_entry, "fragment");
     return result;
 }
 
@@ -336,8 +336,54 @@ std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_
         std::ranges::sort(set_layout.bindings, [](const VkDescriptorSetLayoutBinding& p_lhs, const VkDescriptorSetLayoutBinding& p_rhs) {
             return p_lhs.binding < p_rhs.binding;
         });
+        set_layout.binding_flags.reserve(set_layout.bindings.size());
+        for (const auto& layout_binding : set_layout.bindings) {
+            auto descriptor_binding =
+                std::ranges::find_if(p_bindings, [&set_layout, &layout_binding](const ShaderDescriptorBindingVK& p_binding) {
+                    return p_binding.set_index == set_layout.set_index && p_binding.layout_binding.binding == layout_binding.binding;
+                });
+            VkDescriptorBindingFlags binding_flags = 0;
+            if (descriptor_binding != p_bindings.end()) {
+                if (descriptor_binding->variable_descriptor_count) {
+                    binding_flags |= VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+                }
+            }
+            set_layout.binding_flags.push_back(binding_flags);
+        }
     }
     return result;
+}
+
+void set_variable_descriptor_count_upper_bounds(std::vector<ShaderDescriptorSetLayoutVK>& p_set_layouts, uint32_t p_max_descriptor_count) {
+    uint64_t fixed_descriptor_count = 0;
+    uint32_t variable_binding_count = 0;
+    for (const auto& set_layout : p_set_layouts) {
+        if (set_layout.bindings.size() != set_layout.binding_flags.size()) {
+            throw std::runtime_error("Failed to assign variable descriptor bounds: binding flags do not match bindings.");
+        }
+        for (size_t i = 0; i < set_layout.bindings.size(); ++i) {
+            if ((set_layout.binding_flags[i] & VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT) != 0) {
+                ++variable_binding_count;
+            } else {
+                fixed_descriptor_count += set_layout.bindings[i].descriptorCount;
+            }
+        }
+    }
+    if (variable_binding_count == 0) {
+        return;
+    }
+    if (fixed_descriptor_count >= p_max_descriptor_count || p_max_descriptor_count - fixed_descriptor_count < variable_binding_count) {
+        throw std::runtime_error("Failed to assign variable descriptor bounds: the fixed descriptors exhaust the descriptor budget.");
+    }
+    uint32_t variable_descriptor_upper_bound =
+        static_cast<uint32_t>((p_max_descriptor_count - fixed_descriptor_count) / variable_binding_count);
+    for (auto& set_layout : p_set_layouts) {
+        for (size_t i = 0; i < set_layout.bindings.size(); ++i) {
+            if ((set_layout.binding_flags[i] & VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT) != 0) {
+                set_layout.bindings[i].descriptorCount = variable_descriptor_upper_bound;
+            }
+        }
+    }
 }
 
 } // namespace WhiteBirdEngine

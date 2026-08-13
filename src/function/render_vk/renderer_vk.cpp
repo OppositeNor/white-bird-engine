@@ -272,6 +272,12 @@ void RendererVK::setup_base_render_data() {
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.descriptor_pool = descriptor_pool;
+    VkPhysicalDeviceProperties physical_device_properties{};
+    vkGetPhysicalDeviceProperties(physical_device, &physical_device_properties);
+    base_render_data.max_variable_sampled_image_descriptor_count = std::min({static_cast<uint32_t>(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT),
+        physical_device_properties.limits.maxPerStageDescriptorSampledImages,
+        physical_device_properties.limits.maxDescriptorSetSampledImages,
+        physical_device_properties.limits.maxPerStageResources});
     if (!in_flight_fences.empty()) {
         base_render_data.in_flight_fence = in_flight_fences[0];
     } else {
@@ -624,6 +630,13 @@ void RendererVK::create_logical_device() {
     dynamic_rendering_features.dynamicRendering = VK_TRUE;
     sync2_features.pNext = &dynamic_rendering_features;
 
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{};
+    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+    dynamic_rendering_features.pNext = &descriptor_indexing_features;
+
     // Create logical device.
     if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device.");
@@ -721,7 +734,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
 }
 
 bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
-    VkPhysicalDeviceProperties device_properties;
+    VkPhysicalDeviceProperties device_properties{};
     vkGetPhysicalDeviceProperties(p_device, &device_properties);
     if (device_properties.apiVersion < VULKAN_API_VERSION) {
         return false;
@@ -737,10 +750,18 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (swap_chain_support_details.formats.empty() || swap_chain_support_details.present_modes.empty()) {
         return false;
     }
-    VkPhysicalDeviceFeatures device_features{};
-    vkGetPhysicalDeviceFeatures(p_device, &device_features);
-    if (device_features.depthClamp != VK_TRUE || device_features.multiDrawIndirect != VK_TRUE ||
-        device_features.drawIndirectFirstInstance != VK_TRUE || device_features.shaderSampledImageArrayDynamicIndexing != VK_TRUE) {
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{};
+    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    VkPhysicalDeviceFeatures2 device_features{};
+    device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    device_features.pNext = &descriptor_indexing_features;
+    vkGetPhysicalDeviceFeatures2(p_device, &device_features);
+    if (device_features.features.depthClamp != VK_TRUE || device_features.features.multiDrawIndirect != VK_TRUE ||
+        device_features.features.drawIndirectFirstInstance != VK_TRUE ||
+        device_features.features.shaderSampledImageArrayDynamicIndexing != VK_TRUE ||
+        descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
+        descriptor_indexing_features.descriptorBindingVariableDescriptorCount != VK_TRUE ||
+        descriptor_indexing_features.runtimeDescriptorArray != VK_TRUE) {
         return false;
     }
 
@@ -1120,11 +1141,15 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
 
 namespace {
 constexpr uint32_t STATIC_OPAQUE_MATERIAL_TABLE_SIZE = 32;
+constexpr uint32_t STATIC_OPAQUE_TEXTURES_PER_MATERIAL = 3;
+constexpr uint32_t STATIC_OPAQUE_ALBEDO_TEXTURE_OFFSET = 0;
+constexpr uint32_t STATIC_OPAQUE_NORMAL_TEXTURE_OFFSET = 1;
+constexpr uint32_t STATIC_OPAQUE_ROUGHNESS_METALLIC_AO_TEXTURE_OFFSET = 2;
 
 struct alignas(16) StaticOpaqueMaterialParamsVK {
-    int32_t albedo_index = 0;
-    int32_t normal_index = 0;
-    int32_t roughness_metallic_ao_index = 0;
+    int32_t albedo_index = STATIC_OPAQUE_ALBEDO_TEXTURE_OFFSET;
+    int32_t normal_index = STATIC_OPAQUE_NORMAL_TEXTURE_OFFSET;
+    int32_t roughness_metallic_ao_index = STATIC_OPAQUE_ROUGHNESS_METALLIC_AO_TEXTURE_OFFSET;
     int32_t padding = 0;
 };
 
@@ -1142,7 +1167,6 @@ std::string get_material_texture_key(const RUMaterial::TextureSlot& p_texture_sl
 void add_static_opaque_material_bindings(RenderBindpointDeclarationsBuilder& p_builder,
     RefRes<RUMaterial> p_material,
     uint32_t p_material_index,
-    Ref<ROSamplerVK> p_sampler,
     StaticOpaqueMaterialParamsVK& p_material_params) {
     if (p_material == nullptr) {
         throw std::runtime_error("Failed to compile static opaque triangles: material is missing.");
@@ -1153,26 +1177,35 @@ void add_static_opaque_material_bindings(RenderBindpointDeclarationsBuilder& p_b
             continue;
         }
         std::string texture_key = get_material_texture_key(texture_slot);
-        p_builder
-            .add_image_decleration(std::format("material_textures.{}[{}]", texture_key, p_material_index), texture_slot.texture)
-            .add_sampler_decleration(std::format("material_textures.{}_sampler[{}]", texture_key, p_material_index), p_sampler);
+        uint32_t texture_offset = 0;
         if (texture_key == "albedo") {
-            p_material_params.albedo_index = static_cast<int32_t>(p_material_index);
+            texture_offset = STATIC_OPAQUE_ALBEDO_TEXTURE_OFFSET;
         } else if (texture_key == "normal") {
-            p_material_params.normal_index = static_cast<int32_t>(p_material_index);
+            texture_offset = STATIC_OPAQUE_NORMAL_TEXTURE_OFFSET;
         } else if (texture_key == "roughness_metallic_ao") {
-            p_material_params.roughness_metallic_ao_index = static_cast<int32_t>(p_material_index);
+            texture_offset = STATIC_OPAQUE_ROUGHNESS_METALLIC_AO_TEXTURE_OFFSET;
+        } else {
+            continue;
+        }
+        uint32_t texture_index = p_material_index * STATIC_OPAQUE_TEXTURES_PER_MATERIAL + texture_offset;
+        p_builder.add_image_decleration(std::format("material_textures.textures[{}]", texture_index), texture_slot.texture);
+        if (texture_key == "albedo") {
+            p_material_params.albedo_index = static_cast<int32_t>(texture_index);
+        } else if (texture_key == "normal") {
+            p_material_params.normal_index = static_cast<int32_t>(texture_index);
+        } else {
+            p_material_params.roughness_metallic_ao_index = static_cast<int32_t>(texture_index);
         }
     }
 }
 
-RefRes<RUImage> find_default_material_image(RefRes<RUMaterial> p_material) {
+RefRes<RUImage> find_material_image(RefRes<RUMaterial> p_material, std::string_view p_texture_key) {
     if (p_material == nullptr) {
         return MEM_NULL;
     }
     std::span<RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
     for (const auto& texture_slot : texture_slots) {
-        if (texture_slot.texture != nullptr) {
+        if (texture_slot.texture != nullptr && get_material_texture_key(texture_slot) == p_texture_key) {
             return texture_slot.texture;
         }
     }
@@ -1244,9 +1277,11 @@ StaticOpaqueMaterialDataVK build_static_opaque_material_data(
         throw std::runtime_error("Failed to compile static opaque triangles: resource manager is missing.");
     }
     RefRes<RUMaterial> default_material = resource_manager->get_resource<RUMaterial>("default_material");
-    RefRes<RUImage> default_image = find_default_material_image(default_material);
-    if (default_material == nullptr || default_image == nullptr) {
-        throw std::runtime_error("Failed to compile static opaque triangles: default_material must provide at least one texture.");
+    RefRes<RUImage> default_image = find_material_image(default_material, "albedo");
+    if (default_image == nullptr || find_material_image(default_material, "normal") == nullptr ||
+        find_material_image(default_material, "roughness_metallic_ao") == nullptr) {
+        throw std::runtime_error(
+            "Failed to compile static opaque triangles: default_material must provide albedo, normal, and roughness_metallic_ao textures.");
     }
     auto material_sampler = ROSamplerVK::Builder()
                                 .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
@@ -1254,14 +1289,12 @@ StaticOpaqueMaterialDataVK build_static_opaque_material_data(
                                 .create_ref(p_render_data);
     RenderBindpointDeclarationsBuilder bindpoint_builder;
     StaticOpaqueMaterialParamsTableVK material_params;
-    add_static_opaque_material_bindings(bindpoint_builder, default_material, 0, material_sampler, material_params.materials[0]);
+    bindpoint_builder.add_sampler_decleration("material_textures.material_sampler", material_sampler);
+    add_static_opaque_material_bindings(bindpoint_builder, default_material, 0, material_params.materials[0]);
     for (uint32_t material_index = 0; material_index < p_triangles_info.materials.size(); ++material_index) {
         uint32_t table_index = material_index + 1;
-        add_static_opaque_material_bindings(bindpoint_builder,
-            p_triangles_info.materials[material_index].material,
-            table_index,
-            material_sampler,
-            material_params.materials[table_index]);
+        add_static_opaque_material_bindings(
+            bindpoint_builder, p_triangles_info.materials[material_index].material, table_index, material_params.materials[table_index]);
     }
     bindpoint_builder.add_buffer_decleration("material_params", &material_params, sizeof(material_params));
     return StaticOpaqueMaterialDataVK{.bindpoints = bindpoint_builder.build(), .default_image = default_image};

@@ -22,27 +22,36 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include <vulkan/vk_enum_string_helper.h>
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 namespace {
+using BoundObjectReferencesVK = Vector<Ref<RenderObjectVK>, RenderAllocator>;
+using PendingBoundObjectsVK = Vector<BoundObjectReferencesVK, RenderAllocator>;
+
+uint64_t descriptor_array_element_key(uint32_t p_binding, uint32_t p_array_element) {
+    return (static_cast<uint64_t>(p_binding) << 32U) | p_array_element;
+}
+
 void write_buffer_info(VkDescriptorType p_descriptor_type,
     VkWriteDescriptorSet& p_write_info,
     const std::vector<RODescriptorSetVK::Writer::BufferInfo>& p_buffer_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator>::iterator p_bound_object_it,
+    RenderAllocator* p_allocator,
+    PendingBoundObjectsVK& p_pending_bound_objects,
     std::vector<VkDescriptorBufferInfo>& p_result_buffer_infos) {
     WBE_DEBUG_ASSERT(p_result_buffer_infos.empty());
+    WBE_DEBUG_ASSERT(p_pending_bound_objects.empty());
     p_write_info.descriptorType = p_descriptor_type;
     p_result_buffer_infos.reserve(p_buffer_infos.size());
-    p_bound_object_it->second.reserve(p_buffer_infos.size());
+    p_pending_bound_objects.reserve(p_buffer_infos.size());
     for (const auto& buffer_info : p_buffer_infos) {
         VkDescriptorBufferInfo vk_buffer_info{};
         vk_buffer_info.buffer = buffer_info.buffer->get_buffer();
@@ -50,7 +59,9 @@ void write_buffer_info(VkDescriptorType p_descriptor_type,
         vk_buffer_info.range = buffer_info.range;
         p_result_buffer_infos.push_back(vk_buffer_info);
         // Keep a reference to the buffer to prevent it from being destroyed.
-        p_bound_object_it->second.emplace_back(buffer_info.buffer);
+        BoundObjectReferencesVK pending_bound_objects(p_allocator);
+        pending_bound_objects.emplace_back(buffer_info.buffer);
+        p_pending_bound_objects.push_back(std::move(pending_bound_objects));
     }
     p_write_info.descriptorCount = p_result_buffer_infos.size();
     p_write_info.pBufferInfo = p_result_buffer_infos.data();
@@ -59,14 +70,18 @@ void write_buffer_info(VkDescriptorType p_descriptor_type,
 void write_image_info(VkDescriptorType p_descriptor_type,
     VkWriteDescriptorSet& p_write_info,
     const std::vector<RODescriptorSetVK::Writer::ImageInfo>& p_image_infos,
-    Map<uint32_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator>::iterator p_bound_object_it,
+    RenderAllocator* p_allocator,
+    PendingBoundObjectsVK& p_pending_bound_objects,
     std::vector<VkDescriptorImageInfo>& p_result_image_infos) {
     WBE_DEBUG_ASSERT(p_result_image_infos.empty());
+    WBE_DEBUG_ASSERT(p_pending_bound_objects.empty());
     p_write_info.descriptorType = p_descriptor_type;
     p_result_image_infos.reserve(p_image_infos.size());
-    p_bound_object_it->second.reserve(p_image_infos.size() * 2);
+    p_pending_bound_objects.reserve(p_image_infos.size());
     for (const auto& image_info : p_image_infos) {
         VkDescriptorImageInfo vk_image_info{};
+        BoundObjectReferencesVK pending_bound_objects(p_allocator);
+        pending_bound_objects.reserve(2);
         vk_image_info.imageLayout = image_info.image_layout;
         if (p_descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLER) {
             if (image_info.image_view == MEM_NULL) {
@@ -74,7 +89,7 @@ void write_image_info(VkDescriptorType p_descriptor_type,
             }
             vk_image_info.imageView = image_info.image_view->get_image_view();
             // Keep the image view alive for as long as this descriptor set uses it.
-            p_bound_object_it->second.emplace_back(image_info.image_view);
+            pending_bound_objects.emplace_back(image_info.image_view);
         }
         if (p_descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
             if (image_info.sampler == MEM_NULL) {
@@ -82,9 +97,10 @@ void write_image_info(VkDescriptorType p_descriptor_type,
             }
             vk_image_info.sampler = image_info.sampler->get_sampler();
             // Keep the sampler alive for as long as this descriptor set uses it.
-            p_bound_object_it->second.emplace_back(image_info.sampler);
+            pending_bound_objects.emplace_back(image_info.sampler);
         }
         p_result_image_infos.push_back(vk_image_info);
+        p_pending_bound_objects.push_back(std::move(pending_bound_objects));
     }
     p_write_info.descriptorCount = p_result_image_infos.size();
     p_write_info.pImageInfo = p_result_image_infos.data();
@@ -103,6 +119,22 @@ VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDat
     }
     alloc_info.descriptorSetCount = static_cast<uint32_t>(layouts.size());
     alloc_info.pSetLayouts = layouts.data();
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info{};
+    if (variable_descriptor_count != 0) {
+        if (layouts.size() != 1) {
+            throw std::runtime_error("Failed to allocate variable-count descriptor set: exactly one layout is required.");
+        }
+        uint32_t variable_descriptor_count_upper_bound = descriptor_set_layouts.front()->get_variable_descriptor_count_upper_bound();
+        if (variable_descriptor_count_upper_bound == 0 || variable_descriptor_count > variable_descriptor_count_upper_bound) {
+            throw std::runtime_error(std::format("Failed to allocate variable-count descriptor set: requested count {} exceeds layout upper bound {}.",
+                variable_descriptor_count,
+                variable_descriptor_count_upper_bound));
+        }
+        variable_count_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+        variable_count_info.descriptorSetCount = 1;
+        variable_count_info.pDescriptorCounts = &variable_descriptor_count;
+        alloc_info.pNext = &variable_count_info;
+    }
     VkDescriptorSet result_descriptor_set;
     VkResult allocate_result = vkAllocateDescriptorSets(p_render_data->logic_device, &alloc_info, &result_descriptor_set);
     if (allocate_result) {
@@ -151,36 +183,46 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     write_info.dstSet = descriptor_set;
     write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
     write_info.dstArrayElement = p_writer.dst_array_element;
+    PendingBoundObjectsVK pending_bound_objects(render_data->allocator);
     std::vector<VkDescriptorBufferInfo> buffer_infos;
-    // Prepare buffer infos
-    auto emplace_result =
-        bound_objects.emplace(write_info.dstBinding, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
-    auto bound_object_it = emplace_result.first;
-    if (!emplace_result.second && p_writer.dst_array_element == 0) {
-        // Rewriting a binding from the first array element replaces the entire binding's retained resources.
-        // Partial array writes for later elements must keep earlier references alive.
-        bound_object_it->second.clear();
-    }
 
     if (!p_writer.storage_buffer_infos.empty()) {
-        write_buffer_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, p_writer.storage_buffer_infos, bound_object_it, buffer_infos);
+        write_buffer_info(
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, p_writer.storage_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
     }
     if (!p_writer.uniform_buffer_infos.empty()) {
-        write_buffer_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, bound_object_it, buffer_infos);
+        write_buffer_info(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
     }
     std::vector<VkDescriptorImageInfo> image_infos;
     if (!p_writer.sampled_image_infos.empty()) {
-        write_image_info(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, p_writer.sampled_image_infos, bound_object_it, image_infos);
+        write_image_info(
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, p_writer.sampled_image_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
     if (!p_writer.sampler_infos.empty()) {
-        write_image_info(VK_DESCRIPTOR_TYPE_SAMPLER, write_info, p_writer.sampler_infos, bound_object_it, image_infos);
+        write_image_info(
+            VK_DESCRIPTOR_TYPE_SAMPLER, write_info, p_writer.sampler_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
     if (!p_writer.combined_image_sampler_infos.empty()) {
-        write_image_info(
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, write_info, p_writer.combined_image_sampler_infos, bound_object_it, image_infos);
+        write_image_info(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            write_info,
+            p_writer.combined_image_sampler_infos,
+            render_data->allocator,
+            pending_bound_objects,
+            image_infos);
     }
     // TODO: Texel buffer view
     vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
+    for (uint32_t i = 0; i < pending_bound_objects.size(); ++i) {
+        uint64_t key = descriptor_array_element_key(write_info.dstBinding, write_info.dstArrayElement + i);
+        auto emplace_result = bound_objects.emplace(key, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
+        auto& retained_objects = emplace_result.first->second;
+        retained_objects.clear();
+        retained_objects.reserve(pending_bound_objects[i].size());
+        for (const auto& bound_object : pending_bound_objects[i]) {
+            retained_objects.emplace_back(bound_object);
+        }
+    }
 }
 
 } // namespace WhiteBirdEngine

@@ -87,12 +87,16 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
     uint roughness_metallic_ao_index =
         uint(active_material.roughness_metallic_ao_index >= 0 ? active_material.roughness_metallic_ao_index : 0);
+    uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
+    uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
+    uint roughness_metallic_ao_descriptor_index = NonUniformResourceIndex(roughness_metallic_ao_index);
 
-    float3 base_color = material_textures.albedo[albedo_index].Sample(material_textures.albedo_sampler[albedo_index], p_input.uv).rgb;
+    float3 base_color =
+        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
     float3 sampled_normal =
-        material_textures.normal[normal_index].Sample(material_textures.normal_sampler[normal_index], p_input.uv).rgb;
-    float3 rma = material_textures.roughness_metallic_ao[roughness_metallic_ao_index]
-                     .Sample(material_textures.roughness_metallic_ao_sampler[roughness_metallic_ao_index], p_input.uv)
+        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float3 rma = material_textures.textures[roughness_metallic_ao_descriptor_index]
+                     .Sample(material_textures.material_sampler, p_input.uv)
                      .rgb;
     float roughness = clamp(rma.r, 0.04, 1.0);
     float metallic = clamp(rma.g, 0.0, 1.0);
