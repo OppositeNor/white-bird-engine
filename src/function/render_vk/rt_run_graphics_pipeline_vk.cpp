@@ -37,7 +37,7 @@
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
     const glm::vec4& p_clear_color,
     VkExtent2D p_render_extent,
     std::string_view p_color_attachment_id,
@@ -189,10 +189,11 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     vkCmdBeginRendering(p_command_buffer, &rendering_info);
 
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
-    vkCmdSetViewport(p_command_buffer, 0, 1, &(render_data->viewport));
-    VkRect2D scissor{};
-    scissor.offset = {.x = 0, .y = 0};
-    scissor.extent = render_extent;
+    VkViewport viewport = render_data->viewport;
+    viewport.width = static_cast<float>(render_extent.width);
+    viewport.height = static_cast<float>(render_extent.height);
+    vkCmdSetViewport(p_command_buffer, 0, 1, &viewport);
+    VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
 
     if (!descriptor_sets_instances.empty()) {

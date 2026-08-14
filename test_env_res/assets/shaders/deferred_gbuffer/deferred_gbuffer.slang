@@ -19,6 +19,14 @@
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
 ConstantBuffer<CameraInfo> camera_info;
+/**
+ * @brief Descriptor indices for all materials rendered by the indirect draw batch.
+ */
+ConstantBuffer<MaterialParamsBuffer> material_params;
+/**
+ * @brief Bindless material texture table and sampler.
+ */
+ParameterBlock<MaterialTextures> material_textures;
 
 /**
  * @brief Transform a textured vertex into clip space and pass per-vertex attributes through to the fragment stage.
@@ -26,11 +34,11 @@ ConstantBuffer<CameraInfo> camera_info;
  * @return The vertex output for the deferred G-buffer pass.
  */
 [shader("vertex")]
-VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     VSOutput output;
     float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position       = mul(camera_info.proj, mul(camera_info.view, world_position));
-    output.world_position = p_input.position;
+    output.world_position = float4(p_input.position, float(p_instance_id));
     output.normal         = p_input.normal;
     output.tangent        = p_input.tangent;
     output.bitangent      = p_input.bitangent;
@@ -57,7 +65,7 @@ struct GBufferOutput {
 };
 
 /**
- * @brief Pack interpolated surface attributes into the G-buffer outputs. Used by the renderer test as a stand-in for a real material shader.
+ * @brief Sample the active material and pack its surface data into the G-buffer outputs.
  * @param p_input The interpolated vertex output.
  * @return The packed G-buffer attachments for this fragment.
  */
@@ -65,19 +73,34 @@ struct GBufferOutput {
 GBufferOutput fragment_main(VSOutput p_input) {
     GBufferOutput output;
 
-    // Test material: simple colored albedo derived from uv, material id 1.
-    float3 albedo = float3(p_input.uv.x, p_input.uv.y, 0.4);
-    float material_id_unorm = 1.0 / 255.0; // material id 1 packed into 8-bit unorm.
-    output.albedo_matid = float4(albedo, material_id_unorm);
+    uint material_index = uint(round(p_input.world_position.w));
+    MaterialParams active_material = material_params.materials[material_index];
+    uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
+    uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
+    uint roughness_metallic_ao_index =
+        uint(active_material.roughness_metallic_ao_index >= 0 ? active_material.roughness_metallic_ao_index : 0);
+    uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
+    uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
+    uint roughness_metallic_ao_descriptor_index = NonUniformResourceIndex(roughness_metallic_ao_index);
 
-    float3 normal = normalize(p_input.normal);
+    float4 albedo_sample =
+        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
+    if (albedo_sample.a == 0.0) {
+        discard;
+    }
+    float material_id_unorm = float(material_index) / 255.0;
+    output.albedo_matid = float4(albedo_sample.rgb, material_id_unorm);
+
+    float3 sampled_normal =
+        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float3 normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     output.octahedron_normal = octahedron_encode(normal);
 
-    float roughness = 0.5;
-    float metallic = 0.1;
-    float ambient_occlusion = 1.0;
+    float3 rma = material_textures.textures[roughness_metallic_ao_descriptor_index]
+                     .Sample(material_textures.material_sampler, p_input.uv)
+                     .rgb;
     float flags = 0.0;
-    output.rma_flags = float4(roughness, metallic, ambient_occlusion, flags);
+    output.rma_flags = float4(rma, flags);
 
     return output;
 }

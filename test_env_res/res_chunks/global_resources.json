@@ -11,8 +11,7 @@
         "assets/shaders/draw_triangle/draw_triangle_shader.json",
         "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.json",
         "assets/shaders/deferred_gbuffer/deferred_gbuffer_shader.json",
-        "assets/shaders/deferred_composition/deferred_composition_shader.json",
-        "assets/shaders/deferred_albedo_debug/deferred_albedo_debug_shader.json"
+        "assets/shaders/deferred_composition/deferred_composition_shader.json"
     ],
     "resources": [
         {

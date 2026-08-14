@@ -27,7 +27,6 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -84,6 +83,8 @@ struct StaticOpaqueTrianglesCompileConfigVK {
 
     /** Task id assigned to the compiled graph descriptor. */
     RendTaskID task_id = RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK;
+    /** Optional graphics-pipeline resource key. Empty uses the pipeline declared by the material batches. */
+    std::string graphics_pipeline_resource_key;
     /** Render area. A zero extent uses the current swap-chain extent. */
     VkExtent2D render_extent{};
     /** Color attachment resource ids. An empty list targets the current swap-chain image. */
@@ -196,8 +197,8 @@ public:
      *
      * @param p_config Output attachment and render-area configuration.
      * @return A graph-ready task descriptor and its updateable descriptor handles.
-     * @throws std::runtime_error When no static triangles exist, materials use different pipelines, required defaults are
-     * absent, or the material count exceeds the shader table capacity.
+     * @throws std::runtime_error When no static triangles exist, the selected pipeline is missing, materials use different
+     * pipelines without an override, required defaults are absent, or the material count exceeds the shader table capacity.
      */
     CompiledStaticOpaqueTrianglesVK compile_static_opaque_triangles(const StaticOpaqueTrianglesCompileConfigVK& p_config = {});
 
@@ -307,7 +308,6 @@ private:
 
     AllocType* allocator = nullptr;
     Ref<RenderDatabase> render_database;
-    Ref<AllocatorVK> allocator_vk;
 
     Ref<IWindow> window;
 
@@ -482,7 +482,7 @@ private:
     void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
-        return allocator_vk->get_allocation_callbacks();
+        return nullptr;
     }
 
     int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;

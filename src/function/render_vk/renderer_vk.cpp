@@ -27,7 +27,6 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -69,8 +68,8 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
-      allocator_vk(make_ref<AllocatorVK>(p_allocator, p_allocator)), window(p_window), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), render_graphs(p_allocator), base_render_data(p_allocator) {
+      window(p_window), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
+      base_render_data(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -577,7 +576,7 @@ void RendererVK::create_physical_device() {
     vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
 }
 
-void RendererVK::create_logical_device() {
+void RendererVK::create_logical_device() { // NOLINT
     // Setup queues create info.
     float queue_priority = 1.0;
     Set<uint32_t> indices = queue_family_indices.get_unique_indices();
@@ -613,6 +612,7 @@ void RendererVK::create_logical_device() {
     device_features.multiDrawIndirect = VK_TRUE;
     device_features.drawIndirectFirstInstance = VK_TRUE;
     device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+    device_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
     create_info.pEnabledFeatures = &device_features;
 
     VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features{};
@@ -759,6 +759,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (device_features.features.depthClamp != VK_TRUE || device_features.features.multiDrawIndirect != VK_TRUE ||
         device_features.features.drawIndirectFirstInstance != VK_TRUE ||
         device_features.features.shaderSampledImageArrayDynamicIndexing != VK_TRUE ||
+        device_features.features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE ||
         descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
         descriptor_indexing_features.descriptorBindingVariableDescriptorCount != VK_TRUE ||
         descriptor_indexing_features.runtimeDescriptorArray != VK_TRUE) {
@@ -1222,7 +1223,7 @@ struct StaticOpaqueDrawDataVK {
 };
 
 StaticOpaqueDrawDataVK build_static_opaque_draw_data(
-    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RenderAllocator* p_allocator) {
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RenderAllocator* p_allocator, bool p_require_material_pipeline) {
     if (p_triangles_info.vertices.empty() || p_triangles_info.indices.empty() || p_triangles_info.materials.empty()) {
         throw std::runtime_error("Failed to compile static opaque triangles: the render database contains no drawable triangles.");
     }
@@ -1236,17 +1237,21 @@ StaticOpaqueDrawDataVK build_static_opaque_draw_data(
     result.indirect_commands.reserve(p_triangles_info.materials.size());
     for (uint32_t material_index = 0; material_index < p_triangles_info.materials.size(); ++material_index) {
         const auto& material_unit = p_triangles_info.materials[material_index];
-        if (material_unit.material == nullptr || material_unit.material->graphics_pipeline == nullptr ||
-            material_unit.material->graphics_pipeline->resource_key == nullptr) {
-            throw std::runtime_error("Failed to compile static opaque triangles: a material or its graphics pipeline is missing.");
+        if (material_unit.material == nullptr) {
+            throw std::runtime_error("Failed to compile static opaque triangles: a material is missing.");
         }
-        std::string_view material_pipeline_key(material_unit.material->graphics_pipeline->resource_key);
-        if (result.graphics_pipeline == nullptr) {
-            result.graphics_pipeline = material_unit.material->graphics_pipeline;
-            result.graphics_pipeline_key = material_pipeline_key;
-        } else if (result.graphics_pipeline != material_unit.material->graphics_pipeline &&
-                   result.graphics_pipeline_key != material_pipeline_key) {
-            throw std::runtime_error("Failed to compile static opaque triangles: all material batches must use one graphics pipeline.");
+        if (p_require_material_pipeline) {
+            if (material_unit.material->graphics_pipeline == nullptr || material_unit.material->graphics_pipeline->resource_key == nullptr) {
+                throw std::runtime_error("Failed to compile static opaque triangles: a material graphics pipeline is missing.");
+            }
+            std::string_view material_pipeline_key(material_unit.material->graphics_pipeline->resource_key);
+            if (result.graphics_pipeline == nullptr) {
+                result.graphics_pipeline = material_unit.material->graphics_pipeline;
+                result.graphics_pipeline_key = material_pipeline_key;
+            } else if (result.graphics_pipeline != material_unit.material->graphics_pipeline &&
+                       result.graphics_pipeline_key != material_pipeline_key) {
+                throw std::runtime_error("Failed to compile static opaque triangles: all material batches must use one graphics pipeline.");
+            }
         }
         if (material_unit.sub_region.starting_index > p_triangles_info.indices.size() ||
             material_unit.sub_region.size > p_triangles_info.indices.size() - material_unit.sub_region.starting_index ||
@@ -1425,7 +1430,19 @@ void RendererVK::update_static_opaque_triangles() {
 
 CompiledStaticOpaqueTrianglesVK RendererVK::compile_static_opaque_triangles(const StaticOpaqueTrianglesCompileConfigVK& p_config) {
     const auto& triangles_info = render_database->get_static_opaque_triangles_info();
-    auto draw_data = build_static_opaque_draw_data(triangles_info, allocator);
+    auto draw_data = build_static_opaque_draw_data(triangles_info, allocator, p_config.graphics_pipeline_resource_key.empty());
+    if (!p_config.graphics_pipeline_resource_key.empty()) {
+        auto* resource_manager = ResourceManager::get_singleton();
+        if (resource_manager == nullptr) {
+            throw std::runtime_error("Failed to compile static opaque triangles: resource manager is missing.");
+        }
+        draw_data.graphics_pipeline = resource_manager->get_resource<RUGraphicsPipeline>(p_config.graphics_pipeline_resource_key);
+        if (draw_data.graphics_pipeline == nullptr) {
+            throw std::runtime_error(std::format("Failed to compile static opaque triangles: graphics pipeline '{}' was not found.",
+                p_config.graphics_pipeline_resource_key));
+        }
+        draw_data.graphics_pipeline_key = p_config.graphics_pipeline_resource_key;
+    }
     VkPhysicalDeviceProperties device_properties{};
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
     if (draw_data.indirect_commands.size() > device_properties.limits.maxDrawIndirectCount) {

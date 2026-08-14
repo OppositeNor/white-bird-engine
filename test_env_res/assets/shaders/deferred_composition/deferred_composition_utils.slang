@@ -17,6 +17,8 @@
 
 #include "utils.slang"
 
+static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
+
 /**
  * @brief Vertex shader output / fragment shader input for the deferred composition fullscreen pass.
  */
@@ -29,6 +31,62 @@ struct VSOutput {
  * @brief Screen-space uv used to sample the G-buffer attachments.
      */
     float2 uv       : TEXCOORD0;
+};
+
+/**
+ * @brief Spot light parameters consumed by the deferred composition pass.
+ */
+struct SpotLightInfo {
+    /// World-to-light view matrix used to sample the shadow map.
+    float4x4 view;
+    /// Light-space projection matrix used to sample the shadow map.
+    float4x4 proj;
+    /// World-space position of the spot light.
+    float3 position;
+    /// Scalar intensity multiplier.
+    float intensity;
+    /// World-space direction the spot is pointing.
+    float3 direction;
+    /// Cosine of the inner cone half-angle.
+    float inner_cone_cos;
+    /// Linear-space color of the spot light.
+    float3 color;
+    /// Cosine of the outer cone half-angle.
+    float outer_cone_cos;
+    /// Maximum effective light distance.
+    float range;
+};
+
+/**
+ * @brief Per-frame camera data used by the deferred composition pass to reconstruct world-space positions from depth and evaluate view directions.
+ */
+struct CompositionCamera {
+    /**
+ * @brief Inverse view-projection matrix used for world-space position reconstruction from screen-space uv and depth.
+     */
+    float4x4 inv_view_proj;
+    /**
+ * @brief Camera world-space position (xyz). The w component is unused.
+     */
+    float4   camera_world_pos;
+};
+
+
+/**
+ * @brief Descriptor-backed resources for one spot light.
+ */
+struct LightParam {
+    ConstantBuffer<SpotLightInfo> info;
+    Texture2D<float> shadowmap;
+    SamplerState shadowmap_sampler;
+};
+
+/**
+ * @brief Variable-active-size spot light descriptor table.
+ */
+struct LightParams {
+    LightParam lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    ConstantBuffer<uint> light_count;
 };
 
 /**
