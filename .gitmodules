@@ -40,3 +40,6 @@
 [submodule "dependencies/wbe-utils-model-compiler"]
 	path = dependencies/wbe-utils-model-compiler
 	url = https://github.com/OppositeNor/wbe-utils-model-compiler.git
+[submodule "dependencies/VulkanMemoryAllocator"]
+	path = dependencies/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
