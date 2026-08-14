@@ -24,63 +24,76 @@
 #include <format>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-VkBuffer ROBufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
-    VkBufferCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = size;
-    create_info.usage = WBE_REQUIRED(usage);
-    std::vector<uint32_t> initial_queues;
-    if (queue_family_indices.empty()) {
-        initial_queues = std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
-    }
-    else {
-        initial_queues = std::vector<uint32_t>(queue_family_indices.begin(), queue_family_indices.end());
-    }
-    create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-    create_info.pQueueFamilyIndices = initial_queues.data();
-    create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
-    VkBuffer result;
-    if (vkCreateBuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create buffer.");
+static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_domain) {
+    VmaAllocationCreateInfo result{};
+    switch (p_domain) {
+    case DeviceDomain::HOST:
+        result.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        result.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+        result.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        break;
+    case DeviceDomain::DEVICE:
+        result.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        result.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        break;
+    case DeviceDomain::HOST_DEVICE:
+        result.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        result.usage = VMA_MEMORY_USAGE_AUTO;
+        result.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        break;
     }
     return result;
 }
 
 ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
-    buffer = p_builder.create_vk_object(p_render_data);
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
+    VkBufferCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size = p_builder.size;
+    create_info.usage = WBE_REQUIRED(p_builder.usage);
+    std::vector<uint32_t> initial_queues;
+    if (p_builder.queue_family_indices.empty()) {
+        initial_queues =
+            std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
+    } else {
+        initial_queues = std::vector<uint32_t>(p_builder.queue_family_indices.begin(), p_builder.queue_family_indices.end());
+    }
+    if (initial_queues.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = initial_queues.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
     exposed_fields.buffer_size = p_builder.size;
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
-    buffer_memory = allocate_device_memory(memory_requirements, exposed_fields.domain);
-    if (exposed_fields.domain == DeviceDomain::HOST || exposed_fields.domain == DeviceDomain::HOST_DEVICE) {
-        vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
+    VmaAllocationCreateInfo allocation_create_info = buffer_allocation_create_info(exposed_fields.domain);
+    VmaAllocationInfo allocation_info{};
+    VkResult result =
+        vmaCreateBuffer(render_data->vma_allocator, &create_info, &allocation_create_info, &buffer, &allocation, &allocation_info);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create Vulkan buffer: {}.", string_VkResult(result)));
     }
-    if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind buffer memory.");
-    }
+    mapped_memory = allocation_info.pMappedData;
 }
 
 ROBufferVK::~ROBufferVK() {
-    if (exposed_fields.domain == DeviceDomain::HOST) {
-        vkUnmapMemory(render_data->logic_device, buffer_memory);
-    }
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data, buffer = buffer, buffer_memory = buffer_memory]() {
-            vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-            vkFreeMemory(render_data->logic_device, buffer_memory, render_data->allocation_callbacks);
+        [render_data = render_data, buffer = buffer, allocation = allocation]() {
+            vmaDestroyBuffer(render_data->vma_allocator, buffer, allocation);
         },
         render_data->frames_in_flight);
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {
     if (exposed_fields.domain != DeviceDomain::HOST && exposed_fields.domain != DeviceDomain::HOST_DEVICE) {
-        throw std::runtime_error("Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
+        throw std::runtime_error(
+            "Failed to update buffer: the domain of the device must be declared as host to update buffer from host memory.");
     }
     if (p_dst_offset + p_size > exposed_fields.buffer_size) {
         throw std::runtime_error(std::format("Failed to update buffer: trying to map a region ({} to {}) onto a buffer with capacity {}.",
@@ -89,6 +102,10 @@ void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p
             exposed_fields.buffer_size));
     }
     memcpy(static_cast<uint8_t*>(mapped_memory) + p_dst_offset, p_data, p_size);
+    VkResult flush_result = vmaFlushAllocation(render_data->vma_allocator, allocation, p_dst_offset, p_size);
+    if (flush_result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to flush Vulkan buffer allocation: {}.", string_VkResult(flush_result)));
+    }
 }
 
 void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size_t p_dst_offset, size_t p_size) {
@@ -133,6 +150,10 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data) {
 
 void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, size_t p_size) { // NOLINT
     size_t src_offset = reinterpret_cast<uintptr_t>(p_data) - reinterpret_cast<uintptr_t>(p_buffer->mapped_memory);
+    VkResult flush_result = vmaFlushAllocation(render_data->vma_allocator, p_buffer->allocation, src_offset, p_size);
+    if (flush_result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to flush Vulkan staging-buffer allocation: {}.", string_VkResult(flush_result)));
+    }
     VkBufferCopy copy_region{};
     copy_region.srcOffset = src_offset;
     copy_region.dstOffset = 0;

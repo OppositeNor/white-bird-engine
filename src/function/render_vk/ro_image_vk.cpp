@@ -25,10 +25,12 @@
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
 #include <cstdint>
+#include <format>
 #include <glm/glm.hpp>
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -162,44 +164,6 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     image->exposed_fileds.image_layout = new_layout;
 }
 
-VkImage ROImageVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
-    VkImageCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.imageType = WBE_REQUIRED(image_type);
-    create_info.format = WBE_REQUIRED(format);
-    create_info.extent = WBE_REQUIRED(extent);
-    create_info.mipLevels = mipmap_level;
-    create_info.arrayLayers = layers_count;
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create_info.usage = WBE_REQUIRED(usage);
-    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    Vector<uint32_t, RenderAllocator> queue_families_data(p_render_data->allocator);
-    if (queue_families.empty()) {
-        queue_families_data = Vector<uint32_t, RenderAllocator>(
-            p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end(), p_render_data->allocator);
-    } else {
-        queue_families_data = Vector<uint32_t, RenderAllocator>(queue_families.begin(), queue_families.end(), p_render_data->allocator);
-    }
-
-    if (queue_families_data.size() > 1) {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.pQueueFamilyIndices = queue_families_data.data();
-        create_info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families_data.size());
-    } else {
-        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.pQueueFamilyIndices = nullptr;
-        create_info.queueFamilyIndexCount = 0;
-    }
-
-    VkImage result;
-    if (vkCreateImage(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create vulkan image.");
-    }
-    return result;
-}
-
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
     init(p_builder);
 }
@@ -209,36 +173,63 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
     exposed_fileds.image = p_image;
     p_image = VK_NULL_HANDLE;
     exposed_fileds.image_memory = VK_NULL_HANDLE;
+    allocation = VK_NULL_HANDLE;
     exposed_fileds.image_layout = p_initial_image_layout;
     exposed_fileds.is_swap_chain_image = true;
 }
 
 ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
-    if (!exposed_fileds.is_swap_chain_image && (exposed_fileds.image != VK_NULL_HANDLE || exposed_fileds.image_memory != VK_NULL_HANDLE)) {
+    if (!exposed_fileds.is_swap_chain_image && (exposed_fileds.image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)) {
         render_data->register_delayed_call(
-            [render_data = render_data, image = exposed_fileds.image, image_memory = exposed_fileds.image_memory]() {
-                if (image != VK_NULL_HANDLE) {
-                    vkDestroyImage(render_data->logic_device, image, render_data->allocation_callbacks);
-                }
-                if (image_memory != VK_NULL_HANDLE) {
-                    vkFreeMemory(render_data->logic_device, image_memory, render_data->allocation_callbacks);
-                }
+            [render_data = render_data, image = exposed_fileds.image, allocation = allocation]() {
+                vmaDestroyImage(render_data->vma_allocator, image, allocation);
             },
             render_data->frames_in_flight);
     }
 }
 
 void ROImageVK::init(const Builder& p_builder) {
-    exposed_fileds.image = p_builder.create_vk_object(render_data);
     exposed_fileds.queue_families = p_builder.queue_families;
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fileds.image, &memory_requirements);
-    // Images are only allowed to be allocated on device.
-    exposed_fileds.image_memory = allocate_device_memory(memory_requirements, DeviceDomain::DEVICE);
-    if (vkBindImageMemory(render_data->logic_device, exposed_fileds.image, exposed_fileds.image_memory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind vulkan image memory.");
+    VkImageCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info.imageType = WBE_REQUIRED(p_builder.image_type);
+    create_info.format = WBE_REQUIRED(p_builder.format);
+    create_info.extent = WBE_REQUIRED(p_builder.extent);
+    create_info.mipLevels = p_builder.mipmap_level;
+    create_info.arrayLayers = p_builder.layers_count;
+    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    create_info.usage = WBE_REQUIRED(p_builder.usage);
+    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    Vector<uint32_t, RenderAllocator> queue_families(render_data->allocator);
+    if (p_builder.queue_families.empty()) {
+        queue_families = Vector<uint32_t, RenderAllocator>(
+            render_data->queue_family_indices.begin(), render_data->queue_family_indices.end(), render_data->allocator);
+    } else {
+        queue_families = Vector<uint32_t, RenderAllocator>(
+            p_builder.queue_families.begin(), p_builder.queue_families.end(), render_data->allocator);
     }
+    if (queue_families.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = queue_families.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(queue_families.size());
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    VmaAllocationCreateInfo allocation_create_info{
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    VmaAllocationInfo allocation_info{};
+    VkResult result = vmaCreateImage(
+        render_data->vma_allocator, &create_info, &allocation_create_info, &exposed_fileds.image, &allocation, &allocation_info);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
+    }
+    exposed_fileds.image_memory = allocation_info.deviceMemory;
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {

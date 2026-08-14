@@ -279,26 +279,38 @@ public:
     RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
-     * @brief Write to the descriptor set.
+     * @brief Write a descriptor generation.
+     *
+     * Before the set is first acquired this initializes it in place. Once acquired, the write creates and publishes a copy so
+     * command buffers using an older generation remain valid. Calls must be externally synchronized with command recording.
      *
      * @param p_writer The writer configuration.
      */
     void write_descriptor_set(const Writer& p_writer);
 
     /**
-     * @brief Get the descriptor set.
+     * @brief Acquire the current descriptor-set generation for command recording.
      *
      * @return The VkDescriptorSet instance.
      */
     VkDescriptorSet get_descriptor_set() const {
+        has_been_acquired = true;
         return descriptor_set;
     }
 
 private:
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
+    uint32_t variable_descriptor_count = 0;
+    mutable bool has_been_acquired = false;
     Vector<Ref<RODescriptorSetLayoutVK>, RenderAllocator> descriptor_set_layouts;
     // Keep references per binding and array element to prevent bound resources from being destroyed.
     Map<uint64_t, Vector<Ref<RenderObjectVK>, RenderAllocator>, RenderAllocator> bound_objects;
+
+    void validate_writer(const Writer& p_writer) const;
+    VkDescriptorSet create_descriptor_set() const;
+    VkDescriptorSet create_descriptor_set_for_write() const;
+    void publish_descriptor_set(VkDescriptorSet p_descriptor_set);
+    void retire_descriptor_set(VkDescriptorSet p_descriptor_set) const;
 };
 
 } // namespace WhiteBirdEngine

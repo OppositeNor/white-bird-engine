@@ -19,6 +19,7 @@
 #include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/vma_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
 
@@ -48,6 +49,8 @@ struct BaseRenderDataVK {
 
     // The logic device.
     VkDevice logic_device = VK_NULL_HANDLE;
+    // The VMA allocator used for owned Vulkan buffers and images.
+    VmaAllocator vma_allocator = VK_NULL_HANDLE;
     // The image format of the swap chain.
     VkFormat swap_chain_format = VK_FORMAT_UNDEFINED;
     // The size of the swap chain.
@@ -100,10 +103,6 @@ struct BaseRenderDataVK {
 
     // Task to execute in the pre-execution task.
     Vector<std::function<void(VkCommandBuffer)>, RenderAllocator> pre_execute_tasks_queue;
-
-    // A function that finds a suitable memory type for a certain memory
-    // property.
-    std::function<uint32_t(uint32_t, DeviceDomain)> find_memory_type;
 
     // Function to register a delayed call.
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;

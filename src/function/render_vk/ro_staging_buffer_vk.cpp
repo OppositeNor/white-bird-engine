@@ -24,52 +24,48 @@
 #include <format>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-VkBuffer ROStagingBufferVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
-    VkBufferCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = size;
-    create_info.usage = WBE_REQUIRED(usage);
-    if (queue_family_indices.size() > 1) {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        std::vector<uint32_t> vec_queue_family_indices(queue_family_indices.begin(), queue_family_indices.end());
-        create_info.queueFamilyIndexCount = vec_queue_family_indices.size();
-        create_info.pQueueFamilyIndices = vec_queue_family_indices.data();
-    } else {
-        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-    VkBuffer result;
-    if (vkCreateBuffer(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create buffer.");
-    }
-    return result;
-}
 
 ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {
-    buffer = p_builder.create_vk_object(p_render_data);
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &memory_requirements);
-    exposed_fields.buffer_size = p_builder.size;
-    buffer_memory = allocate_device_memory(memory_requirements, DeviceDomain::HOST);
-    vkMapMemory(render_data->logic_device, buffer_memory, 0, exposed_fields.buffer_size, 0, &mapped_memory);
-    if (vkBindBufferMemory(render_data->logic_device, buffer, buffer_memory, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to bind buffer memory.");
+    VkBufferCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size = p_builder.size;
+    create_info.usage = WBE_REQUIRED(p_builder.usage);
+    std::vector<uint32_t> queue_family_indices(p_builder.queue_family_indices.begin(), p_builder.queue_family_indices.end());
+    if (queue_family_indices.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(queue_family_indices.size());
+        create_info.pQueueFamilyIndices = queue_family_indices.data();
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
+    exposed_fields.buffer_size = p_builder.size;
+    VmaAllocationCreateInfo allocation_create_info{
+        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+        .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    VmaAllocationInfo allocation_info{};
+    VkResult result =
+        vmaCreateBuffer(render_data->vma_allocator, &create_info, &allocation_create_info, &buffer, &allocation, &allocation_info);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create Vulkan staging buffer: {}.", string_VkResult(result)));
+    }
+    mapped_memory = allocation_info.pMappedData;
     static_cast<DataChunkHeader*>(mapped_memory)->size = exposed_fields.buffer_size;
     static_cast<DataChunkHeader*>(mapped_memory)->is_allocated = false;
     static_cast<DataChunkHeader*>(mapped_memory)->frame = 0;
 }
 
 ROStagingBufferVK::~ROStagingBufferVK() {
-    vkUnmapMemory(render_data->logic_device, buffer_memory);
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data, buffer = buffer, buffer_memory = buffer_memory]() {
-            vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-            vkFreeMemory(render_data->logic_device, buffer_memory, render_data->allocation_callbacks);
+        [render_data = render_data, buffer = buffer, allocation = allocation]() {
+            vmaDestroyBuffer(render_data->vma_allocator, buffer, allocation);
         },
         render_data->frames_in_flight);
 }

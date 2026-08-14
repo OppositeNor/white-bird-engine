@@ -315,9 +315,8 @@ private:
     VkInstance vk_instance = VK_NULL_HANDLE;
 
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    bool is_physical_device_descrete = false;
-    VkPhysicalDeviceMemoryProperties physical_device_memory_properties{};
     VkDevice logical_device = VK_NULL_HANDLE;
+    VmaAllocator vma_allocator = VK_NULL_HANDLE;
 
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
@@ -460,6 +459,7 @@ private:
 
     void create_instance();
     void create_device();
+    void create_vma_allocator();
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
@@ -484,9 +484,6 @@ private:
     VkAllocationCallbacks* get_allocation_callbacks() {
         return nullptr;
     }
-
-    int32_t rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const;
-    uint32_t find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const;
 
     void run_stored_jobs();
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);

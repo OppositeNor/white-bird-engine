@@ -52,15 +52,6 @@ protected:
      * @brief The base render data.
      */
     const BaseRenderDataVK* render_data;
-    /**
-     * @brief Allocate a device memory.
-     *
-     * @param p_memory_requirements The memroy requirements for allocating
-     * memory.
-     * @param p_domain The domain where this memory will be allocated.
-     * @return The allocated device memory.
-     */
-    VkDeviceMemory allocate_device_memory(VkMemoryRequirements p_memory_requirements, DeviceDomain p_domain) const;
 };
 
 } // namespace WhiteBirdEngine

@@ -141,6 +141,8 @@ private:
     Ref<ROBufferVK> gbuffer_camera_info_ubo;
     Ref<ROBufferVK> composition_camera_info_ubo;
     Ref<ROBufferVK> spot_light_info_ubo;
+    Ref<RODescriptorSetVK> gbuffer_camera_descriptor_set;
+    uint32_t gbuffer_camera_descriptor_binding = 0;
     ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
@@ -247,21 +249,53 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
     }
 
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
-    ROBufferVK* gbuffer_camera_buffer = gbuffer_camera_info_ubo.get();
-    ROBufferVK* composition_camera_buffer = composition_camera_info_ubo.get();
-    ROBufferVK* spot_light_buffer = spot_light_info_ubo.get();
-    if (gbuffer_camera_buffer == nullptr || composition_camera_buffer == nullptr || spot_light_buffer == nullptr) {
-        return;
-    }
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    add_render_job(
-        [gbuffer_camera_info, composition_camera_info, spot_light_info, gbuffer_camera_buffer, composition_camera_buffer, spot_light_buffer]() {
-            gbuffer_camera_buffer->update_buffer(&gbuffer_camera_info, sizeof(CameraInfoVKUBO));
-            composition_camera_buffer->update_buffer(&composition_camera_info, sizeof(CompositionCameraInfo));
-            spot_light_buffer->update_buffer(&spot_light_info, sizeof(SpotLightInfoVKUBO));
-        });
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info]() {
+        Ref<ROBufferVK> new_gbuffer_camera_ubo = ROBufferVK::Builder()
+                                                     .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                     .set_domain(DeviceDomain::HOST_DEVICE)
+                                                     .set_size(sizeof(CameraInfoVKUBO))
+                                                     .create_ref(base_render_data);
+        new_gbuffer_camera_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
+        gbuffer_camera_descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
+                .set_binding(gbuffer_camera_descriptor_binding)
+                .add_uniform_buffer_info(new_gbuffer_camera_ubo, 0, sizeof(CameraInfoVKUBO)));
+
+        Ref<ROBufferVK> new_composition_camera_ubo = ROBufferVK::Builder()
+                                                         .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                         .set_domain(DeviceDomain::HOST_DEVICE)
+                                                         .set_size(sizeof(CompositionCameraInfo))
+                                                         .create_ref(base_render_data);
+        new_composition_camera_ubo->update_buffer(&composition_camera_info, sizeof(composition_camera_info));
+        auto [composition_camera_set, composition_camera_binding] = composition_descriptor_set_bindings.at("camera_info");
+        composition_descriptor_sets.at(composition_camera_set)
+            ->write_descriptor_set(RODescriptorSetVK::Writer()
+                    .set_binding(composition_camera_binding)
+                    .add_uniform_buffer_info(new_composition_camera_ubo, 0, sizeof(CompositionCameraInfo)));
+
+        Ref<ROBufferVK> new_spot_light_info_ubo = ROBufferVK::Builder()
+                                                      .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                      .set_domain(DeviceDomain::HOST_DEVICE)
+                                                      .set_size(sizeof(SpotLightInfoVKUBO))
+                                                      .create_ref(base_render_data);
+        new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
+        auto [shadow_set, shadow_binding] = shadow_descriptor_set_bindings.at("light_camera_info");
+        shadow_descriptor_sets.at(shadow_set)
+            ->write_descriptor_set(
+                RODescriptorSetVK::Writer().set_binding(shadow_binding).add_uniform_buffer_info(new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+        auto [composition_light_set, composition_light_binding] = composition_descriptor_set_bindings.at("light.lights.info");
+        composition_descriptor_sets.at(composition_light_set)
+            ->write_descriptor_set(RODescriptorSetVK::Writer()
+                    .set_binding(composition_light_binding)
+                    .set_dst_array_element(0)
+                    .add_uniform_buffer_info(new_spot_light_info_ubo, 0, sizeof(SpotLightInfoVKUBO)));
+
+        gbuffer_camera_info_ubo = std::move(new_gbuffer_camera_ubo);
+        composition_camera_info_ubo = std::move(new_composition_camera_ubo);
+        spot_light_info_ubo = std::move(new_spot_light_info_ubo);
+    });
 }
 
 void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
@@ -497,9 +531,10 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     gbuffer_camera_info_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
     auto [gbuffer_set, gbuffer_binding] = p_gbuffer.descriptor_set_bindings.at("camera_info");
-    p_gbuffer.descriptor_sets.at(gbuffer_set)
-        ->write_descriptor_set(
-            RODescriptorSetVK::Writer().set_binding(gbuffer_binding).add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+    gbuffer_camera_descriptor_set = p_gbuffer.descriptor_sets.at(gbuffer_set);
+    gbuffer_camera_descriptor_binding = gbuffer_binding;
+    gbuffer_camera_descriptor_set->write_descriptor_set(
+        RODescriptorSetVK::Writer().set_binding(gbuffer_binding).add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
 
     composition_camera_info_ubo = ROBufferVK::Builder()
                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)

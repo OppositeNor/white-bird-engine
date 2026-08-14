@@ -49,6 +49,10 @@ else()
     add_subdirectory(dependencies/SDL2)
 endif()
 find_package(Vulkan REQUIRED)
+set(VMA_ENABLE_INSTALL OFF)
+set(VMA_BUILD_DOCUMENTATION OFF)
+set(VMA_BUILD_SAMPLES OFF)
+add_subdirectory(dependencies/VulkanMemoryAllocator)
 
 set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
@@ -146,6 +150,7 @@ include_directories(
 
 set(libs ${libs}
     Vulkan::Vulkan
+    GPUOpen::VulkanMemoryAllocator
     SDL2::SDL2
     yaml-cpp::yaml-cpp
     boost_thread

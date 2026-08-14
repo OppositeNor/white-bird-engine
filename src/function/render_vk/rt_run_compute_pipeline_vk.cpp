@@ -43,12 +43,6 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(const BaseRenderDataVK* p_render_
       additional_read_accesses(p_read_accesses.begin(), p_read_accesses.end(), p_render_data->allocator),
       additional_write_accesses(p_write_accesses.begin(), p_write_accesses.end(), p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
-    for (const auto& descriptor_set : descriptor_sets) {
-        if (descriptor_set == MEM_NULL || descriptor_set->get_descriptor_set() == VK_NULL_HANDLE) {
-            throw std::runtime_error("RTRunComputePipelineVK: descriptor set is missing.");
-        }
-        descriptor_sets_instances.push_back(descriptor_set->get_descriptor_set());
-    }
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::read_resources() const {
@@ -78,6 +72,17 @@ void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, const Rend
     }
 
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline->get_compute_pipeline());
+    descriptor_sets_instances.clear();
+    for (const auto& descriptor_set : descriptor_sets) {
+        if (descriptor_set == MEM_NULL) {
+            throw std::runtime_error("RTRunComputePipelineVK: descriptor set is missing.");
+        }
+        VkDescriptorSet descriptor_set_instance = descriptor_set->get_descriptor_set();
+        if (descriptor_set_instance == VK_NULL_HANDLE) {
+            throw std::runtime_error("RTRunComputePipelineVK: descriptor set is missing.");
+        }
+        descriptor_sets_instances.push_back(descriptor_set_instance);
+    }
     if (!descriptor_sets_instances.empty()) {
         vkCmdBindDescriptorSets(p_command_buffer,
             VK_PIPELINE_BIND_POINT_COMPUTE,

@@ -144,7 +144,8 @@ VkDescriptorSet RODescriptorSetVK::Builder::create_vk_object(const BaseRenderDat
 }
 
 RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data), descriptor_set_layouts(p_render_data->allocator), bound_objects(p_render_data->allocator) {
+    : RenderObjectVK(p_render_data), variable_descriptor_count(p_builder.variable_descriptor_count),
+      descriptor_set_layouts(p_render_data->allocator), bound_objects(p_render_data->allocator) {
     descriptor_set = p_builder.create_vk_object(p_render_data);
     descriptor_set_layouts.reserve(p_builder.descriptor_set_layouts.size());
     for (const auto& layout : p_builder.descriptor_set_layouts) {
@@ -153,11 +154,32 @@ RODescriptorSetVK::RODescriptorSetVK(const BaseRenderDataVK* p_render_data, cons
 }
 
 RODescriptorSetVK::~RODescriptorSetVK() {
-    vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
+    retire_descriptor_set(descriptor_set);
 }
 
-void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
-    // Make sure only one type of resource is being written.
+VkDescriptorSet RODescriptorSetVK::create_descriptor_set() const {
+    Builder builder;
+    for (const auto& descriptor_set_layout : descriptor_set_layouts) {
+        builder.add_descriptor_set_layout(descriptor_set_layout);
+    }
+    if (variable_descriptor_count != 0) {
+        builder.set_variable_descriptor_count(variable_descriptor_count);
+    }
+    return builder.create_vk_object(render_data);
+}
+
+void RODescriptorSetVK::retire_descriptor_set(VkDescriptorSet p_descriptor_set) const {
+    if (p_descriptor_set == VK_NULL_HANDLE) {
+        return;
+    }
+    render_data->register_delayed_call(
+        [render_data = render_data, descriptor_set = p_descriptor_set]() {
+            vkFreeDescriptorSets(render_data->logic_device, render_data->descriptor_pool, 1, &descriptor_set);
+        },
+        render_data->frames_in_flight);
+}
+
+void RODescriptorSetVK::validate_writer(const Writer& p_writer) const {
     size_t resource_type_count = 0;
     if (!p_writer.storage_buffer_infos.empty()) {
         resource_type_count++;
@@ -178,9 +200,52 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
         throw std::runtime_error("Failed to write descriptor set: only one "
                                  "type of resource can be written at a time.");
     }
+}
+
+VkDescriptorSet RODescriptorSetVK::create_descriptor_set_for_write() const {
+    if (!has_been_acquired) {
+        return descriptor_set;
+    }
+    VkDescriptorSet result = create_descriptor_set();
+    std::vector<VkCopyDescriptorSet> copy_infos;
+    copy_infos.reserve(bound_objects.size());
+    for (const auto& [key, objects] : bound_objects) {
+        static_cast<void>(objects);
+        uint32_t binding = static_cast<uint32_t>(key >> 32U);
+        uint32_t array_element = static_cast<uint32_t>(key);
+        copy_infos.push_back(VkCopyDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET,
+            .srcSet = descriptor_set,
+            .srcBinding = binding,
+            .srcArrayElement = array_element,
+            .dstSet = result,
+            .dstBinding = binding,
+            .dstArrayElement = array_element,
+            .descriptorCount = 1,
+        });
+    }
+    if (!copy_infos.empty()) {
+        vkUpdateDescriptorSets(render_data->logic_device, 0, nullptr, static_cast<uint32_t>(copy_infos.size()), copy_infos.data());
+    }
+    return result;
+}
+
+void RODescriptorSetVK::publish_descriptor_set(VkDescriptorSet p_descriptor_set) {
+    if (p_descriptor_set == descriptor_set) {
+        return;
+    }
+    retire_descriptor_set(descriptor_set);
+    descriptor_set = p_descriptor_set;
+    has_been_acquired = false;
+}
+
+void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
+    validate_writer(p_writer);
+    VkDescriptorSet updated_descriptor_set = create_descriptor_set_for_write();
+
     VkWriteDescriptorSet write_info{};
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_info.dstSet = descriptor_set;
+    write_info.dstSet = updated_descriptor_set;
     write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
     write_info.dstArrayElement = p_writer.dst_array_element;
     PendingBoundObjectsVK pending_bound_objects(render_data->allocator);
@@ -213,6 +278,8 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     }
     // TODO: Texel buffer view
     vkUpdateDescriptorSets(render_data->logic_device, 1, &write_info, 0, nullptr);
+
+    publish_descriptor_set(updated_descriptor_set);
     for (uint32_t i = 0; i < pending_bound_objects.size(); ++i) {
         uint64_t key = descriptor_array_element_key(write_info.dstBinding, write_info.dstArrayElement + i);
         auto emplace_result = bound_objects.emplace(key, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));

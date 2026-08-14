@@ -128,9 +128,6 @@ public:
         Unique<ROStagingBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
             return make_unique<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
-
-    private:
-        VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
@@ -175,7 +172,7 @@ private:
     static constexpr size_t DATA_CHUNK_HEADER_SIZE = sizeof(DataChunkHeader);
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
     ExposedFields exposed_fields;
 };
 } // namespace WhiteBirdEngine

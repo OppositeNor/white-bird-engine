@@ -148,9 +148,6 @@ public:
         Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
             return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
         }
-
-    private:
-        VkBuffer create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     /**
@@ -398,7 +395,7 @@ public:
 private:
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
     ExposedFields exposed_fields{};
 };
 } // namespace WhiteBirdEngine

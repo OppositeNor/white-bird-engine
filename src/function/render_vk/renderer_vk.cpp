@@ -62,6 +62,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -234,6 +235,8 @@ void RendererVK::terminate() {
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
     vkDestroySurfaceKHR(vk_instance, surface, nullptr);
+    vmaDestroyAllocator(vma_allocator);
+    vma_allocator = VK_NULL_HANDLE;
     vkDestroyDevice(logical_device, get_allocation_callbacks());
     vkDestroyInstance(vk_instance, get_allocation_callbacks());
 }
@@ -241,6 +244,7 @@ void RendererVK::terminate() {
 void RendererVK::init_vulkan() {
     create_instance();
     create_device();
+    create_vma_allocator();
     create_swap_chain();
     create_command_pools();
     create_descriptor_pool();
@@ -259,6 +263,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.allocator = allocator;
     base_render_data.render_database = render_database.get();
     base_render_data.logic_device = logical_device;
+    base_render_data.vma_allocator = vma_allocator;
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;
     base_render_data.swap_chain_aspect_ratio =
@@ -285,9 +290,6 @@ void RendererVK::setup_base_render_data() {
     base_render_data.current_swap_chain_index = 0;
     base_render_data.swap_chain_images_count = swap_chain_images_count;
     base_render_data.queue_family_indices = queue_family_indices.get_unique_indices();
-    base_render_data.find_memory_type = [this](uint32_t p_type_filter, DeviceDomain p_properties) -> uint32_t {
-        return this->find_memory_type(p_type_filter, p_properties);
-    };
     base_render_data.register_delayed_call = [this](std::function<void()>&& p_function, uint32_t p_delayed_frames) {
         register_delay_call(std::move(p_function), p_delayed_frames);
     };
@@ -379,6 +381,20 @@ void RendererVK::create_instance() { // NOLINT
 void RendererVK::create_device() {
     create_physical_device();
     create_logical_device();
+}
+
+void RendererVK::create_vma_allocator() {
+    VmaAllocatorCreateInfo create_info{
+        .physicalDevice = physical_device,
+        .device = logical_device,
+        .pAllocationCallbacks = get_allocation_callbacks(),
+        .instance = vk_instance,
+        .vulkanApiVersion = VULKAN_API_VERSION,
+    };
+    VkResult result = vmaCreateAllocator(&create_info, &vma_allocator);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create Vulkan memory allocator: {}.", string_VkResult(result)));
+    }
 }
 
 void RendererVK::create_swap_chain() { // NOLINT
@@ -521,17 +537,28 @@ void RendererVK::create_command_pools() {
 }
 
 void RendererVK::create_descriptor_pool() {
+    uint64_t descriptor_generation_capacity = static_cast<uint64_t>(frames_in_flight) + 2;
+    auto scale_descriptor_capacity = [descriptor_generation_capacity](size_t p_capacity) -> uint32_t {
+        uint64_t scaled_capacity = static_cast<uint64_t>(p_capacity) * descriptor_generation_capacity;
+        if (scaled_capacity > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("Failed to create descriptor pool: generation capacity exceeds Vulkan limits.");
+        }
+        return static_cast<uint32_t>(scaled_capacity);
+    };
     std::array<VkDescriptorPoolSize, 4> pool_sizes{
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = MAX_UNIFORM_DESCRIPTOR_COUNT},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = MAX_SAMPLER_DESCRIPTOR_COUNT},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = scale_descriptor_capacity(MAX_UNIFORM_DESCRIPTOR_COUNT)},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = scale_descriptor_capacity(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT)},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = scale_descriptor_capacity(MAX_SAMPLER_DESCRIPTOR_COUNT)},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = scale_descriptor_capacity(MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT)},
     };
 
     VkDescriptorPoolCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    create_info.maxSets = MAX_DESCRIPTOR_SET_COUNT;
+    create_info.maxSets = scale_descriptor_capacity(MAX_DESCRIPTOR_SET_COUNT);
     create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
     create_info.pPoolSizes = pool_sizes.data();
     if (vkCreateDescriptorPool(logical_device, &create_info, get_allocation_callbacks(), &descriptor_pool) != VK_SUCCESS) {
@@ -569,11 +596,9 @@ void RendererVK::create_physical_device() {
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    is_physical_device_descrete = device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
     String device_name(device_properties.deviceName, allocator);
     stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked video device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &physical_device_memory_properties);
 }
 
 void RendererVK::create_logical_device() { // NOLINT
@@ -894,65 +919,6 @@ void RendererVK::setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent)
     scissor.offset.x = 0;
     scissor.offset.y = 0;
     scissor.extent = p_swap_chain_extent;
-}
-
-int32_t RendererVK::rate_memory_type(VkMemoryType p_memory_type, DeviceDomain p_domain) const {
-    switch (p_domain) {
-    case DeviceDomain::HOST:
-        if (!(p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT &&
-                p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-            return -1; // not a suitable memory property.
-        }
-        if (p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
-            return 50; // not exclusive for host, but still could be used.
-        }
-        return 100; // host exclusive, which usually is better than shared.
-        break;
-    case DeviceDomain::DEVICE:
-        if (!(p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-            return -1; // not a suitable memory property.
-        }
-        // For discrete GPUs, allocating exclusivly on the device is a better
-        // choice. For other types, such as a UMA device, or integrated GPU,
-        // allocating on shared memory is a better choice.
-        if (p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-            return is_physical_device_descrete ? 50 : 100;
-        }
-        return is_physical_device_descrete ? 100 : 50;
-        break;
-    case DeviceDomain::HOST_DEVICE:
-        if (!(p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT && p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT &&
-                p_memory_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-            return -1; // not a suitable memory property.
-        }
-        return 100;
-        break;
-    };
-    throw std::runtime_error("Unrecognized device domain.");
-}
-
-uint32_t RendererVK::find_memory_type(uint32_t p_type_filter, DeviceDomain p_domain) const {
-    int32_t best_type = -1;
-    int32_t best_type_score = 0;
-    for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
-        // Find the first memory property that could be used.
-        if (!(p_type_filter & (1 << i))) {
-            // Not able to be allocated on the current type, continue.
-            continue;
-        }
-        int32_t type_score = rate_memory_type(physical_device_memory_properties.memoryTypes[i], p_domain);
-        if (type_score < 0) {
-            continue;
-        }
-        if (type_score > best_type_score) {
-            best_type = static_cast<int32_t>(i);
-            best_type_score = type_score;
-        }
-    }
-    if (best_type < 0) {
-        throw std::runtime_error("Failed to find a suitable physical device to allocate memory.");
-    }
-    return best_type;
 }
 
 void RendererVK::run_stored_jobs() {

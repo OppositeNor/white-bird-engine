@@ -55,9 +55,6 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
         VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}});
     color_attachment_ids.emplace_back(p_color_attachment_id);
     descriptor_set_instances.reserve(descriptor_sets.size());
-    for (const auto& descriptor_set : descriptor_sets) {
-        descriptor_set_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
-    }
 }
 
 RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, // NOLINT
@@ -83,9 +80,6 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_set_instances(p_render_data->allocator) {
     descriptor_set_instances.reserve(descriptor_sets.size());
-    for (const auto& descriptor_set : descriptor_sets) {
-        descriptor_set_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
-    }
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resources() const {
@@ -185,6 +179,10 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     vkCmdSetViewport(p_command_buffer, 0, 1, &viewport);
     VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
+    descriptor_set_instances.clear();
+    for (const auto& descriptor_set : descriptor_sets) {
+        descriptor_set_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
+    }
     if (!descriptor_set_instances.empty()) {
         vkCmdBindDescriptorSets(p_command_buffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,

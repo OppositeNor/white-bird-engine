@@ -117,9 +117,6 @@ public:
         Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
             return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
         }
-
-    private:
-        VkImage create_vk_object(const BaseRenderDataVK* p_render_data) const;
     };
 
     ROImageVK() = delete;
@@ -175,7 +172,9 @@ public:
          */
         bool is_swap_chain_image = false;
         /**
-         * @brief The image's memory.
+         * @brief VMA-owned device-memory handle containing the image allocation.
+         *
+         * This handle is exposed for introspection only and must not be freed or rebound directly.
          */
         VkDeviceMemory image_memory = VK_NULL_HANDLE;
         /**
@@ -356,6 +355,7 @@ public:
 
 private:
     ExposedFields exposed_fileds{};
+    VmaAllocation allocation = VK_NULL_HANDLE;
 
     void init(const Builder& p_builder);
 };
