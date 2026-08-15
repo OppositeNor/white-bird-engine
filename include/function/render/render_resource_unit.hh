@@ -104,6 +104,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     // Should enable depth write.
     WBE_META(WBE_REFLECT)
     bool depth_write = true;
+    // Should cull back-facing triangles.
+    WBE_META(WBE_REFLECT)
+    bool cull_backfaces = true;
 };
 
 /**
@@ -248,6 +251,8 @@ struct RUGraphicsPipeline : public ResourceUnit {
     bool depth_test = true;
     // Should enable depth write.
     bool depth_write = true;
+    // Should cull back-facing triangles.
+    bool cull_backfaces = true;
 };
 
 /**

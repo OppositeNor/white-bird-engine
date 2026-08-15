@@ -18,7 +18,6 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "utils/defs.hh"
 #include <format>
 #include <stdexcept>
 #include <string>

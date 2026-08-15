@@ -98,13 +98,12 @@ private:
     void setup_spot_light();
     void create_shadow_map_resources();
     void create_gbuffer_resources();
-    void compile_shadow_pipeline();
+    CompiledStaticOpaqueTrianglesVK compile_shadow_pipeline();
     void compile_composition_pipeline();
     void write_dynamic_camera_descriptors(CompiledStaticOpaqueTrianglesVK& p_gbuffer);
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(RendTaskDescVK p_gbuffer_task);
+    void register_deferred_render_graph(RendTaskDescVK p_shadow_task, RendTaskDescVK p_gbuffer_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
-    RendTaskDescVK create_shadow_task_desc() const;
     RendTaskDescVK create_composition_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
 
@@ -113,16 +112,12 @@ private:
     RenderAllocator* render_allocator = nullptr;
     RenderDatabase* render_database = nullptr;
     RefRes<RUMesh3D> sponza_mesh;
-    RefRes<RUGraphicsPipeline> shadow_pipeline_resource;
     RefRes<RUGraphicsPipeline> composition_pipeline_resource;
 
     // Kept alive for the lifetime of the test because the graph resources and
     // descriptor sets reference these objects by raw handles.
-    Ref<ROGraphicsPipelineVK> shadow_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> composition_graphics_pipeline = MEM_NULL;
-    std::vector<Ref<RODescriptorSetVK>> shadow_descriptor_sets;
     std::vector<Ref<RODescriptorSetVK>> composition_descriptor_sets;
-    GraphicsPipelineCompilerVK::DescriptorSetBindings shadow_descriptor_set_bindings;
     GraphicsPipelineCompilerVK::DescriptorSetBindings composition_descriptor_set_bindings;
     Ref<ROImageVK> gbuffer_albedo_image;
     Ref<ROImageVK> gbuffer_normal_image;
@@ -141,8 +136,8 @@ private:
     Ref<ROBufferVK> gbuffer_camera_info_ubo;
     Ref<ROBufferVK> composition_camera_info_ubo;
     Ref<ROBufferVK> spot_light_info_ubo;
-    Ref<RODescriptorSetVK> gbuffer_camera_descriptor_set;
-    uint32_t gbuffer_camera_descriptor_binding = 0;
+    std::vector<std::pair<Ref<RODescriptorSetVK>, uint32_t>> gbuffer_camera_descriptor_bindings;
+    std::vector<std::pair<Ref<RODescriptorSetVK>, uint32_t>> shadow_camera_descriptor_bindings;
     ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
@@ -259,9 +254,11 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                                                      .set_size(sizeof(CameraInfoVKUBO))
                                                      .create_ref(base_render_data);
         new_gbuffer_camera_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
-        gbuffer_camera_descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                .set_binding(gbuffer_camera_descriptor_binding)
-                .add_uniform_buffer_info(new_gbuffer_camera_ubo, 0, sizeof(CameraInfoVKUBO)));
+        for (auto& [descriptor_set, binding] : gbuffer_camera_descriptor_bindings) {
+            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
+                    .set_binding(binding)
+                    .add_uniform_buffer_info(new_gbuffer_camera_ubo, 0, sizeof(CameraInfoVKUBO)));
+        }
 
         Ref<ROBufferVK> new_composition_camera_ubo = ROBufferVK::Builder()
                                                          .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -281,10 +278,11 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                                                       .set_size(sizeof(SpotLightInfoVKUBO))
                                                       .create_ref(base_render_data);
         new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
-        auto [shadow_set, shadow_binding] = shadow_descriptor_set_bindings.at("light_camera_info");
-        shadow_descriptor_sets.at(shadow_set)
-            ->write_descriptor_set(
-                RODescriptorSetVK::Writer().set_binding(shadow_binding).add_uniform_buffer_info(new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+        for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
+            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
+                    .set_binding(binding)
+                    .add_uniform_buffer_info(new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+        }
         auto [composition_light_set, composition_light_binding] = composition_descriptor_set_bindings.at("light.lights.info");
         composition_descriptor_sets.at(composition_light_set)
             ->write_descriptor_set(RODescriptorSetVK::Writer()
@@ -308,7 +306,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     setup_spot_light();
     create_shadow_map_resources();
     create_gbuffer_resources();
-    compile_shadow_pipeline();
+    auto compiled_shadow = compile_shadow_pipeline();
     StaticOpaqueTrianglesCompileConfigVK compile_config;
     compile_config.task_id = RT_RUN_DEFERRED_GBUFFER;
     compile_config.graphics_pipeline_resource_key = "deferred_gbuffer";
@@ -325,7 +323,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     compile_composition_pipeline();
     write_dynamic_camera_descriptors(compiled_gbuffer);
     write_dynamic_light_descriptors();
-    register_deferred_render_graph(std::move(compiled_gbuffer.task));
+    register_deferred_render_graph(std::move(compiled_shadow.task), std::move(compiled_gbuffer.task));
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
@@ -341,10 +339,6 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("sponza.mesh");
     if (sponza_mesh == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: sponza mesh resource was not found.");
-    }
-    shadow_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("shadowmap_spot");
-    if (shadow_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'shadowmap_spot' graphics pipeline resource not found.");
     }
     composition_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_composition");
     if (composition_pipeline_resource == nullptr) {
@@ -470,24 +464,26 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
                           .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDeferredPBRTest::compile_shadow_pipeline() {
-    GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = render_allocator,
-        .render_data = base_render_data,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {SHADOWMAP_COLOR_FORMAT},
-        .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
+CompiledStaticOpaqueTrianglesVK ApplicationVulkanDeferredPBRTest::compile_shadow_pipeline() {
+    StaticOpaqueTrianglesCompileConfigVK compile_config;
+    compile_config.task_id = RT_RUN_PIPELINE_SHADOWMAP;
+    compile_config.render_extent = shadow_extent;
+    compile_config.color_attachment_ids = {std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW)};
+    compile_config.depth_attachment_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
+    compile_config.color_attachment_formats = {SHADOWMAP_COLOR_FORMAT};
+    compile_config.depth_attachment_format = SHADOWMAP_DEPTH_FORMAT;
+    compile_config.clear_values.resize(2);
+    compile_config.clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
+    compile_config.graphics_pipeline_overrides = {
+        StaticOpaqueTrianglesPipelineOverrideVK("forward_cook_torrance_pbr", "shadowmap_spot"),
+        StaticOpaqueTrianglesPipelineOverrideVK("forward_cook_torrance_pbr_masked", "shadowmap_spot_masked"),
     };
-    RenderBindpointDeclarationsBuilder bindpoint_builder;
-    bindpoint_builder
-        .add_buffer_decleration("light_camera_info.view", &spot_light_component.view, sizeof(spot_light_component.view))
-        .add_buffer_decleration("light_camera_info.proj", &spot_light_component.proj, sizeof(spot_light_component.proj));
-    auto compiled =
-        GraphicsPipelineCompilerVK(compiler_context).compile("shadowmap_spot", shadow_pipeline_resource, bindpoint_builder.build());
-    shadow_graphics_pipeline = compiled.graphics_pipeline;
-    shadow_descriptor_sets = std::move(compiled.descriptor_sets);
-    shadow_descriptor_set_bindings = std::move(compiled.descriptor_set_bindings);
+    auto compiled = renderer_vk->compile_static_opaque_triangles(compile_config);
+    for (auto& pipeline_batch : compiled.graphics_pipeline_batches) {
+        auto [set, binding] = pipeline_batch.descriptor_set_bindings.at("light_camera_info");
+        shadow_camera_descriptor_bindings.emplace_back(pipeline_batch.descriptor_sets.at(set), binding);
+    }
+    return compiled;
 }
 
 void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
@@ -520,7 +516,7 @@ void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(CompiledStaticOpaqueTrianglesVK& p_gbuffer) {
-    if (p_gbuffer.descriptor_sets.empty() || composition_descriptor_sets.empty()) {
+    if (p_gbuffer.graphics_pipeline_batches.empty() || composition_descriptor_sets.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled pipelines produced no descriptor sets.");
     }
     gbuffer_camera_info_ubo = ROBufferVK::Builder()
@@ -530,11 +526,14 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
                                   .create_ref(base_render_data);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     gbuffer_camera_info_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
-    auto [gbuffer_set, gbuffer_binding] = p_gbuffer.descriptor_set_bindings.at("camera_info");
-    gbuffer_camera_descriptor_set = p_gbuffer.descriptor_sets.at(gbuffer_set);
-    gbuffer_camera_descriptor_binding = gbuffer_binding;
-    gbuffer_camera_descriptor_set->write_descriptor_set(
-        RODescriptorSetVK::Writer().set_binding(gbuffer_binding).add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+    for (auto& pipeline_batch : p_gbuffer.graphics_pipeline_batches) {
+        auto [gbuffer_set, gbuffer_binding] = pipeline_batch.descriptor_set_bindings.at("camera_info");
+        auto descriptor_set = pipeline_batch.descriptor_sets.at(gbuffer_set);
+        gbuffer_camera_descriptor_bindings.emplace_back(descriptor_set, gbuffer_binding);
+        descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
+                .set_binding(gbuffer_binding)
+                .add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+    }
 
     composition_camera_info_ubo = ROBufferVK::Builder()
                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -549,7 +548,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
-    if (shadow_descriptor_sets.empty() || composition_descriptor_sets.empty()) {
+    if (shadow_camera_descriptor_bindings.empty() || composition_descriptor_sets.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled light pipelines produced no descriptor sets.");
     }
     spot_light_info_ubo = ROBufferVK::Builder()
@@ -560,10 +559,11 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
 
-    auto [shadow_set, shadow_binding] = shadow_descriptor_set_bindings.at("light_camera_info");
-    shadow_descriptor_sets.at(shadow_set)
-        ->write_descriptor_set(
-            RODescriptorSetVK::Writer().set_binding(shadow_binding).add_uniform_buffer_info(spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+    for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
+        descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
+                .set_binding(binding)
+                .add_uniform_buffer_info(spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+    }
 
     auto [composition_set, composition_binding] = composition_descriptor_set_bindings.at("light.lights.info");
     composition_descriptor_sets.at(composition_set)
@@ -573,10 +573,11 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
                 .add_uniform_buffer_info(spot_light_info_ubo, 0, sizeof(SpotLightInfoVKUBO)));
 }
 
-void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(RendTaskDescVK p_gbuffer_task) {
+void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
+    RendTaskDescVK p_shadow_task, RendTaskDescVK p_gbuffer_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
-    pipeline_desc.tasks.emplace_back(create_shadow_task_desc());
+    pipeline_desc.tasks.emplace_back(std::move(p_shadow_task));
     pipeline_desc.tasks.emplace_back(std::move(p_gbuffer_task));
     pipeline_desc.tasks.emplace_back(create_composition_task_desc());
     renderer_vk->register_render_graph("deferred_pipeline", std::move(pipeline_desc));
@@ -589,9 +590,6 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_DEFERRED_COMPOSITION_GRAPHICS_PIPELINE),
         .res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID,
         .res = composition_graphics_pipeline});
-    p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
-        .res_type_id = TypeUUID<ROGraphicsPipelineVK>::UUID,
-        .res = shadow_graphics_pipeline});
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = shadow_color_view});
@@ -610,31 +608,6 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = gbuffer_depth_view});
-}
-
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task_desc() const {
-    RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_RUN_PIPELINE_SHADOWMAP;
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_shadow_extent = shadow_extent,
-                           task_descriptor_sets = shadow_descriptor_sets]() -> Unique<RenderTaskVK> {
-        std::array<VkClearValue, 2> clear_values{};
-        clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
-        clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
-        std::array<std::string_view, 1> color_attachment_ids{REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
-        return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
-            task_base_render_data,
-            std::span<const VkClearValue>(clear_values.data(), clear_values.size()),
-            task_shadow_extent,
-            std::span<const std::string_view>(color_attachment_ids.data(), color_attachment_ids.size()),
-            REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-            REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
-            REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-            REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-            std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()));
-    };
-    return task_desc;
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_composition_task_desc() const {

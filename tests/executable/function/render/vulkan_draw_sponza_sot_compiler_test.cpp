@@ -187,9 +187,11 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(CompiledSt
                              .create_ref(base_render_data);
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
-    auto [set_index, binding] = p_compiled.descriptor_set_bindings.at("camera_info");
-    p_compiled.descriptor_sets.at(set_index)->write_descriptor_set(
-        RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
+    for (auto& pipeline_batch : p_compiled.graphics_pipeline_batches) {
+        auto [set_index, binding] = pipeline_batch.descriptor_set_bindings.at("camera_info");
+        pipeline_batch.descriptor_sets.at(set_index)->write_descriptor_set(
+            RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
+    }
 }
 
 } // namespace WhiteBirdEngine

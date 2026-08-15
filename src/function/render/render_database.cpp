@@ -38,6 +38,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 struct MaterialMeshInfo {
+    std::string_view graphics_pipeline_key;
     std::string_view material_key;
     RefRes<RUMaterial> material;
     Vector<RUSubmesh3D*, RenderAllocator> submeshes;
@@ -56,13 +57,19 @@ void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_mate
     if (material->resource_key == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: submesh material resource key should not be NULL.");
     }
+    if (material->graphics_pipeline == nullptr || material->graphics_pipeline->resource_key == nullptr) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh material graphics pipeline should not be NULL.");
+    }
     std::string_view material_key = material->resource_key;
     auto material_entry = p_registered_material_index.find(material_key);
     if (material_entry == p_registered_material_index.end()) {
         size_t material_index = p_material_mesh_infos.size();
         p_registered_material_index.insert({material_key, material_index});
         p_material_mesh_infos.push_back(MaterialMeshInfo{
-            .material_key = material_key, .material = material, .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
+            .graphics_pipeline_key = material->graphics_pipeline->resource_key,
+            .material_key = material_key,
+            .material = material,
+            .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
         material_entry = p_registered_material_index.find(material_key);
     }
     p_material_mesh_infos[material_entry->second].submeshes.push_back(&p_submesh);
@@ -185,8 +192,23 @@ void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangle
     p_triangles_info.obj_id.reserve(total_triangles);
     p_triangles_info.indices.reserve(total_triangles * 3);
 
+    std::sort(material_mesh_infos.begin(), material_mesh_infos.end(), [](const MaterialMeshInfo& p_left, const MaterialMeshInfo& p_right) {
+        if (p_left.graphics_pipeline_key != p_right.graphics_pipeline_key) {
+            return p_left.graphics_pipeline_key < p_right.graphics_pipeline_key;
+        }
+        return p_left.material_key < p_right.material_key;
+    });
+
     for (const auto& mesh_info : material_mesh_infos) {
+        if (p_triangles_info.graphics_pipelines.empty() ||
+            p_triangles_info.graphics_pipelines.back().graphics_pipeline != mesh_info.material->graphics_pipeline) {
+            p_triangles_info.graphics_pipelines.push_back(OpaqueTrianglesInfo::GraphicsPipelineUnit{
+                .graphics_pipeline = mesh_info.material->graphics_pipeline,
+                .material_sub_region = {.starting_index = p_triangles_info.materials.size(), .size = 0},
+            });
+        }
         append_material_mesh_info(p_triangles_info, mesh_info);
+        ++p_triangles_info.graphics_pipelines.back().material_sub_region.size;
     }
 }
 } // namespace WhiteBirdEngine

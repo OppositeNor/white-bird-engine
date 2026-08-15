@@ -1099,10 +1099,10 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
             render_objects->static_opaque_indirect_commands,
             TypeUUID<ROBufferVK>::UUID);
     }
-    if (render_objects->static_opaque_graphics_pipeline != MEM_NULL) {
-        p_graph->set_resource(REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK,
-            render_objects->static_opaque_graphics_pipeline,
-            TypeUUID<ROGraphicsPipelineVK>::UUID);
+    for (const auto& [resource_id, graphics_pipeline] : render_objects->static_opaque_graphics_pipelines) {
+        if (graphics_pipeline != MEM_NULL) {
+            p_graph->set_resource(resource_id, graphics_pipeline, TypeUUID<ROGraphicsPipelineVK>::UUID);
+        }
     }
 }
 
@@ -1180,17 +1180,26 @@ RefRes<RUImage> find_material_image(RefRes<RUMaterial> p_material, std::string_v
 }
 
 struct StaticOpaqueDrawDataVK {
-    explicit StaticOpaqueDrawDataVK(RenderAllocator* p_allocator) : indirect_commands(p_allocator) {
+    struct PipelineBatch {
+        RefRes<RUGraphicsPipeline> graphics_pipeline = MEM_NULL;
+        std::string graphics_pipeline_key;
+        uint32_t first_draw = 0;
+        uint32_t draw_count = 0;
+    };
+
+    explicit StaticOpaqueDrawDataVK(RenderAllocator* p_allocator) : indirect_commands(p_allocator), pipeline_batches(p_allocator) {
     }
 
-    RefRes<RUGraphicsPipeline> graphics_pipeline = MEM_NULL;
-    std::string graphics_pipeline_key;
     Vector<VkDrawIndexedIndirectCommand, RenderAllocator> indirect_commands;
+    Vector<PipelineBatch, RenderAllocator> pipeline_batches;
 };
 
 StaticOpaqueDrawDataVK build_static_opaque_draw_data(
-    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RenderAllocator* p_allocator, bool p_require_material_pipeline) {
-    if (p_triangles_info.vertices.empty() || p_triangles_info.indices.empty() || p_triangles_info.materials.empty()) {
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
+    const StaticOpaqueTrianglesCompileConfigVK& p_config,
+    RenderAllocator* p_allocator) {
+    if (p_triangles_info.vertices.empty() || p_triangles_info.indices.empty() || p_triangles_info.materials.empty() ||
+        p_triangles_info.graphics_pipelines.empty()) {
         throw std::runtime_error("Failed to compile static opaque triangles: the render database contains no drawable triangles.");
     }
     if (p_triangles_info.materials.size() >= STATIC_OPAQUE_MATERIAL_TABLE_SIZE) {
@@ -1206,19 +1215,6 @@ StaticOpaqueDrawDataVK build_static_opaque_draw_data(
         if (material_unit.material == nullptr) {
             throw std::runtime_error("Failed to compile static opaque triangles: a material is missing.");
         }
-        if (p_require_material_pipeline) {
-            if (material_unit.material->graphics_pipeline == nullptr || material_unit.material->graphics_pipeline->resource_key == nullptr) {
-                throw std::runtime_error("Failed to compile static opaque triangles: a material graphics pipeline is missing.");
-            }
-            std::string_view material_pipeline_key(material_unit.material->graphics_pipeline->resource_key);
-            if (result.graphics_pipeline == nullptr) {
-                result.graphics_pipeline = material_unit.material->graphics_pipeline;
-                result.graphics_pipeline_key = material_pipeline_key;
-            } else if (result.graphics_pipeline != material_unit.material->graphics_pipeline &&
-                       result.graphics_pipeline_key != material_pipeline_key) {
-                throw std::runtime_error("Failed to compile static opaque triangles: all material batches must use one graphics pipeline.");
-            }
-        }
         if (material_unit.sub_region.starting_index > p_triangles_info.indices.size() ||
             material_unit.sub_region.size > p_triangles_info.indices.size() - material_unit.sub_region.starting_index ||
             material_unit.sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
@@ -1232,6 +1228,61 @@ StaticOpaqueDrawDataVK build_static_opaque_draw_data(
             .vertexOffset = 0,
             .firstInstance = material_index + 1,
         });
+    }
+
+    auto* resource_manager = ResourceManager::get_singleton();
+    if (resource_manager == nullptr) {
+        throw std::runtime_error("Failed to compile static opaque triangles: resource manager is missing.");
+    }
+    for (const auto& pipeline_override : p_config.graphics_pipeline_overrides) {
+        if (pipeline_override.source_graphics_pipeline_resource_key.empty() ||
+            pipeline_override.target_graphics_pipeline_resource_key.empty()) {
+            throw std::runtime_error("Failed to compile static opaque triangles: graphics-pipeline override keys must not be empty.");
+        }
+    }
+    for (const auto& pipeline_unit : p_triangles_info.graphics_pipelines) {
+        if (pipeline_unit.graphics_pipeline == nullptr || pipeline_unit.graphics_pipeline->resource_key == nullptr) {
+            throw std::runtime_error("Failed to compile static opaque triangles: a material graphics pipeline is missing.");
+        }
+        if (pipeline_unit.material_sub_region.starting_index > p_triangles_info.materials.size() ||
+            pipeline_unit.material_sub_region.size >
+                p_triangles_info.materials.size() - pipeline_unit.material_sub_region.starting_index ||
+            pipeline_unit.material_sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
+            pipeline_unit.material_sub_region.size > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("Failed to compile static opaque triangles: a graphics-pipeline material range is invalid.");
+        }
+        std::string source_pipeline_key = pipeline_unit.graphics_pipeline->resource_key;
+        std::string target_pipeline_key = source_pipeline_key;
+        if (!p_config.graphics_pipeline_resource_key.empty()) {
+            target_pipeline_key = p_config.graphics_pipeline_resource_key;
+        } else {
+            for (const auto& pipeline_override : p_config.graphics_pipeline_overrides) {
+                if (pipeline_override.source_graphics_pipeline_resource_key == source_pipeline_key) {
+                    target_pipeline_key = pipeline_override.target_graphics_pipeline_resource_key;
+                    break;
+                }
+            }
+        }
+        RefRes<RUGraphicsPipeline> target_pipeline =
+            target_pipeline_key == source_pipeline_key ? pipeline_unit.graphics_pipeline
+                                                       : resource_manager->get_resource<RUGraphicsPipeline>(target_pipeline_key);
+        if (target_pipeline == nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to compile static opaque triangles: graphics pipeline '{}' was not found.", target_pipeline_key));
+        }
+        uint32_t first_draw = static_cast<uint32_t>(pipeline_unit.material_sub_region.starting_index);
+        uint32_t draw_count = static_cast<uint32_t>(pipeline_unit.material_sub_region.size);
+        if (!result.pipeline_batches.empty() && result.pipeline_batches.back().graphics_pipeline_key == target_pipeline_key &&
+            result.pipeline_batches.back().first_draw + result.pipeline_batches.back().draw_count == first_draw) {
+            result.pipeline_batches.back().draw_count += draw_count;
+        } else {
+            result.pipeline_batches.push_back(StaticOpaqueDrawDataVK::PipelineBatch{
+                .graphics_pipeline = target_pipeline,
+                .graphics_pipeline_key = std::move(target_pipeline_key),
+                .first_draw = first_draw,
+                .draw_count = draw_count,
+            });
+        }
     }
     return result;
 }
@@ -1324,16 +1375,14 @@ std::function<Unique<RenderTaskVK>()> make_static_opaque_task_factory(RenderAllo
     const BaseRenderDataVK* p_render_data,
     StaticOpaqueAttachmentDataVK p_attachment_data,
     std::optional<std::string> p_depth_attachment_id,
-    std::vector<Ref<RODescriptorSetVK>> p_descriptor_sets,
-    uint32_t p_draw_count,
+    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch> p_pipeline_batches,
     VkAttachmentLoadOp p_color_load_op,
     VkAttachmentLoadOp p_depth_load_op) { // NOLINT
     return [task_allocator = p_allocator,
                task_render_data = p_render_data,
                task_attachment_data = std::move(p_attachment_data),
                task_depth_attachment_id = std::move(p_depth_attachment_id),
-               task_descriptor_sets = std::move(p_descriptor_sets),
-               task_draw_count = p_draw_count,
+               task_pipeline_batches = std::move(p_pipeline_batches),
                task_color_load_op = p_color_load_op,
                task_depth_load_op = p_depth_load_op]() -> Unique<RenderTaskVK> {
         std::vector<std::string_view> color_attachment_id_views;
@@ -1351,12 +1400,10 @@ std::function<Unique<RenderTaskVK>()> make_static_opaque_task_factory(RenderAllo
             task_attachment_data.render_extent,
             std::span<const std::string_view>(color_attachment_id_views.data(), color_attachment_id_views.size()),
             depth_attachment_id_view,
-            REND_RES_STATIC_OPAQUE_TRIANGLES_GRAPHICS_PIPELINE_VK,
             REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
             REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
             REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK,
-            task_draw_count,
-            std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
+            std::span<const RTRunGraphicsPipelineIndirectVK::PipelineBatch>(task_pipeline_batches.data(), task_pipeline_batches.size()),
             task_color_load_op,
             task_depth_load_op);
     };
@@ -1396,19 +1443,7 @@ void RendererVK::update_static_opaque_triangles() {
 
 CompiledStaticOpaqueTrianglesVK RendererVK::compile_static_opaque_triangles(const StaticOpaqueTrianglesCompileConfigVK& p_config) {
     const auto& triangles_info = render_database->get_static_opaque_triangles_info();
-    auto draw_data = build_static_opaque_draw_data(triangles_info, allocator, p_config.graphics_pipeline_resource_key.empty());
-    if (!p_config.graphics_pipeline_resource_key.empty()) {
-        auto* resource_manager = ResourceManager::get_singleton();
-        if (resource_manager == nullptr) {
-            throw std::runtime_error("Failed to compile static opaque triangles: resource manager is missing.");
-        }
-        draw_data.graphics_pipeline = resource_manager->get_resource<RUGraphicsPipeline>(p_config.graphics_pipeline_resource_key);
-        if (draw_data.graphics_pipeline == nullptr) {
-            throw std::runtime_error(std::format("Failed to compile static opaque triangles: graphics pipeline '{}' was not found.",
-                p_config.graphics_pipeline_resource_key));
-        }
-        draw_data.graphics_pipeline_key = p_config.graphics_pipeline_resource_key;
-    }
+    auto draw_data = build_static_opaque_draw_data(triangles_info, p_config, allocator);
     VkPhysicalDeviceProperties device_properties{};
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
     if (draw_data.indirect_commands.size() > device_properties.limits.maxDrawIndirectCount) {
@@ -1429,25 +1464,39 @@ CompiledStaticOpaqueTrianglesVK RendererVK::compile_static_opaque_triangles(cons
         .depth_attachment_format = p_config.depth_attachment_format,
         .stencil_attachment_format = p_config.stencil_attachment_format,
     };
-    std::string compiled_pipeline_key = make_static_opaque_pipeline_key(
-        draw_data.graphics_pipeline_key, attachment_data.color_attachment_formats, p_config.depth_attachment_format, p_config.stencil_attachment_format);
-    auto compiled_pipeline = GraphicsPipelineCompilerVK(compiler_context)
-                                 .compile(compiled_pipeline_key, draw_data.graphics_pipeline, material_data.bindpoints);
-    render_objects->static_opaque_graphics_pipeline = compiled_pipeline.graphics_pipeline;
+    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch> task_pipeline_batches;
+    task_pipeline_batches.reserve(draw_data.pipeline_batches.size());
+    CompiledStaticOpaqueTrianglesVK result(allocator);
+    result.graphics_pipeline_batches.reserve(draw_data.pipeline_batches.size());
+    for (const auto& draw_batch : draw_data.pipeline_batches) {
+        std::string compiled_pipeline_key = make_static_opaque_pipeline_key(draw_batch.graphics_pipeline_key,
+            attachment_data.color_attachment_formats,
+            p_config.depth_attachment_format,
+            p_config.stencil_attachment_format);
+        auto compiled_pipeline = GraphicsPipelineCompilerVK(compiler_context)
+                                     .compile(compiled_pipeline_key, draw_batch.graphics_pipeline, material_data.bindpoints);
+        render_objects->static_opaque_graphics_pipelines.insert_or_assign(compiled_pipeline_key, compiled_pipeline.graphics_pipeline);
+        RTRunGraphicsPipelineIndirectVK::PipelineBatch task_batch(allocator);
+        task_batch.pipeline_id = compiled_pipeline_key;
+        task_batch.first_draw = draw_batch.first_draw;
+        task_batch.draw_count = draw_batch.draw_count;
+        task_batch.descriptor_sets.assign(compiled_pipeline.descriptor_sets.begin(), compiled_pipeline.descriptor_sets.end());
+        task_pipeline_batches.push_back(std::move(task_batch));
+        CompiledStaticOpaqueTrianglesPipelineVK result_batch;
+        result_batch.descriptor_sets = std::move(compiled_pipeline.descriptor_sets);
+        result_batch.descriptor_set_bindings = std::move(compiled_pipeline.descriptor_set_bindings);
+        result.graphics_pipeline_batches.push_back(std::move(result_batch));
+    }
     render_objects->static_opaque_indirect_commands = build_or_resize_host_visible_buffer(
         &base_render_data, render_objects->static_opaque_indirect_commands, draw_data.indirect_commands, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
     update_static_opaque_triangles();
 
-    CompiledStaticOpaqueTrianglesVK result(allocator);
     result.task.task_id = p_config.task_id;
-    result.descriptor_sets = std::move(compiled_pipeline.descriptor_sets);
-    result.descriptor_set_bindings = std::move(compiled_pipeline.descriptor_set_bindings);
     result.task.create = make_static_opaque_task_factory(allocator,
         &base_render_data,
         std::move(attachment_data),
         p_config.depth_attachment_id,
-        result.descriptor_sets,
-        static_cast<uint32_t>(draw_data.indirect_commands.size()),
+        std::move(task_pipeline_batches),
         p_config.color_attachment_load_op,
         p_config.depth_attachment_load_op);
     set_graph_static_opaque_resources(active_graph);

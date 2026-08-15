@@ -70,6 +70,34 @@ WBE_LABEL(RT_PRE_EXECUTE_PIPELINE_VK, WBE_RENDER_TASK);
 WBE_LABEL(RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, WBE_RENDER_TASK);
 
 /**
+ * @class StaticOpaqueTrianglesPipelineOverrideVK
+ * @brief Maps one material pipeline to the pipeline used by a compiled static-opaque pass.
+ */
+struct StaticOpaqueTrianglesPipelineOverrideVK {
+    StaticOpaqueTrianglesPipelineOverrideVK() = default;
+    /**
+     * @brief Construct a source-to-target pipeline mapping.
+     *
+     * @param p_source_resource_key Material graphics-pipeline resource key.
+     * @param p_target_resource_key Graphics-pipeline resource key used by the pass.
+     */
+    StaticOpaqueTrianglesPipelineOverrideVK(std::string p_source_resource_key, std::string p_target_resource_key)
+        : source_graphics_pipeline_resource_key(std::move(p_source_resource_key)),
+          target_graphics_pipeline_resource_key(std::move(p_target_resource_key)) {
+    }
+    ~StaticOpaqueTrianglesPipelineOverrideVK() = default;
+    StaticOpaqueTrianglesPipelineOverrideVK(const StaticOpaqueTrianglesPipelineOverrideVK&) = default;
+    StaticOpaqueTrianglesPipelineOverrideVK(StaticOpaqueTrianglesPipelineOverrideVK&&) noexcept = default;
+    StaticOpaqueTrianglesPipelineOverrideVK& operator=(const StaticOpaqueTrianglesPipelineOverrideVK&) = default;
+    StaticOpaqueTrianglesPipelineOverrideVK& operator=(StaticOpaqueTrianglesPipelineOverrideVK&&) noexcept = default;
+
+    /** Material graphics-pipeline resource key. */
+    std::string source_graphics_pipeline_resource_key;
+    /** Graphics-pipeline resource key used by this render pass. */
+    std::string target_graphics_pipeline_resource_key;
+};
+
+/**
  * @class StaticOpaqueTrianglesCompileConfigVK
  * @brief Attachment configuration for compiling the renderer's static opaque triangles into one indirect task.
  */
@@ -85,6 +113,8 @@ struct StaticOpaqueTrianglesCompileConfigVK {
     RendTaskID task_id = RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK;
     /** Optional graphics-pipeline resource key. Empty uses the pipeline declared by the material batches. */
     std::string graphics_pipeline_resource_key;
+    /** Per-material-pipeline overrides applied when graphics_pipeline_resource_key is empty. */
+    std::vector<StaticOpaqueTrianglesPipelineOverrideVK> graphics_pipeline_overrides;
     /** Render area. A zero extent uses the current swap-chain extent. */
     VkExtent2D render_extent{};
     /** Color attachment resource ids. An empty list targets the current swap-chain image. */
@@ -103,6 +133,24 @@ struct StaticOpaqueTrianglesCompileConfigVK {
     VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     /** Load operation used for the depth attachment. */
     VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+};
+
+/**
+ * @class CompiledStaticOpaqueTrianglesPipelineVK
+ * @brief Descriptor state for one compiled graphics-pipeline batch.
+ */
+struct CompiledStaticOpaqueTrianglesPipelineVK {
+    CompiledStaticOpaqueTrianglesPipelineVK() = default;
+    ~CompiledStaticOpaqueTrianglesPipelineVK() = default;
+    CompiledStaticOpaqueTrianglesPipelineVK(const CompiledStaticOpaqueTrianglesPipelineVK&) = default;
+    CompiledStaticOpaqueTrianglesPipelineVK(CompiledStaticOpaqueTrianglesPipelineVK&&) noexcept = default;
+    CompiledStaticOpaqueTrianglesPipelineVK& operator=(const CompiledStaticOpaqueTrianglesPipelineVK&) = default;
+    CompiledStaticOpaqueTrianglesPipelineVK& operator=(CompiledStaticOpaqueTrianglesPipelineVK&&) noexcept = default;
+
+    /** Descriptor sets exposed so defaulted uniforms can be replaced before graph execution. */
+    std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
+    /** Reflected descriptor name to set/binding lookup. */
+    GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
 };
 
 /**
@@ -125,10 +173,8 @@ struct CompiledStaticOpaqueTrianglesVK {
 
     /** Task descriptor ready to append to a RendGraphDescVK. */
     RendTaskDescVK task;
-    /** Descriptor sets exposed so defaulted uniforms can be replaced before graph execution. */
-    std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
-    /** Reflected descriptor name to set/binding lookup. */
-    GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
+    /** Descriptor state for each graphics-pipeline batch, in draw order. */
+    std::vector<CompiledStaticOpaqueTrianglesPipelineVK> graphics_pipeline_batches;
 };
 
 /**
@@ -426,7 +472,8 @@ private:
 
     // Render objects for the renderer.
     struct RenderObjects {
-        RenderObjects(AllocType* p_allocator) : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator) {
+        RenderObjects(AllocType* p_allocator)
+            : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator), static_opaque_graphics_pipelines(p_allocator) {
         }
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
@@ -444,7 +491,7 @@ private:
         Ref<ROBufferVK> static_opaque_indices;
         Ref<ROBufferVK> static_opaque_obj_ids;
         Ref<ROBufferVK> static_opaque_indirect_commands;
-        Ref<ROGraphicsPipelineVK> static_opaque_graphics_pipeline;
+        Map<std::string, Ref<ROGraphicsPipelineVK>> static_opaque_graphics_pipelines;
     };
     Unique<RenderObjects> render_objects;
 

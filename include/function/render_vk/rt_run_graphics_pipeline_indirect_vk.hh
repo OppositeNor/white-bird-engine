@@ -39,6 +39,29 @@ namespace WhiteBirdEngine {
  * The task retains its descriptor sets, while graph resources are resolved by their declared ids.
  */
 struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
+    /**
+     * @class PipelineBatch
+     * @brief One graphics pipeline and its contiguous range of indirect commands.
+     */
+    struct PipelineBatch {
+        explicit PipelineBatch(RenderAllocator* p_allocator) : descriptor_sets(p_allocator) {
+        }
+        ~PipelineBatch() = default;
+        PipelineBatch(const PipelineBatch&) = default;
+        PipelineBatch(PipelineBatch&&) noexcept = default;
+        PipelineBatch& operator=(const PipelineBatch&) = default;
+        PipelineBatch& operator=(PipelineBatch&&) noexcept = default;
+
+        /** Graphics-pipeline render-graph resource id. */
+        std::string pipeline_id;
+        /** First tightly packed indirect command in the shared command buffer. */
+        uint32_t first_draw = 0;
+        /** Number of indirect commands rendered by this pipeline. */
+        uint32_t draw_count = 0;
+        /** Descriptor sets bound in set order for this pipeline. */
+        Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
+    };
+
     RTRunGraphicsPipelineIndirectVK() = delete;
     virtual ~RTRunGraphicsPipelineIndirectVK() override = default;
     RTRunGraphicsPipelineIndirectVK(const RTRunGraphicsPipelineIndirectVK&) = delete;
@@ -104,6 +127,33 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
 
+    /**
+     * @brief Construct one render task containing multiple contiguous graphics-pipeline batches.
+     *
+     * @param p_render_data Renderer state used while recording.
+     * @param p_clear_values Color clear values followed by depth when present.
+     * @param p_render_extent Render area extent.
+     * @param p_color_attachment_ids Color attachment graph resource ids.
+     * @param p_depth_attachment_id Optional depth attachment graph resource id.
+     * @param p_vertex_buffer_id Vertex buffer graph resource id.
+     * @param p_index_buffer_id Index buffer graph resource id.
+     * @param p_indirect_buffer_id Shared indexed-indirect command buffer graph resource id.
+     * @param p_pipeline_batches Ordered pipeline batches covering the command buffer.
+     * @param p_color_attachment_load_op Load operation used for every color attachment.
+     * @param p_depth_attachment_load_op Depth attachment load operation.
+     */
+    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
+        std::span<const VkClearValue> p_clear_values,
+        VkExtent2D p_render_extent,
+        std::span<const std::string_view> p_color_attachment_ids,
+        std::optional<std::string_view> p_depth_attachment_id,
+        std::string_view p_vertex_buffer_id,
+        std::string_view p_index_buffer_id,
+        std::string_view p_indirect_buffer_id,
+        std::span<const PipelineBatch> p_pipeline_batches,
+        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
+
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
@@ -120,12 +170,10 @@ private:
     VkExtent2D render_extent{};
     Vector<std::string, RenderAllocator> color_attachment_ids;
     std::optional<std::string> depth_attachment_id;
-    std::string pipeline_id;
     std::string vertex_buffer_id;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
-    uint32_t draw_count = 0;
-    Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
+    Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     Vector<VkDescriptorSet, RenderAllocator> descriptor_set_instances;
 };
 

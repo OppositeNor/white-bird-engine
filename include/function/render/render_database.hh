@@ -78,6 +78,15 @@ public:
         };
         // The materials that are used.
         Vector<MaterialUnit> materials;
+        // Represents one graphics pipeline and its contiguous material range.
+        struct GraphicsPipelineUnit {
+            // The graphics pipeline used by every material in the range.
+            RefRes<RUGraphicsPipeline> graphics_pipeline;
+            // The subregion of the materials array rendered with this pipeline.
+            SubRegion material_sub_region;
+        };
+        // Graphics-pipeline batches in draw order.
+        Vector<GraphicsPipelineUnit> graphics_pipelines;
 
         /**
          * @brief Constructor.
@@ -85,7 +94,7 @@ public:
          * @param p_allocator The allocator to allocate resource on.
          */
         OpaqueTrianglesInfo(AllocType* p_allocator)
-            : vertices(p_allocator), indices(p_allocator), obj_id(p_allocator), materials(p_allocator) {
+            : vertices(p_allocator), indices(p_allocator), obj_id(p_allocator), materials(p_allocator), graphics_pipelines(p_allocator) {
         }
 
         /**
@@ -96,6 +105,7 @@ public:
             indices.clear();
             obj_id.clear();
             materials.clear();
+            graphics_pipelines.clear();
         }
     };
 

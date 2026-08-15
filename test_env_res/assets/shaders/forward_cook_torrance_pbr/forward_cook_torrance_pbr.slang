@@ -75,10 +75,10 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
 /**
  * @brief Evaluate the Cook-Torrance BRDF for one forward-shaded fragment lit by a single shadow-mapped spot light.
  * @param p_input The interpolated vertex output.
+ * @param p_masked Whether fragments below the alpha-mask cutoff should be discarded.
  * @return The sRGB-encoded shaded color with alpha = 1.0.
  */
-[shader("fragment")]
-float4 fragment_main(VSOutput p_input) : SV_Target0 {
+float4 shade_fragment(VSOutput p_input, bool p_masked) {
     // The instance id crosses the rasterizer in world_position.w. Round away interpolation error before using it as a table
     // index.
     uint material_index = uint(round(p_input.world_position.w));
@@ -91,8 +91,12 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
     uint roughness_metallic_ao_descriptor_index = NonUniformResourceIndex(roughness_metallic_ao_index);
 
-    float3 base_color =
-        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float4 albedo_sample =
+        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
+    if (p_masked && albedo_sample.a < 0.5) {
+        discard;
+    }
+    float3 base_color = albedo_sample.rgb;
     float3 sampled_normal =
         material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
     float3 rma = material_textures.textures[roughness_metallic_ao_descriptor_index]
@@ -138,4 +142,14 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     }
     color = color / (color + float3(1.0));
     return float4(linear_to_srgb(color), 1.0);
+}
+
+[shader("fragment")]
+float4 fragment_main(VSOutput p_input) : SV_Target0 {
+    return shade_fragment(p_input, false);
+}
+
+[shader("fragment")]
+float4 fragment_masked_main(VSOutput p_input) : SV_Target0 {
+    return shade_fragment(p_input, true);
 }

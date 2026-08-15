@@ -12,7 +12,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "main_pipeline/main_pipeline_utils.slang"
+
+/**
+ * @brief Vertex shader output / fragment shader input for the main pipeline fullscreen pass.
+ */
+struct VSOutput {
+    /**
+ * @brief Clip-space position.
+     */
+    float4 position : SV_Position;
+    /**
+ * @brief Screen-space uv used by the fragment stage.
+     */
+    float2 uv       : TEXCOORD0;
+};
 
 /**
  * @brief Emit one vertex of a fullscreen triangle covering the viewport.
