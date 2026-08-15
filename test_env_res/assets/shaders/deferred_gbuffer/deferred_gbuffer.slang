@@ -85,7 +85,7 @@ GBufferOutput fragment_main(VSOutput p_input) {
 
     float4 albedo_sample =
         material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
-    if (albedo_sample.a == 0.0) {
+    if (albedo_sample.a < 0.5) {
         discard;
     }
     float material_id_unorm = float(material_index) / 255.0;
