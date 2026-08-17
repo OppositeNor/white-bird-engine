@@ -3,15 +3,15 @@
     "resources": [
         {
             "id": "model_cube",
-            "type": "model",
-            "file": "assets/models/Cube/glTF/Cube.gltf",
+            "source_type": "model",
+            "source_file": "assets/models/Cube/glTF/Cube.gltf",
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "texture_output_dir": "assets/images"
         },
         {
             "id": "sponza",
-            "type": "model",
-            "file": "assets/models/Sponza/glTF/Sponza.gltf",
+            "source_type": "model",
+            "source_file": "assets/models/Sponza/glTF/Sponza.gltf",
             "scale_vertex_pos": 0.01,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],

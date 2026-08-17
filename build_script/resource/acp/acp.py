@@ -16,7 +16,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-from build_script.resource.acp.acp_compiler import ManifestData, ManifestResource, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestData, ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
 
 class WBEACP:
     """The asset conditioning pipeline.
@@ -186,7 +186,7 @@ class WBEACP:
         if isinstance(value, list):
             return [self._process_value(element, manifest_rel_path) for element in value]
         if isinstance(value, dict):
-            if self._is_typed_resource(value):
+            if self._is_nested_source_resource(value):
                 # Nested resources live inside another resource field. They cannot
                 # expand into multiple sibling resources without losing placement.
                 processed_resources = self._process_typed_resource(value, manifest_rel_path, False)
@@ -201,7 +201,14 @@ class WBEACP:
             return result
         return value
 
+    def _is_nested_source_resource(self, value: dict[str, Any]) -> bool:
+        source_type = value.get(SOURCE_RESOURCE_TYPE_KEY)
+        return isinstance(source_type, str) and bool(source_type)
+
     def _is_typed_resource(self, value: dict[str, Any]) -> bool:
+        source_type = value.get(SOURCE_RESOURCE_TYPE_KEY)
+        if isinstance(source_type, str) and source_type:
+            return True
         resource_type = value.get("type")
         return isinstance(resource_type, str) and bool(resource_type)
 
@@ -213,9 +220,19 @@ class WBEACP:
             )
 
         result = dict(resource)
-        resource_type = result["type"]
+        source_resource_type = result.get(SOURCE_RESOURCE_TYPE_KEY)
+        has_source_resource_type = isinstance(source_resource_type, str) and bool(source_resource_type)
+        runtime_resource_type = result.get("type")
+        if has_source_resource_type:
+            resource_type = source_resource_type
+        elif isinstance(runtime_resource_type, str) and runtime_resource_type:
+            resource_type = runtime_resource_type
+        else:
+            raise RuntimeError(
+                f"WBEACP: Typed resource is missing required type field in {manifest_rel_path}: {resource}."
+            )
         compiler = self._compiler_map.get(resource_type)
-        if compiler is not None:
+        if compiler is not None and (is_top_level or has_source_resource_type):
             # Compilers replace one typed source entry with one or more runtime
             # resource entries in the same manifest.
             replacement_resources = compiler.compile(result, Path(manifest_rel_path), self._res_dir, self._res_output_dir)
@@ -254,6 +271,10 @@ class WBEACP:
     def _validate_uncompiled_resource(self, resource: dict[str, Any], manifest_rel_path: str) -> dict[str, Any]:
         result = dict(resource)
         resource_type = str(result.get("type"))
+        if SOURCE_RESOURCE_TYPE_KEY in result or SOURCE_RESOURCE_FILE_KEY in result:
+            raise RuntimeError(
+                f"WBEACP: Resource type '{resource_type}' in {manifest_rel_path} still declares source-only fields after compilation."
+            )
         if "file" in result:
             raise RuntimeError(
                 f"WBEACP: Resource type '{resource_type}' declares file in {manifest_rel_path} but has no registered compiler."

@@ -22,7 +22,7 @@ from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompi
 class WBEACPCompilerMesh(WBEACPCompiler):
     """Compile mesh and submesh source geometry into runtime binary sections."""
 
-    _SOURCE_ONLY_FIELDS = {"vertices_data", "indices_data", "geometry_output_dir", "_geometry_output_name"}
+    _SOURCE_ONLY_FIELDS = {"vertices_data", "indices_data", "geometry_output_dir", "_geometry_output_name", "source_type", "source_file"}
     _SECTION_TYPES = {
         "position": "vec3",
         "normal": "vec3",
@@ -40,7 +40,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
-        resource_type = resource.get("type")
+        resource_type = resource.get("source_type", resource.get("type"))
         if resource_type == "mesh":
             return [self._compile_mesh(resource, manifest_path)]
         if resource_type == "submesh":
@@ -56,6 +56,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             )
 
         result = self._copy_runtime_fields(resource)
+        result.setdefault("type", "mesh")
         geometry_output_dir = resource.get("geometry_output_dir")
         submeshes = result.get("submeshes")
         if submeshes is None:
@@ -89,7 +90,9 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             )
         if has_runtime_geometry:
             self._validate_runtime_submesh(resource, manifest_path)
-            return self._copy_runtime_fields(resource)
+            result = self._copy_runtime_fields(resource)
+            result.setdefault("type", "submesh")
+            return result
         if has_inline_vertices != has_inline_indices:
             raise RuntimeError(
                 f"WBEACPCompilerMesh: inline submesh requires both vertices_data and indices_data in {manifest_path}."
@@ -113,6 +116,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         output_path.write_bytes(payload)
 
         result = self._copy_runtime_fields(resource)
+        result.setdefault("type", "submesh")
         result["geometry_path"] = output_rel_path.as_posix()
         result["geometry_sections"] = sections
         return result

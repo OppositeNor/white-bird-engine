@@ -16,8 +16,8 @@
     "resources": [
         {
             "id": "test_text",
-            "type": "text",
-            "file": "test_text_files/test_file_utf8.txt"
+            "source_type": "text",
+            "source_file": "test_text_files/test_file_utf8.txt"
         }
     ]
 }

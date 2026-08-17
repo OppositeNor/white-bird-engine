@@ -3,7 +3,7 @@
     "resources": [
         {
             "id": "deferred_gbuffer_shader",
-            "type": "shader",
+            "source_type": "shader",
             "src": "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang",
             "dst": "assets/shaders/deferred_gbuffer/deferred_gbuffer.spv",
             "metadata": "assets/shaders/deferred_gbuffer/deferred_gbuffer.json"

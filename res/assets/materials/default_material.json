@@ -8,8 +8,8 @@
                 {
                     "texture_key": "normal",
                     "texture": {
-                        "type": "image",
-                        "file": "assets/images/default_normal.png",
+                        "source_type": "image",
+                        "source_file": "assets/images/default_normal.png",
                         "color_space": "rgb",
                         "channel_count": 3
                     }
@@ -17,8 +17,8 @@
                 {
                     "texture_key": "albedo",
                     "texture": {
-                        "type": "image",
-                        "file": "assets/images/default_albedo.png",
+                        "source_type": "image",
+                        "source_file": "assets/images/default_albedo.png",
                         "color_space": "srgb",
                         "channel_count": 3
                     }
@@ -26,8 +26,8 @@
                 {
                     "texture_key": "roughness_metallic_ao",
                     "texture": {
-                        "type": "image",
-                        "file": "assets/images/default_rma.png",
+                        "source_type": "image",
+                        "source_file": "assets/images/default_rma.png",
                         "color_space": "rgb",
                         "channel_count": 3
                     }

@@ -3,7 +3,7 @@
     "resources": [
         {
             "id": "deferred_composition_shader",
-            "type": "shader",
+            "source_type": "shader",
             "src": "assets/shaders/deferred_composition/deferred_composition.slang",
             "dst": "assets/shaders/deferred_composition/deferred_composition.spv",
             "metadata": "assets/shaders/deferred_composition/deferred_composition.json"

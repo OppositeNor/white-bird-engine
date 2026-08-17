@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import shutil
 from typing import override
-from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
 
 
 class WBEACPCompilerFile(WBEACPCompiler):
@@ -33,10 +33,17 @@ class WBEACPCompilerFile(WBEACPCompiler):
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
-        resource_file = result.get("file")
-        if not isinstance(resource_file, str) or not resource_file:
+        resource_type = self._get_source_resource_type(result)
+        if resource_type is None:
             raise RuntimeError(
-                f"File resource must declare a non-empty 'file' field in {manifest_path}: {resource}."
+                f"File resource must declare a non-empty source type in {manifest_path}: {resource}."
+            )
+        result["type"] = resource_type
+
+        resource_file = self._get_source_resource_file(result)
+        if resource_file is None:
+            raise RuntimeError(
+                f"File resource must declare a non-empty source file field in {manifest_path}: {resource}."
             )
 
         source_path, relative_file = self._resolve_resource_file_path(resource_file, manifest_path, res_dir)
@@ -52,6 +59,7 @@ class WBEACPCompilerFile(WBEACPCompiler):
         shutil.copyfile(source_path, output_path)
 
         result["path"] = relative_output_file.as_posix()
-        if "file" in result:
-            del result["file"]
+        result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
+        result.pop(SOURCE_RESOURCE_FILE_KEY, None)
+        result.pop("file", None)
         return [result]

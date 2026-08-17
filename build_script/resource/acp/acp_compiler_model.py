@@ -30,20 +30,23 @@ class WBEACPCompilerModel(WBEACPCompiler):
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
-        resource_path = resource.get("file")
-        if not isinstance(resource_path, str) or not resource_path:
+        resource_path = self._get_source_resource_file(resource)
+        if resource_path is None:
             raise RuntimeError(
-                f"Model resource must declare a non-empty 'file' field in {manifest_path}: {resource}."
+                f"Model resource must declare a non-empty source file field in {manifest_path}: {resource}."
             )
 
         resolved_resource = dict(resource)
         source_path, _ = self._resolve_resource_file_path(resource_path, manifest_path, res_dir)
-        resolved_resource["path"] = source_path.as_posix()
+        resolved_resource["type"] = "model"
+        resolved_resource["file"] = source_path.as_posix()
         resolved_manifest_path = Path.joinpath(res_dir, manifest_path)
         mesh_resource = self._utils_mesh_compiler.compile_mesh(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
         material_resources = self._utils_mesh_compiler.compile_materials(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
         # Assimp converts imported UVs to a bottom-left origin, so generated textures must use the same convention.
         for material_resource in material_resources:
             for texture_binding in material_resource.get("textures", []):
-                texture_binding["texture"]["flip_v"] = True
+                texture = texture_binding["texture"]
+                texture["path"] = texture.pop("file")
+                texture["flip_v"] = True
         return [mesh_resource] + material_resources

@@ -2,10 +2,10 @@
     "resources": [
         {
             "id": "cube",
-            "type": "mesh",
+            "source_type": "mesh",
             "submeshes": [
                 {
-                    "type": "submesh",
+                    "source_type": "submesh",
                     "vertices_data": [
                         { "position": { "x": -0.5, "y": -0.5, "z":  0.5 }, "uv": { "u": 0.0, "v": 0.0 }, "normal": { "x": 0.0, "y": 0.0, "z": 1.0 } },
                         { "position": { "x":  0.5, "y": -0.5, "z":  0.5 }, "uv": { "u": 1.0, "v": 0.0 }, "normal": { "x": 0.0, "y": 0.0, "z": 1.0 } },

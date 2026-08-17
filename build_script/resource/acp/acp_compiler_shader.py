@@ -18,7 +18,7 @@ from pathlib import Path
 import subprocess
 import shutil
 from typing import Any, override
-from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
 import build_setup
 
 
@@ -41,6 +41,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
+        result.setdefault("type", self._get_source_resource_type(result) or "shader")
         metadata_rel_path = result.get("metadata")
         if not isinstance(metadata_rel_path, str) or not metadata_rel_path:
             raise RuntimeError(
@@ -71,6 +72,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             self._compile_resource(source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, result)
             result["path"] = dst_rel.as_posix()
             result["metadata"] = metadata_rel.as_posix()
+            result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
             if "src" in result:
                 del result["src"]
             if "dst" in result:
