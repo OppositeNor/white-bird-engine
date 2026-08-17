@@ -111,8 +111,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
 
     float3 f0 = lerp(float3(0.04), base_color, metallic);
 
-    float3 ambient = base_color * 0.03 * ambient_occlusion;
-    float3 color = ambient;
+    float3 color = float3(0.0);
     uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
         SpotLightInfo spot_light_info = light.lights[spot_light_index].info;
@@ -140,6 +139,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
         float shadow = spot_light_index == 0 ? compute_spot_shadow(spot_light_index, p_input.light_space_pos) : 1.0;
         color += (diffuse + specular) * radiance * ndotl * shadow;
     }
+    color *= ambient_occlusion;
     color = color / (color + float3(1.0));
     return float4(linear_to_srgb(color), 1.0);
 }

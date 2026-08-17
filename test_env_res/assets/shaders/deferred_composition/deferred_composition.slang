@@ -159,5 +159,4 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     color *= ambient_occlusion;
     color = color / (color + float3(1.0));
     return float4(linear_to_srgb(color), 1.0);
-    // return float4(float3(metallic), 1.0);
 }
