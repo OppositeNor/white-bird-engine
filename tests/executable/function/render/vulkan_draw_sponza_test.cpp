@@ -15,7 +15,6 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
@@ -33,11 +32,9 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
@@ -59,7 +56,6 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
