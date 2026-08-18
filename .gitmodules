@@ -43,3 +43,6 @@
 [submodule "dependencies/VulkanMemoryAllocator"]
 	path = dependencies/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "dependencies/KTX-Software"]
+	path = dependencies/KTX-Software
+	url = https://github.com/KhronosGroup/KTX-Software.git
