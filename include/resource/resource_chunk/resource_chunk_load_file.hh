@@ -28,6 +28,7 @@
 #include <cstring>
 #include <format>
 #include <functional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -43,11 +44,19 @@ using ParserResource = ParserJSON;
  * @class ResourceChunk
  * @brief Chunk of resources. Used for containing multiple resources to be
  * loaded and deloaded at once.
+ *
+ * Resource payload bytes are still stored in the chunk allocator, but resource
+ * units themselves may now be constructed in place and can have non-trivial
+ * destructors. Registered resource-unit destructors run in reverse
+ * construction order before the allocator stack memory is popped.
  * @todo Test
  */
 class ResourceChunkLoadFile final : public IResourceChunk {
 public:
     ~ResourceChunkLoadFile() {
+        for (const auto& resource_destructor : std::views::reverse(resource_destructors)) {
+            resource_destructor.destroy(resource_destructor.resource);
+        }
         allocator->pop_stack(total_size);
     }
     ResourceChunkLoadFile(const ResourceChunkLoadFile&) = delete;
@@ -127,7 +136,7 @@ protected:
         ref_map.push_back(ResourceReference{.assign_ref = std::move(p_assign_ref), .id = std::string(p_id)});
     }
 
-    virtual RefRes<char> push_res_unit_ptr(std::string_view p_res_key, const void* p_res, size_t p_size) override {
+    virtual ResUnitStorage reserve_res_unit_storage(std::string_view p_res_key, size_t p_size) override {
         if (!p_res_key.empty() && resource_map.contains(p_res_key)) {
             throw std::runtime_error(std::format("Redefinition of key: {}.", p_res_key));
         }
@@ -143,18 +152,23 @@ protected:
         }
         total_size += p_size;
         MemID result_mem_id = allocator->allocate(p_size);
-        auto* stored_resource = allocator->get(result_mem_id);
-        memcpy(stored_resource, p_res, p_size);
-        // Every manifest-backed resource unit derives from ResourceUnit.
-        static_cast<ResourceUnit*>(stored_resource)->resource_key = resource_key;
         RefRes<char> result(result_mem_id, allocator);
         if (!p_res_key.empty()) {
             resource_map[std::string(p_res_key)] = result;
         }
-        return result;
+        return ResUnitStorage{.resource = result, .resource_key = resource_key};
+    }
+
+    virtual void register_res_unit_destructor(void* p_resource, void (*p_destructor)(void*)) override {
+        resource_destructors.push_back(ResourceDestructor{.resource = p_resource, .destroy = p_destructor});
     }
 
 private:
+    struct ResourceDestructor {
+        void* resource;
+        void (*destroy)(void*);
+    };
+
     struct ResourceReference {
         std::function<void(RefRes<char>)> assign_ref;
         std::string id;
@@ -163,6 +177,7 @@ private:
     size_t total_size = 0;
     std::unordered_map<std::string, RefRes<char>, TransparentStrHash, TransparentEqual> resource_map;
     std::vector<ResourceReference> ref_map;
+    std::vector<ResourceDestructor> resource_destructors;
     // For resources that needs RAII support.
     std::vector<Unique<Object>> objects;
     StackAllocator* allocator;

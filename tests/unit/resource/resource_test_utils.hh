@@ -41,7 +41,8 @@ public:
         std::function<const void*(WBE::MemID)> get_data_const_callback = nullptr;
         std::function<std::vector<std::string>()> get_all_keys_callback = nullptr;
         std::function<bool(std::string_view)> contains_callback = nullptr;
-        std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)> push_res_unit_ptr_callback = nullptr;
+        std::function<WBE::RefRes<char>(std::string_view, size_t)> reserve_res_unit_storage_callback = nullptr;
+        std::function<void(void*, void (*)(void*))> register_res_unit_destructor_callback = nullptr;
         std::function<void(std::function<void(WBE::RefRes<char>)>, std::string_view)> create_ref_to_callback = nullptr;
 
         Builder& set_get_resource_callback(std::function<WBE::RefRes<char>(std::string_view)> p_callback) {
@@ -89,8 +90,13 @@ public:
             return *this;
         }
 
-        Builder& set_push_res_unit_ptr_callback(std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)> p_callback) {
-            push_res_unit_ptr_callback = p_callback;
+        Builder& set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)> p_callback) {
+            reserve_res_unit_storage_callback = p_callback;
+            return *this;
+        }
+
+        Builder& set_register_res_unit_destructor_callback(std::function<void(void*, void (*)(void*))> p_callback) {
+            register_res_unit_destructor_callback = p_callback;
             return *this;
         }
 
@@ -109,7 +115,8 @@ public:
                 get_data_const_callback,
                 get_all_keys_callback,
                 contains_callback,
-                push_res_unit_ptr_callback,
+                reserve_res_unit_storage_callback,
+                register_res_unit_destructor_callback,
                 create_ref_to_callback,
                 p_os);
         }
@@ -125,14 +132,16 @@ public:
         std::function<const void*(WBE::MemID)> p_get_data_const_cb,
         std::function<std::vector<std::string>()> p_get_all_keys_cb,
         std::function<bool(std::string_view)> p_contains_cb,
-        std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)> p_push_res_unit_ptr_cb,
+        std::function<WBE::RefRes<char>(std::string_view, size_t)> p_reserve_res_unit_storage_cb,
+        std::function<void(void*, void (*)(void*))> p_register_res_unit_destructor_cb,
         std::function<void(std::function<void(WBE::RefRes<char>)>, std::string_view)> p_create_ref_to_cb,
         std::ostream& p_os)
         : get_resource_callback(p_get_resource_cb), try_get_resource_callback(p_try_get_resource_cb),
           get_size_callback(p_get_size_cb), push_data_callback(p_push_data_cb), register_object_callback(p_register_object_cb),
-          get_data_callback(p_get_data_cb), get_data_const_callback(p_get_data_const_cb),
-          get_all_keys_callback(p_get_all_keys_cb), contains_callback(p_contains_cb),
-          push_res_unit_ptr_callback(p_push_res_unit_ptr_cb), create_ref_to_callback(p_create_ref_to_cb), os(&p_os) {
+          get_data_callback(p_get_data_cb), get_data_const_callback(p_get_data_const_cb), get_all_keys_callback(p_get_all_keys_cb),
+          contains_callback(p_contains_cb), reserve_res_unit_storage_callback(p_reserve_res_unit_storage_cb),
+          register_res_unit_destructor_callback(p_register_res_unit_destructor_cb),
+          create_ref_to_callback(p_create_ref_to_cb), os(&p_os) {
     }
 
     virtual WBE::RefRes<char> get_resource(std::string_view p_id) const override {
@@ -223,21 +232,30 @@ protected:
         (*os) << "create_ref_to p_ptr " << p_key << '\n';
     }
 
-    virtual WBE::RefRes<char> push_res_unit_ptr(std::string_view p_res_key, const void* p_res, size_t p_size) override {
+    virtual WBE::IResourceChunk::ResUnitStorage reserve_res_unit_storage(std::string_view p_res_key, size_t p_size) override {
         WBE::RefRes<char> ret = WBE::MEM_NULL;
-        if (push_res_unit_ptr_callback) {
-            ret = push_res_unit_ptr_callback(p_res_key, p_res, p_size);
+        if (reserve_res_unit_storage_callback) {
+            ret = reserve_res_unit_storage_callback(p_res_key, p_size);
         }
+        const char* resource_key = nullptr;
         if (!ret.is_null()) {
             auto resource = ret.force_cast<WBE::ResourceUnit>();
             resource->resource_key = nullptr;
             if (!p_res_key.empty()) {
                 resource_keys.emplace_back(p_res_key);
-                resource->resource_key = resource_keys.back().c_str();
+                resource_key = resource_keys.back().c_str();
+                resource->resource_key = resource_key;
             }
         }
-        (*os) << "push_res_unit_ptr " << p_res_key << " p_res " << p_size << '\n';
-        return ret;
+        (*os) << "reserve_res_unit_storage " << p_res_key << " " << p_size << '\n';
+        return WBE::IResourceChunk::ResUnitStorage{.resource = ret, .resource_key = resource_key};
+    }
+
+    virtual void register_res_unit_destructor(void* p_resource, void (*p_destructor)(void*)) override {
+        if (register_res_unit_destructor_callback) {
+            register_res_unit_destructor_callback(p_resource, p_destructor);
+        }
+        (*os) << "register_res_unit_destructor " << p_resource << '\n';
     }
 
 private:
@@ -250,7 +268,8 @@ private:
     std::function<const void*(WBE::MemID)> get_data_const_callback;
     std::function<std::vector<std::string>()> get_all_keys_callback;
     std::function<bool(std::string_view)> contains_callback;
-    std::function<WBE::RefRes<char>(std::string_view, const void*, size_t)> push_res_unit_ptr_callback;
+    std::function<WBE::RefRes<char>(std::string_view, size_t)> reserve_res_unit_storage_callback;
+    std::function<void(void*, void (*)(void*))> register_res_unit_destructor_callback;
     std::function<void(std::function<void(WBE::RefRes<char>)>, std::string_view)> create_ref_to_callback;
     std::deque<std::string> resource_keys;
     std::ostream* os;

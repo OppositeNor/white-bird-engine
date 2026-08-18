@@ -30,6 +30,10 @@ namespace WhiteBirdEngine {
 /**
  * @class ResourceUnit
  * @brief Base type for manifest-loaded resource units.
+ *
+ * Resource units are stored inside resource chunks and may now be constructed
+ * and destructed explicitly by the chunk. They are no longer required to be
+ * trivially destructible.
  */
 struct ResourceUnit {
     /**
@@ -170,16 +174,16 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeVideo : public RUScheme {
  * @brief Audio data resource. Contains description of an audio,
  * and a MemID referencing the resource of the audio data.
  *
- * The audio data should always be pushed as data before pushing this
- * description, and the release process should always be backwards
- * (first release the resource unit and then remove the data). It is
- * recommended to store the audio data right before the audio description
- * in a stack allocator.
+ * When this unit references chunk-owned payload data, push that payload before
+ * emplacing the resource unit so addresses stay stable inside the stack
+ * allocator. Chunk teardown now runs any registered resource-unit destructors
+ * before releasing the underlying stack storage.
  */
 struct RUAudio : public ResourceUnit {
     /**
      * @brief Configurations to this resource unit.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum AudioConfig {
         // Should the audio be streamed. If true, then audio data will be a
         // stb_vorbis object.
@@ -208,10 +212,10 @@ struct RUAudio : public ResourceUnit {
  * @brief Binary resource unit. contains a size (in bytes) and a MemID pointing
  * to the data chunk that stores the data of the binary data.
  *
- * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit,
- * and then release the data) It is recommended to store the image data right
- * before the text resource unit in a stack allocator.
+ * Push the payload data before emplacing this unit when it references
+ * chunk-owned memory. Chunk teardown runs registered resource-unit destructors
+ * before releasing the allocator storage that backs both the unit and its
+ * payload.
  *
  */
 struct RUBinary : public ResourceUnit {
@@ -234,17 +238,17 @@ struct RUFont : public ResourceUnit {
  * @brief Image resource unit. Contains descriptions of an image
  * resource and a MemID to the resource of the image data.
  *
- * The image data should always be pushed as data before pushing this
- * description, and the release process should always be backwards
- * (first release the resource unit and then remove the data). It is
- * recommended to store the image data right before the image description
- * in a stack allocator.
+ * When this unit references chunk-owned image payload data, push that payload
+ * before emplacing the unit so the stored references remain valid. Chunk
+ * teardown runs registered resource-unit destructors before releasing the
+ * underlying stack storage.
  *
  */
 struct RUImage : public ResourceUnit {
     /**
      * @brief Configurations to this resource unit.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum ImageConfig {
         // Is the image an HDR image (32 bit instead of 8 bit)
         IS_HDR,
@@ -271,10 +275,10 @@ struct RUImage : public ResourceUnit {
  * the NUL terminater) and a MemID pointing to the data chunk that stores the
  * data of the string (ends with a NUL terminater).
  *
- * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit,
- * and then release the data) It is recommended to store the image data right
- * before the text resource unit in a stack allocator.
+ * Push the string payload before emplacing this unit when it references
+ * chunk-owned memory. Chunk teardown runs registered resource-unit destructors
+ * before releasing the allocator storage that backs both the unit and its
+ * payload.
  */
 struct RUText : public ResourceUnit {
     // The encoding type.

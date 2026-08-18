@@ -24,6 +24,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -37,10 +38,20 @@ constexpr ResourceChunkID RES_CHUNK_NULL = 0x0;
  * @class IResourceChunk
  * @brief Interface for chunk of resources. Used for containing multiple
  * resources to be loaded and deloaded at once.
+ *
+ * Resource units stored in a chunk are not required to be trivially
+ * destructible. Chunks may reserve uninitialized storage, construct units
+ * in place, and register destructors to be run before the backing allocator
+ * memory is released.
  * @todo Test
  */
 class IResourceChunk {
 public:
+    struct ResUnitStorage {
+        RefRes<char> resource;
+        const char* resource_key = nullptr;
+    };
+
     IResourceChunk() = default;
     virtual ~IResourceChunk() = default;
     IResourceChunk(const IResourceChunk&) = default;
@@ -143,15 +154,46 @@ public:
     /**
      * @brief Push a resource unit to the chunk.
      *
+     * Stores a constructed copy of @p p_res inside chunk-owned storage. When
+     * the resource unit type has a non-trivial destructor, the chunk will
+     * register teardown so destruction happens before the chunk releases its
+     * allocator memory.
+     *
      * @tparam T The type of the resource unit.
      * @param p_id The identifier of the resource unit.
-     * @param p_allocator The allocator to allocate memory.
      * @param p_res The resource unit instance.
-     * @return The memory id of the pushed resource unit.
+     * @return The resource reference to the stored resource unit.
      */
     template <ResourceUnitConcept T>
     RefRes<char> push_res_unit(std::string_view p_id, const T& p_res) {
-        return push_res_unit_ptr(p_id, &p_res, sizeof(T));
+        RefRes<T> stored_resource = emplace_res_unit<T>(p_id, p_res);
+        return stored_resource.template force_cast<char>();
+    }
+
+    /**
+     * @brief Construct a resource unit directly inside chunk-owned storage.
+     *
+     * This is the preferred path for resource units that need real
+     * constructors or destructors. The chunk reserves storage, constructs the
+     * unit in place, assigns the stable resource key, and registers a
+     * destructor callback when @p T is not trivially destructible.
+     *
+     * @tparam T The type of the resource unit.
+     * @param p_id The identifier of the resource unit.
+     * @param p_args The arguments forwarded to the resource unit constructor.
+     * @return The typed reference to the constructed resource unit.
+     */
+    template <ResourceUnitConcept T, typename... Args>
+    RefRes<T> emplace_res_unit(std::string_view p_id, Args&&... p_args) {
+        ResUnitStorage storage = reserve_res_unit_storage(p_id, sizeof(T));
+        T* stored_resource = new (storage.resource.get()) T(std::forward<Args>(p_args)...);
+        stored_resource->resource_key = storage.resource_key;
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            register_res_unit_destructor(storage.resource.get(), [](void* p_resource) {
+                static_cast<T*>(p_resource)->~T();
+            });
+        }
+        return storage.resource.template force_cast<T>();
     }
 
     /**
@@ -188,13 +230,25 @@ protected:
     virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, std::string_view p_key) = 0;
 
     /**
-     * @brief Push the resource unit pointer to the chunk.
+     * @brief Reserve uninitialized storage for a resource unit.
      *
      * @param p_res_key The key of the resource unit.
-     * @param p_res The pointer to the resource unit.
      * @param p_size The size of the resource unit.
+     * @return The storage handle containing the reserved bytes and the
+     * chunk-owned stable resource key.
      */
-    virtual RefRes<char> push_res_unit_ptr(std::string_view p_res_key, const void* p_res, size_t p_size) = 0;
+    virtual ResUnitStorage reserve_res_unit_storage(std::string_view p_res_key, size_t p_size) = 0;
+
+    /**
+     * @brief Register a destructor callback for a non-trivial resource unit.
+     *
+     * The callback will be invoked before the chunk releases the allocator
+     * memory backing the resource unit.
+     *
+     * @param p_resource The resource instance to destroy.
+     * @param p_destructor The type-erased destructor callback.
+     */
+    virtual void register_res_unit_destructor(void* p_resource, void (*p_destructor)(void*)) = 0;
 };
 
 } // namespace WhiteBirdEngine

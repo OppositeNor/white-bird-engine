@@ -200,10 +200,10 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
  * @brief Shader resource unit. Contains a word count and a MemID pointing to
  * the data chunk that stores the SPIR-V words.
  *
- * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit,
- * and then release the data) It is recommended to store the image data right
- * before the text resource unit in a stack allocator.
+ * Push any chunk-owned payload data before emplacing this unit so the stored
+ * references remain valid. Chunk teardown now runs registered resource-unit
+ * destructors before releasing the allocator storage behind the unit and its
+ * payload.
  *
  */
 struct RUShader : public ResourceUnit {
@@ -281,10 +281,10 @@ struct RUMaterial : public ResourceUnit {
  * @class RUSubmesh3D
  * @brief 3D submesh resource unit.
  *
- * The data should always be pushed before pushing this resource unit, and the
- * release process should always be backwards (first release the resource unit,
- * and then release the data) It is recommended to store the image data right
- * before the text resource unit in a stack allocator.
+ * Push any chunk-owned geometry payload before emplacing this unit so the
+ * stored references remain valid. Chunk teardown now runs registered
+ * resource-unit destructors before releasing the allocator storage behind the
+ * unit and its payload.
  */
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.
