@@ -44,9 +44,9 @@ const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_
 }
 
 RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) {
-    auto result = p_res_chunk.push_data(p_str.size() + 1, p_str.data());
-    result.get()[p_str.size()] = '\0';
-    return result;
+    std::string nul_terminated_text(p_str);
+    nul_terminated_text.push_back('\0');
+    return p_res_chunk.push_data(nul_terminated_text.size(), nul_terminated_text.data());
 }
 
 } // namespace

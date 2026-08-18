@@ -270,7 +270,7 @@ TEST_F(ResourcePopulatorTest, ResourceChunkLoadFileDestroysNonTrivialResourceUni
     std::vector<int> destroy_order;
 
     {
-        WBE::ResourceChunkLoadFile resource_chunk("global_resources", stack_allocator);
+        WBE::ResourceChunkLoadFile resource_chunk("res_chunks/empty_resource_chunk.json", stack_allocator);
         auto first_resource = resource_chunk.emplace_res_unit<ResourceUnitLoaderTestSupport::OrderedDestroyTestResourceUnit>(
             "destroy_order_first", &destroy_order, 1);
         auto second_resource = resource_chunk.emplace_res_unit<ResourceUnitLoaderTestSupport::OrderedDestroyTestResourceUnit>(
@@ -290,17 +290,27 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     WBE::ResourceUnitLoaderText loader;
     std::stringstream ss;
     std::string text_content_storage;
-    RefResHolder res_holder;
+    WBE::StackAllocator stack_allocator(1024);
+    WBE::RefRes<WBE::RUText> captured_ru_text = WBE::MEM_NULL;
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
-                             [&text_content_storage, &res_holder](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                             [&text_content_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
                                  text_content_storage.resize(p_res_size - 1);
                                  std::memcpy(text_content_storage.data(), p_res, p_res_size - 1);
                                  EXPECT_EQ(static_cast<const char*>(p_res)[p_res_size - 1], '\0');
-                                 return res_holder.res;
+                                 return WBE::MEM_NULL;
                              }))
+                         .set_reserve_res_unit_storage_callback(
+                             [&captured_ru_text, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(p_size, sizeof(WBE::RUText));
+                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                 captured_ru_text = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUText>();
+                                 return captured_ru_text.force_cast<char>();
+                             })
                          .build(ss);
     loader.populate_scheme(*res_chunk, text_scheme);
+    ASSERT_NE(captured_ru_text, nullptr);
+    EXPECT_EQ(captured_ru_text->size, test_file_content.size() + 1);
     EXPECT_EQ(text_content_storage, test_file_content);
 }
 
