@@ -44,7 +44,7 @@ void ResourceUnitLoaderComponent::populate_scheme_from_data(IResourceChunk& p_re
     throw_loader_not_implemented("component");
 }
 
-std::any ResourceUnitLoaderComponent::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderComponent::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     (void)p_res_chunk;
     (void)p_scheme;
     throw_loader_not_implemented("component");
@@ -61,7 +61,7 @@ void ResourceUnitLoaderPrefab::populate_scheme_from_data(IResourceChunk& p_res_c
     throw_loader_not_implemented("prefab");
 }
 
-std::any ResourceUnitLoaderPrefab::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderPrefab::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     (void)p_res_chunk;
     (void)p_scheme;
     throw_loader_not_implemented("prefab");
@@ -78,7 +78,7 @@ void ResourceUnitLoaderWorld::populate_scheme_from_data(IResourceChunk& p_res_ch
     throw_loader_not_implemented("world");
 }
 
-std::any ResourceUnitLoaderWorld::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderWorld::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     (void)p_res_chunk;
     (void)p_scheme;
     throw_loader_not_implemented("world");
@@ -95,7 +95,7 @@ void ResourceUnitLoaderScene::populate_scheme_from_data(IResourceChunk& p_res_ch
     throw_loader_not_implemented("scene");
 }
 
-std::any ResourceUnitLoaderScene::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+std::any ResourceUnitLoaderScene::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     (void)p_res_chunk;
     (void)p_scheme;
     throw_loader_not_implemented("scene");

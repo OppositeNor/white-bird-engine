@@ -34,7 +34,7 @@ public:
     /** @return A read-only view containing the component resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 /**
@@ -46,7 +46,7 @@ public:
     /** @return A read-only view containing the prefab resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 /**
@@ -58,7 +58,7 @@ public:
     /** @return A read-only view containing the world resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 /**
@@ -70,7 +70,7 @@ public:
     /** @return A read-only view containing the scene resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 } // namespace WhiteBirdEngine

@@ -55,12 +55,12 @@ template <typename T>
 using RefRes = RefRaw<T, IAllocator, false>;
 
 /**
- * @class ResourceScheme
+ * @class ResourceSchema
  * @brief The scheme of a resource unit.
  *
  */
-struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
-    WBE_DECL_SERIALIZABLE(RUScheme)
+struct WBE_META(WBE_SERIALIZABLE) RUSchema : public Serializable {
+    WBE_DECL_SERIALIZABLE(RUSchema)
     // The id of the resource. Default to empty string, which is an ananymous
     // resource.
     WBE_META(WBE_REFLECT)
@@ -71,11 +71,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUScheme : public Serializable {
 };
 
 /**
- * @class RUSchemeAudio
+ * @class RUSchemaAudio
  * @brief The scheme of RUAudio.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeAudio final : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeAudio)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaAudio final : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaAudio)
     // Sample rate of the audio. Could be read from file.
     WBE_META(WBE_REFLECT)
     int32_t sample_rate = -1;
@@ -101,31 +101,31 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeAudio final : public RUScheme {
 };
 
 /**
- * @class RUSchemeBinary
+ * @class RUSchemaBinary
  * @brief The scheme of RUBinary.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeBinary : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeBinary)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaBinary : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaBinary)
     // The path to the binary file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
 };
 
 /**
- * @class RUSchemeFont
+ * @class RUSchemaFont
  * @brief The scheme of RUFont.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeFont : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeFont)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaFont : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaFont)
     // TODO
 };
 
 /**
- * @class RUSchemeImage
+ * @class RUSchemaImage
  * @brief The scheme of RUImage.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeImage : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeImage)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaImage : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaImage)
     // The channel count of the image. Read from file if set to 0.
     WBE_META(WBE_REFLECT)
     uint32_t channel_count = 0;
@@ -147,11 +147,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeImage : public RUScheme {
 };
 
 /**
- * @class RUSchemeText
+ * @class RUSchemaText
  * @brief The scheme of RUText.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeText : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeText)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaText : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaText)
     // The path to the text file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
@@ -161,11 +161,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeText : public RUScheme {
 };
 
 /**
- * @class RUSchemeVideo
+ * @class RUSchemaVideo
  * @brief The scheme of RUVideo.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeVideo : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeVideo)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaVideo : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaVideo)
     // TODO
 };
 

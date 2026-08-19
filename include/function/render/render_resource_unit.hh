@@ -28,11 +28,11 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RUSchemeShader
+ * @class RUSchemaShader
  * @brief The scheme of RUShader.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeShader)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaShader : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaShader)
     // The path to the shader file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
@@ -57,11 +57,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeShader : public RUScheme {
 };
 
 /**
- * @class RUSchemeGraphicsPipeline
+ * @class RUSchemaGraphicsPipeline
  * @brief The scheme of RUGraphicsPipeline.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeGraphicsPipeline)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaGraphicsPipeline)
     // The resource ID of the vertex shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> vertex_stage_id;
@@ -70,7 +70,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::optional<std::string> vertex_stage_entry;
     // The vertex shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeShader> vertex_stage;
+    std::optional<RUSchemaShader> vertex_stage;
     // The resource ID of the tessellation shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> tessellation_stage_id;
@@ -79,7 +79,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::optional<std::string> tessellation_stage_entry;
     // The tessellation shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeShader> tessellation_stage;
+    std::optional<RUSchemaShader> tessellation_stage;
     // The resource ID of the geometry shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> geometry_stage_id;
@@ -88,7 +88,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::optional<std::string> geometry_stage_entry;
     // The geometry shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeShader> geometry_stage;
+    std::optional<RUSchemaShader> geometry_stage;
     // The resource ID of the fragment shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> fragment_stage_id;
@@ -97,7 +97,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
     std::optional<std::string> fragment_stage_entry;
     // The fragment shader of the pipeline.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeShader> fragment_stage;
+    std::optional<RUSchemaShader> fragment_stage;
     // Should enable depth test.
     WBE_META(WBE_REFLECT)
     bool depth_test = true;
@@ -110,43 +110,43 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeGraphicsPipeline : public RUScheme {
 };
 
 /**
- * @class RUSchemeMaterialTextureSlot
+ * @class RUSchemaMaterialTextureSlot
  * @brief The scheme of one texture slot in RUMaterial.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeMaterialTextureSlot {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
     // The key used by the material shader to find this texture.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string texture_key;
     // Inline texture data.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeImage> texture;
+    std::optional<RUSchemaImage> texture;
     // A string referencing an already populated texture.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> texture_id;
 };
 
 /**
- * @class RUSchemeMaterial
+ * @class RUSchemaMaterial
  * @brief The scheme of RUMaterial.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeMaterial : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeMaterial)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaMaterial)
     // The graphics pipelines that can render this material.
     WBE_META(WBE_REFLECT)
     std::vector<std::string> graphics_pipeline_ids;
     // The inline graphics pipeline used to render this material.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeGraphicsPipeline> graphics_pipeline;
+    std::optional<RUSchemaGraphicsPipeline> graphics_pipeline;
     // The texture slots used by this material.
     WBE_META(WBE_REFLECT)
-    std::vector<RUSchemeMaterialTextureSlot> textures;
+    std::vector<RUSchemaMaterialTextureSlot> textures;
 };
 
 /**
- * @class RUSchemeSubmesh3DGeometrySection
+ * @class RUSchemaSubmesh3DGeometrySection
  * @brief Byte-addressed geometry section inside a submesh sidecar binary.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeSubmesh3DGeometrySection {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3DGeometrySection {
     // The geometry slot stored by this section.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string slot;
@@ -162,14 +162,14 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemeSubmesh3DGeometrySection {
 };
 
 /**
- * @class RUSchemeSubmesh3D
+ * @class RUSchemaSubmesh3D
  * @brief The scheme of RUSubmesh3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeSubmesh3D)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaSubmesh3D : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaSubmesh3D)
     // The material if it could be populated in place.
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemeMaterial> material;
+    std::optional<RUSchemaMaterial> material;
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> material_id;
@@ -178,18 +178,18 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemeSubmesh3D : public RUScheme {
     std::string geometry_path;
     // Byte-addressed sections inside the geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemeSubmesh3DGeometrySection> geometry_sections;
+    std::vector<RUSchemaSubmesh3DGeometrySection> geometry_sections;
 };
 
 /**
- * @class RUSchemeMesh3D
+ * @class RUSchemaMesh3D
  * @brief The scheme of RUMesh3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeMesh3D : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeMesh3D)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaMesh3D)
     // Submeshes that could be populated in place.
     WBE_META(WBE_REFLECT)
-    std::vector<RUSchemeSubmesh3D> submeshes;
+    std::vector<RUSchemaSubmesh3D> submeshes;
     // Submesh ids referencing unpopulated submeshes.
     WBE_META(WBE_REFLECT)
     std::vector<std::string> submeshes_id;

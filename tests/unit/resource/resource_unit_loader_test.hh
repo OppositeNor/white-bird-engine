@@ -116,7 +116,7 @@ protected:
     }
 
     std::unique_ptr<WBE::Global> global;
-    WBE::RUSchemeText text_scheme;
+    WBE::RUSchemaText text_scheme;
     std::string test_file_content = R"txt(这是一个测试文本。
 English text is also supported.
 日本語テキストもサポート。
@@ -320,7 +320,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     WBE::StackAllocator stack_allocator(1024);
     std::vector<uint8_t> binary_data_storage;
     WBE::RefRes<WBE::RUBinary> captured_ru_binary = WBE::MEM_NULL;
-    WBE::RUSchemeBinary binary_scheme;
+    WBE::RUSchemaBinary binary_scheme;
     binary_scheme.path = "assets/images/default_albedo.png";
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback([&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
@@ -352,7 +352,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     WBE::StackAllocator stack_allocator(1024);
     std::vector<char> image_data_storage;
     WBE::RefRes<WBE::RUImage> captured_ru_image = WBE::MEM_NULL;
-    WBE::RUSchemeImage image_scheme;
+    WBE::RUSchemaImage image_scheme;
     image_scheme.path = "assets/images/test_ppm3.ppm";
     image_scheme.color_space = "srgb";
     auto res_chunk = MockResourceChunk::Builder()
@@ -393,7 +393,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
     WBE::StackAllocator stack_allocator(1024);
     std::vector<char> image_data_storage;
     WBE::RefRes<WBE::RUImage> captured_ru_image = WBE::MEM_NULL;
-    WBE::RUSchemeImage image_scheme;
+    WBE::RUSchemaImage image_scheme;
     image_scheme.path = "assets/images/test_ppm3.ppm";
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(

@@ -22,43 +22,43 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RUSchemeComponent
+ * @class RUSchemaComponent
  * @brief Placeholder scheme for a serialized component resource.
  *
  * @todo Define the component type and value representation.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeComponent : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeComponent)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaComponent : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaComponent)
 };
 
 /**
- * @class RUSchemePrefab
+ * @class RUSchemaPrefab
  * @brief Placeholder scheme for a prefab resource.
  *
  * @todo Define node hierarchy and component references.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemePrefab : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemePrefab)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaPrefab : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaPrefab)
 };
 
 /**
- * @class RUSchemeWorld
+ * @class RUSchemaWorld
  * @brief Placeholder scheme for a world resource.
  *
  * @todo Define render-graph, mesh, prefab, and component references.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeWorld : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeWorld)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaWorld : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaWorld)
 };
 
 /**
- * @class RUSchemeScene
+ * @class RUSchemaScene
  * @brief Placeholder scheme for a scene resource.
  *
  * @todo Define world references and initial active-world selection.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemeScene : public RUScheme {
-    WBE_DECL_SERIALIZABLE(RUSchemeScene)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaScene : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaScene)
 };
 
 /**

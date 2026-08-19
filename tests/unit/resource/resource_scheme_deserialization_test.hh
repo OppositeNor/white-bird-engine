@@ -27,7 +27,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-class WBEResourceSchemeDeserializationTest : public ::testing::Test {
+class WBEResourceSchemaDeserializationTest : public ::testing::Test {
 protected:
     void SetUp() override {
         global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
@@ -40,7 +40,7 @@ protected:
     std::unique_ptr<WBE::Global> global;
 };
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_text_01",
@@ -51,7 +51,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
+    WBE::RUSchemaText scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_text_01");
     ASSERT_EQ(scheme.type, "text");
@@ -59,7 +59,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextGeneral) {
     ASSERT_EQ(scheme.encode_type, "utf8");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextDefaults) {
     std::string json_buffer = R"(
     {
         "id": "test_text_02",
@@ -69,7 +69,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
+    WBE::RUSchemaText scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_text_02");
     ASSERT_EQ(scheme.type, "text");
@@ -77,7 +77,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextDefaults) {
     ASSERT_EQ(scheme.encode_type, "utf8");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaAudioGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_audio_01",
@@ -93,7 +93,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeAudio scheme;
+    WBE::RUSchemaAudio scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_audio_01");
     ASSERT_EQ(scheme.type, "audio");
@@ -106,7 +106,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioGeneral) {
     ASSERT_EQ(scheme.path, "audio/test_audio_01.wav");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioDefaults) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaAudioDefaults) {
     std::string json_buffer = R"(
     {
         "id": "test_audio_02",
@@ -117,7 +117,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioDefaults) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeAudio scheme;
+    WBE::RUSchemaAudio scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_audio_02");
     ASSERT_EQ(scheme.type, "audio");
@@ -130,7 +130,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioDefaults) {
     ASSERT_EQ(scheme.path, "audio/test_audio_02.ogg");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_image_01",
@@ -143,7 +143,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeImage scheme;
+    WBE::RUSchemaImage scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
@@ -153,7 +153,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageGeneral) {
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageHDR) {
     std::string json_buffer = R"(
     {
         "id": "test_image_hdr",
@@ -166,7 +166,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeImage scheme;
+    WBE::RUSchemaImage scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
@@ -176,7 +176,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageHDR) {
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageDefaults) {
     std::string json_buffer = R"(
     {
         "id": "test_image_minimal",
@@ -186,7 +186,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeImage scheme;
+    WBE::RUSchemaImage scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_image_minimal");
     ASSERT_EQ(scheme.type, "image");
@@ -198,7 +198,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageDefaults) {
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBinaryGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaBinaryGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_binary_01",
@@ -208,14 +208,14 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBinaryGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeBinary scheme;
+    WBE::RUSchemaBinary scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_binary_01");
     ASSERT_EQ(scheme.type, "binary");
     ASSERT_EQ(scheme.path, "data/test_binary_01.bin");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_submesh_01",
@@ -236,7 +236,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeSubmesh3D scheme;
+    WBE::RUSchemaSubmesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_submesh_01");
     ASSERT_EQ(scheme.type, "submesh3d");
@@ -257,7 +257,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DGeneral) {
     ASSERT_EQ(scheme.geometry_sections[3].type, "uint32");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DMinimal) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DMinimal) {
     std::string json_buffer = R"(
     {
         "id": "test_submesh_minimal",
@@ -268,7 +268,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DMinimal) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeSubmesh3D scheme;
+    WBE::RUSchemaSubmesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_submesh_minimal");
     ASSERT_EQ(scheme.type, "submesh3d");
@@ -278,7 +278,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeSubmesh3DMinimal) {
     ASSERT_FALSE(scheme.material.has_value());
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
     std::string json_buffer = R"(
     {
         "id": "test_mesh_01",
@@ -302,7 +302,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeMesh3D scheme;
+    WBE::RUSchemaMesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_mesh_01");
     ASSERT_EQ(scheme.type, "mesh");
@@ -314,7 +314,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshGeneral) {
     ASSERT_EQ(scheme.submeshes_id[1], "submesh_ref_02");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshEmpty) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshEmpty) {
     std::string json_buffer = R"(
     {
         "id": "test_mesh_empty",
@@ -323,7 +323,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshEmpty) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeMesh3D scheme;
+    WBE::RUSchemaMesh3D scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_mesh_empty");
     ASSERT_EQ(scheme.type, "mesh");
@@ -332,8 +332,8 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMeshEmpty) {
 }
 
 // Basic tests for TODO schemes to ensure they can be deserialized
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeFont) {
-    // TODO: Expand this test once RUSchemeFont is fully implemented
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaFont) {
+    // TODO: Expand this test once RUSchemaFont is fully implemented
     std::string json_buffer = R"(
     {
         "id": "test_font_01",
@@ -342,14 +342,14 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeFont) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeFont scheme;
+    WBE::RUSchemaFont scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_font_01");
     ASSERT_EQ(scheme.type, "font");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeVideo) {
-    // TODO: Expand this test once RUSchemeVideo is fully implemented
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaVideo) {
+    // TODO: Expand this test once RUSchemaVideo is fully implemented
     std::string json_buffer = R"(
     {
         "id": "test_video_01",
@@ -358,13 +358,13 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeVideo) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeVideo scheme;
+    WBE::RUSchemaVideo scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_video_01");
     ASSERT_EQ(scheme.type, "video");
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     std::string json_buffer = R"(
     {
         "id": "test_material_01",
@@ -390,7 +390,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeMaterial scheme;
+    WBE::RUSchemaMaterial scheme;
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_material_01");
     ASSERT_EQ(scheme.type, "material");
@@ -412,7 +412,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeMaterial) {
     ASSERT_EQ(scheme.textures[1].texture.value().channel_count, 3U);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingType) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaBaseMissingType) {
     std::string json_buffer = R"(
     {
         "id": "test_resource",
@@ -421,12 +421,12 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingType) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
-    // Should throw because type is required in base RUScheme
+    WBE::RUSchemaText scheme;
+    // Should throw because type is required in base RUSchema
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingBothIdAndType) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaBaseMissingBothIdAndType) {
     std::string json_buffer = R"(
     {
         "path": "texts/test.txt"
@@ -434,12 +434,12 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeBaseMissingBothIdAndType) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
-    // Should throw because both id and type are required in base RUScheme
+    WBE::RUSchemaText scheme;
+    // Should throw because both id and type are required in base RUSchema
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingType) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageMissingType) {
     std::string json_buffer = R"(
     {
         "id": "test_image",
@@ -451,12 +451,12 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingType) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeImage scheme;
-    // Should throw because type is required in base RUScheme
+    WBE::RUSchemaImage scheme;
+    // Should throw because type is required in base RUSchema
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextMissingRequiredField) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextMissingRequiredField) {
     std::string json_buffer = R"(
     {
         "id": "test_text_error",
@@ -465,12 +465,12 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeTextMissingRequiredField) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeText scheme;
+    WBE::RUSchemaText scheme;
     // Should throw because path is required
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioMissingRequiredFields) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaAudioMissingRequiredFields) {
     std::string json_buffer = R"(
     {
         "id": "test_audio_error",
@@ -479,12 +479,12 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeAudioMissingRequiredFields)
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeAudio scheme;
+    WBE::RUSchemaAudio scheme;
     // Should throw because is_stream and path are required
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 
-TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingRequiredFields) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageMissingRequiredFields) {
     std::string json_buffer = R"(
     {
         "id": "test_image_error",
@@ -493,7 +493,7 @@ TEST_F(WBEResourceSchemeDeserializationTest, RUSchemeImageMissingRequiredFields)
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemeImage scheme;
+    WBE::RUSchemaImage scheme;
     // Should throw because channel_count, color_space, is_hdr, and path are required
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }

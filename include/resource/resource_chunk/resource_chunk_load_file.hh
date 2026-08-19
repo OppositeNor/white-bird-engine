@@ -219,7 +219,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
     std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
     for (auto& res : resources) {
         // Use generic scheme only for quick type/id extraction during dispatch.
-        RUScheme resource_scheme;
+        RUSchema resource_scheme;
         resource_scheme.deserialize(res);
         if (!resource_scheme.id.empty()) {
             if (resource_map.contains(resource_scheme.id)) {

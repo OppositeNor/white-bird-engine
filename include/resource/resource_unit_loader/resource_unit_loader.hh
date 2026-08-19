@@ -50,7 +50,7 @@ public:
      * @param p_res_chunk The resource chunk to populate the scheme into.
      * @param p_scheme The scheme to populate.
      */
-    void populate_scheme(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
+    void populate_scheme(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
         (void)populate_scheme_ptr(p_res_chunk, p_scheme);
     }
 
@@ -69,7 +69,7 @@ public:
      * @param p_scheme The scheme to populate.
      * @return A type-erased reference to the resource unit in the chunk.
      */
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const = 0;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const = 0;
 };
 
 class ResourceUnitLoaderAudio final : public IResourceUnitLoader {
@@ -78,7 +78,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderBinary final : public IResourceUnitLoader {
@@ -87,7 +87,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderFont final : public IResourceUnitLoader {
@@ -96,7 +96,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderImage final : public IResourceUnitLoader {
@@ -105,7 +105,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderText final : public IResourceUnitLoader {
@@ -114,7 +114,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderVideo final : public IResourceUnitLoader {
@@ -123,7 +123,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 } // namespace WhiteBirdEngine

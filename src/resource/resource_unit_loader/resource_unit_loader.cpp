@@ -31,9 +31,9 @@
 namespace WhiteBirdEngine {
 namespace {
 
-template <typename SchemeType>
-const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_expected_type) {
-    const auto* typed_scheme = dynamic_cast<const SchemeType*>(&p_scheme);
+template <typename SchemaType>
+const SchemaType& get_typed_scheme(const RUSchema& p_scheme, std::string_view p_expected_type) {
+    const auto* typed_scheme = dynamic_cast<const SchemaType*>(&p_scheme);
     if (typed_scheme == nullptr) {
         throw std::runtime_error(std::format("Failed to populate resource: expected typed scheme {} "
                                              "but got type {}.",
@@ -56,8 +56,8 @@ std::span<const std::string> ResourceUnitLoaderAudio::get_supported_resource_typ
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderAudio::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeAudio>(p_scheme, "audio");
+std::any ResourceUnitLoaderAudio::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaAudio>(p_scheme, "audio");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
@@ -65,7 +65,7 @@ std::any ResourceUnitLoaderAudio::populate_scheme_ptr(IResourceChunk& p_res_chun
 }
 
 void ResourceUnitLoaderAudio::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeAudio scheme;
+    RUSchemaAudio scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -75,8 +75,8 @@ std::span<const std::string> ResourceUnitLoaderBinary::get_supported_resource_ty
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeBinary>(p_scheme, "binary");
+std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaBinary>(p_scheme, "binary");
     auto file_path = get_resource_path(typed_scheme.path);
     auto file_content = load_binary_file(static_cast<std::string>(file_path).c_str());
     auto data = p_res_chunk.push_data(file_content.size(), file_content.data());
@@ -87,7 +87,7 @@ std::any ResourceUnitLoaderBinary::populate_scheme_ptr(IResourceChunk& p_res_chu
 }
 
 void ResourceUnitLoaderBinary::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeBinary scheme;
+    RUSchemaBinary scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -97,8 +97,8 @@ std::span<const std::string> ResourceUnitLoaderFont::get_supported_resource_type
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderFont::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeFont>(p_scheme, "font");
+std::any ResourceUnitLoaderFont::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaFont>(p_scheme, "font");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
@@ -106,7 +106,7 @@ std::any ResourceUnitLoaderFont::populate_scheme_ptr(IResourceChunk& p_res_chunk
 }
 
 void ResourceUnitLoaderFont::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeFont scheme;
+    RUSchemaFont scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -116,8 +116,8 @@ std::span<const std::string> ResourceUnitLoaderImage::get_supported_resource_typ
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeImage>(p_scheme, "image");
+std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaImage>(p_scheme, "image");
     auto file_path = get_resource_path(typed_scheme.path);
     uint32_t width, height, file_channels;
     RUImage resource_unit;
@@ -152,7 +152,7 @@ std::any ResourceUnitLoaderImage::populate_scheme_ptr(IResourceChunk& p_res_chun
 }
 
 void ResourceUnitLoaderImage::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeImage scheme;
+    RUSchemaImage scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -162,8 +162,8 @@ std::span<const std::string> ResourceUnitLoaderText::get_supported_resource_type
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeText>(p_scheme, "text");
+std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaText>(p_scheme, "text");
     auto file_path = get_resource_path(typed_scheme.path);
     std::string file_content = load_text_file(static_cast<std::string>(file_path).c_str());
     auto data = populate_text(p_res_chunk, file_content);
@@ -175,7 +175,7 @@ std::any ResourceUnitLoaderText::populate_scheme_ptr(IResourceChunk& p_res_chunk
 }
 
 void ResourceUnitLoaderText::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeText scheme;
+    RUSchemaText scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -185,8 +185,8 @@ std::span<const std::string> ResourceUnitLoaderVideo::get_supported_resource_typ
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderVideo::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeVideo>(p_scheme, "video");
+std::any ResourceUnitLoaderVideo::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaVideo>(p_scheme, "video");
     (void)p_res_chunk;
     (void)typed_scheme;
     // TODO
@@ -194,7 +194,7 @@ std::any ResourceUnitLoaderVideo::populate_scheme_ptr(IResourceChunk& p_res_chun
 }
 
 void ResourceUnitLoaderVideo::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeVideo scheme;
+    RUSchemaVideo scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }

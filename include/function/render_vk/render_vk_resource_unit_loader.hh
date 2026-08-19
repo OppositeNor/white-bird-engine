@@ -32,7 +32,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 // TODO: Test
@@ -42,7 +42,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 // TODO: Test
@@ -52,7 +52,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 
 private:
     ResourceUnitLoaderImage image_loader;
@@ -64,7 +64,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 class ResourceUnitLoaderSubmesh final : public IResourceUnitLoader {
@@ -73,7 +73,7 @@ public:
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
 
 protected:
-    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const override;
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
 void register_renderer_vk_resource_unit_loaders();

@@ -80,12 +80,12 @@ size_t get_geometry_element_size(const GeometrySlotInfo& p_slot_info) {
     return p_slot_info.component_count * p_slot_info.component_size;
 }
 
-size_t get_geometry_element_count(const RUSchemeSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info) {
+size_t get_geometry_element_count(const RUSchemaSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info) {
     return p_section.size / get_geometry_element_size(p_slot_info);
 }
 
 void validate_geometry_section_bounds(
-    const RUSchemeSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info, size_t p_geometry_size) {
+    const RUSchemaSubmesh3DGeometrySection& p_section, const GeometrySlotInfo& p_slot_info, size_t p_geometry_size) {
     if (p_section.start > p_geometry_size || p_section.size > p_geometry_size - p_section.start) {
         throw std::runtime_error(std::format("Failed to populate submesh resource unit: geometry section '{}' range [{}, {}) exceeds file size {}.",
             p_section.slot,
@@ -109,9 +109,9 @@ void validate_geometry_section_bounds(
     }
 }
 
-std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> validate_geometry_sections(
-    const RUSchemeSubmesh3D& p_scheme, size_t p_geometry_size) {
-    std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> sections_by_slot{};
+std::array<const RUSchemaSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> validate_geometry_sections(
+    const RUSchemaSubmesh3D& p_scheme, size_t p_geometry_size) {
+    std::array<const RUSchemaSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> sections_by_slot{};
     for (const auto& section : p_scheme.geometry_sections) {
         const GeometrySlotInfo* slot_info = get_geometry_slot_info(section.slot);
         if (slot_info == nullptr) {
@@ -157,21 +157,21 @@ std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()> 
 }
 
 std::array<float, 3> read_geometry_vec3(
-    const std::vector<uint8_t>& p_geometry_data, const RUSchemeSubmesh3DGeometrySection& p_section, size_t p_index) {
+    const std::vector<uint8_t>& p_geometry_data, const RUSchemaSubmesh3DGeometrySection& p_section, size_t p_index) {
     std::array<float, 3> value{};
     std::memcpy(value.data(), p_geometry_data.data() + p_section.start + p_index * sizeof(value), sizeof(value));
     return value;
 }
 
 std::array<float, 2> read_geometry_vec2(
-    const std::vector<uint8_t>& p_geometry_data, const RUSchemeSubmesh3DGeometrySection& p_section, size_t p_index) {
+    const std::vector<uint8_t>& p_geometry_data, const RUSchemaSubmesh3DGeometrySection& p_section, size_t p_index) {
     std::array<float, 2> value{};
     std::memcpy(value.data(), p_geometry_data.data() + p_section.start + p_index * sizeof(value), sizeof(value));
     return value;
 }
 
 void apply_geometry_vec3_section(const std::vector<uint8_t>& p_geometry_data,
-    const RUSchemeSubmesh3DGeometrySection* p_section,
+    const RUSchemaSubmesh3DGeometrySection* p_section,
     std::vector<Vertex3DTextured>& p_vertices,
     glm::vec3 Vertex3DTextured::* p_member_ptr) {
     if (p_section == nullptr) {
@@ -184,7 +184,7 @@ void apply_geometry_vec3_section(const std::vector<uint8_t>& p_geometry_data,
 }
 
 void apply_geometry_vec2_section(const std::vector<uint8_t>& p_geometry_data,
-    const RUSchemeSubmesh3DGeometrySection* p_section,
+    const RUSchemaSubmesh3DGeometrySection* p_section,
     std::vector<Vertex3DTextured>& p_vertices,
     glm::vec2 Vertex3DTextured::* p_member_ptr) {
     if (p_section == nullptr) {
@@ -197,7 +197,7 @@ void apply_geometry_vec2_section(const std::vector<uint8_t>& p_geometry_data,
 }
 
 std::vector<Vertex3DTextured> build_vertices_from_geometry_sections(const std::vector<uint8_t>& p_geometry_data,
-    const std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot) {
+    const std::array<const RUSchemaSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot) {
     const auto* position_info = get_geometry_slot_info("position");
     const auto* position_section = p_sections_by_slot[get_geometry_slot_index(*position_info)];
     std::vector<Vertex3DTextured> vertices(get_geometry_element_count(*position_section, *position_info));
@@ -228,7 +228,7 @@ std::vector<Vertex3DTextured> build_vertices_from_geometry_sections(const std::v
 }
 
 std::vector<uint32_t> build_indices_from_geometry_sections(const std::vector<uint8_t>& p_geometry_data,
-    const std::array<const RUSchemeSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot,
+    const std::array<const RUSchemaSubmesh3DGeometrySection*, GEOMETRY_SLOT_INFOS.size()>& p_sections_by_slot,
     size_t p_vertex_count) {
     const auto* index_info = get_geometry_slot_info("index");
     const auto* index_section = p_sections_by_slot[get_geometry_slot_index(*index_info)];
@@ -249,9 +249,9 @@ std::vector<uint32_t> build_indices_from_geometry_sections(const std::vector<uin
     return indices;
 }
 
-template <typename SchemeType>
-const SchemeType& get_typed_scheme(const RUScheme& p_scheme, std::string_view p_expected_type) {
-    const auto* typed_scheme = dynamic_cast<const SchemeType*>(&p_scheme);
+template <typename SchemaType>
+const SchemaType& get_typed_scheme(const RUSchema& p_scheme, std::string_view p_expected_type) {
+    const auto* typed_scheme = dynamic_cast<const SchemaType*>(&p_scheme);
     if (typed_scheme == nullptr) {
         throw std::runtime_error(std::format("Failed to populate resource: expected typed scheme {} "
                                              "but got type {}.",
@@ -274,7 +274,7 @@ RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, std::string_v
     return p_res_chunk.push_res_unit("", resource_unit).force_cast<RUText>();
 }
 
-RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemeImage& p_scheme) {
+RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemaImage& p_scheme) {
     if (p_scheme.path.empty()) {
         throw std::runtime_error("Failed to populate image resource: inline image requires path.");
     }
@@ -283,7 +283,7 @@ RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSch
         static_cast<const IResourceUnitLoader&>(image_loader).populate_scheme_ptr(p_res_chunk, p_scheme));
 }
 
-RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemeShader& p_scheme) {
+RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemaShader& p_scheme) {
     auto file_path = get_resource_path(p_scheme.path);
     auto file_content = load_binary_file<uint32_t>(static_cast<std::string>(file_path).c_str());
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
@@ -302,7 +302,7 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
 void populate_pipeline_stage(IResourceChunk& p_res_chunk,
     RefRes<RUShader>& p_stage,
     const std::optional<std::string>& p_stage_id,
-    const std::optional<RUSchemeShader>& p_stage_scheme,
+    const std::optional<RUSchemaShader>& p_stage_scheme,
     std::string_view p_stage_name,
     bool p_is_required = true) {
     if (p_stage_id.has_value()) {
@@ -342,11 +342,11 @@ std::string_view resolve_pipeline_stage_entry(const std::optional<std::string>& 
     return {};
 }
 
-bool scheme_has_pipeline_stage(const std::optional<std::string>& p_stage_id, const std::optional<RUSchemeShader>& p_stage_scheme) {
+bool scheme_has_pipeline_stage(const std::optional<std::string>& p_stage_id, const std::optional<RUSchemaShader>& p_stage_scheme) {
     return p_stage_id.has_value() || p_stage_scheme.has_value();
 }
 
-RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemeGraphicsPipeline& p_scheme) {
+RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemaGraphicsPipeline& p_scheme) {
     RUGraphicsPipeline resource_unit;
     populate_pipeline_stage(p_res_chunk, resource_unit.vertex_stage, p_scheme.vertex_stage_id, p_scheme.vertex_stage, "vertex");
     populate_pipeline_stage(
@@ -379,7 +379,7 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     return saved_resource;
 }
 
-RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeMaterial& p_material) {
+RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) {
     const bool has_inline_pipeline = p_material.graphics_pipeline.has_value();
     if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
         throw std::runtime_error("Failed to populate material resource: graphics_pipeline_ids or inline graphics_pipeline is required.");
@@ -433,7 +433,7 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemeM
     return saved_resource;
 }
 
-void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
+void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
     if (!p_scheme.material_id.has_value()) {
         if (!p_scheme.material.has_value()) {
             throw std::runtime_error("Failed to populate submesh resource unit: material_id or inline material is required.");
@@ -466,7 +466,7 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemeSubmesh3D& 
     p_resource_unit.triangles_count = triangles.size();
 }
 
-void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemeSubmesh3D& p_scheme) {
+void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemaSubmesh3D& p_scheme) {
     if (p_scheme.material_id.has_value()) {
         p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id.value());
     }
@@ -479,13 +479,13 @@ std::span<const std::string> ResourceUnitLoaderShader::get_supported_resource_ty
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderShader::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeShader>(p_scheme, "shader");
+std::any ResourceUnitLoaderShader::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaShader>(p_scheme, "shader");
     return populate_shader_resource(p_res_chunk, typed_scheme);
 }
 
 void ResourceUnitLoaderShader::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeShader scheme;
+    RUSchemaShader scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -495,14 +495,14 @@ std::span<const std::string> ResourceUnitLoaderGraphicsPipeline::get_supported_r
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeGraphicsPipeline>(p_scheme, "graphics_pipeline");
+std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaGraphicsPipeline>(p_scheme, "graphics_pipeline");
     return populate_graphics_pipeline_resource(p_res_chunk, typed_scheme);
 }
 
 void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(
     IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeGraphicsPipeline scheme;
+    RUSchemaGraphicsPipeline scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -512,13 +512,13 @@ std::span<const std::string> ResourceUnitLoaderMaterial::get_supported_resource_
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderMaterial::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeMaterial>(p_scheme, "material");
+std::any ResourceUnitLoaderMaterial::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaMaterial>(p_scheme, "material");
     return resolve_material(p_res_chunk, typed_scheme);
 }
 
 void ResourceUnitLoaderMaterial::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeMaterial scheme;
+    RUSchemaMaterial scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -528,8 +528,8 @@ std::span<const std::string> ResourceUnitLoaderMesh::get_supported_resource_type
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeMesh3D>(p_scheme, "mesh");
+std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaMesh3D>(p_scheme, "mesh");
     RUMesh3D resource_unit;
     std::vector<RefRes<RUSubmesh3D>> submeshes;
     submeshes.reserve(typed_scheme.submeshes.size() + typed_scheme.submeshes_id.size());
@@ -550,7 +550,7 @@ std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk
 }
 
 void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeMesh3D scheme;
+    RUSchemaMesh3D scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -560,8 +560,8 @@ std::span<const std::string> ResourceUnitLoaderSubmesh::get_supported_resource_t
     return supported_resource_types;
 }
 
-std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUScheme& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemeSubmesh3D>(p_scheme, "submesh");
+std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaSubmesh3D>(p_scheme, "submesh");
     RUSubmesh3D resource_unit;
     resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
     auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUSubmesh3D>();
@@ -570,7 +570,7 @@ std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_ch
 }
 
 void ResourceUnitLoaderSubmesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemeSubmesh3D scheme;
+    RUSchemaSubmesh3D scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
