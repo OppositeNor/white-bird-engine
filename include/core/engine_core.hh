@@ -21,8 +21,6 @@
 #include "core/engine_config/engine_config.hh"
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
-#include "generated/label_manager.gen.hh"
-#include "generated/type_uuid.gen.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
 #include "utils/interface/i_singleton.hh"
@@ -108,11 +106,11 @@ public:
     /**
      * @brief Manager for the labels.
      */
-    LabelManager* label_manager = nullptr;
+    class LabelManager* label_manager = nullptr;
     /**
      * @brief Manager for type UUIDs.
      */
-    TypeUUIDManager* type_uuid_manager = nullptr;
+    class TypeUUIDManager* type_uuid_manager = nullptr;
     /**
      * @brief Factory for constructing serializable objects by reflected name.
      */
