@@ -308,10 +308,13 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
 
 std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const ShaderMetadata& p_vertex_shader_metadata,
     std::string_view p_vertex_stage_entry,
+    const ShaderMetadata* p_geometry_shader_metadata,
+    std::string_view p_geometry_stage_entry,
     const ShaderMetadata& p_fragment_shader_metadata,
     std::string_view p_fragment_stage_entry) {
     std::vector<ShaderDescriptorBindingVK> result;
     append_stage_descriptor_bindings(result, &p_vertex_shader_metadata, p_vertex_stage_entry, "vertex");
+    append_stage_descriptor_bindings(result, p_geometry_shader_metadata, p_geometry_stage_entry, "geometry");
     append_stage_descriptor_bindings(result, &p_fragment_shader_metadata, p_fragment_stage_entry, "fragment");
     return result;
 }

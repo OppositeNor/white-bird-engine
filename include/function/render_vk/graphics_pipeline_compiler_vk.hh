@@ -148,8 +148,10 @@ private:
     Ref<ROGraphicsPipelineVK> compile_graphics_pipeline(std::string_view p_resource_key,
         const RUGraphicsPipeline& p_pipeline_resource,
         Ref<ROShaderVK> p_vertex_shader,
+        Ref<ROShaderVK> p_geometry_shader,
         Ref<ROShaderVK> p_fragment_shader,
         std::string_view p_vertex_stage_entry,
+        std::string_view p_geometry_stage_entry,
         std::string_view p_fragment_stage_entry,
         Ref<ROPipelineLayoutVK> p_pipeline_layout);
     std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(std::string_view p_resource_key,

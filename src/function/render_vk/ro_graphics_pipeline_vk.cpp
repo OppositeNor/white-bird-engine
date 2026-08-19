@@ -56,16 +56,22 @@ VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_in
 
 void ROGraphicsPipelineVK::init(const Config& p_config) {
     const auto& vertex_stage = WBE_REQUIRED(p_config.shader.vertex_shader);
+    const bool has_geometry_stage = p_config.shader.geometry_shader.has_value();
     const auto& fragment_stage = WBE_REQUIRED(p_config.shader.fragment_shader);
 
     // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
-    shader_stages.reserve(4); // We can have a maximum of 4 shader stages
+    shader_stages.reserve(5); // We can have a maximum of 5 shader stages
                               // (vertex, TSC, TSE, geometry, fragment)
     shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertex_stage));
+    if (has_geometry_stage) {
+        shader_stages.push_back(
+            get_shader_stage_create_info(VK_SHADER_STAGE_GEOMETRY_BIT, WBE_REQUIRED(p_config.shader.geometry_shader)));
+    }
     shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_stage));
-    // TODO: TSC, TSE and geometry shader
+    // TODO: TSC and TSE shaders
     exposed_fields.vertex_shader = vertex_stage.shader;
+    exposed_fields.geometry_shader = has_geometry_stage ? WBE_REQUIRED(p_config.shader.geometry_shader).shader : MEM_NULL;
     exposed_fields.fragment_shader = fragment_stage.shader;
 
     // Setup create information for states.

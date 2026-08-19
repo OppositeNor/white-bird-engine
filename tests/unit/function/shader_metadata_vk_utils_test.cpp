@@ -107,4 +107,61 @@ TEST(WBEShaderMetadataVKUtilsTest, SharesVariableDescriptorBudgetAcrossDescripto
     EXPECT_THROW(set_variable_descriptor_count_upper_bounds(set_layouts, 4), std::runtime_error);
 }
 
+TEST(WBEShaderMetadataVKUtilsTest, MergesGeometryStageDescriptorBindingsIntoGraphicsPipelineLayouts) {
+    ShaderMetadata vertex_metadata;
+    ShaderMetadataParameter vertex_uniform;
+    vertex_uniform.name = "vertex_ubo";
+    vertex_uniform.binding.kind = "descriptorTableSlot";
+    vertex_uniform.binding.space = 0;
+    vertex_uniform.binding.index = 0;
+    vertex_uniform.binding.size = 64;
+    vertex_uniform.type.kind = "constantBuffer";
+    vertex_metadata.parameters.push_back(vertex_uniform);
+    ShaderMetadataEntryPoint vertex_entry_point;
+    vertex_entry_point.name = "vertex_main";
+    vertex_entry_point.stage = "vertex";
+    vertex_metadata.entry_points.push_back(vertex_entry_point);
+
+    ShaderMetadata geometry_metadata;
+    ShaderMetadataParameter geometry_texture;
+    geometry_texture.name = "geometry_texture";
+    geometry_texture.binding.kind = "descriptorTableSlot";
+    geometry_texture.binding.space = 1;
+    geometry_texture.binding.index = 2;
+    geometry_texture.type.kind = "resource";
+    geometry_texture.type.scalar_type = "texture2D";
+    geometry_metadata.parameters.push_back(geometry_texture);
+    ShaderMetadataEntryPoint geometry_entry_point;
+    geometry_entry_point.name = "geometry_main";
+    geometry_entry_point.stage = "geometry";
+    geometry_metadata.entry_points.push_back(geometry_entry_point);
+
+    ShaderMetadata fragment_metadata;
+    ShaderMetadataParameter fragment_sampler;
+    fragment_sampler.name = "fragment_sampler";
+    fragment_sampler.binding.kind = "descriptorTableSlot";
+    fragment_sampler.binding.space = 1;
+    fragment_sampler.binding.index = 3;
+    fragment_sampler.type.kind = "samplerState";
+    fragment_metadata.parameters.push_back(fragment_sampler);
+    ShaderMetadataEntryPoint fragment_entry_point;
+    fragment_entry_point.name = "fragment_main";
+    fragment_entry_point.stage = "fragment";
+    fragment_metadata.entry_points.push_back(fragment_entry_point);
+
+    std::vector<ShaderDescriptorBindingVK> bindings = collect_graphics_pipeline_descriptor_bindings(
+        vertex_metadata, "vertex_main", &geometry_metadata, "geometry_main", fragment_metadata, "fragment_main");
+
+    ASSERT_EQ(bindings.size(), 3U);
+    EXPECT_EQ(bindings[0].parameter_name, "vertex_ubo");
+    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_VERTEX_BIT);
+    EXPECT_EQ(bindings[1].parameter_name, "geometry_texture");
+    EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
+    EXPECT_EQ(bindings[1].layout_binding.stageFlags, VK_SHADER_STAGE_GEOMETRY_BIT);
+    EXPECT_EQ(bindings[2].parameter_name, "fragment_sampler");
+    EXPECT_EQ(bindings[2].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLER);
+    EXPECT_EQ(bindings[2].layout_binding.stageFlags, VK_SHADER_STAGE_FRAGMENT_BIT);
+}
+
 } // namespace WhiteBirdEngine

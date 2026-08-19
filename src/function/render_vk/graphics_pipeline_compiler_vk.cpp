@@ -509,20 +509,42 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
             std::format("Failed to compile graphics pipeline '{}': vertex and fragment stages are required.", p_resource_key));
     }
     auto vertex_shader = compile_shader(p_pipeline_resource->vertex_stage);
+    Ref<ROShaderVK> geometry_shader = MEM_NULL;
     auto fragment_shader = compile_shader(p_pipeline_resource->fragment_stage);
     auto vertex_shader_metadata = load_shader_metadata(p_pipeline_resource->vertex_stage);
+    std::optional<ShaderMetadata> geometry_shader_metadata;
     auto fragment_shader_metadata = load_shader_metadata(p_pipeline_resource->fragment_stage);
     std::string vertex_stage_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->vertex_stage, vertex_shader_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
+    std::string geometry_stage_entry;
+    if (p_pipeline_resource->geometry_stage != nullptr) {
+        geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
+        geometry_shader_metadata = load_shader_metadata(p_pipeline_resource->geometry_stage);
+        geometry_stage_entry = resolve_pipeline_stage_entry(
+            p_pipeline_resource->geometry_stage, *geometry_shader_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
+    }
     std::string fragment_stage_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->fragment_stage, fragment_shader_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
     auto descriptor_bindings = collect_graphics_pipeline_descriptor_bindings(
-        vertex_shader_metadata, vertex_stage_entry, fragment_shader_metadata, fragment_stage_entry);
+        vertex_shader_metadata,
+        vertex_stage_entry,
+        geometry_shader_metadata.has_value() ? &(*geometry_shader_metadata) : nullptr,
+        geometry_stage_entry,
+        fragment_shader_metadata,
+        fragment_stage_entry);
     auto descriptor_set_layouts = compile_descriptor_set_layouts(p_resource_key, descriptor_bindings);
     auto pipeline_layout = compile_pipeline_layout(p_resource_key, descriptor_set_layouts);
     CompiledPipelineObjects result;
     result.graphics_pipeline = compile_graphics_pipeline(
-        p_resource_key, *p_pipeline_resource, vertex_shader, fragment_shader, vertex_stage_entry, fragment_stage_entry, pipeline_layout);
+        p_resource_key,
+        *p_pipeline_resource,
+        vertex_shader,
+        geometry_shader,
+        fragment_shader,
+        vertex_stage_entry,
+        geometry_stage_entry,
+        fragment_stage_entry,
+        pipeline_layout);
     result.descriptor_sets =
         compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     result.descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings);
@@ -600,8 +622,10 @@ Ref<ROPipelineLayoutVK> GraphicsPipelineCompilerVK::compile_pipeline_layout(
 Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(std::string_view p_resource_key,
     const RUGraphicsPipeline& p_pipeline_resource,
     Ref<ROShaderVK> p_vertex_shader,
+    Ref<ROShaderVK> p_geometry_shader,
     Ref<ROShaderVK> p_fragment_shader,
     std::string_view p_vertex_stage_entry,
+    std::string_view p_geometry_stage_entry,
     std::string_view p_fragment_stage_entry,
     Ref<ROPipelineLayoutVK> p_pipeline_layout) {
     auto graphics_pipeline = get_registered_render_object<ROGraphicsPipelineVK>(
@@ -613,6 +637,9 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     // Shader config connects compiled shader modules to their manifest-defined entry points.
     ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
     shader_config.set_shaders(p_vertex_shader, p_fragment_shader, p_vertex_stage_entry, p_fragment_stage_entry);
+    if (p_geometry_shader != MEM_NULL) {
+        shader_config.set_geometry_shader(p_geometry_shader, p_geometry_stage_entry);
+    }
     auto pipeline_builder =
         ROGraphicsPipelineVK::Builder().default_render_opaque_configuration(context.render_data, shader_config, p_pipeline_layout);
     pipeline_builder.config.attachment_config.set_color_formats(context.color_attachment_formats)

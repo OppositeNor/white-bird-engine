@@ -125,6 +125,8 @@ std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
  */
 std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const ShaderMetadata& p_vertex_shader_metadata,
     std::string_view p_vertex_stage_entry,
+    const ShaderMetadata* p_geometry_shader_metadata,
+    std::string_view p_geometry_stage_entry,
     const ShaderMetadata& p_fragment_shader_metadata,
     std::string_view p_fragment_stage_entry);
 

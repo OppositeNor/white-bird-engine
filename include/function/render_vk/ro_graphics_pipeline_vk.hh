@@ -58,9 +58,11 @@ public:
             };
             // The vertex shader stage.
             Required<ShaderStage> vertex_shader;
+            // The geometry shader stage.
+            Required<ShaderStage> geometry_shader;
             // The fragment shader stage.
             Required<ShaderStage> fragment_shader;
-            // TODO: TSC TSE and Geometry shader setup
+            // TODO: TSC TSE shader setup
 
             /**
              * @brief Set vertex shader stage.
@@ -81,6 +83,17 @@ public:
              */
             ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
                 fragment_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader};
+                return *this;
+            }
+
+            /**
+             * @brief Set geometry shader stage.
+             *
+             * @param p_shader The shader instance.
+             * @return *this
+             */
+            ShaderConfig& set_geometry_shader(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
+                geometry_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader};
                 return *this;
             }
 
@@ -767,8 +780,9 @@ public:
 
     struct ExposedFields {
         Ref<const ROShaderVK> vertex_shader;
+        Ref<const ROShaderVK> geometry_shader;
         Ref<const ROShaderVK> fragment_shader;
-        // TODO: TSC TSE geometry shaders
+        // TODO: TSC TSE shaders
         Ref<const ROPipelineLayoutVK> pipeline_layout;
     };
 
