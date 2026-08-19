@@ -16,5 +16,6 @@
 #include "accessor_test.hh"
 #include "deserializer_test_json.hh"
 #include "deserializer_test_yaml.hh"
+#include "factory_test.hh"
 #include "serializer_test.hh"
 // NOLINTEND

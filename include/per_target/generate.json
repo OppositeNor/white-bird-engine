@@ -21,6 +21,16 @@
     },
     {
         "out_dir" : "${include_dir}/per_target/${build_target}/generated",
+        "output_name" : "serializable_factory.gen.hh",
+        "template" : "serializable_factory.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "serializables" : ".serializables",
+            "static_serializables" : ".static_serializables"
+        }
+    },
+    {
+        "out_dir" : "${include_dir}/per_target/${build_target}/generated",
         "output_name" : "label_manager.gen.hh",
         "template" : "label_manager.hh.jinja",
         "data" : {
