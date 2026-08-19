@@ -16,6 +16,7 @@
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
+#include "generated/serializables_access.gen.hh"
 #include "core/surface/3d_primitive.hh"
 #include "function/render/render_resource_unit.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
@@ -172,24 +173,26 @@ std::array<float, 2> read_geometry_vec2(
 void apply_geometry_vec3_section(const std::vector<uint8_t>& p_geometry_data,
     const RUSchemeSubmesh3DGeometrySection* p_section,
     std::vector<Vertex3DTextured>& p_vertices,
-    void (*p_assign)(Vertex3DTextured&, const std::array<float, 3>&)) {
+    glm::vec3 Vertex3DTextured::* p_member_ptr) {
     if (p_section == nullptr) {
         return;
     }
     for (size_t i = 0; i < p_vertices.size(); ++i) {
-        p_assign(p_vertices[i], read_geometry_vec3(p_geometry_data, *p_section, i));
+        const auto value = read_geometry_vec3(p_geometry_data, *p_section, i);
+        p_vertices[i].*p_member_ptr = {value[0], value[1], value[2]};
     }
 }
 
 void apply_geometry_vec2_section(const std::vector<uint8_t>& p_geometry_data,
     const RUSchemeSubmesh3DGeometrySection* p_section,
     std::vector<Vertex3DTextured>& p_vertices,
-    void (*p_assign)(Vertex3DTextured&, const std::array<float, 2>&)) {
+    glm::vec2 Vertex3DTextured::* p_member_ptr) {
     if (p_section == nullptr) {
         return;
     }
     for (size_t i = 0; i < p_vertices.size(); ++i) {
-        p_assign(p_vertices[i], read_geometry_vec2(p_geometry_data, *p_section, i));
+        const auto value = read_geometry_vec2(p_geometry_data, *p_section, i);
+        p_vertices[i].*p_member_ptr = {value[0], value[1]};
     }
 }
 
@@ -198,25 +201,29 @@ std::vector<Vertex3DTextured> build_vertices_from_geometry_sections(const std::v
     const auto* position_info = get_geometry_slot_info("position");
     const auto* position_section = p_sections_by_slot[get_geometry_slot_index(*position_info)];
     std::vector<Vertex3DTextured> vertices(get_geometry_element_count(*position_section, *position_info));
-    apply_geometry_vec3_section(p_geometry_data, position_section, vertices, [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) {
-        p_vertex.position = {p_value[0], p_value[1], p_value[2]};
-    });
-    apply_geometry_vec3_section(p_geometry_data,
-        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("normal"))],
-        vertices,
-        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.normal = {p_value[0], p_value[1], p_value[2]}; });
-    apply_geometry_vec3_section(p_geometry_data,
-        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("tangent"))],
-        vertices,
-        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.tangent = {p_value[0], p_value[1], p_value[2]}; });
-    apply_geometry_vec3_section(p_geometry_data,
-        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("bitangent"))],
-        vertices,
-        [](Vertex3DTextured& p_vertex, const std::array<float, 3>& p_value) { p_vertex.bitangent = {p_value[0], p_value[1], p_value[2]}; });
-    apply_geometry_vec2_section(p_geometry_data,
-        p_sections_by_slot[get_geometry_slot_index(*get_geometry_slot_info("uv"))],
-        vertices,
-        [](Vertex3DTextured& p_vertex, const std::array<float, 2>& p_value) { p_vertex.uv = {p_value[0], p_value[1]}; });
+    SerializableAccess<Vertex3DTextured> accessor;
+    for (size_t slot_index = 0; slot_index < GEOMETRY_SLOT_INFOS.size(); ++slot_index) {
+        const auto& slot_info = GEOMETRY_SLOT_INFOS[slot_index];
+        const auto* section = p_sections_by_slot[slot_index];
+        if (section == nullptr || slot_info.slot == "index") {
+            continue;
+        }
+
+        if (slot_info.type == "vec3") {
+            auto member_ptr = accessor.get_pointer_to_member<glm::vec3>(slot_info.slot);
+            apply_geometry_vec3_section(p_geometry_data, section, vertices, member_ptr);
+            continue;
+        }
+
+        if (slot_info.type == "vec2") {
+            auto member_ptr = accessor.get_pointer_to_member<glm::vec2>(slot_info.slot);
+            apply_geometry_vec2_section(p_geometry_data, section, vertices, member_ptr);
+            continue;
+        }
+
+        throw std::runtime_error(std::format(
+            "Failed to populate submesh resource unit: unsupported vertex attribute type '{}' for slot '{}'.", slot_info.type, slot_info.slot));
+    }
     return vertices;
 }
 
