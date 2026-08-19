@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the slot.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3D {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_ALIASES = [vertex_3d]) Vertex3D {
     /**
      * @brief The position of the vertex.
      */
@@ -78,7 +78,7 @@ struct Triangle3D {
 /**
  * @brief Textured vertex.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) Vertex3DTextured {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_ALIASES = [vertex_3d_textured]) Vertex3DTextured {
     /**
      * @brief The position of the vertex.
      */
@@ -136,7 +136,11 @@ struct Triangle3DIndx {
     uint32_t obj_id;
 };
 
-using Triangle3DIndxTextured = Triangle3DIndx<Vertex3DTextured>;
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_ALIASES = [triangle_3d_indx_vertex_3d]) Triangle3DIndxVertex3D final
+    : public Triangle3DIndx<Vertex3D> {};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_ALIASES = [triangle_3d_indx_textured]) Triangle3DIndxTextured final
+    : public Triangle3DIndx<Vertex3DTextured> {};
 } // namespace WhiteBirdEngine
 
 #endif

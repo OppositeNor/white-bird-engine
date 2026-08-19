@@ -19,7 +19,9 @@
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
 #include "core/reflection/serializable.hh"
+#include "core/surface/3d_primitive.hh"
 #include "generated/serializable_factory.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "reflection_test_data.hh"
@@ -49,7 +51,8 @@ TEST_F(WBESerializableFactoryTest, CreatesSerializableObjectByName) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(R"({"si32_test":3,"str_test":"Hello!","optional_str_test":"Optional hello!"})");
 
-    WBE::Unique<WBE::Serializable> created = WBE::SerializableFactory::create_serializable_object_unique("TestSerializable", parser.get_data());
+    WBE::Unique<WBE::Serializable> created =
+        WBE::SerializableFactory::create_serializable_object_unique("TestSerializable", parser.get_data());
     auto* serializable = dynamic_cast<WBE::TestSerializable*>(created.get());
 
     ASSERT_NE(serializable, nullptr);
@@ -63,7 +66,8 @@ TEST_F(WBESerializableFactoryTest, CreatesSerializableRefByName) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(R"({"si32_test":7,"str_test":"Hello ref!"})");
 
-    WBE::Ref<WBE::Serializable> created = WBE::SerializableFactory::create_serializable_object_ref("TestSerializable", parser.get_data());
+    WBE::Ref<WBE::Serializable> created =
+        WBE::SerializableFactory::create_serializable_object_ref("TestSerializable", parser.get_data());
     auto* serializable = dynamic_cast<WBE::TestSerializable*>(created.get());
 
     ASSERT_NE(serializable, nullptr);
@@ -75,7 +79,8 @@ TEST_F(WBESerializableFactoryTest, CreatesSerializableByAliasName) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(R"({"display_name":"aliased","required_alias":55})");
 
-    WBE::Unique<WBE::Serializable> created = WBE::SerializableFactory::create_serializable_object_unique("TestSerializableAlias", parser.get_data());
+    WBE::Unique<WBE::Serializable> created =
+        WBE::SerializableFactory::create_serializable_object_unique("TestSerializableAlias", parser.get_data());
     auto* serializable = dynamic_cast<WBE::TestSerializableAliases*>(created.get());
 
     ASSERT_NE(serializable, nullptr);
@@ -97,6 +102,14 @@ TEST_F(WBESerializableFactoryTest, SupportsInPlaceConstruction) {
     EXPECT_EQ(serializable->str_test, "In place");
 
     serializable->~TestSerializable();
+}
+
+TEST_F(WBESerializableFactoryTest, ResolvesTypeUuidByAliasName) {
+    auto* type_uuid_manager = WBE::TypeUUIDManager::get_singleton();
+
+    ASSERT_NE(type_uuid_manager, nullptr);
+    EXPECT_EQ(type_uuid_manager->get_type_uuid("vertex_3d"), WBE::TypeUUID<WBE::Vertex3D>::UUID);
+    EXPECT_EQ(type_uuid_manager->get_type_uuid("vertex_3d_textured"), WBE::TypeUUID<WBE::Vertex3DTextured>::UUID);
 }
 
 TEST_F(WBESerializableFactoryTest, ThrowsForUnknownSerializableName) {

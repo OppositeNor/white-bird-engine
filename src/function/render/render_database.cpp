@@ -21,6 +21,7 @@
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -28,6 +29,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -43,6 +45,38 @@ struct MaterialMeshInfo {
     RefRes<RUMaterial> material;
     Vector<RUSubmesh3D*, RenderAllocator> submeshes;
 };
+
+void append_vertex_range_from_vertex3d(
+    RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, size_t p_curr_index, uint32_t p_max_index, const Vertex3D* p_vertices) {
+    p_triangles_info.vertices.resize(p_curr_index + p_max_index + 1);
+    for (uint32_t vertex_index = 0; vertex_index <= p_max_index; ++vertex_index) {
+        const auto& source = p_vertices[vertex_index];
+        auto& target = p_triangles_info.vertices[p_curr_index + vertex_index];
+        target.position = source.position;
+        target.normal = source.normal;
+        target.tangent = source.tangent;
+        target.bitangent = source.bitangent;
+        target.uv = glm::vec2(0.0F);
+    }
+}
+
+template <typename TTriangleType>
+uint32_t append_triangle_index_data(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
+    size_t p_curr_index,
+    const TTriangleType* p_triangles,
+    size_t p_triangle_count,
+    uint32_t p_obj_id) {
+    uint32_t max_index = 0;
+    for (size_t triangle_index = 0; triangle_index < p_triangle_count; ++triangle_index) {
+        const auto& triangle = p_triangles[triangle_index];
+        p_triangles_info.indices.push_back(p_curr_index + triangle.indices.vert_1);
+        p_triangles_info.indices.push_back(p_curr_index + triangle.indices.vert_2);
+        p_triangles_info.indices.push_back(p_curr_index + triangle.indices.vert_3);
+        max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
+    }
+    p_triangles_info.obj_id.push_back(p_obj_id);
+    return max_index;
+}
 
 // Group submeshes by material before flattening them. This lets the render
 // database record one contiguous index subregion per material.
@@ -65,8 +99,7 @@ void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_mate
     if (material_entry == p_registered_material_index.end()) {
         size_t material_index = p_material_mesh_infos.size();
         p_registered_material_index.insert({material_key, material_index});
-        p_material_mesh_infos.push_back(MaterialMeshInfo{
-            .graphics_pipeline_key = material->graphics_pipeline->resource_key,
+        p_material_mesh_infos.push_back(MaterialMeshInfo{.graphics_pipeline_key = material->graphics_pipeline->resource_key,
             .material_key = material_key,
             .material = material,
             .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
@@ -78,18 +111,36 @@ void register_material_submesh(Vector<MaterialMeshInfo, RenderAllocator>& p_mate
 // Append one submesh into the linear static-opaque buffers while preserving its
 // local triangle indices as offsets into the merged vertex buffer.
 void append_submesh_triangles(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, RUSubmesh3D& p_submesh, uint32_t p_obj_id) {
+    if (p_submesh.triangles_count == 0) {
+        return;
+    }
+
     uint32_t max_index = 0;
     size_t curr_index = p_triangles_info.vertices.size();
-    for (size_t i = 0; i < p_submesh.triangles_count; ++i) {
-        auto& triangle = p_submesh.triangles.get()[i];
-        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_1);
-        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_2);
-        p_triangles_info.indices.push_back(curr_index + triangle.indices.vert_3);
-        max_index = std::max({max_index, triangle.indices.vert_1, triangle.indices.vert_2, triangle.indices.vert_3});
+    switch (p_submesh.triangle_type_uuid) {
+    case TypeUUID<Triangle3DIndxVertex3D>::UUID: {
+        if (p_submesh.triangles.stride != sizeof(Triangle3DIndxVertex3D)) {
+            throw std::runtime_error("Failed to set opaque triangles: submesh triangle stride does not match Triangle3DIndxVertex3D.");
+        }
+        const auto* triangles = reinterpret_cast<const Triangle3DIndxVertex3D*>(p_submesh.triangles.data);
+        max_index = append_triangle_index_data(p_triangles_info, curr_index, triangles, p_submesh.triangles_count, p_obj_id);
+        append_vertex_range_from_vertex3d(p_triangles_info, curr_index, max_index, triangles->vert_array.get());
+        return;
     }
-    p_triangles_info.obj_id.push_back(p_obj_id);
-    p_triangles_info.vertices.resize(curr_index + max_index + 1);
-    memcpy(&(p_triangles_info.vertices[curr_index]), p_submesh.triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
+    case TypeUUID<Triangle3DIndxTextured>::UUID: {
+        if (p_submesh.triangles.stride != sizeof(Triangle3DIndxTextured)) {
+            throw std::runtime_error("Failed to set opaque triangles: submesh triangle stride does not match Triangle3DIndxTextured.");
+        }
+        const auto* triangles = reinterpret_cast<const Triangle3DIndxTextured*>(p_submesh.triangles.data);
+        max_index = append_triangle_index_data(p_triangles_info, curr_index, triangles, p_submesh.triangles_count, p_obj_id);
+        p_triangles_info.vertices.resize(curr_index + max_index + 1);
+        memcpy(&(p_triangles_info.vertices[curr_index]), triangles->vert_array.get(), (max_index + 1) * sizeof(Vertex3DTextured));
+        return;
+    }
+    default:
+        throw std::runtime_error(
+            std::format("Failed to set opaque triangles: unsupported submesh triangle type '{}'.", p_submesh.triangle_type_uuid));
+    }
 }
 
 // Append all submeshes for one material and record the material's index range.

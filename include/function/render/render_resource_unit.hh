@@ -17,15 +17,23 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
-#include "core/surface/3d_primitive.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace WhiteBirdEngine {
+
+struct SubmeshTriangleBuffer {
+    const void* data;
+    size_t stride;
+};
+
+static_assert(std::is_trivial_v<SubmeshTriangleBuffer>);
 
 /**
  * @class RUSchemaShader
@@ -176,6 +184,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaSubmesh3D : public RUSchema {
     // Resource-relative path to the sidecar geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string geometry_path;
+    // The vertex type stored in the geometry binary.
+    WBE_META(WBE_REFLECT)
+    std::string vertex_type = "vertex_3d_textured";
     // Byte-addressed sections inside the geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<RUSchemaSubmesh3DGeometrySection> geometry_sections;
@@ -289,10 +300,12 @@ struct RUMaterial : public ResourceUnit {
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.
     RefRes<RUMaterial> material;
+    // The type UUID of one triangle entry.
+    TypeID triangle_type_uuid = 0;
     // The total number of triangles.
-    size_t triangles_count;
+    size_t triangles_count = 0;
     // The triangles instances.
-    RefRes<Triangle3DIndxTextured> triangles;
+    SubmeshTriangleBuffer triangles{};
 };
 
 /**

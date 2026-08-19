@@ -246,6 +246,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DGeneral) {
     ASSERT_TRUE(scheme.material_id.has_value());
     ASSERT_EQ(scheme.material_id.value(), "mat_ref_01");
     ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_01.bin");
+    ASSERT_EQ(scheme.vertex_type, "vertex_3d_textured");
     ASSERT_EQ(scheme.geometry_sections.size(), 4U);
     ASSERT_EQ(scheme.geometry_sections[0].slot, "position");
     ASSERT_EQ(scheme.geometry_sections[0].start, 0U);
@@ -273,9 +274,30 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DMinimal) {
     ASSERT_EQ(scheme.id, "test_submesh_minimal");
     ASSERT_EQ(scheme.type, "submesh3d");
     ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_minimal.bin");
+    ASSERT_EQ(scheme.vertex_type, "vertex_3d_textured");
     ASSERT_TRUE(scheme.geometry_sections.empty());
     ASSERT_FALSE(scheme.material_id.has_value());
     ASSERT_FALSE(scheme.material.has_value());
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DVertexTypeOverride) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_submesh_vertex_type",
+        "type": "submesh3d",
+        "geometry_path": "assets/meshes/test_submesh_vertex_type.bin",
+        "vertex_type": "vertex_3d",
+        "geometry_sections": [
+            {"slot": "position", "start": 0, "size": 0, "type": "vec3"},
+            {"slot": "index", "start": 0, "size": 0, "type": "uint32"}
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaSubmesh3D scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_EQ(scheme.vertex_type, "vertex_3d");
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
