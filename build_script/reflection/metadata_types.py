@@ -22,6 +22,7 @@ class WBEFieldMetadata(BaseModel):
         field_type: The type of the field.
     """
     attribute : list[str] = Field(default_factory=list)
+    aliases : list[str] = Field(default_factory=list[str])
     name : str = ""
     type : str = ""
 
@@ -54,6 +55,7 @@ class WBEClassMetadata(BaseModel):
     name : str = ""
     extended_parents : list[Any] = Field(default_factory=list[Any])
     attribute : list[str] = Field(default_factory=list[str])
+    aliases : list[str] = Field(default_factory=list[str])
     fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
     methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
 
@@ -65,6 +67,7 @@ class WBELabelMetadata(BaseModel):
         label_name: The name of the label.
     """
     attribute : list[str] = Field(default_factory=list[str])
+    aliases : list[str] = Field(default_factory=list[str])
     name : str = ""
 
 class WBEFileMetadata(BaseModel):

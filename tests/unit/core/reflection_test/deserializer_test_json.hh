@@ -207,6 +207,23 @@ TEST_F(WBEDeserializerJSONTest, OptionalFieldPresentAndMissing) {
     EXPECT_FALSE(test_obj.optional_str_test.has_value());
 }
 
+TEST_F(WBEDeserializerJSONTest, SupportsAliasedFieldNames) {
+    WBE::TestSerializableAliases test_obj;
+    WBE::ParserJSON parser;
+
+    parser.parse_from_buffer(R"({ "canonical_name": "primary", "legacy_name": "alias", "required_value": 17, "required_alias": 29 })");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializableAliases>::deserialize(parser.get_data(), test_obj);
+
+    EXPECT_EQ(test_obj.canonical_name, "primary");
+    EXPECT_EQ(test_obj.required_value, 17);
+
+    parser.parse_from_buffer(R"({ "display_name": "alias-only", "required_alias": 31 })");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializableAliases>::deserialize(parser.get_data(), test_obj);
+
+    EXPECT_EQ(test_obj.canonical_name, "alias-only");
+    EXPECT_EQ(test_obj.required_value, 31);
+}
+
 TEST_F(WBEDeserializerJSONTest, NestingGeneral) {
     WBE::SerializableSD<WBE::TestSerializableNesting> sd;
     WBE::TestSerializableNesting test_obj;

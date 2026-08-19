@@ -166,6 +166,24 @@ inline void serializer_test_nesting(ParserDataType p_data) {
 }
 
 template <typename ParserDataType>
+inline void serializer_test_aliases_use_canonical_names(ParserDataType p_data) {
+    WBE::TestSerializableAliases serializable{};
+    serializable.canonical_name = "canonical";
+    serializable.required_value = 41;
+
+    WBE::SerializableSD<WBE::TestSerializableAliases> sd;
+    sd.serialize(p_data, serializable);
+
+    EXPECT_TRUE(p_data.contains("canonical_name"));
+    EXPECT_TRUE(p_data.contains("required_value"));
+    EXPECT_FALSE(p_data.contains("legacy_name"));
+    EXPECT_FALSE(p_data.contains("display_name"));
+    EXPECT_FALSE(p_data.contains("required_alias"));
+    EXPECT_EQ(p_data.template get_value<std::string>("canonical_name"), "canonical");
+    EXPECT_EQ(p_data.template get_value<int32_t>("required_value"), 41);
+}
+
+template <typename ParserDataType>
 inline void serializer_test_deep_nesting(ParserDataType p_data) {
     // Depth-2: TestDepth2 contains WBE::TestSerializable
     WBE::TestDepth2 td2{};
@@ -1177,6 +1195,13 @@ TEST_F(WBESerializerTest, General) {
     serializer_test_general(json_data);
     WBE::YAMLData yaml_data;
     serializer_test_general(yaml_data);
+}
+
+TEST_F(WBESerializerTest, AliasFieldsSerializeCanonically) {
+    WBE::JSONData json_data;
+    serializer_test_aliases_use_canonical_names(json_data);
+    WBE::YAMLData yaml_data;
+    serializer_test_aliases_use_canonical_names(yaml_data);
 }
 
 TEST_F(WBESerializerTest, NestingSerialize) {

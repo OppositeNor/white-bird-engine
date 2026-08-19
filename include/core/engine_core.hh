@@ -113,6 +113,10 @@ public:
      * @brief Manager for type UUIDs.
      */
     TypeUUIDManager* type_uuid_manager = nullptr;
+    /**
+     * @brief Factory for constructing serializable objects by reflected name.
+     */
+    class SerializableFactory* serializable_factory = nullptr;
 
 private:
     void initialize(uint32_t p_argc, char* p_argv[]);

@@ -23,7 +23,25 @@
 {% endfor %}
 #include "core/reflection/reflection_defs.hh"
 
+#include <initializer_list>
+#include <stdexcept>
+#include <string_view>
+
 namespace WhiteBirdEngine {
+
+template <typename ParserDataType>
+std::string_view find_serializable_key(
+        const ParserDataType& p_data, std::string_view p_primary_key, std::initializer_list<std::string_view> p_aliases) {
+    if (p_data.contains(p_primary_key)) {
+        return p_primary_key;
+    }
+    for (std::string_view alias : p_aliases) {
+        if (p_data.contains(alias)) {
+            return alias;
+        }
+    }
+    return {};
+}
 
 /**
  * @class SerializableSD
@@ -145,13 +163,18 @@ void SerializableSD<{{ serializable.name }}>::deserialize(const ParserDataType& 
     {% endfor %}
 
     {% for field in serializable.fields %}
+    const std::string_view field_key_{{ field.name }} =
+        find_serializable_key(p_data, "{{ field.name }}", { {% for alias in field.aliases %}"{{ alias }}"{% if not loop.last %}, {% endif %}{% endfor %} });
     {% if "WBE_REFLECT_REQUIRED" in field.attribute %}
+    if (field_key_{{ field.name }}.empty()) {
+    throw std::runtime_error("Required field missing: {{ field.name }}");
+    }
     SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
-            p_data.template get_value<ParserDataType>("{{ field.name }}"), p_serializable.{{ field.name }});
+        p_data.template get_value<ParserDataType>(field_key_{{ field.name }}), p_serializable.{{ field.name }});
     {% else %}
-    if (p_data.contains("{{ field.name }}")) {
+    if (!field_key_{{ field.name }}.empty()) {
         SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
-                p_data.template get_value<ParserDataType>("{{ field.name }}"), p_serializable.{{ field.name }});
+        p_data.template get_value<ParserDataType>(field_key_{{ field.name }}), p_serializable.{{ field.name }});
     } else {
         reset_if_optional(p_serializable.{{ field.name }});
     }

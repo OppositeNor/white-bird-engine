@@ -19,6 +19,7 @@
 #include "core/logging/logging_manager.hh"
 #include "core/profiling/profiling_manager.hh"
 #include "generated/label_manager.gen.hh"
+#include "generated/serializable_factory.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
@@ -28,6 +29,7 @@
 namespace WhiteBirdEngine {
 
 EngineCore::~EngineCore() {
+    delete serializable_factory;
     delete type_uuid_manager;
     delete label_manager;
     delete profiling_manager;
@@ -60,6 +62,7 @@ void EngineCore::initialize(uint32_t p_argc, char* p_argv[]) {
     label_manager = new LabelManager();
     type_uuid_manager = new TypeUUIDManager();
     singleton = this;
+    serializable_factory = new SerializableFactory();
 }
 
 } // namespace WhiteBirdEngine

@@ -190,6 +190,23 @@ TEST_F(WBEDeserializerYAMLTest, PartialUpdateOnlyOneField) {
     EXPECT_EQ(test_obj.str_test, std::string("orig"));
 }
 
+  TEST_F(WBEDeserializerYAMLTest, SupportsAliasedFieldNames) {
+    WBE::TestSerializableAliases test_obj;
+    WBE::ParserYAML parser;
+
+    parser.parse_from_buffer("canonical_name: primary\nlegacy_name: alias\nrequired_value: 17\nrequired_alias: 29\n");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializableAliases>::deserialize(parser.get_data(), test_obj);
+
+    EXPECT_EQ(test_obj.canonical_name, "primary");
+    EXPECT_EQ(test_obj.required_value, 17);
+
+    parser.parse_from_buffer("display_name: alias-only\nrequired_alias: 31\n");
+    WhiteBirdEngine::SerializableSD<WhiteBirdEngine::TestSerializableAliases>::deserialize(parser.get_data(), test_obj);
+
+    EXPECT_EQ(test_obj.canonical_name, "alias-only");
+    EXPECT_EQ(test_obj.required_value, 31);
+  }
+
 TEST_F(WBEDeserializerYAMLTest, NestingGeneral) {
     WBE::SerializableSD<WBE::TestSerializableNesting> sd;
     WBE::TestSerializableNesting test_obj;

@@ -72,6 +72,15 @@ struct WBE_META(WBE_SERIALIZABLE) TestPartialStruct final : public Serializable 
     uint64_t ui64_test = 0;
 };
 
+struct WBE_META(WBE_SERIALIZABLE, WBE_ALIASES=[TestSerializableAlias, LegacySerializableAlias]) TestSerializableAliases final : public Serializable {
+    WBE_DECL_SERIALIZABLE(TestSerializableAliases)
+
+    WBE_META(WBE_REFLECT, WBE_ALIASES=[legacy_name, display_name])
+    std::string canonical_name;
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_ALIASES=[required_alias])
+    int32_t required_value = 0;
+};
+
 struct WBE_META(WBE_SERIALIZABLE) TestSerializableNesting final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializableNesting)
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import re
 from typing import Callable
 from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
@@ -21,6 +22,9 @@ from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMet
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
+
+META_PARAMETER_PATTERN = re.compile(r"\s*(?P<parameter>[A-Za-z_][A-Za-z0-9_]*(?:\s*=\s*\[[^\]]*\])?)\s*(?:,|$)")
+ALIASES_ATTRIBUTE_PATTERN = re.compile(r"^WBE_ALIASES\s*=\s*\[(?P<aliases>[^\]]*)\]$")
 
 class WBEMetaparser:
     """Metaparser
@@ -144,8 +148,8 @@ class WBEMetaparser:
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.labels)):
-                    attributes = self._get_attributes(attr.spelling)
-                    label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes)
+                    attributes, aliases = self._get_attributes(attr.spelling)
+                    label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes, aliases=aliases)
                     metadata.labels.append(label_metadata)
 
     def _handle_visit_class_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:
@@ -153,8 +157,8 @@ class WBEMetaparser:
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
                 if not self._any_all(metadata, lambda curr_metadata:
                         WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.classes)):
-                    attributes = self._get_attributes(attr.spelling)
-                    class_metadata = self._get_class_metadata(cursor, attributes, in_file)
+                    attributes, aliases = self._get_attributes(attr.spelling)
+                    class_metadata = self._get_class_metadata(cursor, attributes, aliases, in_file)
                     metadata.classes.append(class_metadata)
 
     def _read_from_cache(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
@@ -182,12 +186,13 @@ class WBEMetaparser:
                 return True
         return False
 
-    def _get_class_metadata(self, cursor: clang.cindex.Cursor, attributes: list[str],
+    def _get_class_metadata(self, cursor: clang.cindex.Cursor, attributes: list[str], aliases: list[str],
                             in_file: str) -> WBEClassMetadata:
         result = WBEClassMetadata()
         result.in_header = in_file
         result.name = cursor.spelling
         result.attribute = attributes
+        result.aliases = aliases
         result.is_struct = cursor.kind == clang.cindex.CursorKind.STRUCT_DECL
 
         for field in cursor.get_children():
@@ -197,13 +202,39 @@ class WBEMetaparser:
                 for attr in field.get_children():
                     if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
                         continue
-                    attributes = self._get_attributes(attr.spelling)
+                    attributes, aliases = self._get_attributes(attr.spelling)
                     if WBE_REFLECT in attributes:
                         result.fields.append(WBEFieldMetadata(attribute=attributes,
+                                                              aliases=aliases,
                                                               name=field.spelling, type=field.type.spelling))
         return result
 
-    def _get_attributes(self, attr_spelling : str) -> list[str]:
-        return attr_spelling.split(", ")
+    def _split_meta_parameters(self, attr_spelling: str) -> list[str]:
+        parameters: list[str] = []
+        position = 0
+        while position < len(attr_spelling):
+            match = META_PARAMETER_PATTERN.match(attr_spelling, position)
+            if match is None:
+                raise ValueError(f"Failed to parse metadata attributes near: '{attr_spelling[position:]}'")
+            parameters.append(match.group("parameter").strip())
+            position = match.end()
+        return parameters
+
+    @staticmethod
+    def _parse_aliases(aliases_spelling: str) -> list[str]:
+        stripped = aliases_spelling.strip()
+        if stripped == "":
+            return []
+        return [alias.strip() for alias in re.split(r"\s*,\s*", stripped) if alias.strip() != ""]
+
+    def _get_attributes(self, attr_spelling : str) -> tuple[list[str], list[str]]:
+        attributes: list[str] = []
+        aliases: list[str] = []
+        for parameter in self._split_meta_parameters(attr_spelling):
+            attributes.append(parameter)
+            aliases_match = ALIASES_ATTRIBUTE_PATTERN.fullmatch(parameter)
+            if aliases_match is not None:
+                aliases.extend(self._parse_aliases(aliases_match.group("aliases")))
+        return attributes, aliases
 
 

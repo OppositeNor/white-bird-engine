@@ -17,13 +17,19 @@
 #define WBE_FILE_SERIALIZABLE_FACTORY_GEN_HH
 
 #include "core/engine_core.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "utils/interface/i_singleton.hh"
 #include "generated/serializables_sd.gen.hh"
+#include <cstddef>
 #include <concepts>
 #include <new>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <unordered_map>
 
 {% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", serializables) | list | length > 0  %}
@@ -38,54 +44,140 @@ constexpr bool SERIALIZABLE_FACTORY_DESERIALIZABLE_FROM_PARSER = requires(const 
     SerializableSD<SerializableType>::deserialize(p_data, p_serializable);
 };
 
-class SerializableFactory {
+template <typename SerializableType>
+constexpr bool SERIALIZABLE_FACTORY_CAN_RETURN_SERIALIZABLE_BASE = std::is_convertible_v<SerializableType*, Serializable*>;
+
+class SerializableFactory final : public ISingleton<SerializableFactory> {
 public:
-    SerializableFactory() = delete;
-    ~SerializableFactory() = delete;
+    SerializableFactory() {
+        singleton = this;
+        {% for serializable in metadata.classes %}
+        {% if serializable.attribute | select("in", serializables) | list | length > 0 and serializable.name != "Serializable" %}
+        {% set serializable_index = loop.index0 %}
+        register_serializable_name("{{ serializable.name }}", {{ serializable_index }});
+        {% for alias in serializable.aliases %}
+        register_serializable_name("{{ alias }}", {{ serializable_index }});
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+    }
+    ~SerializableFactory() override {
+        singleton = nullptr;
+    }
     SerializableFactory(const SerializableFactory&) = delete;
     SerializableFactory(SerializableFactory&&) = delete;
     SerializableFactory& operator=(const SerializableFactory&) = delete;
     SerializableFactory& operator=(SerializableFactory&&) = delete;
 
+    static SerializableFactory* get_singleton() {
+        return singleton;
+    }
+
     template <typename ParserDataType>
-    static void* create_serializable_object(std::string_view p_serializable_name, const ParserDataType& p_data, void* p_memory = nullptr) {
+    static Unique<Serializable> create_serializable_object_unique(std::string_view p_serializable_name, const ParserDataType& p_data) {
+        switch (required_singleton()->get_serializable_index(p_serializable_name)) {
         {% for serializable in metadata.classes %}
         {% if serializable.attribute | select("in", serializables) | list | length > 0 and serializable.name != "Serializable" %}
-        if (p_serializable_name == "{{ serializable.name }}") {
-            if constexpr (SERIALIZABLE_FACTORY_DESERIALIZABLE_FROM_PARSER<{{ serializable.name }}, ParserDataType>) {
-                return create_serializable_object_impl<{{ serializable.name }}>(p_data, p_memory);
+        case {{ loop.index0 }}:
+            if constexpr (SERIALIZABLE_FACTORY_CAN_RETURN_SERIALIZABLE_BASE<{{ serializable.name }}> &&
+                          SERIALIZABLE_FACTORY_DESERIALIZABLE_FROM_PARSER<{{ serializable.name }}, ParserDataType>) {
+                return create_serializable_object_impl<{{ serializable.name }}>(p_data);
             } else {
-                throw std::runtime_error("Serializable type '" + std::string(p_serializable_name) + "' does not support this parser data type.");
+                throw std::runtime_error("Serializable type '" + std::string(p_serializable_name) +
+                                         "' cannot be returned as Serializable or does not support this parser data type.");
             }
-        }
         {% endif %}
         {% endfor %}
-        throw std::runtime_error("Serializable type not found: " + std::string(p_serializable_name));
+        default:
+            throw std::runtime_error("Serializable type not found: " + std::string(p_serializable_name));
+        }
+    }
+
+    template <typename ParserDataType>
+    static Ref<Serializable> create_serializable_object_ref(std::string_view p_serializable_name, const ParserDataType& p_data) {
+        switch (required_singleton()->get_serializable_index(p_serializable_name)) {
+        {% for serializable in metadata.classes %}
+        {% if serializable.attribute | select("in", serializables) | list | length > 0 and serializable.name != "Serializable" %}
+        case {{ loop.index0 }}:
+            if constexpr (SERIALIZABLE_FACTORY_CAN_RETURN_SERIALIZABLE_BASE<{{ serializable.name }}> &&
+                          SERIALIZABLE_FACTORY_DESERIALIZABLE_FROM_PARSER<{{ serializable.name }}, ParserDataType>) {
+                return create_serializable_object_ref_impl<{{ serializable.name }}>(p_data);
+            } else {
+                throw std::runtime_error("Serializable type '" + std::string(p_serializable_name) +
+                                         "' cannot be returned as Serializable or does not support this parser data type.");
+            }
+        {% endif %}
+        {% endfor %}
+        default:
+            throw std::runtime_error("Serializable type not found: " + std::string(p_serializable_name));
+        }
+    }
+
+    template <typename ParserDataType>
+    static Serializable* create_serializable_object(std::string_view p_serializable_name, const ParserDataType& p_data, void* p_memory) {
+        switch (required_singleton()->get_serializable_index(p_serializable_name)) {
+        {% for serializable in metadata.classes %}
+        {% if serializable.attribute | select("in", serializables) | list | length > 0 and serializable.name != "Serializable" %}
+        case {{ loop.index0 }}:
+            if constexpr (SERIALIZABLE_FACTORY_CAN_RETURN_SERIALIZABLE_BASE<{{ serializable.name }}> &&
+                          SERIALIZABLE_FACTORY_DESERIALIZABLE_FROM_PARSER<{{ serializable.name }}, ParserDataType>) {
+                return create_serializable_object_in_place_impl<{{ serializable.name }}>(p_data, p_memory);
+            } else {
+                throw std::runtime_error("Serializable type '" + std::string(p_serializable_name) +
+                                         "' cannot be returned as Serializable or does not support this parser data type.");
+            }
+        {% endif %}
+        {% endfor %}
+        default:
+            throw std::runtime_error("Serializable type not found: " + std::string(p_serializable_name));
+        }
     }
 private:
-    template <typename SerializableType, typename ParserDataType>
-    static void* create_serializable_object_impl(const ParserDataType& p_data, void* p_memory) {
-        if (p_memory != nullptr) {
-            SerializableType* serializable = new (p_memory) SerializableType();
-            try {
-                SerializableSD<SerializableType>::deserialize(p_data, *serializable);
-            } catch (...) {
-                serializable->~SerializableType();
-                throw;
-            }
-            return serializable;
-        }
+    static constexpr size_t INVALID_SERIALIZABLE_INDEX = static_cast<size_t>(-1);
+    inline static SerializableFactory* singleton = nullptr;
+    std::unordered_map<std::string, size_t> serializable_name_to_index;
 
-        void* allocated_memory = ::operator new(sizeof(SerializableType), std::align_val_t(alignof(SerializableType)));
-        SerializableType* serializable = new (allocated_memory) SerializableType();
-        try {
-            SerializableSD<SerializableType>::deserialize(p_data, *serializable);
-        } catch (...) {
-            serializable->~SerializableType();
-            ::operator delete(allocated_memory, std::align_val_t(alignof(SerializableType)));
-            throw;
+    static SerializableFactory* required_singleton() {
+        if (singleton == nullptr) {
+            throw std::runtime_error("SerializableFactory singleton has not been initialized.");
         }
+        return singleton;
+    }
+
+    void register_serializable_name(std::string_view p_name, size_t p_index) {
+        auto result = serializable_name_to_index.emplace(std::string(p_name), p_index);
+        if (!result.second) {
+            throw std::runtime_error("SerializableFactory duplicate serializable name or alias: " + std::string(p_name));
+        }
+    }
+
+    size_t get_serializable_index(std::string_view p_serializable_name) const {
+        auto found = serializable_name_to_index.find(std::string(p_serializable_name));
+        if (found == serializable_name_to_index.end()) {
+            return INVALID_SERIALIZABLE_INDEX;
+        }
+        return found->second;
+    }
+
+    template <typename SerializableType, typename ParserDataType>
+    static Unique<Serializable> create_serializable_object_impl(const ParserDataType& p_data) {
+        Unique<SerializableType> serializable = make_unique<SerializableType>(global_allocator());
+        SerializableSD<SerializableType>::deserialize(p_data, *serializable);
         return serializable;
+    }
+
+    template <typename SerializableType, typename ParserDataType>
+    static Ref<Serializable> create_serializable_object_ref_impl(const ParserDataType& p_data) {
+        Ref<SerializableType> serializable = make_ref<SerializableType>(global_allocator());
+        SerializableSD<SerializableType>::deserialize(p_data, *serializable);
+        return serializable;
+    }
+
+    template <typename SerializableType, typename ParserDataType>
+    static Serializable* create_serializable_object_in_place_impl(const ParserDataType& p_data, void* p_memory) {
+        SerializableType* serializable = new (p_memory) SerializableType();
+        SerializableSD<SerializableType>::deserialize(p_data, *serializable);
+        return static_cast<Serializable*>(serializable);
     }
 };
 
