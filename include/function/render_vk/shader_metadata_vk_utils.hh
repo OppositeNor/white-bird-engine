@@ -49,7 +49,7 @@ struct ShaderDescriptorFieldBindingVK {
  */
 struct ShaderDescriptorBindingVK {
     /**
-     * @brief Shader parameter name, used to match material texture slots.
+     * @brief Reflected shader parameter name used to match bindpoint field paths.
      */
     std::string parameter_name;
     /**

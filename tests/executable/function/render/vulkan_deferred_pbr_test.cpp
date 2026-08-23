@@ -17,8 +17,10 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_database.hh"
@@ -38,14 +40,17 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "glm/ext/matrix_transform.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "function/render_vk/static_opaque_triangles_pipeline_vk.hh"
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_float4x4.hpp>
@@ -54,6 +59,7 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -104,11 +110,12 @@ private:
     void setup_spot_light();
     void create_shadow_map_resources();
     void create_gbuffer_resources();
-    CompiledStaticOpaqueTrianglesVK compile_shadow_pipeline();
+    StaticOpaqueTrianglesPipelineVK compile_shadow_pipeline();
     void compile_composition_pipeline();
-    void write_dynamic_camera_descriptors(CompiledStaticOpaqueTrianglesVK& p_gbuffer);
+    void write_dynamic_camera_descriptors(StaticOpaqueTrianglesPipelineVK& p_gbuffer_pipeline);
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(RendTaskDescVK p_shadow_task, RendTaskDescVK p_gbuffer_task);
+    void register_deferred_render_graph(
+        StaticOpaqueTrianglesPipelineVK& p_shadow_pipeline, StaticOpaqueTrianglesPipelineVK& p_gbuffer_pipeline);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     RendTaskDescVK create_composition_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
@@ -271,9 +278,8 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                                                      .create_ref(base_render_data);
         new_gbuffer_camera_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
         for (auto& [descriptor_set, binding] : gbuffer_camera_descriptor_bindings) {
-            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                    .set_binding(binding)
-                    .add_uniform_buffer_info(new_gbuffer_camera_ubo, 0, sizeof(CameraInfoVKUBO)));
+            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+                new_gbuffer_camera_ubo, 0, sizeof(CameraInfoVKUBO)));
         }
 
         Ref<ROBufferVK> new_composition_camera_ubo = ROBufferVK::Builder()
@@ -289,16 +295,16 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                     .add_uniform_buffer_info(new_composition_camera_ubo, 0, sizeof(CompositionCameraInfo)));
 
         Ref<ROBufferVK> new_composition_debug_view_ubo = ROBufferVK::Builder()
-                                     .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                     .set_domain(DeviceDomain::HOST_DEVICE)
-                                     .set_size(sizeof(CompositionDebugViewInfo))
-                                     .create_ref(base_render_data);
+                                                             .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                             .set_domain(DeviceDomain::HOST_DEVICE)
+                                                             .set_size(sizeof(CompositionDebugViewInfo))
+                                                             .create_ref(base_render_data);
         new_composition_debug_view_ubo->update_buffer(&composition_debug_view_info, sizeof(composition_debug_view_info));
         auto [composition_debug_view_set, composition_debug_view_binding] = composition_descriptor_set_bindings.at("debug_view");
         composition_descriptor_sets.at(composition_debug_view_set)
             ->write_descriptor_set(RODescriptorSetVK::Writer()
-                .set_binding(composition_debug_view_binding)
-                .add_uniform_buffer_info(new_composition_debug_view_ubo, 0, sizeof(CompositionDebugViewInfo)));
+                    .set_binding(composition_debug_view_binding)
+                    .add_uniform_buffer_info(new_composition_debug_view_ubo, 0, sizeof(CompositionDebugViewInfo)));
 
         Ref<ROBufferVK> new_spot_light_info_ubo = ROBufferVK::Builder()
                                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -307,9 +313,8 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                                                       .create_ref(base_render_data);
         new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
         for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
-            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                    .set_binding(binding)
-                    .add_uniform_buffer_info(new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+            descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+                new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
         }
         auto [composition_light_set, composition_light_binding] = composition_descriptor_set_bindings.at("light.lights.info");
         composition_descriptor_sets.at(composition_light_set)
@@ -335,24 +340,26 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     setup_spot_light();
     create_shadow_map_resources();
     create_gbuffer_resources();
-    auto compiled_shadow = compile_shadow_pipeline();
-    StaticOpaqueTrianglesCompileConfigVK compile_config;
-    compile_config.task_id = RT_RUN_DEFERRED_GBUFFER;
-    compile_config.graphics_pipeline_resource_key = "deferred_gbuffer";
-    compile_config.color_attachment_ids = {std::string(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW),
-        std::string(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW),
-        std::string(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW)};
-    compile_config.depth_attachment_id = std::string(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW);
-    compile_config.color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT};
-    compile_config.depth_attachment_format = GBUFFER_DEPTH_FORMAT;
-    compile_config.clear_values.resize(4);
-    compile_config.clear_values[3].depthStencil = {.depth = 1.0F, .stencil = 0};
-    auto compiled_gbuffer = renderer_vk->compile_static_opaque_triangles(compile_config);
-    compiled_gbuffer.task.prev.emplace_back(RT_RUN_PIPELINE_SHADOWMAP);
+    auto shadow_pipeline = compile_shadow_pipeline();
+    StaticOpaqueTrianglesPipelineVK::Config compile_config;
+    VkClearValue color_clear{};
+    VkClearValue depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
+    compile_config.set_task_id(RT_RUN_DEFERRED_GBUFFER)
+        .set_graphics_pipeline_resource_key("deferred_gbuffer")
+        .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_FORMAT)
+        .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_FORMAT)
+        .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_FORMAT)
+        .set_depth_attachment(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_FORMAT)
+        .add_clear_value(color_clear)
+        .add_clear_value(color_clear)
+        .add_clear_value(color_clear)
+        .add_clear_value(depth_clear);
+    StaticOpaqueTrianglesPipelineVK gbuffer_pipeline(renderer_vk, compile_config);
+    gbuffer_pipeline.get_task().prev.emplace_back(RT_RUN_PIPELINE_SHADOWMAP);
     compile_composition_pipeline();
-    write_dynamic_camera_descriptors(compiled_gbuffer);
+    write_dynamic_camera_descriptors(gbuffer_pipeline);
     write_dynamic_light_descriptors();
-    register_deferred_render_graph(std::move(compiled_shadow.task), std::move(compiled_gbuffer.task));
+    register_deferred_render_graph(shadow_pipeline, gbuffer_pipeline);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
@@ -493,26 +500,24 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
                           .create_ref(base_render_data);
 }
 
-CompiledStaticOpaqueTrianglesVK ApplicationVulkanDeferredPBRTest::compile_shadow_pipeline() {
-    StaticOpaqueTrianglesCompileConfigVK compile_config;
-    compile_config.task_id = RT_RUN_PIPELINE_SHADOWMAP;
-    compile_config.render_extent = shadow_extent;
-    compile_config.color_attachment_ids = {std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW)};
-    compile_config.depth_attachment_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-    compile_config.color_attachment_formats = {SHADOWMAP_COLOR_FORMAT};
-    compile_config.depth_attachment_format = SHADOWMAP_DEPTH_FORMAT;
-    compile_config.clear_values.resize(2);
-    compile_config.clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
-    compile_config.graphics_pipeline_overrides = {
-        StaticOpaqueTrianglesPipelineOverrideVK("forward_cook_torrance_pbr", "shadowmap_spot"),
-        StaticOpaqueTrianglesPipelineOverrideVK("forward_cook_torrance_pbr_masked", "shadowmap_spot_masked"),
-    };
-    auto compiled = renderer_vk->compile_static_opaque_triangles(compile_config);
-    for (auto& pipeline_batch : compiled.graphics_pipeline_batches) {
-        auto [set, binding] = pipeline_batch.descriptor_set_bindings.at("light_camera_info");
-        shadow_camera_descriptor_bindings.emplace_back(pipeline_batch.descriptor_sets.at(set), binding);
+StaticOpaqueTrianglesPipelineVK ApplicationVulkanDeferredPBRTest::compile_shadow_pipeline() {
+    StaticOpaqueTrianglesPipelineVK::Config compile_config;
+    VkClearValue shadow_color_clear{};
+    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
+    compile_config.set_task_id(RT_RUN_PIPELINE_SHADOWMAP)
+        .set_render_extent(shadow_extent)
+        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
+        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
+        .add_clear_value(shadow_color_clear)
+        .add_clear_value(shadow_depth_clear)
+        .add_graphics_pipeline_override("forward_cook_torrance_pbr", "shadowmap_spot")
+        .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "shadowmap_spot_masked");
+    StaticOpaqueTrianglesPipelineVK pipeline(renderer_vk, compile_config);
+    for (size_t batch_index = 0; batch_index < pipeline.get_compiled_batch_count(); ++batch_index) {
+        auto [set, binding] = pipeline.get_descriptor_binding(batch_index, "light_camera_info");
+        shadow_camera_descriptor_bindings.emplace_back(pipeline.get_descriptor_set(batch_index, set), binding);
     }
-    return compiled;
+    return pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
@@ -546,8 +551,8 @@ void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
     composition_descriptor_set_bindings = std::move(compiled.descriptor_set_bindings);
 }
 
-void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(CompiledStaticOpaqueTrianglesVK& p_gbuffer) {
-    if (p_gbuffer.graphics_pipeline_batches.empty() || composition_descriptor_sets.empty()) {
+void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(StaticOpaqueTrianglesPipelineVK& p_gbuffer_pipeline) {
+    if (p_gbuffer_pipeline.get_compiled_batch_count() == 0 || composition_descriptor_sets.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled pipelines produced no descriptor sets.");
     }
     gbuffer_camera_info_ubo = ROBufferVK::Builder()
@@ -557,13 +562,12 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
                                   .create_ref(base_render_data);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     gbuffer_camera_info_ubo->update_buffer(&gbuffer_camera_info, sizeof(gbuffer_camera_info));
-    for (auto& pipeline_batch : p_gbuffer.graphics_pipeline_batches) {
-        auto [gbuffer_set, gbuffer_binding] = pipeline_batch.descriptor_set_bindings.at("camera_info");
-        auto descriptor_set = pipeline_batch.descriptor_sets.at(gbuffer_set);
+    for (size_t batch_index = 0; batch_index < p_gbuffer_pipeline.get_compiled_batch_count(); ++batch_index) {
+        auto [gbuffer_set, gbuffer_binding] = p_gbuffer_pipeline.get_descriptor_binding(batch_index, "camera_info");
+        auto descriptor_set = p_gbuffer_pipeline.get_descriptor_set(batch_index, gbuffer_set);
         gbuffer_camera_descriptor_bindings.emplace_back(descriptor_set, gbuffer_binding);
-        descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                .set_binding(gbuffer_binding)
-                .add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+        descriptor_set->write_descriptor_set(
+            RODescriptorSetVK::Writer().set_binding(gbuffer_binding).add_uniform_buffer_info(gbuffer_camera_info_ubo, 0, sizeof(CameraInfoVKUBO)));
     }
 
     composition_camera_info_ubo = ROBufferVK::Builder()
@@ -577,15 +581,15 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
     composition_descriptor_sets[composition_set]->write_descriptor_set(
         RODescriptorSetVK::Writer().set_binding(composition_binding).add_uniform_buffer_info(composition_camera_info_ubo, 0, sizeof(CompositionCameraInfo)));
 
-        composition_debug_view_ubo = ROBufferVK::Builder()
-                         .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                         .set_domain(DeviceDomain::HOST_DEVICE)
-                         .set_size(sizeof(CompositionDebugViewInfo))
-                         .create_ref(base_render_data);
-        CompositionDebugViewInfo composition_debug_view_info{.material_view = material_debug_view};
-        composition_debug_view_ubo->update_buffer(&composition_debug_view_info, sizeof(composition_debug_view_info));
-        auto [composition_debug_view_set, composition_debug_view_binding] = composition_descriptor_set_bindings.at("debug_view");
-        composition_descriptor_sets[composition_debug_view_set]->write_descriptor_set(RODescriptorSetVK::Writer()
+    composition_debug_view_ubo = ROBufferVK::Builder()
+                                     .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                     .set_domain(DeviceDomain::HOST_DEVICE)
+                                     .set_size(sizeof(CompositionDebugViewInfo))
+                                     .create_ref(base_render_data);
+    CompositionDebugViewInfo composition_debug_view_info{.material_view = material_debug_view};
+    composition_debug_view_ubo->update_buffer(&composition_debug_view_info, sizeof(composition_debug_view_info));
+    auto [composition_debug_view_set, composition_debug_view_binding] = composition_descriptor_set_bindings.at("debug_view");
+    composition_descriptor_sets[composition_debug_view_set]->write_descriptor_set(RODescriptorSetVK::Writer()
             .set_binding(composition_debug_view_binding)
             .add_uniform_buffer_info(composition_debug_view_ubo, 0, sizeof(CompositionDebugViewInfo)));
 }
@@ -603,9 +607,8 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
     spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
 
     for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
-        descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                .set_binding(binding)
-                .add_uniform_buffer_info(spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+        descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+            spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
     }
 
     auto [composition_set, composition_binding] = composition_descriptor_set_bindings.at("light.lights.info");
@@ -617,11 +620,13 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
-    RendTaskDescVK p_shadow_task, RendTaskDescVK p_gbuffer_task) {
+    StaticOpaqueTrianglesPipelineVK& p_shadow_pipeline, StaticOpaqueTrianglesPipelineVK& p_gbuffer_pipeline) {
     RendGraphDescVK pipeline_desc(render_allocator);
+    p_shadow_pipeline.add_resources(pipeline_desc);
+    p_gbuffer_pipeline.add_resources(pipeline_desc);
     add_render_graph_resources(pipeline_desc);
-    pipeline_desc.tasks.emplace_back(std::move(p_shadow_task));
-    pipeline_desc.tasks.emplace_back(std::move(p_gbuffer_task));
+    pipeline_desc.tasks.emplace_back(p_shadow_pipeline.take_task());
+    pipeline_desc.tasks.emplace_back(p_gbuffer_pipeline.take_task());
     pipeline_desc.tasks.emplace_back(create_composition_task_desc());
     renderer_vk->register_render_graph("deferred_pipeline", std::move(pipeline_desc));
     renderer_vk->activate_render_graph("deferred_pipeline");

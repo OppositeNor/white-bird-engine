@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -40,29 +41,26 @@ struct MaterialParamsUBO {
     int32_t roughness_metallic_ao_index = MATERIAL_TEXTURE_DEFAULT_ROUGHNESS_METALLIC_AO_INDEX;
 };
 
-inline RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, std::string_view p_texture_key) {
+inline RefRes<RUImage> require_material_texture(RefRes<RUImage> p_texture, std::string_view p_texture_name) {
+    RefRes<RUImage> texture = p_texture;
+    if (texture == nullptr) {
+        throw std::runtime_error(
+            std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_name));
+    }
+    return texture;
+}
+
+inline RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, HashCode p_texture_type) {
     if (p_material == nullptr) {
         return MEM_NULL;
     }
-    std::span<RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
-    for (const auto& texture_slot : texture_slots) {
-        if (texture_slot.texture_key == nullptr || texture_slot.texture_key->text_data == nullptr) {
-            continue;
-        }
-        if (std::string_view(texture_slot.texture_key->text_data.get()) == p_texture_key) {
+    std::span<const RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
+    for (const RUMaterial::TextureSlot& texture_slot : texture_slots) {
+        if (texture_slot.texture_type == p_texture_type) {
             return texture_slot.texture;
         }
     }
     return MEM_NULL;
-}
-
-inline RefRes<RUImage> require_material_texture(RefRes<RUMaterial> p_material, std::string_view p_texture_key) {
-    RefRes<RUImage> texture = find_material_texture(p_material, p_texture_key);
-    if (texture == nullptr) {
-        throw std::runtime_error(
-            std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_key));
-    }
-    return texture;
 }
 
 inline void add_material_texture_binding(RenderBindpointDeclarationsBuilder& p_builder,
@@ -82,13 +80,15 @@ inline std::vector<uint8_t> add_material_texture_bindings(RenderBindpointDeclara
     Ref<ROSamplerVK> p_sampler) {
     MaterialParamsUBO material_params;
 
-    RefRes<RUImage> default_albedo = require_material_texture(p_default_material, "albedo");
-    RefRes<RUImage> default_normal = require_material_texture(p_default_material, "normal");
-    RefRes<RUImage> default_rma = require_material_texture(p_default_material, "roughness_metallic_ao");
+    RefRes<RUImage> default_albedo =
+        require_material_texture(find_material_texture(p_default_material, dynam_hash("albedo")), "albedo");
+    RefRes<RUImage> default_normal =
+        require_material_texture(find_material_texture(p_default_material, dynam_hash("normal")), "normal");
+    RefRes<RUImage> default_rma = require_material_texture(find_material_texture(p_default_material, dynam_hash("rma")), "rma");
 
-    RefRes<RUImage> albedo_texture = find_material_texture(p_material, "albedo");
-    RefRes<RUImage> normal_texture = find_material_texture(p_material, "normal");
-    RefRes<RUImage> rma_texture = find_material_texture(p_material, "roughness_metallic_ao");
+    RefRes<RUImage> albedo_texture = find_material_texture(p_material, dynam_hash("albedo"));
+    RefRes<RUImage> normal_texture = find_material_texture(p_material, dynam_hash("normal"));
+    RefRes<RUImage> rma_texture = find_material_texture(p_material, dynam_hash("rma"));
 
     p_builder.add_sampler_decleration("material_textures.material_sampler", p_sampler);
     add_material_texture_binding(

@@ -81,6 +81,8 @@ struct BaseRenderDataVK {
      * This is capped by both the renderer descriptor pool and the physical-device descriptor limits.
      */
     uint32_t max_variable_sampled_image_descriptor_count = 1;
+    /** Maximum indexed-indirect draws accepted by one Vulkan draw call. */
+    uint32_t max_draw_indirect_count = 1;
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence = VK_NULL_HANDLE;

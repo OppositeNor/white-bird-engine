@@ -157,17 +157,6 @@ void append_material_mesh_info(RenderDatabase::OpaqueTrianglesInfo& p_triangles_
     });
 }
 
-const RenderDatabase::OpaqueTrianglesInfo::MaterialUnit* find_material_unit(
-    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, std::string_view p_material_key) {
-    for (const auto& material_unit : p_triangles_info.materials) {
-        if (material_unit.material != nullptr && material_unit.material->resource_key != nullptr &&
-            std::string_view(material_unit.material->resource_key) == p_material_key) {
-            return &material_unit;
-        }
-    }
-    return nullptr;
-}
-
 } // namespace
 
 RenderDatabase::RenderDatabase(AllocType* p_allocator)
@@ -209,13 +198,6 @@ bool RenderDatabase::contains_compiled_render_resource(std::string_view p_resour
 
 void RenderDatabase::clear_compiled_render_resources() {
     compiled_render_resources.clear();
-}
-
-const RenderDatabase::OpaqueTrianglesInfo::MaterialUnit* RenderDatabase::find_opaque_material(std::string_view p_material_key) const {
-    if (const auto* static_material = find_material_unit(static_opaque, p_material_key); static_material != nullptr) {
-        return static_material;
-    }
-    return find_material_unit(dynamic_opaque, p_material_key);
 }
 
 void RenderDatabase::set_opaque_triangles_linear(OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh) {

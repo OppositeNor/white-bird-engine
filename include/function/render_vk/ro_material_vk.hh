@@ -40,13 +40,13 @@ class WBE_META(WBE_RENDER_OBJECT) ROMaterialVK final : public RenderObjectVK {
 public:
     /**
      * @class TextureBinding
-     * @brief Texture image binding keyed by shader parameter name.
+     * @brief Texture image binding addressed by reflected shader field path.
      */
     struct TextureBinding {
         /**
-         * @brief Name of the shader texture parameter.
+         * @brief Reflected shader field path.
          */
-        std::string texture_key;
+        std::string field_path;
         /**
          * @brief Index inside a descriptor array, when this binding targets one array element.
          */
@@ -135,7 +135,7 @@ public:
          */
         Builder& set_descriptor_bindings(const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
         /**
-         * @brief Add a texture binding keyed by shader parameter name.
+         * @brief Add a texture binding addressed by reflected shader field path.
          */
         Builder& add_texture_binding(const TextureBinding& p_texture_binding);
         /**

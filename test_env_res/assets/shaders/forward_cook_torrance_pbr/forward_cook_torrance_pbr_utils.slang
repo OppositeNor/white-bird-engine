@@ -18,7 +18,6 @@
 #include "utils.slang"
 
 static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
-static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
 /**
  * @brief Vertex shader output / fragment shader input for the forward Cook-Torrance PBR pass.
@@ -86,21 +85,6 @@ struct SpotLightInfoBuffer {
     SpotLightInfo spot_light_info[WBE_MAX_SPOT_LIGHT_COUNT];
     /// Number of active spot light entries in spot_light_info.
     uint spot_light_count;
-};
-
-struct MaterialTextures {
-    SamplerState material_sampler;
-    Texture2D<float4> textures[];
-};
-
-struct MaterialParams {
-    int albedo_index;
-    int normal_index;
-    int roughness_metallic_ao_index;
-};
-
-struct MaterialParamsBuffer {
-    MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
 struct LightParam {

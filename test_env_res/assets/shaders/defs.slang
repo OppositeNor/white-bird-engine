@@ -69,4 +69,31 @@ struct Time {
     float duration_sec;
 };
 
+/** Maximum number of bindless material entries addressable by one draw pass. */
+static const uint WBE_MAX_MATERIAL_COUNT = 32;
+
+/** Fixed bindless texture table contract. Applications may only vary the parameter's base variable name. */
+struct MaterialTextures {
+    /** Sampler shared by all material textures. */
+    SamplerState material_sampler;
+    /** Bindless texture array indexed through MaterialParams. */
+    Texture2D<float4> textures[];
+};
+
+/** Fixed descriptor indices for one material's textures. */
+struct MaterialParams {
+    /** Albedo texture descriptor index. */
+    int albedo_index;
+    /** Normal texture descriptor index. */
+    int normal_index;
+    /** Roughness-metallic-ambient-occlusion texture descriptor index. */
+    int roughness_metallic_ao_index;
+};
+
+/** Fixed descriptor-index table for every material addressed by an indirect draw. */
+struct MaterialParamsBuffer {
+    /** Material entries indexed by the indirect draw's material index. */
+    MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
+};
+
 #endif

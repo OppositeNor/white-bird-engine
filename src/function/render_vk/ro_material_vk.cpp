@@ -34,20 +34,18 @@
 namespace WhiteBirdEngine {
 namespace {
 
-// Material texture keys are shader parameter names. This keeps manifest
-// material slots independent of backend descriptor binding numbers.
 ROMaterialVK::TextureBinding find_texture_binding(const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings,
-    std::string_view p_texture_key,
+    std::string_view p_field_path,
     const ROMaterialVK::TextureBinding& p_default_texture) {
-    auto binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key](const ROMaterialVK::TextureBinding& p_binding) {
-        return p_binding.texture_key == p_texture_key;
+    auto binding = std::ranges::find_if(p_texture_bindings, [&p_field_path](const ROMaterialVK::TextureBinding& p_binding) {
+        return p_binding.field_path == p_field_path;
     });
     if (binding == p_texture_bindings.end()) {
-        std::size_t field_separator = p_texture_key.rfind('.');
+        std::size_t field_separator = p_field_path.rfind('.');
         if (field_separator != std::string_view::npos) {
-            std::string_view field_name = p_texture_key.substr(field_separator + 1);
+            std::string_view field_name = p_field_path.substr(field_separator + 1);
             binding = std::ranges::find_if(p_texture_bindings, [&field_name](const ROMaterialVK::TextureBinding& p_binding) {
-                return p_binding.texture_key == field_name;
+                return p_binding.field_path == field_name;
             });
         }
     }
@@ -55,57 +53,57 @@ ROMaterialVK::TextureBinding find_texture_binding(const std::vector<ROMaterialVK
         if (p_default_texture.image_view != MEM_NULL) {
             return p_default_texture;
         }
-        throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_texture_key));
+        throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_field_path));
     }
     if (binding->image_view == MEM_NULL) {
-        throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_texture_key));
+        throw std::runtime_error(std::format("Failed to bind material texture '{}': image view is missing.", p_field_path));
     }
     return *binding;
 }
 
 const ROMaterialVK::TextureBinding* find_indexed_texture_binding(
-    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_texture_key, uint32_t p_array_index) {
-    auto unindexed_binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key](const ROMaterialVK::TextureBinding& p_binding) {
-        return p_binding.texture_key == p_texture_key && !p_binding.has_array_index;
+    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_field_path, uint32_t p_array_index) {
+    auto unindexed_binding = std::ranges::find_if(p_texture_bindings, [&p_field_path](const ROMaterialVK::TextureBinding& p_binding) {
+        return p_binding.field_path == p_field_path && !p_binding.has_array_index;
     });
     if (unindexed_binding != p_texture_bindings.end()) {
         throw std::runtime_error(
-            std::format("Failed to bind material texture array '{}': array index must be specified with [].", p_texture_key));
+            std::format("Failed to bind material texture array '{}': array index must be specified with [].", p_field_path));
     }
-    auto binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key, p_array_index](const ROMaterialVK::TextureBinding& p_binding) {
-        return p_binding.texture_key == p_texture_key && p_binding.has_array_index && p_binding.array_index == p_array_index;
+    auto binding = std::ranges::find_if(p_texture_bindings, [&p_field_path, p_array_index](const ROMaterialVK::TextureBinding& p_binding) {
+        return p_binding.field_path == p_field_path && p_binding.has_array_index && p_binding.array_index == p_array_index;
     });
     if (binding == p_texture_bindings.end()) {
         return nullptr;
     }
     if (binding->image_view == MEM_NULL) {
         throw std::runtime_error(
-            std::format("Failed to bind material texture '{}[{}]': image view is missing.", p_texture_key, p_array_index));
+            std::format("Failed to bind material texture '{}[{}]': image view is missing.", p_field_path, p_array_index));
     }
     return &*binding;
 }
 
 const ROMaterialVK::TextureBinding* find_indexed_texture_binding_fallback(
-    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_texture_key) {
+    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_field_path) {
     // Use element 0 as the default descriptor for array slots that are inactive but still must be valid for Vulkan.
-    auto binding = std::ranges::find_if(p_texture_bindings, [&p_texture_key](const ROMaterialVK::TextureBinding& p_binding) {
-        return p_binding.texture_key == p_texture_key && p_binding.has_array_index && p_binding.array_index == 0;
+    auto binding = std::ranges::find_if(p_texture_bindings, [&p_field_path](const ROMaterialVK::TextureBinding& p_binding) {
+        return p_binding.field_path == p_field_path && p_binding.has_array_index && p_binding.array_index == 0;
     });
     if (binding == p_texture_bindings.end()) {
         return nullptr;
     }
     if (binding->image_view == MEM_NULL) {
-        throw std::runtime_error(std::format("Failed to bind material texture '{}[0]': image view is missing.", p_texture_key));
+        throw std::runtime_error(std::format("Failed to bind material texture '{}[0]': image view is missing.", p_field_path));
     }
     return &*binding;
 }
 
 void validate_indexed_texture_bindings(
-    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_texture_key, uint32_t p_descriptor_count) {
+    const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings, std::string_view p_field_path, uint32_t p_descriptor_count) {
     for (const ROMaterialVK::TextureBinding& binding : p_texture_bindings) {
-        if (binding.texture_key == p_texture_key && binding.has_array_index && binding.array_index >= p_descriptor_count) {
+        if (binding.field_path == p_field_path && binding.has_array_index && binding.array_index >= p_descriptor_count) {
             throw std::runtime_error(std::format(
-                "Failed to bind material texture array '{}': index {} is out of bounds.", p_texture_key, binding.array_index));
+                "Failed to bind material texture array '{}': index {} is out of bounds.", p_field_path, binding.array_index));
         }
     }
 }
@@ -124,7 +122,7 @@ uint32_t get_variable_sampled_image_descriptor_count(const ROMaterialVK::Builder
         }
         descriptor_count = 1;
         for (const auto& texture_binding : p_builder.texture_bindings) {
-            if (texture_binding.texture_key != descriptor_binding.parameter_name) {
+            if (texture_binding.field_path != descriptor_binding.parameter_name) {
                 continue;
             }
             if (!texture_binding.has_array_index) {

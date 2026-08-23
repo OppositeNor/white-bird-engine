@@ -167,11 +167,6 @@ private:
         std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_direct_sampler_bindpoints(
         std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
-    void add_material_texture_bindpoints(std::string_view p_resource_key,
-        ROMaterialVK::Builder& p_builder,
-        const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        uint32_t p_set_index,
-        const RenderBindpointDeclarations& p_bindpoint_declarations);
     Ref<ROImageViewVK> compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource);
     Ref<ROImageVK> compile_image(std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
     void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,

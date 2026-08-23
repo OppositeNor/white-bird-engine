@@ -186,16 +186,6 @@ public:
     }
 
     /**
-     * @brief Find an opaque-triangle material batch by resource key.
-     *
-     * Searches static batches first, then dynamic batches.
-     *
-     * @param p_material_key Stable material resource key.
-     * @return Matching batch info, or nullptr when the key is not present.
-     */
-    const OpaqueTrianglesInfo::MaterialUnit* find_opaque_material(std::string_view p_material_key) const;
-
-    /**
      * @brief Register or replace a compiled render object for a resource key.
      *
      * @param p_resource_key The source resource key or a derived compiler key.

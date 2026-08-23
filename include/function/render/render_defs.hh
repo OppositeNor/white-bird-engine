@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render/render_resource_unit.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -69,15 +69,6 @@ struct RenderBindpointSamplerDeclaration {
 };
 
 /**
- * @class RenderBindpointMaterialDeclaration
- * @brief Caller-provided material bindpoint resolved from a material resource unit.
- */
-struct RenderBindpointMaterialDeclaration {
-    std::string field_path;
-    std::string material_key;
-};
-
-/**
  * @class RenderBindpointDeclarations
  * @brief Aggregated caller-provided bindpoint data.
  */
@@ -86,7 +77,6 @@ struct RenderBindpointDeclarations {
     std::vector<RenderBindpointBufferDeclaration> buffer_declerations;
     std::vector<RenderBindpointImageDeclaration> image_declerations;
     std::vector<RenderBindpointSamplerDeclaration> sampler_declerations;
-    std::vector<RenderBindpointMaterialDeclaration> material_declerations;
 
     std::span<const uint8_t> get_buffer_data(const RenderBindpointBufferDeclaration& p_decleration) const {
         return std::span<const uint8_t>(buffer_data.data() + p_decleration.offset, p_decleration.size);
@@ -151,27 +141,6 @@ struct RenderBindpointDeclarationsBuilder {
     RenderBindpointDeclarationsBuilder& add_sampler_decleration(std::string_view p_field_path, Ref<IRenderObject> p_sampler_render_object) {
         declerations.sampler_declerations.push_back(
             {.field_path = std::string(p_field_path), .sampler_render_object = p_sampler_render_object});
-        return *this;
-    }
-
-    /**
-     * @brief Add a material decleration.
-     */
-    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, std::string_view p_material_key) {
-        declerations.material_declerations.push_back(
-            {.field_path = std::string(p_field_path), .material_key = std::string(p_material_key)});
-        return *this;
-    }
-
-    /**
-     * @brief Add a material decleration from a resource unit.
-     */
-    RenderBindpointDeclarationsBuilder& add_material_decleration(std::string_view p_field_path, RefRes<RUMaterial> p_material_resource) {
-        if (p_material_resource == nullptr || p_material_resource->resource_key == nullptr) {
-            throw std::runtime_error("Failed to add material declaration: material resource key was not propagated.");
-        }
-        declerations.material_declerations.push_back(
-            {.field_path = std::string(p_field_path), .material_key = std::string(p_material_resource->resource_key)});
         return *this;
     }
 

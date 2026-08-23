@@ -355,13 +355,6 @@ RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) 
     return result;
 }
 
-RefRes<RUText> populate_text_resource(IResourceChunk& p_res_chunk, std::string_view p_str) {
-    RUText resource_unit;
-    resource_unit.text_data = populate_text(p_res_chunk, p_str);
-    resource_unit.size = p_str.size() + 1;
-    return p_res_chunk.push_res_unit("", resource_unit).force_cast<RUText>();
-}
-
 RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemaImage& p_scheme) {
     if (p_scheme.path.empty()) {
         throw std::runtime_error("Failed to populate image resource: inline image requires path.");
@@ -465,6 +458,35 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     return saved_resource;
 }
 
+HashCode get_material_type(std::string_view p_material_type) {
+    HashCode material_type = dynam_hash(p_material_type);
+    if (dynam_hash("cook_torrance") == material_type) {
+        return material_type;
+    }
+    throw std::runtime_error(std::format("Failed to populate material resource: unsupported material_type '{}'.", p_material_type));
+}
+
+HashCode get_material_texture_type(std::string_view p_texture_type) {
+    HashCode texture_type = dynam_hash(p_texture_type);
+    if (dynam_hash("albedo") == texture_type || dynam_hash("normal") == texture_type || dynam_hash("rma") == texture_type) {
+        return texture_type;
+    }
+    throw std::runtime_error(std::format("Failed to populate material resource: unsupported texture_type '{}'.", p_texture_type));
+}
+
+size_t get_material_texture_type_index(HashCode p_texture_type) {
+    if (dynam_hash("albedo") == p_texture_type) {
+        return 0;
+    }
+    if (dynam_hash("normal") == p_texture_type) {
+        return 1;
+    }
+    if (dynam_hash("rma") == p_texture_type) {
+        return 2;
+    }
+    throw std::runtime_error("Failed to populate material resource: unsupported runtime material texture type.");
+}
+
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) {
     const bool has_inline_pipeline = p_material.graphics_pipeline.has_value();
     if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
@@ -475,42 +497,47 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
     }
 
     RUMaterial resource_unit;
+    resource_unit.material_type = get_material_type(p_material.material_type);
     if (has_inline_pipeline) {
         resource_unit.graphics_pipeline = populate_graphics_pipeline_resource(p_res_chunk, p_material.graphics_pipeline.value());
     }
     std::vector<RUMaterial::TextureSlot> texture_slots;
     std::vector<std::string> texture_ids;
+    std::array<bool, 3> has_texture_types{};
     texture_slots.reserve(p_material.textures.size());
     texture_ids.reserve(p_material.textures.size());
-    for (const auto& texture_scheme : p_material.textures) {
-        if (texture_scheme.texture_key.empty()) {
-            throw std::runtime_error("Failed to populate material resource: texture slot requires non-empty texture_key.");
+    for (const RUSchemaMaterialTextureSlot& texture_scheme : p_material.textures) {
+        HashCode texture_type = get_material_texture_type(texture_scheme.texture_type);
+        size_t texture_type_index = get_material_texture_type_index(texture_type);
+        if (has_texture_types[texture_type_index]) {
+            throw std::runtime_error(
+                std::format("Failed to populate material resource: texture_type '{}' is declared more than once.", texture_scheme.texture_type));
+        }
+        has_texture_types[texture_type_index] = true;
+        if (texture_scheme.texture.has_value() == texture_scheme.texture_id.has_value()) {
+            throw std::runtime_error("Failed to populate material resource: texture requires exactly one of texture or texture_id.");
         }
         RUMaterial::TextureSlot texture_slot;
-        texture_slot.texture_key = populate_text_resource(p_res_chunk, texture_scheme.texture_key);
+        texture_slot.texture_type = texture_type;
         if (texture_scheme.texture_id.has_value()) {
-            texture_ids.push_back(texture_scheme.texture_id.value());
+            texture_ids.push_back(*texture_scheme.texture_id);
         } else {
-            if (!texture_scheme.texture.has_value()) {
-                throw std::runtime_error("Failed to populate material resource: texture slot requires either texture_id or inline texture.");
-            }
-            texture_slot.texture = populate_image_resource(p_res_chunk, texture_scheme.texture.value());
+            texture_slot.texture = populate_image_resource(p_res_chunk, *texture_scheme.texture);
             texture_ids.emplace_back();
         }
         texture_slots.push_back(texture_slot);
     }
-
     resource_unit.texture_count = texture_slots.size();
     if (!texture_slots.empty()) {
-        auto texture_slot_data = p_res_chunk.push_data(texture_slots.size() * sizeof(RUMaterial::TextureSlot), texture_slots.data());
-        resource_unit.textures = texture_slot_data.force_cast<RUMaterial::TextureSlot>();
+        resource_unit.textures =
+            p_res_chunk.push_data(texture_slots.size() * sizeof(RUMaterial::TextureSlot), texture_slots.data()).force_cast<RUMaterial::TextureSlot>();
     }
 
     auto saved_resource = p_res_chunk.push_res_unit(p_material.id, resource_unit).force_cast<RUMaterial>();
     if (!p_material.graphics_pipeline_ids.empty()) {
         p_res_chunk.create_ref_to(saved_resource->graphics_pipeline, p_material.graphics_pipeline_ids.front());
     }
-    auto* saved_texture_slots = saved_resource->textures.get();
+    RUMaterial::TextureSlot* saved_texture_slots = saved_resource->textures.get();
     for (size_t i = 0; i < texture_ids.size(); ++i) {
         if (!texture_ids[i].empty()) {
             p_res_chunk.create_ref_to(saved_texture_slots[i].texture, texture_ids[i]);

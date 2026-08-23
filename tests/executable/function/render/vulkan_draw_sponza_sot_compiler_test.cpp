@@ -36,6 +36,7 @@
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "function/render_vk/static_opaque_triangles_pipeline_vk.hh"
 #include <algorithm>
 #include <cstdlib>
 #include <glm/ext/vector_float3.hpp>
@@ -61,7 +62,7 @@ public:
 
 private:
     void create_depth_resources();
-    void write_camera_descriptor(CompiledStaticOpaqueTrianglesVK& p_compiled);
+    void write_camera_descriptor(StaticOpaqueTrianglesPipelineVK& p_pipeline);
 
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
@@ -143,14 +144,14 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
         throw std::runtime_error("Failed to setup indirect Sponza test: sponza mesh resource was not found.");
     }
     renderer_vk->get_render_database()->set_static_opaque_triangles(sponza_mesh.get());
+    renderer_vk->update_static_opaque_triangles();
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
     create_depth_resources();
 
-    StaticOpaqueTrianglesCompileConfigVK compile_config;
-    compile_config.depth_attachment_id = std::string(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW);
-    compile_config.depth_attachment_format = DRAW_SPONZA_INDIRECT_DEPTH_FORMAT;
-    auto compiled = renderer_vk->compile_static_opaque_triangles(compile_config);
-    write_camera_descriptor(compiled);
+    StaticOpaqueTrianglesPipelineVK::Config compile_config;
+    compile_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
+    StaticOpaqueTrianglesPipelineVK pipeline(renderer_vk, compile_config);
+    write_camera_descriptor(pipeline);
 
     RendGraphDescVK graph_desc(render_allocator);
     graph_desc.resources.emplace_back(RendResVK{
@@ -158,7 +159,8 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     graph_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = depth_view});
-    graph_desc.tasks.emplace_back(std::move(compiled.task));
+    pipeline.add_resources(graph_desc);
+    graph_desc.tasks.emplace_back(pipeline.take_task());
     renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
     renderer_vk->activate_render_graph("draw_sponza_indirect_graph");
 }
@@ -179,7 +181,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
             .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(CompiledStaticOpaqueTrianglesVK& p_compiled) {
+void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(StaticOpaqueTrianglesPipelineVK& p_pipeline) {
     camera_info_buffer = ROBufferVK::Builder()
                              .set_domain(DeviceDomain::HOST_DEVICE)
                              .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -187,10 +189,11 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(CompiledSt
                              .create_ref(base_render_data);
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
-    for (auto& pipeline_batch : p_compiled.graphics_pipeline_batches) {
-        auto [set_index, binding] = pipeline_batch.descriptor_set_bindings.at("camera_info");
-        pipeline_batch.descriptor_sets.at(set_index)->write_descriptor_set(
-            RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
+    for (size_t batch_index = 0; batch_index < p_pipeline.get_compiled_batch_count(); ++batch_index) {
+        auto [set_index, binding] = p_pipeline.get_descriptor_binding(batch_index, "camera_info");
+        p_pipeline.get_descriptor_set(batch_index, set_index)
+            ->write_descriptor_set(
+                RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
     }
 }
 

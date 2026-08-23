@@ -17,7 +17,6 @@
 
 #include "utils.slang"
 
-static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
 /**
  * @brief Vertex shader output / fragment shader input for the deferred G-buffer pass.
@@ -47,30 +46,6 @@ struct VSOutput {
  * @brief Texture coordinate interpolated from the vertex attribute.
      */
     float2 uv             : TEXCOORD4;
-};
-
-/**
- * @brief Bindless material textures sampled by the G-buffer pass.
- */
-struct MaterialTextures {
-    SamplerState material_sampler;
-    Texture2D<float4> textures[];
-};
-
-/**
- * @brief Descriptor indices for the active material textures.
- */
-struct MaterialParams {
-    int albedo_index;
-    int normal_index;
-    int roughness_metallic_ao_index;
-};
-
-/**
- * @brief Descriptor-index table for every material addressed by an indirect draw.
- */
-struct MaterialParamsBuffer {
-    MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
 /**

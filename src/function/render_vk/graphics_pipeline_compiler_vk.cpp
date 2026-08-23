@@ -169,14 +169,6 @@ std::vector<uint8_t> build_image_upload_data(const RUImage& p_image) {
     return upload_data;
 }
 
-std::string text_resource_value(RefRes<RUText> p_text) {
-    // RUText stores C-string data in the resource chunk; expose it as a normal string for binding lookups.
-    if (p_text == nullptr || p_text->text_data == nullptr) {
-        throw std::runtime_error("Failed to compile material texture: texture key is missing.");
-    }
-    return std::string(p_text->text_data.get());
-}
-
 ShaderMetadata load_shader_metadata(RefRes<RUShader> p_shader) {
     // Shader metadata is loaded beside the shader resource because descriptor layouts are derived from reflection data.
     if (p_shader == nullptr || p_shader->metadata_path == nullptr) {
@@ -189,31 +181,10 @@ ShaderMetadata load_shader_metadata(RefRes<RUShader> p_shader) {
     return metadata;
 }
 
-bool descriptor_name_matches_bindpoint_scope(std::string_view p_descriptor_name, std::string_view p_bindpoint_scope) {
-    if (p_descriptor_name == p_bindpoint_scope) {
-        return true;
-    }
-    if (p_descriptor_name.size() <= p_bindpoint_scope.size() + 1 || !p_descriptor_name.starts_with(p_bindpoint_scope)) {
-        return false;
-    }
-    return p_descriptor_name[p_bindpoint_scope.size()] == '.';
-}
-
-const RenderBindpointMaterialDeclaration* find_material_bindpoint(
-    const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_descriptor_name) {
-    for (const auto& bindpoint_declaration : p_bindpoint_declarations.material_declerations) {
-        if (!bindpoint_declaration.material_key.empty() &&
-            descriptor_name_matches_bindpoint_scope(p_descriptor_name, bindpoint_declaration.field_path)) {
-            return &bindpoint_declaration;
-        }
-    }
-    return nullptr;
-}
-
-bool has_texture_bindpoint(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_texture_key) {
+bool has_texture_bindpoint(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
     // Raw texture bindings are matched by shader texture parameter name, independent of material texture slots.
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.image_declerations) {
-        if (parse_indexed_field_path(bindpoint_declaration.field_path).field_path == p_texture_key) {
+        if (parse_indexed_field_path(bindpoint_declaration.field_path).field_path == p_field_path) {
             return true;
         }
     }
@@ -252,12 +223,6 @@ void validate_bindpoint_declarations(const RenderBindpointDeclarations& p_bindpo
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.sampler_declerations) {
         if (bindpoint_declaration.field_path.empty()) {
             throw std::runtime_error("Failed to compile graphics pipeline: sampler binding field path is empty.");
-        }
-        parse_indexed_field_path(bindpoint_declaration.field_path);
-    }
-    for (const auto& bindpoint_declaration : p_bindpoint_declarations.material_declerations) {
-        if (bindpoint_declaration.field_path.empty()) {
-            throw std::runtime_error("Failed to compile graphics pipeline: material binding field path is empty.");
         }
         parse_indexed_field_path(bindpoint_declaration.field_path);
     }
@@ -407,9 +372,6 @@ void validate_texture_bindpoint_sources(std::string_view p_resource_key,
     bool p_has_default_image) {
     for (const auto& descriptor_binding : p_descriptor_bindings) {
         if (!requires_texture_image(descriptor_binding)) {
-            continue;
-        }
-        if (find_material_bindpoint(p_bindpoint_declarations, descriptor_binding.parameter_name) != nullptr) {
             continue;
         }
         if (p_has_default_image) {
@@ -707,7 +669,6 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
     }
     add_direct_texture_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
     add_direct_sampler_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
-    add_material_texture_bindpoints(p_resource_key, builder, p_descriptor_bindings, p_set_index, p_bindpoint_declarations);
     return builder.create_ref(context.render_data)->get_descriptor_set();
 }
 
@@ -717,7 +678,7 @@ void GraphicsPipelineCompilerVK::add_direct_texture_bindpoints(
         // Add raw texture bindpoints before material slots so explicit per-compile inputs win on duplicate texture keys.
         IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
         ROMaterialVK::TextureBinding texture_binding{
-            .texture_key = indexed_path.field_path,
+            .field_path = indexed_path.field_path,
             .array_index = indexed_path.array_index.value_or(0),
             .has_array_index = indexed_path.array_index.has_value(),
             .image_layout = VK_IMAGE_LAYOUT_GENERAL,
@@ -753,46 +714,6 @@ void GraphicsPipelineCompilerVK::add_direct_sampler_bindpoints(
             .array_index = indexed_path.array_index.value_or(0),
             .has_array_index = indexed_path.array_index.has_value(),
             .sampler = sampler});
-    }
-}
-
-void GraphicsPipelineCompilerVK::add_material_texture_bindpoints(std::string_view p_resource_key,
-    ROMaterialVK::Builder& p_builder,
-    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-    uint32_t p_set_index,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
-    for (const auto& bindpoint_declaration : p_bindpoint_declarations.material_declerations) {
-        const auto* material_unit = context.render_database->find_opaque_material(bindpoint_declaration.material_key);
-        if (material_unit == nullptr || material_unit->material == nullptr) {
-            throw std::runtime_error(std::format("Failed to compile graphics pipeline '{}': material '{}' was not found in the render database.",
-                p_resource_key,
-                bindpoint_declaration.material_key));
-        }
-        auto material = material_unit->material;
-        bool material_used_by_set = false;
-        for (const auto& descriptor_binding : p_descriptor_bindings) {
-            if (descriptor_binding.set_index == p_set_index && requires_texture_image(descriptor_binding) &&
-                descriptor_name_matches_bindpoint_scope(descriptor_binding.parameter_name, bindpoint_declaration.field_path)) {
-                material_used_by_set = true;
-                break;
-            }
-        }
-        if (!material_used_by_set) {
-            continue;
-        }
-        std::span<RUMaterial::TextureSlot> texture_slots(material->textures.get(), material->texture_count);
-        for (const auto& texture_slot : texture_slots) {
-            std::string texture_key = text_resource_value(texture_slot.texture_key);
-            if (texture_slot.texture == nullptr) {
-                throw std::runtime_error(
-                    std::format("Failed to compile material '{}': texture '{}' is missing.", material->resource_key, texture_key));
-            }
-            std::string scoped_texture_key = std::format("{}.{}", bindpoint_declaration.field_path, texture_key);
-            p_builder.add_texture_binding(ROMaterialVK::TextureBinding{.texture_key = scoped_texture_key,
-                .image_view = compile_image_view(
-                    std::format("{}#texture_{}", material->resource_key, scoped_texture_key), texture_slot.texture),
-                .image_layout = VK_IMAGE_LAYOUT_GENERAL});
-        }
     }
 }
 

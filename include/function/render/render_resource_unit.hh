@@ -119,16 +119,16 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
 
 /**
  * @class RUSchemaMaterialTextureSlot
- * @brief The scheme of one texture slot in RUMaterial.
+ * @brief One typed material texture declared inline or by resource id.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
-    // The key used by the material shader to find this texture.
+    /** Texture role. Supported values are `albedo`, `normal`, and `rma`. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string texture_key;
-    // Inline texture data.
+    std::string texture_type;
+    /** Inline texture data. Exactly one of texture and texture_id must be present. */
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaImage> texture;
-    // A string referencing an already populated texture.
+    /** Reference to an already populated texture. Exactly one of texture and texture_id must be present. */
     WBE_META(WBE_REFLECT)
     std::optional<std::string> texture_id;
 };
@@ -139,13 +139,16 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaMaterial)
-    // The graphics pipelines that can render this material.
+    /** Material model. The only currently supported value is `cook_torrance`. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string material_type;
+    /** The graphics pipelines that can render this material. */
     WBE_META(WBE_REFLECT)
     std::vector<std::string> graphics_pipeline_ids;
-    // The inline graphics pipeline used to render this material.
+    /** The inline graphics pipeline used to render this material. */
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaGraphicsPipeline> graphics_pipeline;
-    // The texture slots used by this material.
+    /** Typed texture slots used by the material. Texture types must not be duplicated. */
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemaMaterialTextureSlot> textures;
 };
@@ -268,23 +271,23 @@ struct RUGraphicsPipeline : public ResourceUnit {
 
 /**
  * @class RUMaterial
- * @brief Cook-Torrance material resource unit.
+ * @brief Typed material resource unit.
  */
 struct RUMaterial : public ResourceUnit {
-    // The graphics pipeline to run this material.
+    /** Runtime hash decoded from the schema material_type name. */
+    HashCode material_type = 0;
+    /** The graphics pipeline used to render this material. */
     RefRes<RUGraphicsPipeline> graphics_pipeline;
-    /**
-     * @brief The texture slot.
-     */
+    /** One resolved typed texture slot. */
     struct TextureSlot {
-        // The key of the texture.
-        RefRes<RUText> texture_key;
-        // The texture instance.
+        /** Runtime hash decoded from the schema texture_type name. */
+        HashCode texture_type = 0;
+        /** Resolved texture resource. */
         RefRes<RUImage> texture;
     };
-    // The texture slots.
+    /** Chunk-owned contiguous texture-slot storage. */
     RefRes<TextureSlot> textures;
-    // The number of texture slots.
+    /** Number of entries in textures. */
     size_t texture_count = 0;
 };
 
