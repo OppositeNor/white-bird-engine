@@ -1,0 +1,183 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "core/parser/parser_json.hh"
+#include "function/render_vk/shader_metadata_vk.hh"
+#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
+#include <gtest/gtest.h>
+#include <string>
+
+namespace WhiteBirdEngine {
+
+TEST(WBEShaderMetadataVKTest, DeserializesNormalizedSlangUserAttributes) {
+    std::string json_buffer = R"(
+    {
+        "parameters": [
+            {
+                "name": "material_texture",
+                "user_attributes": [
+                    {
+                        "name": "MaterialSlot",
+                        "arguments": [
+                            {"kind": "string", "string_value": "albedo"},
+                            {"kind": "int", "integer_value": 7},
+                            {"kind": "float", "floating_point_value": 0.5}
+                        ]
+                    }
+                ],
+                "type": {
+                    "kind": "struct",
+                    "user_attributes": [{"name": "MaterialContract", "arguments": []}],
+                    "fields": [
+                        {
+                            "name": "texture",
+                            "type": {
+                                "kind": "resource",
+                                "user_attributes": [{"name": "TextureShape", "arguments": []}]
+                            },
+                            "user_attributes": [{"name": "Required", "arguments": []}]
+                        }
+                    ]
+                }
+            }
+        ],
+        "entry_points": [
+            {
+                "name": "fragment_main",
+                "stage": "fragment",
+                "user_attributes": [{"name": "MaterialShader", "arguments": []}]
+            }
+        ]
+    }
+    )";
+    ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    ASSERT_EQ(metadata.parameters.size(), 1U);
+    const ShaderMetadataParameter& parameter = metadata.parameters[0];
+    ASSERT_EQ(parameter.user_attributes.size(), 1U);
+    const ShaderMetadataUserAttribute& attribute = parameter.user_attributes[0];
+    EXPECT_EQ(attribute.name, "MaterialSlot");
+    ASSERT_EQ(attribute.arguments.size(), 3U);
+    EXPECT_EQ(attribute.arguments[0].kind, "string");
+    EXPECT_EQ(attribute.arguments[0].string_value, "albedo");
+    EXPECT_EQ(attribute.arguments[1].kind, "int");
+    EXPECT_EQ(attribute.arguments[1].integer_value, 7);
+    EXPECT_EQ(attribute.arguments[2].kind, "float");
+    EXPECT_DOUBLE_EQ(attribute.arguments[2].floating_point_value, 0.5);
+
+    ASSERT_EQ(parameter.type.user_attributes.size(), 1U);
+    EXPECT_EQ(parameter.type.user_attributes[0].name, "MaterialContract");
+    ASSERT_EQ(parameter.type.fields.size(), 1U);
+    ASSERT_EQ(parameter.type.fields[0].user_attributes.size(), 1U);
+    EXPECT_EQ(parameter.type.fields[0].user_attributes[0].name, "Required");
+    ASSERT_EQ(parameter.type.fields[0].type.user_attributes.size(), 1U);
+    EXPECT_EQ(parameter.type.fields[0].type.user_attributes[0].name, "TextureShape");
+
+    ASSERT_EQ(metadata.entry_points.size(), 1U);
+    ASSERT_EQ(metadata.entry_points[0].user_attributes.size(), 1U);
+    EXPECT_EQ(metadata.entry_points[0].user_attributes[0].name, "MaterialShader");
+}
+
+TEST(WBEShaderMetadataVKTest, MissingUserAttributesRemainEmpty) {
+    std::string json_buffer = R"(
+    {
+        "parameters": [{"name": "camera_info", "type": {"fields": [{"name": "view", "type": {}}]}}],
+        "entry_points": [{"name": "vertex_main", "stage": "vertex"}]
+    }
+    )";
+    ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    ASSERT_EQ(metadata.parameters.size(), 1U);
+    EXPECT_TRUE(metadata.parameters[0].user_attributes.empty());
+    EXPECT_TRUE(metadata.parameters[0].type.user_attributes.empty());
+    ASSERT_EQ(metadata.parameters[0].type.fields.size(), 1U);
+    EXPECT_TRUE(metadata.parameters[0].type.fields[0].user_attributes.empty());
+    EXPECT_TRUE(metadata.parameters[0].type.fields[0].type.user_attributes.empty());
+    ASSERT_EQ(metadata.entry_points.size(), 1U);
+    EXPECT_TRUE(metadata.entry_points[0].user_attributes.empty());
+}
+
+TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
+    ParserJSON parser;
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "reflection_attributes"}),
+        "reflection_attributes.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    ASSERT_EQ(metadata.parameters.size(), 1U);
+    const ShaderMetadataParameter& global_parameter = metadata.parameters[0];
+    EXPECT_EQ(global_parameter.name, "attributed_global");
+    ASSERT_EQ(global_parameter.user_attributes.size(), 6U);
+    EXPECT_EQ(global_parameter.user_attributes[0].name, "VariableContract");
+    ASSERT_EQ(global_parameter.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(global_parameter.user_attributes[0].arguments[0].kind, "string");
+    EXPECT_EQ(global_parameter.user_attributes[0].arguments[0].string_value, "global");
+    EXPECT_EQ(global_parameter.user_attributes[1].name, "BindingContract");
+    ASSERT_EQ(global_parameter.user_attributes[1].arguments.size(), 1U);
+    EXPECT_EQ(global_parameter.user_attributes[1].arguments[0].kind, "int");
+    EXPECT_EQ(global_parameter.user_attributes[1].arguments[0].integer_value, 3);
+    EXPECT_EQ(global_parameter.user_attributes[2].name, "MarkerContract");
+    EXPECT_TRUE(global_parameter.user_attributes[2].arguments.empty());
+    EXPECT_EQ(global_parameter.user_attributes[3].name, "RangeContract");
+    ASSERT_EQ(global_parameter.user_attributes[3].arguments.size(), 2U);
+    EXPECT_EQ(global_parameter.user_attributes[3].arguments[0].kind, "int");
+    EXPECT_EQ(global_parameter.user_attributes[3].arguments[0].integer_value, -4);
+    EXPECT_EQ(global_parameter.user_attributes[3].arguments[1].kind, "int");
+    EXPECT_EQ(global_parameter.user_attributes[3].arguments[1].integer_value, 9);
+    EXPECT_EQ(global_parameter.user_attributes[4].name, "WeightContract");
+    ASSERT_EQ(global_parameter.user_attributes[4].arguments.size(), 1U);
+    EXPECT_EQ(global_parameter.user_attributes[4].arguments[0].kind, "float");
+    EXPECT_DOUBLE_EQ(global_parameter.user_attributes[4].arguments[0].floating_point_value, -0.25);
+    EXPECT_EQ(global_parameter.user_attributes[5].name, "AliasContract");
+    ASSERT_EQ(global_parameter.user_attributes[5].arguments.size(), 1U);
+    EXPECT_EQ(global_parameter.user_attributes[5].arguments[0].kind, "string");
+    EXPECT_TRUE(global_parameter.user_attributes[5].arguments[0].string_value.empty());
+
+    ASSERT_EQ(global_parameter.type.element_type.user_attributes.size(), 1U);
+    const ShaderMetadataUserAttribute& struct_attribute = global_parameter.type.element_type.user_attributes[0];
+    EXPECT_EQ(struct_attribute.name, "StructContract");
+    ASSERT_EQ(struct_attribute.arguments.size(), 1U);
+    EXPECT_EQ(struct_attribute.arguments[0].kind, "float");
+    EXPECT_DOUBLE_EQ(struct_attribute.arguments[0].floating_point_value, 0.5);
+
+    ASSERT_EQ(global_parameter.type.fields.size(), 1U);
+    ASSERT_EQ(global_parameter.type.fields[0].user_attributes.size(), 1U);
+    EXPECT_EQ(global_parameter.type.fields[0].user_attributes[0].name, "VariableContract");
+    ASSERT_EQ(global_parameter.type.fields[0].user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(global_parameter.type.fields[0].user_attributes[0].arguments[0].string_value, "field");
+
+    ASSERT_EQ(metadata.entry_points.size(), 1U);
+    const ShaderMetadataEntryPoint& entry_point = metadata.entry_points[0];
+    EXPECT_EQ(entry_point.name, "fragment_main");
+    ASSERT_EQ(entry_point.user_attributes.size(), 1U);
+    EXPECT_EQ(entry_point.user_attributes[0].name, "EntryContract");
+    ASSERT_EQ(entry_point.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(entry_point.user_attributes[0].arguments[0].string_value, "entry");
+
+    ASSERT_EQ(entry_point.parameters.size(), 1U);
+    ASSERT_EQ(entry_point.parameters[0].user_attributes.size(), 1U);
+    EXPECT_EQ(entry_point.parameters[0].user_attributes[0].name, "ParameterContract");
+    ASSERT_EQ(entry_point.parameters[0].user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].kind, "int");
+    EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].integer_value, 7);
+}
+
+} // namespace WhiteBirdEngine

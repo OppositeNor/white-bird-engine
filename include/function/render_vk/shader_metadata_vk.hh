@@ -24,6 +24,46 @@
 
 namespace WhiteBirdEngine {
 
+/**
+ * @class ShaderMetadataUserAttributeArgument
+ * @brief One typed argument supplied to a reflected Slang user attribute.
+ *
+ * The kind is `int`, `float`, or `string`. Only the value field selected by kind is meaningful.
+ */
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataUserAttributeArgument final : public Serializable {
+    WBE_DECL_SERIALIZABLE(ShaderMetadataUserAttributeArgument)
+
+    /** @brief Normalized argument kind. */
+    WBE_META(WBE_REFLECT)
+    std::string kind;
+    /** @brief Integer argument value when kind is `int`. */
+    WBE_META(WBE_REFLECT)
+    int64_t integer_value = 0;
+    /** @brief Floating-point argument value when kind is `float`. */
+    WBE_META(WBE_REFLECT)
+    double floating_point_value = 0.0;
+    /** @brief String argument value when kind is `string`. */
+    WBE_META(WBE_REFLECT)
+    std::string string_value;
+};
+
+/**
+ * @class ShaderMetadataUserAttribute
+ * @brief Slang user attribute reflected on a shader declaration.
+ *
+ * Attribute names and argument order are preserved from the source declaration.
+ */
+struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataUserAttribute final : public Serializable {
+    WBE_DECL_SERIALIZABLE(ShaderMetadataUserAttribute)
+
+    /** @brief Attribute type name without the `Attribute` suffix applied by Slang syntax. */
+    WBE_META(WBE_REFLECT)
+    std::string name;
+    /** @brief Ordered arguments supplied to the attribute. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttributeArgument> arguments;
+};
+
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataBinding final : public Serializable {
     WBE_DECL_SERIALIZABLE(ShaderMetadataBinding)
 
@@ -56,6 +96,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final : public Serializ
     int32_t element_count = 0;
     WBE_META(WBE_REFLECT)
     std::string element_scalar_type;
+    /** @brief User attributes reflected from this type declaration. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttribute> user_attributes;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Serializable {
@@ -75,6 +118,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Seriali
     std::string semantic_name;
     WBE_META(WBE_REFLECT)
     int32_t semantic_index = 0;
+    /** @brief User attributes reflected from this field declaration. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttribute> user_attributes;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable {
@@ -92,6 +138,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable
     ShaderMetadataTypeAtom element_type;
     WBE_META(WBE_REFLECT)
     std::string scalar_type;
+    /** @brief User attributes reflected from this type declaration. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttribute> user_attributes;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataParameter final : public Serializable {
@@ -109,6 +158,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataParameter final : public Seriali
     std::string semantic_name;
     WBE_META(WBE_REFLECT)
     int32_t semantic_index = 0;
+    /** @brief User attributes reflected from this variable or parameter declaration. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttribute> user_attributes;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataResult final : public Serializable {
@@ -139,6 +191,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataEntryPoint final : public Serial
     ShaderMetadataResult result;
     WBE_META(WBE_REFLECT)
     std::vector<ShaderMetadataBinding> bindings;
+    /** @brief User attributes reflected from this entry-point function. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataUserAttribute> user_attributes;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadata final : public Serializable {

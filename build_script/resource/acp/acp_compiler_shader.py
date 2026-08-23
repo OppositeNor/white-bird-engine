@@ -225,6 +225,34 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "bindless_space_index": int(raw_metadata.get("bindlessSpaceIndex", 0)),
         }
 
+    def _transform_shader_user_attribute_argument(self, raw_argument: Any) -> dict[str, Any]:
+        if isinstance(raw_argument, bool):
+            raise RuntimeError("Unsupported boolean Slang user attribute argument.")
+        if isinstance(raw_argument, int):
+            return {"kind": "int", "integer_value": raw_argument}
+        if isinstance(raw_argument, float):
+            return {"kind": "float", "floating_point_value": raw_argument}
+        if isinstance(raw_argument, str):
+            return {"kind": "string", "string_value": raw_argument}
+        raise RuntimeError(f"Unsupported Slang user attribute argument: {raw_argument!r}.")
+
+    def _transform_shader_user_attributes(self, raw_declaration: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_attributes = raw_declaration.get("userAttribs", [])
+        if not isinstance(raw_attributes, list):
+            return []
+        attributes: list[dict[str, Any]] = []
+        for raw_attribute in raw_attributes:
+            if not isinstance(raw_attribute, dict):
+                continue
+            raw_arguments = raw_attribute.get("arguments", [])
+            if not isinstance(raw_arguments, list):
+                raw_arguments = []
+            attributes.append({
+                "name": str(raw_attribute.get("name", "")),
+                "arguments": [self._transform_shader_user_attribute_argument(argument) for argument in raw_arguments],
+            })
+        return attributes
+
     def _transform_shader_binding(self, raw_binding: dict[str, Any]) -> dict[str, Any]:
         return {
             "kind": str(raw_binding.get("kind", "")),
@@ -280,6 +308,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "name": str(raw_type.get("name", "")),
             "element_count": int(raw_type.get("elementCount", 0)),
             "element_scalar_type": str(element_scalar_type),
+            "user_attributes": self._transform_shader_user_attributes(raw_type),
         }
 
     def _transform_shader_type_field(self, raw_field: dict[str, Any]) -> dict[str, Any]:
@@ -294,6 +323,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "buffer_size": self._shader_buffer_size(raw_type),
             "semantic_name": str(raw_field.get("semanticName", "")),
             "semantic_index": int(raw_field.get("semanticIndex", 0)),
+            "user_attributes": self._transform_shader_user_attributes(raw_field),
         }
 
     def _flatten_shader_type_fields(self, raw_fields: list[Any]) -> list[dict[str, Any]]:
@@ -365,6 +395,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "element_count": int(raw_type.get("elementCount", 0)),
             "element_type": self._transform_shader_type_atom(element_type),
             "scalar_type": str(raw_type.get("scalarType", raw_type.get("baseShape", ""))),
+            "user_attributes": self._transform_shader_user_attributes(raw_type),
         }
 
     def _transform_shader_parameter(self, raw_parameter: dict[str, Any]) -> dict[str, Any]:
@@ -375,6 +406,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "type": self._transform_shader_type(raw_parameter.get("type", {})),
             "semantic_name": str(raw_parameter.get("semanticName", "")),
             "semantic_index": int(raw_parameter.get("semanticIndex", 0)),
+            "user_attributes": self._transform_shader_user_attributes(raw_parameter),
         }
 
     def _transform_shader_result(self, raw_result: dict[str, Any]) -> dict[str, Any]:
@@ -396,4 +428,5 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "parameters": [self._transform_shader_parameter(parameter) for parameter in raw_entry_point.get("parameters", []) if isinstance(parameter, dict)],
             "result": self._transform_shader_result(raw_entry_point.get("result", {})),
             "bindings": [self._transform_shader_binding(binding.get("binding", binding)) for binding in bindings if isinstance(binding, dict)],
+            "user_attributes": self._transform_shader_user_attributes(raw_entry_point),
         }
