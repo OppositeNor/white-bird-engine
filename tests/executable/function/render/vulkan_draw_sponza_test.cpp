@@ -264,7 +264,7 @@ void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
-    spot_light_component = WBE::make_default_test_spot_light_component(32.0F);
+    spot_light_component = WBE::make_default_test_spot_light_component(128.0F);
     shadow_extent = VkExtent2D{
         .width = spot_light_component.shadow_map_resolution,
         .height = spot_light_component.shadow_map_resolution,

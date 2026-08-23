@@ -22,6 +22,7 @@
 #include "function/render_vk/vma_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
 
 #include <array>
 #include <cstddef>
@@ -158,6 +159,10 @@ struct CameraInfoVKUBO {
      * @brief The projection matrix.
      */
     glm::mat4 proj;
+    /**
+     * @brief The world-space camera position.
+     */
+    glm::vec4 world_position;
 };
 
 constexpr uint32_t MAX_SPOT_LIGHT_INFO_COUNT = 4;

@@ -18,6 +18,12 @@
 #include "utils.slang"
 
 static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
+static const uint WBE_MATERIAL_DEBUG_VIEW_SHADED = 0;
+static const uint WBE_MATERIAL_DEBUG_VIEW_ALBEDO = 1;
+static const uint WBE_MATERIAL_DEBUG_VIEW_NORMAL = 2;
+static const uint WBE_MATERIAL_DEBUG_VIEW_ROUGHNESS = 3;
+static const uint WBE_MATERIAL_DEBUG_VIEW_METALLIC = 4;
+static const uint WBE_MATERIAL_DEBUG_VIEW_AO = 5;
 
 /**
  * @brief Vertex shader output / fragment shader input for the deferred composition fullscreen pass.
@@ -71,6 +77,20 @@ struct CompositionCamera {
     float4   camera_world_pos;
 };
 
+/**
+ * @brief Debug view selector for the deferred composition pass.
+ */
+struct CompositionDebugView {
+    /**
+ * @brief Selected material debug view. 0 keeps normal shaded output.
+     */
+    uint material_view;
+    /**
+ * @brief Padding to preserve constant-buffer layout alignment.
+     */
+    uint3 padding;
+};
+
 
 /**
  * @brief Descriptor-backed resources for one spot light.
@@ -102,7 +122,7 @@ float distribution_ggx(float3 p_normal, float3 p_half_vector, float p_roughness)
     float ndoth = max(dot(p_normal, p_half_vector), 0.0);
     float ndoth2 = ndoth * ndoth;
     float denominator = ndoth2 * (alpha2 - 1.0) + 1.0;
-    return alpha2 / max(WBE_PI * denominator * denominator, 0.0001);
+    return alpha2 / max(WBE_PI * denominator * denominator, 0.000000000001);
 }
 
 /**
@@ -156,6 +176,34 @@ float3 world_position_from_depth(float2 p_uv, float p_depth, float4x4 p_inv_view
     float4 ndc = float4(ndc_xy, p_depth, 1.0);
     float4 world = mul(p_inv_view_proj, ndc);
     return world.xyz / world.w;
+}
+
+/**
+ * @brief Convert the selected deferred material debug view into a display color.
+ * @param p_material_view The selected debug view constant.
+ * @param p_base_color The sampled base color from the G-buffer.
+ * @param p_normal The decoded world-space normal.
+ * @param p_roughness The sampled roughness value.
+ * @param p_metallic The sampled metallic value.
+ * @param p_ambient_occlusion The sampled ambient occlusion value.
+ * @return The display color for the selected material view.
+ */
+float3 material_debug_view_color(
+    uint p_material_view, float3 p_base_color, float3 p_normal, float p_roughness, float p_metallic, float p_ambient_occlusion) {
+    switch (p_material_view) {
+    case WBE_MATERIAL_DEBUG_VIEW_ALBEDO:
+        return p_base_color;
+    case WBE_MATERIAL_DEBUG_VIEW_NORMAL:
+        return p_normal * 0.5 + 0.5;
+    case WBE_MATERIAL_DEBUG_VIEW_ROUGHNESS:
+        return p_roughness.xxx;
+    case WBE_MATERIAL_DEBUG_VIEW_METALLIC:
+        return p_metallic.xxx;
+    case WBE_MATERIAL_DEBUG_VIEW_AO:
+        return p_ambient_occlusion.xxx;
+    default:
+        return float3(0.0);
+    }
 }
 
 #endif

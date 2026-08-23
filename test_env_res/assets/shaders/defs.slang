@@ -53,6 +53,10 @@ struct CameraInfo {
  * @brief The projection matrix.
      */
     float4x4 proj;
+    /**
+ * @brief The world-space camera position.
+     */
+    float4 world_position;
 };
 
 /**

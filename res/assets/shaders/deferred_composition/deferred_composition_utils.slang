@@ -102,7 +102,7 @@ float distribution_ggx(float3 p_normal, float3 p_half_vector, float p_roughness)
     float ndoth = max(dot(p_normal, p_half_vector), 0.0);
     float ndoth2 = ndoth * ndoth;
     float denominator = ndoth2 * (alpha2 - 1.0) + 1.0;
-    return alpha2 / max(WBE_PI * denominator * denominator, 0.0001);
+    return alpha2 / max(WBE_PI * denominator * denominator, 0.000000000001);
 }
 
 /**

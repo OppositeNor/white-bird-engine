@@ -76,7 +76,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
  * @brief Evaluate the Cook-Torrance BRDF for one forward-shaded fragment lit by a single shadow-mapped spot light.
  * @param p_input The interpolated vertex output.
  * @param p_masked Whether fragments below the alpha-mask cutoff should be discarded.
- * @return The sRGB-encoded shaded color with alpha = 1.0.
+ * @return The linear shaded color with alpha = 1.0.
  */
 float4 shade_fragment(VSOutput p_input, bool p_masked) {
     // The instance id crosses the rasterizer in world_position.w. Round away interpolation error before using it as a table
@@ -107,7 +107,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     float ambient_occlusion = clamp(rma.b, 0.0, 1.0);
 
     float3 n = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
-    float3 v = normalize(float3(0.0, 0.0, 3.0) - p_input.world_position.xyz);
+    float3 v = normalize(camera_info.world_position.xyz - p_input.world_position.xyz);
 
     float3 f0 = lerp(float3(0.04), base_color, metallic);
 
@@ -141,7 +141,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     }
     color *= ambient_occlusion;
     color = color / (color + float3(1.0));
-    return float4(linear_to_srgb(color), 1.0);
+    return float4(color, 1.0);
 }
 
 [shader("fragment")]

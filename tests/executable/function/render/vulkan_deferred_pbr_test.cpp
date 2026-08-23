@@ -78,6 +78,7 @@ constexpr VkFormat GBUFFER_RMA_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
 constexpr VkFormat SHADOWMAP_COLOR_FORMAT = ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
+constexpr uint32_t MATERIAL_DEBUG_VIEW_COUNT = 6;
 
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
@@ -90,6 +91,11 @@ private:
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
         glm::vec4 camera_world_position;
+    };
+
+    struct CompositionDebugViewInfo {
+        uint32_t material_view = 0;
+        std::array<uint32_t, 3> padding{};
     };
 
     void setup_render_context();
@@ -135,6 +141,7 @@ private:
     Ref<ROSamplerVK> gbuffer_sampler;
     Ref<ROBufferVK> gbuffer_camera_info_ubo;
     Ref<ROBufferVK> composition_camera_info_ubo;
+    Ref<ROBufferVK> composition_debug_view_ubo;
     Ref<ROBufferVK> spot_light_info_ubo;
     std::vector<std::pair<Ref<RODescriptorSetVK>, uint32_t>> gbuffer_camera_descriptor_bindings;
     std::vector<std::pair<Ref<RODescriptorSetVK>, uint32_t>> shadow_camera_descriptor_bindings;
@@ -146,6 +153,8 @@ private:
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
     float camera_yaw = default_test_camera_yaw();
     float camera_pitch = default_test_camera_pitch();
+    uint32_t material_debug_view = 0;
+    bool material_debug_view_toggle_was_down = false;
 };
 
 void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
@@ -192,6 +201,12 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
     if (input_manager->get_input_status(KEYCODE_Q).is_down()) {
         camera_position -= up * move_delta;
     }
+
+    bool material_debug_view_toggle_is_down = input_manager->get_input_status(KEYCODE_V).is_down();
+    if (material_debug_view_toggle_is_down && !material_debug_view_toggle_was_down) {
+        material_debug_view = (material_debug_view + 1) % MATERIAL_DEBUG_VIEW_COUNT;
+    }
+    material_debug_view_toggle_was_down = material_debug_view_toggle_is_down;
 
     bool spot_light_changed = false;
     if (input_manager->get_input_status(KEYCODE_I).is_down()) {
@@ -246,8 +261,9 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
+    CompositionDebugViewInfo composition_debug_view_info{.material_view = material_debug_view};
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info]() {
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, composition_debug_view_info, spot_light_info]() {
         Ref<ROBufferVK> new_gbuffer_camera_ubo = ROBufferVK::Builder()
                                                      .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                                                      .set_domain(DeviceDomain::HOST_DEVICE)
@@ -272,6 +288,18 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
                     .set_binding(composition_camera_binding)
                     .add_uniform_buffer_info(new_composition_camera_ubo, 0, sizeof(CompositionCameraInfo)));
 
+        Ref<ROBufferVK> new_composition_debug_view_ubo = ROBufferVK::Builder()
+                                     .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                     .set_domain(DeviceDomain::HOST_DEVICE)
+                                     .set_size(sizeof(CompositionDebugViewInfo))
+                                     .create_ref(base_render_data);
+        new_composition_debug_view_ubo->update_buffer(&composition_debug_view_info, sizeof(composition_debug_view_info));
+        auto [composition_debug_view_set, composition_debug_view_binding] = composition_descriptor_set_bindings.at("debug_view");
+        composition_descriptor_sets.at(composition_debug_view_set)
+            ->write_descriptor_set(RODescriptorSetVK::Writer()
+                .set_binding(composition_debug_view_binding)
+                .add_uniform_buffer_info(new_composition_debug_view_ubo, 0, sizeof(CompositionDebugViewInfo)));
+
         Ref<ROBufferVK> new_spot_light_info_ubo = ROBufferVK::Builder()
                                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                                                       .set_domain(DeviceDomain::HOST_DEVICE)
@@ -292,6 +320,7 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
 
         gbuffer_camera_info_ubo = std::move(new_gbuffer_camera_ubo);
         composition_camera_info_ubo = std::move(new_composition_camera_ubo);
+        composition_debug_view_ubo = std::move(new_composition_debug_view_ubo);
         spot_light_info_ubo = std::move(new_spot_light_info_ubo);
     });
 }
@@ -352,7 +381,7 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
-    spot_light_component = make_default_test_spot_light_component(32.0F);
+    spot_light_component = make_default_test_spot_light_component(128.0F);
     spot_light_yaw = std::atan2(spot_light_component.direction.z, spot_light_component.direction.x);
     spot_light_pitch = std::asin(std::clamp(spot_light_component.direction.y, -1.0F, 1.0F));
     shadow_extent = VkExtent2D{
@@ -488,10 +517,12 @@ CompiledStaticOpaqueTrianglesVK ApplicationVulkanDeferredPBRTest::compile_shadow
 
 void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
     CompositionCameraInfo camera_info = make_composition_camera_info();
+    CompositionDebugViewInfo debug_view_info{.material_view = material_debug_view};
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     uint32_t spot_light_count = 1;
     RenderBindpointDeclarationsBuilder bindpoint_builder;
     bindpoint_builder.add_buffer_decleration("camera_info", &camera_info, sizeof(camera_info))
+        .add_buffer_decleration("debug_view", &debug_view_info, sizeof(debug_view_info))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
         .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
         .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
@@ -545,6 +576,18 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(Compiled
     auto [composition_set, composition_binding] = composition_descriptor_set_bindings.at("camera_info");
     composition_descriptor_sets[composition_set]->write_descriptor_set(
         RODescriptorSetVK::Writer().set_binding(composition_binding).add_uniform_buffer_info(composition_camera_info_ubo, 0, sizeof(CompositionCameraInfo)));
+
+        composition_debug_view_ubo = ROBufferVK::Builder()
+                         .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                         .set_domain(DeviceDomain::HOST_DEVICE)
+                         .set_size(sizeof(CompositionDebugViewInfo))
+                         .create_ref(base_render_data);
+        CompositionDebugViewInfo composition_debug_view_info{.material_view = material_debug_view};
+        composition_debug_view_ubo->update_buffer(&composition_debug_view_info, sizeof(composition_debug_view_info));
+        auto [composition_debug_view_set, composition_debug_view_binding] = composition_descriptor_set_bindings.at("debug_view");
+        composition_descriptor_sets[composition_debug_view_set]->write_descriptor_set(RODescriptorSetVK::Writer()
+            .set_binding(composition_debug_view_binding)
+            .add_uniform_buffer_info(composition_debug_view_ubo, 0, sizeof(CompositionDebugViewInfo)));
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {

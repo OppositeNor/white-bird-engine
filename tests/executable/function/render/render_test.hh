@@ -25,6 +25,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 #include <string_view>
 
@@ -76,7 +77,11 @@ inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio, 
 }
 
 inline CameraInfoVKUBO make_camera_info_ubo(const ComponentCamera& p_camera_component) {
-    return CameraInfoVKUBO{.view = p_camera_component.view, .proj = p_camera_component.proj};
+    return CameraInfoVKUBO{
+        .view = p_camera_component.view,
+        .proj = p_camera_component.proj,
+        .world_position = glm::inverse(p_camera_component.view)[3],
+    };
 }
 
 inline ComponentSpotLight make_default_test_spot_light_component(float p_intensity) {
