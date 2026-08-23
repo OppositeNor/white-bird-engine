@@ -47,13 +47,13 @@ struct InputStatus {
      * @return True if the key is up. False otherwise.
      */
     bool is_up() const {
-        return status_code & KEY_UP;
+        return status_code == KEY_UP;
     }
 
     /**
-     * @brief Is key up.
+     * @brief Is key down.
      *
-     * @return True if the key is up. False otherwise.
+     * @return True if the key is down. False otherwise.
      */
     bool is_down() const {
         return status_code & KEY_DOWN;
