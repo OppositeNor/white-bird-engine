@@ -77,11 +77,10 @@ GBufferOutput fragment_main(VSOutput p_input) {
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
     uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
-    uint roughness_metallic_ao_index =
-        uint(active_material.roughness_metallic_ao_index >= 0 ? active_material.roughness_metallic_ao_index : 0);
+    uint rma_index = uint(active_material.rma_index >= 0 ? active_material.rma_index : 0);
     uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
     uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
-    uint roughness_metallic_ao_descriptor_index = NonUniformResourceIndex(roughness_metallic_ao_index);
+    uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
 
     float4 albedo_sample =
         material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
@@ -96,7 +95,7 @@ GBufferOutput fragment_main(VSOutput p_input) {
     float3 normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     output.octahedron_normal = octahedron_encode(normal);
 
-    float3 rma = material_textures.textures[roughness_metallic_ao_descriptor_index]
+    float3 rma = material_textures.textures[rma_descriptor_index]
                      .Sample(material_textures.material_sampler, p_input.uv)
                      .rgb;
     float flags = 0.0;

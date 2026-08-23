@@ -41,29 +41,4 @@ class WBEACPCompilerModel(WBEACPCompiler):
         resolved_resource["type"] = "model"
         resolved_resource["file"] = source_path.as_posix()
         resolved_manifest_path = Path.joinpath(res_dir, manifest_path)
-        mesh_resource = self._utils_mesh_compiler.compile_mesh(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
-        material_resources = self._utils_mesh_compiler.compile_materials(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)
-        # Assimp converts imported UVs to a bottom-left origin, so generated textures must use the same convention.
-        texture_types = {
-            "albedo": "albedo",
-            "normal": "normal",
-            "roughness_metallic_ao": "rma",
-        }
-        for material_resource in material_resources:
-            material_resource["material_type"] = "cook_torrance"
-            typed_textures: list[dict[str, object]] = []
-            used_texture_types: set[str] = set()
-            for texture_binding in material_resource.pop("textures", []):
-                texture_key = texture_binding["texture_key"]
-                texture_type = texture_types.get(texture_key)
-                if texture_type is None:
-                    raise RuntimeError(f"Model compiler produced unsupported material texture '{texture_key}'.")
-                if texture_type in used_texture_types:
-                    raise RuntimeError(f"Model compiler produced duplicate material texture '{texture_key}'.")
-                used_texture_types.add(texture_type)
-                texture = texture_binding["texture"]
-                texture["path"] = texture.pop("file")
-                texture["flip_v"] = True
-                typed_textures.append({"texture_type": texture_type, "texture": texture})
-            material_resource["textures"] = typed_textures
-        return [mesh_resource] + material_resources
+        return self._utils_mesh_compiler.compile(resolved_resource, resolved_manifest_path, res_dir, res_output_dir)

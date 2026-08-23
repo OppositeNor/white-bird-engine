@@ -26,7 +26,7 @@ For non-trivial implementation tasks:
 1. Use repo-explorer when repository context is unclear.
 2. Use investigator first for debugging, root cause analysis, and other investigation work.
 3. Start implementation only after the investigation findings are clear.
-4. Validate completed changes with the validator agent before considering the task done.
+4. Validate completed changes with the validator agent before considering a large task is done.
 
 ---
 
@@ -131,6 +131,25 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - Do not make ACP scan every JSON file under a resource tree; formats such as glTF are JSON and are not ACP manifests.
 - Manifest files outside `res_chunks` are processed only when reachable from a root chunk manifest through `include`.
 - `include` paths are resource-root-relative manifest paths. Included files must contain a `resources` array.
+- `wbe-utils-model-compiler` owns final mesh and material resource shaping. Keep `acp_compiler_model.py` limited to ACP path/schema
+  adaptation; do not normalize compiled material textures in the ACP adapter.
+
+### Material Texture Contract
+
+- Materials do not have a `material_type`. Their graphics pipeline and its reflected shader metadata define the rendering
+  contract.
+- Every material texture slot has a non-empty, shader-defined `texture_role`; do not introduce a closed engine-side texture-role
+  enum or whitelist.
+- Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `defs.slang`.
+  - `[WBE_TEXTURE("albedo")] int albedo_index;` selects the explicit `albedo` role.
+  - `[WBE_TEXTURE] int detail_index;` uses `detail_index` as the role.
+- `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and `MaterialParamsBuffer.materials` are fixed global-contract
+  members. Applications may configure only the `material_textures` and `material_params` base variable names and the
+  `default_material` resource key.
+- Bindless descriptor arrays and material indices are assembled per graphics pipeline from reflected roles. Keep engine
+  propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or `rma`.
+- `rma` is the canonical project abbreviation and texture role for the roughness, metallic, and ambient-occlusion channel pack.
+  Use `rma` in project-owned identifiers instead of a spelled-out equivalent.
 
 ## Memory Model
 
@@ -184,7 +203,7 @@ Rules:
 - Function parameters: prefix `p_` (e.g. `p_allocator`, `p_buffer_size`). Local variables: no prefix. Member fields: no prefix.
 - **No abbreviations** unless they are universally well-known. Examples:
   - Forbidden: `ci` (use `create_info`), `mgr` (use `manager`), `tex` (use `texture`), `cfg` (use `config` only if widely understood, else `configuration`).
-  - Allowed well-known: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer), `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan), `rma` (roughness-metallic-ao texture channel pack).
+  - Allowed well-known: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer), `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan), `rma` (roughness, metallic, and ambient-occlusion texture channel pack).
 - If a name is too long, each word may be shortened to its first **≥4** letters. Examples: `initiate` → `init`, `information` → `info`, `allocator` → `alloc`; use shortening only when it remains unambiguous (`init`, `info`, `config`, `descr`).
 - Preserve domain spellings already used in the codebase (e.g. test labels) even if unusual.
 

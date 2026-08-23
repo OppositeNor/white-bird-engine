@@ -16,8 +16,14 @@
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <format>
 #include <gtest/gtest.h>
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -117,8 +123,7 @@ TEST(WBEShaderMetadataVKTest, MissingUserAttributesRemainEmpty) {
 
 TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "reflection_attributes"}),
-        "reflection_attributes.json"));
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "reflection_attributes"}), "reflection_attributes.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -158,11 +163,20 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     EXPECT_EQ(struct_attribute.arguments[0].kind, "float");
     EXPECT_DOUBLE_EQ(struct_attribute.arguments[0].floating_point_value, 0.5);
 
-    ASSERT_EQ(global_parameter.type.fields.size(), 1U);
+    ASSERT_EQ(global_parameter.type.fields.size(), 7U);
     ASSERT_EQ(global_parameter.type.fields[0].user_attributes.size(), 1U);
     EXPECT_EQ(global_parameter.type.fields[0].user_attributes[0].name, "VariableContract");
     ASSERT_EQ(global_parameter.type.fields[0].user_attributes[0].arguments.size(), 1U);
     EXPECT_EQ(global_parameter.type.fields[0].user_attributes[0].arguments[0].string_value, "field");
+    for (size_t i = 1; i < global_parameter.type.fields.size(); ++i) {
+        const ShaderMetadataTypeField& texture_field = global_parameter.type.fields[i];
+        ASSERT_EQ(texture_field.user_attributes.size(), 1U);
+        EXPECT_EQ(texture_field.user_attributes[0].name, "WBE_TEXTURE");
+        ASSERT_EQ(texture_field.user_attributes[0].arguments.size(), 1U);
+        EXPECT_EQ(texture_field.user_attributes[0].arguments[0].kind, "string");
+        std::string expected_texture_role = i < 6 ? std::format("role_{}", i) : std::string();
+        EXPECT_EQ(texture_field.user_attributes[0].arguments[0].string_value, expected_texture_role);
+    }
 
     ASSERT_EQ(metadata.entry_points.size(), 1U);
     const ShaderMetadataEntryPoint& entry_point = metadata.entry_points[0];
@@ -178,6 +192,39 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     ASSERT_EQ(entry_point.parameters[0].user_attributes[0].arguments.size(), 1U);
     EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].kind, "int");
     EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].integer_value, 7);
+}
+
+TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
+    ParserJSON parser;
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    auto material_params = std::ranges::find_if(metadata.parameters, [](const ShaderMetadataParameter& p_parameter) {
+        return p_parameter.name == "material_params";
+    });
+    ASSERT_NE(material_params, metadata.parameters.end());
+    ASSERT_EQ(material_params->type.fields.size(), 1U);
+    const ShaderMetadataTypeField& materials = material_params->type.fields[0];
+    EXPECT_EQ(materials.name, "materials");
+    EXPECT_EQ(materials.type.kind, "array");
+    EXPECT_EQ(materials.type.element_count, 32);
+    EXPECT_EQ(materials.binding.element_stride, 16);
+    ASSERT_EQ(materials.fields.size(), 3U);
+
+    const std::array<std::string_view, 3> expected_names{"albedo_index", "normal_index", "rma_index"};
+    const std::array<std::string_view, 3> expected_texture_roles{"albedo", "normal", "rma"};
+    for (size_t i = 0; i < materials.fields.size(); ++i) {
+        const ShaderMetadataTypeField& field = materials.fields[i];
+        EXPECT_EQ(field.name, expected_names[i]);
+        EXPECT_EQ(field.type.scalar_type, "int32");
+        EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(int32_t)));
+        ASSERT_EQ(field.user_attributes.size(), 1U);
+        EXPECT_EQ(field.user_attributes[0].name, "WBE_TEXTURE");
+        ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
+        EXPECT_EQ(field.user_attributes[0].arguments[0].kind, "string");
+        EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, expected_texture_roles[i]);
+    }
 }
 
 } // namespace WhiteBirdEngine

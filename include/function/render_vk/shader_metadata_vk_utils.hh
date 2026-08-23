@@ -15,7 +15,9 @@
 #ifndef WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 #define WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -23,6 +25,15 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @brief Load and deserialize normalized metadata belonging to a shader resource.
+ *
+ * @param p_shader Shader resource whose metadata sidecar will be loaded.
+ * @return Deserialized shader metadata.
+ * @throws std::runtime_error When the shader, metadata path, or metadata file is invalid.
+ */
+ShaderMetadata load_shader_metadata_vk(RefRes<RUShader> p_shader);
 
 /**
  * @class ShaderDescriptorFieldBindingVK

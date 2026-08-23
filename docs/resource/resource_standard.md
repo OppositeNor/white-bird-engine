@@ -28,29 +28,46 @@ a root chunk manifest. Included files must be valid ACP manifests with a `resour
 
 ## Material Resources
 
-Material resources identify their shading model independently from their texture slots. The currently supported material contract is:
+Material resources associate graphics pipelines with shader-defined texture slots:
 
 ```json
 {
     "id": "example_material",
     "type": "material",
-    "material_type": "cook_torrance",
     "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
     "textures": [
-        {"texture_type": "albedo", "texture_id": "example_albedo"},
-        {"texture_type": "normal", "texture_id": "example_normal"},
-        {"texture_type": "rma", "texture_id": "example_rma"}
+        {"texture_role": "albedo", "texture_id": "example_albedo"},
+        {"texture_role": "normal", "texture_id": "example_normal"},
+        {"texture_role": "rma", "texture_id": "example_rma"}
     ]
 }
 ```
 
-- `material_type` is required and currently accepts only `cook_torrance`.
-- Each texture slot requires a `texture_type`: `albedo`, `normal`, or `rma`.
-- The loader decodes both type names to runtime hash codes; resource units do not retain the strings or use closed enums.
-- A texture type may appear at most once in a material.
+Materials do not declare a `material_type`; their graphics pipeline and reflected shader metadata define the rendering contract.
+
+- Each texture slot requires a non-empty `texture_role`. Shaders select roles through reflected `WBE_TEXTURE` attributes.
+- The loader decodes texture role names to runtime hash codes; resource units do not retain the strings or use closed enums.
+- A texture role may appear at most once in a material.
 - Each slot must provide exactly one of `texture` for an inline image or `texture_id` for an existing image resource.
-- Regular materials may omit slots; bindless compilation uses the corresponding slot from the configured default material.
-- The default material must provide all three Cook–Torrance texture types.
+- Regular materials may omit slots; bindless compilation uses the corresponding shader-selected role from the configured default material.
+- The default material must provide every texture role selected by each material shader used by the pass.
+- `rma` is the canonical texture role and project abbreviation for the roughness, metallic, and ambient-occlusion channel pack.
+
+Material texture descriptor-index fields are selected in `MaterialParams` with `WBE_TEXTURE`. An explicit string selects that
+texture role. Omitting the argument selects the annotated field name:
+
+```slang
+[WBE_TEXTURE("albedo")]
+int albedo_index; // Selects texture_role "albedo".
+
+[WBE_TEXTURE]
+int detail_index; // Selects texture_role "detail_index".
+```
+
+The static opaque pipeline reflects these attributes independently for each graphics pipeline, assembles the corresponding
+bindless texture array, and writes descriptor indices at the reflected field offsets. `material_sampler`, `textures`, and
+`materials` remain fixed members of the global contract in `defs.slang`; applications may configure only the base variable names
+for `material_textures` and `material_params`, plus the `default_material` resource key.
 
 ## Runtime Index Output
 

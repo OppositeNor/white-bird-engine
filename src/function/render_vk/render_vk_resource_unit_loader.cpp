@@ -458,33 +458,11 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     return saved_resource;
 }
 
-HashCode get_material_type(std::string_view p_material_type) {
-    HashCode material_type = dynam_hash(p_material_type);
-    if (dynam_hash("cook_torrance") == material_type) {
-        return material_type;
+HashCode get_material_texture_role(std::string_view p_texture_role) {
+    if (p_texture_role.empty()) {
+        throw std::runtime_error("Failed to populate material resource: texture_role must not be empty.");
     }
-    throw std::runtime_error(std::format("Failed to populate material resource: unsupported material_type '{}'.", p_material_type));
-}
-
-HashCode get_material_texture_type(std::string_view p_texture_type) {
-    HashCode texture_type = dynam_hash(p_texture_type);
-    if (dynam_hash("albedo") == texture_type || dynam_hash("normal") == texture_type || dynam_hash("rma") == texture_type) {
-        return texture_type;
-    }
-    throw std::runtime_error(std::format("Failed to populate material resource: unsupported texture_type '{}'.", p_texture_type));
-}
-
-size_t get_material_texture_type_index(HashCode p_texture_type) {
-    if (dynam_hash("albedo") == p_texture_type) {
-        return 0;
-    }
-    if (dynam_hash("normal") == p_texture_type) {
-        return 1;
-    }
-    if (dynam_hash("rma") == p_texture_type) {
-        return 2;
-    }
-    throw std::runtime_error("Failed to populate material resource: unsupported runtime material texture type.");
+    return dynam_hash(p_texture_role);
 }
 
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) {
@@ -497,28 +475,26 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
     }
 
     RUMaterial resource_unit;
-    resource_unit.material_type = get_material_type(p_material.material_type);
     if (has_inline_pipeline) {
         resource_unit.graphics_pipeline = populate_graphics_pipeline_resource(p_res_chunk, p_material.graphics_pipeline.value());
     }
     std::vector<RUMaterial::TextureSlot> texture_slots;
     std::vector<std::string> texture_ids;
-    std::array<bool, 3> has_texture_types{};
     texture_slots.reserve(p_material.textures.size());
     texture_ids.reserve(p_material.textures.size());
     for (const RUSchemaMaterialTextureSlot& texture_scheme : p_material.textures) {
-        HashCode texture_type = get_material_texture_type(texture_scheme.texture_type);
-        size_t texture_type_index = get_material_texture_type_index(texture_type);
-        if (has_texture_types[texture_type_index]) {
-            throw std::runtime_error(
-                std::format("Failed to populate material resource: texture_type '{}' is declared more than once.", texture_scheme.texture_type));
+        HashCode texture_role = get_material_texture_role(texture_scheme.texture_role);
+        if (std::ranges::any_of(texture_slots, [texture_role](const RUMaterial::TextureSlot& p_texture_slot) {
+                return p_texture_slot.texture_role == texture_role;
+            })) {
+            throw std::runtime_error(std::format("Failed to populate material resource: texture_role '{}' is declared more than once.",
+                texture_scheme.texture_role));
         }
-        has_texture_types[texture_type_index] = true;
         if (texture_scheme.texture.has_value() == texture_scheme.texture_id.has_value()) {
             throw std::runtime_error("Failed to populate material resource: texture requires exactly one of texture or texture_id.");
         }
         RUMaterial::TextureSlot texture_slot;
-        texture_slot.texture_type = texture_type;
+        texture_slot.texture_role = texture_role;
         if (texture_scheme.texture_id.has_value()) {
             texture_ids.push_back(*texture_scheme.texture_id);
         } else {

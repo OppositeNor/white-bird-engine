@@ -13,8 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "core/parser/parser_json.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
@@ -216,6 +221,17 @@ void append_stage_descriptor_bindings(
 }
 
 } // namespace
+
+ShaderMetadata load_shader_metadata_vk(RefRes<RUShader> p_shader) {
+    if (p_shader == nullptr || p_shader->metadata_path == nullptr) {
+        throw std::runtime_error("Failed to load shader metadata: metadata path is missing.");
+    }
+    ParserJSON metadata_parser;
+    metadata_parser.parse(get_resource_path(p_shader->metadata_path.get()));
+    ShaderMetadata metadata;
+    metadata.deserialize(metadata_parser.get_data());
+    return metadata;
+}
 
 const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {

@@ -72,6 +72,13 @@ struct Time {
 /** Maximum number of bindless material entries addressable by one draw pass. */
 static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
+/** Marks an integer material parameter as the descriptor index for one texture role. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_TEXTUREAttribute {
+    /** Texture role; an empty value selects the annotated variable name. */
+    string texture_role = "";
+};
+
 /** Fixed bindless texture table contract. Applications may only vary the parameter's base variable name. */
 struct MaterialTextures {
     /** Sampler shared by all material textures. */
@@ -83,11 +90,14 @@ struct MaterialTextures {
 /** Fixed descriptor indices for one material's textures. */
 struct MaterialParams {
     /** Albedo texture descriptor index. */
+    [WBE_TEXTURE("albedo")]
     int albedo_index;
     /** Normal texture descriptor index. */
+    [WBE_TEXTURE("normal")]
     int normal_index;
-    /** Roughness-metallic-ambient-occlusion texture descriptor index. */
-    int roughness_metallic_ao_index;
+    /** RMA texture descriptor index. */
+    [WBE_TEXTURE("rma")]
+    int rma_index;
 };
 
 /** Fixed descriptor-index table for every material addressed by an indirect draw. */

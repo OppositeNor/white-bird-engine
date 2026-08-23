@@ -13,3 +13,4 @@ compile_commands.json
 other/
 
 imgui.ini
+*.log

@@ -69,6 +69,14 @@ struct AliasContractAttribute
     string value;
 };
 
+/** @brief Marks a reflected field as a material texture descriptor index. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_TEXTUREAttribute
+{
+    /** @brief Texture role; an empty value selects the annotated variable name. */
+    string texture_role = "";
+};
+
 /** @brief Associates an integer contract value with an entry-point parameter. */
 [__AttributeUsage(_AttributeTargets.Param)]
 struct ParameterContractAttribute
@@ -92,6 +100,24 @@ struct AttributePayload
     /** @brief Color supplied by the reflected constant buffer. */
     [VariableContract("field")]
     float4 color;
+    /** @brief First explicit texture-role index. */
+    [WBE_TEXTURE("role_1")]
+    int texture_index_1;
+    /** @brief Second explicit texture-role index. */
+    [WBE_TEXTURE("role_2")]
+    int texture_index_2;
+    /** @brief Third explicit texture-role index. */
+    [WBE_TEXTURE("role_3")]
+    int texture_index_3;
+    /** @brief Fourth explicit texture-role index. */
+    [WBE_TEXTURE("role_4")]
+    int texture_index_4;
+    /** @brief Fifth explicit texture-role index. */
+    [WBE_TEXTURE("role_5")]
+    int texture_index_5;
+    /** @brief Texture-role index that exercises variable-name fallback. */
+    [WBE_TEXTURE]
+    int texture_index_6;
 };
 
 /** @brief Attributed global parameter used by the fragment entry point. */

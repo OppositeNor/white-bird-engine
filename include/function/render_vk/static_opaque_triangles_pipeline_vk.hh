@@ -28,6 +28,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -74,8 +75,8 @@ public:
          */
         Config& set_task_id(RendTaskID p_task_id);
         /**
-         * @brief Set the resource key of the Cook-Torrance material supplying fallback typed textures.
-         * @param p_resource_key Material resource key. The material must provide albedo, normal, and rma slots.
+         * @brief Set the resource key of the material supplying fallback textures for shader-reflected roles.
+         * @param p_resource_key Material resource key. It must provide every WBE_TEXTURE role consumed by a pipeline batch.
          * @return This configuration.
          */
         Config& set_default_material_resource_key(std::string_view p_resource_key);
@@ -86,7 +87,7 @@ public:
          */
         Config& set_material_textures_variable_name(std::string_view p_variable_name);
         /**
-         * @brief Set the base shader variable name of the fixed MaterialParamsBuffer contract.
+         * @brief Set the base shader variable name of the reflected MaterialParamsBuffer contract.
          * @param p_variable_name Base shader variable name.
          * @return This configuration.
          */

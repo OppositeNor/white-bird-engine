@@ -222,8 +222,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DGeneral) {
         "type": "submesh3d",
         "material": {
             "id": "material_01",
-            "type": "material",
-            "material_type": "cook_torrance"
+            "type": "material"
         },
         "material_id": "mat_ref_01",
         "geometry_path": "assets/meshes/test_submesh_01.bin",
@@ -392,15 +391,14 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     {
         "id": "test_material_01",
         "type": "material",
-        "material_type": "cook_torrance",
         "graphics_pipeline_ids": ["main_pipeline", "shadow_pipeline"],
         "textures": [
             {
-                "texture_type": "albedo",
+                "texture_role": "albedo",
                 "texture_id": "albedo_texture"
             },
             {
-                "texture_type": "normal",
+                "texture_role": "normal",
                 "texture": {
                     "id": "normal_texture",
                     "type": "image",
@@ -418,16 +416,15 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_material_01");
     ASSERT_EQ(scheme.type, "material");
-    ASSERT_EQ(scheme.material_type, "cook_torrance");
     ASSERT_EQ(scheme.graphics_pipeline_ids.size(), 2U);
     ASSERT_EQ(scheme.graphics_pipeline_ids[0], "main_pipeline");
     ASSERT_EQ(scheme.graphics_pipeline_ids[1], "shadow_pipeline");
     ASSERT_EQ(scheme.textures.size(), 2U);
-    ASSERT_EQ(scheme.textures[0].texture_type, "albedo");
+    ASSERT_EQ(scheme.textures[0].texture_role, "albedo");
     ASSERT_TRUE(scheme.textures[0].texture_id.has_value());
     ASSERT_EQ(*scheme.textures[0].texture_id, "albedo_texture");
     ASSERT_FALSE(scheme.textures[0].texture.has_value());
-    ASSERT_EQ(scheme.textures[1].texture_type, "normal");
+    ASSERT_EQ(scheme.textures[1].texture_role, "normal");
     ASSERT_FALSE(scheme.textures[1].texture_id.has_value());
     ASSERT_TRUE(scheme.textures[1].texture.has_value());
     ASSERT_EQ(scheme.textures[1].texture->id, "normal_texture");

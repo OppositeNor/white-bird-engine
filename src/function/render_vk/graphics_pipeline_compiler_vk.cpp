@@ -16,7 +16,6 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
-#include "core/parser/parser_json.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_database.hh"
@@ -37,7 +36,6 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "resource/resource_utils.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
@@ -167,18 +165,6 @@ std::vector<uint8_t> build_image_upload_data(const RUImage& p_image) {
         upload_data[target_offset + 3] = UINT8_MAX;
     }
     return upload_data;
-}
-
-ShaderMetadata load_shader_metadata(RefRes<RUShader> p_shader) {
-    // Shader metadata is loaded beside the shader resource because descriptor layouts are derived from reflection data.
-    if (p_shader == nullptr || p_shader->metadata_path == nullptr) {
-        throw std::runtime_error("Failed to load shader metadata: metadata path is missing.");
-    }
-    ParserJSON metadata_parser;
-    metadata_parser.parse(get_resource_path(p_shader->metadata_path.get()));
-    ShaderMetadata metadata;
-    metadata.deserialize(metadata_parser.get_data());
-    return metadata;
 }
 
 bool has_texture_bindpoint(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
@@ -473,22 +459,21 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     auto vertex_shader = compile_shader(p_pipeline_resource->vertex_stage);
     Ref<ROShaderVK> geometry_shader = MEM_NULL;
     auto fragment_shader = compile_shader(p_pipeline_resource->fragment_stage);
-    auto vertex_shader_metadata = load_shader_metadata(p_pipeline_resource->vertex_stage);
+    auto vertex_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->vertex_stage);
     std::optional<ShaderMetadata> geometry_shader_metadata;
-    auto fragment_shader_metadata = load_shader_metadata(p_pipeline_resource->fragment_stage);
+    auto fragment_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->fragment_stage);
     std::string vertex_stage_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->vertex_stage, vertex_shader_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
     std::string geometry_stage_entry;
     if (p_pipeline_resource->geometry_stage != nullptr) {
         geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
-        geometry_shader_metadata = load_shader_metadata(p_pipeline_resource->geometry_stage);
+        geometry_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->geometry_stage);
         geometry_stage_entry = resolve_pipeline_stage_entry(
             p_pipeline_resource->geometry_stage, *geometry_shader_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
     }
     std::string fragment_stage_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->fragment_stage, fragment_shader_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
-    auto descriptor_bindings = collect_graphics_pipeline_descriptor_bindings(
-        vertex_shader_metadata,
+    auto descriptor_bindings = collect_graphics_pipeline_descriptor_bindings(vertex_shader_metadata,
         vertex_stage_entry,
         geometry_shader_metadata.has_value() ? &(*geometry_shader_metadata) : nullptr,
         geometry_stage_entry,
@@ -498,15 +483,7 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     auto pipeline_layout = compile_pipeline_layout(p_resource_key, descriptor_set_layouts);
     CompiledPipelineObjects result;
     result.graphics_pipeline = compile_graphics_pipeline(
-        p_resource_key,
-        *p_pipeline_resource,
-        vertex_shader,
-        geometry_shader,
-        fragment_shader,
-        vertex_stage_entry,
-        geometry_stage_entry,
-        fragment_stage_entry,
-        pipeline_layout);
+        p_resource_key, *p_pipeline_resource, vertex_shader, geometry_shader, fragment_shader, vertex_stage_entry, geometry_stage_entry, fragment_stage_entry, pipeline_layout);
     result.descriptor_sets =
         compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     result.descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings);
@@ -581,7 +558,7 @@ Ref<ROPipelineLayoutVK> GraphicsPipelineCompilerVK::compile_pipeline_layout(
     return pipeline_layout;
 }
 
-Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(std::string_view p_resource_key,
+Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(std::string_view p_resource_key, // NOLINT
     const RUGraphicsPipeline& p_pipeline_resource,
     Ref<ROShaderVK> p_vertex_shader,
     Ref<ROShaderVK> p_geometry_shader,

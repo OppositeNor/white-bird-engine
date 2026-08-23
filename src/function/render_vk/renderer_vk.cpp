@@ -29,7 +29,6 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -39,7 +38,6 @@
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>

@@ -3,11 +3,10 @@
         {
             "id": "default_material",
             "type": "material",
-            "material_type": "cook_torrance",
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "textures": [
                 {
-                    "texture_type": "normal",
+                    "texture_role": "normal",
                     "texture": {
                         "source_type": "image",
                         "source_file": "assets/images/default_normal.png",
@@ -16,7 +15,7 @@
                     }
                 },
                 {
-                    "texture_type": "albedo",
+                    "texture_role": "albedo",
                     "texture": {
                         "source_type": "image",
                         "source_file": "assets/images/default_albedo.png",
@@ -25,7 +24,7 @@
                     }
                 },
                 {
-                    "texture_type": "rma",
+                    "texture_role": "rma",
                     "texture": {
                         "source_type": "image",
                         "source_file": "assets/images/default_rma.png",

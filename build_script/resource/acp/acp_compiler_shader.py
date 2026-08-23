@@ -315,6 +315,16 @@ class WBEACPCompilerShader(WBEACPCompiler):
         raw_type = raw_field.get("type", {})
         if not isinstance(raw_type, dict):
             raw_type = {}
+        nested_type = raw_type
+        while nested_type.get("kind") == "array":
+            element_type = nested_type.get("elementType", {})
+            if not isinstance(element_type, dict):
+                nested_type = {}
+                break
+            nested_type = element_type
+        nested_fields = nested_type.get("fields", [])
+        if not isinstance(nested_fields, list):
+            nested_fields = []
         return {
             "name": str(raw_field.get("name", "")),
             "type": self._transform_shader_type_atom(raw_type),
@@ -324,6 +334,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "semantic_name": str(raw_field.get("semanticName", "")),
             "semantic_index": int(raw_field.get("semanticIndex", 0)),
             "user_attributes": self._transform_shader_user_attributes(raw_field),
+            "fields": [self._transform_shader_type_field(field) for field in nested_fields if isinstance(field, dict)],
         }
 
     def _flatten_shader_type_fields(self, raw_fields: list[Any]) -> list[dict[str, Any]]:

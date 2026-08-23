@@ -474,15 +474,14 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     {
         "id": "test_material",
         "type": "material",
-        "material_type": "cook_torrance",
         "graphics_pipeline_ids": ["main_pipeline", "shadow_pipeline"],
         "textures": [
             {
-                "texture_type": "normal",
+                "texture_role": "normal",
                 "texture_id": "normal_texture"
             },
             {
-                "texture_type": "albedo",
+                "texture_role": "albedo",
                 "texture": {
                     "id": "albedo_texture",
                     "type": "image",
@@ -502,13 +501,12 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_material->resource_key, nullptr);
     EXPECT_STREQ(captured_material->resource_key, "test_material");
-    EXPECT_EQ(captured_material->material_type, WBE::dynam_hash("cook_torrance"));
     EXPECT_EQ(captured_material->graphics_pipeline.get(), graphics_pipeline_ref.get());
     ASSERT_EQ(captured_material->texture_count, 2U);
     ASSERT_NE(captured_material->textures, nullptr);
-    EXPECT_EQ(captured_material->textures.get()[0].texture_type, WBE::dynam_hash("normal"));
+    EXPECT_EQ(captured_material->textures.get()[0].texture_role, WBE::dynam_hash("normal"));
     EXPECT_EQ(captured_material->textures.get()[0].texture.get(), referenced_texture_ref.get());
-    EXPECT_EQ(captured_material->textures.get()[1].texture_type, WBE::dynam_hash("albedo"));
+    EXPECT_EQ(captured_material->textures.get()[1].texture_role, WBE::dynam_hash("albedo"));
     ASSERT_NE(captured_material->textures.get()[1].texture, nullptr);
     EXPECT_EQ(captured_material->textures.get()[1].texture->width, 16U);
     EXPECT_EQ(captured_material->textures.get()[1].texture->height, 16U);
@@ -569,7 +567,6 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     {
         "id": "test_material_inline_pipeline",
         "type": "material",
-        "material_type": "cook_torrance",
         "graphics_pipeline": {
             "id": "inline_pipeline",
             "type": "graphics_pipeline",
@@ -595,7 +592,6 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     EXPECT_STREQ(captured_material->resource_key, "test_material_inline_pipeline");
     EXPECT_STREQ(captured_pipeline->resource_key, "inline_pipeline");
     EXPECT_EQ(captured_material->graphics_pipeline.get(), captured_pipeline.get());
-    EXPECT_EQ(captured_material->material_type, WBE::dynam_hash("cook_torrance"));
     EXPECT_EQ(captured_material->textures, nullptr);
     EXPECT_EQ(captured_material->texture_count, 0U);
     EXPECT_EQ(captured_pipeline->vertex_stage.get(), vertex_shader_ref.get());
@@ -610,7 +606,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     EXPECT_EQ(created_ref_keys[1], "fragment_shader");
 }
 
-TEST_F(ResourcePopulatorTest, MaterialTypeAndTextureSlotValidation) {
+TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     WBE::ResourceUnitLoaderMaterial loader;
     WBE::StackAllocator stack_allocator(64 * 1024);
     std::stringstream stream;
@@ -634,9 +630,8 @@ TEST_F(ResourcePopulatorTest, MaterialTypeAndTextureSlotValidation) {
     {
         "id": "test_material_missing_texture_binding",
         "type": "material",
-        "material_type": "cook_torrance",
         "graphics_pipeline_ids": ["main_pipeline"],
-        "textures": [{"texture_type": "albedo"}]
+        "textures": [{"texture_role": "albedo"}]
     }
     )";
     WBE::ParserJSON parser;
@@ -644,46 +639,44 @@ TEST_F(ResourcePopulatorTest, MaterialTypeAndTextureSlotValidation) {
 
     EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, parser.get_data()), std::runtime_error);
 
-    std::string unsupported_material_type_json = R"(
+    std::string arbitrary_texture_role_json = R"(
     {
-        "id": "test_unsupported_material_type",
+        "id": "test_arbitrary_texture_role",
         "type": "material",
-        "material_type": "phong",
-        "graphics_pipeline_ids": ["main_pipeline"]
-    }
-    )";
-    WBE::ParserJSON unsupported_material_type_parser;
-    unsupported_material_type_parser.parse_from_buffer(unsupported_material_type_json);
-    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, unsupported_material_type_parser.get_data()), std::runtime_error);
-
-    std::string unsupported_texture_type_json = R"(
-    {
-        "id": "test_unsupported_texture_type",
-        "type": "material",
-        "material_type": "cook_torrance",
         "graphics_pipeline_ids": ["main_pipeline"],
-        "textures": [{"texture_type": "height", "texture_id": "height_texture"}]
+        "textures": [{"texture_role": "height", "texture_id": "height_texture"}]
     }
     )";
-    WBE::ParserJSON unsupported_texture_type_parser;
-    unsupported_texture_type_parser.parse_from_buffer(unsupported_texture_type_json);
-    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, unsupported_texture_type_parser.get_data()), std::runtime_error);
+    WBE::ParserJSON arbitrary_texture_role_parser;
+    arbitrary_texture_role_parser.parse_from_buffer(arbitrary_texture_role_json);
+    EXPECT_NO_THROW(loader.populate_scheme_from_data(*res_chunk, arbitrary_texture_role_parser.get_data()));
 
-    std::string duplicate_texture_type_json = R"(
+    std::string empty_texture_role_json = R"(
     {
-        "id": "test_duplicate_texture_type",
+        "id": "test_empty_texture_role",
         "type": "material",
-        "material_type": "cook_torrance",
+        "graphics_pipeline_ids": ["main_pipeline"],
+        "textures": [{"texture_role": "", "texture_id": "empty_texture"}]
+    }
+    )";
+    WBE::ParserJSON empty_texture_role_parser;
+    empty_texture_role_parser.parse_from_buffer(empty_texture_role_json);
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, empty_texture_role_parser.get_data()), std::runtime_error);
+
+    std::string duplicate_texture_role_json = R"(
+    {
+        "id": "test_duplicate_texture_role",
+        "type": "material",
         "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [
-            {"texture_type": "albedo", "texture_id": "first_albedo"},
-            {"texture_type": "albedo", "texture_id": "second_albedo"}
+            {"texture_role": "albedo", "texture_id": "first_albedo"},
+            {"texture_role": "albedo", "texture_id": "second_albedo"}
         ]
     }
     )";
-    WBE::ParserJSON duplicate_texture_type_parser;
-    duplicate_texture_type_parser.parse_from_buffer(duplicate_texture_type_json);
-    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, duplicate_texture_type_parser.get_data()), std::runtime_error);
+    WBE::ParserJSON duplicate_texture_role_parser;
+    duplicate_texture_role_parser.parse_from_buffer(duplicate_texture_role_json);
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, duplicate_texture_role_parser.get_data()), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, VideoResourceGeneral) {

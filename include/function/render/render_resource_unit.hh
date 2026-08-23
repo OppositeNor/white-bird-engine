@@ -119,12 +119,12 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
 
 /**
  * @class RUSchemaMaterialTextureSlot
- * @brief One typed material texture declared inline or by resource id.
+ * @brief One material texture role declared inline or by resource id.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
-    /** Texture role. Supported values are `albedo`, `normal`, and `rma`. */
+    /** Non-empty shader-defined texture role. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string texture_type;
+    std::string texture_role;
     /** Inline texture data. Exactly one of texture and texture_id must be present. */
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaImage> texture;
@@ -139,16 +139,13 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaMaterial)
-    /** Material model. The only currently supported value is `cook_torrance`. */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string material_type;
     /** The graphics pipelines that can render this material. */
     WBE_META(WBE_REFLECT)
     std::vector<std::string> graphics_pipeline_ids;
     /** The inline graphics pipeline used to render this material. */
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaGraphicsPipeline> graphics_pipeline;
-    /** Typed texture slots used by the material. Texture types must not be duplicated. */
+    /** Shader-defined texture slots used by the material. Texture roles must not be empty or duplicated. */
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemaMaterialTextureSlot> textures;
 };
@@ -274,14 +271,12 @@ struct RUGraphicsPipeline : public ResourceUnit {
  * @brief Typed material resource unit.
  */
 struct RUMaterial : public ResourceUnit {
-    /** Runtime hash decoded from the schema material_type name. */
-    HashCode material_type = 0;
     /** The graphics pipeline used to render this material. */
     RefRes<RUGraphicsPipeline> graphics_pipeline;
-    /** One resolved typed texture slot. */
+    /** One resolved texture-role slot. */
     struct TextureSlot {
-        /** Runtime hash decoded from the schema texture_type name. */
-        HashCode texture_type = 0;
+        /** Runtime hash decoded from the shader-defined schema texture_role name. */
+        HashCode texture_role = 0;
         /** Resolved texture resource. */
         RefRes<RUImage> texture;
     };

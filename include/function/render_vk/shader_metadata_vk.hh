@@ -121,6 +121,9 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeField final : public Seriali
     /** @brief User attributes reflected from this field declaration. */
     WBE_META(WBE_REFLECT)
     std::vector<ShaderMetadataUserAttribute> user_attributes;
+    /** @brief Fields nested inside this field's struct or array-element type. */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMetadataTypeField> fields;
 };
 
 struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable {
