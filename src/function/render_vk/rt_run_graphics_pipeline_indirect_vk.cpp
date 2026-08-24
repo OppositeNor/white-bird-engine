@@ -50,8 +50,8 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     VkAttachmentLoadOp p_color_attachment_load_op)
     : render_data(p_render_data), clear_values(p_render_data->allocator), color_attachment_load_op(p_color_attachment_load_op),
       render_extent(p_render_extent), color_attachment_ids(p_render_data->allocator), vertex_buffer_id(p_vertex_buffer_id),
-      index_buffer_id(p_index_buffer_id), indirect_buffer_id(p_indirect_buffer_id), pipeline_batches(p_render_data->allocator),
-      descriptor_set_instances(p_render_data->allocator) {
+      index_buffer_id(p_index_buffer_id), indirect_buffer_id(p_indirect_buffer_id),
+      pipeline_batches(p_render_data->allocator), descriptor_set_instances(p_render_data->allocator) {
     clear_values.push_back(
         VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}});
     color_attachment_ids.emplace_back(p_color_attachment_id);
@@ -117,9 +117,44 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     descriptor_set_instances.reserve(descriptor_set_count);
 }
 
+RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, // NOLINT
+    std::span<const VkClearValue> p_clear_values,
+    VkExtent2D p_render_extent,
+    std::span<const std::string_view> p_color_attachment_ids,
+    std::optional<std::string_view> p_depth_attachment_id,
+    std::string_view p_vertex_buffer_id,
+    std::string_view p_index_buffer_id,
+    Ref<ROBufferVK> p_indirect_buffer,
+    std::span<const PipelineBatch> p_pipeline_batches,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VkAttachmentLoadOp p_depth_attachment_load_op)
+    : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
+      color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
+      render_extent(p_render_extent),
+      color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
+      depth_attachment_id(p_depth_attachment_id.has_value() ? std::optional<std::string>(*p_depth_attachment_id) : std::nullopt),
+      vertex_buffer_id(p_vertex_buffer_id), index_buffer_id(p_index_buffer_id), indirect_buffer(std::move(p_indirect_buffer)),
+      pipeline_batches(p_pipeline_batches.begin(), p_pipeline_batches.end(), p_render_data->allocator),
+      descriptor_set_instances(p_render_data->allocator) {
+    if (indirect_buffer == nullptr) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: task-owned indirect command buffer is null.");
+    }
+    size_t descriptor_set_count = 0;
+    for (const auto& batch : pipeline_batches) {
+        if (batch.graphics_pipeline == nullptr) {
+            throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: task-owned graphics pipeline is null.");
+        }
+        descriptor_set_count = std::max(descriptor_set_count, batch.descriptor_sets.size());
+    }
+    descriptor_set_instances.reserve(descriptor_set_count);
+}
+
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resources() const {
     Vector<ResAccessVK, RenderAllocator> read_accesses(render_data->allocator);
     for (const auto& batch : pipeline_batches) {
+        if (batch.graphics_pipeline != nullptr) {
+            continue;
+        }
         read_accesses.push_back({.res_id = batch.pipeline_id,
             .access = VK_ACCESS_2_SHADER_READ_BIT,
             .stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT});
@@ -140,8 +175,10 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resou
         {.res_id = vertex_buffer_id, .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT, .stage = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT});
     read_accesses.push_back(
         {.res_id = index_buffer_id, .access = VK_ACCESS_2_INDEX_READ_BIT, .stage = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT});
-    read_accesses.push_back(
-        {.res_id = indirect_buffer_id, .access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT});
+    if (indirect_buffer == nullptr) {
+        read_accesses.push_back(
+            {.res_id = indirect_buffer_id, .access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT});
+    }
     return read_accesses;
 }
 
@@ -167,18 +204,26 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     double /*p_delta*/) {
     auto vertex_buffer = WBE_REQUIRES_VALID(p_resources.get(vertex_buffer_id).res.dynamic_cast_ref<ROBufferVK>());
     auto index_buffer = WBE_REQUIRES_VALID(p_resources.get(index_buffer_id).res.dynamic_cast_ref<ROBufferVK>());
-    auto indirect_buffer = WBE_REQUIRES_VALID(p_resources.get(indirect_buffer_id).res.dynamic_cast_ref<ROBufferVK>());
+    Ref<ROBufferVK> resolved_indirect_buffer = indirect_buffer;
+    if (resolved_indirect_buffer == nullptr) {
+        resolved_indirect_buffer = WBE_REQUIRES_VALID(p_resources.get(indirect_buffer_id).res.dynamic_cast_ref<ROBufferVK>());
+    }
     uint64_t required_draw_count = 0;
     for (const auto& batch : pipeline_batches) {
         required_draw_count = std::max(required_draw_count, static_cast<uint64_t>(batch.first_draw) + batch.draw_count);
     }
     const uint64_t required_indirect_size = required_draw_count * sizeof(VkDrawIndexedIndirectCommand);
-    if (pipeline_batches.empty() || required_draw_count == 0 || indirect_buffer->fields().buffer_size < required_indirect_size) {
+    if (pipeline_batches.empty() || required_draw_count == 0 || resolved_indirect_buffer->fields().buffer_size < required_indirect_size) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: indirect command buffer is empty or too small.");
     }
 
-    auto first_graphics_pipeline =
-        WBE_REQUIRES_VALID(p_resources.get(pipeline_batches.front().pipeline_id).res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+    auto resolve_graphics_pipeline = [&p_resources](const PipelineBatch& p_batch) {
+        if (p_batch.graphics_pipeline != nullptr) {
+            return p_batch.graphics_pipeline;
+        }
+        return WBE_REQUIRES_VALID(p_resources.get(p_batch.pipeline_id).res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+    };
+    Ref<ROGraphicsPipelineVK> first_graphics_pipeline = resolve_graphics_pipeline(pipeline_batches.front());
 
     VkRenderingInfo rendering_info{};
     rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -226,7 +271,7 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &vertex_offset);
     vkCmdBindIndexBuffer(p_command_buffer, index_buffer->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
     for (const auto& batch : pipeline_batches) {
-        auto graphics_pipeline = WBE_REQUIRES_VALID(p_resources.get(batch.pipeline_id).res.dynamic_cast_ref<ROGraphicsPipelineVK>());
+        Ref<ROGraphicsPipelineVK> graphics_pipeline = resolve_graphics_pipeline(batch);
         if (graphics_pipeline->get_config().attachment_config.color_formats.size() != color_attachment_count) {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: pipeline batch attachment counts do not match.");
         }
@@ -247,7 +292,7 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
         }
         VkDeviceSize indirect_offset = static_cast<VkDeviceSize>(batch.first_draw) * sizeof(VkDrawIndexedIndirectCommand);
         vkCmdDrawIndexedIndirect(
-            p_command_buffer, indirect_buffer->get_buffer(), indirect_offset, batch.draw_count, sizeof(VkDrawIndexedIndirectCommand));
+            p_command_buffer, resolved_indirect_buffer->get_buffer(), indirect_offset, batch.draw_count, sizeof(VkDrawIndexedIndirectCommand));
     }
     vkCmdEndRendering(p_command_buffer);
 }

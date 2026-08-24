@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_I_WINDOW_HH
 #define WBE_FILE_I_WINDOW_HH
 
-#include "utils/defs.hh"
 #include <cstdint>
 #include <string_view>
 #include <vector>

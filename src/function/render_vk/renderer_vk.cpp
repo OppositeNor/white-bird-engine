@@ -289,13 +289,13 @@ void RendererVK::setup_base_render_data() {
     base_render_data.frames_in_flight = frames_in_flight;
 }
 
-void RendererVK::create_instance() { // NOLINT
+void RendererVK::create_instance() {
     // Get configuration informations.
     const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
 
     // Setup IApplication info.
-    VkApplicationInfo app_info{};
+    VkApplicationInfo app_info {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = game_config.game_name.c_str();
     app_info.applicationVersion = VK_MAKE_VERSION(game_config.version_major, game_config.version_minor, game_config.version_patch);
@@ -390,7 +390,7 @@ void RendererVK::create_vma_allocator() {
     }
 }
 
-void RendererVK::create_swap_chain() { // NOLINT
+void RendererVK::create_swap_chain() {
     // Get informations to create swap chain.
     SwapChainSupportDetails details = get_swap_chain_support_details(physical_device);
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(details.formats);
@@ -594,7 +594,7 @@ void RendererVK::create_physical_device() {
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
-void RendererVK::create_logical_device() { // NOLINT
+void RendererVK::create_logical_device() {
     // Setup queues create info.
     float queue_priority = 1.0;
     Set<uint32_t> indices = queue_family_indices.get_unique_indices();
@@ -788,7 +788,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     return true;
 }
 
-RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) { // NOLINT
+RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) {
     QueueFamilyIndices indices{};
     indices.allocator = allocator;
 

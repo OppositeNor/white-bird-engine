@@ -31,8 +31,24 @@ namespace WhiteBirdEngine {
  * defers the concrete RenderTaskVK instantiation until the graph is built.
  */
 struct RendTaskDescVK {
-    RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator) {
-    }
+    /** @brief Construct an empty task descriptor backed by the supplied allocator. */
+    explicit RendTaskDescVK(RenderAllocator* p_allocator);
+    /**
+     * @brief Construct a descriptor that transfers one prebuilt task into the graph.
+     *
+     * The resulting factory is one-shot and throws if invoked more than once. Descriptor copies share that one-shot state.
+     *
+     * @param p_allocator Allocator used by the dependency list and direct-task holder.
+     * @param p_task_id Task id used for graph dependencies.
+     * @param p_task Task transferred to the graph when the descriptor is built.
+     */
+    RendTaskDescVK(RenderAllocator* p_allocator, RendTaskID p_task_id, Unique<RenderTaskVK> p_task);
+    ~RendTaskDescVK() = default;
+    RendTaskDescVK(const RendTaskDescVK&) = default;
+    RendTaskDescVK(RendTaskDescVK&&) noexcept = default;
+    RendTaskDescVK& operator=(const RendTaskDescVK&) = default;
+    RendTaskDescVK& operator=(RendTaskDescVK&&) noexcept = default;
+
     // The id of this task within the pipeline.
     RendTaskID task_id = 0;
     // The ids of tasks that must complete before this task starts. Used by the

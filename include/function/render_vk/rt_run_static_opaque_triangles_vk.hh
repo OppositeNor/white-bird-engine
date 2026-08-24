@@ -12,23 +12,21 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_OPAQUE_TRIANGLES_PIPELINE_VK_HH
-#define WBE_FILE_STATIC_OPAQUE_TRIANGLES_PIPELINE_VK_HH
+#ifndef WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
+#define WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -36,22 +34,21 @@ namespace WhiteBirdEngine {
 
 class RendererVK;
 
-inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK =
-    "REND_RES_STATIC_OPAQUE_TRIANGLES_INDIRECT_COMMANDS_VK";
 WBE_LABEL(RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, WBE_RENDER_TASK);
 
 /**
- * @class StaticOpaqueTrianglesPipelineVK
- * @brief Static opaque indexed-indirect pipeline assembled from the render database.
+ * @class RTRunStaticOpaqueTrianglesVK
+ * @brief Render task that compiles and draws the render database's static opaque triangles.
  *
- * This keeps pass-specific pipeline compilation and task construction out of RendererVK. Compiled graphics pipelines and the
- * indirect command buffer are exposed as graph resources and retained by the graph after add_resources() is called.
+ * The task compiles and retains its graphics pipelines, material descriptors, and indirect-command buffer. Populate
+ * RenderDatabase and call RendererVK::update_static_opaque_triangles() before construction. Attachment resources configured
+ * by Config remain the render graph caller's responsibility.
  */
-class StaticOpaqueTrianglesPipelineVK final {
+class RTRunStaticOpaqueTrianglesVK final : public RenderTaskVK {
 public:
     /**
      * @class Config
-     * @brief Attachment and material-pipeline selection for the manually assembled pass.
+     * @brief Attachment and material-pipeline selection for the task.
      */
     class Config {
     public:
@@ -68,12 +65,6 @@ public:
         /** @brief Move configuration. */
         Config& operator=(Config&&) noexcept = default;
 
-        /**
-         * @brief Set the task id assigned to the assembled task.
-         * @param p_task_id Task id.
-         * @return This configuration.
-         */
-        Config& set_task_id(RendTaskID p_task_id);
         /**
          * @brief Set the resource key of the material supplying fallback textures for shader-reflected roles.
          * @param p_resource_key Material resource key. It must provide every WBE_TEXTURE role consumed by a pipeline batch.
@@ -94,6 +85,9 @@ public:
         Config& set_material_params_variable_name(std::string_view p_variable_name);
         /**
          * @brief Use one graphics-pipeline resource for every material batch.
+         *
+         * A non-empty resource key takes precedence over replacements added with add_graphics_pipeline_override().
+         *
          * @param p_resource_key Graphics-pipeline resource key.
          * @return This configuration.
          */
@@ -133,6 +127,10 @@ public:
         Config& set_stencil_attachment_format(VkFormat p_format);
         /**
          * @brief Add a clear value in attachment order.
+         *
+         * Color attachment values precede the optional depth value. Missing color values default to opaque black. When a
+         * depth attachment is configured and only color values are present, depth defaults to 1.0 and stencil to 0.
+         *
          * @param p_clear_value Clear value.
          * @return This configuration.
          */
@@ -150,11 +148,6 @@ public:
          */
         Config& set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op);
 
-        /**
-         * @brief Get the configured task id.
-         * @return Task id.
-         */
-        RendTaskID get_task_id() const;
         /**
          * @brief Get the fallback material resource key.
          * @return Material resource key.
@@ -275,7 +268,6 @@ public:
             std::string target_resource_key;
         };
 
-        RendTaskID task_id = RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK;
         std::string default_material_resource_key = "default_material";
         std::string material_textures_variable_name = "material_textures";
         std::string material_params_variable_name = "material_params";
@@ -303,50 +295,39 @@ public:
         uint32_t binding;
     };
 
-    /** @brief Static opaque pipelines require a renderer and configuration. */
-    StaticOpaqueTrianglesPipelineVK() = delete;
-    /** @brief Destroy the compiled pipeline state. */
-    ~StaticOpaqueTrianglesPipelineVK() = default;
-    /** @brief Static opaque pipeline state is not copyable. */
-    StaticOpaqueTrianglesPipelineVK(const StaticOpaqueTrianglesPipelineVK&) = delete;
-    /** @brief Move compiled pipeline state. */
-    StaticOpaqueTrianglesPipelineVK(StaticOpaqueTrianglesPipelineVK&&) noexcept = default;
-    /** @brief Static opaque pipeline state is not copy-assignable. */
-    StaticOpaqueTrianglesPipelineVK& operator=(const StaticOpaqueTrianglesPipelineVK&) = delete;
-    /** @brief Move-assign compiled pipeline state. */
-    StaticOpaqueTrianglesPipelineVK& operator=(StaticOpaqueTrianglesPipelineVK&&) noexcept = default;
+    /** @brief Static opaque tasks require a renderer and configuration. */
+    RTRunStaticOpaqueTrianglesVK() = delete;
+    /** @brief Destroy the task and its retained render objects. */
+    virtual ~RTRunStaticOpaqueTrianglesVK() override = default;
+    /** @brief Static opaque tasks are not copyable. */
+    RTRunStaticOpaqueTrianglesVK(const RTRunStaticOpaqueTrianglesVK&) = delete;
+    /** @brief Static opaque tasks are not movable. */
+    RTRunStaticOpaqueTrianglesVK(RTRunStaticOpaqueTrianglesVK&&) noexcept = delete;
+    /** @brief Static opaque tasks are not copy-assignable. */
+    RTRunStaticOpaqueTrianglesVK& operator=(const RTRunStaticOpaqueTrianglesVK&) = delete;
+    /** @brief Static opaque tasks are not move-assignable. */
+    RTRunStaticOpaqueTrianglesVK& operator=(RTRunStaticOpaqueTrianglesVK&&) noexcept = delete;
 
     /**
-     * @brief Compile and assemble the pass from the renderer's database and generic Vulkan compiler.
+     * @brief Compile the task from the renderer's database and generic Vulkan compiler.
      *
      * Every compiled graphics pipeline is explicitly registered in RenderDatabase before construction completes.
      *
      * @param p_renderer Renderer providing Vulkan state and static opaque geometry.
      * @param p_config Pass configuration.
+     * @throws std::runtime_error When renderer or resource state is missing, configuration is invalid, reflected material
+     * contracts are incompatible, or device draw and descriptor limits are exceeded.
      */
-    StaticOpaqueTrianglesPipelineVK(RendererVK* p_renderer, const Config& p_config);
+    RTRunStaticOpaqueTrianglesVK(RendererVK* p_renderer, const Config& p_config);
 
-    /**
-     * @brief Add the compiled graphics pipelines and indirect command buffer to a graph descriptor.
-     * @param p_graph_desc Graph descriptor receiving the resources.
-     */
-    void add_resources(RendGraphDescVK& p_graph_desc) const;
-
-    /**
-     * @brief Move the assembled task descriptor out of the pipeline.
-     * @return Assembled render-task descriptor.
-     */
-    RendTaskDescVK take_task() {
-        return std::move(task);
-    }
-
-    /**
-     * @brief Get the task descriptor before it is moved out of the pipeline.
-     * @return Mutable assembled render-task descriptor.
-     */
-    RendTaskDescVK& get_task() {
-        return task;
-    }
+    /** @copydoc RenderTaskVK::queue_family */
+    virtual QueueFamilyVK queue_family() const override;
+    /** @copydoc RenderTaskVK::read_resources */
+    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
+    /** @copydoc RenderTaskVK::write_resources */
+    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    /** @copydoc RenderTaskVK::record */
+    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
 
     /**
      * @brief Get the number of compiled material batches.
@@ -384,22 +365,7 @@ private:
         std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
         GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
     };
-    struct GraphicsPipelineResource {
-        GraphicsPipelineResource() = default;
-        ~GraphicsPipelineResource() = default;
-        GraphicsPipelineResource(const GraphicsPipelineResource&) = default;
-        GraphicsPipelineResource(GraphicsPipelineResource&&) noexcept = default;
-        GraphicsPipelineResource& operator=(const GraphicsPipelineResource&) = default;
-        GraphicsPipelineResource& operator=(GraphicsPipelineResource&&) noexcept = default;
-
-        std::string resource_key;
-        Ref<ROGraphicsPipelineVK> graphics_pipeline;
-    };
-
-    RendTaskDescVK task;
-    std::string indirect_commands_resource_key;
-    Ref<ROBufferVK> indirect_commands;
-    std::vector<GraphicsPipelineResource> graphics_pipeline_resources;
+    Unique<RTRunGraphicsPipelineIndirectVK> indirect_task;
     std::vector<CompiledBatch> compiled_batches;
 };
 
