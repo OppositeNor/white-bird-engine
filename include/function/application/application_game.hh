@@ -74,6 +74,15 @@ public:
     }
 
     /**
+     * @brief Get the capabilities enabled by the renderer.
+     *
+     * @return The negotiated renderer capabilities.
+     */
+    const RendererCapabilities& get_renderer_capabilities() const {
+        return renderer_capabilities;
+    }
+
+    /**
      * @brief Add a job for the renderer.
      */
     void add_render_job(std::function<void()> p_job) {
@@ -82,6 +91,7 @@ public:
 
 private:
     Ref<RenderAllocator> renderer_allocator;
+    RendererCapabilities renderer_capabilities{.ray_tracing = true};
     Ref<InputManager> input_manager;
     Ref<IWindow> window;
 

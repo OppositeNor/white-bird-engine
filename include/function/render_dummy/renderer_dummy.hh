@@ -34,7 +34,9 @@ namespace WhiteBirdEngine {
  */
 class RendererDummy final : public IRenderer {
 public:
-    RendererDummy(RenderAllocator* p_allocator) : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+    RendererDummy(RenderAllocator* p_allocator, RendererCapabilities& p_capabilities)
+        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+        p_capabilities.ray_tracing = false;
     }
 
     virtual ~RendererDummy() override = default;

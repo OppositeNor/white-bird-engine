@@ -59,7 +59,60 @@
 
 namespace WhiteBirdEngine {
 
-RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer)
+template <VkStructureType StructureType, typename FeatureType>
+static bool check_device_feature_support(VkPhysicalDevice p_device, VkBool32 FeatureType::* p_feature) {
+    FeatureType feature{};
+    feature.sType = StructureType;
+
+    VkPhysicalDeviceFeatures2 device_features{};
+    device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    device_features.pNext = &feature;
+    vkGetPhysicalDeviceFeatures2(p_device, &device_features);
+
+    return feature.*p_feature == VK_TRUE;
+}
+
+template <typename EnumerateFunction>
+static bool check_extension_support(std::span<const char* const> p_extensions,
+    std::span<const char* const> p_enabled_layers,
+    const EnumerateFunction& p_enumerate_extensions) {
+    std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
+
+    auto remove_supported_extensions = [&](const char* p_layer_name) {
+        VkResult result = VK_SUCCESS;
+        do {
+            uint32_t extension_count = 0;
+            result = p_enumerate_extensions(p_layer_name, &extension_count, nullptr);
+            if (result != VK_SUCCESS) {
+                return false;
+            }
+
+            std::vector<VkExtensionProperties> extension_properties(extension_count);
+            result = p_enumerate_extensions(p_layer_name, &extension_count, extension_properties.data());
+            if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
+                return false;
+            }
+            if (result == VK_SUCCESS) {
+                for (const auto& extension : extension_properties) {
+                    unsupported_extensions.erase(extension.extensionName);
+                }
+            }
+        } while (result == VK_INCOMPLETE);
+        return true;
+    };
+
+    if (!remove_supported_extensions(nullptr)) {
+        return false;
+    }
+    for (const char* layer_name : p_enabled_layers) {
+        if (!remove_supported_extensions(layer_name)) {
+            return false;
+        }
+    }
+    return unsupported_extensions.empty();
+}
+
+RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       window(p_window), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
       base_render_data(p_allocator) {
@@ -71,7 +124,7 @@ RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBuf
         delayed_call.second = -1;
     }
     register_renderer_vk_resource_unit_loaders();
-    init();
+    init(p_capabilities);
 }
 
 RendererVK::~RendererVK() {
@@ -169,10 +222,10 @@ static void update_buffer(const BaseRenderDataVK* p_render_data,
     }
 }
 
-void RendererVK::init() {
+void RendererVK::init(RendererCapabilities& p_capabilities) {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
-    init_vulkan();
+    init_vulkan(p_capabilities);
     setup_base_render_data();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
@@ -233,10 +286,10 @@ void RendererVK::terminate() {
     vkDestroyInstance(vk_instance, get_allocation_callbacks());
 }
 
-void RendererVK::init_vulkan() {
+void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_instance();
-    create_device();
-    create_vma_allocator();
+    create_device(p_capabilities);
+    create_vma_allocator(p_capabilities.ray_tracing);
     create_swap_chain();
     create_command_pools();
     create_descriptor_pool();
@@ -312,52 +365,16 @@ void RendererVK::create_instance() {
     create_info.enabledLayerCount = enabled_layers.size();
     create_info.ppEnabledLayerNames = enabled_layers.data();
 
-    std::set<std::string> available_extensions;
-    uint32_t available_extension_count = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &available_extension_count, nullptr);
-    std::vector<VkExtensionProperties> available_extension_properties(available_extension_count);
-    vkEnumerateInstanceExtensionProperties(nullptr, &available_extension_count, available_extension_properties.data());
-    for (const auto& extension : available_extension_properties) {
-        available_extensions.insert(extension.extensionName);
-    }
-
-    for (const char* layer_name : enabled_layers) {
-        uint32_t layer_extension_count = 0;
-        VkResult layer_ext_result = vkEnumerateInstanceExtensionProperties(layer_name, &layer_extension_count, nullptr);
-        if (layer_ext_result != VK_SUCCESS) {
-            throw std::runtime_error(std::format("Failed to enumerate instance extensions for layer {}.", layer_name));
-        }
-        std::vector<VkExtensionProperties> layer_extension_properties(layer_extension_count);
-        layer_ext_result =
-            vkEnumerateInstanceExtensionProperties(layer_name, &layer_extension_count, layer_extension_properties.data());
-        if (layer_ext_result != VK_SUCCESS) {
-            throw std::runtime_error(std::format("Failed to enumerate instance extensions for layer {}.", layer_name));
-        }
-        for (const auto& extension : layer_extension_properties) {
-            available_extensions.insert(extension.extensionName);
-        }
-    }
-
     // Setup and validate instance extensions.
     std::vector<const char*> required_extensions = window->get_required_vulkan_instance_extensions();
     required_extensions.reserve(required_extensions.size() + enabled_instance_extensions.size());
     required_extensions.insert(required_extensions.end(), enabled_instance_extensions.begin(), enabled_instance_extensions.end());
-
-    std::set<std::string> missing_extensions;
-    for (const char* extension_name : required_extensions) {
-        if (!available_extensions.contains(extension_name)) {
-            missing_extensions.insert(extension_name);
-        }
-    }
-    if (!missing_extensions.empty()) {
-        std::string missing_extensions_message;
-        for (const auto& missing_extension : missing_extensions) {
-            if (!missing_extensions_message.empty()) {
-                missing_extensions_message += ", ";
-            }
-            missing_extensions_message += missing_extension;
-        }
-        throw std::runtime_error(std::format("Missing required Vulkan instance extension(s): {}.", missing_extensions_message));
+    if (!check_extension_support(required_extensions,
+            enabled_layers,
+            [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                return vkEnumerateInstanceExtensionProperties(p_layer_name, p_extension_count, p_extension_properties);
+            })) {
+        throw std::runtime_error("Required Vulkan instance extensions are not supported.");
     }
 
     create_info.enabledExtensionCount = required_extensions.size();
@@ -371,13 +388,21 @@ void RendererVK::create_instance() {
     surface = window->get_vulkan_surface();
 }
 
-void RendererVK::create_device() {
+void RendererVK::create_device(RendererCapabilities& p_capabilities) {
     create_physical_device();
-    create_logical_device();
+    if (p_capabilities.ray_tracing && check_ray_tracing_support(physical_device)) {
+        enabled_device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        enabled_device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+        enabled_device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    } else {
+        p_capabilities.ray_tracing = false;
+    }
+    create_logical_device(p_capabilities.ray_tracing);
 }
 
-void RendererVK::create_vma_allocator() {
+void RendererVK::create_vma_allocator(bool p_enable_buffer_device_address) {
     VmaAllocatorCreateInfo create_info{
+        .flags = static_cast<VmaAllocatorCreateFlags>(p_enable_buffer_device_address ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0),
         .physicalDevice = physical_device,
         .device = logical_device,
         .pAllocationCallbacks = get_allocation_callbacks(),
@@ -594,7 +619,7 @@ void RendererVK::create_physical_device() {
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
-void RendererVK::create_logical_device() {
+void RendererVK::create_logical_device(bool p_enable_ray_tracing) {
     // Setup queues create info.
     float queue_priority = 1.0;
     Set<uint32_t> indices = queue_family_indices.get_unique_indices();
@@ -660,6 +685,23 @@ void RendererVK::create_logical_device() {
     vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
     descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
 
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{};
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{};
+    if (p_enable_ray_tracing) {
+        buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+        buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+        vertex_input_dynamic_state_features.pNext = &buffer_device_address_features;
+
+        acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+        acceleration_structure_features.accelerationStructure = VK_TRUE;
+        buffer_device_address_features.pNext = &acceleration_structure_features;
+
+        ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+        ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
+        acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+    }
+
     // Create logical device.
     if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device.");
@@ -676,16 +718,26 @@ void RendererVK::create_logical_device() {
     vkGetDeviceQueue(logical_device, queue_family_indices.get_present(), 0, &present_queue);
 }
 
-bool RendererVK::check_device_extension_support(VkPhysicalDevice p_device) {
-    uint32_t extension_count = 0;
-    vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, nullptr);
-    Vector<VkExtensionProperties> extension_properties(extension_count, allocator);
-    vkEnumerateDeviceExtensionProperties(p_device, nullptr, &extension_count, extension_properties.data());
-    std::set<std::string> enabled_extensions(enabled_device_extensions.begin(), enabled_device_extensions.end());
-    for (const auto& extension : extension_properties) {
-        enabled_extensions.erase(extension.extensionName);
+bool RendererVK::check_ray_tracing_support(VkPhysicalDevice p_device) {
+    const std::array<const char*, 3> required_extensions{
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+    };
+    if (!check_extension_support(required_extensions,
+            enabled_layers,
+            [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
+            })) {
+        return false;
     }
-    return enabled_extensions.empty();
+
+    return check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(
+               p_device, &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress) &&
+           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR>(
+               p_device, &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure) &&
+           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
+               p_device, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
 }
 
 bool RendererVK::check_layer_support() {
@@ -771,7 +823,11 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (!device_indices.is_complete()) {
         return false;
     }
-    if (!check_device_extension_support(p_device)) {
+    if (!check_extension_support(enabled_device_extensions,
+            enabled_layers,
+            [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
+            })) {
         return false;
     }
     SwapChainSupportDetails swap_chain_support_details = get_swap_chain_support_details(p_device);

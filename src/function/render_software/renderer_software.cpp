@@ -24,6 +24,12 @@
 
 namespace WhiteBirdEngine {
 
+RendererSoftware::RendererSoftware(Ref<RenderAllocator> p_allocator, RendererCapabilities& p_capabilities)
+    : render_allocator(p_allocator), per_thread_allocators(render_allocator.get()), render_stages(render_allocator.get()),
+      base_render_data(render_allocator.get()) {
+    p_capabilities.ray_tracing = false;
+}
+
 void RendererSoftware::tick(double p_delta) {
     (void)p_delta;
     // TODO

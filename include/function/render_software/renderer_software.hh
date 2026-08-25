@@ -45,7 +45,7 @@ public:
     RendererSoftware& operator=(const RendererSoftware&) = delete;
     RendererSoftware& operator=(RendererSoftware&&) = delete;
 
-    RendererSoftware(Ref<RenderAllocator> p_allocator);
+    RendererSoftware(Ref<RenderAllocator> p_allocator, RendererCapabilities& p_capabilities);
 
     virtual uint32_t get_worker_nums() override {
         // Leave one thread for logic and one thread for worker thread.

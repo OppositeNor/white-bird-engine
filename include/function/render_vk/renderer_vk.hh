@@ -95,8 +95,9 @@ public:
      * @param p_window The window whose surface and swap chain are rendered.
      * @param p_job_buffer The render job buffer. Used for committing jobs for
      * the renderer to perform.
+     * @param p_capabilities The requested capabilities. Unsupported requested capabilities are disabled during construction.
      */
-    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer);
+    RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities);
 
     virtual uint32_t get_worker_nums() override {
         return 1;
@@ -280,7 +281,7 @@ private:
 
     const std::vector<const char*> enabled_instance_extensions;
 
-    const std::vector<const char*> enabled_device_extensions{
+    std::vector<const char*> enabled_device_extensions{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME,
 
@@ -364,29 +365,29 @@ private:
     };
     Unique<RenderObjects> render_objects;
 
-    void init();
+    void init(RendererCapabilities& p_capabilities);
     void terminate();
 
-    void init_vulkan();
+    void init_vulkan(RendererCapabilities& p_capabilities);
     void setup_base_render_data();
     void init_swap_chain_images();
     void init_swap_chain_image_views();
     void recreate_swap_chain();
 
     void create_instance();
-    void create_device();
-    void create_vma_allocator();
+    void create_device(RendererCapabilities& p_capabilities);
+    void create_vma_allocator(bool p_enable_buffer_device_address);
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
     void create_descriptor_pool();
     void create_async_objects();
 
-    bool check_device_extension_support(VkPhysicalDevice p_device);
+    bool check_ray_tracing_support(VkPhysicalDevice p_device);
     bool check_layer_support();
     void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
-    void create_logical_device();
+    void create_logical_device(bool p_enable_ray_tracing);
 
     bool is_device_suitable(VkPhysicalDevice p_device);
 

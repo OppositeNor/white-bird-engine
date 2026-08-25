@@ -29,6 +29,17 @@ namespace WhiteBirdEngine {
 WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
 
 /**
+ * @struct RendererCapabilities
+ * @brief Optional renderer capabilities requested by the caller and enabled by the renderer.
+ */
+struct RendererCapabilities {
+    /**
+     * @brief Whether ray tracing is requested and was enabled.
+     */
+    bool ray_tracing = false;
+};
+
+/**
  * @class IRenderer
  * @brief IRenderer interface for different types of renderers, usually refer
  * to the rendering API.

@@ -68,13 +68,14 @@ void ApplicationGame::init() {
     input_manager = make_ref<InputManager>(global_allocator());
     window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
     if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer);
+        renderer = make_ref<RendererVK>(
+            global_allocator(), renderer_allocator.get(), window, render_job_buffer, renderer_capabilities);
     } else if (game_config.render_api == "dummy") {
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
+        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
     } else {
         stdout_log(WBE_CHANNEL_RENDER)
             ->warning(std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get());
+        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
     }
     worker = make_ref<Worker>(global_allocator());
     // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
