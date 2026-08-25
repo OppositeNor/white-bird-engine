@@ -26,6 +26,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/ray_tracing_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -58,8 +59,6 @@ inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK = "REND_RES_
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK";
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK";
 inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK";
-
-WBE_LABEL(RT_PRE_EXECUTE_PIPELINE_VK, WBE_RENDER_TASK);
 
 /**
  * @class RendererVK
@@ -120,6 +119,16 @@ public:
 
     virtual void update_static_opaque_triangles() override;
 
+    /**
+     * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
+     *
+     * Registered jobs are batched into the renderer's reusable graphics command buffer. Captured resources stay alive until
+     * the job is recorded, submitted, and waited by the renderer.
+     *
+     * @param p_job The GPU job to record.
+     */
+    void register_gpu_job(GPUJobVK p_job);
+
     virtual void add_job(std::function<void()> p_job) override {
         job_buffer->add_job(std::move(p_job));
     }
@@ -159,24 +168,6 @@ public:
      */
     const BaseRenderDataVK* get_base_render_data() const {
         return &base_render_data;
-    }
-
-    /**
-     * @brief Add a pre-execute task to the pre-execute task queue.
-     *
-     * @param p_task The task to be added.
-     */
-    void add_pre_execute_task(const std::function<void(VkCommandBuffer)>& p_task) {
-        base_render_data.pre_execute_tasks_queue.push_back(p_task);
-    }
-
-    /**
-     * @brief Add a pre-execute task to the pre-execute task queue.
-     *
-     * @param p_task The task to be added.
-     */
-    void add_pre_execute_task(std::function<void(VkCommandBuffer)>&& p_task) {
-        base_render_data.pre_execute_tasks_queue.push_back(std::move(p_task));
     }
 
     /**
@@ -342,11 +333,17 @@ private:
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
+    Unique<RayTracingVK> ray_tracing;
 
     // Render objects for the renderer.
     struct RenderObjects {
         RenderObjects(AllocType* p_allocator) : swap_chain_images(p_allocator), swap_chain_image_views(p_allocator) {
         }
+        ~RenderObjects() = default;
+        RenderObjects(const RenderObjects&) = delete;
+        RenderObjects(RenderObjects&&) noexcept = delete;
+        RenderObjects& operator=(const RenderObjects&) = delete;
+        RenderObjects& operator=(RenderObjects&&) noexcept = delete;
         // Graphics pipeline layout.
         Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain images
@@ -365,6 +362,10 @@ private:
     };
     Unique<RenderObjects> render_objects;
 
+    static constexpr size_t MAX_GPU_JOBS = 1024;
+    VkCommandBuffer gpu_job_command_buffer = VK_NULL_HANDLE;
+    std::array<GPUJobVK, MAX_GPU_JOBS> gpu_jobs;
+
     void init(RendererCapabilities& p_capabilities);
     void terminate();
 
@@ -380,6 +381,7 @@ private:
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
+    void create_gpu_job_command_buffer();
     void create_descriptor_pool();
     void create_async_objects();
 
@@ -406,6 +408,9 @@ private:
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
     std::optional<uint32_t> tick_setup_pipeline();
     void run_delayed_calls();
+    void run_gpu_jobs();
+    void synchronize_gpu_and_flush_delayed_calls();
+    void submit_gpu_job_command_buffer();
     void set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph);
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
 };

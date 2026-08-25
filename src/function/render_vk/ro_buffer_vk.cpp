@@ -126,8 +126,8 @@ void ROBufferVK::update_buffer(Ref<ROBufferVK> p_data, size_t p_src_offset, size
     copy_region.srcOffset = p_src_offset;
     copy_region.dstOffset = p_dst_offset;
     copy_region.size = p_size;
-    // Register a pre-execute task to copy the buffer.
-    RendererVK::get_singleton()->add_pre_execute_task(
+    // Register a renderer-owned GPU job to copy the buffer before graph execution.
+    RendererVK::get_singleton()->register_gpu_job(
         [src_buffer = p_data, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
             vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
         });
@@ -159,7 +159,7 @@ void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, si
     copy_region.srcOffset = src_offset;
     copy_region.dstOffset = 0;
     copy_region.size = p_size;
-    RendererVK::get_singleton()->add_pre_execute_task(
+    RendererVK::get_singleton()->register_gpu_job(
         [src_buffer = p_buffer, dst_buffer = this->get_buffer(), copy_region](VkCommandBuffer p_command_buffer) {
             vkCmdCopyBuffer(p_command_buffer, src_buffer->get_buffer(), dst_buffer, 1, &copy_region);
         });

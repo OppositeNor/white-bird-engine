@@ -1,8 +1,9 @@
 # Project-scoped Codex copy of .github/agents/investigator.agent.md.
 # Copilot tool intent: read, search.
+# Use a cheap available Codex model; gpt-4.1 is not available on some ChatGPT-backed Codex accounts.
 name = "investigator"
 description = "Investigates codebases, traces bugs, and produces technical findings without making code changes."
-model = "gpt-4.1"
+model = "gpt-5.6-luna"
 sandbox_mode = "read-only"
 developer_instructions = '''
 
@@ -128,4 +129,3 @@ Do not:
 ```
 
 '''
-

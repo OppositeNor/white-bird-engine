@@ -743,9 +743,9 @@ Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
                              .set_size(upload_data.size())
                              .create_ref(context.render_data);
     upload_buffer->update_buffer(upload_data.data(), upload_data.size());
-    context.renderer->add_pre_execute_task([image, upload_buffer, width = p_image_resource->width, height = p_image_resource->height](
-                                               VkCommandBuffer p_command_buffer) mutable {
-        // Defer the image copy until a command buffer is available from the renderer's pre-execute phase.
+    context.renderer->register_gpu_job([image, upload_buffer, width = p_image_resource->width, height = p_image_resource->height](
+                                           VkCommandBuffer p_command_buffer) mutable {
+        // Defer the image copy until the renderer resolves the upload job at frame start.
         VkBufferImageCopy region_info{};
         region_info.imageSubresource =
             VkImageSubresourceLayers{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};

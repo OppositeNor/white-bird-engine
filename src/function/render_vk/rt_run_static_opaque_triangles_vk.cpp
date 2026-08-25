@@ -475,6 +475,35 @@ StaticOpaqueDrawDataVK build_draw_data(const RenderDatabase::OpaqueTrianglesInfo
     return result;
 }
 
+void apply_vertex_offsets(StaticOpaqueDrawDataVK& p_draw_data,
+    const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
+    const StaticOpaqueVertexBatchPlannerVK::Batch& p_vertex_batch) {
+    if (p_vertex_batch.first_draw > p_triangles_info.draw_groups.size() ||
+        p_vertex_batch.draw_count > p_triangles_info.draw_groups.size() - p_vertex_batch.first_draw ||
+        p_vertex_batch.first_draw > p_draw_data.indirect_commands.size() ||
+        p_vertex_batch.draw_count > p_draw_data.indirect_commands.size() - p_vertex_batch.first_draw) {
+        throw std::runtime_error("Failed to construct static opaque task: vertex batch range is invalid.");
+    }
+    const auto& first_draw_group = p_triangles_info.draw_groups[p_vertex_batch.first_draw];
+    const size_t vertex_stride = first_draw_group.vertex_layout.vertex_stride;
+    if (vertex_stride == 0 || p_vertex_batch.vertex_buffer_offset > first_draw_group.vertex_buffer_byte_offset) {
+        throw std::runtime_error("Failed to construct static opaque task: vertex batch stride or offset is invalid.");
+    }
+    for (uint32_t draw_index = 0; draw_index < p_vertex_batch.draw_count; ++draw_index) {
+        const size_t draw_group_index = p_vertex_batch.first_draw + draw_index;
+        const auto& draw_group = p_triangles_info.draw_groups[draw_group_index];
+        const size_t byte_delta = draw_group.vertex_buffer_byte_offset - p_vertex_batch.vertex_buffer_offset;
+        if (byte_delta % vertex_stride != 0) {
+            throw std::runtime_error("Failed to construct static opaque task: vertex batch offsets are not stride aligned.");
+        }
+        const size_t vertex_offset = byte_delta / vertex_stride;
+        if (vertex_offset > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
+            throw std::runtime_error("Failed to construct static opaque task: vertex offset exceeds Vulkan's int32 range.");
+        }
+        p_draw_data.indirect_commands[draw_group_index].vertexOffset = static_cast<int32_t>(vertex_offset);
+    }
+}
+
 void validate_material_data_range(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
     const StaticOpaqueDrawDataVK::PipelineBatch& p_draw_batch,
     const MaterialTextureContract& p_contract) {
@@ -782,6 +811,7 @@ RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_rendere
         std::vector<StaticOpaqueVertexBatchPlannerVK::Batch> vertex_batches = StaticOpaqueVertexBatchPlannerVK().build(
             vertex_metadata, vertex_entry_name, triangles_info, pipeline_batch.first_draw, pipeline_batch.draw_count);
         for (StaticOpaqueVertexBatchPlannerVK::Batch& vertex_batch : vertex_batches) {
+            apply_vertex_offsets(draw_data, triangles_info, vertex_batch);
             RTRunGraphicsPipelineIndirectVK::PipelineBatch task_batch(render_allocator);
             task_batch.graphics_pipeline = pipeline_batch.compiled.graphics_pipeline;
             task_batch.first_draw = vertex_batch.first_draw;

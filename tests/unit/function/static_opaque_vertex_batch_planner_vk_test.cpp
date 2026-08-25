@@ -106,4 +106,26 @@ TEST(WBEStaticOpaqueVertexBatchPlannerVKTest, PreservesIndirectRangesAndBuildsLa
     EXPECT_THROW(StaticOpaqueVertexBatchPlannerVK().build(metadata, "vertex_main", triangles_info, 1, 2), std::runtime_error);
 }
 
+TEST(WBEStaticOpaqueVertexBatchPlannerVKTest, MergesAdjacentDrawGroupsWithTheSameVertexLayout) {
+    RenderAllocator allocator{WBE_KI_B(128)};
+    RenderDatabase::OpaqueTrianglesInfo triangles_info(&allocator);
+    const ShaderMetadata metadata = make_static_opaque_batch_vertex_metadata();
+
+    for (size_t i = 0; i < 2; ++i) {
+        RenderDatabase::OpaqueTrianglesInfo::DrawGroup group(&allocator);
+        group.vertex_buffer_byte_offset = i * sizeof(float) * 3 * 2;
+        group.indirect_command_sub_region = {.starting_index = i, .size = 1};
+        group.vertex_layout.vertex_stride = sizeof(float) * 3;
+        group.vertex_layout.attributes.push_back(
+            make_static_opaque_batch_attribute("position", RUVertexAttributeFormat::FLOAT3, 0, sizeof(float) * 3));
+        triangles_info.draw_groups.push_back(std::move(group));
+    }
+
+    const auto batches = StaticOpaqueVertexBatchPlannerVK().build(metadata, "vertex_main", triangles_info, 0, 2);
+    ASSERT_EQ(batches.size(), 1);
+    EXPECT_EQ(batches[0].first_draw, 0U);
+    EXPECT_EQ(batches[0].draw_count, 2U);
+    EXPECT_EQ(batches[0].vertex_buffer_offset, 0U);
+}
+
 } // namespace WhiteBirdEngine

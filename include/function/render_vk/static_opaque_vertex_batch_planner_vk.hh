@@ -97,7 +97,7 @@ public:
     StaticOpaqueVertexBatchPlannerVK& operator=(StaticOpaqueVertexBatchPlannerVK&&) noexcept = default;
 
     /**
-     * @brief Build one batch per draw group in a contiguous pipeline range.
+     * @brief Build one batch per contiguous vertex layout in a pipeline range.
      * @throws std::runtime_error When the group range, indirect range, vertex layout, or shader contract is invalid.
      */
     std::vector<Batch> build(const ShaderMetadata& p_vertex_metadata,

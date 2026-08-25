@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_JOB_HANDLER_HH
 #define WBE_FILE_JOB_HANDLER_HH
 
-#include "utils/defs.hh"
 #include <functional>
 namespace WhiteBirdEngine {
 

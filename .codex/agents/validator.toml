@@ -1,8 +1,9 @@
 # Project-scoped Codex copy of .github/agents/validator.agent.md.
 # Copilot tool intent: read, search, execute.
+# Use a cheap available Codex model; gpt-4.1 is not available on some ChatGPT-backed Codex accounts.
 name = "validator"
 description = "Reviews code changes for correctness, project convention compliance, and validation completeness. Runs repository validation without artificial timeouts. Does not implement fixes."
-model = "gpt-4.1"
+model = "gpt-5.6-luna"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
 
@@ -446,4 +447,3 @@ Do not:
 
 Your role is validation, not implementation.
 '''
-

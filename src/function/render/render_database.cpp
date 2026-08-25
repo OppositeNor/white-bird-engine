@@ -343,10 +343,13 @@ void RenderDatabase::set_opaque_triangles_linear(
         if (p_left.graphics_pipeline_key != p_right.graphics_pipeline_key) {
             return p_left.graphics_pipeline_key < p_right.graphics_pipeline_key;
         }
-        if (p_left.material_key != p_right.material_key) {
-            return p_left.material_key < p_right.material_key;
+        if (vertex_layout_less(*p_left.vertex_data, *p_right.vertex_data)) {
+            return true;
         }
-        return vertex_layout_less(*p_left.vertex_data, *p_right.vertex_data);
+        if (vertex_layout_less(*p_right.vertex_data, *p_left.vertex_data)) {
+            return false;
+        }
+        return p_left.material_key < p_right.material_key;
     });
 
     std::unordered_map<std::string_view, size_t> registered_material_indices;

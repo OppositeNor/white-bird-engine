@@ -25,7 +25,6 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <glm/ext/vector_float4.hpp>

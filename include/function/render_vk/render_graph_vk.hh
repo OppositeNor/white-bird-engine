@@ -320,7 +320,6 @@ private:
         VkCommandBuffer p_command_buffer,
         const RendResViewVK& p_resources,
         double p_delta,
-        bool p_record_pre_execute_tasks,
         bool p_record_present_transition);
     void record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const RendResViewVK& p_resources);
     void record_present_transition(VkCommandBuffer p_command_buffer);

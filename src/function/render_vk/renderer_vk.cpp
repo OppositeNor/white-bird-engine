@@ -26,6 +26,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render_vk/ray_tracing_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -149,6 +150,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         return;
     }
     run_delayed_calls();
+    run_gpu_jobs();
     uint32_t frame_counter = *tick_frame_counter;
 
     if (p_graph == MEM_NULL) {
@@ -184,9 +186,6 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
 
     present(image_index, p_graph);
     p_graph->reset_transient_resources();
-
-    // Clear pre-execute tasks queue.
-    base_render_data.pre_execute_tasks_queue.clear();
 
     ++(base_render_data.current_frame);
 }
@@ -226,6 +225,7 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
     init_vulkan(p_capabilities);
+    base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
@@ -238,12 +238,17 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     for (size_t i = 0; i < frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
     }
+    if (base_render_data.renderer_capabilities.ray_tracing) {
+        ray_tracing = make_unique<RayTracingVK>(allocator, &base_render_data);
+    }
     stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
 void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
+    ray_tracing.reset();
     render_objects.reset();
+    base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
 
     // Release the active render graph and any registered render graph descriptors.
     // These hold Refs to render-object resources (buffers, images, etc.) whose
@@ -255,23 +260,7 @@ void RendererVK::terminate() {
     render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
 
-    // Drain every pending delayed call regardless of remaining frame countdown
-    // (the device is about to be destroyed, so all per-frame deferrals must
-    // run now). Loop until no slot has work left, since running a call may
-    // register more delayed calls into freed slots.
-    bool ran_any = true;
-    while (ran_any) {
-        ran_any = false;
-        for (auto& delayed_call : delayed_calls) {
-            if (delayed_call.first && delayed_call.second >= 0) {
-                auto call = std::move(delayed_call.first);
-                delayed_call.first = nullptr;
-                delayed_call.second = -1;
-                call();
-                ran_any = true;
-            }
-        }
-    }
+    synchronize_gpu_and_flush_delayed_calls();
     for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
@@ -292,6 +281,7 @@ void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_vma_allocator(p_capabilities.ray_tracing);
     create_swap_chain();
     create_command_pools();
+    create_gpu_job_command_buffer();
     create_descriptor_pool();
     create_async_objects();
 }
@@ -321,13 +311,25 @@ void RendererVK::setup_base_render_data() {
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.descriptor_pool = descriptor_pool;
-    VkPhysicalDeviceProperties physical_device_properties{};
-    vkGetPhysicalDeviceProperties(physical_device, &physical_device_properties);
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties{};
+    acceleration_structure_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
+    VkPhysicalDeviceProperties2 physical_device_properties{};
+    physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    if (base_render_data.renderer_capabilities.ray_tracing) {
+        physical_device_properties.pNext = &acceleration_structure_properties;
+    }
+    vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
     base_render_data.max_variable_sampled_image_descriptor_count = std::min({static_cast<uint32_t>(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT),
-        physical_device_properties.limits.maxPerStageDescriptorSampledImages,
-        physical_device_properties.limits.maxDescriptorSetSampledImages,
-        physical_device_properties.limits.maxPerStageResources});
-    base_render_data.max_draw_indirect_count = physical_device_properties.limits.maxDrawIndirectCount;
+        physical_device_properties.properties.limits.maxPerStageDescriptorSampledImages,
+        physical_device_properties.properties.limits.maxDescriptorSetSampledImages,
+        physical_device_properties.properties.limits.maxPerStageResources});
+    base_render_data.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
+    if (base_render_data.renderer_capabilities.ray_tracing) {
+        base_render_data.min_acceleration_structure_scratch_offset_alignment =
+            acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
+        base_render_data.max_acceleration_structure_geometry_count = acceleration_structure_properties.maxGeometryCount;
+        base_render_data.max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
+    }
     if (!in_flight_fences.empty()) {
         base_render_data.in_flight_fence = in_flight_fences[0];
     } else {
@@ -554,6 +556,17 @@ void RendererVK::create_command_pools() {
     }
 }
 
+void RendererVK::create_gpu_job_command_buffer() {
+    VkCommandBufferAllocateInfo allocate_info{};
+    allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocate_info.commandPool = graphics_command_pool;
+    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate_info.commandBufferCount = 1;
+    if (vkAllocateCommandBuffers(logical_device, &allocate_info, &gpu_job_command_buffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate GPU-job command buffer.");
+    }
+}
+
 void RendererVK::create_descriptor_pool() {
     uint64_t descriptor_generation_capacity = static_cast<uint64_t>(frames_in_flight) + 2;
     auto scale_descriptor_capacity = [descriptor_generation_capacity](size_t p_capacity) -> uint32_t {
@@ -711,6 +724,21 @@ void RendererVK::create_logical_device(bool p_enable_ray_tracing) {
     if (base_render_data.command_set_vertex_input == nullptr) {
         throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
     }
+    if (p_enable_ray_tracing) {
+        base_render_data.create_acceleration_structure = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
+            vkGetDeviceProcAddr(logical_device, "vkCreateAccelerationStructureKHR"));
+        base_render_data.destroy_acceleration_structure = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
+            vkGetDeviceProcAddr(logical_device, "vkDestroyAccelerationStructureKHR"));
+        base_render_data.get_acceleration_structure_build_sizes = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(
+            vkGetDeviceProcAddr(logical_device, "vkGetAccelerationStructureBuildSizesKHR"));
+        base_render_data.command_build_acceleration_structures = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
+            vkGetDeviceProcAddr(logical_device, "vkCmdBuildAccelerationStructuresKHR"));
+        if (base_render_data.create_acceleration_structure == nullptr || base_render_data.destroy_acceleration_structure == nullptr ||
+            base_render_data.get_acceleration_structure_build_sizes == nullptr ||
+            base_render_data.command_build_acceleration_structures == nullptr) {
+            throw std::runtime_error("Failed to load Vulkan acceleration-structure commands.");
+        }
+    }
 
     // Get the device queues.
     vkGetDeviceQueue(logical_device, queue_family_indices.get_graphics(), 0, &graphics_queue);
@@ -729,6 +757,12 @@ bool RendererVK::check_ray_tracing_support(VkPhysicalDevice p_device) {
             [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                 return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
             })) {
+        return false;
+    }
+
+    VkFormatProperties position_format_properties{};
+    vkGetPhysicalDeviceFormatProperties(p_device, VK_FORMAT_R32G32B32_SFLOAT, &position_format_properties);
+    if ((position_format_properties.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR) == 0) {
         return false;
     }
 
@@ -1036,6 +1070,116 @@ void RendererVK::run_delayed_calls() {
     }
 }
 
+void RendererVK::register_gpu_job(GPUJobVK p_job) {
+    if (!p_job) {
+        throw std::runtime_error("Failed to register GPU job: job is empty.");
+    }
+    for (auto& gpu_job : gpu_jobs) {
+        if (gpu_job) {
+            continue;
+        }
+        gpu_job = std::move(p_job);
+        return;
+    }
+    throw std::runtime_error("Failed to register GPU job: GPU-job capacity is exhausted.");
+}
+
+void RendererVK::run_gpu_jobs() {
+    bool has_job = false;
+    for (const auto& gpu_job : gpu_jobs) {
+        if (gpu_job) {
+            has_job = true;
+            break;
+        }
+    }
+    if (!has_job) {
+        return;
+    }
+
+    if (vkResetCommandBuffer(gpu_job_command_buffer, 0) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to reset GPU-job command buffer.");
+    }
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (vkBeginCommandBuffer(gpu_job_command_buffer, &begin_info) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin GPU-job command buffer.");
+    }
+    Vector<GPUJobVK> running_jobs(allocator);
+    for (auto& gpu_job : gpu_jobs) {
+        if (!gpu_job) {
+            continue;
+        }
+        running_jobs.push_back(std::move(gpu_job));
+        gpu_job = nullptr;
+        running_jobs.back()(gpu_job_command_buffer);
+    }
+    submit_gpu_job_command_buffer();
+}
+
+void RendererVK::submit_gpu_job_command_buffer() {
+    VkMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    VkDependencyInfo dependency_info{};
+    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &barrier;
+    vkCmdPipelineBarrier2(gpu_job_command_buffer, &dependency_info);
+    if (vkEndCommandBuffer(gpu_job_command_buffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to end GPU-job command buffer.");
+    }
+
+    VkCommandBufferSubmitInfo command_buffer_info{};
+    command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command_buffer_info.commandBuffer = gpu_job_command_buffer;
+    VkSubmitInfo2 submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit_info.commandBufferInfoCount = 1;
+    submit_info.pCommandBufferInfos = &command_buffer_info;
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    if (vkCreateFence(logical_device, &fence_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create GPU-job fence.");
+    }
+    if (vkQueueSubmit2(graphics_queue, 1, &submit_info, fence) != VK_SUCCESS) {
+        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
+        throw std::runtime_error("Failed to submit GPU jobs.");
+    }
+    if (vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
+        throw std::runtime_error("Failed to submit GPU jobs.");
+    }
+    vkDestroyFence(logical_device, fence, get_allocation_callbacks());
+}
+
+void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
+    for (VkFence fence : in_flight_fences) {
+        if (vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to synchronize GPU work before flushing delayed calls.");
+        }
+    }
+    run_gpu_jobs();
+    bool ran_any = true;
+    while (ran_any) {
+        ran_any = false;
+        for (auto& delayed_call : delayed_calls) {
+            if (!delayed_call.first) {
+                continue;
+            }
+            auto call = std::move(delayed_call.first);
+            delayed_call.first = nullptr;
+            delayed_call.second = -1;
+            call();
+            ran_any = true;
+        }
+    }
+}
+
 void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1159,9 +1303,8 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
     }
 }
 
-namespace {
 template <typename T, typename SrcAlloc>
-Ref<ROBufferVK> build_or_resize_host_visible_buffer(
+static Ref<ROBufferVK> build_or_resize_host_visible_buffer(
     const BaseRenderDataVK* p_render_data, Ref<ROBufferVK> p_existing, const Vector<T, SrcAlloc>& p_data, VkBufferUsageFlags p_usage) {
     const size_t size_in_bytes = p_data.size() * sizeof(T);
     if (size_in_bytes == 0) {
@@ -1174,19 +1317,35 @@ Ref<ROBufferVK> build_or_resize_host_visible_buffer(
     buffer->update_buffer(p_data.data(), size_in_bytes);
     return buffer;
 }
-} // namespace
 
 void RendererVK::update_static_opaque_triangles() {
     WBE_DEBUG_ASSERT(render_database != MEM_NULL);
+    synchronize_gpu_and_flush_delayed_calls();
     render_database->refresh_static_opaque_triangles();
     const auto& info = render_database->get_static_opaque_triangles_info();
 
-    render_objects->static_opaque_vertices = build_or_resize_host_visible_buffer(
-        &base_render_data, render_objects->static_opaque_vertices, info.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    render_objects->static_opaque_indices = build_or_resize_host_visible_buffer(
-        &base_render_data, render_objects->static_opaque_indices, info.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    if (base_render_data.renderer_capabilities.ray_tracing) {
+        vertex_usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        index_usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
+    render_objects->static_opaque_vertices =
+        build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_vertices, info.vertices, vertex_usage);
+    render_objects->static_opaque_indices =
+        build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_indices, info.indices, index_usage);
     render_objects->static_opaque_obj_ids = build_or_resize_host_visible_buffer(
         &base_render_data, render_objects->static_opaque_obj_ids, info.obj_id, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    if (ray_tracing != nullptr) {
+        auto acceleration_structure_build_job = ray_tracing->update_static_opaque_acceleration_structure(
+            info, render_objects->static_opaque_vertices, render_objects->static_opaque_indices);
+        base_render_data.static_opaque_acceleration_structure = ray_tracing->get_static_opaque_acceleration_structure();
+        if (acceleration_structure_build_job) {
+            register_gpu_job(std::move(acceleration_structure_build_job));
+        }
+    } else {
+        base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
+    }
 
     // Publish the buffers under the global resource IDs so render tasks in the
     // active graph can resolve them without per-pipeline registration.

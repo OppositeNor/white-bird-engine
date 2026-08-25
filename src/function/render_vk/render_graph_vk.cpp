@@ -479,7 +479,7 @@ void RenderGraphVK::execute(uint64_t p_frame_index,
         const bool is_first_graphics = (i == first_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
         const bool is_last_graphics = (i == last_graphics_idx && queue_family == QueueFamilyVK::GRAPHICS);
         // The first/last graphics nodes bridge external acquire/present synchronization.
-        record_node(node, command_buffer, resource_view, p_delta, i == 0, is_last_graphics);
+        record_node(node, command_buffer, resource_view, p_delta, is_last_graphics);
 
         // Build wait/signal semaphore lists from exec edges + extras.
         Vector<VkSemaphoreSubmitInfo, RenderAllocator> wait_infos(render_data->allocator);
@@ -525,7 +525,6 @@ void RenderGraphVK::record_node(Ref<RGNode> p_node,
     VkCommandBuffer p_command_buffer,
     const RendResViewVK& p_resources,
     double p_delta,
-    bool p_record_pre_execute_tasks,
     bool p_record_present_transition) {
     // Record all barriers and task work for one node into its per-frame primary command buffer.
     VkCommandBufferBeginInfo begin_info{};
@@ -557,12 +556,6 @@ void RenderGraphVK::record_node(Ref<RGNode> p_node,
         dependency_info.memoryBarrierCount = static_cast<uint32_t>(mem_barriers.size());
         dependency_info.pMemoryBarriers = mem_barriers.data();
         vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
-    }
-
-    if (p_record_pre_execute_tasks) {
-        for (const auto& pre_execute_task : render_data->pre_execute_tasks_queue) {
-            pre_execute_task(p_command_buffer);
-        }
     }
 
     record_general_transition(p_command_buffer, p_node, p_resources);

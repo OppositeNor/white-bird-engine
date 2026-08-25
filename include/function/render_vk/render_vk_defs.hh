@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RENDER_VK_DEFS_HH
 #define WBE_FILE_RENDER_VK_DEFS_HH
 
-#include "function/function_utils.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -31,6 +31,9 @@
 
 namespace WhiteBirdEngine {
 
+/** One-shot Vulkan command-buffer recording job. */
+using GPUJobVK = std::function<void(VkCommandBuffer)>;
+
 /**
  * @class BaseRenderDataVK
  * @brief The base render data that is commonly used throughout
@@ -38,18 +41,29 @@ namespace WhiteBirdEngine {
  *
  */
 struct BaseRenderDataVK {
-    BaseRenderDataVK(RenderAllocator* p_allocator)
-        : queue_family_indices(p_allocator), pre_execute_tasks_queue(p_allocator) {
+    BaseRenderDataVK(RenderAllocator* p_allocator) : queue_family_indices(p_allocator) {
     }
     // The render allocator.
     RenderAllocator* allocator = nullptr;
     // The render database.
     RenderDatabase* render_database = nullptr;
+    /** Capabilities negotiated when the renderer was constructed. */
+    RendererCapabilities renderer_capabilities{};
 
     // The logic device.
     VkDevice logic_device = VK_NULL_HANDLE;
     /** Command for setting dynamic vertex input state. */
     PFN_vkCmdSetVertexInputEXT command_set_vertex_input = nullptr;
+    /** Command for creating an acceleration structure. */
+    PFN_vkCreateAccelerationStructureKHR create_acceleration_structure = nullptr;
+    /** Command for destroying an acceleration structure. */
+    PFN_vkDestroyAccelerationStructureKHR destroy_acceleration_structure = nullptr;
+    /** Command for querying acceleration-structure build sizes. */
+    PFN_vkGetAccelerationStructureBuildSizesKHR get_acceleration_structure_build_sizes = nullptr;
+    /** Command for recording acceleration-structure builds. */
+    PFN_vkCmdBuildAccelerationStructuresKHR command_build_acceleration_structures = nullptr;
+    /** Non-owning handle for the current static-opaque bottom-level acceleration structure. */
+    VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
     // The VMA allocator used for owned Vulkan buffers and images.
     VmaAllocator vma_allocator = VK_NULL_HANDLE;
     // The image format of the swap chain.
@@ -83,6 +97,12 @@ struct BaseRenderDataVK {
     uint32_t max_variable_sampled_image_descriptor_count = 1;
     /** Maximum indexed-indirect draws accepted by one Vulkan draw call. */
     uint32_t max_draw_indirect_count = 1;
+    /** Required device-address alignment for acceleration-structure scratch storage. */
+    VkDeviceSize min_acceleration_structure_scratch_offset_alignment = 1;
+    /** Maximum geometries accepted by one acceleration structure. */
+    uint64_t max_acceleration_structure_geometry_count = 0;
+    /** Maximum primitives accepted by one acceleration structure. */
+    uint64_t max_acceleration_structure_primitive_count = 0;
 
     // The fence that blocks every render tick.
     VkFence in_flight_fence = VK_NULL_HANDLE;
@@ -103,9 +123,6 @@ struct BaseRenderDataVK {
 
     // The queue family indices.
     Set<uint32_t, RenderAllocator> queue_family_indices;
-
-    // Task to execute in the pre-execution task.
-    Vector<std::function<void(VkCommandBuffer)>, RenderAllocator> pre_execute_tasks_queue;
 
     // Function to register a delayed call.
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;

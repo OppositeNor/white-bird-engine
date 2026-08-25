@@ -26,6 +26,25 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+namespace {
+
+bool vertex_layouts_equal(const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_left,
+    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_right) {
+    if (p_left.vertex_stride != p_right.vertex_stride || p_left.attributes.size() != p_right.attributes.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < p_left.attributes.size(); ++i) {
+        const auto& left = p_left.attributes[i];
+        const auto& right = p_right.attributes[i];
+        if (left.role.get_name() != right.role.get_name() || left.format != right.format || left.offset != right.offset ||
+            left.size != right.size) {
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
 
 std::vector<StaticOpaqueVertexBatchPlannerVK::Batch> StaticOpaqueVertexBatchPlannerVK::build(const ShaderMetadata& p_vertex_metadata,
     std::string_view p_vertex_entry_name,
@@ -44,6 +63,16 @@ std::vector<StaticOpaqueVertexBatchPlannerVK::Batch> StaticOpaqueVertexBatchPlan
         if (draw_group.indirect_command_sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
             draw_group.indirect_command_sub_region.size > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error("Failed to plan static opaque vertex batches: indirect command range exceeds uint32.");
+        }
+        const bool can_merge = !result.empty() && vertex_layouts_equal(p_triangles_info.draw_groups[draw_group_index - 1].vertex_layout,
+                                                      draw_group.vertex_layout);
+        if (can_merge) {
+            Batch& batch = result.back();
+            if (draw_group.indirect_command_sub_region.starting_index != batch.first_draw + batch.draw_count) {
+                throw std::runtime_error("Failed to plan static opaque vertex batches: indirect command ranges are not contiguous.");
+            }
+            batch.draw_count += static_cast<uint32_t>(draw_group.indirect_command_sub_region.size);
+            continue;
         }
         Batch batch;
         batch.first_draw = static_cast<uint32_t>(draw_group.indirect_command_sub_region.starting_index);
