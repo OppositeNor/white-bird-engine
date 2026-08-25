@@ -16,6 +16,27 @@
 #include "defs.slang"
 
 /**
+ * @brief The input data from the vertex buffer
+ */
+struct Vertex3DUnshadedInput {
+    /**
+     * @brief The position of the vertex.
+     */
+    [WBE_VERTEX_INPUT("position")]
+    float3 position;
+    /**
+     * @brief The normal of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 normal;
+    /**
+     * @brief The uv of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float2 uv;
+};
+
+/**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
 ConstantBuffer<CameraInfo> camera_info;
@@ -26,7 +47,7 @@ ConstantBuffer<CameraInfo> camera_info;
  * @return The vertex output for the unshaded cube debug pass.
  */
 [shader("vertex")]
-VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+VSOutput vertex_main(Vertex3DUnshadedInput p_input) {
     VSOutput output;
     float4 pos = float4(p_input.position.xyz, 1.0);
     output.position = mul(camera_info.proj, mul(camera_info.view, pos));
