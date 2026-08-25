@@ -13,12 +13,15 @@
    limitations under the License.
 */
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -60,7 +63,7 @@ TEST(WBERenderGraphDescriptorVKTest, DescriptorCopiesShareOneDirectTaskTransfer)
     RenderAllocator allocator(WBE_KI_B(64));
     bool destroyed = false;
     RendTaskDescVK descriptor(&allocator, 17, make_unique<DirectDescriptorRenderTaskVK>(&allocator, &allocator, &destroyed));
-    RendTaskDescVK descriptor_copy = descriptor;
+    const RendTaskDescVK& descriptor_copy = descriptor;
 
     Unique<RenderTaskVK> task = descriptor_copy.create();
 

@@ -15,11 +15,13 @@
 #ifndef WBE_FILE_VMA_VK_HH
 #define WBE_FILE_VMA_VK_HH
 
+// NOLINTBEGIN
 #define VMA_VULKAN_VERSION 1003000
 #define VMA_NULLABLE
 #define VMA_NOT_NULL
 #define VMA_NULLABLE_NON_DISPATCHABLE
 #define VMA_NOT_NULL_NON_DISPATCHABLE
 #include <vk_mem_alloc.h>
+// NOLINTEND
 
 #endif

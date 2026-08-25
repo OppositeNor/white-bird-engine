@@ -14,7 +14,9 @@
 */
 #include "core/profiling/profiling_manager.hh"
 #include "generated/label_manager.gen.hh"
+#include "utils/utils.hh"
 #include <mutex>
+#include <string>
 #include <utility>
 
 namespace WhiteBirdEngine {

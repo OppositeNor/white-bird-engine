@@ -23,6 +23,8 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <memory>
+#include <numbers>
 #include <stdexcept>
 #include <string>
 
@@ -48,7 +50,7 @@ TEST_F(WBEDeserializerTest, General) {
     serializable.ui32_test = 42;
     serializable.ui64_test = 365;
     serializable.f32_test = 3.14F;
-    serializable.f64_test = 2.718;
+    serializable.f64_test = std::numbers::e;
     serializable.vec3_test = glm::vec3(3.0F, 2.0F, 1.0F);
     serializable.vec4_test = glm::vec4(1.0F, 2.0F, 3.0F, 4.0F);
     serializable.str_test = "Hello, world!";

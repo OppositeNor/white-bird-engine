@@ -31,6 +31,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -122,11 +123,9 @@ protected:
     }
 };
 
-class WBETransformSystemTest : public WBEWorldSystemTest {
-};
+class WBETransformSystemTest : public WBEWorldSystemTest {};
 
-class WBECameraSystemTest : public WBEWorldSystemTest {
-};
+class WBECameraSystemTest : public WBEWorldSystemTest {};
 
 } // namespace
 

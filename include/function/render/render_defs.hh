@@ -15,8 +15,9 @@
 #ifndef WBE_FILE_RENDER_DEFS_HH
 #define WBE_FILE_RENDER_DEFS_HH
 
-#include "core/memory/reference_strong.hh"
 #include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
@@ -113,8 +114,7 @@ struct RenderBindpointDeclarationsBuilder {
      * @brief Add a buffer decleration from raw bytes.
      */
     RenderBindpointDeclarationsBuilder& add_buffer_decleration(std::string_view p_field_path, const void* p_data, size_t p_size) {
-        return add_buffer_decleration(
-            p_field_path, std::span<const uint8_t>(static_cast<const uint8_t*>(p_data), p_size));
+        return add_buffer_decleration(p_field_path, std::span<const uint8_t>(static_cast<const uint8_t*>(p_data), p_size));
     }
 
     /**

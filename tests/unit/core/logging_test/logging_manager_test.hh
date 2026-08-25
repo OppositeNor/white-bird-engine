@@ -18,9 +18,9 @@
 #include "core/logging/log.hh"
 #include "core/logging/logging_manager.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "generated/label_manager.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
-#include "generated/label_manager.gen.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
 #include <memory>

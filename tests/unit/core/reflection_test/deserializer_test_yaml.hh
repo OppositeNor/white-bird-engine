@@ -190,7 +190,7 @@ TEST_F(WBEDeserializerYAMLTest, PartialUpdateOnlyOneField) {
     EXPECT_EQ(test_obj.str_test, std::string("orig"));
 }
 
-  TEST_F(WBEDeserializerYAMLTest, SupportsAliasedFieldNames) {
+TEST_F(WBEDeserializerYAMLTest, SupportsAliasedFieldNames) {
     WBE::TestSerializableAliases test_obj;
     WBE::ParserYAML parser;
 
@@ -205,7 +205,7 @@ TEST_F(WBEDeserializerYAMLTest, PartialUpdateOnlyOneField) {
 
     EXPECT_EQ(test_obj.canonical_name, "alias-only");
     EXPECT_EQ(test_obj.required_value, 31);
-  }
+}
 
 TEST_F(WBEDeserializerYAMLTest, NestingGeneral) {
     WBE::SerializableSD<WBE::TestSerializableNesting> sd;

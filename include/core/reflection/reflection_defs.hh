@@ -34,12 +34,10 @@
 
 namespace WhiteBirdEngine {
 template <typename T>
-struct IsStdOptional : std::false_type {
-};
+struct IsStdOptional : std::false_type {};
 
 template <typename T>
-struct IsStdOptional<std::optional<T>> : std::true_type {
-};
+struct IsStdOptional<std::optional<T>> : std::true_type {};
 
 template <typename T>
 constexpr bool IS_STD_OPTIONAL = IsStdOptional<std::remove_cvref_t<T>>::value;

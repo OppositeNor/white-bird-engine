@@ -14,6 +14,7 @@
 */
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"

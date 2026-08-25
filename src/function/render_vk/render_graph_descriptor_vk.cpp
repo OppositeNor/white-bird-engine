@@ -15,6 +15,8 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include <stdexcept>
 #include <utility>
