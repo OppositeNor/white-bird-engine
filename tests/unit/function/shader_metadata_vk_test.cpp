@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/parser/parser_json.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
@@ -224,6 +225,32 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].kind, "string");
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, expected_texture_roles[i]);
+    }
+}
+
+TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
+    ParserJSON parser;
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "draw_triangle"}), "draw_triangle.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    auto entry_point = std::ranges::find_if(metadata.entry_points, [](const ShaderMetadataEntryPoint& p_entry_point) {
+        return p_entry_point.name == "vertex_main" && p_entry_point.stage == "vertex";
+    });
+    ASSERT_NE(entry_point, metadata.entry_points.end());
+    ASSERT_FALSE(entry_point->parameters.empty());
+    const auto& fields = entry_point->parameters[0].type.fields;
+    const std::array<std::string_view, 5> expected_roles{"position", "normal", "tangent", "bitangent", "uv"};
+    ASSERT_EQ(fields.size(), expected_roles.size());
+    for (size_t i = 0; i < fields.size(); ++i) {
+        EXPECT_EQ(fields[i].binding.kind, "varyingInput");
+        EXPECT_EQ(fields[i].binding.index, static_cast<int32_t>(i));
+        ASSERT_EQ(fields[i].user_attributes.size(), 1U);
+        EXPECT_EQ(fields[i].user_attributes[0].name, "WBE_VERTEX_INPUT");
+        ASSERT_EQ(fields[i].user_attributes[0].arguments.size(), 1U);
+        EXPECT_EQ(fields[i].user_attributes[0].arguments[0].kind, "string");
+        const std::string expected_argument = i == 0 ? std::string(expected_roles[i]) : std::string();
+        EXPECT_EQ(fields[i].user_attributes[0].arguments[0].string_value, expected_argument);
     }
 }
 

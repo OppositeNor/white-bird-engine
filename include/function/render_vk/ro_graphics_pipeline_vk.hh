@@ -700,9 +700,9 @@ public:
         /**
          * @brief Apply default opaque-rendering pipeline configuration.
          *
-         * This helper configures textured vertex input, viewport/scissor from
-         * render data, pipeline layout, a default color attachment state, swap
-         * chain color format, and default dynamic states.
+         * This helper configures empty static vertex input, viewport/scissor
+         * from render data, pipeline layout, a default color attachment state,
+         * swap chain color format, and dynamic vertex input state.
          *
          * @param p_render_data Base render data for viewport/scissor defaults.
          * @param p_shader_config Shader stage configuration.
@@ -712,17 +712,14 @@ public:
         Builder& default_render_opaque_configuration(
             const BaseRenderDataVK* p_render_data, const Config::ShaderConfig& p_shader_config, Ref<ROPipelineLayoutVK> p_pipeline_layout) {
 
-            ROGraphicsPipelineVK::Config::VertexInputConfig vertex_input_config;
-            vertex_input_config.add_binding(VERTEX_3D_TEXTURED_INPUT_BINDING_DESCRIPTION).add_attributes(VERTEX_3D_TEXTURED_INPUT_ATTRIBUTE_DESCRIPTION);
-
             config.shader = p_shader_config;
-            config.vertex_input = vertex_input_config;
+            config.vertex_input = {};
             config.viewport.viewports = {p_render_data->viewport};
             config.viewport.scissors = {p_render_data->scissor};
             config.pipeline_layout = p_pipeline_layout;
             config.color_blend.add_default_color_attachment();
             config.attachment_config.add_color_format(p_render_data->swap_chain_format).set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
-            config.dynamic_state.add_default_dynamic_states();
+            config.dynamic_state.add_default_dynamic_states().add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
             return *this;
         }
 

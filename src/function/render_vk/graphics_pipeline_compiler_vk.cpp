@@ -21,6 +21,8 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
@@ -459,15 +461,15 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     auto vertex_shader = compile_shader(p_pipeline_resource->vertex_stage);
     Ref<ROShaderVK> geometry_shader = MEM_NULL;
     auto fragment_shader = compile_shader(p_pipeline_resource->fragment_stage);
-    auto vertex_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->vertex_stage);
+    auto vertex_shader_metadata = ShaderMetadataLoader().load(p_pipeline_resource->vertex_stage);
     std::optional<ShaderMetadata> geometry_shader_metadata;
-    auto fragment_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->fragment_stage);
+    auto fragment_shader_metadata = ShaderMetadataLoader().load(p_pipeline_resource->fragment_stage);
     std::string vertex_stage_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->vertex_stage, vertex_shader_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
     std::string geometry_stage_entry;
     if (p_pipeline_resource->geometry_stage != nullptr) {
         geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
-        geometry_shader_metadata = load_shader_metadata_vk(p_pipeline_resource->geometry_stage);
+        geometry_shader_metadata = ShaderMetadataLoader().load(p_pipeline_resource->geometry_stage);
         geometry_stage_entry = resolve_pipeline_stage_entry(
             p_pipeline_resource->geometry_stage, *geometry_shader_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
     }

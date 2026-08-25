@@ -25,6 +25,7 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <glm/ext/vector_float4.hpp>
@@ -33,6 +34,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -46,13 +48,15 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::optional<std::string_view> p_index_buffer_id,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
     std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
-    VkAttachmentLoadOp p_color_attachment_load_op)
-    : render_data(p_render_data), clear_values(p_render_data->allocator),
-      color_attachment_load_op(p_color_attachment_load_op), render_extent(p_render_extent),
-      color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset)
+    : render_data(p_render_data), clear_values(p_render_data->allocator), color_attachment_load_op(p_color_attachment_load_op),
+      render_extent(p_render_extent), color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
       vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
       index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
-      indexed_draw_region(p_indexed_draw_region),
+      indexed_draw_region(p_indexed_draw_region), vertex_input(std::move(p_vertex_input)),
+      vertex_buffer_offset(p_vertex_buffer_offset),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator) {
     clear_values.push_back(
@@ -72,7 +76,9 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
     std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
     VkAttachmentLoadOp p_color_attachment_load_op,
-    VkAttachmentLoadOp p_depth_attachment_load_op)
+    VkAttachmentLoadOp p_depth_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
       color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
       render_extent(p_render_extent),
@@ -81,7 +87,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
       pipeline_id(p_pipeline_id),
       vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
       index_buffer_id(p_index_buffer_id.has_value() ? std::optional<std::string>(*p_index_buffer_id) : std::nullopt),
-      indexed_draw_region(p_indexed_draw_region),
+      indexed_draw_region(p_indexed_draw_region), vertex_input(std::move(p_vertex_input)),
+      vertex_buffer_offset(p_vertex_buffer_offset),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
@@ -164,9 +171,9 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     for (size_t i = 0; i < color_attachment_count; ++i) {
         auto color_attachment = WBE_REQUIRES_VALID(p_resources.get(color_attachment_ids[i]).res.dynamic_cast_ref<ROImageViewVK>());
         color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
-                                        .set_load_op(color_attachment_load_op)
-                                        .set_clear_value(clear_values[i])
-                                        .build());
+                .set_load_op(color_attachment_load_op)
+                .set_clear_value(clear_values[i])
+                .build());
     }
     rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachments.size());
     rendering_info.pColorAttachments = color_attachments.data();
@@ -206,10 +213,17 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     }
 
     if (vertex_buffer != MEM_NULL && index_buffer != MEM_NULL) {
+        if (render_data->command_set_vertex_input == nullptr) {
+            throw std::runtime_error("RTRunGraphicsPipelineVK: dynamic vertex-input command is unavailable.");
+        }
         VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
         VkBuffer index_buffer_handle = index_buffer->get_buffer();
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &offset);
+        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &vertex_buffer_offset);
+        render_data->command_set_vertex_input(p_command_buffer,
+            static_cast<uint32_t>(vertex_input.bindings.size()),
+            vertex_input.bindings.data(),
+            static_cast<uint32_t>(vertex_input.attributes.size()),
+            vertex_input.attributes.data());
         vkCmdBindIndexBuffer(p_command_buffer, index_buffer_handle, 0, VK_INDEX_TYPE_UINT32);
         uint32_t full_index_count = static_cast<uint32_t>(index_buffer->fields().buffer_size / sizeof(uint32_t));
         uint32_t first_index = 0;
@@ -226,6 +240,10 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
         vkCmdDrawIndexed(p_command_buffer, index_count, 1, first_index, vertex_offset, 0);
     } else {
         // Screen-triangle / no vertex binding case.
+        if (render_data->command_set_vertex_input == nullptr) {
+            throw std::runtime_error("RTRunGraphicsPipelineVK: dynamic vertex-input command is unavailable.");
+        }
+        render_data->command_set_vertex_input(p_command_buffer, 0, nullptr, 0, nullptr);
         vkCmdDraw(p_command_buffer, 3, 1, 0, 0);
     }
 

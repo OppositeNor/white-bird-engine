@@ -13,11 +13,16 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "core/parser/parser_json.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_loader.hh"
+#include "function/render/shader_metadata_query.hh"
+#include "function/render/vertex_input_contract.hh"
+#include "function/render/vertex_input_contract_resolver.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "resource/resource_utils.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -223,48 +228,17 @@ void append_stage_descriptor_bindings(
 } // namespace
 
 ShaderMetadata load_shader_metadata_vk(RefRes<RUShader> p_shader) {
-    if (p_shader == nullptr || p_shader->metadata_path == nullptr) {
-        throw std::runtime_error("Failed to load shader metadata: metadata path is missing.");
-    }
-    ParserJSON metadata_parser;
-    metadata_parser.parse(get_resource_path(p_shader->metadata_path.get()));
-    ShaderMetadata metadata;
-    metadata.deserialize(metadata_parser.get_data());
-    return metadata;
+    return ShaderMetadataLoader().load(p_shader);
 }
 
 const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    if (!p_entry_name.empty()) {
-        return find_shader_entry_point(p_metadata, p_stage, p_entry_name);
-    }
-    const ShaderMetadataEntryPoint* matched_entry_point = nullptr;
-    for (const auto& entry_point : p_metadata.entry_points) {
-        if (entry_point.stage != p_stage) {
-            continue;
-        }
-        if (matched_entry_point != nullptr) {
-            throw std::runtime_error(std::format("Failed to resolve shader entry point for stage '{}': multiple reflected entries exist, so the pipeline must specify one.",
-                p_stage));
-        }
-        matched_entry_point = &entry_point;
-    }
-    if (matched_entry_point == nullptr) {
-        throw std::runtime_error(std::format("Failed to find shader entry point for stage '{}'.", p_stage));
-    }
-    return *matched_entry_point;
+    return ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, p_entry_name);
 }
 
 const ShaderMetadataEntryPoint& find_shader_entry_point(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    auto entry_point =
-        std::ranges::find_if(p_metadata.entry_points, [&p_stage, &p_entry_name](const ShaderMetadataEntryPoint& p_entry_point) {
-            return p_entry_point.stage == p_stage && p_entry_point.name == p_entry_name;
-        });
-    if (entry_point == p_metadata.entry_points.end()) {
-        throw std::runtime_error(std::format("Failed to find shader entry point '{}:{}'.", p_stage, p_entry_name));
-    }
-    return *entry_point;
+    return ShaderMetadataQuery().find_entry_point(p_metadata, p_stage, p_entry_name);
 }
 
 VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_stage) {
@@ -284,6 +258,19 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
         return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
     }
     throw std::runtime_error(std::format("Unsupported shader stage '{}'.", p_stage));
+}
+
+VertexInputDescriptionVK build_vertex_input_description_vk(
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data) {
+    const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_data);
+    return VertexInputDescriptionVK::from_contract(contract);
+}
+
+VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
+    std::string_view p_entry_name,
+    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout) {
+    const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_layout);
+    return VertexInputDescriptionVK::from_contract(contract);
 }
 
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(

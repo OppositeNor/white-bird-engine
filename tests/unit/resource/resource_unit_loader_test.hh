@@ -22,6 +22,13 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/scene/scene_resource_unit_loader.hh"
+#include "glm/ext/vector_float4.hpp"
+#include "glm/ext/vector_int2.hpp"
+#include "glm/ext/vector_int3.hpp"
+#include "glm/ext/vector_int4.hpp"
+#include "glm/ext/vector_uint2.hpp"
+#include "glm/ext/vector_uint3.hpp"
+#include "glm/ext/vector_uint4.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -38,12 +45,14 @@
 #include <functional>
 #include <gtest/gtest.h>
 #include <memory>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -113,6 +122,43 @@ protected:
 
     void TearDown() override {
         global.reset();
+    }
+
+    std::unique_ptr<MockResourceChunk> create_submesh_test_chunk(
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUSubmesh3D>& p_captured_submesh) {
+        return MockResourceChunk::Builder()
+            .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                if (p_size == 0) {
+                    return WBE::MEM_NULL;
+                }
+                WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
+                std::memcpy(p_stack_allocator.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &p_stack_allocator);
+            })
+            .set_reserve_res_unit_storage_callback(
+                [&p_stack_allocator, &p_captured_submesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
+                    if (p_id == "loaded_submesh") {
+                        p_captured_submesh = resource.force_cast<WBE::RUSubmesh3D>();
+                    }
+                    return resource;
+                })
+            .build(p_stream);
+    }
+
+    WBE::RUSchemaSubmesh3D make_triangle_submesh_scheme() {
+        WBE::RUSchemaSubmesh3D scheme;
+        scheme.id = "loaded_submesh";
+        scheme.type = "submesh";
+        scheme.material_id = "unused_material";
+        scheme.geometry_path = "assets/meshes/triangle.submesh.0.geometry.bin";
+        scheme.geometry_sections = {
+            {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+            {.slot = "uv", .start = 36, .size = 24, .type = "vec2"},
+            {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+        };
+        return scheme;
     }
 
     std::unique_ptr<WBE::Global> global;
@@ -200,6 +246,217 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         EXPECT_EQ(first_resource_types.front(), expected_resource_types[i]);
         EXPECT_EQ(first_resource_types.data(), second_resource_types.data());
     }
+}
+
+TEST_F(ResourcePopulatorTest, SubmeshGeometrySectionsBecomeInterleavedVertexData) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
+    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+    WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
+    WBE::ResourceUnitLoaderSubmesh loader;
+
+    loader.populate_scheme(*resource_chunk, scheme);
+
+    ASSERT_NE(captured_submesh, nullptr);
+    ASSERT_NE(captured_submesh->vertex_data, nullptr);
+    const WBE::RUVertexData& vertex_data = *captured_submesh->vertex_data;
+    EXPECT_EQ(vertex_data.vertex_count, 3U);
+    EXPECT_EQ(vertex_data.vertex_stride, sizeof(float) * 5);
+    EXPECT_EQ(vertex_data.vertices_size, sizeof(float) * 15);
+    ASSERT_EQ(vertex_data.attribute_count, 2U);
+    ASSERT_NE(vertex_data.attributes, nullptr);
+    EXPECT_STREQ(vertex_data.attributes->role.name.get(), "position");
+    EXPECT_EQ(vertex_data.attributes->role.hash, WBE::dynam_hash("position"));
+    EXPECT_EQ(vertex_data.attributes->format, WBE::RUVertexAttributeFormat::FLOAT3);
+    EXPECT_EQ(vertex_data.attributes->offset, 0U);
+    EXPECT_EQ(vertex_data.attributes->size, sizeof(float) * 3);
+    EXPECT_STREQ(vertex_data.attributes.get()[1].role.name.get(), "uv");
+    EXPECT_EQ(vertex_data.attributes.get()[1].role.hash, WBE::dynam_hash("uv"));
+    EXPECT_EQ(vertex_data.attributes.get()[1].format, WBE::RUVertexAttributeFormat::FLOAT2);
+    EXPECT_EQ(vertex_data.attributes.get()[1].offset, sizeof(float) * 3);
+    EXPECT_EQ(vertex_data.attributes.get()[1].size, sizeof(float) * 2);
+
+    const std::array<std::array<float, 5>, 3> expected_vertices{{
+        {{0.0F, 0.5F, 0.0F, 0.5F, 1.0F}},
+        {{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F}},
+        {{0.5F, -0.5F, 0.0F, 1.0F, 0.0F}},
+    }};
+    for (size_t vertex_index = 0; vertex_index < expected_vertices.size(); ++vertex_index) {
+        std::array<float, 5> actual_vertex{};
+        std::memcpy(actual_vertex.data(), vertex_data.vertices.get() + vertex_index * vertex_data.vertex_stride, vertex_data.vertex_stride);
+        for (size_t component_index = 0; component_index < actual_vertex.size(); ++component_index) {
+            EXPECT_FLOAT_EQ(actual_vertex[component_index], expected_vertices[vertex_index][component_index]);
+        }
+    }
+
+    ASSERT_EQ(captured_submesh->index_count, 3U);
+    ASSERT_NE(captured_submesh->indices, nullptr);
+    EXPECT_EQ(captured_submesh->indices.get()[0], 0U);
+    EXPECT_EQ(captured_submesh->indices.get()[1], 1U);
+    EXPECT_EQ(captured_submesh->indices.get()[2], 2U);
+    EXPECT_EQ(captured_submesh->get_vertex_attribute_offset("uv"), sizeof(float) * 3);
+    EXPECT_EQ(captured_submesh->get_vertex_stride(), sizeof(float) * 5);
+    EXPECT_EQ(captured_submesh->get_vertices_num(), 3U);
+
+    captured_submesh->set_vertex_attribute(1, "position", glm::vec3(2.0F, 3.0F, 4.0F));
+    captured_submesh->set_vertex_attribute(1, "uv", glm::vec2(5.0F, 6.0F));
+    std::array<float, 5> changed_vertex{};
+    std::memcpy(changed_vertex.data(), vertex_data.vertices.get() + vertex_data.vertex_stride, vertex_data.vertex_stride);
+    EXPECT_EQ(changed_vertex, (std::array<float, 5>{{2.0F, 3.0F, 4.0F, 5.0F, 6.0F}}));
+    EXPECT_THROW(captured_submesh->set_vertex_attribute(3, "position", glm::vec3(0.0F)), std::runtime_error);
+    EXPECT_THROW(captured_submesh->set_vertex_attribute(0, "missing", glm::vec3(0.0F)), std::runtime_error);
+    EXPECT_THROW(captured_submesh->set_vertex_attribute(0, "position", glm::vec2(0.0F)), std::runtime_error);
+
+    captured_submesh->swap_vertices(0, 1);
+    std::array<float, 5> first_vertex{};
+    std::memcpy(first_vertex.data(), vertex_data.vertices.get(), vertex_data.vertex_stride);
+    EXPECT_EQ(first_vertex, changed_vertex);
+    EXPECT_THROW(captured_submesh->swap_vertices(0, 3), std::runtime_error);
+}
+
+TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat) {
+    struct FormatCase {
+        std::string_view type;
+        WBE::RUVertexAttributeFormat format;
+        size_t element_size;
+        size_t section_start;
+    };
+    const std::array<FormatCase, 12> format_cases{{
+        {.type = "float", .format = WBE::RUVertexAttributeFormat::FLOAT, .element_size = 4, .section_start = 0},
+        {.type = "vec2", .format = WBE::RUVertexAttributeFormat::FLOAT2, .element_size = 8, .section_start = 36},
+        {.type = "vec3", .format = WBE::RUVertexAttributeFormat::FLOAT3, .element_size = 12, .section_start = 0},
+        {.type = "vec4", .format = WBE::RUVertexAttributeFormat::FLOAT4, .element_size = 16, .section_start = 0},
+        {.type = "int", .format = WBE::RUVertexAttributeFormat::INT, .element_size = 4, .section_start = 0},
+        {.type = "ivec2", .format = WBE::RUVertexAttributeFormat::INT2, .element_size = 8, .section_start = 36},
+        {.type = "ivec3", .format = WBE::RUVertexAttributeFormat::INT3, .element_size = 12, .section_start = 0},
+        {.type = "ivec4", .format = WBE::RUVertexAttributeFormat::INT4, .element_size = 16, .section_start = 0},
+        {.type = "uint", .format = WBE::RUVertexAttributeFormat::UINT, .element_size = 4, .section_start = 0},
+        {.type = "uvec2", .format = WBE::RUVertexAttributeFormat::UINT2, .element_size = 8, .section_start = 36},
+        {.type = "uvec3", .format = WBE::RUVertexAttributeFormat::UINT3, .element_size = 12, .section_start = 0},
+        {.type = "uvec4", .format = WBE::RUVertexAttributeFormat::UINT4, .element_size = 16, .section_start = 0},
+    }};
+    WBE::ResourceUnitLoaderSubmesh loader;
+
+    for (const FormatCase& format_case : format_cases) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+        WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
+        scheme.geometry_sections = {
+            {.slot = "custom_role",
+                .start = format_case.section_start,
+                .size = format_case.element_size * 3,
+                .type = std::string(format_case.type)},
+            {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+        };
+
+        loader.populate_scheme(*resource_chunk, scheme);
+
+        ASSERT_NE(captured_submesh, nullptr);
+        ASSERT_NE(captured_submesh->vertex_data, nullptr);
+        ASSERT_EQ(captured_submesh->vertex_data->attribute_count, 1U);
+        EXPECT_EQ(captured_submesh->vertex_data->attributes->format, format_case.format);
+        EXPECT_EQ(captured_submesh->vertex_data->attributes->size, format_case.element_size);
+        EXPECT_EQ(captured_submesh->vertex_data->vertex_stride, format_case.element_size);
+        EXPECT_EQ(captured_submesh->vertex_data->vertex_count, 3U);
+
+        switch (format_case.format) {
+        case WBE::RUVertexAttributeFormat::FLOAT:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", 1.0F));
+            break;
+        case WBE::RUVertexAttributeFormat::FLOAT2:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::vec2(1.0F)));
+            break;
+        case WBE::RUVertexAttributeFormat::FLOAT3:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::vec3(1.0F)));
+            break;
+        case WBE::RUVertexAttributeFormat::FLOAT4:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::vec4(1.0F)));
+            break;
+        case WBE::RUVertexAttributeFormat::INT:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", int32_t{1}));
+            break;
+        case WBE::RUVertexAttributeFormat::INT2:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::ivec2(1)));
+            break;
+        case WBE::RUVertexAttributeFormat::INT3:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::ivec3(1)));
+            break;
+        case WBE::RUVertexAttributeFormat::INT4:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::ivec4(1)));
+            break;
+        case WBE::RUVertexAttributeFormat::UINT:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", uint32_t{1}));
+            break;
+        case WBE::RUVertexAttributeFormat::UINT2:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::uvec2(1U)));
+            break;
+        case WBE::RUVertexAttributeFormat::UINT3:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::uvec3(1U)));
+            break;
+        case WBE::RUVertexAttributeFormat::UINT4:
+            EXPECT_NO_THROW(captured_submesh->set_vertex_attribute(0, "custom_role", glm::uvec4(1U)));
+            break;
+        }
+    }
+}
+
+TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
+    WBE::ResourceUnitLoaderSubmesh loader;
+    auto expect_invalid = [this, &loader](std::vector<WBE::RUSchemaSubmesh3DGeometrySection> p_sections) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+        WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
+        scheme.geometry_sections = std::move(p_sections);
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+    };
+
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "position", .start = 36, .size = 24, .type = "vec2"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    static_assert(WBE::dynam_hash("role_002876ae4c05a223") == WBE::dynam_hash("role_2ffa43e2b7d24f56"));
+    expect_invalid({
+        {.slot = "role_002876ae4c05a223", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "role_2ffa43e2b7d24f56", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "uv", .start = 36, .size = 16, .type = "vec2"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "double"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 72, .size = 12, .type = "vec3"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint"},
+    });
+    expect_invalid({
+        {.slot = "position", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "index", .start = 0, .size = 12, .type = "uint32"},
+    });
+    expect_invalid({
+        {.slot = "", .start = 0, .size = 36, .type = "vec3"},
+        {.slot = "index", .start = 60, .size = 12, .type = "uint32"},
+    });
 }
 
 TEST_F(ResourcePopulatorTest, EmplaceResUnitRegistersDestructorForNonTrivialResourceUnit) {
@@ -504,9 +761,11 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     EXPECT_EQ(captured_material->graphics_pipeline.get(), graphics_pipeline_ref.get());
     ASSERT_EQ(captured_material->texture_count, 2U);
     ASSERT_NE(captured_material->textures, nullptr);
-    EXPECT_EQ(captured_material->textures.get()[0].texture_role, WBE::dynam_hash("normal"));
+    EXPECT_STREQ(captured_material->textures.get()[0].role.name.get(), "normal");
+    EXPECT_EQ(captured_material->textures.get()[0].role.hash, WBE::dynam_hash("normal"));
     EXPECT_EQ(captured_material->textures.get()[0].texture.get(), referenced_texture_ref.get());
-    EXPECT_EQ(captured_material->textures.get()[1].texture_role, WBE::dynam_hash("albedo"));
+    EXPECT_STREQ(captured_material->textures.get()[1].role.name.get(), "albedo");
+    EXPECT_EQ(captured_material->textures.get()[1].role.hash, WBE::dynam_hash("albedo"));
     ASSERT_NE(captured_material->textures.get()[1].texture, nullptr);
     EXPECT_EQ(captured_material->textures.get()[1].texture->width, 16U);
     EXPECT_EQ(captured_material->textures.get()[1].texture->height, 16U);
@@ -677,6 +936,22 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     WBE::ParserJSON duplicate_texture_role_parser;
     duplicate_texture_role_parser.parse_from_buffer(duplicate_texture_role_json);
     EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, duplicate_texture_role_parser.get_data()), std::runtime_error);
+
+    std::string colliding_texture_role_json = R"(
+    {
+        "id": "test_colliding_texture_role",
+        "type": "material",
+        "graphics_pipeline_ids": ["main_pipeline"],
+        "textures": [
+            {"texture_role": "role_002876ae4c05a223", "texture_id": "first_texture"},
+            {"texture_role": "role_2ffa43e2b7d24f56", "texture_id": "second_texture"}
+        ]
+    }
+    )";
+    static_assert(WBE::dynam_hash("role_002876ae4c05a223") == WBE::dynam_hash("role_2ffa43e2b7d24f56"));
+    WBE::ParserJSON colliding_texture_role_parser;
+    colliding_texture_role_parser.parse_from_buffer(colliding_texture_role_json);
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, colliding_texture_role_parser.get_data()), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, VideoResourceGeneral) {

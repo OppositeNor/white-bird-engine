@@ -46,7 +46,8 @@ Material resources associate graphics pipelines with shader-defined texture slot
 Materials do not declare a `material_type`; their graphics pipeline and reflected shader metadata define the rendering contract.
 
 - Each texture slot requires a non-empty `texture_role`. Shaders select roles through reflected `WBE_TEXTURE` attributes.
-- The loader decodes texture role names to runtime hash codes; resource units do not retain the strings or use closed enums.
+- The loader retains each exact texture role name together with its runtime hash; consumers use both and never treat a hash alone
+  as identity. Resource units do not use closed role enums.
 - A texture role may appear at most once in a material.
 - Each slot must provide exactly one of `texture` for an inline image or `texture_id` for an existing image resource.
 - Regular materials may omit slots; bindless compilation uses the corresponding shader-selected role from the configured default material.
@@ -68,6 +69,11 @@ The static opaque pipeline reflects these attributes independently for each grap
 bindless texture array, and writes descriptor indices at the reflected field offsets. `material_sampler`, `textures`, and
 `materials` remain fixed members of the global contract in `defs.slang`; applications may configure only the base variable names
 for `material_textures` and `material_params`, plus the `default_material` resource key.
+
+`WBE_TEXTURE` and `WBE_VERTEX_INPUT` share the same open-role annotation resolver: both accept one optional string, default to the
+annotated field name, retain exact names for diagnostics, and reject duplicate roles and distinct-name hash collisions. Their
+contract policies remain separate: material textures validate the global descriptor/index-table shape, while vertex inputs
+validate varying locations, scalar/vector formats, and resource byte layouts.
 
 ## Runtime Index Output
 

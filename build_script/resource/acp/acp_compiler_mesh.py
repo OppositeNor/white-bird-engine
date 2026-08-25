@@ -32,6 +32,11 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         "index": "uint32",
     }
     _OPTIONAL_VERTEX_SLOTS = ["normal", "tangent", "bitangent", "uv"]
+    _RUNTIME_VERTEX_TYPES = {
+        "float", "vec2", "vec3", "vec4",
+        "int", "ivec2", "ivec3", "ivec4",
+        "uint", "uvec2", "uvec3", "uvec4",
+    }
 
     @override
     def get_supported_resource_types(self) -> list[str]:
@@ -251,16 +256,18 @@ class WBEACPCompilerMesh(WBEACPCompiler):
                     f"WBEACPCompilerMesh: geometry section entries must be objects in {manifest_path}."
                 )
             slot = section.get("slot")
-            if not isinstance(slot, str) or slot not in self._SECTION_TYPES:
+            if not isinstance(slot, str) or not slot:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: unsupported geometry section slot in {manifest_path}: {slot}."
+                    f"WBEACPCompilerMesh: geometry section slot must be a non-empty string in {manifest_path}: {slot}."
                 )
             if slot in seen_slots:
                 raise RuntimeError(
                     f"WBEACPCompilerMesh: duplicate geometry section slot '{slot}' in {manifest_path}."
                 )
             seen_slots.add(slot)
-            if section.get("type") != self._SECTION_TYPES[slot]:
+            section_type = section.get("type")
+            if (slot == "index" and section_type != "uint32") or (
+                    slot != "index" and section_type not in self._RUNTIME_VERTEX_TYPES):
                 raise RuntimeError(
                     f"WBEACPCompilerMesh: geometry slot '{slot}' has invalid type in {manifest_path}."
                 )
@@ -270,8 +277,11 @@ class WBEACPCompilerMesh(WBEACPCompiler):
                     raise RuntimeError(
                         f"WBEACPCompilerMesh: geometry section '{slot}' {key} must be a non-negative integer in {manifest_path}."
                     )
-        for required_slot in ("position", "index"):
-            if required_slot not in seen_slots:
-                raise RuntimeError(
-                    f"WBEACPCompilerMesh: missing required geometry section '{required_slot}' in {manifest_path}."
-                )
+        if "index" not in seen_slots:
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: missing required geometry section 'index' in {manifest_path}."
+            )
+        if len(seen_slots) == 1:
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: submesh requires at least one vertex attribute in {manifest_path}."
+            )

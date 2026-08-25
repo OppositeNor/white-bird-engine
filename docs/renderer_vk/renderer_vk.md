@@ -32,11 +32,53 @@ The nested contract member names are fixed in `defs.slang`: `MaterialTextures.ma
 variable names and the `default_material` resource key. Materials do not carry a separate `material_type`; the selected graphics
 pipeline defines the shader model.
 
+Texture and vertex annotations use one backend-neutral role resolver. Exact role names are authoritative and hashes are only a
+matching acceleration, so duplicate names and distinct-name hash collisions are rejected consistently. Separate material and
+vertex contract resolvers then apply their domain rules; Vulkan code only translates the validated vertex contract or binds the
+validated texture table.
+
+## Vertex Resource Layout
+
+Mesh sidecar files keep geometry attributes as separate arrays. When a submesh resource is loaded, its non-index
+`geometry_sections` are packed in declaration order into one tightly interleaved vertex buffer. Every section supplies an open
+string role, and every section must contain the same number of elements. Indices remain a contiguous `uint32` array.
+
+Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `ivec3`, `ivec4`, `uint`, `uvec2`, `uvec3`, and
+`uvec4`. The resulting attribute offsets, byte sizes, stride, and vertex count are fixed after loading. Attribute values may be
+changed through `RUSubmesh3D`, but mutation is not thread-safe. Call `RendererVK::update_static_opaque_triangles()` after a
+mutation to rebuild and upload the current interleaved data before subsequent draws.
+
+Vertex shader fields opt into resource matching with `WBE_VERTEX_INPUT`. An explicit string selects a resource role, while an
+omitted argument uses the annotated field name:
+
+```slang
+struct VertexInput
+{
+    [WBE_VERTEX_INPUT("position")]
+    float3 object_position;
+
+    [WBE_VERTEX_INPUT]
+    float2 uv;
+};
+```
+
+The selected vertex entry point must contain at most one annotation per field, role, and reflected location. Every annotated
+shader role must exist in the resource with the same scalar kind and vector width; unconsumed resource attributes are allowed.
+Locations come from the shader's reflected varying-input bindings rather than fixed engine locations.
+
+The Vulkan backend requires `VK_EXT_vertex_input_dynamic_state` and its `vertexInputDynamicState` feature. It supplies binding
+zero's stride and the matched formats, locations, and offsets immediately before each draw batch. Physical devices without the
+extension and feature are rejected; there is no static vertex-input fallback. Direct indexed graphics tasks receive their
+reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
+state.
+
 ## Static Opaque Triangles Task
 
 `RTRunStaticOpaqueTrianglesVK` compiles the render database's static opaque mesh into one indexed-indirect draw task. Construction
-compiles one Vulkan graphics pipeline per contiguous material-pipeline batch, creates the material descriptor data for each batch,
-and uploads the indirect commands. The task owns those compiled pipelines, descriptor sets, and the indirect-command buffer.
+compiles one logical Vulkan graphics pipeline per pipeline and attachment configuration, creates material descriptor data for each
+pipeline batch, and uploads the indirect commands. Flattened vertex data remains raw interleaved bytes. Geometry is merged only
+when its pipeline, material, and vertex layout match; command batches split whenever the layout or vertex-buffer byte offset
+changes. The task owns the compiled pipelines, descriptor sets, and indirect-command buffer.
 
 Before constructing the task:
 

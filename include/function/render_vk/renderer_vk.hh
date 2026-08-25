@@ -282,6 +282,7 @@ private:
 
     const std::vector<const char*> enabled_device_extensions{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME,
 
         // To make VK_IMAGE_LAYOUT_GENERAL works as well as other layouts.
         VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,

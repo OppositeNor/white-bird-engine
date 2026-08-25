@@ -1,0 +1,252 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "function/render/render_resource_unit.hh"
+#include "function/render/vertex_attribute_format_info.hh"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
+#include "glm/ext/vector_int2.hpp"
+#include "glm/ext/vector_int3.hpp"
+#include "glm/ext/vector_int4.hpp"
+#include "glm/ext/vector_uint2.hpp"
+#include "glm/ext/vector_uint3.hpp"
+#include "glm/ext/vector_uint4.hpp"
+#include "utils/utils.hh"
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <format>
+#include <limits>
+#include <stdexcept>
+#include <string_view>
+#include <utility>
+
+namespace WhiteBirdEngine {
+
+std::string_view RUShaderRole::get_name() const {
+    if (name == nullptr) {
+        throw std::runtime_error("Failed to access shader role: role name is missing.");
+    }
+    const std::string_view role_name(name.get());
+    if (role_name.empty()) {
+        throw std::runtime_error("Failed to access shader role: role name is empty.");
+    }
+    if (hash != dynam_hash(role_name)) {
+        throw std::runtime_error("Failed to access shader role: role hash does not match its name.");
+    }
+    return role_name;
+}
+
+bool RUShaderRole::matches(std::string_view p_name) const {
+    if (p_name.empty() || p_name.contains('\0')) {
+        throw std::runtime_error("Failed to match shader role: requested role name is invalid.");
+    }
+    const std::string_view retained_name = get_name();
+    return hash == dynam_hash(p_name) && retained_name == p_name;
+}
+
+static void validate_vertex_storage(const RUVertexData& p_vertex_data) {
+    if (p_vertex_data.vertex_stride == 0) {
+        if (p_vertex_data.vertex_count != 0 || p_vertex_data.vertices_size != 0) {
+            throw std::runtime_error("Failed to access vertex data: zero stride has non-empty vertex storage.");
+        }
+    } else if (p_vertex_data.vertex_count > std::numeric_limits<size_t>::max() / p_vertex_data.vertex_stride ||
+               p_vertex_data.vertices_size != p_vertex_data.vertex_count * p_vertex_data.vertex_stride) {
+        throw std::runtime_error("Failed to access vertex data: vertex storage size does not match its count and stride.");
+    }
+    if (p_vertex_data.vertices_size > 0 && p_vertex_data.vertices == nullptr) {
+        throw std::runtime_error("Failed to access vertex data: vertex storage is missing.");
+    }
+    if (p_vertex_data.attribute_count > 0 && p_vertex_data.attributes == nullptr) {
+        throw std::runtime_error("Failed to access vertex data: attribute metadata storage is missing.");
+    }
+    size_t expected_offset = 0;
+    for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
+        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        const std::string_view attribute_role_name = attribute.role.get_name();
+        const size_t format_size = VertexAttributeFormatInfo::get_size(attribute.format);
+        if (attribute.offset != expected_offset || attribute.size != format_size ||
+            attribute.size > std::numeric_limits<size_t>::max() - expected_offset) {
+            throw std::runtime_error("Failed to access vertex data: attributes are not tightly packed in declaration order.");
+        }
+        for (size_t previous_index = 0; previous_index < i; ++previous_index) {
+            const RUShaderRole& previous_role = p_vertex_data.attributes.get()[previous_index].role;
+            if (previous_role.get_name() == attribute_role_name) {
+                throw std::runtime_error("Failed to access vertex data: attribute role is duplicated.");
+            }
+            if (previous_role.hash == attribute.role.hash) {
+                throw std::runtime_error("Failed to access vertex data: distinct attribute roles have a hash collision.");
+            }
+        }
+        expected_offset += attribute.size;
+    }
+    if (expected_offset != p_vertex_data.vertex_stride) {
+        throw std::runtime_error("Failed to access vertex data: attribute sizes do not match the vertex stride.");
+    }
+}
+
+static const RUVertexData::Attribute& find_vertex_attribute(const RUVertexData& p_vertex_data, std::string_view p_role) {
+    validate_vertex_storage(p_vertex_data);
+    if (p_role.empty()) {
+        throw std::runtime_error("Failed to access vertex attribute: role is empty.");
+    }
+    const HashCode role_hash = dynam_hash(p_role);
+    const RUVertexData::Attribute* result = nullptr;
+    for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
+        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        if (attribute.role.hash != role_hash || !attribute.role.matches(p_role)) {
+            continue;
+        }
+        if (result != nullptr) {
+            throw std::runtime_error(std::format("Failed to access vertex attribute: role '{}' is duplicated.", p_role));
+        }
+        result = &attribute;
+    }
+    if (result == nullptr) {
+        throw std::runtime_error(std::format("Failed to access vertex attribute: role '{}' does not exist.", p_role));
+    }
+    if (result->offset > p_vertex_data.vertex_stride || result->size > p_vertex_data.vertex_stride - result->offset) {
+        throw std::runtime_error(std::format("Failed to access vertex attribute: role '{}' exceeds the vertex stride.", p_role));
+    }
+    return *result;
+}
+
+static RUVertexData& get_submesh_vertex_data(RUSubmesh3D& p_submesh) {
+    if (p_submesh.vertex_data == nullptr) {
+        throw std::runtime_error("Failed to access submesh vertex data: vertex data is missing.");
+    }
+    return *p_submesh.vertex_data;
+}
+
+static const RUVertexData& get_submesh_vertex_data(const RUSubmesh3D& p_submesh) {
+    if (p_submesh.vertex_data == nullptr) {
+        throw std::runtime_error("Failed to access submesh vertex data: vertex data is missing.");
+    }
+    return *p_submesh.vertex_data;
+}
+
+template <typename TValue>
+static void set_vertex_attribute_value(
+    RUSubmesh3D& p_submesh, size_t p_vertex_index, std::string_view p_role, RUVertexAttributeFormat p_expected_format, const TValue& p_value) {
+    RUVertexData& vertex_data = get_submesh_vertex_data(p_submesh);
+    validate_vertex_storage(vertex_data);
+    if (p_vertex_index >= vertex_data.vertex_count) {
+        throw std::runtime_error(std::format("Failed to set vertex attribute '{}': vertex {} is out of bounds for {} vertices.",
+            p_role,
+            p_vertex_index,
+            vertex_data.vertex_count));
+    }
+    const RUVertexData::Attribute& attribute = find_vertex_attribute(vertex_data, p_role);
+    if (attribute.format != p_expected_format || attribute.size != sizeof(TValue)) {
+        throw std::runtime_error(
+            std::format("Failed to set vertex attribute '{}': value type does not match the resource layout.", p_role));
+    }
+    const size_t vertex_offset = p_vertex_index * vertex_data.vertex_stride;
+    if (vertex_offset > vertex_data.vertices_size || attribute.offset > vertex_data.vertices_size - vertex_offset ||
+        sizeof(TValue) > vertex_data.vertices_size - vertex_offset - attribute.offset) {
+        throw std::runtime_error(std::format("Failed to set vertex attribute '{}': target storage is out of bounds.", p_role));
+    }
+    std::memcpy(vertex_data.vertices.get() + vertex_offset + attribute.offset, &p_value, sizeof(TValue));
+}
+
+void RUVertexData::swap_vertices(size_t p_first, size_t p_second) {
+    validate_vertex_storage(*this);
+    if (p_first >= vertex_count || p_second >= vertex_count) {
+        throw std::runtime_error(std::format(
+            "Failed to swap vertices: indices {} and {} are out of bounds for {} vertices.", p_first, p_second, vertex_count));
+    }
+    if (p_first == p_second) {
+        return;
+    }
+    uint8_t* first_vertex = vertices.get() + p_first * vertex_stride;
+    uint8_t* second_vertex = vertices.get() + p_second * vertex_stride;
+    for (size_t i = 0; i < vertex_stride; ++i) {
+        std::swap(first_vertex[i], second_vertex[i]);
+    }
+}
+
+size_t RUVertexData::get_vertex_attribute_offset(std::string_view p_role) const {
+    return find_vertex_attribute(*this, p_role).offset;
+}
+
+void RUSubmesh3D::swap_vertices(size_t p_first, size_t p_second) {
+    get_submesh_vertex_data(*this).swap_vertices(p_first, p_second);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, float p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::FLOAT, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec2& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::FLOAT2, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec3& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::FLOAT3, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec4& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::FLOAT4, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, int32_t p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::INT, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec2& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::INT2, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec3& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::INT3, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec4& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::INT4, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, uint32_t p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::UINT, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec2& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::UINT2, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec3& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::UINT3, p_value);
+}
+
+void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec4& p_value) {
+    set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::UINT4, p_value);
+}
+
+size_t RUSubmesh3D::get_vertex_attribute_offset(std::string_view p_role) const {
+    return get_submesh_vertex_data(*this).get_vertex_attribute_offset(p_role);
+}
+
+size_t RUSubmesh3D::get_vertex_stride() const {
+    const RUVertexData& vertex_data = get_submesh_vertex_data(*this);
+    validate_vertex_storage(vertex_data);
+    return vertex_data.vertex_stride;
+}
+
+size_t RUSubmesh3D::get_vertices_num() const {
+    const RUVertexData& vertex_data = get_submesh_vertex_data(*this);
+    validate_vertex_storage(vertex_data);
+    return vertex_data.vertex_count;
+}
+
+} // namespace WhiteBirdEngine

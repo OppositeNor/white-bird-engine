@@ -12,14 +12,102 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stack_allocator.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <gtest/gtest.h>
+#include <span>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+struct VertexAttributeTestSpec {
+    std::string_view role;
+    RUVertexAttributeFormat format;
+    size_t offset;
+    size_t size;
+};
+
+static RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_size, const void* p_data) {
+    MemID memory = p_allocator.allocate(p_size);
+    if (p_size > 0) {
+        std::memcpy(p_allocator.get(memory), p_data, p_size);
+    }
+    return RefRes<char>(memory, &p_allocator);
+}
+
+static RUVertexData make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
+    std::vector<RUVertexData::Attribute> attributes;
+    attributes.reserve(p_specs.size());
+    for (const VertexAttributeTestSpec& spec : p_specs) {
+        RefRes<char> role_name = push_vertex_test_data(p_allocator, spec.role.size() + 1, spec.role.data());
+        role_name.get()[spec.role.size()] = '\0';
+        RUShaderRole role;
+        role.name = role_name;
+        role.hash = dynam_hash(spec.role);
+        attributes.push_back(RUVertexData::Attribute{.role = role, .format = spec.format, .offset = spec.offset, .size = spec.size});
+    }
+    RUVertexData result;
+    if (!attributes.empty()) {
+        result.attributes =
+            push_vertex_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexData::Attribute>();
+    }
+    result.attribute_count = attributes.size();
+    result.vertex_stride = p_stride;
+    return result;
+}
+
+static ShaderMetadataTypeField make_vertex_shader_field(
+    std::string_view p_name, std::string_view p_role, int32_t p_location, std::string_view p_kind, std::string_view p_scalar_type, int32_t p_component_count) {
+    ShaderMetadataTypeField field;
+    field.name = p_name;
+    field.binding.kind = "varyingInput";
+    field.binding.index = p_location;
+    field.type.kind = p_kind;
+    if (p_kind == "scalar") {
+        field.type.scalar_type = p_scalar_type;
+    } else {
+        field.type.element_scalar_type = p_scalar_type;
+        field.type.element_count = p_component_count;
+    }
+    ShaderMetadataUserAttribute attribute;
+    attribute.name = "WBE_VERTEX_INPUT";
+    if (!p_role.empty()) {
+        ShaderMetadataUserAttributeArgument argument;
+        argument.kind = "string";
+        argument.string_value = p_role;
+        attribute.arguments.push_back(argument);
+    }
+    field.user_attributes.push_back(attribute);
+    return field;
+}
+
+static ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField> p_fields) {
+    ShaderMetadata metadata;
+    ShaderMetadataEntryPoint entry_point;
+    entry_point.name = "vertex_main";
+    entry_point.stage = "vertex";
+    ShaderMetadataParameter parameter;
+    parameter.name = "p_input";
+    parameter.type.kind = "struct";
+    parameter.type.fields.assign(p_fields.begin(), p_fields.end());
+    entry_point.parameters.push_back(parameter);
+    metadata.entry_points.push_back(entry_point);
+    return metadata;
+}
 
 TEST(WBEShaderMetadataVKUtilsTest, MarksRuntimeSampledImageArrayAsVariableDescriptorBinding) {
     ShaderMetadataParameter material_textures;
@@ -162,6 +250,148 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGeometryStageDescriptorBindingsIntoGrap
     EXPECT_EQ(bindings[2].parameter_name, "fragment_sampler");
     EXPECT_EQ(bindings[2].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLER);
     EXPECT_EQ(bindings[2].layout_binding.stageFlags, VK_SHADER_STAGE_FRAGMENT_BIT);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat) {
+    struct FormatCase {
+        RUVertexAttributeFormat resource_format;
+        std::string_view kind;
+        std::string_view scalar_type;
+        int32_t component_count;
+        size_t size;
+        VkFormat vk_format;
+    };
+    const std::array<FormatCase, 12> cases{{
+        {.resource_format = RUVertexAttributeFormat::FLOAT, .kind = "scalar", .scalar_type = "float32", .component_count = 1, .size = 4, .vk_format = VK_FORMAT_R32_SFLOAT},
+        {.resource_format = RUVertexAttributeFormat::FLOAT2, .kind = "vector", .scalar_type = "float32", .component_count = 2, .size = 8, .vk_format = VK_FORMAT_R32G32_SFLOAT},
+        {.resource_format = RUVertexAttributeFormat::FLOAT3, .kind = "vector", .scalar_type = "float32", .component_count = 3, .size = 12, .vk_format = VK_FORMAT_R32G32B32_SFLOAT},
+        {.resource_format = RUVertexAttributeFormat::FLOAT4, .kind = "vector", .scalar_type = "float32", .component_count = 4, .size = 16, .vk_format = VK_FORMAT_R32G32B32A32_SFLOAT},
+        {.resource_format = RUVertexAttributeFormat::INT, .kind = "scalar", .scalar_type = "int32", .component_count = 1, .size = 4, .vk_format = VK_FORMAT_R32_SINT},
+        {.resource_format = RUVertexAttributeFormat::INT2, .kind = "vector", .scalar_type = "int32", .component_count = 2, .size = 8, .vk_format = VK_FORMAT_R32G32_SINT},
+        {.resource_format = RUVertexAttributeFormat::INT3, .kind = "vector", .scalar_type = "int32", .component_count = 3, .size = 12, .vk_format = VK_FORMAT_R32G32B32_SINT},
+        {.resource_format = RUVertexAttributeFormat::INT4, .kind = "vector", .scalar_type = "int32", .component_count = 4, .size = 16, .vk_format = VK_FORMAT_R32G32B32A32_SINT},
+        {.resource_format = RUVertexAttributeFormat::UINT, .kind = "scalar", .scalar_type = "uint32", .component_count = 1, .size = 4, .vk_format = VK_FORMAT_R32_UINT},
+        {.resource_format = RUVertexAttributeFormat::UINT2, .kind = "vector", .scalar_type = "uint32", .component_count = 2, .size = 8, .vk_format = VK_FORMAT_R32G32_UINT},
+        {.resource_format = RUVertexAttributeFormat::UINT3, .kind = "vector", .scalar_type = "uint32", .component_count = 3, .size = 12, .vk_format = VK_FORMAT_R32G32B32_UINT},
+        {.resource_format = RUVertexAttributeFormat::UINT4, .kind = "vector", .scalar_type = "uint32", .component_count = 4, .size = 16, .vk_format = VK_FORMAT_R32G32B32A32_UINT},
+    }};
+    for (const FormatCase& format_case : cases) {
+        StackAllocator allocator(WBE_KI_B(8));
+        const VertexAttributeTestSpec spec{
+            .role = "value", .format = format_case.resource_format, .offset = 0, .size = format_case.size};
+        RUVertexData vertex_data =
+            make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), format_case.size);
+        const ShaderMetadataTypeField field =
+            make_vertex_shader_field("value", "", 3, format_case.kind, format_case.scalar_type, format_case.component_count);
+        ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&field, 1));
+
+        VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
+        ASSERT_EQ(description.bindings.size(), 1U);
+        ASSERT_EQ(description.attributes.size(), 1U);
+        EXPECT_EQ(description.bindings[0].stride, format_case.size);
+        EXPECT_EQ(description.attributes[0].location, 3U);
+        EXPECT_EQ(description.attributes[0].format, format_case.vk_format);
+    }
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, MatchesShaderSubsetAndAllowsExtraResourceAttributes) {
+    StackAllocator allocator(WBE_KI_B(8));
+    const std::array<VertexAttributeTestSpec, 2> specs{{
+        {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
+        {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
+    }};
+    RUVertexData vertex_data = make_vertex_test_data(allocator, specs, 20);
+    const ShaderMetadataTypeField field = make_vertex_shader_field("input_position", "position", 5, "vector", "float32", 3);
+    ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&field, 1));
+
+    VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
+    ASSERT_EQ(description.bindings.size(), 1U);
+    ASSERT_EQ(description.attributes.size(), 1U);
+    EXPECT_EQ(description.bindings[0].stride, 20U);
+    EXPECT_EQ(description.attributes[0].location, 5U);
+    EXPECT_EQ(description.attributes[0].offset, 0U);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, FindsAnnotatedFieldsInNestedVertexStructs) {
+    StackAllocator allocator(WBE_KI_B(8));
+    const VertexAttributeTestSpec spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
+    RUVertexData vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), 12);
+    ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 2, "vector", "float32", 3);
+    ShaderMetadataTypeField nested;
+    nested.name = "nested";
+    nested.type.kind = "struct";
+    nested.fields.push_back(position);
+    ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&nested, 1));
+
+    VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
+
+    ASSERT_EQ(description.attributes.size(), 1U);
+    EXPECT_EQ(description.attributes[0].location, 2U);
+    EXPECT_EQ(description.attributes[0].format, VK_FORMAT_R32G32B32_SFLOAT);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
+    StackAllocator allocator(WBE_KI_B(32));
+    const std::array<VertexAttributeTestSpec, 2> specs{{
+        {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
+        {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
+    }};
+    RUVertexData vertex_data = make_vertex_test_data(allocator, specs, 20);
+
+    ShaderMetadataTypeField missing = make_vertex_shader_field("missing", "missing", 0, "vector", "float32", 3);
+    ShaderMetadata missing_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&missing, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(missing_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    ShaderMetadataTypeField incompatible = make_vertex_shader_field("position", "", 0, "vector", "uint32", 3);
+    ShaderMetadata incompatible_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&incompatible, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(incompatible_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    std::array<ShaderMetadataTypeField, 2> duplicate_role_fields{{
+        make_vertex_shader_field("first", "position", 0, "vector", "float32", 3),
+        make_vertex_shader_field("second", "position", 1, "vector", "float32", 3),
+    }};
+    ShaderMetadata duplicate_role_metadata = make_vertex_shader_metadata(duplicate_role_fields);
+    EXPECT_THROW(build_vertex_input_description_vk(duplicate_role_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    std::array<ShaderMetadataTypeField, 2> duplicate_location_fields{{
+        make_vertex_shader_field("position", "", 0, "vector", "float32", 3),
+        make_vertex_shader_field("uv", "", 0, "vector", "float32", 2),
+    }};
+    ShaderMetadata duplicate_location_metadata = make_vertex_shader_metadata(duplicate_location_fields);
+    EXPECT_THROW(build_vertex_input_description_vk(duplicate_location_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    ShaderMetadataTypeField malformed = make_vertex_shader_field("position", "", 0, "vector", "float32", 3);
+    malformed.user_attributes[0].arguments.emplace_back();
+    malformed.user_attributes[0].arguments[0].kind = "int";
+    ShaderMetadata malformed_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&malformed, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(malformed_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    ShaderMetadataTypeField repeated = make_vertex_shader_field("position", "", 0, "vector", "float32", 3);
+    repeated.user_attributes.push_back(repeated.user_attributes[0]);
+    ShaderMetadata repeated_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&repeated, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(repeated_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    ShaderMetadataTypeField unsupported = make_vertex_shader_field("position", "", 0, "matrix", "float32", 3);
+    ShaderMetadata unsupported_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&unsupported, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(unsupported_metadata, "vertex_main", vertex_data), std::runtime_error);
+
+    const std::array<VertexAttributeTestSpec, 2> duplicate_specs{{
+        {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
+        {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 12, .size = 12},
+    }};
+    RUVertexData duplicate_resource = make_vertex_test_data(allocator, duplicate_specs, 24);
+    ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 0, "vector", "float32", 3);
+    ShaderMetadata position_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&position, 1));
+    EXPECT_THROW(build_vertex_input_description_vk(position_metadata, "vertex_main", duplicate_resource), std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, BuildsEmptyStateForVertexlessEntry) {
+    StackAllocator allocator(WBE_KI_B(4));
+    RUVertexData vertex_data = make_vertex_test_data(allocator, {}, 0);
+    ShaderMetadata metadata = make_vertex_shader_metadata({});
+    VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
+    EXPECT_TRUE(description.bindings.empty());
+    EXPECT_TRUE(description.attributes.empty());
 }
 
 } // namespace WhiteBirdEngine

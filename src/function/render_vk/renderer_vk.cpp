@@ -295,7 +295,7 @@ void RendererVK::create_instance() {
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
 
     // Setup IApplication info.
-    VkApplicationInfo app_info {};
+    VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = game_config.game_name.c_str();
     app_info.applicationVersion = VK_MAKE_VERSION(game_config.version_major, game_config.version_minor, game_config.version_patch);
@@ -655,9 +655,19 @@ void RendererVK::create_logical_device() {
     descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
     dynamic_rendering_features.pNext = &descriptor_indexing_features;
 
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state_features{};
+    vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+    vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
+    descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
+
     // Create logical device.
     if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device.");
+    }
+    base_render_data.command_set_vertex_input =
+        reinterpret_cast<PFN_vkCmdSetVertexInputEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdSetVertexInputEXT"));
+    if (base_render_data.command_set_vertex_input == nullptr) {
+        throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
     }
 
     // Get the device queues.
@@ -770,6 +780,9 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     }
     VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{};
     descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state_features{};
+    vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+    descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
     VkPhysicalDeviceFeatures2 device_features{};
     device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     device_features.pNext = &descriptor_indexing_features;
@@ -780,7 +793,8 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
         device_features.features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE ||
         descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
         descriptor_indexing_features.descriptorBindingVariableDescriptorCount != VK_TRUE ||
-        descriptor_indexing_features.runtimeDescriptorArray != VK_TRUE) {
+        descriptor_indexing_features.runtimeDescriptorArray != VK_TRUE ||
+        vertex_input_dynamic_state_features.vertexInputDynamicState != VK_TRUE) {
         return false;
     }
 
@@ -1108,6 +1122,7 @@ Ref<ROBufferVK> build_or_resize_host_visible_buffer(
 
 void RendererVK::update_static_opaque_triangles() {
     WBE_DEBUG_ASSERT(render_database != MEM_NULL);
+    render_database->refresh_static_opaque_triangles();
     const auto& info = render_database->get_static_opaque_triangles_info();
 
     render_objects->static_opaque_vertices = build_or_resize_host_visible_buffer(

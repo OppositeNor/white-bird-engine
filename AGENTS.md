@@ -239,6 +239,16 @@ Avoid placing complex logic, control flow, or dependency-heavy code in headers. 
 
 Use Doxygen for C++ and Slang.
 
+Place Doxygen commands in multiline comment blocks, with every command on its own `*` line. Do not use compact command comments
+such as `/** @brief ... */` or combine commands such as `@class` and `@brief` on one line.
+
+```cpp
+/**
+ * @class Example
+ * @brief Describes the example.
+ */
+```
+
 Required:
 - Public/protected classes, structs, fields, functions.
 

@@ -38,6 +38,8 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "material_bindpoint_test_utils.hh"
@@ -60,6 +62,7 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -95,6 +98,7 @@ private:
     void write_main_dynamic_descriptors();
     void register_draw_cube_render_graph();
     void add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const;
+    std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> build_vertex_input_data(WBE::RefRes<WBE::RUGraphicsPipeline> p_pipeline) const;
     WBE::RendTaskDescVK create_shadow_task_desc() const;
     WBE::RendTaskDescVK create_main_task_desc() const;
 
@@ -396,13 +400,37 @@ void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDes
         .res = main_graphics_pipeline});
 }
 
+std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCubeTest::build_vertex_input_data(
+    WBE::RefRes<WBE::RUGraphicsPipeline> p_pipeline) const {
+    if (p_pipeline == nullptr || p_pipeline->vertex_stage == nullptr) {
+        throw std::runtime_error("Failed to setup draw cube test: vertex shader resource is missing.");
+    }
+    const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+    if (triangles_info.draw_groups.size() != 1) {
+        throw std::runtime_error("Failed to setup draw cube test: expected one vertex draw group.");
+    }
+    std::string_view entry_name;
+    if (p_pipeline->vertex_stage_entry != nullptr && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
+        entry_name = p_pipeline->vertex_stage_entry.get();
+    } else if (p_pipeline->vertex_stage->vertex_entry != nullptr && p_pipeline->vertex_stage->vertex_entry.get()[0] != '\0') {
+        entry_name = p_pipeline->vertex_stage->vertex_entry.get();
+    }
+    const auto& draw_group = triangles_info.draw_groups[0];
+    return {WBE::build_vertex_input_description_vk(
+                WBE::load_shader_metadata_vk(p_pipeline->vertex_stage), entry_name, draw_group.vertex_layout),
+        static_cast<VkDeviceSize>(draw_group.vertex_buffer_byte_offset)};
+}
+
 WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() const {
+    auto [vertex_input, vertex_buffer_offset] = build_vertex_input_data(shadow_pipeline_resource);
     WBE::RendTaskDescVK shadow_task_desc(render_allocator);
     shadow_task_desc.task_id = WBE::RT_RUN_PIPELINE_SHADOWMAP;
     shadow_task_desc.create = [task_render_allocator = render_allocator,
                                   task_base_render_data = base_render_data,
                                   task_shadow_extent = shadow_extent,
-                                  task_shadow_descriptor_sets = shadow_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+                                  task_shadow_descriptor_sets = shadow_descriptor_sets,
+                                  vertex_input,
+                                  vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
         std::array<VkClearValue, 2> shadow_clear_values{};
         shadow_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
         shadow_clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
@@ -416,18 +444,26 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
             WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
             WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
             WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_shadow_descriptor_sets.data(), task_shadow_descriptor_sets.size()));
+            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_shadow_descriptor_sets.data(), task_shadow_descriptor_sets.size()),
+            std::nullopt,
+            VK_ATTACHMENT_LOAD_OP_CLEAR,
+            VK_ATTACHMENT_LOAD_OP_CLEAR,
+            vertex_input,
+            vertex_buffer_offset);
     };
     return shadow_task_desc;
 }
 
 WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const {
+    auto [vertex_input, vertex_buffer_offset] = build_vertex_input_data(default_material->graphics_pipeline);
     WBE::RendTaskDescVK main_task_desc(render_allocator);
     main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
     main_task_desc.prev.push_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
     main_task_desc.create = [task_render_allocator = render_allocator,
                                 task_base_render_data = base_render_data,
-                                task_main_descriptor_sets = main_descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+                                task_main_descriptor_sets = main_descriptor_sets,
+                                vertex_input,
+                                vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
@@ -436,7 +472,11 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const
             WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
             WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
             WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_main_descriptor_sets.data(), task_main_descriptor_sets.size()));
+            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_main_descriptor_sets.data(), task_main_descriptor_sets.size()),
+            std::nullopt,
+            VK_ATTACHMENT_LOAD_OP_CLEAR,
+            vertex_input,
+            vertex_buffer_offset);
     };
     return main_task_desc;
 }

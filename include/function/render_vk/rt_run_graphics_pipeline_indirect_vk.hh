@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_INDIRECT_VK_HH
 #define WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_INDIRECT_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -24,6 +25,8 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <glm/ext/vector_float4.hpp>
 #include <optional>
@@ -64,6 +67,10 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         uint32_t draw_count = 0;
         /** Descriptor sets bound in set order for this pipeline. */
         Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
+        /** Dynamic vertex-input state used by this command range. */
+        VertexInputDescriptionVK vertex_input;
+        /** Byte offset bound for the shared vertex buffer. */
+        VkDeviceSize vertex_buffer_offset = 0;
     };
 
     RTRunGraphicsPipelineIndirectVK() = delete;
@@ -87,6 +94,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_draw_count Number of tightly packed VkDrawIndexedIndirectCommand records to execute.
      * @param p_descriptor_sets Descriptor sets bound in set order.
      * @param p_color_attachment_load_op Color attachment load operation.
+     * @param p_vertex_input Dynamic vertex-input state for the draw range.
+     * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
      */
     RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
@@ -98,7 +107,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         std::string_view p_indirect_buffer_id,
         uint32_t p_draw_count,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
+        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VertexInputDescriptionVK p_vertex_input = {},
+        VkDeviceSize p_vertex_buffer_offset = 0);
 
     /**
      * @brief Construct a task with multiple color attachments and an optional depth attachment.
@@ -116,6 +127,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_descriptor_sets Descriptor sets bound in set order.
      * @param p_color_attachment_load_op Load operation used for every color attachment.
      * @param p_depth_attachment_load_op Depth attachment load operation.
+     * @param p_vertex_input Dynamic vertex-input state for the draw range.
+     * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
      */
     RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
         std::span<const VkClearValue> p_clear_values,
@@ -129,7 +142,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         uint32_t p_draw_count,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
+        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VertexInputDescriptionVK p_vertex_input = {},
+        VkDeviceSize p_vertex_buffer_offset = 0);
 
     /**
      * @brief Construct a task with task-owned pipelines and an indirect-command buffer.

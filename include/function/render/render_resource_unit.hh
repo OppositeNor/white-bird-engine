@@ -17,23 +17,26 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "glm/ext/vector_float2.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
+#include "glm/ext/vector_int2.hpp"
+#include "glm/ext/vector_int3.hpp"
+#include "glm/ext/vector_int4.hpp"
+#include "glm/ext/vector_uint2.hpp"
+#include "glm/ext/vector_uint3.hpp"
+#include "glm/ext/vector_uint4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <optional>
 #include <string>
-#include <type_traits>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
-
-struct SubmeshTriangleBuffer {
-    const void* data;
-    size_t stride;
-};
-
-static_assert(std::is_trivial_v<SubmeshTriangleBuffer>);
 
 /**
  * @class RUSchemaShader
@@ -184,9 +187,6 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaSubmesh3D : public RUSchema {
     // Resource-relative path to the sidecar geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string geometry_path;
-    // The vertex type stored in the geometry binary.
-    WBE_META(WBE_REFLECT)
-    std::string vertex_type = "vertex_3d_textured";
     // Byte-addressed sections inside the geometry binary.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<RUSchemaSubmesh3DGeometrySection> geometry_sections;
@@ -267,6 +267,63 @@ struct RUGraphicsPipeline : public ResourceUnit {
 };
 
 /**
+ * @class RUShaderRole
+ * @brief Chunk-owned identity for an open shader-defined resource role.
+ *
+ * The name is retained for exact matching and diagnostics. The hash is an acceleration value and must always match the full
+ * NUL-terminated name; consumers must not treat the hash alone as identity. This type is a non-owning resource-chunk view
+ * and is copyable and movable with shallow chunk references.
+ */
+struct RUShaderRole {
+    /**
+     * @brief Construct an empty role for resource population.
+     */
+    RUShaderRole() = default;
+    /**
+     * @brief Destroy a non-owning role view.
+     */
+    ~RUShaderRole() = default;
+    /**
+     * @brief Copy a shallow role view.
+     */
+    RUShaderRole(const RUShaderRole&) = default;
+    /**
+     * @brief Move a shallow role view.
+     */
+    RUShaderRole(RUShaderRole&&) noexcept = default;
+    /**
+     * @brief Copy a shallow role view.
+     */
+    RUShaderRole& operator=(const RUShaderRole&) = default;
+    /**
+     * @brief Move a shallow role view.
+     */
+    RUShaderRole& operator=(RUShaderRole&&) noexcept = default;
+
+    /**
+     * @brief Construct a populated shallow role view; validation occurs when the role is accessed.
+     */
+    RUShaderRole(RefRes<char> p_name, HashCode p_hash) : name(p_name), hash(p_hash) {
+    }
+
+    /** Non-empty NUL-terminated role name. */
+    RefRes<char> name;
+    /** Runtime hash of name. */
+    HashCode hash = 0;
+
+    /**
+     * @brief Return and validate the retained role name.
+     * @throws std::runtime_error When the name is missing or empty, or its hash is inconsistent.
+     */
+    std::string_view get_name() const;
+    /**
+     * @brief Test a role using the hash and exact retained name.
+     * @throws std::runtime_error When this role or the requested name is invalid.
+     */
+    bool matches(std::string_view p_name) const;
+};
+
+/**
  * @class RUMaterial
  * @brief Typed material resource unit.
  */
@@ -275,8 +332,8 @@ struct RUMaterial : public ResourceUnit {
     RefRes<RUGraphicsPipeline> graphics_pipeline;
     /** One resolved texture-role slot. */
     struct TextureSlot {
-        /** Runtime hash decoded from the shader-defined schema texture_role name. */
-        HashCode texture_role = 0;
+        /** Exact shader-defined texture role. */
+        RUShaderRole role;
         /** Resolved texture resource. */
         RefRes<RUImage> texture;
     };
@@ -284,6 +341,73 @@ struct RUMaterial : public ResourceUnit {
     RefRes<TextureSlot> textures;
     /** Number of entries in textures. */
     size_t texture_count = 0;
+};
+
+/**
+ * @enum RUVertexAttributeFormat
+ * @brief Supported tightly packed 32-bit vertex attribute formats.
+ */
+enum class RUVertexAttributeFormat : uint8_t {
+    FLOAT,
+    FLOAT2,
+    FLOAT3,
+    FLOAT4,
+    INT,
+    INT2,
+    INT3,
+    INT4,
+    UINT,
+    UINT2,
+    UINT3,
+    UINT4,
+};
+
+/**
+ * @class RUVertexData
+ * @brief Chunk-owned mutable interleaved vertex data and its fixed layout.
+ *
+ * The layout is immutable after loading. Vertex bytes may be changed by the mutation methods, which are not thread-safe. A
+ * renderer update is required before changes reach the GPU. The resource is a non-owning view into its resource chunk and is
+ * copyable and movable with shallow chunk references.
+ */
+struct RUVertexData : public ResourceUnit {
+    /**
+     * @brief One attribute in declaration and packing order.
+     */
+    struct Attribute {
+        /** Exact shader-defined vertex role. */
+        RUShaderRole role;
+        /** Exact 32-bit scalar or vector format. */
+        RUVertexAttributeFormat format = RUVertexAttributeFormat::FLOAT;
+        /** Byte offset inside one interleaved vertex. */
+        size_t offset = 0;
+        /** Byte size inside one interleaved vertex. */
+        size_t size = 0;
+    };
+
+    /** Mutable tightly interleaved vertex bytes. */
+    RefRes<uint8_t> vertices;
+    /** Total byte size of vertices. */
+    size_t vertices_size = 0;
+    /** Ordered fixed-layout attributes. */
+    RefRes<Attribute> attributes;
+    /** Number of entries in attributes. */
+    size_t attribute_count = 0;
+    /** Byte stride between vertices. */
+    size_t vertex_stride = 0;
+    /** Number of interleaved vertices. */
+    size_t vertex_count = 0;
+
+    /**
+     * @brief Swap two complete interleaved vertices.
+     * @throws std::runtime_error When storage is missing or either vertex is out of bounds.
+     */
+    void swap_vertices(size_t p_first, size_t p_second);
+    /**
+     * @brief Return the byte offset of a role inside one vertex.
+     * @throws std::runtime_error When the role is empty, duplicated, or absent, or layout storage is missing.
+     */
+    size_t get_vertex_attribute_offset(std::string_view p_role) const;
 };
 
 /**
@@ -298,12 +422,53 @@ struct RUMaterial : public ResourceUnit {
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.
     RefRes<RUMaterial> material;
-    // The type UUID of one triangle entry.
-    TypeID triangle_type_uuid = 0;
-    // The total number of triangles.
-    size_t triangles_count = 0;
-    // The triangles instances.
-    SubmeshTriangleBuffer triangles{};
+    /** Chunk-owned interleaved vertices and fixed layout. */
+    RefRes<RUVertexData> vertex_data;
+    /** Chunk-owned contiguous uint32 indices. */
+    RefRes<uint32_t> indices;
+    /** Number of entries in indices. */
+    size_t index_count = 0;
+
+    /**
+     * @copydoc RUVertexData::swap_vertices
+     */
+    void swap_vertices(size_t p_first, size_t p_second);
+    /** Set an exact float scalar attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, float p_value);
+    /** Set an exact float2 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec2& p_value);
+    /** Set an exact float3 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec3& p_value);
+    /** Set an exact float4 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::vec4& p_value);
+    /** Set an exact signed 32-bit scalar attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, int32_t p_value);
+    /** Set an exact signed 32-bit integer2 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec2& p_value);
+    /** Set an exact signed 32-bit integer3 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec3& p_value);
+    /** Set an exact signed 32-bit integer4 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::ivec4& p_value);
+    /** Set an exact unsigned 32-bit scalar attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, uint32_t p_value);
+    /** Set an exact unsigned 32-bit integer2 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec2& p_value);
+    /** Set an exact unsigned 32-bit integer3 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec3& p_value);
+    /** Set an exact unsigned 32-bit integer4 attribute. */
+    void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec4& p_value);
+    /**
+     * @copydoc RUVertexData::get_vertex_attribute_offset
+     */
+    size_t get_vertex_attribute_offset(std::string_view p_role) const;
+    /**
+     * @brief Return the byte stride between vertices.
+     */
+    size_t get_vertex_stride() const;
+    /**
+     * @brief Return the number of vertices.
+     */
+    size_t get_vertices_num() const;
 };
 
 /**

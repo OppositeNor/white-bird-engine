@@ -19,7 +19,6 @@
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
 #include "core/reflection/serializable.hh"
-#include "core/surface/3d_primitive.hh"
 #include "generated/serializable_factory.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
@@ -102,14 +101,6 @@ TEST_F(WBESerializableFactoryTest, SupportsInPlaceConstruction) {
     EXPECT_EQ(serializable->str_test, "In place");
 
     serializable->~TestSerializable();
-}
-
-TEST_F(WBESerializableFactoryTest, ResolvesTypeUuidByAliasName) {
-    auto* type_uuid_manager = WBE::TypeUUIDManager::get_singleton();
-
-    ASSERT_NE(type_uuid_manager, nullptr);
-    EXPECT_EQ(type_uuid_manager->get_type_uuid("vertex_3d"), WBE::TypeUUID<WBE::Vertex3D>::UUID);
-    EXPECT_EQ(type_uuid_manager->get_type_uuid("vertex_3d_textured"), WBE::TypeUUID<WBE::Vertex3DTextured>::UUID);
 }
 
 TEST_F(WBESerializableFactoryTest, ThrowsForUnknownSerializableName) {

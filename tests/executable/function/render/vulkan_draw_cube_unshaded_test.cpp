@@ -32,18 +32,23 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <memory>
+#include <optional>
 #include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -115,13 +120,22 @@ public:
         // from the RenderDatabase, and exposed to render tasks under the
         // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
         std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
+        const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+        if (triangles_info.draw_groups.size() != 1) {
+            throw std::runtime_error("Failed to setup draw cube unshaded test: expected one vertex draw group.");
+        }
+        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_cube_unshaded_shader");
+        WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
+            WBE::load_shader_metadata_vk(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
+        const VkDeviceSize vertex_buffer_offset = triangles_info.draw_groups[0].vertex_buffer_byte_offset;
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
             .res = graphics_pipeline});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
-        task_desc.create = [render_allocator, base_render_data, descriptor_sets]() -> WBE::Unique<WBE::RenderTaskVK> {
+        task_desc.create =
+            [render_allocator, base_render_data, descriptor_sets, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
@@ -130,7 +144,11 @@ public:
                 WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
                 WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()));
+                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()),
+                std::nullopt,
+                VK_ATTACHMENT_LOAD_OP_CLEAR,
+                vertex_input,
+                vertex_buffer_offset);
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));

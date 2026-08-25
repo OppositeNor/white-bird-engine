@@ -15,8 +15,11 @@
 #ifndef WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 #define WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 
+#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <string>
@@ -124,6 +127,25 @@ const ShaderMetadataEntryPoint& find_shader_entry_point(
  * @brief Convert a reflected shader stage string into a Vulkan stage flag.
  */
 VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_stage);
+
+/**
+ * @brief Reflect and match one vertex entry point against a resource-defined vertex layout.
+ *
+ * Every field marked WBE_VERTEX_INPUT must match an exact resource role and format. Extra resource attributes are allowed.
+ * Locations come from the reflected varying-input binding indices. A vertex entry without annotated fields produces an empty
+ * vertex-less state.
+ *
+ * @throws std::runtime_error When attributes, roles, locations, formats, arguments, or resource layout metadata are invalid.
+ */
+VertexInputDescriptionVK build_vertex_input_description_vk(
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data);
+
+/**
+ * @copydoc build_vertex_input_description_vk(const ShaderMetadata&, std::string_view, const RUVertexData&)
+ */
+VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
+    std::string_view p_entry_name,
+    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout);
 
 /**
  * @brief Collect descriptor bindings used by one shader entry point.

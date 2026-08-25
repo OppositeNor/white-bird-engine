@@ -15,6 +15,13 @@
 #ifndef WBE_FILE_DEFS_SLANG
 #define WBE_FILE_DEFS_SLANG
 
+/** Marks a vertex entry-point field and selects a resource attribute by role. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_VERTEX_INPUTAttribute {
+    /** Vertex attribute role; an empty value selects the annotated field name. */
+    string vertex_role = "";
+};
+
 /**
  * @brief The input data from the vertex buffer
  */
@@ -22,23 +29,28 @@ struct Vertex3DTexturedInput {
     /**
  * @brief The position of the vertex.
      */
-    [[vk::location(0)]] float3 position;
+    [WBE_VERTEX_INPUT("position")]
+    float3 position;
     /**
  * @brief The normal of the vertex.
      */
-    [[vk::location(1)]] float3 normal;
+    [WBE_VERTEX_INPUT]
+    float3 normal;
     /**
  * @brief The tanglent vector of the vertex.
      */
-    [[vk::location(2)]] float3 tangent;
+    [WBE_VERTEX_INPUT]
+    float3 tangent;
     /**
  * @brief The bitangent vector of the vertex.
      */
-    [[vk::location(3)]] float3 bitangent;
+    [WBE_VERTEX_INPUT]
+    float3 bitangent;
     /**
  * @brief The uv value.
      */
-    [[vk::location(4)]] float2 uv;
+    [WBE_VERTEX_INPUT]
+    float2 uv;
 };
 
 /**

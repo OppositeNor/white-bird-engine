@@ -20,10 +20,17 @@
 #include "core/memory/unique.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/material_texture_contract.hh"
+#include "function/render/material_texture_contract_resolver.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_loader.hh"
+#include "function/render/shader_role.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -33,6 +40,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/static_opaque_vertex_batch_planner_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -259,47 +267,6 @@ struct StaticOpaqueMaterialDataVK {
     RefRes<RUImage> default_image = MEM_NULL;
 };
 
-struct StaticOpaqueMaterialTextureFieldVK {
-    StaticOpaqueMaterialTextureFieldVK() = default;
-    ~StaticOpaqueMaterialTextureFieldVK() = default;
-    StaticOpaqueMaterialTextureFieldVK(const StaticOpaqueMaterialTextureFieldVK&) = default;
-    StaticOpaqueMaterialTextureFieldVK(StaticOpaqueMaterialTextureFieldVK&&) noexcept = default;
-    StaticOpaqueMaterialTextureFieldVK& operator=(const StaticOpaqueMaterialTextureFieldVK&) = default;
-    StaticOpaqueMaterialTextureFieldVK& operator=(StaticOpaqueMaterialTextureFieldVK&&) noexcept = default;
-
-    std::string texture_role;
-    HashCode texture_role_hash = 0;
-    size_t offset = 0;
-};
-
-struct StaticOpaqueMaterialTextureContractVK {
-    StaticOpaqueMaterialTextureContractVK() = default;
-    ~StaticOpaqueMaterialTextureContractVK() = default;
-    StaticOpaqueMaterialTextureContractVK(const StaticOpaqueMaterialTextureContractVK&) = default;
-    StaticOpaqueMaterialTextureContractVK(StaticOpaqueMaterialTextureContractVK&&) noexcept = default;
-    StaticOpaqueMaterialTextureContractVK& operator=(const StaticOpaqueMaterialTextureContractVK&) = default;
-    StaticOpaqueMaterialTextureContractVK& operator=(StaticOpaqueMaterialTextureContractVK&&) noexcept = default;
-
-    std::vector<StaticOpaqueMaterialTextureFieldVK> texture_fields;
-    size_t table_offset = 0;
-    size_t table_stride = 0;
-    size_t table_size = 0;
-    size_t material_count = 0;
-};
-
-struct StaticOpaquePipelineMaterialReflectionVK {
-    StaticOpaquePipelineMaterialReflectionVK() = default;
-    ~StaticOpaquePipelineMaterialReflectionVK() = default;
-    StaticOpaquePipelineMaterialReflectionVK(const StaticOpaquePipelineMaterialReflectionVK&) = default;
-    StaticOpaquePipelineMaterialReflectionVK(StaticOpaquePipelineMaterialReflectionVK&&) noexcept = default;
-    StaticOpaquePipelineMaterialReflectionVK& operator=(const StaticOpaquePipelineMaterialReflectionVK&) = default;
-    StaticOpaquePipelineMaterialReflectionVK& operator=(StaticOpaquePipelineMaterialReflectionVK&&) noexcept = default;
-
-    std::optional<StaticOpaqueMaterialTextureContractVK> contract;
-    bool has_material_params = false;
-    bool has_material_textures = false;
-};
-
 struct StaticOpaqueAttachmentDataVK {
     StaticOpaqueAttachmentDataVK() = default;
     ~StaticOpaqueAttachmentDataVK() = default;
@@ -343,194 +310,33 @@ void validate_task_config(const RTRunStaticOpaqueTrianglesVK::Config& p_config) 
     }
 }
 
-const ShaderMetadataParameter* find_shader_parameter(const ShaderMetadata& p_metadata, std::string_view p_name) {
-    const ShaderMetadataParameter* result = nullptr;
-    for (const ShaderMetadataParameter& parameter : p_metadata.parameters) {
-        if (parameter.name != p_name) {
-            continue;
-        }
-        if (result != nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to reflect static opaque material contract: shader parameter '{}' is duplicated.", p_name));
-        }
-        result = &parameter;
-    }
-    return result;
-}
-
-const ShaderMetadataTypeField* find_shader_field(const std::vector<ShaderMetadataTypeField>& p_fields, std::string_view p_name) {
-    const ShaderMetadataTypeField* result = nullptr;
-    for (const ShaderMetadataTypeField& field : p_fields) {
-        if (field.name != p_name) {
-            continue;
-        }
-        if (result != nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to reflect static opaque material contract: shader field '{}' is duplicated.", p_name));
-        }
-        result = &field;
-    }
-    return result;
-}
-
-std::optional<std::string> get_texture_role(const ShaderMetadataTypeField& p_field) {
-    const ShaderMetadataUserAttribute* texture_attribute = nullptr;
-    for (const ShaderMetadataUserAttribute& attribute : p_field.user_attributes) {
-        if (attribute.name != "WBE_TEXTURE") {
-            continue;
-        }
-        if (texture_attribute != nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to reflect static opaque material contract: field '{}' repeats WBE_TEXTURE.", p_field.name));
-        }
-        texture_attribute = &attribute;
-    }
-    if (texture_attribute == nullptr) {
-        return std::nullopt;
-    }
-    if (texture_attribute->arguments.size() > 1 ||
-        (!texture_attribute->arguments.empty() && texture_attribute->arguments[0].kind != "string")) {
-        throw std::runtime_error(std::format(
-            "Failed to reflect static opaque material contract: WBE_TEXTURE on '{}' requires one optional string.", p_field.name));
-    }
-    std::string texture_role = texture_attribute->arguments.empty() ? std::string() : texture_attribute->arguments[0].string_value;
-    if (texture_role.empty()) {
-        texture_role = p_field.name;
-    }
-    if (texture_role.empty()) {
-        throw std::runtime_error("Failed to reflect static opaque material contract: WBE_TEXTURE resolved to an empty texture role.");
-    }
-    return texture_role;
-}
-
-StaticOpaqueMaterialTextureContractVK reflect_material_texture_contract(const ShaderMetadataParameter& p_material_params_parameter) {
-    if (p_material_params_parameter.type.kind != "constantBuffer" || p_material_params_parameter.type.fields.size() != 1) {
-        throw std::runtime_error(
-            "Failed to reflect static opaque material contract: material params must be a constant buffer containing only materials.");
-    }
-    const ShaderMetadataTypeField* materials_field = find_shader_field(p_material_params_parameter.type.fields, "materials");
-    if (materials_field == nullptr || materials_field->type.kind != "array" || materials_field->type.element_count <= 0 ||
-        materials_field->binding.offset < 0 || materials_field->binding.size <= 0 || materials_field->binding.element_stride <= 0) {
-        throw std::runtime_error(
-            "Failed to reflect static opaque material contract: materials must be a sized array with a reflected uniform layout.");
-    }
-    StaticOpaqueMaterialTextureContractVK result;
-    result.table_offset = static_cast<size_t>(materials_field->binding.offset);
-    result.table_stride = static_cast<size_t>(materials_field->binding.element_stride);
-    result.table_size = static_cast<size_t>(materials_field->binding.size);
-    result.material_count = static_cast<size_t>(materials_field->type.element_count);
-    if (result.table_size < result.table_stride * result.material_count) {
-        throw std::runtime_error("Failed to reflect static opaque material contract: reflected material table is too small.");
-    }
-    for (const ShaderMetadataTypeField& field : materials_field->fields) {
-        std::optional<std::string> texture_role = get_texture_role(field);
-        if (!texture_role.has_value()) {
-            continue;
-        }
-        if (field.type.kind != "scalar" || field.type.scalar_type != "int32" || field.binding.kind != "uniform" ||
-            field.binding.offset < 0 || std::cmp_not_equal(field.binding.size, sizeof(int32_t))) {
-            throw std::runtime_error(std::format("Failed to reflect static opaque material contract: WBE_TEXTURE field '{}' must be a 32-bit uniform integer.",
-                field.name));
-        }
-        size_t field_offset = static_cast<size_t>(field.binding.offset);
-        if (field_offset + sizeof(int32_t) > result.table_stride) {
-            throw std::runtime_error(std::format("Failed to reflect static opaque material contract: WBE_TEXTURE field '{}' exceeds the material stride.",
-                field.name));
-        }
-        HashCode texture_role_hash = dynam_hash(*texture_role);
-        if (std::ranges::any_of(result.texture_fields, [texture_role_hash](const StaticOpaqueMaterialTextureFieldVK& p_existing) {
-                return p_existing.texture_role_hash == texture_role_hash;
-            })) {
-            throw std::runtime_error(std::format(
-                "Failed to reflect static opaque material contract: texture role '{}' is declared more than once.", *texture_role));
-        }
-        StaticOpaqueMaterialTextureFieldVK texture_field;
-        texture_field.texture_role = std::move(*texture_role);
-        texture_field.texture_role_hash = texture_role_hash;
-        texture_field.offset = field_offset;
-        result.texture_fields.push_back(std::move(texture_field));
-    }
-    if (result.texture_fields.empty()) {
-        throw std::runtime_error("Failed to reflect static opaque material contract: MaterialParams has no WBE_TEXTURE fields.");
-    }
-    return result;
-}
-
-void validate_material_textures_parameter(const ShaderMetadataParameter& p_material_textures_parameter) {
-    const ShaderMetadataTypeField* sampler_field = find_shader_field(p_material_textures_parameter.type.fields, "material_sampler");
-    const ShaderMetadataTypeField* textures_field = find_shader_field(p_material_textures_parameter.type.fields, "textures");
-    if (p_material_textures_parameter.type.kind != "parameterBlock" || sampler_field == nullptr ||
-        textures_field == nullptr || sampler_field->type.kind != "samplerState" || textures_field->type.kind != "array" ||
-        !textures_field->type.element_scalar_type.starts_with("texture")) {
-        throw std::runtime_error(
-            "Failed to reflect static opaque material contract: material textures must contain material_sampler and textures[].");
-    }
-}
-
-bool material_texture_contracts_match(
-    const StaticOpaqueMaterialTextureContractVK& p_lhs, const StaticOpaqueMaterialTextureContractVK& p_rhs) {
-    if (p_lhs.table_offset != p_rhs.table_offset || p_lhs.table_stride != p_rhs.table_stride || p_lhs.table_size != p_rhs.table_size ||
-        p_lhs.material_count != p_rhs.material_count || p_lhs.texture_fields.size() != p_rhs.texture_fields.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < p_lhs.texture_fields.size(); ++i) {
-        if (p_lhs.texture_fields[i].texture_role_hash != p_rhs.texture_fields[i].texture_role_hash ||
-            p_lhs.texture_fields[i].offset != p_rhs.texture_fields[i].offset) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void merge_shader_material_reflection(StaticOpaquePipelineMaterialReflectionVK& p_result,
-    const ShaderMetadata& p_metadata,
+std::optional<MaterialTextureContract> reflect_pipeline_material_texture_contract(RefRes<RUGraphicsPipeline> p_pipeline,
     std::string_view p_material_textures_variable_name,
     std::string_view p_material_params_variable_name) {
-    const ShaderMetadataParameter* material_params = find_shader_parameter(p_metadata, p_material_params_variable_name);
-    const ShaderMetadataParameter* material_textures = find_shader_parameter(p_metadata, p_material_textures_variable_name);
-    if (material_params != nullptr) {
-        StaticOpaqueMaterialTextureContractVK contract = reflect_material_texture_contract(*material_params);
-        if (p_result.contract.has_value() && !material_texture_contracts_match(*p_result.contract, contract)) {
-            throw std::runtime_error("Failed to reflect static opaque material contract: shader stages use incompatible material layouts.");
-        }
-        p_result.contract = std::move(contract);
-        p_result.has_material_params = true;
-    }
-    if (material_textures != nullptr) {
-        validate_material_textures_parameter(*material_textures);
-        p_result.has_material_textures = true;
-    }
-}
-
-std::optional<StaticOpaqueMaterialTextureContractVK> reflect_pipeline_material_texture_contract(
-    RefRes<RUGraphicsPipeline> p_pipeline, std::string_view p_material_textures_variable_name, std::string_view p_material_params_variable_name) {
     if (p_pipeline == nullptr || p_pipeline->vertex_stage == nullptr || p_pipeline->fragment_stage == nullptr) {
         throw std::runtime_error("Failed to reflect static opaque material contract: graphics pipeline stages are missing.");
     }
-    StaticOpaquePipelineMaterialReflectionVK reflection;
-    merge_shader_material_reflection(
-        reflection, load_shader_metadata_vk(p_pipeline->vertex_stage), p_material_textures_variable_name, p_material_params_variable_name);
+    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline->vertex_stage);
+    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline->fragment_stage);
+    std::optional<ShaderMetadata> geometry_metadata;
     if (p_pipeline->geometry_stage != nullptr) {
-        merge_shader_material_reflection(
-            reflection, load_shader_metadata_vk(p_pipeline->geometry_stage), p_material_textures_variable_name, p_material_params_variable_name);
+        geometry_metadata = ShaderMetadataLoader().load(p_pipeline->geometry_stage);
     }
-    merge_shader_material_reflection(
-        reflection, load_shader_metadata_vk(p_pipeline->fragment_stage), p_material_textures_variable_name, p_material_params_variable_name);
-    if (reflection.has_material_params != reflection.has_material_textures) {
-        throw std::runtime_error(
-            "Failed to reflect static opaque material contract: material_params and material_textures must be declared together.");
-    }
-    return std::move(reflection.contract);
+    return MaterialTextureContractResolver().resolve(vertex_metadata,
+        geometry_metadata.has_value() ? &*geometry_metadata : nullptr,
+        fragment_metadata,
+        p_material_textures_variable_name,
+        p_material_params_variable_name);
 }
 
-RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, HashCode p_texture_role) {
+RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, const ShaderRole& p_texture_role) {
     if (p_material == nullptr || (p_material->texture_count > 0 && p_material->textures == nullptr)) {
         throw std::runtime_error("Failed to construct static opaque task: material texture storage is missing.");
     }
     RefRes<RUImage> result = MEM_NULL;
     for (size_t i = 0; i < p_material->texture_count; ++i) {
         const RUMaterial::TextureSlot& texture_slot = p_material->textures.get()[i];
-        if (texture_slot.texture_role != p_texture_role) {
+        if (!texture_slot.role.matches(p_texture_role.get_name())) {
             continue;
         }
         if (result != nullptr) {
@@ -548,11 +354,8 @@ RefRes<RUImage> find_first_material_texture(RefRes<RUMaterial> p_material) {
     return p_material->textures.get()[0].texture;
 }
 
-void write_material_texture_index(std::vector<uint8_t>& p_buffer,
-    const StaticOpaqueMaterialTextureContractVK& p_contract,
-    size_t p_material_index,
-    size_t p_field_offset,
-    int32_t p_texture_index) {
+void write_material_texture_index(
+    std::vector<uint8_t>& p_buffer, const MaterialTextureContract& p_contract, size_t p_material_index, size_t p_field_offset, int32_t p_texture_index) {
     size_t offset = p_contract.table_offset + p_material_index * p_contract.table_stride + p_field_offset;
     if (offset > p_buffer.size() || sizeof(p_texture_index) > p_buffer.size() - offset) {
         throw std::runtime_error("Failed to construct static opaque task: reflected material index write is out of bounds.");
@@ -562,27 +365,30 @@ void write_material_texture_index(std::vector<uint8_t>& p_buffer,
 
 void validate_draw_data_source(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info) {
     if (p_triangles_info.vertices.empty() || p_triangles_info.indices.empty() || p_triangles_info.materials.empty() ||
-        p_triangles_info.graphics_pipelines.empty()) {
+        p_triangles_info.draw_groups.empty() || p_triangles_info.graphics_pipelines.empty()) {
         throw std::runtime_error("Failed to construct static opaque task: the render database has no drawable triangles.");
     }
 }
 
 void append_indirect_commands(StaticOpaqueDrawDataVK& p_draw_data, const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info) {
-    p_draw_data.indirect_commands.reserve(p_triangles_info.materials.size());
-    for (uint32_t material_index = 0; material_index < p_triangles_info.materials.size(); ++material_index) {
-        const auto& material_unit = p_triangles_info.materials[material_index];
-        if (material_unit.sub_region.starting_index > p_triangles_info.indices.size() ||
-            material_unit.sub_region.size > p_triangles_info.indices.size() - material_unit.sub_region.starting_index ||
-            material_unit.sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
-            material_unit.sub_region.size > std::numeric_limits<uint32_t>::max()) {
-            throw std::runtime_error("Failed to construct static opaque task: a material index range is invalid.");
+    p_draw_data.indirect_commands.reserve(p_triangles_info.draw_groups.size());
+    for (const auto& draw_group : p_triangles_info.draw_groups) {
+        if (draw_group.index_sub_region.starting_index > p_triangles_info.indices.size() ||
+            draw_group.index_sub_region.size > p_triangles_info.indices.size() - draw_group.index_sub_region.starting_index ||
+            draw_group.index_sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
+            draw_group.index_sub_region.size > std::numeric_limits<uint32_t>::max() ||
+            draw_group.material_index >= p_triangles_info.materials.size() ||
+            draw_group.material_index >= std::numeric_limits<uint32_t>::max() ||
+            draw_group.indirect_command_sub_region.starting_index != p_draw_data.indirect_commands.size() ||
+            draw_group.indirect_command_sub_region.size != 1) {
+            throw std::runtime_error("Failed to construct static opaque task: a draw-group range is invalid.");
         }
         p_draw_data.indirect_commands.push_back(VkDrawIndexedIndirectCommand{
-            .indexCount = static_cast<uint32_t>(material_unit.sub_region.size),
+            .indexCount = static_cast<uint32_t>(draw_group.index_sub_region.size),
             .instanceCount = 1,
-            .firstIndex = static_cast<uint32_t>(material_unit.sub_region.starting_index),
+            .firstIndex = static_cast<uint32_t>(draw_group.index_sub_region.starting_index),
             .vertexOffset = 0,
-            .firstInstance = material_index + 1,
+            .firstInstance = static_cast<uint32_t>(draw_group.material_index) + 1,
         });
     }
 }
@@ -637,11 +443,12 @@ void append_pipeline_batches(StaticOpaqueDrawDataVK& p_draw_data,
         if (pipeline_unit.graphics_pipeline == nullptr || pipeline_unit.graphics_pipeline->resource_key == nullptr) {
             throw std::runtime_error("Failed to construct static opaque task: a material graphics pipeline is missing.");
         }
-        if (pipeline_unit.material_sub_region.starting_index > p_triangles_info.materials.size() ||
-            pipeline_unit.material_sub_region.size > p_triangles_info.materials.size() - pipeline_unit.material_sub_region.starting_index ||
-            pipeline_unit.material_sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
-            pipeline_unit.material_sub_region.size > std::numeric_limits<uint32_t>::max()) {
-            throw std::runtime_error("Failed to construct static opaque task: a graphics-pipeline material range is invalid.");
+        if (pipeline_unit.draw_group_sub_region.starting_index > p_triangles_info.draw_groups.size() ||
+            pipeline_unit.draw_group_sub_region.size >
+                p_triangles_info.draw_groups.size() - pipeline_unit.draw_group_sub_region.starting_index ||
+            pipeline_unit.draw_group_sub_region.starting_index > std::numeric_limits<uint32_t>::max() ||
+            pipeline_unit.draw_group_sub_region.size > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("Failed to construct static opaque task: a graphics-pipeline draw-group range is invalid.");
         }
         std::string source_pipeline_key = pipeline_unit.graphics_pipeline->resource_key;
         std::string target_pipeline_key = resolve_target_pipeline_key(source_pipeline_key, p_config);
@@ -652,8 +459,8 @@ void append_pipeline_batches(StaticOpaqueDrawDataVK& p_draw_data,
             throw std::runtime_error(
                 std::format("Failed to construct static opaque task: graphics pipeline '{}' was not found.", target_pipeline_key));
         }
-        uint32_t first_draw = static_cast<uint32_t>(pipeline_unit.material_sub_region.starting_index);
-        uint32_t draw_count = static_cast<uint32_t>(pipeline_unit.material_sub_region.size);
+        uint32_t first_draw = static_cast<uint32_t>(pipeline_unit.draw_group_sub_region.starting_index);
+        uint32_t draw_count = static_cast<uint32_t>(pipeline_unit.draw_group_sub_region.size);
         append_pipeline_batch(p_draw_data, target_pipeline, std::move(target_pipeline_key), first_draw, draw_count);
     }
 }
@@ -670,11 +477,11 @@ StaticOpaqueDrawDataVK build_draw_data(const RenderDatabase::OpaqueTrianglesInfo
 
 void validate_material_data_range(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
     const StaticOpaqueDrawDataVK::PipelineBatch& p_draw_batch,
-    const StaticOpaqueMaterialTextureContractVK& p_contract) {
-    if (p_draw_batch.first_draw > p_triangles_info.materials.size() ||
-        p_draw_batch.draw_count > p_triangles_info.materials.size() - p_draw_batch.first_draw ||
-        static_cast<size_t>(p_draw_batch.first_draw) + p_draw_batch.draw_count + 1 > p_contract.material_count) {
-        throw std::runtime_error("Failed to construct static opaque task: pipeline material range exceeds the reflected table.");
+    const MaterialTextureContract& p_contract) {
+    if (p_draw_batch.first_draw > p_triangles_info.draw_groups.size() ||
+        p_draw_batch.draw_count > p_triangles_info.draw_groups.size() - p_draw_batch.first_draw ||
+        p_triangles_info.materials.size() + 1 > p_contract.material_count) {
+        throw std::runtime_error("Failed to construct static opaque task: pipeline draw or material range exceeds the reflected table.");
     }
     if (p_contract.table_offset > std::numeric_limits<size_t>::max() - p_contract.table_size) {
         throw std::runtime_error("Failed to construct static opaque task: reflected material table size overflows.");
@@ -695,19 +502,19 @@ int32_t append_material_texture_declaration(RenderBindpointDeclarationsBuilder& 
 }
 
 std::vector<int32_t> append_default_material_textures(RenderBindpointDeclarationsBuilder& p_bindpoint_builder,
-    const StaticOpaqueMaterialTextureContractVK& p_contract,
+    const MaterialTextureContract& p_contract,
     const RTRunStaticOpaqueTrianglesVK::Config& p_config,
     const BaseRenderDataVK* p_render_data,
     RefRes<RUMaterial> p_default_material,
     RefRes<RUImage>& p_default_image) {
     std::vector<int32_t> result;
     result.reserve(p_contract.texture_fields.size());
-    for (const StaticOpaqueMaterialTextureFieldVK& texture_field : p_contract.texture_fields) {
-        RefRes<RUImage> texture = find_material_texture(p_default_material, texture_field.texture_role_hash);
+    for (const MaterialTextureContract::TextureField& texture_field : p_contract.texture_fields) {
+        RefRes<RUImage> texture = find_material_texture(p_default_material, texture_field.role);
         if (texture == nullptr) {
             throw std::runtime_error(std::format("Failed to construct static opaque task: default material '{}' is missing texture role '{}'.",
                 p_config.get_default_material_resource_key(),
-                texture_field.texture_role));
+                texture_field.role.get_name()));
         }
         result.push_back(append_material_texture_declaration(
             p_bindpoint_builder, p_config.get_material_textures_variable_name(), texture, p_render_data));
@@ -719,7 +526,7 @@ std::vector<int32_t> append_default_material_textures(RenderBindpointDeclaration
 }
 
 void initialize_material_texture_indices(std::vector<uint8_t>& p_material_params,
-    const StaticOpaqueMaterialTextureContractVK& p_contract,
+    const MaterialTextureContract& p_contract,
     const std::vector<int32_t>& p_default_texture_indices) {
     for (size_t material_index = 0; material_index < p_contract.material_count; ++material_index) {
         for (size_t texture_field_index = 0; texture_field_index < p_contract.texture_fields.size(); ++texture_field_index) {
@@ -736,20 +543,29 @@ void append_material_texture_overrides(RenderBindpointDeclarationsBuilder& p_bin
     std::vector<uint8_t>& p_material_params,
     const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
     const StaticOpaqueDrawDataVK::PipelineBatch& p_draw_batch,
-    const StaticOpaqueMaterialTextureContractVK& p_contract,
+    const MaterialTextureContract& p_contract,
     std::string_view p_material_textures_variable_name,
     const BaseRenderDataVK* p_render_data) {
     size_t draw_end = static_cast<size_t>(p_draw_batch.first_draw) + p_draw_batch.draw_count;
+    std::vector<bool> processed_materials(p_triangles_info.materials.size(), false);
     for (size_t draw_index = p_draw_batch.first_draw; draw_index < draw_end; ++draw_index) {
-        RefRes<RUMaterial> material = p_triangles_info.materials[draw_index].material;
-        for (const StaticOpaqueMaterialTextureFieldVK& texture_field : p_contract.texture_fields) {
-            RefRes<RUImage> texture = find_material_texture(material, texture_field.texture_role_hash);
+        const size_t material_index = p_triangles_info.draw_groups[draw_index].material_index;
+        if (material_index >= p_triangles_info.materials.size()) {
+            throw std::runtime_error("Failed to construct static opaque task: draw group references an invalid material.");
+        }
+        if (processed_materials[material_index]) {
+            continue;
+        }
+        processed_materials[material_index] = true;
+        RefRes<RUMaterial> material = p_triangles_info.materials[material_index].material;
+        for (const MaterialTextureContract::TextureField& texture_field : p_contract.texture_fields) {
+            RefRes<RUImage> texture = find_material_texture(material, texture_field.role);
             if (texture == nullptr) {
                 continue;
             }
             int32_t texture_index =
                 append_material_texture_declaration(p_bindpoint_builder, p_material_textures_variable_name, texture, p_render_data);
-            write_material_texture_index(p_material_params, p_contract, draw_index + 1, texture_field.offset, texture_index);
+            write_material_texture_index(p_material_params, p_contract, material_index + 1, texture_field.offset, texture_index);
         }
     }
 }
@@ -762,7 +578,7 @@ StaticOpaqueMaterialDataVK build_material_data(const RenderDatabase::OpaqueTrian
     Ref<IRenderObject> p_material_sampler) {
     StaticOpaqueMaterialDataVK result;
     result.default_image = find_first_material_texture(p_default_material);
-    std::optional<StaticOpaqueMaterialTextureContractVK> contract = reflect_pipeline_material_texture_contract(
+    std::optional<MaterialTextureContract> contract = reflect_pipeline_material_texture_contract(
         p_draw_batch.graphics_pipeline, p_config.get_material_textures_variable_name(), p_config.get_material_params_variable_name());
     if (!contract.has_value()) {
         return result;
@@ -918,6 +734,19 @@ Unique<RTRunGraphicsPipelineIndirectVK> build_indirect_task(RenderAllocator* p_a
         p_depth_load_op);
 }
 
+std::string_view get_vertex_stage_entry_name(RefRes<RUGraphicsPipeline> p_pipeline) {
+    if (p_pipeline == nullptr || p_pipeline->vertex_stage == nullptr) {
+        throw std::runtime_error("Failed to construct static opaque task: vertex shader stage is missing.");
+    }
+    if (p_pipeline->vertex_stage_entry != nullptr && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
+        return p_pipeline->vertex_stage_entry.get();
+    }
+    if (p_pipeline->vertex_stage->vertex_entry != nullptr && p_pipeline->vertex_stage->vertex_entry.get()[0] != '\0') {
+        return p_pipeline->vertex_stage->vertex_entry.get();
+    }
+    return {};
+}
+
 } // namespace
 
 RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_renderer, const Config& p_config) {
@@ -948,13 +777,21 @@ RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_rendere
     for (const auto& draw_batch : draw_data.pipeline_batches) {
         StaticOpaqueCompiledPipelineBatchVK pipeline_batch =
             compile_pipeline_batch(triangles_info, draw_batch, p_config, compiler_context, default_material, material_sampler);
-        RTRunGraphicsPipelineIndirectVK::PipelineBatch task_batch(render_allocator);
-        task_batch.graphics_pipeline = pipeline_batch.compiled.graphics_pipeline;
-        task_batch.first_draw = pipeline_batch.first_draw;
-        task_batch.draw_count = pipeline_batch.draw_count;
-        task_batch.descriptor_sets.assign(
-            pipeline_batch.compiled.descriptor_sets.begin(), pipeline_batch.compiled.descriptor_sets.end());
-        task_pipeline_batches.push_back(std::move(task_batch));
+        ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(draw_batch.graphics_pipeline->vertex_stage);
+        const std::string_view vertex_entry_name = get_vertex_stage_entry_name(draw_batch.graphics_pipeline);
+        std::vector<StaticOpaqueVertexBatchPlannerVK::Batch> vertex_batches = StaticOpaqueVertexBatchPlannerVK().build(
+            vertex_metadata, vertex_entry_name, triangles_info, pipeline_batch.first_draw, pipeline_batch.draw_count);
+        for (StaticOpaqueVertexBatchPlannerVK::Batch& vertex_batch : vertex_batches) {
+            RTRunGraphicsPipelineIndirectVK::PipelineBatch task_batch(render_allocator);
+            task_batch.graphics_pipeline = pipeline_batch.compiled.graphics_pipeline;
+            task_batch.first_draw = vertex_batch.first_draw;
+            task_batch.draw_count = vertex_batch.draw_count;
+            task_batch.vertex_buffer_offset = vertex_batch.vertex_buffer_offset;
+            task_batch.vertex_input = std::move(vertex_batch.vertex_input);
+            task_batch.descriptor_sets.assign(
+                pipeline_batch.compiled.descriptor_sets.begin(), pipeline_batch.compiled.descriptor_sets.end());
+            task_pipeline_batches.push_back(std::move(task_batch));
+        }
         CompiledBatch compiled_batch;
         compiled_batch.descriptor_sets = std::move(pipeline_batch.compiled.descriptor_sets);
         compiled_batch.descriptor_set_bindings = std::move(pipeline_batch.compiled.descriptor_set_bindings);

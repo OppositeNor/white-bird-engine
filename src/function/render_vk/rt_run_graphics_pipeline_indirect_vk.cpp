@@ -23,6 +23,7 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "glm/ext/vector_float4.hpp"
 #include <algorithm>
 #include <cstddef>
@@ -47,7 +48,9 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     std::string_view p_indirect_buffer_id,
     uint32_t p_draw_count,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
-    VkAttachmentLoadOp p_color_attachment_load_op)
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset)
     : render_data(p_render_data), clear_values(p_render_data->allocator), color_attachment_load_op(p_color_attachment_load_op),
       render_extent(p_render_extent), color_attachment_ids(p_render_data->allocator), vertex_buffer_id(p_vertex_buffer_id),
       index_buffer_id(p_index_buffer_id), indirect_buffer_id(p_indirect_buffer_id),
@@ -59,6 +62,8 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     batch.pipeline_id = p_pipeline_id;
     batch.draw_count = p_draw_count;
     batch.descriptor_sets.assign(p_descriptor_sets.begin(), p_descriptor_sets.end());
+    batch.vertex_input = std::move(p_vertex_input);
+    batch.vertex_buffer_offset = p_vertex_buffer_offset;
     pipeline_batches.push_back(std::move(batch));
     descriptor_set_instances.reserve(p_descriptor_sets.size());
 }
@@ -75,7 +80,9 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     uint32_t p_draw_count,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
     VkAttachmentLoadOp p_color_attachment_load_op,
-    VkAttachmentLoadOp p_depth_attachment_load_op)
+    VkAttachmentLoadOp p_depth_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
       color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
       render_extent(p_render_extent),
@@ -87,6 +94,8 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     batch.pipeline_id = p_pipeline_id;
     batch.draw_count = p_draw_count;
     batch.descriptor_sets.assign(p_descriptor_sets.begin(), p_descriptor_sets.end());
+    batch.vertex_input = std::move(p_vertex_input);
+    batch.vertex_buffer_offset = p_vertex_buffer_offset;
     pipeline_batches.push_back(std::move(batch));
     descriptor_set_instances.reserve(p_descriptor_sets.size());
 }
@@ -266,16 +275,23 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     vkCmdSetViewport(p_command_buffer, 0, 1, &viewport);
     VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
-    VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
-    VkDeviceSize vertex_offset = 0;
-    vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &vertex_offset);
     vkCmdBindIndexBuffer(p_command_buffer, index_buffer->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
+    if (render_data->command_set_vertex_input == nullptr) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: dynamic vertex-input command is unavailable.");
+    }
     for (const auto& batch : pipeline_batches) {
         Ref<ROGraphicsPipelineVK> graphics_pipeline = resolve_graphics_pipeline(batch);
         if (graphics_pipeline->get_config().attachment_config.color_formats.size() != color_attachment_count) {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: pipeline batch attachment counts do not match.");
         }
         vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_graphics_pipeline());
+        VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
+        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &batch.vertex_buffer_offset);
+        render_data->command_set_vertex_input(p_command_buffer,
+            static_cast<uint32_t>(batch.vertex_input.bindings.size()),
+            batch.vertex_input.bindings.data(),
+            static_cast<uint32_t>(batch.vertex_input.attributes.size()),
+            batch.vertex_input.attributes.data());
         descriptor_set_instances.clear();
         for (const auto& descriptor_set : batch.descriptor_sets) {
             descriptor_set_instances.push_back(WBE_REQUIRES_VALID(descriptor_set->get_descriptor_set()));
