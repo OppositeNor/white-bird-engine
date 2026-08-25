@@ -29,7 +29,7 @@ struct Vertex3DTexturedInput {
     /**
  * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [WBE_VERTEX_INPUT("position")]
     float3 position;
     /**
  * @brief The normal of the vertex.
