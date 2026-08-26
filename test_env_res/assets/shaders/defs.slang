@@ -118,4 +118,8 @@ struct MaterialParamsBuffer {
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
+float random(float2 p_seed) {
+    return frac(sin(dot(p_seed, float2(12.9898, 78.233))) * 43758.5453123);
+}
+
 #endif

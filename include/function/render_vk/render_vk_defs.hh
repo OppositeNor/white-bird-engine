@@ -160,6 +160,10 @@ struct SpotLightInfoVKUBO {
      */
     glm::mat4 proj;
     /**
+     * @brief Inverse light-space view-projection matrix used to reconstruct world positions from shadow-map depth.
+     */
+    glm::mat4 inv_view_proj;
+    /**
      * @brief World-space position of the spot light.
      */
     glm::vec3 position;
@@ -193,7 +197,7 @@ struct SpotLightInfoVKUBO {
     std::array<uint32_t, 3> padding{};
 };
 
-static_assert(sizeof(SpotLightInfoVKUBO) == 192);
+static_assert(sizeof(SpotLightInfoVKUBO) == 256);
 
 struct SpotLightInfosVKUBO {
     /**

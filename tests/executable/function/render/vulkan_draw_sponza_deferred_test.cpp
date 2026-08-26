@@ -83,8 +83,30 @@ constexpr VkFormat GBUFFER_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat GBUFFER_RMA_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
-constexpr VkFormat SHADOWMAP_COLOR_FORMAT = ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
-constexpr uint32_t MATERIAL_DEBUG_VIEW_COUNT = 6;
+constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
+constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
+constexpr uint32_t MATERIAL_DEBUG_VIEW_COUNT = 7;
+
+const char* material_debug_view_name(uint32_t p_material_debug_view) {
+    switch (p_material_debug_view) {
+    case 0:
+        return "Shaded";
+    case 1:
+        return "Albedo";
+    case 2:
+        return "Normal";
+    case 3:
+        return "Roughness";
+    case 4:
+        return "Metallic";
+    case 5:
+        return "Ambient Occlusion";
+    case 6:
+        return "Direct/Indirect Split";
+    default:
+        return "Unknown";
+    }
+}
 
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
@@ -142,8 +164,10 @@ private:
     Ref<ROImageViewVK> gbuffer_depth_view;
     Ref<ROImageVK> shadow_depth_image;
     Ref<ROImageVK> shadow_color_image;
+    Ref<ROImageVK> shadow_normal_image;
     Ref<ROImageViewVK> shadow_depth_view;
     Ref<ROImageViewVK> shadow_color_view;
+    Ref<ROImageViewVK> shadow_normal_view;
     Ref<ROSamplerVK> shadow_sampler;
     Ref<ROSamplerVK> gbuffer_sampler;
     Ref<ROBufferVK> gbuffer_camera_info_ubo;
@@ -212,6 +236,8 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
     bool material_debug_view_toggle_is_down = input_manager->get_input_status(KEYCODE_V).is_down();
     if (material_debug_view_toggle_is_down && !material_debug_view_toggle_was_down) {
         material_debug_view = (material_debug_view + 1) % MATERIAL_DEBUG_VIEW_COUNT;
+        stdout_log(WBE_CHANNEL_DEBUG)->message(
+            std::format("Deferred debug view: {}", material_debug_view_name(material_debug_view)));
     }
     material_debug_view_toggle_was_down = material_debug_view_toggle_is_down;
 
@@ -314,7 +340,7 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
         new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
         for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
             descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-                new_spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+                new_spot_light_info_ubo, 0, sizeof(SpotLightInfoVKUBO)));
         }
         auto [composition_light_set, composition_light_binding] = composition_descriptor_set_bindings.at("light.lights.info");
         composition_descriptor_sets.at(composition_light_set)
@@ -397,7 +423,16 @@ void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
 
 void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
     shadow_depth_image = ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
-    shadow_color_image = ROImageVK::Builder().shadow_map_color(spot_light_component).create_ref(base_render_data);
+    shadow_color_image = ROImageVK::Builder()
+                             .set_format(RSM_FLUX_FORMAT)
+                             .image_2d(shadow_extent)
+                             .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                             .create_ref(base_render_data);
+    shadow_normal_image = ROImageVK::Builder()
+                              .set_format(RSM_NORMAL_FORMAT)
+                              .image_2d(shadow_extent)
+                              .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                              .create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -422,9 +457,15 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
     shadow_color_view = ROImageViewVK::Builder()
                             .set_image(shadow_color_image)
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_format(SHADOWMAP_COLOR_FORMAT)
+                            .set_format(RSM_FLUX_FORMAT)
                             .set_subresource_range(color_subresource)
                             .create_ref(base_render_data);
+    shadow_normal_view = ROImageViewVK::Builder()
+                             .set_image(shadow_normal_image)
+                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                             .set_format(RSM_NORMAL_FORMAT)
+                             .set_subresource_range(color_subresource)
+                             .create_ref(base_render_data);
     shadow_sampler = ROSamplerVK::Builder()
                          .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                          .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
@@ -501,14 +542,17 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
 Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task() {
     RTRunStaticOpaqueTrianglesVK::Config task_config;
     VkClearValue shadow_color_clear{};
+    VkClearValue shadow_normal_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
     task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
+        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
+        .add_color_attachment(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)
         .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .add_clear_value(shadow_color_clear)
+        .add_clear_value(shadow_normal_clear)
         .add_clear_value(shadow_depth_clear)
-        .add_graphics_pipeline_override("forward_cook_torrance_pbr", "shadowmap_spot")
-        .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "shadowmap_spot_masked");
+        .add_graphics_pipeline_override("forward_cook_torrance_pbr", "rsm_spot")
+        .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "rsm_spot_masked");
     auto task = make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
     for (size_t batch_index = 0; batch_index < task->get_compiled_batch_count(); ++batch_index) {
         auto [set, binding] = task->get_descriptor_binding(batch_index, "light_camera_info");
@@ -527,6 +571,8 @@ void ApplicationVulkanDeferredPBRTest::compile_composition_pipeline() {
         .add_buffer_decleration("debug_view", &debug_view_info, sizeof(debug_view_info))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
         .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
+        .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
+        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
         .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
         .add_buffer_decleration("light.light_count", &spot_light_count, sizeof(spot_light_count))
         .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
@@ -605,7 +651,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
 
     for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
         descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-            spot_light_info_ubo, 0, sizeof(CameraInfoVKUBO)));
+            spot_light_info_ubo, 0, sizeof(SpotLightInfoVKUBO)));
     }
 
     auto [composition_set, composition_binding] = composition_descriptor_set_bindings.at("light.lights.info");
@@ -638,6 +684,9 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = shadow_color_view});
+    p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW),
+        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
+        .res = shadow_normal_view});
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = shadow_depth_view});

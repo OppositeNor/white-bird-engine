@@ -41,6 +41,8 @@ struct SpotLightInfo {
     float4x4 view;
     /// Light-space projection matrix used to sample the shadow map.
     float4x4 proj;
+    /// Inverse light-space view-projection used to reconstruct world positions from the shadow map.
+    float4x4 inv_view_proj;
     /// World-space position of the spot light.
     float3 position;
     /// Scalar intensity multiplier.
@@ -78,6 +80,8 @@ struct CompositionCamera {
 struct LightParam {
     ConstantBuffer<SpotLightInfo> info;
     Texture2D<float> shadowmap;
+    Texture2D<float4> rsm_flux;
+    Texture2D<float2> rsm_octa_normal;
     SamplerState shadowmap_sampler;
 };
 

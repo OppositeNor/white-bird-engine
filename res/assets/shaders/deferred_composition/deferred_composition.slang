@@ -72,6 +72,73 @@ Texture2D<float>  gbuffer_depth;
  */
 SamplerState gbuffer_sampler;
 
+static const uint WBE_RSM_SAMPLE_COUNT = 16;
+static const float WBE_RSM_SAMPLE_RADIUS_UV = 0.5;
+static const float WBE_RSM_MIN_DISTANCE_SQUARED = 0.05;
+
+float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uint p_sample_index) {
+    float sample_index = float(p_sample_index);
+    float light_index = float(p_spot_light_index + 1);
+    float2 seed = p_receiver_uv * 4096.0 + float2(sample_index * 17.0 + light_index * 31.0, sample_index * 29.0 + light_index * 13.0);
+    float angle = 2.0 * WBE_PI * random(seed + float2(0.37, 0.61));
+    float radius = (sample_index + random(seed + float2(0.83, 0.17))) / float(WBE_RSM_SAMPLE_COUNT);
+    return float2(cos(angle), sin(angle)) * radius;
+}
+
+float3 compute_rsm_indirect(uint p_spot_light_index, float2 p_receiver_uv, float3 p_world_position, float3 p_normal) {
+    SpotLightInfo spot_light_info = light.lights[p_spot_light_index].info;
+    float4 light_space_position =
+        mul(spot_light_info.proj, mul(spot_light_info.view, float4(p_world_position, 1.0)));
+    float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
+    float2 center_uv = ndc.xy * 0.5 + 0.5;
+    if (ndc.z < 0.0 || ndc.z > 1.0) {
+        return float3(0.0);
+    }
+    uint shadow_width;
+    uint shadow_height;
+    light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
+    float2 texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
+    float3 indirect_irradiance = float3(0.0);
+    float maximum_sample_distance_squared = 0.0;
+    for (uint sample_index = 0; sample_index < WBE_RSM_SAMPLE_COUNT; ++sample_index) {
+        float2 sample_disk_offset = random_rsm_disk_offset(p_receiver_uv, p_spot_light_index, sample_index);
+        float sample_radius_squared = dot(sample_disk_offset, sample_disk_offset);
+        float2 sample_uv = center_uv + sample_disk_offset * WBE_RSM_SAMPLE_RADIUS_UV;
+        if (sample_uv.x < 0.0 || sample_uv.x >= 1.0 || sample_uv.y < 0.0 || sample_uv.y >= 1.0) {
+            continue;
+        }
+        int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
+        float2 sample_texel_uv = (float2(sample_texel) + 0.5) * texel_size;
+        float sample_depth = light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
+        if (sample_depth >= 1.0) {
+            continue;
+        }
+        float3 sample_flux = light.lights[p_spot_light_index].rsm_flux.Load(int3(sample_texel, 0)).rgb;
+        if (dot(sample_flux, sample_flux) < 0.000001) {
+            continue;
+        }
+        float2 sample_octa_normal = light.lights[p_spot_light_index].rsm_octa_normal.Load(int3(sample_texel, 0));
+        float3 sample_world_position =
+            world_position_from_depth(sample_texel_uv, sample_depth, spot_light_info.inv_view_proj);
+        float3 sample_world_normal = octahedron_decode(sample_octa_normal);
+        float3 receiver_to_sample = sample_world_position - p_world_position;
+        float distance_squared = dot(receiver_to_sample, receiver_to_sample);
+        if (distance_squared <= WBE_RSM_MIN_DISTANCE_SQUARED) {
+            continue;
+        }
+        maximum_sample_distance_squared = max(maximum_sample_distance_squared, distance_squared);
+        float receiver_numerator = max(dot(p_normal, receiver_to_sample), 0.0);
+        float emitter_numerator = max(dot(sample_world_normal, -receiver_to_sample), 0.0);
+        if (receiver_numerator <= 0.0 || emitter_numerator <= 0.0) {
+            continue;
+        }
+        indirect_irradiance +=
+            sample_flux * receiver_numerator * emitter_numerator * sample_radius_squared /
+            (distance_squared * distance_squared);
+    }
+    return indirect_irradiance * (2.0 * maximum_sample_distance_squared / float(WBE_RSM_SAMPLE_COUNT));
+}
+
 /**
  * @brief Compute shadow visibility for one spot light at a reconstructed world-space position.
  * @param p_spot_light_index Descriptor-array index of the spot light.
@@ -131,6 +198,7 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     float3 v = normalize(camera_info.camera_world_pos.xyz - world_pos);
     float3 f0 = lerp(float3(0.04), base_color, metallic);
     float3 color = float3(0.0);
+    float3 indirect_irradiance = float3(0.0);
     uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
         SpotLightInfo spot_light_info = light.lights[spot_light_index].info;
@@ -155,7 +223,9 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
         float3 radiance = spot_light_info.color * spot_light_info.intensity * cone_falloff * distance_falloff;
         float shadow = compute_spot_shadow(spot_light_index, world_pos);
         color += (diffuse + specular) * radiance * ndotl * shadow;
+        indirect_irradiance += compute_rsm_indirect(spot_light_index, p_input.uv, world_pos, n);
     }
+    color += ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
     color *= ambient_occlusion;
     color = color / (color + float3(1.0));
     return float4(color, 1.0);

@@ -33,6 +33,39 @@
             "depth_write": true,
             "cull_backfaces": false,
             "color_blend": false
+        },
+        {
+            "id": "rsm_spot_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/shadowmap_spot/rsm_spot.slang",
+            "dst": "assets/shaders/shadowmap_spot/rsm_spot.spv",
+            "metadata": "assets/shaders/shadowmap_spot/rsm_spot.json"
+        },
+        {
+            "id": "rsm_spot",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "rsm_spot_shader",
+            "fragment_stage_id": "rsm_spot_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false
+        },
+        {
+            "id": "rsm_spot_masked_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/shadowmap_spot/rsm_spot_masked.slang",
+            "dst": "assets/shaders/shadowmap_spot/rsm_spot_masked.spv",
+            "metadata": "assets/shaders/shadowmap_spot/rsm_spot_masked.json"
+        },
+        {
+            "id": "rsm_spot_masked",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "rsm_spot_masked_shader",
+            "fragment_stage_id": "rsm_spot_masked_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "cull_backfaces": false,
+            "color_blend": false
         }
     ]
 }

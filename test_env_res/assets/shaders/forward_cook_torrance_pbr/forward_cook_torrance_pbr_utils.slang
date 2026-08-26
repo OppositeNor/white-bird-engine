@@ -61,6 +61,8 @@ struct SpotLightInfo {
     float4x4 view;
     /// Light-space projection matrix used to sample the shadow map.
     float4x4 proj;
+    /// Inverse light-space view-projection used to reconstruct world positions from shadow-map depth.
+    float4x4 inv_view_proj;
     /// World-space position of the spot light.
     float3 position;
     /// Scalar intensity multiplier.

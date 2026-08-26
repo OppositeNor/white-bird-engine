@@ -37,6 +37,7 @@ inline constexpr std::string_view REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE = "R
 inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE = "REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE";
 inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW = "REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW";
 inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW = "REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW";
+inline constexpr std::string_view REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW = "REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW";
 inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_POSITION = glm::vec3(2.0F, 2.0F, 2.0F);
 inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_TARGET = glm::vec3(0.0F, 0.0F, 0.0F);
 inline constexpr float TEST_CAMERA_MOVE_SPEED = 3.0F;
@@ -108,6 +109,7 @@ inline ComponentSpotLight make_default_test_spot_light_component(float p_intensi
 inline SpotLightInfoVKUBO make_spot_light_info_ubo(const ComponentSpotLight& p_spot_light_component) {
     return SpotLightInfoVKUBO{.view = p_spot_light_component.view,
         .proj = p_spot_light_component.proj,
+        .inv_view_proj = glm::inverse(p_spot_light_component.proj * p_spot_light_component.view),
         .position = p_spot_light_component.position,
         .intensity = p_spot_light_component.intensity,
         .direction = p_spot_light_component.direction,
