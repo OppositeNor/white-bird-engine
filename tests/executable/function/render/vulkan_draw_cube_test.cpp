@@ -25,6 +25,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -417,7 +418,7 @@ std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCube
     }
     const auto& draw_group = triangles_info.draw_groups[0];
     return {WBE::build_vertex_input_description_vk(
-                WBE::load_shader_metadata_vk(p_pipeline->vertex_stage), entry_name, draw_group.vertex_layout),
+                WBE::ShaderMetadataLoader().load(p_pipeline->vertex_stage), entry_name, draw_group.vertex_layout),
         static_cast<VkDeviceSize>(draw_group.vertex_buffer_byte_offset)};
 }
 

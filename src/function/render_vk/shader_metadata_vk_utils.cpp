@@ -16,13 +16,11 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
 #include "function/render/vertex_input_contract.hh"
 #include "function/render/vertex_input_contract_resolver.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -227,20 +225,6 @@ void append_stage_descriptor_bindings(
 
 } // namespace
 
-ShaderMetadata load_shader_metadata_vk(RefRes<RUShader> p_shader) {
-    return ShaderMetadataLoader().load(p_shader);
-}
-
-const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
-    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    return ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, p_entry_name);
-}
-
-const ShaderMetadataEntryPoint& find_shader_entry_point(
-    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    return ShaderMetadataQuery().find_entry_point(p_metadata, p_stage, p_entry_name);
-}
-
 VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_stage) {
     if (p_stage == "vertex" || p_stage == "vert") {
         return VK_SHADER_STAGE_VERTEX_BIT;
@@ -275,7 +259,7 @@ VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata&
 
 std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
-    const auto& entry_point = resolve_shader_stage_entry_point(p_metadata, p_stage, p_entry_name);
+    const auto& entry_point = ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, p_entry_name);
     VkShaderStageFlagBits stage_flag = shader_stage_flag_from_metadata_stage(entry_point.stage);
     std::vector<ShaderDescriptorBindingVK> result;
     for (const auto& parameter : p_metadata.parameters) {

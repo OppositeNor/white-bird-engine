@@ -40,6 +40,10 @@ struct WindowProperties {
      */
     uint32_t height;
     /**
+     * @brief Is the window resizable.
+     */
+    bool is_resizable;
+    /**
      * @brief Is window full screen.
      */
     bool is_full_screen;

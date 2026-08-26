@@ -23,6 +23,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
+#include "function/render/shader_metadata_query.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
@@ -406,7 +407,7 @@ std::string resolve_pipeline_stage_entry(
     if (resolved_stage_entry.empty()) {
         resolved_stage_entry = get_shader_resource_stage_entry(p_shader, p_stage);
     }
-    return std::string(resolve_shader_stage_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
+    return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
 }
 
 template <typename RenderObjectType>

@@ -38,7 +38,7 @@ WindowSDL::WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& 
         SDL_WINDOWPOS_UNDEFINED,
         static_cast<int>(window_properties.width),
         static_cast<int>(window_properties.height),
-        SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
+        SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | (p_window_properties.is_resizable ? SDL_WINDOW_RESIZABLE : 0));
 }
 
 WindowSDL::~WindowSDL() {

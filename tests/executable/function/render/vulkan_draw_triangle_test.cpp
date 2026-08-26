@@ -21,6 +21,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -114,7 +115,7 @@ public:
         }
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
         WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
-            WBE::load_shader_metadata_vk(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
+            WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
         const VkDeviceSize vertex_buffer_offset = triangles_info.draw_groups[0].vertex_buffer_byte_offset;
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE),

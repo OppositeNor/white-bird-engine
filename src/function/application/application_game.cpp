@@ -125,6 +125,7 @@ WindowProperties ApplicationGame::get_window_properties_from_game_config_options
         .title = p_game_config_options.game_name,
         .width = p_game_config_options.window_width,
         .height = p_game_config_options.window_height,
+        .is_resizable = false, // TODO
         .is_full_screen = false // TODO
     };
     return properties;

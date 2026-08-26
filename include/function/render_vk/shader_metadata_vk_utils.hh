@@ -20,7 +20,6 @@
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -28,15 +27,6 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-
-/**
- * @brief Load and deserialize normalized metadata belonging to a shader resource.
- *
- * @param p_shader Shader resource whose metadata sidecar will be loaded.
- * @return Deserialized shader metadata.
- * @throws std::runtime_error When the shader, metadata path, or metadata file is invalid.
- */
-ShaderMetadata load_shader_metadata_vk(RefRes<RUShader> p_shader);
 
 /**
  * @class ShaderDescriptorFieldBindingVK
@@ -110,18 +100,6 @@ struct ShaderDescriptorSetLayoutVK {
      */
     std::vector<VkDescriptorBindingFlags> binding_flags;
 };
-
-/**
- * @brief Resolve a stage entry point, falling back to the only reflected entry for that stage.
- */
-const ShaderMetadataEntryPoint& resolve_shader_stage_entry_point(
-    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
-
-/**
- * @brief Find a shader entry point by stage and entry function name.
- */
-const ShaderMetadataEntryPoint& find_shader_entry_point(
-    const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
 
 /**
  * @brief Convert a reflected shader stage string into a Vulkan stage flag.
