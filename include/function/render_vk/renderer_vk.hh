@@ -20,15 +20,14 @@
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/ray_tracing_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -333,7 +332,7 @@ private:
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
-    Unique<RayTracingVK> ray_tracing;
+    Vector<Ref<RenderPluginVK>> registered_plugins;
 
     // Render objects for the renderer.
     struct RenderObjects {
@@ -368,6 +367,7 @@ private:
 
     void init(RendererCapabilities& p_capabilities);
     void terminate();
+    void register_requested_plugins(const RendererCapabilities& p_capabilities);
 
     void init_vulkan(RendererCapabilities& p_capabilities);
     void setup_base_render_data();
@@ -377,7 +377,7 @@ private:
 
     void create_instance();
     void create_device(RendererCapabilities& p_capabilities);
-    void create_vma_allocator(bool p_enable_buffer_device_address);
+    void create_vma_allocator();
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
@@ -385,11 +385,10 @@ private:
     void create_descriptor_pool();
     void create_async_objects();
 
-    bool check_ray_tracing_support(VkPhysicalDevice p_device);
     bool check_layer_support();
     void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
-    void create_logical_device(bool p_enable_ray_tracing);
+    void create_logical_device();
 
     bool is_device_suitable(VkPhysicalDevice p_device);
 

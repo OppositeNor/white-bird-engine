@@ -62,6 +62,8 @@ struct BaseRenderDataVK {
     PFN_vkGetAccelerationStructureBuildSizesKHR get_acceleration_structure_build_sizes = nullptr;
     /** Command for recording acceleration-structure builds. */
     PFN_vkCmdBuildAccelerationStructuresKHR command_build_acceleration_structures = nullptr;
+    /** Command for querying an acceleration-structure device address. */
+    PFN_vkGetAccelerationStructureDeviceAddressKHR get_acceleration_structure_device_address = nullptr;
     /** Non-owning handle for the current static-opaque bottom-level acceleration structure. */
     VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
     // The VMA allocator used for owned Vulkan buffers and images.

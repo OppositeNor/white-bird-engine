@@ -26,10 +26,10 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
-#include "function/render_vk/ray_tracing_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -116,7 +116,7 @@ static bool check_extension_support(std::span<const char* const> p_extensions,
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       window(p_window), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
-      base_render_data(p_allocator) {
+      base_render_data(p_allocator), registered_plugins(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -224,6 +224,7 @@ static void update_buffer(const BaseRenderDataVK* p_render_data,
 void RendererVK::init(RendererCapabilities& p_capabilities) {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
+    register_requested_plugins(p_capabilities);
     init_vulkan(p_capabilities);
     base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
@@ -238,15 +239,12 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     for (size_t i = 0; i < frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
     }
-    if (base_render_data.renderer_capabilities.ray_tracing) {
-        ray_tracing = make_unique<RayTracingVK>(allocator, &base_render_data);
-    }
     stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
 
 void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
-    ray_tracing.reset();
+    registered_plugins.clear();
     render_objects.reset();
     base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
 
@@ -275,10 +273,14 @@ void RendererVK::terminate() {
     vkDestroyInstance(vk_instance, get_allocation_callbacks());
 }
 
+void RendererVK::register_requested_plugins(const RendererCapabilities& p_capabilities) {
+    register_builtin_render_plugins_vk(registered_plugins, allocator, &base_render_data, p_capabilities);
+}
+
 void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_instance();
     create_device(p_capabilities);
-    create_vma_allocator(p_capabilities.ray_tracing);
+    create_vma_allocator();
     create_swap_chain();
     create_command_pools();
     create_gpu_job_command_buffer();
@@ -311,24 +313,16 @@ void RendererVK::setup_base_render_data() {
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.descriptor_pool = descriptor_pool;
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties{};
-    acceleration_structure_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
     VkPhysicalDeviceProperties2 physical_device_properties{};
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    if (base_render_data.renderer_capabilities.ray_tracing) {
-        physical_device_properties.pNext = &acceleration_structure_properties;
-    }
     vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
     base_render_data.max_variable_sampled_image_descriptor_count = std::min({static_cast<uint32_t>(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT),
         physical_device_properties.properties.limits.maxPerStageDescriptorSampledImages,
         physical_device_properties.properties.limits.maxDescriptorSetSampledImages,
         physical_device_properties.properties.limits.maxPerStageResources});
     base_render_data.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
-    if (base_render_data.renderer_capabilities.ray_tracing) {
-        base_render_data.min_acceleration_structure_scratch_offset_alignment =
-            acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
-        base_render_data.max_acceleration_structure_geometry_count = acceleration_structure_properties.maxGeometryCount;
-        base_render_data.max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
+    for (auto& plugin : registered_plugins) {
+        plugin->update_base_render_data(&base_render_data, physical_device);
     }
     if (!in_flight_fences.empty()) {
         base_render_data.in_flight_fence = in_flight_fences[0];
@@ -369,8 +363,17 @@ void RendererVK::create_instance() {
 
     // Setup and validate instance extensions.
     std::vector<const char*> required_extensions = window->get_required_vulkan_instance_extensions();
-    required_extensions.reserve(required_extensions.size() + enabled_instance_extensions.size());
+    size_t plugin_instance_extension_count = 0;
+    for (const auto& plugin : registered_plugins) {
+        plugin_instance_extension_count += plugin->get_required_instance_extensions().size();
+    }
+    required_extensions.reserve(required_extensions.size() + enabled_instance_extensions.size() + plugin_instance_extension_count);
     required_extensions.insert(required_extensions.end(), enabled_instance_extensions.begin(), enabled_instance_extensions.end());
+    for (const auto& plugin : registered_plugins) {
+        for (const char* required_extension : plugin->get_required_instance_extensions()) {
+            required_extensions.push_back(required_extension);
+        }
+    }
     if (!check_extension_support(required_extensions,
             enabled_layers,
             [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
@@ -392,19 +395,30 @@ void RendererVK::create_instance() {
 
 void RendererVK::create_device(RendererCapabilities& p_capabilities) {
     create_physical_device();
-    if (p_capabilities.ray_tracing && check_ray_tracing_support(physical_device)) {
-        enabled_device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-        enabled_device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-        enabled_device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    } else {
-        p_capabilities.ray_tracing = false;
+    for (size_t i = 0; i < registered_plugins.size();) {
+        auto& plugin = registered_plugins[i];
+        if (!plugin->try_enable(p_capabilities, physical_device, enabled_layers.data(), enabled_layers.size())) {
+            registered_plugins.erase(registered_plugins.begin() + static_cast<std::ptrdiff_t>(i));
+            continue;
+        }
+        for (const char* required_extension : plugin->get_required_device_extensions()) {
+            enabled_device_extensions.push_back(required_extension);
+        }
+        ++i;
     }
-    create_logical_device(p_capabilities.ray_tracing);
+    create_logical_device();
 }
 
-void RendererVK::create_vma_allocator(bool p_enable_buffer_device_address) {
+void RendererVK::create_vma_allocator() {
+    VmaAllocatorCreateFlags allocator_flags = 0;
+    for (auto& plugin : registered_plugins) {
+        if ((plugin->get_static_opaque_vertex_buffer_usage() & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0 ||
+            (plugin->get_static_opaque_index_buffer_usage() & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0) {
+            allocator_flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+        }
+    }
     VmaAllocatorCreateInfo create_info{
-        .flags = static_cast<VmaAllocatorCreateFlags>(p_enable_buffer_device_address ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0),
+        .flags = allocator_flags,
         .physicalDevice = physical_device,
         .device = logical_device,
         .pAllocationCallbacks = get_allocation_callbacks(),
@@ -632,7 +646,7 @@ void RendererVK::create_physical_device() {
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
-void RendererVK::create_logical_device(bool p_enable_ray_tracing) {
+void RendererVK::create_logical_device() {
     // Setup queues create info.
     float queue_priority = 1.0;
     Set<uint32_t> indices = queue_family_indices.get_unique_indices();
@@ -697,22 +711,16 @@ void RendererVK::create_logical_device(bool p_enable_ray_tracing) {
     vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
     vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
     descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
-
-    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{};
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{};
-    if (p_enable_ray_tracing) {
-        buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-        buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
-        vertex_input_dynamic_state_features.pNext = &buffer_device_address_features;
-
-        acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-        acceleration_structure_features.accelerationStructure = VK_TRUE;
-        buffer_device_address_features.pNext = &acceleration_structure_features;
-
-        ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-        ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
-        acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+    VkBaseOutStructure* feature_chain_tail = reinterpret_cast<VkBaseOutStructure*>(&vertex_input_dynamic_state_features);
+    for (auto& plugin : registered_plugins) {
+        VkBaseOutStructure* plugin_feature_chain = plugin->get_device_feature_chain();
+        if (plugin_feature_chain == nullptr) {
+            continue;
+        }
+        feature_chain_tail->pNext = plugin_feature_chain;
+        while (feature_chain_tail->pNext != nullptr) {
+            feature_chain_tail = feature_chain_tail->pNext;
+        }
     }
 
     // Create logical device.
@@ -724,54 +732,14 @@ void RendererVK::create_logical_device(bool p_enable_ray_tracing) {
     if (base_render_data.command_set_vertex_input == nullptr) {
         throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
     }
-    if (p_enable_ray_tracing) {
-        base_render_data.create_acceleration_structure = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
-            vkGetDeviceProcAddr(logical_device, "vkCreateAccelerationStructureKHR"));
-        base_render_data.destroy_acceleration_structure = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
-            vkGetDeviceProcAddr(logical_device, "vkDestroyAccelerationStructureKHR"));
-        base_render_data.get_acceleration_structure_build_sizes = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(
-            vkGetDeviceProcAddr(logical_device, "vkGetAccelerationStructureBuildSizesKHR"));
-        base_render_data.command_build_acceleration_structures = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
-            vkGetDeviceProcAddr(logical_device, "vkCmdBuildAccelerationStructuresKHR"));
-        if (base_render_data.create_acceleration_structure == nullptr || base_render_data.destroy_acceleration_structure == nullptr ||
-            base_render_data.get_acceleration_structure_build_sizes == nullptr ||
-            base_render_data.command_build_acceleration_structures == nullptr) {
-            throw std::runtime_error("Failed to load Vulkan acceleration-structure commands.");
-        }
+    for (auto& plugin : registered_plugins) {
+        plugin->on_device_created(&base_render_data, physical_device, logical_device);
     }
 
     // Get the device queues.
     vkGetDeviceQueue(logical_device, queue_family_indices.get_graphics(), 0, &graphics_queue);
     vkGetDeviceQueue(logical_device, queue_family_indices.get_compute(), 0, &compute_queue);
     vkGetDeviceQueue(logical_device, queue_family_indices.get_present(), 0, &present_queue);
-}
-
-bool RendererVK::check_ray_tracing_support(VkPhysicalDevice p_device) {
-    const std::array<const char*, 3> required_extensions{
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-    };
-    if (!check_extension_support(required_extensions,
-            enabled_layers,
-            [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
-                return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
-            })) {
-        return false;
-    }
-
-    VkFormatProperties position_format_properties{};
-    vkGetPhysicalDeviceFormatProperties(p_device, VK_FORMAT_R32G32B32_SFLOAT, &position_format_properties);
-    if ((position_format_properties.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR) == 0) {
-        return false;
-    }
-
-    return check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(
-               p_device, &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress) &&
-           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR>(
-               p_device, &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure) &&
-           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
-               p_device, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
 }
 
 bool RendererVK::check_layer_support() {
@@ -1326,9 +1294,9 @@ void RendererVK::update_static_opaque_triangles() {
 
     VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    if (base_render_data.renderer_capabilities.ray_tracing) {
-        vertex_usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        index_usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    for (auto& plugin : registered_plugins) {
+        vertex_usage |= plugin->get_static_opaque_vertex_buffer_usage();
+        index_usage |= plugin->get_static_opaque_index_buffer_usage();
     }
     render_objects->static_opaque_vertices =
         build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_vertices, info.vertices, vertex_usage);
@@ -1336,15 +1304,15 @@ void RendererVK::update_static_opaque_triangles() {
         build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_indices, info.indices, index_usage);
     render_objects->static_opaque_obj_ids = build_or_resize_host_visible_buffer(
         &base_render_data, render_objects->static_opaque_obj_ids, info.obj_id, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    if (ray_tracing != nullptr) {
-        auto acceleration_structure_build_job = ray_tracing->update_static_opaque_acceleration_structure(
-            info, render_objects->static_opaque_vertices, render_objects->static_opaque_indices);
-        base_render_data.static_opaque_acceleration_structure = ray_tracing->get_static_opaque_acceleration_structure();
-        if (acceleration_structure_build_job) {
-            register_gpu_job(std::move(acceleration_structure_build_job));
+    for (auto& plugin : registered_plugins) {
+        auto plugin_job = plugin->on_static_opaque_triangles_updated(&base_render_data,
+            info,
+            render_objects->static_opaque_vertices,
+            render_objects->static_opaque_indices,
+            render_objects->static_opaque_obj_ids);
+        if (plugin_job) {
+            register_gpu_job(std::move(plugin_job));
         }
-    } else {
-        base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
     }
 
     // Publish the buffers under the global resource IDs so render tasks in the
