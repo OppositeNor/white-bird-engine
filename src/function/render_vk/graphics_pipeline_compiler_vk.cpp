@@ -35,7 +35,6 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"

@@ -38,14 +38,10 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/static_opaque_vertex_batch_planner_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/utils.hh"
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
