@@ -19,7 +19,6 @@
 #include "function/render/shader_metadata_query.hh"
 #include "function/render/vertex_input_contract.hh"
 #include "function/render/vertex_input_contract_resolver.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <algorithm>
 #include <cstddef>

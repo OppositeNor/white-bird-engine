@@ -86,7 +86,6 @@ def _gather_license() -> None:
                 for nf in notice_files:
                     target_name = f"{subdir.name}_{nf.name}"
                     target_path = os.path.join(output_dir, target_name)
-                    print(f"Copying NOTICE {nf} -> {target_path}")
                     shutil.copy2(nf, target_path)
 
 def _gather_gen_infos() -> list[WBEGenFileInfo]:
