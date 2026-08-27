@@ -873,8 +873,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
             dispatch_group_count,
             std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
             std::span<const ResAccessVK>(read_accesses.data(), read_accesses.size()),
-            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()),
-            QueueFamilyVK::GRAPHICS);
+            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()));
     };
     return task_desc;
 }
@@ -917,8 +916,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
             dispatch_group_count,
             std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
             std::span<const ResAccessVK>(read_accesses.data(), read_accesses.size()),
-            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()),
-            QueueFamilyVK::GRAPHICS);
+            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()));
     };
     return task_desc;
 }
@@ -958,8 +956,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_post_processing_task_des
             dispatch_group_count,
             std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
             std::span<const ResAccessVK>(read_accesses.data(), read_accesses.size()),
-            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()),
-            QueueFamilyVK::GRAPHICS);
+            std::span<const ResAccessVK>(write_accesses.data(), write_accesses.size()));
     };
     return task_desc;
 }
