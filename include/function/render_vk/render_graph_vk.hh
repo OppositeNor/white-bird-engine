@@ -158,9 +158,9 @@ struct RGResEdge {
 /**
  * @class RenderGraphVK
  * @brief Vulkan-specific render graph. Manages per-task command buffers on
- * the appropriate queue family, inserts pipeline barriers from declared
- * resource accesses, and uses one timeline semaphore per execution edge to
- * sequence submits.
+ * the appropriate queue family and uses timeline-semaphore execution edges
+ * inferred from declared resource accesses or explicit dependencies to
+ * sequence submits and make memory visible.
  *
  * The graph is built once from a RendGraphDescVK; thereafter, execute()
  * may be called every frame.
@@ -209,9 +209,9 @@ public:
 
     /**
      * @brief Build the graph from a high-level descriptor: instantiate every
-     * task, infer resource edges from the union of read/write accesses, and
-     * sequence them with execution edges based on `prev`. After this call,
-     * the graph is ready to execute().
+     * task, infer resource and execution edges from the union of read/write
+     * accesses, and add explicit execution edges based on `prev`. After this
+     * call, the graph is ready to execute().
      *
      * @param p_desc The render graph descriptor.
      */
@@ -219,9 +219,9 @@ public:
 
     /**
      * @brief Execute every node in topological order, submitting each to the
-     * command buffer of its queue family. Inserts pipeline barriers per
-     * resource edge and signals/waits the timeline semaphore on each
-     * execution edge.
+     * command buffer of its queue family and signals/waits the timeline
+     * semaphore on each execution edge. Resource dependencies are synchronized
+     * by inferred execution edges; image layout transitions remain explicit.
      *
      * Wait/signal semaphores in p_extra_waits_first_submit and
      * p_extra_signals_last_submit are attached to the first and last

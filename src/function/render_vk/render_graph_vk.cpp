@@ -410,6 +410,21 @@ void RenderGraphVK::infer_res_edges(const Map<std::string, Ref<RendResVK>, Rende
     };
     Vector<WriteInfo, RenderAllocator> last_writers(render_data->allocator);
 
+    auto ensure_exec_edge = [&](Ref<RGNode> p_before,
+                                Ref<RGNode> p_after,
+                                VkPipelineStageFlags2 p_before_stage,
+                                VkPipelineStageFlags2 p_after_stage) {
+        for (auto& weak_edge : p_before->exec_after) {
+            auto edge = weak_edge.lock();
+            if (edge != MEM_NULL && edge->after == p_after) {
+                edge->before_finish_pipeline_stage |= p_before_stage;
+                edge->after_start_pipeline_stage |= p_after_stage;
+                return;
+            }
+        }
+        add_exec_edge(p_before, p_after, p_before_stage, p_after_stage);
+    };
+
     for (auto& node : nodes) {
         auto reads = node->render_task->read_resources();
         for (auto& read_access : reads) {
@@ -428,6 +443,7 @@ void RenderGraphVK::infer_res_edges(const Map<std::string, Ref<RendResVK>, Rende
                         read_access.access,
                         last_writer.stage,
                         read_access.stage);
+                    ensure_exec_edge(last_writer.node, node, last_writer.stage, read_access.stage);
                     break;
                 }
             }
@@ -533,31 +549,6 @@ void RenderGraphVK::record_node(Ref<RGNode> p_node,
         throw std::runtime_error("RenderGraphVK: failed to begin command buffer.");
     }
 
-    // Emit memory barriers for incoming resource edges.
-    Vector<VkMemoryBarrier2, RenderAllocator> mem_barriers(render_data->allocator);
-    mem_barriers.reserve(p_node->res_before.size());
-    for (auto& weak_edge : p_node->res_before) {
-        auto edge = weak_edge.lock();
-        if (edge == MEM_NULL) {
-            continue;
-        }
-        // TODO: Use buffer barrier or image barrier instead.
-        VkMemoryBarrier2 barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-        barrier.srcStageMask = edge->before_stage;
-        barrier.srcAccessMask = edge->before_last_access;
-        barrier.dstStageMask = edge->after_stage;
-        barrier.dstAccessMask = edge->after_first_access;
-        mem_barriers.push_back(barrier);
-    }
-    if (!mem_barriers.empty()) {
-        VkDependencyInfo dependency_info{};
-        dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dependency_info.memoryBarrierCount = static_cast<uint32_t>(mem_barriers.size());
-        dependency_info.pMemoryBarriers = mem_barriers.data();
-        vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
-    }
-
     record_general_transition(p_command_buffer, p_node, p_resources);
 
     p_node->render_task->record(p_command_buffer, p_resources, p_delta);
@@ -587,7 +578,7 @@ void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, 
             continue;
         }
         ROImageVK::MemoryBarrierBuilder()
-            .set_src_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
+            .set_src_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
             .set_dst_access(write.access, write.stage)
             .set_subresource_range(image_view->fields().subresource_range)
             .set_new_layout(VK_IMAGE_LAYOUT_GENERAL)

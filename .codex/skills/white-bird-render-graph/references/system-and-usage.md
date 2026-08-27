@@ -56,7 +56,7 @@ Keep task creation logic in the application class when it has meaningful setup. 
 
 After topological sorting, inference tracks the most recent writer for each resource. A later read creates an edge from that writer to the reader. A later write replaces the tracked writer. Read-read accesses do not create edges.
 
-Execution edges carry timeline semaphore waits and signals. Incoming resource edges also produce a `VkMemoryBarrier2` before the consuming task. The implementation currently uses general memory barriers rather than `VkBufferMemoryBarrier2` or `VkImageMemoryBarrier2`; resource-specific transitions and queue ownership are not encoded by inferred edges.
+Every inferred resource edge creates or reuses an execution edge whose timeline semaphore supplies execution ordering and memory visibility. Explicit `prev` dependencies use the same execution-edge mechanism. Image layout transitions remain explicit image barriers; queue ownership transfers are not encoded by inferred edges.
 
 ## Queue behavior
 

@@ -46,8 +46,8 @@ class RendResViewVK;
 /**
  * @class ResAccessVK
  * @brief Per-resource access metadata declared by a Vulkan render task. The
- * render graph uses this to compute pipeline barriers between consumer and
- * producer nodes that share the same resource.
+ * render graph uses this to scope timeline-semaphore dependencies between
+ * consumer and producer nodes that share the same resource.
  */
 struct ResAccessVK {
     // The id of the resource consumed/produced by the task.
@@ -104,9 +104,9 @@ struct RenderTaskVK : public RenderTask {
     /**
      * @brief Record this task's commands into the given command buffer. The
      * command buffer has already been begun by the graph and will be ended by
-     * the graph after this call returns. Pipeline barriers required by the
-     * resource edges into this task have already been emitted before this is
-     * invoked.
+     * the graph after this call returns. Timeline-semaphore waits required by
+     * incoming resource dependencies accompany this task's submission;
+     * required image layout transitions are emitted first.
      *
      * @param p_command_buffer The command buffer to record into.
      * @param p_resources All resources for the active graph, indexed by

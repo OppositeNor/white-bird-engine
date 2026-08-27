@@ -26,7 +26,7 @@ Prefer existing task types such as `RTRunComputePipelineVK` and graphics task im
 
 ## Use queues and resources safely
 
-Graphics and compute nodes record from queue-specific command pools and submit to their corresponding queues. Execution edges use timeline semaphores across queues.
+Graphics and compute nodes record from queue-specific command pools and submit to their corresponding queues. Execution edges use timeline semaphores between task submissions, including submissions to the same queue.
 
 Images and buffers shared across renderer-selected queue families should retain their default queue-family configuration. Their builders then use concurrent sharing when multiple families exist. An explicit exclusive-sharing override requires queue-family ownership transfers, which render-graph resource barriers do not currently emit.
 
