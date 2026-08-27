@@ -112,6 +112,9 @@ private:
         glm::vec4 camera_world_position;
     };
 
+    void control(double p_delta);
+    void update_descriptors();
+
     void setup_render_context();
     void load_resources();
     void setup_static_scene_resources();
@@ -192,7 +195,12 @@ private:
     float camera_pitch = default_test_camera_pitch();
 };
 
-void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
+void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
+    control(p_delta);
+    update_descriptors();
+}
+
+void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
     InputManager* input_manager = InputManager::get_singleton();
     if (input_manager == nullptr) {
         return;
@@ -286,7 +294,9 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) { // NOLINT
         spot_light_component.view =
             glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
     }
+}
 
+void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
@@ -363,7 +373,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     auto shadow_task = compile_shadow_task();
     RTRunStaticOpaqueTrianglesVK::Config task_config;
     VkClearValue color_clear{};
-    VkClearValue depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
+    VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     task_config.set_graphics_pipeline_resource_key("deferred_gbuffer")
         .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_FORMAT)
         .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_FORMAT)
@@ -597,7 +607,7 @@ Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_s
     RTRunStaticOpaqueTrianglesVK::Config task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
-    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
+    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     task_config.set_render_extent(shadow_extent)
         .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
         .add_color_attachment(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)

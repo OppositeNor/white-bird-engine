@@ -33,7 +33,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     }
     float2 uv = (float2(dispatch_thread_id) + 0.5) / float2(width, height);
     float depth = gbuffer_depth.SampleLevel(gbuffer_sampler, uv, 0.0);
-    if (depth >= 1.0) {
+    if (depth <= 0.0) {
         post_processed_output[dispatch_thread_id] = float4(0.0, 0.0, 0.0, 1.0);
         return;
     }

@@ -675,7 +675,7 @@ StaticOpaqueAttachmentDataVK build_attachment_data(
         result.clear_values.push_back(VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}});
     }
     if (p_config.has_depth_attachment() && result.clear_values.size() == result.color_attachment_ids.size()) {
-        result.clear_values.push_back(VkClearValue{.depthStencil = {.depth = 1.0F, .stencil = 0}});
+        result.clear_values.push_back(VkClearValue{.depthStencil = {.depth = 0.0F, .stencil = 0}});
     }
     return result;
 }

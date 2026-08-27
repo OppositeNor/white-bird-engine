@@ -139,7 +139,7 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
         int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
         float2 sample_texel_uv = (float2(sample_texel) + 0.5) * texel_size;
         float sample_depth = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
-        if (sample_depth >= 1.0) {
+        if (sample_depth <= 0.0) {
             continue;
         }
         float3 sample_flux = p_light.lights[p_spot_light_index].rsm_flux.Load(int3(sample_texel, 0)).rgb;
@@ -175,7 +175,7 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
         return 1.0;
     }
     const float bias = 0.0015;
-    float current_depth = ndc.z - bias;
+    float current_depth = ndc.z + bias;
     uint shadow_width;
     uint shadow_height;
     p_light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
@@ -187,7 +187,7 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
             int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
             sample_texel = clamp(sample_texel, int2(0, 0), int2(int(shadow_width) - 1, int(shadow_height) - 1));
             float sampled = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
-            visibility += current_depth <= sampled ? 1.0 : 0.0;
+            visibility += current_depth >= sampled ? 1.0 : 0.0;
         }
     }
     return visibility / 9.0;

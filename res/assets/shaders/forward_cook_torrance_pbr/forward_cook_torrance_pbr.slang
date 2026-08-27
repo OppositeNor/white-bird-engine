@@ -54,7 +54,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
         return 1.0;
     }
     const float bias = 0.0015;
-    float current_depth = ndc.z - bias;
+    float current_depth = ndc.z + bias;
     float2 texel_size;
     uint shadow_width;
     uint shadow_height;
@@ -65,7 +65,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
         for (int x = -1; x <= 1; ++x) {
             float sampled = light.lights[p_spot_light_index].shadowmap.Sample(
                 light.lights[p_spot_light_index].shadowmap_sampler, uv + float2(x, y) * texel_size).r;
-            visibility += current_depth <= sampled ? 1.0 : 0.0;
+            visibility += current_depth >= sampled ? 1.0 : 0.0;
         }
     }
     return visibility / 9.0;

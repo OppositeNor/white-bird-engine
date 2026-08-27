@@ -70,7 +70,7 @@ inline glm::mat4 test_camera_view(const glm::vec3& p_position, float p_yaw, floa
 inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_far_plane = 10.0F) {
     ComponentCamera camera_component{
         .view = test_camera_view(TEST_DEFAULT_CAMERA_POSITION, default_test_camera_yaw(), default_test_camera_pitch()),
-        .proj = glm::perspective(glm::radians(45.0F), p_aspect_ratio, 0.1F, p_far_plane),
+        .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), p_aspect_ratio, p_far_plane, 0.1F),
         .is_dirty = false,
     };
     camera_component.proj[1][1] *= -1;
@@ -101,7 +101,7 @@ inline ComponentSpotLight make_default_test_spot_light_component(float p_intensi
         glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, up);
     float outer_half_angle = std::acos(std::clamp(spot_light_component.outer_cone_cos, -1.0F, 1.0F));
     float far_plane = std::max(spot_light_component.range, 0.2F);
-    spot_light_component.proj = glm::perspective(2.0F * outer_half_angle, 1.0F, 0.1F, far_plane);
+    spot_light_component.proj = glm::perspectiveRH_ZO(2.0F * outer_half_angle, 1.0F, far_plane, 0.1F);
     spot_light_component.proj[1][1] *= -1.0F;
     return spot_light_component;
 }

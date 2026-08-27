@@ -222,7 +222,7 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
     create_main_depth_resources();
     WBE::RTRunStaticOpaqueTrianglesVK::Config shadow_task_config;
     VkClearValue shadow_color_clear{};
-    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 1.0F, .stencil = 0}};
+    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     shadow_task_config.set_render_extent(shadow_extent)
         .add_color_attachment(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
         .set_depth_attachment(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)

@@ -131,7 +131,7 @@ public:
          * @brief Add a clear value in attachment order.
          *
          * Color attachment values precede the optional depth value. Missing color values default to opaque black. When a
-         * depth attachment is configured and only color values are present, depth defaults to 1.0 and stencil to 0.
+         * depth attachment is configured and only color values are present, depth defaults to 0.0 and stencil to 0.
          *
          * @param p_clear_value Clear value.
          * @return This configuration.

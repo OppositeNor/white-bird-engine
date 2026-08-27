@@ -100,7 +100,7 @@ public:
         camera_info = WBE::CameraInfoVKUBO{
             // Look at the origin from (2,2,2)
             .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
-            .proj = glm::perspective(glm::radians(45.0F), aspect_ratio, 0.1F, 10.0F),
+            .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), aspect_ratio, 10.0F, 0.1F),
         };
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;

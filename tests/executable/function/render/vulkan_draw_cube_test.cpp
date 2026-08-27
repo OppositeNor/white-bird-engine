@@ -434,7 +434,7 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
                                   vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
         std::array<VkClearValue, 2> shadow_clear_values{};
         shadow_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
-        shadow_clear_values[1].depthStencil = {.depth = 1.0F, .stencil = 0};
+        shadow_clear_values[1].depthStencil = {.depth = 0.0F, .stencil = 0};
         std::array<std::string_view, 1> shadow_color_attachment_ids{WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,

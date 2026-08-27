@@ -396,7 +396,7 @@ public:
             // Enable depth writing.
             VkBool32 depth_write_enabled = VK_TRUE;
             // Compare operation.
-            VkCompareOp depth_compare_op = VK_COMPARE_OP_LESS;
+            VkCompareOp depth_compare_op = VK_COMPARE_OP_GREATER;
 
             /**
              * @brief Enalbe depth test.
