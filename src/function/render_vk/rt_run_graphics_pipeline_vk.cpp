@@ -50,7 +50,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
     VkAttachmentLoadOp p_color_attachment_load_op,
     VertexInputDescriptionVK p_vertex_input,
-    VkDeviceSize p_vertex_buffer_offset)
+    VkDeviceSize p_vertex_buffer_offset,
+    std::span<const ResAccessVK> p_additional_read_accesses)
     : render_data(p_render_data), clear_values(p_render_data->allocator), color_attachment_load_op(p_color_attachment_load_op),
       render_extent(p_render_extent), color_attachment_ids(p_render_data->allocator), pipeline_id(p_pipeline_id),
       vertex_buffer_id(p_vertex_buffer_id.has_value() ? std::optional<std::string>(*p_vertex_buffer_id) : std::nullopt),
@@ -58,7 +59,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
       indexed_draw_region(p_indexed_draw_region), vertex_input(std::move(p_vertex_input)),
       vertex_buffer_offset(p_vertex_buffer_offset),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
-      descriptor_sets_instances(p_render_data->allocator) {
+      descriptor_sets_instances(p_render_data->allocator),
+      additional_read_accesses(p_additional_read_accesses.begin(), p_additional_read_accesses.end(), p_render_data->allocator) {
     clear_values.push_back(
         VkClearValue{.color = {.float32 = {p_clear_color.r, p_clear_color.g, p_clear_color.b, p_clear_color.a}}});
     color_attachment_ids.emplace_back(p_color_attachment_id);
@@ -78,7 +80,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     VkAttachmentLoadOp p_color_attachment_load_op,
     VkAttachmentLoadOp p_depth_attachment_load_op,
     VertexInputDescriptionVK p_vertex_input,
-    VkDeviceSize p_vertex_buffer_offset)
+    VkDeviceSize p_vertex_buffer_offset,
+    std::span<const ResAccessVK> p_additional_read_accesses)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
       color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
       render_extent(p_render_extent),
@@ -90,7 +93,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
       indexed_draw_region(p_indexed_draw_region), vertex_input(std::move(p_vertex_input)),
       vertex_buffer_offset(p_vertex_buffer_offset),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
-      descriptor_sets_instances(p_render_data->allocator) {
+      descriptor_sets_instances(p_render_data->allocator),
+      additional_read_accesses(p_additional_read_accesses.begin(), p_additional_read_accesses.end(), p_render_data->allocator) {
     descriptor_sets_instances.reserve(descriptor_sets.size());
 }
 
@@ -119,6 +123,9 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() c
     if (index_buffer_id.has_value()) {
         read_accesses.push_back(
             {.res_id = *index_buffer_id, .access = VK_ACCESS_2_INDEX_READ_BIT, .stage = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT});
+    }
+    for (const auto& additional_access : additional_read_accesses) {
+        read_accesses.push_back(additional_access);
     }
     return read_accesses;
 }

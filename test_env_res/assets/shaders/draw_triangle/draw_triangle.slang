@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "draw_triangle/draw_triangle_utils.slang"
-#include "defs.slang"
+#include "utils.slang"
 
 /**
  * @brief Constant buffer providing the current application time.

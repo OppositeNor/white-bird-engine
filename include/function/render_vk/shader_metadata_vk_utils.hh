@@ -148,6 +148,12 @@ std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_
     const std::vector<ShaderDescriptorBindingVK>& p_bindings);
 
 /**
+ * @brief Build descriptor set layout inputs for any reflected pipeline resource.
+ */
+std::vector<ShaderDescriptorSetLayoutVK> build_shader_descriptor_set_layout_bindings(
+    const std::vector<ShaderDescriptorBindingVK>& p_bindings);
+
+/**
  * @brief Assign a stable upper bound shared by all variable-count bindings in the pipeline layouts.
  *
  * Fixed descriptors are reserved first. The remaining descriptor budget is divided between variable bindings so the declared

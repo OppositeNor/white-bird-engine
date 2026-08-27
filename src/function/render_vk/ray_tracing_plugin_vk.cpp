@@ -24,6 +24,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "utils/defs.hh"
 
 #include <algorithm>
 #include <array>
@@ -40,6 +41,7 @@
 
 namespace WhiteBirdEngine {
 
+// Query one Vulkan feature flag through the features2 pNext chain.
 template <VkStructureType StructureType, typename FeatureType>
 static bool check_device_feature_support(VkPhysicalDevice p_device, VkBool32 FeatureType::* p_feature) {
     FeatureType feature{};
@@ -53,6 +55,7 @@ static bool check_device_feature_support(VkPhysicalDevice p_device, VkBool32 Fea
     return feature.*p_feature == VK_TRUE;
 }
 
+// Verify that every requested extension is exposed either globally or by an enabled layer.
 template <typename EnumerateFunction>
 static bool check_extension_support(std::span<const char* const> p_extensions,
     std::span<const char* const> p_enabled_layers,
@@ -126,7 +129,7 @@ struct RayTracingPluginVK::StaticOpaqueTopLevelBuildData {
 };
 
 static VkAccelerationStructureBuildGeometryInfoKHR make_bottom_level_build_info(
-    const Vector<VkAccelerationStructureGeometryKHR, RenderAllocator>& p_geometries) {
+    std::span<const VkAccelerationStructureGeometryKHR> p_geometries) {
     VkAccelerationStructureBuildGeometryInfoKHR result{};
     result.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     result.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -150,7 +153,7 @@ static VkAccelerationStructureBuildGeometryInfoKHR make_top_level_build_info(con
 
 static VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRenderDataVK* p_render_data,
     const VkAccelerationStructureBuildGeometryInfoKHR& p_build_info,
-    const Vector<uint32_t, RenderAllocator>& p_primitive_counts) {
+    std::span<const uint32_t> p_primitive_counts) {
     VkAccelerationStructureBuildSizesInfoKHR result{};
     result.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
     p_render_data->get_acceleration_structure_build_sizes(
@@ -177,6 +180,7 @@ bool RayTracingPluginVK::try_enable(
     if (!p_capabilities.ray_tracing) {
         return false;
     }
+    // Reject ray tracing early unless the device supports the required extensions, buffer format, and feature set.
     if (!check_extension_support(REQUIRED_EXTENSIONS,
             std::span<const char* const>(p_enabled_layers, p_enabled_layer_count),
             [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
@@ -240,6 +244,7 @@ VkBaseOutStructure* RayTracingPluginVK::get_device_feature_chain() {
 void RayTracingPluginVK::on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
+    // Resolve the Vulkan acceleration-structure entry points after logical-device creation.
     p_render_data->create_acceleration_structure = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkCreateAccelerationStructureKHR"));
     p_render_data->destroy_acceleration_structure = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
@@ -302,6 +307,7 @@ RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaqu
     result.geometries.reserve(p_info.draw_groups.size());
     result.build_ranges.reserve(p_info.draw_groups.size());
     result.primitive_counts.reserve(p_info.draw_groups.size());
+    // Translate each valid draw group into BLAS geometry while validating the mesh layout and index ranges.
     for (size_t i = 0; i < p_info.draw_groups.size(); ++i) {
         const auto& draw_group = p_info.draw_groups[i];
         if (draw_group.index_sub_region.size == 0) {
@@ -363,6 +369,7 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuildData RayTracingPluginVK::build_stat
     Ref<ROAccelerationStructureVK> p_bottom_level_acceleration_structure) const {
     StaticOpaqueTopLevelBuildData result(render_data->allocator);
 
+    // Build a single identity TLAS instance that references the generated bottom-level acceleration structure.
     VkAccelerationStructureInstanceKHR instance{};
     instance.transform.matrix[0][0] = 1.0F;
     instance.transform.matrix[1][1] = 1.0F;
@@ -389,7 +396,8 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     Ref<ROAccelerationStructureVK> bottom_level_acceleration_structure = make_ref<ROAccelerationStructureVK>(
         render_data->allocator, render_data, bottom_level_build_sizes.accelerationStructureSize, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     const VkDeviceSize scratch_alignment = render_data->min_acceleration_structure_scratch_offset_alignment;
-    if (scratch_alignment == 0 || bottom_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
+    if (scratch_alignment == 0 ||
+        bottom_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
         throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid scratch-buffer size or alignment.");
     }
     Ref<ROBufferVK> bottom_level_scratch_buffer =
@@ -406,14 +414,15 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
 
     StaticOpaqueTopLevelBuildData top_level_build_data = build_static_opaque_top_level_data(bottom_level_acceleration_structure);
 
+    // Prepare the TLAS build inputs and scratch resources after sizing and allocating the BLAS.
     Ref<ROBufferVK> top_level_instance_buffer =
         ROBufferVK::Builder()
             .set_domain(DeviceDomain::HOST)
             .set_size(sizeof(VkAccelerationStructureInstanceKHR) * top_level_build_data.instances.size())
             .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
             .create_ref(render_data);
-    top_level_instance_buffer->update_buffer(
-        top_level_build_data.instances.data(), sizeof(VkAccelerationStructureInstanceKHR) * top_level_build_data.instances.size());
+    top_level_instance_buffer->update_buffer(top_level_build_data.instances.data(),
+        sizeof(VkAccelerationStructureInstanceKHR) * top_level_build_data.instances.size());
 
     VkAccelerationStructureGeometryKHR top_level_geometry{};
     top_level_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -470,6 +479,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         (void)top_level_acceleration_structure;
         (void)top_level_instance_buffer;
         (void)top_level_scratch_buffer;
+        // Record BLAS build, synchronize its writes, then build the TLAS and expose it to ray-tracing shaders.
         bottom_level_build_info.pGeometries = bottom_level_geometries.data();
         const VkAccelerationStructureBuildRangeInfoKHR* bottom_level_build_range_pointer = bottom_level_build_ranges.data();
         command_build_acceleration_structures(p_command_buffer, 1, &bottom_level_build_info, &bottom_level_build_range_pointer);
@@ -538,8 +548,9 @@ GPUJobVK RayTracingPluginVK::on_static_opaque_triangles_updated(BaseRenderDataVK
     render_data = p_render_data;
     GPUJobVK build_job = update_static_opaque_acceleration_structure(p_info, p_vertex_buffer, p_index_buffer);
     p_render_data->static_opaque_acceleration_structure =
-        static_opaque_top_level_acceleration_structure == MEM_NULL ? VK_NULL_HANDLE
-                                                                   : static_opaque_top_level_acceleration_structure->get_acceleration_structure();
+        static_opaque_top_level_acceleration_structure == MEM_NULL
+            ? VK_NULL_HANDLE
+            : static_opaque_top_level_acceleration_structure->get_acceleration_structure();
     return build_job;
 }
 

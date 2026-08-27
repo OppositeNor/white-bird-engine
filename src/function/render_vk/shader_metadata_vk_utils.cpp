@@ -62,7 +62,7 @@ VkDescriptorType descriptor_type_from_parameter(const ShaderMetadataParameter& p
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     }
     if (p_parameter.type.kind == "resource" && p_parameter.type.scalar_type.starts_with("texture")) {
-        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        return p_parameter.type.access == "readWrite" ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     }
     if (p_parameter.type.kind == "samplerState") {
         return VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -77,7 +77,9 @@ VkDescriptorType descriptor_type_from_field(std::string_view p_field_path, const
     }
     if ((p_field.type.kind == "resource" && p_field.type.scalar_type.starts_with("texture")) ||
         (p_field.type.kind == "array" && p_field.type.element_scalar_type.starts_with("texture"))) {
-        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        const bool is_storage_image = (p_field.type.kind == "resource" && p_field.type.access == "readWrite") ||
+                                      (p_field.type.kind == "array" && p_field.type.element_access == "readWrite");
+        return is_storage_image ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     }
     if (p_field.type.kind == "samplerState" || (p_field.type.kind == "array" && p_field.type.element_scalar_type == "samplerState")) {
         return VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -240,6 +242,9 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
     if (p_stage == "tesseval" || p_stage == "tese") {
         return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
     }
+    if (p_stage == "compute" || p_stage == "comp") {
+        return VK_SHADER_STAGE_COMPUTE_BIT;
+    }
     throw std::runtime_error(std::format("Unsupported shader stage '{}'.", p_stage));
 }
 
@@ -306,6 +311,11 @@ std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bind
 }
 
 std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(
+    const std::vector<ShaderDescriptorBindingVK>& p_bindings) {
+    return build_shader_descriptor_set_layout_bindings(p_bindings);
+}
+
+std::vector<ShaderDescriptorSetLayoutVK> build_shader_descriptor_set_layout_bindings(
     const std::vector<ShaderDescriptorBindingVK>& p_bindings) {
     if (p_bindings.empty()) {
         return {};

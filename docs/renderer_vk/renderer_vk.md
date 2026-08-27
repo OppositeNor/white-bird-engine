@@ -27,7 +27,7 @@ bindless `MaterialTextures.textures` descriptor array, initializes missing slots
 indices into `MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture
 roles.
 
-The nested contract member names are fixed in `defs.slang`: `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and
+The nested contract member names are fixed in `utils/utils.slang`: `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and
 `MaterialParamsBuffer.materials`. Application configuration may vary only the `material_textures` and `material_params` base
 variable names and the `default_material` resource key. Materials do not carry a separate `material_type`; the selected graphics
 pipeline defines the shader model.

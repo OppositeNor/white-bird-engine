@@ -52,6 +52,8 @@ TEST(WBEShaderMetadataVKTest, DeserializesNormalizedSlangUserAttributes) {
                             "name": "texture",
                             "type": {
                                 "kind": "resource",
+                                "scalar_type": "texture2D",
+                                "access": "readWrite",
                                 "user_attributes": [{"name": "TextureShape", "arguments": []}]
                             },
                             "user_attributes": [{"name": "Required", "arguments": []}]
@@ -94,6 +96,7 @@ TEST(WBEShaderMetadataVKTest, DeserializesNormalizedSlangUserAttributes) {
     EXPECT_EQ(parameter.type.fields[0].user_attributes[0].name, "Required");
     ASSERT_EQ(parameter.type.fields[0].type.user_attributes.size(), 1U);
     EXPECT_EQ(parameter.type.fields[0].type.user_attributes[0].name, "TextureShape");
+    EXPECT_EQ(parameter.type.fields[0].type.access, "readWrite");
 
     ASSERT_EQ(metadata.entry_points.size(), 1U);
     ASSERT_EQ(metadata.entry_points[0].user_attributes.size(), 1U);

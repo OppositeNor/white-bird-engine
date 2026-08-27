@@ -154,6 +154,11 @@ public:
         std::vector<ImageInfo> sampled_image_infos;
 
         /**
+         * @brief Storage images to write to the binding.
+         */
+        std::vector<ImageInfo> storage_image_infos;
+
+        /**
          * @brief Samplers to write to the binding.
          */
         std::vector<ImageInfo> sampler_infos;
@@ -237,6 +242,17 @@ public:
          */
         Writer& add_sampled_image_info(const ImageInfo& p_image_info) {
             sampled_image_infos.push_back(p_image_info);
+            return *this;
+        }
+
+        /**
+         * @brief Add storage image information.
+         *
+         * @param p_image_info The image info to add.
+         * @return *this.
+         */
+        Writer& add_storage_image_info(const ImageInfo& p_image_info) {
+            storage_image_infos.push_back(p_image_info);
             return *this;
         }
 

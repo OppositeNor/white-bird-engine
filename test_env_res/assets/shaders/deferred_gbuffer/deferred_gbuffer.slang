@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "deferred_gbuffer/deferred_gbuffer_utils.slang"
-#include "defs.slang"
 
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.

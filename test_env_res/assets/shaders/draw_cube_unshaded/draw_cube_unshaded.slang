@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "draw_cube_unshaded/draw_cube_unshaded_utils.slang"
-#include "defs.slang"
+#include "utils.slang"
 
 /**
  * @brief The input data from the vertex buffer

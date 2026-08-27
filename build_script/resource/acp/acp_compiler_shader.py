@@ -305,9 +305,11 @@ class WBEACPCompilerShader(WBEACPCompiler):
         return {
             "kind": str(raw_type.get("kind", "")),
             "scalar_type": str(scalar_type),
+            "access": str(raw_type.get("access", "")),
             "name": str(raw_type.get("name", "")),
             "element_count": int(raw_type.get("elementCount", 0)),
             "element_scalar_type": str(element_scalar_type),
+            "element_access": str(element_type.get("access", result_type.get("access", ""))),
             "user_attributes": self._transform_shader_user_attributes(raw_type),
         }
 
@@ -406,6 +408,8 @@ class WBEACPCompilerShader(WBEACPCompiler):
             "element_count": int(raw_type.get("elementCount", 0)),
             "element_type": self._transform_shader_type_atom(element_type),
             "scalar_type": str(raw_type.get("scalarType", raw_type.get("baseShape", ""))),
+            "access": str(raw_type.get("access", "")),
+            "element_access": str(element_type.get("access", "")),
             "user_attributes": self._transform_shader_user_attributes(raw_type),
         }
 

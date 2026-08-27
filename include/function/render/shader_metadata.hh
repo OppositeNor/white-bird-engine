@@ -102,11 +102,15 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataTypeAtom final : public Serializ
     WBE_META(WBE_REFLECT)
     std::string scalar_type;
     WBE_META(WBE_REFLECT)
+    std::string access;
+    WBE_META(WBE_REFLECT)
     std::string name;
     WBE_META(WBE_REFLECT)
     int32_t element_count = 0;
     WBE_META(WBE_REFLECT)
     std::string element_scalar_type;
+    WBE_META(WBE_REFLECT)
+    std::string element_access;
     /**
      * @brief User attributes reflected from this type declaration.
      */
@@ -158,6 +162,10 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadataType final : public Serializable
     ShaderMetadataTypeAtom element_type;
     WBE_META(WBE_REFLECT)
     std::string scalar_type;
+    WBE_META(WBE_REFLECT)
+    std::string access;
+    WBE_META(WBE_REFLECT)
+    std::string element_access;
     /**
      * @brief User attributes reflected from this type declaration.
      */

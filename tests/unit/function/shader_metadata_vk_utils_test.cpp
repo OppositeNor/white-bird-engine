@@ -158,6 +158,28 @@ TEST(WBEShaderMetadataVKUtilsTest, MarksRuntimeSampledImageArrayAsVariableDescri
     EXPECT_EQ(set_layouts[2].bindings[1].descriptorCount, 9);
 }
 
+TEST(WBEShaderMetadataVKUtilsTest, MapsReadWriteTextureResourcesToStorageImageDescriptors) {
+    ShaderMetadata metadata;
+    ShaderMetadataParameter output_image;
+    output_image.name = "output_image";
+    output_image.binding.kind = "descriptorTableSlot";
+    output_image.binding.index = 0;
+    output_image.type.kind = "resource";
+    output_image.type.scalar_type = "texture2D";
+    output_image.type.access = "readWrite";
+    metadata.parameters.push_back(output_image);
+
+    ShaderMetadataEntryPoint entry_point;
+    entry_point.name = "compute_main";
+    entry_point.stage = "compute";
+    metadata.entry_points.push_back(entry_point);
+
+    std::vector<ShaderDescriptorBindingVK> bindings = collect_shader_descriptor_bindings(metadata, "compute", "compute_main");
+    ASSERT_EQ(bindings.size(), 1U);
+    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_COMPUTE_BIT);
+}
+
 TEST(WBEShaderMetadataVKUtilsTest, SharesVariableDescriptorBudgetAcrossDescriptorSets) {
     ShaderDescriptorSetLayoutVK first_set;
     first_set.set_index = 0;

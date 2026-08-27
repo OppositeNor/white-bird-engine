@@ -20,6 +20,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
@@ -97,11 +98,11 @@ struct GraphicsPipelineCompilerVKContext {
  * layouts, and graphics pipelines when matching entries already exist in the
  * render database.
  */
-class GraphicsPipelineCompilerVK {
+class GraphicsPipelineCompilerVK : public PipelineCompilerVK {
 public:
     using SupportedUniformDataTypes = std::tuple<float, int32_t, uint32_t, glm::vec2, glm::vec3, glm::vec4, glm::mat3, glm::mat4>;
-    using DescriptorSetBinding = std::pair<uint32_t, uint32_t>;
-    using DescriptorSetBindings = std::unordered_map<std::string, DescriptorSetBinding>;
+    using DescriptorSetBinding = PipelineCompilerVK::DescriptorSetBinding;
+    using DescriptorSetBindings = PipelineCompilerVK::DescriptorSetBindings;
 
     struct CompileResult {
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
@@ -140,11 +141,6 @@ private:
     CompiledPipelineObjects compile_pipeline_objects(std::string_view p_resource_key,
         RefRes<RUGraphicsPipeline> p_pipeline_resource,
         const RenderBindpointDeclarations& p_bindpoint_declarations);
-    Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
-    std::vector<Ref<RODescriptorSetLayoutVK>> compile_descriptor_set_layouts(
-        std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings);
-    Ref<ROPipelineLayoutVK> compile_pipeline_layout(
-        std::string_view p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts);
     Ref<ROGraphicsPipelineVK> compile_graphics_pipeline(std::string_view p_resource_key,
         const RUGraphicsPipeline& p_pipeline_resource,
         Ref<ROShaderVK> p_vertex_shader,

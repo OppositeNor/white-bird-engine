@@ -15,6 +15,109 @@
 #ifndef WBE_FILE_UTILS_SLANG
 #define WBE_FILE_UTILS_SLANG
 
+/** Marks a vertex entry-point field and selects a resource attribute by role. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_VERTEX_INPUTAttribute {
+    /** Vertex attribute role; an empty value selects the annotated field name. */
+    string vertex_role = "";
+};
+
+/**
+ * @brief The input data from the vertex buffer
+ */
+struct Vertex3DTexturedInput {
+    /**
+     * @brief The position of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 position;
+    /**
+     * @brief The normal of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 normal;
+    /**
+     * @brief The tanglent vector of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 tangent;
+    /**
+     * @brief The bitangent vector of the vertex.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 bitangent;
+    /**
+     * @brief The uv value.
+     */
+    [WBE_VERTEX_INPUT]
+    float2 uv;
+};
+
+/**
+ * @brief The information of the camera.
+ */
+struct CameraInfo {
+    /**
+     * @brief The view matrix.
+     */
+    float4x4 view;
+    /**
+     * @brief The projection matrix.
+     */
+    float4x4 proj;
+    /**
+     * @brief The world-space camera position.
+     */
+    float4 world_position;
+};
+
+/**
+ * @brief Time information.
+ */
+struct Time {
+    /**
+     * @brief The duration from the start of the application until now.
+     */
+    float duration_sec;
+};
+
+/** Maximum number of bindless material entries addressable by one draw pass. */
+static const uint WBE_MAX_MATERIAL_COUNT = 32;
+
+/** Marks an integer material parameter as the descriptor index for one texture role. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_TEXTUREAttribute {
+    /** Texture role; an empty value selects the annotated variable name. */
+    string texture_role = "";
+};
+
+/** Fixed bindless texture table contract. Applications may only vary the parameter's base variable name. */
+struct MaterialTextures {
+    /** Sampler shared by all material textures. */
+    SamplerState material_sampler;
+    /** Bindless texture array indexed through MaterialParams. */
+    Texture2D<float4> textures[];
+};
+
+/** Fixed descriptor indices for one material's textures. */
+struct MaterialParams {
+    /** Albedo texture descriptor index. */
+    [WBE_TEXTURE("albedo")]
+    int albedo_index;
+    /** Normal texture descriptor index. */
+    [WBE_TEXTURE("normal")]
+    int normal_index;
+    /** RMA texture descriptor index. */
+    [WBE_TEXTURE("rma")]
+    int rma_index;
+};
+
+/** Fixed descriptor-index table for every material addressed by an indirect draw. */
+struct MaterialParamsBuffer {
+    /** Material entries indexed by the indirect draw's material index. */
+    MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
+};
+
 /**
  * @brief Mathematical constant pi.
  */
@@ -73,6 +176,17 @@ float3 linear_to_srgb(float3 p_color) {
  */
 float3 srgb_to_linear(float3 p_color) {
     return pow(max(p_color, float3(0.0)), float3(2.2));
+}
+
+uint2 z_order_swizzle_8x8(uint2 p_group_id, uint2 p_group_thread_id) {
+    uint linear_index = p_group_thread_id.y * 8 + p_group_thread_id.x;
+    uint swizzled_x = ((linear_index >> 0) & 0x1) | ((linear_index >> 1) & 0x2) | ((linear_index >> 2) & 0x4);
+    uint swizzled_y = ((linear_index >> 1) & 0x1) | ((linear_index >> 2) & 0x2) | ((linear_index >> 3) & 0x4);
+    return p_group_id * 8 + uint2(swizzled_x, swizzled_y);
+}
+
+float random(float2 p_seed) {
+    return frac(sin(dot(p_seed, float2(12.9898, 78.233))) * 43758.5453123);
 }
 
 #endif

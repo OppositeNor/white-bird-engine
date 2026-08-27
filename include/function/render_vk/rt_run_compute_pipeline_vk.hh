@@ -56,16 +56,18 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
      * @param p_descriptor_sets Descriptor sets to bind in order.
      * @param p_read_accesses Additional resources read by the compute shader.
      * @param p_write_accesses Additional resources written by the compute shader.
+     * @param p_queue_family Queue family used to submit the compute dispatch.
      */
     RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
         std::string_view p_pipeline_id,
         VkExtent3D p_dispatch_group_count,
         std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets = {},
         std::span<const ResAccessVK> p_read_accesses = {},
-        std::span<const ResAccessVK> p_write_accesses = {});
+        std::span<const ResAccessVK> p_write_accesses = {},
+        QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     virtual QueueFamilyVK queue_family() const override {
-        return QueueFamilyVK::COMPUTE;
+        return queue_family_id;
     }
 
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
@@ -76,6 +78,7 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
+    QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
     std::string pipeline_id;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
     Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;

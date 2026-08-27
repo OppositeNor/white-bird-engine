@@ -590,11 +590,13 @@ void RendererVK::create_descriptor_pool() {
         }
         return static_cast<uint32_t>(scaled_capacity);
     };
-    std::array<VkDescriptorPoolSize, 4> pool_sizes{
+    std::array<VkDescriptorPoolSize, 5> pool_sizes{
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = scale_descriptor_capacity(MAX_UNIFORM_DESCRIPTOR_COUNT)},
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
             .descriptorCount = scale_descriptor_capacity(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT)},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = scale_descriptor_capacity(MAX_STORAGE_IMAGE_DESCRIPTOR_COUNT)},
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = scale_descriptor_capacity(MAX_SAMPLER_DESCRIPTOR_COUNT)},
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = scale_descriptor_capacity(MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT)},

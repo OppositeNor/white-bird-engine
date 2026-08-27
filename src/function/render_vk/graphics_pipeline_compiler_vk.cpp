@@ -24,6 +24,7 @@
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
+#include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
@@ -409,31 +410,17 @@ std::string resolve_pipeline_stage_entry(
     return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
 }
 
-template <typename RenderObjectType>
-Ref<RenderObjectType> get_registered_render_object(
-    Ref<RenderDatabase> p_render_database, std::string_view p_resource_key, HashCode p_render_object_type_id) {
-    // Render objects are cached by resource key and render-object type so each subresource can be reused independently.
-    auto render_object = p_render_database->get_compiled_render_resource(p_resource_key, p_render_object_type_id);
-    if (render_object == MEM_NULL) {
-        return MEM_NULL;
-    }
-    return render_object.dynamic_cast_ref<RenderObjectType>();
-}
-
-GraphicsPipelineCompilerVK::DescriptorSetBindings build_descriptor_set_bindings(
-    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings) {
-    GraphicsPipelineCompilerVK::DescriptorSetBindings result;
-    for (const auto& descriptor_binding : p_descriptor_bindings) {
-        result.emplace(descriptor_binding.parameter_name,
-            GraphicsPipelineCompilerVK::DescriptorSetBinding{descriptor_binding.set_index, descriptor_binding.layout_binding.binding});
-    }
-    return result;
-}
-
 } // namespace
 
 GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context)
-    : context(p_context) {
+    : PipelineCompilerVK(
+          PipelineCompilerVKContext{
+              .allocator = p_context.allocator,
+              .render_data = p_context.render_data,
+              .render_database = p_context.render_database,
+          },
+          "graphics pipeline"),
+      context(p_context) {
     // Reject incomplete context up front because every compile phase depends on these shared render services.
     if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL ||
         context.renderer == nullptr || context.color_attachment_formats.empty()) {
@@ -490,74 +477,6 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
         compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
     result.descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings);
     return result;
-}
-
-Ref<ROShaderVK> GraphicsPipelineCompilerVK::compile_shader(RefRes<RUShader> p_shader) {
-    // A propagated resource key is required because multiple graphics pipelines can share the same shader resource.
-    if (p_shader == nullptr || p_shader->resource_key == nullptr) {
-        throw std::runtime_error("Failed to compile shader: shader resource key was not propagated.");
-    }
-    std::string shader_key = p_shader->resource_key;
-    auto registered_shader = get_registered_render_object<ROShaderVK>(context.render_database, shader_key, TypeUUID<ROShaderVK>::UUID);
-    if (registered_shader != MEM_NULL) {
-        // Reuse an existing shader object instead of creating duplicate Vulkan shader modules for the same resource.
-        return registered_shader;
-    }
-    auto shader = ROShaderVK::Builder().set_code(p_shader).create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(shader_key, TypeUUID<ROShaderVK>::UUID, RefWeak<IRenderObject>(shader));
-    return shader;
-}
-
-std::vector<Ref<RODescriptorSetLayoutVK>> GraphicsPipelineCompilerVK::compile_descriptor_set_layouts(
-    std::string_view p_resource_key, const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings) {
-    // Descriptor set layouts are compiler-generated subresources derived from shader metadata.
-    std::vector<Ref<RODescriptorSetLayoutVK>> result;
-    auto descriptor_set_layout_bindings = build_graphics_pipeline_descriptor_set_layout_bindings(p_descriptor_bindings);
-    set_variable_descriptor_count_upper_bounds(
-        descriptor_set_layout_bindings, context.render_data->max_variable_sampled_image_descriptor_count);
-    result.reserve(descriptor_set_layout_bindings.size());
-    for (const auto& descriptor_set_layout_binding : descriptor_set_layout_bindings) {
-        // Descriptor set layouts are compiler-generated subresources of the
-        // graphics pipeline, so they use derived resource keys.
-        std::string descriptor_set_layout_key =
-            std::format("{}#descriptor_set_layout_{}", p_resource_key, descriptor_set_layout_binding.set_index);
-        auto descriptor_set_layout = get_registered_render_object<RODescriptorSetLayoutVK>(
-            context.render_database, descriptor_set_layout_key, TypeUUID<RODescriptorSetLayoutVK>::UUID);
-        if (descriptor_set_layout == MEM_NULL) {
-            // Missing cache entry: build the layout from every reflected binding in this set.
-            RODescriptorSetLayoutVK::Builder builder;
-            for (size_t i = 0; i < descriptor_set_layout_binding.bindings.size(); ++i) {
-                VkDescriptorBindingFlags binding_flags = descriptor_set_layout_binding.binding_flags[i];
-                builder.add_binding(descriptor_set_layout_binding.bindings[i], binding_flags);
-            }
-            descriptor_set_layout = builder.create_ref(context.render_data);
-            context.render_database->register_compiled_render_resource(
-                descriptor_set_layout_key, TypeUUID<RODescriptorSetLayoutVK>::UUID, RefWeak<IRenderObject>(descriptor_set_layout));
-        }
-        result.push_back(descriptor_set_layout);
-    }
-    return result;
-}
-
-Ref<ROPipelineLayoutVK> GraphicsPipelineCompilerVK::compile_pipeline_layout(
-    std::string_view p_resource_key, const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts) {
-    // Pipeline layouts are keyed as pipeline subresources because they are generated from this pipeline's descriptor sets.
-    std::string pipeline_layout_key = std::format("{}#pipeline_layout", p_resource_key);
-    auto pipeline_layout = get_registered_render_object<ROPipelineLayoutVK>(
-        context.render_database, pipeline_layout_key, TypeUUID<ROPipelineLayoutVK>::UUID);
-    if (pipeline_layout != MEM_NULL) {
-        // Reuse avoids rebuilding identical Vulkan pipeline layouts during repeated compile calls.
-        return pipeline_layout;
-    }
-    ROPipelineLayoutVK::Builder builder;
-    for (const auto& descriptor_set_layout : p_descriptor_set_layouts) {
-        // Preserve descriptor set order because Vulkan pipeline layouts are indexed by set number.
-        builder.add_descriptor_set_layout(descriptor_set_layout);
-    }
-    pipeline_layout = builder.create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(
-        pipeline_layout_key, TypeUUID<ROPipelineLayoutVK>::UUID, RefWeak<IRenderObject>(pipeline_layout));
-    return pipeline_layout;
 }
 
 Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(std::string_view p_resource_key, // NOLINT

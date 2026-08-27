@@ -1,0 +1,56 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "deferred_composition/deferred_composition_utils.slang"
+
+ConstantBuffer<CompositionCamera> camera_info;
+ParameterBlock<LightParams> light;
+Texture2D<float4> gbuffer_albedo;
+Texture2D<float2> gbuffer_octa_normal;
+Texture2D<float4> gbuffer_rma;
+Texture2D<float> gbuffer_depth;
+SamplerState gbuffer_sampler;
+RWTexture2D<float4> indirect_lighting_output;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+    uint width;
+    uint height;
+    uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
+    indirect_lighting_output.GetDimensions(width, height);
+    if (dispatch_thread_id.x >= width || dispatch_thread_id.y >= height) {
+        return;
+    }
+    float2 uv = (float2(dispatch_thread_id) + 0.5) / float2(width, height);
+    float depth = gbuffer_depth.SampleLevel(gbuffer_sampler, uv, 0.0);
+    if (depth >= 1.0) {
+        indirect_lighting_output[dispatch_thread_id] = float4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+    float4 albedo_matid = gbuffer_albedo.SampleLevel(gbuffer_sampler, uv, 0.0);
+    float2 octa = gbuffer_octa_normal.SampleLevel(gbuffer_sampler, uv, 0.0);
+    float4 rma_flags = gbuffer_rma.SampleLevel(gbuffer_sampler, uv, 0.0);
+    float3 base_color = albedo_matid.rgb;
+    float3 normal = octahedron_decode(octa);
+    float metallic = clamp(rma_flags.g, 0.0, 1.0);
+    float3 world_pos = world_position_from_depth(uv, depth, camera_info.inv_view_proj);
+    float3 indirect_irradiance = float3(0.0);
+    uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+    for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
+        indirect_irradiance += compute_rsm_indirect(light, spot_light_index, uv, world_pos, normal);
+    }
+    float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
+    indirect_lighting_output[dispatch_thread_id] = float4(indirect_lighting, 1.0);
+}

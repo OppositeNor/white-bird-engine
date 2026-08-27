@@ -25,7 +25,6 @@
 #include "utils/interface/i_singleton.hh"
 
 #include <cstddef>
-#include <cstdint>
 #include <span>
 #include <vulkan/vulkan_core.h>
 
@@ -114,7 +113,8 @@ private:
     StaticOpaqueBuildData build_static_opaque_data(const RenderDatabase::OpaqueTrianglesInfo& p_info,
         VkDeviceAddress p_vertex_buffer_address,
         VkDeviceAddress p_index_buffer_address) const;
-    StaticOpaqueTopLevelBuildData build_static_opaque_top_level_data(Ref<ROAccelerationStructureVK> p_bottom_level_acceleration_structure) const;
+    StaticOpaqueTopLevelBuildData build_static_opaque_top_level_data(
+        Ref<ROAccelerationStructureVK> p_bottom_level_acceleration_structure) const;
     GPUJobVK create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data);
     GPUJobVK update_static_opaque_acceleration_structure(
         const RenderDatabase::OpaqueTrianglesInfo& p_info, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer);

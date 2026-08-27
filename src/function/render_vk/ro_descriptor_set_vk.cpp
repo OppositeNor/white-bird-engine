@@ -92,7 +92,7 @@ void write_image_info(VkDescriptorType p_descriptor_type,
             // Keep the image view alive for as long as this descriptor set uses it.
             pending_bound_objects.emplace_back(image_info.image_view);
         }
-        if (p_descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
+        if (p_descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLER || p_descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
             if (image_info.sampler == MEM_NULL) {
                 throw std::runtime_error("Failed to write descriptor set: sampler is required.");
             }
@@ -191,6 +191,9 @@ void RODescriptorSetVK::validate_writer(const Writer& p_writer) const {
     if (!p_writer.sampled_image_infos.empty()) {
         resource_type_count++;
     }
+    if (!p_writer.storage_image_infos.empty()) {
+        resource_type_count++;
+    }
     if (!p_writer.sampler_infos.empty()) {
         resource_type_count++;
     }
@@ -264,6 +267,10 @@ void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
     if (!p_writer.sampled_image_infos.empty()) {
         write_image_info(
             VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, p_writer.sampled_image_infos, render_data->allocator, pending_bound_objects, image_infos);
+    }
+    if (!p_writer.storage_image_infos.empty()) {
+        write_image_info(
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, write_info, p_writer.storage_image_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
     if (!p_writer.sampler_infos.empty()) {
         write_image_info(

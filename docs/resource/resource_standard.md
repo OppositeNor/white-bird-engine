@@ -67,7 +67,7 @@ int detail_index; // Selects texture_role "detail_index".
 
 The static opaque pipeline reflects these attributes independently for each graphics pipeline, assembles the corresponding
 bindless texture array, and writes descriptor indices at the reflected field offsets. `material_sampler`, `textures`, and
-`materials` remain fixed members of the global contract in `defs.slang`; applications may configure only the base variable names
+`materials` remain fixed members of the global contract in `utils/utils.slang`; applications may configure only the base variable names
 for `material_textures` and `material_params`, plus the `default_material` resource key.
 
 `WBE_TEXTURE` and `WBE_VERTEX_INPUT` share the same open-role annotation resolver: both accept one optional string, default to the

@@ -2,20 +2,40 @@
     "include": [],
     "resources": [
         {
-            "id": "deferred_composition_shader",
+            "id": "direct_lighting_shader",
             "source_type": "shader",
-            "src": "assets/shaders/deferred_composition/deferred_composition.slang",
-            "dst": "assets/shaders/deferred_composition/deferred_composition.spv",
-            "metadata": "assets/shaders/deferred_composition/deferred_composition.json"
+            "src": "assets/shaders/deferred_composition/direct_lighting.slang",
+            "dst": "assets/shaders/deferred_composition/direct_lighting.spv",
+            "metadata": "assets/shaders/deferred_composition/direct_lighting.json"
         },
         {
-            "id": "deferred_composition",
+            "id": "indirect_lighting_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/indirect_lighting.slang",
+            "dst": "assets/shaders/deferred_composition/indirect_lighting.spv",
+            "metadata": "assets/shaders/deferred_composition/indirect_lighting.json"
+        },
+        {
+            "id": "post_processing_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/post_processing.slang",
+            "dst": "assets/shaders/deferred_composition/post_processing.spv",
+            "metadata": "assets/shaders/deferred_composition/post_processing.json"
+        },
+        {
+            "id": "present_post_processing_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/present_post_processing.slang",
+            "dst": "assets/shaders/deferred_composition/present_post_processing.spv",
+            "metadata": "assets/shaders/deferred_composition/present_post_processing.json"
+        },
+        {
+            "id": "present_post_processing",
             "type": "graphics_pipeline",
-            "vertex_stage_id": "deferred_composition_shader",
-            "fragment_stage_id": "deferred_composition_shader",
+            "vertex_stage_id": "present_post_processing_shader",
+            "fragment_stage_id": "present_post_processing_shader",
             "depth_test": false,
-            "depth_write": false,
-            "color_blend": false
+            "depth_write": false
         }
     ]
 }

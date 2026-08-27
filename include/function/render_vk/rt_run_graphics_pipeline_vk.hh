@@ -68,6 +68,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_color_attachment_load_op Load operation for the color attachment.
      * @param p_vertex_input Dynamic vertex-input state; empty for a vertex-less draw.
      * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
+     * @param p_additional_read_accesses Additional sampled/storage resources read by the shader stages.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
@@ -80,7 +81,8 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0);
+        VkDeviceSize p_vertex_buffer_offset = 0,
+        std::span<const ResAccessVK> p_additional_read_accesses = {});
 
     /**
      * @brief Constructor (multi-attachment).
@@ -103,6 +105,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_depth_attachment_load_op Load operation for the depth attachment.
      * @param p_vertex_input Dynamic vertex-input state; empty for a vertex-less draw.
      * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
+     * @param p_additional_read_accesses Additional sampled/storage resources read by the shader stages.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         std::span<const VkClearValue> p_clear_values,
@@ -117,7 +120,8 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0);
+        VkDeviceSize p_vertex_buffer_offset = 0,
+        std::span<const ResAccessVK> p_additional_read_accesses = {});
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -145,6 +149,7 @@ private:
     VkDeviceSize vertex_buffer_offset = 0;
     Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
     Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
+    Vector<ResAccessVK, RenderAllocator> additional_read_accesses;
 };
 
 } // namespace WhiteBirdEngine

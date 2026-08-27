@@ -61,7 +61,7 @@ Unsupported descriptor kinds or shapes throw `std::runtime_error`. When merging 
 
 Relevant files:
 
-- `res/assets/shaders/defs.slang`
+- `res/assets/shaders/utils/utils.slang`
 - `include/function/render/vertex_input_contract_resolver.hh`
 - `src/function/render/vertex_input_contract_resolver.cpp`
 - `tests/unit/function/shader_metadata_vk_utils_test.cpp`
@@ -80,7 +80,7 @@ Across the merged pipeline metadata, stages must agree on the reflected layout, 
 
 Relevant files:
 
-- `res/assets/shaders/defs.slang`
+- `res/assets/shaders/utils/utils.slang`
 - `src/function/render/shader_role_field_resolver.cpp`
 - `src/function/render/material_texture_contract_resolver.cpp`
 - `tests/unit/function/shader_role_field_resolver_test.cpp`

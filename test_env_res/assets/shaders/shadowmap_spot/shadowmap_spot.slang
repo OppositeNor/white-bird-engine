@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "defs.slang"
+#include "utils.slang"
 
 /**
  * @brief Vertex shader output / fragment shader input for the spot-light shadow map pass.

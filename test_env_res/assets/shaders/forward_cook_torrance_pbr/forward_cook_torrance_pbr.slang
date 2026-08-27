@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "forward_cook_torrance_pbr/forward_cook_torrance_pbr_utils.slang"
-#include "defs.slang"
 
 ConstantBuffer<CameraInfo> camera_info;
 ConstantBuffer<MaterialParamsBuffer> material_params;

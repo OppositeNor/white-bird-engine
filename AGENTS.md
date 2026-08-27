@@ -140,7 +140,7 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
   contract.
 - Every material texture slot has a non-empty, shader-defined `texture_role`; do not introduce a closed engine-side texture-role
   enum or whitelist.
-- Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `defs.slang`.
+- Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `utils/utils.slang`.
   - `[WBE_TEXTURE("albedo")] int albedo_index;` selects the explicit `albedo` role.
   - `[WBE_TEXTURE] int detail_index;` uses `detail_index` as the role.
 - `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and `MaterialParamsBuffer.materials` are fixed global-contract

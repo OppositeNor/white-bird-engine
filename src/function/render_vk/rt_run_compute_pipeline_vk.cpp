@@ -36,8 +36,9 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(const BaseRenderDataVK* p_render_
     VkExtent3D p_dispatch_group_count,
     std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
     std::span<const ResAccessVK> p_read_accesses,
-    std::span<const ResAccessVK> p_write_accesses)
-    : render_data(p_render_data), pipeline_id(p_pipeline_id), dispatch_group_count(p_dispatch_group_count),
+        std::span<const ResAccessVK> p_write_accesses,
+        QueueFamilyVK p_queue_family)
+        : render_data(p_render_data), queue_family_id(p_queue_family), pipeline_id(p_pipeline_id), dispatch_group_count(p_dispatch_group_count),
       descriptor_sets(p_descriptor_sets.begin(), p_descriptor_sets.end(), p_render_data->allocator),
       descriptor_sets_instances(p_render_data->allocator),
       additional_read_accesses(p_read_accesses.begin(), p_read_accesses.end(), p_render_data->allocator),

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "forward_cook_torrance_pbr/forward_cook_torrance_pbr_utils.slang"
-#include "defs.slang"
+#include "utils.slang"
 
 struct RSMVSOutput {
     float4 position : SV_Position;
