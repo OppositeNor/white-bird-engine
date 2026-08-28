@@ -15,6 +15,10 @@
 #ifndef WBE_FILE_DEFERRED_COMPOSITION_UTILS_SLANG
 #define WBE_FILE_DEFERRED_COMPOSITION_UTILS_SLANG
 
+#ifndef WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+#define WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS 0
+#endif
+
 #include "utils.slang"
 
 static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
@@ -49,6 +53,9 @@ struct CompositionCamera {
 struct LightParam {
     ConstantBuffer<SpotLightInfo> info;
     Texture2D<float2> shadowmap;
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+    Texture2D<float2> shadow_moments_summed_area_table;
+#endif
     Texture2D<float4> rsm_flux;
     Texture2D<float2> rsm_octa_normal;
     SamplerState shadowmap_sampler;
@@ -105,6 +112,79 @@ float3 world_position_from_depth(float2 p_uv, float p_depth, float4x4 p_inv_view
     float4 ndc = float4(ndc_xy, p_depth, 1.0);
     float4 world = mul(p_inv_view_proj, ndc);
     return world.xyz / world.w;
+}
+
+/**
+ * @brief Load one summed-area-table entry, treating coordinates outside its negative boundaries as zero.
+ * @param p_light The deferred-light resources.
+ * @param p_spot_light_index The light whose summed-area table is sampled.
+ * @param p_texel The inclusive prefix-sum coordinate.
+ * @return The summed first and second moments through p_texel, or zero outside the negative boundaries.
+ */
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+float2 load_shadow_moments_summed_area_table(
+    ParameterBlock<LightParams> p_light, uint p_spot_light_index, int2 p_texel) {
+    if (any(p_texel < int2(0))) {
+        return float2(0.0);
+    }
+    return p_light.lights[p_spot_light_index].shadow_moments_summed_area_table.Load(int3(p_texel, 0));
+}
+
+/**
+ * @brief Compute exact box-filtered shadow moments with a summed-area table.
+ * @param p_light The deferred-light resources.
+ * @param p_spot_light_index The light whose summed-area table is queried.
+ * @param p_center_uv The filter center in shadow-map UV coordinates.
+ * @param p_radius_uv The square filter half-width in UV coordinates.
+ * @param p_shadow_size The shadow-map extent in texels.
+ * @return The mean first and second moments in the clamped filter rectangle.
+ */
+float2 sample_shadow_moments_summed_area_table(ParameterBlock<LightParams> p_light,
+    uint p_spot_light_index,
+    float2 p_center_uv,
+    float p_radius_uv,
+    uint2 p_shadow_size) {
+    int2 maximum_texel = int2(p_shadow_size) - int2(1);
+    float2 minimum_uv = clamp(p_center_uv - p_radius_uv, 0.0, 1.0);
+    float2 maximum_uv = clamp(p_center_uv + p_radius_uv, 0.0, 1.0);
+    int2 minimum_texel = clamp(int2(floor(minimum_uv * float2(p_shadow_size))), int2(0), maximum_texel);
+    int2 maximum_filter_texel =
+        clamp(int2(ceil(maximum_uv * float2(p_shadow_size))) - int2(1), minimum_texel, maximum_texel);
+
+    // sum([x0, x1] x [y0, y1]) = SAT(x1, y1) - SAT(x0 - 1, y1) - SAT(x1, y0 - 1) + SAT(x0 - 1, y0 - 1).
+    float2 moment_sum = load_shadow_moments_summed_area_table(p_light, p_spot_light_index, maximum_filter_texel) -
+                        load_shadow_moments_summed_area_table(
+                            p_light, p_spot_light_index, int2(minimum_texel.x - 1, maximum_filter_texel.y)) -
+                        load_shadow_moments_summed_area_table(
+                            p_light, p_spot_light_index, int2(maximum_filter_texel.x, minimum_texel.y - 1)) +
+                        load_shadow_moments_summed_area_table(p_light, p_spot_light_index, minimum_texel - int2(1));
+    int2 filter_extent = maximum_filter_texel - minimum_texel + int2(1);
+    float filter_area = float(filter_extent.x * filter_extent.y);
+    // E[z^n] = sum(z_i^n) / sample_count.
+    return clamp(moment_sum / filter_area, 0.0, 1.0);
+}
+#endif
+
+/**
+ * @brief Approximate box-filtered shadow moments with a trilinearly sampled mip level.
+ * @param p_light The deferred-light resources.
+ * @param p_spot_light_index The light whose moment map is sampled.
+ * @param p_center_uv The filter center in shadow-map UV coordinates.
+ * @param p_radius_uv The square filter half-width in UV coordinates.
+ * @param p_shadow_size The shadow-map extent in texels.
+ * @return The filtered first and second moments.
+ */
+float2 sample_shadow_moments_mipmap(ParameterBlock<LightParams> p_light,
+    uint p_spot_light_index,
+    float2 p_center_uv,
+    float p_radius_uv,
+    uint2 p_shadow_size) {
+    float filter_width_texels = max(2.0 * p_radius_uv * float(p_shadow_size.x), 1.0);
+    // L = log2(filter_width_texels).
+    float maximum_mip_level = floor(log2(float(max(p_shadow_size.x, p_shadow_size.y))));
+    float mip_level = clamp(log2(filter_width_texels), 0.0, maximum_mip_level);
+    return p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
+        p_light.lights[p_spot_light_index].shadowmap_sampler, p_center_uv, mip_level);
 }
 
 float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uint p_sample_index) {
@@ -169,7 +249,9 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
     return indirect_irradiance * (2.0 * maximum_sample_distance_squared / float(WBE_RSM_SAMPLE_COUNT));
 }
 
-float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light_index, float3 p_world_position) {
+float compute_spot_shadow(ParameterBlock<LightParams> p_light,
+    uint p_spot_light_index,
+    float3 p_world_position) {
     SpotLightInfo spot_light_info = p_light.lights[p_spot_light_index].info;
     float4 light_space_position = mul(spot_light_info.proj, mul(spot_light_info.view, float4(p_world_position, 1.0)));
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
@@ -187,8 +269,6 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
     uint shadow_height;
     p_light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
     float emitter_width = max(spot_light_info.emitter_width, 0.0);
-    // L_max = floor(log2(max(shadow_width, shadow_height))).
-    float maximum_mip_level = floor(log2(float(max(shadow_width, shadow_height))));
     float3 light_near_position = world_position_from_depth(float2(0.5, 0.5), 1.0, spot_light_info.inv_view_proj);
     float light_near_distance = max(length(light_near_position - spot_light_info.position), 0.0001);
     // r_light_uv = emitter_width * |projection_x_scale| / (4 * near_distance).
@@ -196,11 +276,13 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
     // r_search_uv = r_light_uv * (receiver_distance - near_distance) / receiver_distance.
     float search_radius_uv = emitter_radius_near_uv * max(receiver_distance - light_near_distance, 0.0) /
                              max(receiver_distance, 0.0001);
-    float search_width_texels = max(2.0 * search_radius_uv * float(shadow_width), 1.0);
-    // L_search = log2(search_width_texels).
-    float search_mip_level = clamp(log2(search_width_texels), 0.0, maximum_mip_level);
-    float2 search_moments = p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
-        p_light.lights[p_spot_light_index].shadowmap_sampler, uv, search_mip_level);
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+    float2 search_moments = sample_shadow_moments_summed_area_table(
+        p_light, p_spot_light_index, uv, search_radius_uv, uint2(shadow_width, shadow_height));
+#else
+    float2 search_moments = sample_shadow_moments_mipmap(
+        p_light, p_spot_light_index, uv, search_radius_uv, uint2(shadow_width, shadow_height));
+#endif
     if (current_depth <= search_moments.x) {
         return 1.0;
     }
@@ -218,11 +300,14 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
     // filter_width_uv = emitter_width * |projection_x_scale| * penumbra_ratio / (2 * receiver_distance).
     float projected_filter_width_uv =
         emitter_width * abs(spot_light_info.proj[0][0]) * penumbra_ratio / (2.0 * max(receiver_distance, 0.0001));
-    float filter_width_texels = max(projected_filter_width_uv * float(shadow_width), 1.0);
-    // L_filter = log2(filter_width_texels).
-    float filter_mip_level = clamp(log2(filter_width_texels), 0.0, maximum_mip_level);
-    float2 filtered_moments = p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
-        p_light.lights[p_spot_light_index].shadowmap_sampler, uv, filter_mip_level);
+    float filter_radius_uv = 0.5 * projected_filter_width_uv;
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+    float2 filtered_moments = sample_shadow_moments_summed_area_table(
+        p_light, p_spot_light_index, uv, filter_radius_uv, uint2(shadow_width, shadow_height));
+#else
+    float2 filtered_moments = sample_shadow_moments_mipmap(
+        p_light, p_spot_light_index, uv, filter_radius_uv, uint2(shadow_width, shadow_height));
+#endif
     if (current_depth <= filtered_moments.x) {
         return 1.0;
     }

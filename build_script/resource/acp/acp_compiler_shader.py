@@ -67,25 +67,65 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 raise RuntimeError(
                     f"Shader resource entry must be a string in {manifest_path}: {resource}."
                 )
+            macro_definitions = self._read_macro_definitions(result, manifest_path)
             source_file_path, _ = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
             dst_rel = self._normalize_resource_path(destination_rel_path, manifest_path)
-            self._compile_resource(source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, result)
+            self._compile_resource(
+                source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions, result
+            )
             result["path"] = dst_rel.as_posix()
             result["metadata"] = metadata_rel.as_posix()
             result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
-            if "src" in result:
-                del result["src"]
-            if "dst" in result:
-                del result["dst"]
+            result.pop("src", None)
+            result.pop("dst", None)
+            result.pop("macros", None)
             return [result]
 
         raise RuntimeError(
             f"Shader resource must provide src/dst fields in {manifest_path}: {resource}."
         )
 
+    def _read_macro_definitions(self, resource: ManifestResource, manifest_path: Path) -> list[str]:
+        raw_macros = resource.get("macros")
+        if raw_macros is None:
+            return []
+        if not isinstance(raw_macros, list):
+            raise RuntimeError(
+                f"Shader resource macros must be an array in {manifest_path}: {resource}."
+            )
+
+        definitions: list[str] = []
+        names: set[str] = set()
+        for raw_macro in raw_macros:
+            if not isinstance(raw_macro, dict):
+                raise RuntimeError(
+                    f"Shader resource macro entries must be objects in {manifest_path}: {resource}."
+                )
+            name = raw_macro.get("name")
+            if not isinstance(name, str) or not name:
+                raise RuntimeError(
+                    f"Shader resource macro name must be a non-empty string in {manifest_path}: {resource}."
+                )
+            if name in names:
+                raise RuntimeError(
+                    f"Shader resource macro name '{name}' is duplicated in {manifest_path}: {resource}."
+                )
+            names.add(name)
+            if "value" not in raw_macro:
+                definitions.append(name)
+                continue
+            value = raw_macro["value"]
+            if not isinstance(value, str):
+                raise RuntimeError(
+                    f"Shader resource macro value must be a string in {manifest_path}: {resource}."
+                )
+            definitions.append(f"{name}={value}")
+        return definitions
+
     def _compile_resource(self, source_file_path: Path, destination_rel_path: Path,
                           metadata_rel_path: Path, res_output_dir: Path,
-                          stage: str | None, entry: str | None, resource: ManifestResource) -> None:
+                          stage: str | None, entry: str | None,
+                          macro_definitions: list[str], resource: ManifestResource) -> None:
         output_file_path = Path.joinpath(res_output_dir, destination_rel_path)
         shader_metadata_file_path = Path.joinpath(res_output_dir, metadata_rel_path)
 
@@ -95,7 +135,9 @@ class WBEACPCompilerShader(WBEACPCompiler):
         os.makedirs(output_file_path.parent, exist_ok=True)
         os.makedirs(shader_metadata_file_path.parent, exist_ok=True)
         if source_file_path.suffix == ".slang":
-            self._compile_slang(source_file_path, output_file_path, shader_metadata_file_path, stage, entry, resource)
+            self._compile_slang(
+                source_file_path, output_file_path, shader_metadata_file_path, stage, entry, macro_definitions, resource
+            )
         else:
             raise RuntimeError(f"Unsupported shader file type: {source_file_path.suffix}.")
 
@@ -114,7 +156,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
 
     def _compile_slang(self, shader_file: Path, output_file: Path,
                        shader_metadata_file_path: Path, stage: str | None, entry: str | None,
-                       resource: ManifestResource) -> None:
+                       macro_definitions: list[str], resource: ManifestResource) -> None:
         shader_stage = stage
         entry_name = entry
 
@@ -147,6 +189,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 shader_metadata_file_path,
                 shader_stage,
                 entry_name,
+                macro_definitions,
                 resource,
             )
             return
@@ -155,12 +198,14 @@ class WBEACPCompilerShader(WBEACPCompiler):
     def _compile_slangc_slang(self, slangc_path: str, shader_file: Path,
                               output_file: Path, shader_metadata_file: Path,
                               shader_stage: str | None, entry_name: str | None,
-                              resource: ManifestResource) -> None:
+                              macro_definitions: list[str], resource: ManifestResource) -> None:
         cmd = [slangc_path, "-target", "spirv"]
         if entry_name is not None:
             cmd.extend(["-entry", entry_name])
         if shader_stage is not None:
             cmd.extend(["-stage", shader_stage])
+        for macro_definition in macro_definitions:
+            cmd.append(f"-D{macro_definition}")
         cmd.extend([
             "-I", str(self._shader_include_dir),
             "-I", str(self._shader_include_dir / "utils"),

@@ -22,9 +22,26 @@ a root chunk manifest. Included files must be valid ACP manifests with a `resour
     - `src`: source shader file in `res`.
     - `dst`: compiled shader output path in runtime resources.
     - `metadata`: reflection metadata output path.
+    - `macros`: optional compile-time Slang macro definitions. Each entry requires a non-empty `name` and may provide a string `value`.
 - For direct-copy resources, use:
     - `file`: source file path in `res`.
 - Missing files referenced by `file` are treated as build errors.
+
+Shader macros are compile-only and are not emitted into the runtime resource manifest:
+
+```json
+{
+    "id": "example_shader_variant",
+    "source_type": "shader",
+    "src": "assets/shaders/example.slang",
+    "dst": "assets/shaders/example_variant.spv",
+    "metadata": "assets/shaders/example_variant.json",
+    "macros": [
+        {"name": "WBE_MACRO_1"},
+        {"name": "WBE_MACRO_2", "value": "1"}
+    ]
+}
+```
 
 ## Material Resources
 
