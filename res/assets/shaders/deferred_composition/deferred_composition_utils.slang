@@ -38,6 +38,7 @@ struct SpotLightInfo {
     float3 color;
     float outer_cone_cos;
     float range;
+    float emitter_width;
 };
 
 struct CompositionCamera {
@@ -47,7 +48,7 @@ struct CompositionCamera {
 
 struct LightParam {
     ConstantBuffer<SpotLightInfo> info;
-    Texture2D<float> shadowmap;
+    Texture2D<float2> shadowmap;
     Texture2D<float4> rsm_flux;
     Texture2D<float2> rsm_octa_normal;
     SamplerState shadowmap_sampler;
@@ -138,7 +139,7 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
         }
         int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
         float2 sample_texel_uv = (float2(sample_texel) + 0.5) * texel_size;
-        float sample_depth = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
+        float sample_depth = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0)).x;
         if (sample_depth <= 0.0) {
             continue;
         }
@@ -147,7 +148,9 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
             continue;
         }
         float2 sample_octa_normal = p_light.lights[p_spot_light_index].rsm_octa_normal.Load(int3(sample_texel, 0));
-        float3 sample_world_position = world_position_from_depth(sample_texel_uv, sample_depth, spot_light_info.inv_view_proj);
+        float3 shadow_ray_position = world_position_from_depth(sample_texel_uv, 1.0, spot_light_info.inv_view_proj);
+        float3 shadow_ray_direction = normalize(shadow_ray_position - spot_light_info.position);
+        float3 sample_world_position = spot_light_info.position + shadow_ray_direction * sample_depth * spot_light_info.range;
         float3 sample_world_normal = octahedron_decode(sample_octa_normal);
         float3 receiver_to_sample = sample_world_position - p_world_position;
         float distance_squared = dot(receiver_to_sample, receiver_to_sample);
@@ -175,22 +178,57 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light, uint p_spot_light
         return 1.0;
     }
     const float bias = 0.0015;
-    float current_depth = ndc.z + bias;
+    const float minimum_variance = 0.00002;
+    const float light_bleeding_reduction = 0.2;
+    float receiver_distance = length(spot_light_info.position - p_world_position);
+    // t = distance(light, receiver) / light_range - bias.
+    float current_depth = clamp(receiver_distance / max(spot_light_info.range, 0.0001) - bias, 0.0, 1.0);
     uint shadow_width;
     uint shadow_height;
     p_light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
-    float2 texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
-    float visibility = 0.0;
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            float2 sample_uv = uv + float2(x, y) * texel_size;
-            int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
-            sample_texel = clamp(sample_texel, int2(0, 0), int2(int(shadow_width) - 1, int(shadow_height) - 1));
-            float sampled = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
-            visibility += current_depth >= sampled ? 1.0 : 0.0;
-        }
+    float emitter_width = max(spot_light_info.emitter_width, 0.0);
+    // L_max = floor(log2(max(shadow_width, shadow_height))).
+    float maximum_mip_level = floor(log2(float(max(shadow_width, shadow_height))));
+    float3 light_near_position = world_position_from_depth(float2(0.5, 0.5), 1.0, spot_light_info.inv_view_proj);
+    float light_near_distance = max(length(light_near_position - spot_light_info.position), 0.0001);
+    // r_light_uv = emitter_width * |projection_x_scale| / (4 * near_distance).
+    float emitter_radius_near_uv = emitter_width * abs(spot_light_info.proj[0][0]) / (4.0 * light_near_distance);
+    // r_search_uv = r_light_uv * (receiver_distance - near_distance) / receiver_distance.
+    float search_radius_uv = emitter_radius_near_uv * max(receiver_distance - light_near_distance, 0.0) /
+                             max(receiver_distance, 0.0001);
+    float search_width_texels = max(2.0 * search_radius_uv * float(shadow_width), 1.0);
+    // L_search = log2(search_width_texels).
+    float search_mip_level = clamp(log2(search_width_texels), 0.0, maximum_mip_level);
+    float2 search_moments = p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
+        p_light.lights[p_spot_light_index].shadowmap_sampler, uv, search_mip_level);
+    if (current_depth <= search_moments.x) {
+        return 1.0;
     }
-    return visibility / 9.0;
+    float non_blocker_probability = chebyshev_upper_bound(search_moments, current_depth, minimum_variance);
+    if (non_blocker_probability >= 0.9999) {
+        return 1.0;
+    }
+    // blocker_depth = (E[z] - p_non_blocker * receiver_depth) / (1 - p_non_blocker).
+    float average_blocker_depth =
+        (search_moments.x - non_blocker_probability * current_depth) / max(1.0 - non_blocker_probability, 0.0001);
+    float light_near_depth = light_near_distance / max(spot_light_info.range, 0.0001);
+    average_blocker_depth = clamp(average_blocker_depth, light_near_depth, max(current_depth, light_near_depth));
+    // penumbra_ratio = (receiver_depth - blocker_depth) / blocker_depth.
+    float penumbra_ratio = max(current_depth - average_blocker_depth, 0.0) / max(average_blocker_depth, 0.0001);
+    // filter_width_uv = emitter_width * |projection_x_scale| * penumbra_ratio / (2 * receiver_distance).
+    float projected_filter_width_uv =
+        emitter_width * abs(spot_light_info.proj[0][0]) * penumbra_ratio / (2.0 * max(receiver_distance, 0.0001));
+    float filter_width_texels = max(projected_filter_width_uv * float(shadow_width), 1.0);
+    // L_filter = log2(filter_width_texels).
+    float filter_mip_level = clamp(log2(filter_width_texels), 0.0, maximum_mip_level);
+    float2 filtered_moments = p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
+        p_light.lights[p_spot_light_index].shadowmap_sampler, uv, filter_mip_level);
+    if (current_depth <= filtered_moments.x) {
+        return 1.0;
+    }
+    float visibility = chebyshev_upper_bound(filtered_moments, current_depth, minimum_variance);
+    // visibility_reduced = saturate((visibility - reduction) / (1 - reduction)).
+    return saturate((visibility - light_bleeding_reduction) / (1.0 - light_bleeding_reduction));
 }
 
 #endif

@@ -52,6 +52,8 @@ struct BaseRenderDataVK {
 
     // The logic device.
     VkDevice logic_device = VK_NULL_HANDLE;
+    // The physical device that owns the renderer queues and resources.
+    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     /** Command for setting dynamic vertex input state. */
     PFN_vkCmdSetVertexInputEXT command_set_vertex_input = nullptr;
     /** Command for creating an acceleration structure. */
@@ -194,9 +196,13 @@ struct SpotLightInfoVKUBO {
      */
     float range = 0.0F;
     /**
+     * @brief Projected emitter width in world units.
+     */
+    float emitter_width = 0.0F;
+    /**
      * @brief Padding to match the shader struct array stride.
      */
-    std::array<uint32_t, 3> padding{};
+    std::array<uint32_t, 2> padding{};
 };
 
 static_assert(sizeof(SpotLightInfoVKUBO) == 256);

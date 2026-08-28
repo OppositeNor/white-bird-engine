@@ -19,6 +19,8 @@
   - Low-level node/edge construction, descriptor building, execution, runtime resource binding, and terminal semaphore access.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
   - General compute dispatch task with compute-queue default and additional resource accesses.
+- `include/function/render_vk/rt_generate_mipmaps_vk.hh`
+  - Graphics-queue color mip generation with filtered blits and per-level image synchronization.
 
 ## Descriptor pattern
 

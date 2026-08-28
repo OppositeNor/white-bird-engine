@@ -102,7 +102,8 @@ Ref<RGExecEdge> RenderGraphVK::add_exec_edge(
     edge->after = p_after;
     edge->before_finish_pipeline_stage = p_before_finish_stage;
     edge->after_start_pipeline_stage = p_after_start_stage;
-    // Timeline semaphore for cross-submit ordering.
+    // TODO: Use a pipeline barrier for execution edges whose nodes run on the
+    // same queue, and reserve semaphores for cross-queue edges.
     edge->semaphore = make_ref<SemaphoreVK>(render_data->allocator, render_data, false);
     p_before->exec_after.emplace_back(edge);
     p_after->exec_before.emplace_back(edge);

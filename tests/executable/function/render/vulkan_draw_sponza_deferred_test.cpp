@@ -40,6 +40,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
@@ -52,6 +53,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -81,10 +83,12 @@ constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW = "R
 constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW";
 constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW";
 constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW = "REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW";
+constexpr std::string_view REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW = "REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW";
 constexpr std::string_view REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW = "REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW";
 constexpr std::string_view REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW = "REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW";
 constexpr std::string_view REND_RES_TEST_POST_PROCESSED_IMAGE_VIEW = "REND_RES_TEST_POST_PROCESSED_IMAGE_VIEW";
 WBE_LABEL(RT_RUN_DEFERRED_GBUFFER, WBE_RENDER_TASK);
+WBE_LABEL(RT_GENERATE_SHADOW_MIPMAPS, WBE_RENDER_TASK);
 WBE_LABEL(RT_RUN_DIRECT_LIGHTING, WBE_RENDER_TASK);
 WBE_LABEL(RT_RUN_INDIRECT_LIGHTING, WBE_RENDER_TASK);
 WBE_LABEL(RT_RUN_POST_PROCESSING, WBE_RENDER_TASK);
@@ -95,6 +99,7 @@ constexpr VkFormat GBUFFER_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat GBUFFER_RMA_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
+constexpr VkFormat SHADOW_MOMENTS_FORMAT = VK_FORMAT_R32G32_SFLOAT;
 constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -129,6 +134,7 @@ private:
     void register_deferred_render_graph(
         Unique<RTRunStaticOpaqueTrianglesVK>& p_shadow_task, Unique<RTRunStaticOpaqueTrianglesVK>& p_gbuffer_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
+    RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_direct_lighting_task_desc() const;
     RendTaskDescVK create_indirect_lighting_task_desc() const;
     RendTaskDescVK create_post_processing_task_desc() const;
@@ -174,9 +180,12 @@ private:
     Ref<ROImageVK> shadow_depth_image;
     Ref<ROImageVK> shadow_color_image;
     Ref<ROImageVK> shadow_normal_image;
+    Ref<ROImageVK> shadow_moments_image;
     Ref<ROImageViewVK> shadow_depth_view;
     Ref<ROImageViewVK> shadow_color_view;
     Ref<ROImageViewVK> shadow_normal_view;
+    Ref<ROImageViewVK> shadow_moments_attachment_view;
+    Ref<ROImageViewVK> shadow_moments_sampled_view;
     Ref<ROSamplerVK> shadow_sampler;
     Ref<ROSamplerVK> gbuffer_sampler;
     Ref<ROSamplerVK> lighting_sampler;
@@ -189,6 +198,7 @@ private:
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
+    uint32_t shadow_mipmap_level_count = 1;
     ComponentCamera camera_component{};
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
     float camera_yaw = default_test_camera_yaw();
@@ -435,6 +445,7 @@ void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
         .width = spot_light_component.shadow_map_resolution,
         .height = spot_light_component.shadow_map_resolution,
     };
+    shadow_mipmap_level_count = std::bit_width(std::max(shadow_extent.width, shadow_extent.height));
 }
 
 void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
@@ -449,6 +460,13 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
                               .image_2d(shadow_extent)
                               .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                               .create_ref(base_render_data);
+    shadow_moments_image = ROImageVK::Builder()
+                               .set_format(SHADOW_MOMENTS_FORMAT)
+                               .image_2d(shadow_extent)
+                               .set_mipmap_level(shadow_mipmap_level_count)
+                               .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                               .create_ref(base_render_data);
 
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -482,8 +500,24 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
                              .set_format(RSM_NORMAL_FORMAT)
                              .set_subresource_range(color_subresource)
                              .create_ref(base_render_data);
+    shadow_moments_attachment_view = ROImageViewVK::Builder()
+                                         .set_image(shadow_moments_image)
+                                         .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                         .set_format(SHADOW_MOMENTS_FORMAT)
+                                         .set_subresource_range(color_subresource)
+                                         .create_ref(base_render_data);
+    VkImageSubresourceRange moments_sampled_subresource = color_subresource;
+    moments_sampled_subresource.levelCount = shadow_mipmap_level_count;
+    shadow_moments_sampled_view = ROImageViewVK::Builder()
+                                      .set_image(shadow_moments_image)
+                                      .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                      .set_format(SHADOW_MOMENTS_FORMAT)
+                                      .set_subresource_range(moments_sampled_subresource)
+                                      .create_ref(base_render_data);
     shadow_sampler = ROSamplerVK::Builder()
                          .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                         .set_mipmap_mode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
+                         .set_lod_range(0.0F, static_cast<float>(shadow_mipmap_level_count - 1))
                          .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                          .create_ref(base_render_data);
 }
@@ -607,13 +641,18 @@ Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_s
     RTRunStaticOpaqueTrianglesVK::Config task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
+    VkClearValue shadow_moments_clear{};
+    shadow_moments_clear.color.float32[0] = 1.0F;
+    shadow_moments_clear.color.float32[1] = 1.0F;
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     task_config.set_render_extent(shadow_extent)
         .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
         .add_color_attachment(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)
+        .add_color_attachment(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_FORMAT)
         .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .add_clear_value(shadow_color_clear)
         .add_clear_value(shadow_normal_clear)
+        .add_clear_value(shadow_moments_clear)
         .add_clear_value(shadow_depth_clear)
         .add_graphics_pipeline_override("forward_cook_torrance_pbr", "rsm_spot")
         .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "rsm_spot_masked");
@@ -633,7 +672,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     RenderBindpointDeclarationsBuilder direct_bindpoints;
     direct_bindpoints.add_buffer_decleration("camera_info", &camera_info, sizeof(camera_info))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
-        .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
+        .add_image_decleration("light.lights[0].shadowmap", shadow_moments_sampled_view)
         .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
         .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
         .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
@@ -659,7 +698,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     RenderBindpointDeclarationsBuilder indirect_bindpoints;
     indirect_bindpoints.add_buffer_decleration("camera_info", &camera_info, sizeof(camera_info))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
-        .add_image_decleration("light.lights[0].shadowmap", shadow_depth_view)
+        .add_image_decleration("light.lights[0].shadowmap", shadow_moments_sampled_view)
         .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
         .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
         .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
@@ -778,6 +817,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
+    pipeline_desc.tasks.emplace_back(create_shadow_mipmap_task_desc());
     RendTaskDescVK gbuffer_task_desc(render_allocator, RT_RUN_DEFERRED_GBUFFER, std::move(p_gbuffer_task));
     gbuffer_task_desc.prev.emplace_back(RT_RUN_PIPELINE_SHADOWMAP);
     pipeline_desc.tasks.emplace_back(std::move(gbuffer_task_desc));
@@ -809,6 +849,9 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .res = shadow_color_view});
     p_pipeline_desc.resources.emplace_back(RendResVK{
         .res_id = std::string(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .res = shadow_normal_view});
+    p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW),
+        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
+        .res = shadow_moments_attachment_view});
     p_pipeline_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .res = shadow_depth_view});
@@ -835,15 +878,34 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .res = post_processed_view});
 }
 
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
+    task_desc.prev.emplace_back(RT_RUN_PIPELINE_SHADOWMAP);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_shadow_extent = shadow_extent,
+                           task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<RenderTaskVK> {
+        return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
+            task_base_render_data,
+            REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW,
+            task_shadow_extent,
+            task_shadow_mipmap_level_count,
+            SHADOW_MOMENTS_FORMAT);
+    };
+    return task_desc;
+}
+
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
     task_desc.prev.emplace_back(RT_RUN_DEFERRED_GBUFFER);
+    task_desc.prev.emplace_back(RT_GENERATE_SHADOW_MIPMAPS);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_descriptor_sets = direct_lighting_descriptor_sets]() -> Unique<RenderTaskVK> {
         std::array<ResAccessVK, 7> read_accesses{{
-            {.res_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
+            {.res_id = std::string(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW),
@@ -882,11 +944,12 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
     task_desc.prev.emplace_back(RT_RUN_DEFERRED_GBUFFER);
+    task_desc.prev.emplace_back(RT_GENERATE_SHADOW_MIPMAPS);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_descriptor_sets = indirect_lighting_descriptor_sets]() -> Unique<RenderTaskVK> {
         std::array<ResAccessVK, 7> read_accesses{{
-            {.res_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
+            {.res_id = std::string(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW), .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT},
             {.res_id = std::string(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW),

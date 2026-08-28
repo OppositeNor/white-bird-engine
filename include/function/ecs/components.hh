@@ -197,6 +197,11 @@ struct WBE_META(WBE_COMPONENT) ComponentSpotLight {
     // as the surface-to-light distance approaches this value.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     float range;
+    /**
+     * @brief Projected emitter width in world units. Controls the shadow-filter footprint.
+     */
+    WBE_META(WBE_REFLECT)
+    float emitter_width = 0.1F;
     // Side length, in texels, of the square shadow map allocated for this
     // light. Higher values give crisper shadows at the cost of more memory
     // and longer shadow-pass render times.

@@ -77,6 +77,8 @@ struct SpotLightInfo {
     float outer_cone_cos;
     /// Maximum effective light distance.
     float range;
+    /// Projected emitter width in world units.
+    float emitter_width;
 };
 
 /**

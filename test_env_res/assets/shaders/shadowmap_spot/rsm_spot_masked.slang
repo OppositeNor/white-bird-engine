@@ -32,6 +32,7 @@ ParameterBlock<MaterialTextures> material_textures;
 struct RSMFragmentOutput {
     float4 flux : SV_Target0;
     float2 octahedron_normal : SV_Target1;
+    float2 shadow_moments : SV_Target2;
 };
 
 float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p_base_color, float p_metallic) {
@@ -88,5 +89,8 @@ RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
     RSMFragmentOutput output;
     output.flux = float4(rsm_flux, 1.0);
     output.octahedron_normal = octahedron_encode(normalize(world_normal));
+    // Store (z, z^2); linear mip filtering produces (E[z], E[z^2]).
+    float shadow_depth = saturate(length(light_camera_info.position - p_input.world_position) / max(light_camera_info.range, 0.0001));
+    output.shadow_moments = float2(shadow_depth, shadow_depth * shadow_depth);
     return output;
 }

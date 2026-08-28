@@ -45,6 +45,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -115,7 +116,11 @@ private:
     WBE::Ref<WBE::ROBufferVK> spot_light_info_ubo;
     WBE::Ref<WBE::ROBufferVK> spot_light_count_ubo;
     std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> camera_descriptor_bindings;
+    std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> shadow_camera_descriptor_bindings;
+    std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> spot_light_descriptor_bindings;
     WBE::ComponentSpotLight spot_light_component{};
+    float spot_light_yaw = 0.0F;
+    float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
     WBE::ComponentCamera camera_component{};
     glm::vec3 camera_position = WBE::TEST_DEFAULT_CAMERA_POSITION;
@@ -147,7 +152,7 @@ int main(int p_argc, char* p_argv[]) {
     return EXIT_SUCCESS;
 }
 
-void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) {
+void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
     WBE::InputManager* input_manager = WBE::InputManager::get_singleton();
     if (input_manager == nullptr) {
         return;
@@ -192,10 +197,61 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) {
         camera_position -= up * move_delta;
     }
 
+    bool spot_light_changed = false;
+    if (input_manager->get_input_status(WBE::KEYCODE_I).is_down()) {
+        spot_light_component.position.z -= move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_K).is_down()) {
+        spot_light_component.position.z += move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_J).is_down()) {
+        spot_light_component.position.x -= move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_L).is_down()) {
+        spot_light_component.position.x += move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_U).is_down()) {
+        spot_light_component.position.y += move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_O).is_down()) {
+        spot_light_component.position.y -= move_delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_Y).is_down()) {
+        spot_light_pitch += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_P).is_down()) {
+        spot_light_pitch -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_H).is_down()) {
+        spot_light_yaw -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_changed = true;
+    }
+    if (input_manager->get_input_status(WBE::KEYCODE_SEMICOLON).is_down()) {
+        spot_light_yaw += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_changed = true;
+    }
+    if (spot_light_changed) {
+        spot_light_pitch = std::clamp(spot_light_pitch, -WBE::TEST_CAMERA_PITCH_LIMIT, WBE::TEST_CAMERA_PITCH_LIMIT);
+        spot_light_component.direction = WBE::test_camera_forward(spot_light_yaw, spot_light_pitch);
+        glm::vec3 light_up =
+            std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
+        spot_light_component.view =
+            glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
+    }
+
     camera_component.view = WBE::test_camera_view(camera_position, camera_yaw, camera_pitch);
 
     WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
-    add_render_job([this, camera_info]() {
+    WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
+    add_render_job([this, camera_info, spot_light_info]() {
         WBE::Ref<WBE::ROBufferVK> new_camera_info_ubo = WBE::ROBufferVK::Builder()
                                                             .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                                                             .set_domain(WBE::DeviceDomain::HOST_DEVICE)
@@ -206,7 +262,25 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) {
             descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
                 new_camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
         }
+
+        WBE::Ref<WBE::ROBufferVK> new_spot_light_info_ubo = WBE::ROBufferVK::Builder()
+                                                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                                                                .set_size(sizeof(WBE::SpotLightInfoVKUBO))
+                                                                .create_ref(base_render_data);
+        new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
+        for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
+            descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+                new_spot_light_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
+        }
+        for (auto& [descriptor_set, binding] : spot_light_descriptor_bindings) {
+            descriptor_set->write_descriptor_set(
+                WBE::RODescriptorSetVK::Writer().set_binding(binding).set_dst_array_element(0).add_uniform_buffer_info(
+                    new_spot_light_info_ubo, 0, sizeof(WBE::SpotLightInfoVKUBO)));
+        }
+
         camera_info_ubo = std::move(new_camera_info_ubo);
+        spot_light_info_ubo = std::move(new_spot_light_info_ubo);
     });
 }
 
@@ -262,6 +336,8 @@ void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
     spot_light_component = WBE::make_default_test_spot_light_component(128.0F);
+    spot_light_yaw = std::atan2(spot_light_component.direction.z, spot_light_component.direction.x);
+    spot_light_pitch = std::asin(std::clamp(spot_light_component.direction.y, -1.0F, 1.0F));
     shadow_extent = VkExtent2D{
         .width = spot_light_component.shadow_map_resolution,
         .height = spot_light_component.shadow_map_resolution,
@@ -336,6 +412,7 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRu
     spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
     for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
         auto [set, binding] = p_task.get_descriptor_binding(batch_index, "light_camera_info");
+        shadow_camera_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, set), binding);
         p_task.get_descriptor_set(batch_index, set)
             ->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
                 spot_light_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
@@ -372,6 +449,8 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
         auto [camera_set, camera_binding] = p_task.get_descriptor_binding(batch_index, "camera_info");
         camera_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, camera_set), camera_binding);
         write_uniform_buffer("light.lights.info", spot_light_info_ubo, sizeof(WBE::SpotLightInfoVKUBO));
+        auto [light_set, light_binding] = p_task.get_descriptor_binding(batch_index, "light.lights.info");
+        spot_light_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, light_set), light_binding);
         write_uniform_buffer("light.light_count", spot_light_count_ubo, sizeof(uint32_t));
 
         auto [shadowmap_set, shadowmap_binding] = p_task.get_descriptor_binding(batch_index, "light.lights.shadowmap");

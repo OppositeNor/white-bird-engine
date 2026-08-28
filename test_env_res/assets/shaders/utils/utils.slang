@@ -124,6 +124,21 @@ struct MaterialParamsBuffer {
 static const float WBE_PI = 3.14159265359;
 
 /**
+ * @brief Compute the Chebyshev upper bound for a value from its first two moments.
+ * @param p_moments The distribution mean and second moment.
+ * @param p_value The value whose probability bound is requested.
+ * @param p_minimum_variance The lower variance bound used for numerical stability.
+ * @return The probability upper bound clamped to [0, 1].
+ */
+float chebyshev_upper_bound(float2 p_moments, float p_value, float p_minimum_variance) {
+    // var(x) = E[x^2] - E[x]^2.
+    float variance = max(p_moments.y - p_moments.x * p_moments.x, p_minimum_variance);
+    float value_delta = p_value - p_moments.x;
+    // p_max(t) = var(x) / (var(x) + (t - E[x])^2).
+    return saturate(variance / (variance + value_delta * value_delta));
+}
+
+/**
  * @brief Helper used by ::octahedron_encode to fold the lower hemisphere onto the unit square.
  * @param p_v The xy components of a normalized direction projected onto the octahedron.
  * @return The folded xy coordinates clamped to the [-1, 1] square.

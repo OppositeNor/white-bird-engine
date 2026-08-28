@@ -42,10 +42,56 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     return output;
 }
 
+/** Number of samples used for each test-only PCSS search and filtering pass. */
+static const uint WBE_PCSS_SAMPLE_COUNT = 16;
+
 /**
- * @brief Compute the unshadowed visibility term for the spot light at the given light-space position.
- * @param p_light_space_pos The fragment position transformed by the spot light's view/proj.
- * @return 1.0 if the fragment is fully lit, 0.0 if fully in shadow, or an interpolated PCF value.
+ * @brief Generate a rotated Vogel-disk sample for test-only PCSS filtering.
+ * @param p_sample_index The sample index in the disk.
+ * @param p_rotation The per-fragment rotation in radians.
+ * @return A sample position inside the unit disk.
+ */
+float2 pcss_disk_sample(uint p_sample_index, float p_rotation) {
+    const float golden_angle = 2.39996323;
+    float radius = sqrt((float(p_sample_index) + 0.5) / float(WBE_PCSS_SAMPLE_COUNT));
+    float angle = float(p_sample_index) * golden_angle + p_rotation;
+    return radius * float2(cos(angle), sin(angle));
+}
+
+/**
+ * @brief Convert one reversed shadow-map depth sample into light-view distance.
+ * @param p_spot_light_info The light transforms used to reconstruct the sample.
+ * @param p_uv The shadow-map coordinate of the sample.
+ * @param p_depth The reversed projected depth stored in the shadow map.
+ * @return The positive distance from the light along its view axis.
+ */
+float shadow_depth_to_light_distance(SpotLightInfo p_spot_light_info, float2 p_uv, float p_depth) {
+    float4 world_position = mul(p_spot_light_info.inv_view_proj, float4(p_uv * 2.0 - 1.0, p_depth, 1.0));
+    world_position /= abs(world_position.w) > 0.0001 ? world_position.w : 0.0001;
+    float4 light_view_position = mul(p_spot_light_info.view, float4(world_position.xyz, 1.0));
+    return max(abs(light_view_position.z), 0.0001);
+}
+
+/**
+ * @brief Load an unfiltered depth texel from the test-only forward shadow map.
+ * @param p_spot_light_index The light whose shadow map is sampled.
+ * @param p_uv The normalized shadow-map coordinate.
+ * @param p_shadow_size The shadow-map dimensions in texels.
+ * @param p_sample_uv The texel-center coordinate that was actually loaded.
+ * @return The reversed depth stored in the selected texel.
+ */
+float load_shadow_depth(uint p_spot_light_index, float2 p_uv, uint2 p_shadow_size, out float2 p_sample_uv) {
+    int2 maximum_texel = int2(p_shadow_size) - 1;
+    int2 sample_texel = clamp(int2(p_uv * float2(p_shadow_size)), int2(0), maximum_texel);
+    p_sample_uv = (float2(sample_texel) + 0.5) / float2(p_shadow_size);
+    return light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0));
+}
+
+/**
+ * @brief Compute test-only PCSS visibility for a reversed-depth spot-light shadow map.
+ * @param p_spot_light_index The light whose shadow map is sampled.
+ * @param p_light_space_pos The fragment position transformed by the spot light's view and projection matrices.
+ * @return The percentage-closer visibility in [0, 1].
  */
 float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
     float3 ndc = p_light_space_pos.xyz / max(p_light_space_pos.w, 0.0001);
@@ -54,21 +100,53 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
         return 1.0;
     }
     const float bias = 0.0015;
-    float current_depth = ndc.z + bias;
-    float2 texel_size;
+    float current_depth = clamp(ndc.z + bias, 0.0, 1.0);
     uint shadow_width;
     uint shadow_height;
     light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
-    texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
-    float visibility = 0.0;
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            float sampled = light.lights[p_spot_light_index].shadowmap.Sample(
-                light.lights[p_spot_light_index].shadowmap_sampler, uv + float2(x, y) * texel_size).r;
-            visibility += current_depth >= sampled ? 1.0 : 0.0;
+    uint2 shadow_size = uint2(shadow_width, shadow_height);
+    SpotLightInfo spot_light_info = light.lights[p_spot_light_index].info;
+    float receiver_distance = max(abs(p_light_space_pos.w), 0.0001);
+    float light_near_distance = shadow_depth_to_light_distance(spot_light_info, float2(0.5), 1.0);
+    // r_light_uv = emitter_width * |projection_x_scale| / (4 * near_distance).
+    float emitter_radius_uv =
+        max(spot_light_info.emitter_width, 0.0) * abs(spot_light_info.proj[0][0]) / (4.0 * light_near_distance);
+    // r_search_uv = r_light_uv * (receiver_distance - near_distance) / receiver_distance.
+    float search_radius_uv = emitter_radius_uv * max(receiver_distance - light_near_distance, 0.0) / receiver_distance;
+    float sample_rotation = random(uv) * 2.0 * WBE_PI;
+
+    // Search for shadow texels that are closer to the light than the receiver.
+    float blocker_distance_sum = 0.0;
+    uint blocker_count = 0;
+    for (uint sample_index = 0; sample_index < WBE_PCSS_SAMPLE_COUNT; ++sample_index) {
+        float2 sample_uv;
+        float2 search_uv = uv + pcss_disk_sample(sample_index, sample_rotation) * search_radius_uv;
+        float sampled_depth = load_shadow_depth(p_spot_light_index, search_uv, shadow_size, sample_uv);
+        if (sampled_depth > current_depth) {
+            blocker_distance_sum += shadow_depth_to_light_distance(spot_light_info, sample_uv, sampled_depth);
+            blocker_count += 1;
         }
     }
-    return visibility / 9.0;
+    if (blocker_count == 0) {
+        return 1.0;
+    }
+
+    // blocker_distance = sum(blocker_distances) / blocker_count.
+    float average_blocker_distance = blocker_distance_sum / float(blocker_count);
+    // penumbra_ratio = (receiver_distance - blocker_distance) / blocker_distance.
+    float penumbra_ratio = max(receiver_distance - average_blocker_distance, 0.0) / average_blocker_distance;
+    // r_filter_uv = penumbra_ratio * r_light_uv * near_distance / receiver_distance.
+    float filter_radius_uv = penumbra_ratio * emitter_radius_uv * light_near_distance / receiver_distance;
+
+    // Percentage-filter the reversed-depth comparisons across the estimated penumbra.
+    float visibility = 0.0;
+    for (uint sample_index = 0; sample_index < WBE_PCSS_SAMPLE_COUNT; ++sample_index) {
+        float2 sample_uv;
+        float2 filter_uv = uv + pcss_disk_sample(sample_index, sample_rotation) * filter_radius_uv;
+        float sampled_depth = load_shadow_depth(p_spot_light_index, filter_uv, shadow_size, sample_uv);
+        visibility += current_depth >= sampled_depth ? 1.0 : 0.0;
+    }
+    return visibility / float(WBE_PCSS_SAMPLE_COUNT);
 }
 
 /**

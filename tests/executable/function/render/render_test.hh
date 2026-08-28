@@ -94,6 +94,7 @@ inline ComponentSpotLight make_default_test_spot_light_component(float p_intensi
         .inner_cone_cos = std::cos(glm::radians(18.0F)),
         .outer_cone_cos = std::cos(glm::radians(28.0F)),
         .range = 12.0F,
+        .emitter_width = 0.05F,
     };
 
     glm::vec3 up = std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
@@ -116,7 +117,8 @@ inline SpotLightInfoVKUBO make_spot_light_info_ubo(const ComponentSpotLight& p_s
         .inner_cone_cos = p_spot_light_component.inner_cone_cos,
         .color = p_spot_light_component.color,
         .outer_cone_cos = p_spot_light_component.outer_cone_cos,
-        .range = p_spot_light_component.range};
+        .range = p_spot_light_component.range,
+        .emitter_width = p_spot_light_component.emitter_width};
 }
 
 } // namespace WhiteBirdEngine

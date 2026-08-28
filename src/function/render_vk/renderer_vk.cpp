@@ -300,6 +300,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.allocator = allocator;
     base_render_data.render_database = render_database.get();
     base_render_data.logic_device = logical_device;
+    base_render_data.physical_device = physical_device;
     base_render_data.vma_allocator = vma_allocator;
     base_render_data.swap_chain_format = swap_chain_image_format;
     base_render_data.swap_chain_extent = swap_chain_extent;
