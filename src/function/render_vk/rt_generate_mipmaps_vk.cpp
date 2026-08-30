@@ -13,7 +13,9 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -62,20 +64,21 @@ RTGenerateMipmapsVK::RTGenerateMipmapsVK(
 Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::read_resources() const {
     // Declare transfer reads from source mip levels to the render graph.
     Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = image_view_id, .access = VK_ACCESS_2_TRANSFER_READ_BIT, .stage = VK_PIPELINE_STAGE_2_BLIT_BIT});
+    resources.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
     return resources;
 }
 
 Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::write_resources() const {
     // Declare transfer writes to destination mip levels to the render graph.
     Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = image_view_id, .access = VK_ACCESS_2_TRANSFER_WRITE_BIT, .stage = VK_PIPELINE_STAGE_2_BLIT_BIT});
+    resources.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_DST});
     return resources;
 }
 
 void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
     // Resolve the graph image view and its underlying image for this frame.
-    auto image_view = p_resources.get(image_view_id).res.dynamic_cast_ref<ROImageViewVK>();
+    auto image_resource = p_resources.get(image_view_id).container;
+    auto image_view = image_resource == MEM_NULL ? Ref<ROImageViewVK>(MEM_NULL) : image_resource->get().dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
         // Commands cannot be recorded without a bound image view and image.
         throw std::runtime_error("RTGenerateMipmapsVK: image-view resource is missing.");

@@ -20,7 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
@@ -45,8 +45,8 @@ struct RendResVK {
     std::string res_id;
     // The runtime type id of the underlying resource (TypeUUID<T>::UUID).
     RendResTID res_type_id = 0;
-    // The resource instance.
-    Ref<RenderObjectVK> res;
+    // The resource container.
+    Ref<RenderObjectContainerVK> container;
 };
 
 /**
@@ -93,22 +93,22 @@ private:
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : exec_before(p_allocator), exec_after(p_allocator), res_before(p_allocator), res_after(p_allocator) {
+        : exec_before(p_allocator), exec_after(p_allocator), reads(p_allocator), writes(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
     Unique<RenderTaskVK> render_task;
+    // String identifier copied from the graph descriptor for diagnostics.
+    RendTaskID task_id;
     // The execution process edge before this node. All of these need
     // to be finished before executing this node.
     Vector<RefWeak<struct RGExecEdge>, RenderAllocator> exec_before;
     // The execution process edge after this node.
     Vector<RefWeak<struct RGExecEdge>, RenderAllocator> exec_after;
-    // The resource process edge before this node. All of these need
-    // to be finished before executing this node.
-    Vector<RefWeak<struct RGResEdge>, RenderAllocator> res_before;
-    // The resource process edge after this node.
-    Vector<RefWeak<struct RGResEdge>, RenderAllocator> res_after;
+    // Compact resource declarations, including intrinsic task usage and descriptor additions.
+    Vector<ResAccessVK, RenderAllocator> reads;
+    Vector<ResAccessVK, RenderAllocator> writes;
     // The queue family where this node lives (graphics/compute/...).
-    uint32_t in_queue = 0;
+    QueueFamilyVK in_queue = QueueFamilyVK::GRAPHICS;
     // Topological order for scheduling.
     uint64_t topo_order = 0;
 };
@@ -132,27 +132,6 @@ struct RGExecEdge {
     VkPipelineStageFlags2 after_start_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     // The timeline semaphore used to signal/wait this edge between submits.
     Ref<SemaphoreVK> semaphore;
-};
-
-/**
- * @class RGResEdge
- * @brief An edge of resource transformation between two graph nodes.
- */
-struct RGResEdge {
-    // The resource being transferred along this edge.
-    Ref<RendResVK> resource;
-    // The node before this edge (writer/last accessor).
-    Ref<RGNode> before;
-    // The node after this edge (next accessor).
-    Ref<RGNode> after;
-    // The last access mask applied by the producer.
-    VkAccessFlags2 before_last_access = VK_ACCESS_2_NONE;
-    // The first access mask applied by the consumer.
-    VkAccessFlags2 after_first_access = VK_ACCESS_2_NONE;
-    // The pipeline stage at which the producer last touched the resource.
-    VkPipelineStageFlags2 before_stage = VK_PIPELINE_STAGE_2_NONE;
-    // The pipeline stage at which the consumer first touches the resource.
-    VkPipelineStageFlags2 after_stage = VK_PIPELINE_STAGE_2_NONE;
 };
 
 /**
@@ -180,32 +159,6 @@ public:
      * @param p_render_data The base render data.
      */
     RenderGraphVK(const BaseRenderDataVK* p_render_data);
-
-    /**
-     * @brief Imperative builder: append a new node wrapping the given task.
-     *
-     * @param p_task The task to wrap.
-     * @return A strong ref to the newly created node.
-     */
-    Ref<RGNode> add_node(Unique<RenderTaskVK> p_task);
-
-    /**
-     * @brief Imperative builder: connect two nodes with an execution edge.
-     * Allocates a timeline semaphore for the edge.
-     */
-    Ref<RGExecEdge> add_exec_edge(
-        Ref<RGNode> p_before, Ref<RGNode> p_after, VkPipelineStageFlags2 p_before_finish_stage, VkPipelineStageFlags2 p_after_start_stage);
-
-    /**
-     * @brief Imperative builder: connect two nodes with a resource edge.
-     */
-    Ref<RGResEdge> add_res_edge(Ref<RendResVK> p_resource,
-        Ref<RGNode> p_before,
-        Ref<RGNode> p_after,
-        VkAccessFlags2 p_before_access,
-        VkAccessFlags2 p_after_access,
-        VkPipelineStageFlags2 p_before_stage,
-        VkPipelineStageFlags2 p_after_stage);
 
     /**
      * @brief Build the graph from a high-level descriptor: instantiate every
@@ -252,7 +205,7 @@ public:
      * @param p_resource    The resource instance.
      * @param p_res_type_id The runtime type id of the resource.
      */
-    void set_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+    void set_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container);
 
     /**
      * @brief Insert or override a resource until the graph next executes.
@@ -261,7 +214,7 @@ public:
      * @param p_resource The transient resource instance.
      * @param p_res_type_id The runtime type id of the resource.
      */
-    void set_transient_resource(std::string_view p_res_id, Ref<RenderObjectVK> p_resource, RendResTID p_res_type_id);
+    void set_transient_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container);
 
     /**
      * @brief Restore descriptor defaults after transient resource overrides.
@@ -284,7 +237,6 @@ private:
 
     Vector<Ref<RGNode>, RenderAllocator> nodes;
     Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
-    Vector<Ref<RGResEdge>, RenderAllocator> res_edges;
     // All resources known to the graph, keyed by res_id.
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
 
@@ -292,7 +244,7 @@ private:
         std::string resource_id;
         bool existed = false;
         RendResTID resource_type_id = 0;
-        Ref<RenderObjectVK> resource;
+        Ref<RenderObjectContainerVK> container;
     };
     Vector<TransientResourceDefault, RenderAllocator> transient_resource_defaults;
 
@@ -309,18 +261,17 @@ private:
     void free_command_buffers();
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
+    Ref<RGNode> add_node(Unique<RenderTaskVK> p_task);
+    Ref<RGExecEdge> add_exec_edge(
+        Ref<RGNode> p_before, Ref<RGNode> p_after, VkPipelineStageFlags2 p_before_finish_stage, VkPipelineStageFlags2 p_after_start_stage);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
     void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_res_edges(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources);
+    void infer_resource_dependencies();
 
     std::tuple<size_t, size_t> find_graphics_range() const;
-    void record_node(Ref<RGNode> p_node,
-        VkCommandBuffer p_command_buffer,
-        const RendResViewVK& p_resources,
-        double p_delta,
-        bool p_record_present_transition);
+    void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta, bool p_record_present_transition);
     void record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const RendResViewVK& p_resources);
     void record_present_transition(VkCommandBuffer p_command_buffer);
     void collect_edge_semaphores(Ref<RGNode> p_node,

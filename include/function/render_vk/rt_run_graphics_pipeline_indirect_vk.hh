@@ -23,7 +23,6 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
@@ -40,7 +39,7 @@ namespace WhiteBirdEngine {
  * @class RTRunGraphicsPipelineIndirectVK
  * @brief Render task that submits indexed draw commands from a GPU buffer in one Vulkan call.
  *
- * The task retains its descriptor sets, while graph resources are resolved by their declared ids.
+ * Pipeline-owned descriptors are bound while graph resources are resolved by their declared ids.
  */
 struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
     /**
@@ -48,7 +47,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @brief One graphics pipeline and its contiguous range of indirect commands.
      */
     struct PipelineBatch {
-        explicit PipelineBatch(RenderAllocator* p_allocator) : descriptor_sets(p_allocator) {
+        explicit PipelineBatch(RenderAllocator* p_allocator) {
+            static_cast<void>(p_allocator);
         }
         ~PipelineBatch() = default;
         PipelineBatch(const PipelineBatch&) = default;
@@ -64,8 +64,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         uint32_t first_draw = 0;
         /** Number of indirect commands rendered by this pipeline. */
         uint32_t draw_count = 0;
-        /** Descriptor sets bound in set order for this pipeline. */
-        Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
         /** Dynamic vertex-input state used by this command range. */
         VertexInputDescriptionVK vertex_input;
         /** Byte offset bound for the shared vertex buffer. */
@@ -91,7 +89,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_index_buffer_id Index buffer graph resource id.
      * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
      * @param p_draw_count Number of tightly packed VkDrawIndexedIndirectCommand records to execute.
-     * @param p_descriptor_sets Descriptor sets bound in set order.
      * @param p_color_attachment_load_op Color attachment load operation.
      * @param p_vertex_input Dynamic vertex-input state for the draw range.
      * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
@@ -105,7 +102,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         std::string_view p_index_buffer_id,
         std::string_view p_indirect_buffer_id,
         uint32_t p_draw_count,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
         VkDeviceSize p_vertex_buffer_offset = 0);
@@ -123,7 +119,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_index_buffer_id Index buffer graph resource id.
      * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
      * @param p_draw_count Number of tightly packed VkDrawIndexedIndirectCommand records to execute.
-     * @param p_descriptor_sets Descriptor sets bound in set order.
      * @param p_color_attachment_load_op Load operation used for every color attachment.
      * @param p_depth_attachment_load_op Depth attachment load operation.
      * @param p_vertex_input Dynamic vertex-input state for the draw range.
@@ -139,7 +134,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         std::string_view p_index_buffer_id,
         std::string_view p_indirect_buffer_id,
         uint32_t p_draw_count,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
@@ -206,6 +200,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         return QueueFamilyVK::GRAPHICS;
     }
 
+    virtual void validate_resources(const RendResViewVK& p_resources) const override;
+
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
     virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
@@ -223,7 +219,6 @@ private:
     std::string indirect_buffer_id;
     Ref<ROBufferVK> indirect_buffer = MEM_NULL;
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
-    Vector<VkDescriptorSet, RenderAllocator> descriptor_set_instances;
 };
 
 } // namespace WhiteBirdEngine

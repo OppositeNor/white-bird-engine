@@ -30,14 +30,13 @@
 #include <string_view>
 
 namespace WhiteBirdEngine {
-inline constexpr HashCode TEST_RENDER_LABEL_HASH_ANCHOR = static_hash("TEST_RENDER_LABEL_HASH_ANCHOR");
-WBE_LABEL(RT_RUN_PIPELINE, WBE_RENDER_TASK);
-WBE_LABEL(RT_RUN_PIPELINE_SHADOWMAP, WBE_RENDER_TASK);
-inline constexpr std::string_view REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE = "REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE";
-inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE = "REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE";
-inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW = "REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW";
-inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW = "REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW";
-inline constexpr std::string_view REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW = "REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW";
+inline constexpr std::string_view RT_RUN_PIPELINE = "run_pipeline";
+inline constexpr std::string_view RT_RUN_PIPELINE_SHADOWMAP = "run_shadowmap";
+inline constexpr std::string_view REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE = "draw_cube_pipeline";
+inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE = "shadowmap_pipeline";
+inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW = "shadowmap_color";
+inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW = "shadowmap_depth";
+inline constexpr std::string_view REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW = "rsm_normal";
 inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_POSITION = glm::vec3(2.0F, 2.0F, 2.0F);
 inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_TARGET = glm::vec3(0.0F, 0.0F, 0.0F);
 inline constexpr float TEST_CAMERA_MOVE_SPEED = 3.0F;

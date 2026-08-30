@@ -21,8 +21,6 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
-#include <span>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -32,12 +30,7 @@ namespace WhiteBirdEngine {
 /**
  * @class RTRunComputePipelineVK
  * @brief Render task that binds a compute pipeline and dispatches workgroups.
- *
- * Resource binding contract:
- *   reads:  [compute_pipeline, additional read resources...]
- *   writes: [additional write resources...]
- * The additional access lists let callers describe buffer/image dependencies
- * for render-graph barriers while this task records the compute dispatch.
+ * Shader resource reads and writes are declared fluently on RendTaskDescVK.
  */
 struct RTRunComputePipelineVK final : public RenderTaskVK {
     RTRunComputePipelineVK() = delete;
@@ -53,22 +46,18 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
      * @param p_render_data Base render data.
      * @param p_pipeline_id Resource id of the compute pipeline.
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
-     * @param p_descriptor_sets Descriptor sets to bind in order.
-     * @param p_read_accesses Additional resources read by the compute shader.
-     * @param p_write_accesses Additional resources written by the compute shader.
      * @param p_queue_family Queue family used to submit the compute dispatch.
      */
     RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
         std::string_view p_pipeline_id,
         VkExtent3D p_dispatch_group_count,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets = {},
-        std::span<const ResAccessVK> p_read_accesses = {},
-        std::span<const ResAccessVK> p_write_accesses = {},
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
     }
+
+    virtual void validate_resources(const RendResViewVK& p_resources) const override;
 
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
@@ -81,10 +70,6 @@ private:
     QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
     std::string pipeline_id;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
-    Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
-    Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
-    Vector<ResAccessVK, RenderAllocator> additional_read_accesses;
-    Vector<ResAccessVK, RenderAllocator> additional_write_accesses;
 };
 
 } // namespace WhiteBirdEngine

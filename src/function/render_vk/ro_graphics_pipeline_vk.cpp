@@ -16,8 +16,8 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <format>
 #include <stdexcept>
@@ -29,21 +29,14 @@
 namespace WhiteBirdEngine {
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : ROPipelineVK(p_render_data, p_builder.config.pipeline_layout) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
     init(p_builder.config);
 }
 
-ROGraphicsPipelineVK::~ROGraphicsPipelineVK() {
-    // Deallocate resource after frames in flight.
-    render_data->register_delayed_call(
-        [render_data = render_data, graphics_pipeline = graphics_pipeline]() {
-            vkDestroyPipeline(render_data->logic_device, graphics_pipeline, render_data->allocation_callbacks);
-        },
-        render_data->frames_in_flight);
-}
+ROGraphicsPipelineVK::~ROGraphicsPipelineVK() = default;
 
 VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_info(
     VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage) {
@@ -109,13 +102,13 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.renderPass = VK_NULL_HANDLE;
     create_info.subpass = p_config.subpass_index;
 
-    exposed_fields.pipeline_layout = p_config.pipeline_layout;
-
+    VkPipeline graphics_pipeline = VK_NULL_HANDLE;
     auto create_result = vkCreateGraphicsPipelines(
         render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline);
     if (create_result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create graphics pipeline: {}.", string_VkResult(create_result)));
     }
+    set_pipeline(graphics_pipeline);
     config = p_config;
 }
 

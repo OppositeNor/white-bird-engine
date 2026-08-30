@@ -106,7 +106,6 @@ public:
 
     struct CompileResult {
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
-        std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
         DescriptorSetBindings descriptor_set_bindings;
     };
 
@@ -132,7 +131,6 @@ public:
 private:
     struct CompiledPipelineObjects {
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
-        std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
         DescriptorSetBindings descriptor_set_bindings;
     };
 

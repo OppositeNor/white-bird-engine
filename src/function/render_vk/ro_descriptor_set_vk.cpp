@@ -34,6 +34,82 @@
 
 namespace WhiteBirdEngine {
 
+bool RODescriptorSetVK::Writer::has_contextual_resources() const {
+    for (const BufferInfo& buffer_info : storage_buffer_infos) {
+        if (buffer_info.buffer_container != MEM_NULL) {
+            return true;
+        }
+    }
+    for (const BufferInfo& buffer_info : uniform_buffer_infos) {
+        if (buffer_info.buffer_container != MEM_NULL) {
+            return true;
+        }
+    }
+    auto image_infos_have_contextual_resources = [](const std::vector<ImageInfo>& p_image_infos) {
+        for (const ImageInfo& image_info : p_image_infos) {
+            if (image_info.image_view_container != MEM_NULL || image_info.sampler_container != MEM_NULL) {
+                return true;
+            }
+        }
+        return false;
+    };
+    return image_infos_have_contextual_resources(sampled_image_infos) || image_infos_have_contextual_resources(storage_image_infos) ||
+           image_infos_have_contextual_resources(sampler_infos) || image_infos_have_contextual_resources(combined_image_sampler_infos);
+}
+
+RODescriptorSetVK::Writer RODescriptorSetVK::Writer::resolve(uint32_t p_frame_slot) const {
+    Writer result = *this;
+    auto resolve_buffers = [p_frame_slot](std::vector<BufferInfo>& p_buffer_infos) {
+        for (BufferInfo& buffer_info : p_buffer_infos) {
+            if (buffer_info.buffer != MEM_NULL && buffer_info.buffer_container != MEM_NULL) {
+                throw std::runtime_error("Failed to resolve descriptor buffer: both a concrete buffer and a container were provided.");
+            }
+            if (buffer_info.buffer_container == MEM_NULL) {
+                continue;
+            }
+            buffer_info.buffer = buffer_info.buffer_container->get(p_frame_slot).dynamic_cast_ref<ROBufferVK>();
+            if (buffer_info.buffer == MEM_NULL) {
+                throw std::runtime_error(
+                    std::format("Failed to resolve descriptor buffer for frame slot {}: container did not contain a buffer.", p_frame_slot));
+            }
+            buffer_info.buffer_container = MEM_NULL;
+        }
+    };
+    auto resolve_images = [p_frame_slot](std::vector<ImageInfo>& p_image_infos) {
+        for (ImageInfo& image_info : p_image_infos) {
+            if (image_info.image_view != MEM_NULL && image_info.image_view_container != MEM_NULL) {
+                throw std::runtime_error("Failed to resolve descriptor image view: both a concrete image view and a container were provided.");
+            }
+            if (image_info.sampler != MEM_NULL && image_info.sampler_container != MEM_NULL) {
+                throw std::runtime_error("Failed to resolve descriptor sampler: both a concrete sampler and a container were provided.");
+            }
+            if (image_info.image_view_container != MEM_NULL) {
+                image_info.image_view = image_info.image_view_container->get(p_frame_slot).dynamic_cast_ref<ROImageViewVK>();
+                if (image_info.image_view == MEM_NULL) {
+                    throw std::runtime_error(std::format(
+                        "Failed to resolve descriptor image view for frame slot {}: container did not contain an image view.", p_frame_slot));
+                }
+                image_info.image_view_container = MEM_NULL;
+            }
+            if (image_info.sampler_container != MEM_NULL) {
+                image_info.sampler = image_info.sampler_container->get(p_frame_slot).dynamic_cast_ref<ROSamplerVK>();
+                if (image_info.sampler == MEM_NULL) {
+                    throw std::runtime_error(
+                        std::format("Failed to resolve descriptor sampler for frame slot {}: container did not contain a sampler.", p_frame_slot));
+                }
+                image_info.sampler_container = MEM_NULL;
+            }
+        }
+    };
+    resolve_buffers(result.storage_buffer_infos);
+    resolve_buffers(result.uniform_buffer_infos);
+    resolve_images(result.sampled_image_infos);
+    resolve_images(result.storage_image_infos);
+    resolve_images(result.sampler_infos);
+    resolve_images(result.combined_image_sampler_infos);
+    return result;
+}
+
 namespace {
 using BoundObjectReferencesVK = Vector<Ref<RenderObjectVK>, RenderAllocator>;
 using PendingBoundObjectsVK = Vector<BoundObjectReferencesVK, RenderAllocator>;
@@ -158,6 +234,43 @@ RODescriptorSetVK::~RODescriptorSetVK() {
     retire_descriptor_set(descriptor_set);
 }
 
+Ref<RODescriptorSetVK> RODescriptorSetVK::create_copy() const {
+    Builder builder;
+    for (const auto& descriptor_set_layout : descriptor_set_layouts) {
+        builder.add_descriptor_set_layout(descriptor_set_layout);
+    }
+    if (variable_descriptor_count != 0) {
+        builder.set_variable_descriptor_count(variable_descriptor_count);
+    }
+    Ref<RODescriptorSetVK> result = builder.create_ref(render_data);
+    std::vector<VkCopyDescriptorSet> copy_infos;
+    copy_infos.reserve(bound_objects.size());
+    for (const auto& [key, objects] : bound_objects) {
+        uint32_t binding = static_cast<uint32_t>(key >> 32U);
+        uint32_t array_element = static_cast<uint32_t>(key);
+        copy_infos.push_back(VkCopyDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET,
+            .srcSet = descriptor_set,
+            .srcBinding = binding,
+            .srcArrayElement = array_element,
+            .dstSet = result->descriptor_set,
+            .dstBinding = binding,
+            .dstArrayElement = array_element,
+            .descriptorCount = 1,
+        });
+        auto emplace_result = result->bound_objects.emplace(key, Vector<Ref<RenderObjectVK>, RenderAllocator>(render_data->allocator));
+        auto& retained_objects = emplace_result.first->second;
+        retained_objects.reserve(objects.size());
+        for (const auto& object : objects) {
+            retained_objects.emplace_back(object);
+        }
+    }
+    if (!copy_infos.empty()) {
+        vkUpdateDescriptorSets(render_data->logic_device, 0, nullptr, static_cast<uint32_t>(copy_infos.size()), copy_infos.data());
+    }
+    return result;
+}
+
 VkDescriptorSet RODescriptorSetVK::create_descriptor_set() const {
     Builder builder;
     for (const auto& descriptor_set_layout : descriptor_set_layouts) {
@@ -244,42 +357,43 @@ void RODescriptorSetVK::publish_descriptor_set(VkDescriptorSet p_descriptor_set)
 }
 
 void RODescriptorSetVK::write_descriptor_set(const Writer& p_writer) {
-    validate_writer(p_writer);
+    Writer resolved_writer = p_writer.resolve(render_data->current_frame_slot);
+    validate_writer(resolved_writer);
     VkDescriptorSet updated_descriptor_set = create_descriptor_set_for_write();
 
     VkWriteDescriptorSet write_info{};
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_info.dstSet = updated_descriptor_set;
-    write_info.dstBinding = WBE_REQUIRED(p_writer.binding);
-    write_info.dstArrayElement = p_writer.dst_array_element;
+    write_info.dstBinding = WBE_REQUIRED(resolved_writer.binding);
+    write_info.dstArrayElement = resolved_writer.dst_array_element;
     PendingBoundObjectsVK pending_bound_objects(render_data->allocator);
     std::vector<VkDescriptorBufferInfo> buffer_infos;
 
-    if (!p_writer.storage_buffer_infos.empty()) {
+    if (!resolved_writer.storage_buffer_infos.empty()) {
         write_buffer_info(
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, p_writer.storage_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, write_info, resolved_writer.storage_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
     }
-    if (!p_writer.uniform_buffer_infos.empty()) {
+    if (!resolved_writer.uniform_buffer_infos.empty()) {
         write_buffer_info(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, p_writer.uniform_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, write_info, resolved_writer.uniform_buffer_infos, render_data->allocator, pending_bound_objects, buffer_infos);
     }
     std::vector<VkDescriptorImageInfo> image_infos;
-    if (!p_writer.sampled_image_infos.empty()) {
+    if (!resolved_writer.sampled_image_infos.empty()) {
         write_image_info(
-            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, p_writer.sampled_image_infos, render_data->allocator, pending_bound_objects, image_infos);
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, write_info, resolved_writer.sampled_image_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
-    if (!p_writer.storage_image_infos.empty()) {
+    if (!resolved_writer.storage_image_infos.empty()) {
         write_image_info(
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, write_info, p_writer.storage_image_infos, render_data->allocator, pending_bound_objects, image_infos);
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, write_info, resolved_writer.storage_image_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
-    if (!p_writer.sampler_infos.empty()) {
+    if (!resolved_writer.sampler_infos.empty()) {
         write_image_info(
-            VK_DESCRIPTOR_TYPE_SAMPLER, write_info, p_writer.sampler_infos, render_data->allocator, pending_bound_objects, image_infos);
+            VK_DESCRIPTOR_TYPE_SAMPLER, write_info, resolved_writer.sampler_infos, render_data->allocator, pending_bound_objects, image_infos);
     }
-    if (!p_writer.combined_image_sampler_infos.empty()) {
+    if (!resolved_writer.combined_image_sampler_infos.empty()) {
         write_image_info(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             write_info,
-            p_writer.combined_image_sampler_infos,
+            resolved_writer.combined_image_sampler_infos,
             render_data->allocator,
             pending_bound_objects,
             image_infos);

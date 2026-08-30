@@ -17,8 +17,12 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace WhiteBirdEngine {
@@ -45,15 +49,65 @@ struct RendTaskDescVKDirectTaskState {
     Unique<RenderTaskVK> task;
 };
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator) {
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator), reads(p_allocator), writes(p_allocator) {
 }
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, RendTaskID p_task_id, Unique<RenderTaskVK> p_task)
-    : task_id(p_task_id), prev(p_allocator) {
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<RenderTaskVK> p_task)
+    : task_id(p_task_id), prev(p_allocator), reads(p_allocator), writes(p_allocator) {
     Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
     create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<RenderTaskVK> {
         return direct_task_state->take_task();
     };
+}
+
+RendTaskDescVK& RendTaskDescVK::after(std::string_view p_task_id) {
+    prev.emplace_back(p_task_id);
+    return *this;
+}
+
+RendTaskDescVK& RendTaskDescVK::read(std::string_view p_resource_id, RendResUsageVK p_usage) {
+    reads.push_back({.res_id = std::string(p_resource_id), .usage = p_usage});
+    return *this;
+}
+
+RendTaskDescVK& RendTaskDescVK::write(std::string_view p_resource_id, RendResUsageVK p_usage) {
+    writes.push_back({.res_id = std::string(p_resource_id), .usage = p_usage});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_task(RendTaskDescVK p_task_desc) {
+    tasks.emplace_back(std::move(p_task_desc));
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_task(std::string_view p_task_id, Unique<RenderTaskVK> p_task) {
+    tasks.emplace_back(allocator, p_task_id, std::move(p_task));
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
+    resources.emplace_back(std::move(p_resource));
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_resource(
+    std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectVK> p_resource) {
+    return add_resource(
+        p_resource_id, p_resource_type_id, make_ref<ROCSingleVK>(allocator, p_resource_type_id, std::move(p_resource)));
+}
+
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id,
+    RendResTID p_resource_type_id,
+    Ref<RenderObjectContainerVK> p_resource_container) {
+    if (p_resource_container != MEM_NULL && p_resource_container->get_resource_type_id() != p_resource_type_id) {
+        throw std::runtime_error("Failed to add render graph resource: container type does not match the declared type.");
+    }
+    resources.emplace_back(RendResVK{
+        .res_id = std::string(p_resource_id),
+        .res_type_id = p_resource_type_id,
+        .container = std::move(p_resource_container),
+    });
+    return *this;
 }
 
 } // namespace WhiteBirdEngine

@@ -41,9 +41,10 @@ Graph-visible resource binding:
 
 - `res_id`: lookup label used by tasks and graph descriptor
 - `res_type_id`: runtime type id, usually `TypeUUID<T>::UUID`
-- `res`: `Ref<RenderObjectVK>` instance
+- `container`: `Ref<RenderObjectContainerVK>` that resolves the current render-object instance
 
-The graph stores resources in a string-keyed map and resolves them through `RendResViewVK`.
+Use `RendGraphDescVK::add_resource()` to wrap a fixed `RenderObjectVK` in `ROCSingleVK`, or pass an explicit container such as
+`ROCPerFrameVK`. The graph stores resources in a string-keyed map and resolves them through `RendResViewVK`.
 
 ### `RenderTaskVK`
 
@@ -65,14 +66,14 @@ The graph never inspects the recorded Vulkan commands to infer hazards. The decl
 3. instantiate concrete tasks from every `RendTaskDescVK`
 4. add execution edges from `prev`
 5. topologically sort the resulting DAG
-6. infer resource edges from task read/write declarations in execution order
+6. infer additional execution edges from task read/write declarations in execution order
 7. allocate per-node command buffers
 8. allocate one terminal binary semaphore per swap-chain image
 
 `RenderGraphVK::execute()` then:
 
 1. walks nodes in topological order
-2. inserts resource transitions before each node based on incoming resource edges
+2. inserts resource transitions before each node based on that node's declared writes and queue-family-aware usage scopes
 3. records the node's commands into that node's command buffer
 4. submits the node to the queue selected by `queue_family()`
 5. attaches timeline semaphore waits/signals for execution edges
@@ -80,13 +81,12 @@ The graph never inspects the recorded Vulkan commands to infer hazards. The decl
 
 ## Resource synchronization model
 
-Resource barriers are inferred from `ResAccessVK` declarations:
+Synchronization scopes are inferred from `ResAccessVK` declarations:
 
 - `res_id`
-- `access`
-- `stage`
+- `usage`
 
-Each task must declare every graph-visible read and write that matters for inter-task ordering. If a task uses a resource in `record()` but omits it from these access lists, the graph will not create the necessary resource edge or pipeline barrier.
+Each task must declare every graph-visible read and write that matters for inter-task ordering. The graph translates compact usage values into Vulkan access and stage scopes, filtered to the node's queue family. If a task uses a resource in `record()` but omits it from these access lists, the graph will not create the necessary execution dependency or image transition.
 
 The resource view passed into `record()` is read-only lookup, not ownership:
 
@@ -123,7 +123,7 @@ Use transient overrides for resources whose per-frame identity changes without r
 
 The graph allocates one terminal binary semaphore per swap-chain image. The last graphics submission signals the semaphore for the currently acquired image, and presentation waits on it.
 
-The swap-chain image view is represented in graph resources as `REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK`, often with a null resource in the descriptor so the renderer can resolve it at frame time.
+The swap-chain image view is represented in graph resources as `REND_RES_SWAP_CHAIN_IMAGE`, often with a null resource in the descriptor so the renderer can resolve it at frame time.
 
 ## Known usage pattern: static opaque pass
 
@@ -141,8 +141,8 @@ Use `docs/renderer_vk/renderer_vk.md` as the canonical end-to-end example for gr
 - `Render graph resource was not bound`: task requested an id not present in the graph resource map.
 - resource type mismatch in `set_resource()` or `set_transient_resource()`: runtime override used a different type id than the graph binding.
 - cycle detected in render graph: `prev` dependencies created a loop.
-- missing barrier behavior: task used a resource without declaring it in `read_resources()` or `write_resources()`.
-- wrong queue execution: task returned the wrong `QueueFamilyVK`.
+- missing dependency or transition behavior: task used a resource without declaring it in `read_resources()` or `write_resources()`.
+- wrong queue execution: task returned the wrong `QueueFamilyVK`, or a graphics-only usage was declared on a compute node.
 
 ## Extension checklist
 

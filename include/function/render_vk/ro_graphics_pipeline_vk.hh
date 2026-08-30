@@ -19,9 +19,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <cstdint>
 #include <optional>
@@ -39,7 +39,7 @@ namespace WhiteBirdEngine {
  * @brief The graphics pipeline.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROGraphicsPipelineVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROGraphicsPipelineVK final : public ROPipelineVK {
 public:
     /**
      * @class PipelineConfigurations
@@ -671,6 +671,7 @@ public:
      */
     struct Builder {
         friend ROGraphicsPipelineVK;
+        friend GraphicsPipelineCompilerVK;
 
         // Graphics pipeline configuration payload.
         Config config{};
@@ -758,15 +759,6 @@ public:
     ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
-     * @brief Get the graphics pipeline instance.
-     *
-     * @return The graphics pipeline instance.
-     */
-    VkPipeline get_graphics_pipeline() const {
-        return graphics_pipeline;
-    }
-
-    /**
      * @brief Get the configurations of the graphics pipeline.
      *
      * @return The configurations of the graphics pipeline.
@@ -780,7 +772,6 @@ public:
         Ref<const ROShaderVK> geometry_shader;
         Ref<const ROShaderVK> fragment_shader;
         // TODO: TSC TSE shaders
-        Ref<const ROPipelineLayoutVK> pipeline_layout;
     };
 
     const ExposedFields& fields() const {
@@ -790,7 +781,6 @@ public:
 private:
     Config config;
     ExposedFields exposed_fields;
-    VkPipeline graphics_pipeline = VK_NULL_HANDLE;
 
     struct PipelineStateCreateInfo {
         VkPipelineViewportStateCreateInfo viewport_state{};

@@ -22,17 +22,16 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata_loader.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -46,7 +45,6 @@
 #include <glm/ext/vector_float4.hpp>
 #include <memory>
 #include <optional>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -57,7 +55,7 @@
 namespace WBE = WhiteBirdEngine;
 
 namespace WhiteBirdEngine {
-inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE = "REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE";
+inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE = "draw_triangle_pipeline";
 }
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
@@ -76,21 +74,23 @@ public:
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
 
-        WBE::ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
-        // Setup shaders
-        auto vertex_shader = WBE::ROShaderVK::Builder().set_code("draw_triangle_shader").create_ref(base_render_data);
-        auto fragment_shader = WBE::ROShaderVK::Builder().set_code("draw_triangle_shader").create_ref(base_render_data);
-        shader_config.set_shaders(vertex_shader, fragment_shader, "vertex_main", "fragment_main");
-
-        // Setup graphics pipeline layout.
-        WBE::Ref<WBE::RODescriptorSetLayoutVK> descriptor_set_layout = WBE::make_ref<WBE::RODescriptorSetLayoutVK>(
-            render_allocator, base_render_data, WBE::RODescriptorSetLayoutVK::Builder().add_ubo(0, 1));
-        WBE::Ref<WBE::ROPipelineLayoutVK> graphics_pipeline_layout = WBE::make_ref<WBE::ROPipelineLayoutVK>(
-            render_allocator, base_render_data, WBE::ROPipelineLayoutVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
-        auto graphics_pipeline = WBE::ROGraphicsPipelineVK::Builder()
-                                     .default_render_opaque_configuration(base_render_data, shader_config, graphics_pipeline_layout)
-                                     .create_ref(base_render_data);
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
+        auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
+        if (pipeline_resource == nullptr) {
+            throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
+        }
+        WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
+        bindpoint_builder.add_buffer_decleration("time", &time_ubo_data, sizeof(time_ubo_data));
+        WBE::GraphicsPipelineCompilerVKContext compiler_context{
+            .allocator = render_allocator,
+            .render_data = base_render_data,
+            .render_database = renderer->get_render_database(),
+            .renderer = renderer,
+            .color_attachment_formats = {base_render_data->swap_chain_format},
+        };
+        auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
+                            .compile("draw_triangle_pipeline", pipeline_resource, bindpoint_builder.build());
+        auto graphics_pipeline = compiled.graphics_pipeline;
         // Setup time UBO
         time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator,
             base_render_data,
@@ -99,16 +99,14 @@ public:
                 .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                 .set_size(sizeof(WBE::TimeVKUBO)));
         time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
-        // Setup descriptor sets.
-        WBE::Ref<WBE::RODescriptorSetVK> descriptor_set = WBE::make_ref<WBE::RODescriptorSetVK>(
-            render_allocator, base_render_data, WBE::RODescriptorSetVK::Builder().add_descriptor_set_layout(descriptor_set_layout));
-        descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(0).add_uniform_buffer_info(
-            WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = time_ubo, .offset = 0}));
+        auto [set_index, binding] = compiled.descriptor_set_bindings.at("time");
+        graphics_pipeline->write_descriptor_set(set_index,
+            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+                WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = time_ubo, .offset = 0, .range = sizeof(WBE::TimeVKUBO)}));
         // Setup render task. The vertex/index data lives in the global static
         // opaque mesh, populated by RendererVK::update_static_opaque_triangles()
         // from the RenderDatabase, and exposed to render tasks under the
-        // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES}_VK global IDs.
-        std::vector<WBE::Ref<WBE::RODescriptorSetVK>> descriptor_sets{descriptor_set};
+        // REND_RES_STATIC_{VERTICES,INDICES} global IDs.
         const auto& triangles_info = WBE::RenderDatabase::get_singleton()->get_static_opaque_triangles_info();
         if (triangles_info.draw_groups.size() != 1) {
             throw std::runtime_error("Failed to setup draw triangle test: expected one vertex draw group.");
@@ -120,20 +118,20 @@ public:
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE),
             .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-            .res = graphics_pipeline});
+            .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator,
+                WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+                graphics_pipeline)});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
-        task_desc.create =
-            [render_allocator, base_render_data, descriptor_sets, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
+        task_desc.create = [render_allocator, base_render_data, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 base_render_data->swap_chain_extent,
-                WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
+                WBE::REND_RES_SWAP_CHAIN_IMAGE,
                 WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
-                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-                WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-                std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(descriptor_sets.data(), descriptor_sets.size()),
+                WBE::REND_RES_STATIC_VERTICES,
+                WBE::REND_RES_STATIC_INDICES,
                 std::nullopt,
                 VK_ATTACHMENT_LOAD_OP_CLEAR,
                 vertex_input,

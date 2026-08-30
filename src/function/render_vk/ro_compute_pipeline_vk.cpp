@@ -16,21 +16,17 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_pipeline_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROComputePipelineVK::~ROComputePipelineVK() {
-    render_data->register_delayed_call(
-        [render_data = render_data, compute_pipeline = compute_pipeline]() {
-            vkDestroyPipeline(render_data->logic_device, compute_pipeline, render_data->allocation_callbacks);
-        },
-        render_data->frames_in_flight);
-}
+ROComputePipelineVK::~ROComputePipelineVK() = default;
 
 ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : ROPipelineVK(p_render_data, p_builder.pipeline_layout) {
     const auto& shader_stage = WBE_REQUIRED(p_builder.shader_stage);
     if (p_builder.pipeline_layout == MEM_NULL) {
         throw std::runtime_error("Failed to create compute pipeline: pipeline layout is missing.");
@@ -44,12 +40,13 @@ ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, 
     create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     create_info.stage = shader_stage_create_info;
     create_info.layout = p_builder.pipeline_layout->get_pipeline_layout();
+    VkPipeline compute_pipeline = VK_NULL_HANDLE;
     if (vkCreateComputePipelines(
             render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create compute pipeline.");
     }
+    set_pipeline(compute_pipeline);
     exposed_fields.compute_shader = shader_stage.shader;
-    exposed_fields.pipeline_layout = p_builder.pipeline_layout;
 }
 
 } // namespace WhiteBirdEngine

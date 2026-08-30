@@ -657,7 +657,7 @@ StaticOpaqueAttachmentDataVK build_attachment_data(
         result.clear_values.push_back(p_config.get_clear_value(i));
     }
     if (result.color_attachment_ids.empty()) {
-        result.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK);
+        result.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN_IMAGE);
     }
     if (result.color_attachment_formats.empty()) {
         result.color_attachment_formats.push_back(p_render_data->swap_chain_format);
@@ -751,8 +751,8 @@ Unique<RTRunGraphicsPipelineIndirectVK> build_indirect_task(RenderAllocator* p_a
         p_attachment_data.render_extent,
         std::span<const std::string_view>(color_attachment_id_views.data(), color_attachment_id_views.size()),
         depth_attachment_id_view,
-        REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-        REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
+        REND_RES_STATIC_VERTICES,
+        REND_RES_STATIC_INDICES,
         std::move(p_indirect_commands),
         std::span<const RTRunGraphicsPipelineIndirectVK::PipelineBatch>(p_pipeline_batches.data(), p_pipeline_batches.size()),
         p_color_load_op,
@@ -814,12 +814,10 @@ RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_rendere
             task_batch.draw_count = vertex_batch.draw_count;
             task_batch.vertex_buffer_offset = vertex_batch.vertex_buffer_offset;
             task_batch.vertex_input = std::move(vertex_batch.vertex_input);
-            task_batch.descriptor_sets.assign(
-                pipeline_batch.compiled.descriptor_sets.begin(), pipeline_batch.compiled.descriptor_sets.end());
             task_pipeline_batches.push_back(std::move(task_batch));
         }
         CompiledBatch compiled_batch;
-        compiled_batch.descriptor_sets = std::move(pipeline_batch.compiled.descriptor_sets);
+        compiled_batch.graphics_pipeline = pipeline_batch.compiled.graphics_pipeline;
         compiled_batch.descriptor_set_bindings = std::move(pipeline_batch.compiled.descriptor_set_bindings);
         compiled_batches.push_back(std::move(compiled_batch));
     }
@@ -838,6 +836,10 @@ QueueFamilyVK RTRunStaticOpaqueTrianglesVK::queue_family() const {
     return indirect_task->queue_family();
 }
 
+void RTRunStaticOpaqueTrianglesVK::validate_resources(const RendResViewVK& p_resources) const {
+    indirect_task->validate_resources(p_resources);
+}
+
 Vector<ResAccessVK, RenderAllocator> RTRunStaticOpaqueTrianglesVK::read_resources() const {
     return indirect_task->read_resources();
 }
@@ -854,11 +856,11 @@ size_t RTRunStaticOpaqueTrianglesVK::get_compiled_batch_count() const {
     return compiled_batches.size();
 }
 
-Ref<RODescriptorSetVK> RTRunStaticOpaqueTrianglesVK::get_descriptor_set(size_t p_batch_index, size_t p_set_index) const {
-    if (p_batch_index >= compiled_batches.size() || p_set_index >= compiled_batches[p_batch_index].descriptor_sets.size()) {
-        throw std::runtime_error("Failed to get static opaque task descriptor set: batch or set index is out of bounds.");
+void RTRunStaticOpaqueTrianglesVK::write_descriptor_set(size_t p_batch_index, size_t p_set_index, const RODescriptorSetVK::Writer& p_writer) {
+    if (p_batch_index >= compiled_batches.size() || compiled_batches[p_batch_index].graphics_pipeline == MEM_NULL) {
+        throw std::runtime_error("Failed to write static opaque task descriptor set: batch index is out of bounds.");
     }
-    return compiled_batches[p_batch_index].descriptor_sets[p_set_index];
+    compiled_batches[p_batch_index].graphics_pipeline->write_descriptor_set(static_cast<uint32_t>(p_set_index), p_writer);
 }
 
 RTRunStaticOpaqueTrianglesVK::DescriptorBinding RTRunStaticOpaqueTrianglesVK::get_descriptor_binding(

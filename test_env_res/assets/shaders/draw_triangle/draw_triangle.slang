@@ -21,12 +21,28 @@
 ConstantBuffer<Time> time;
 
 /**
+ * @brief Vertex attributes provided by the minimal triangle test mesh.
+ */
+struct TriangleVertexInput {
+    /**
+     * @brief Position attribute.
+     */
+    [WBE_VERTEX_INPUT]
+    float3 position;
+    /**
+     * @brief Texture-coordinate attribute.
+     */
+    [WBE_VERTEX_INPUT]
+    float2 uv;
+};
+
+/**
  * @brief Transform a textured vertex into a 2D triangle in clip space with the y axis flipped to match Vulkan conventions.
  * @param p_input The incoming vertex attributes.
  * @return The vertex output for the animated triangle debug pass.
  */
 [shader("vertex")]
-VSOutput vertex_main(Vertex3DTexturedInput p_input) {
+VSOutput vertex_main(TriangleVertexInput p_input) {
     VSOutput output;
 
     output.position = float4(p_input.position.x, -1.0 * p_input.position.y, 1.0, 1.0);

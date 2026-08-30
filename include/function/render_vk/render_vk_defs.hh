@@ -41,7 +41,7 @@ using GPUJobVK = std::function<void(VkCommandBuffer)>;
  *
  */
 struct BaseRenderDataVK {
-    BaseRenderDataVK(RenderAllocator* p_allocator) : queue_family_indices(p_allocator) {
+    BaseRenderDataVK(RenderAllocator* p_allocator) : allocator(p_allocator), queue_family_indices(p_allocator) {
     }
     // The render allocator.
     RenderAllocator* allocator = nullptr;

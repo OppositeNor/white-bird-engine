@@ -433,7 +433,6 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(st
     const RenderBindpointDeclarations& p_bindpoint_declarations) {
     auto compiled = compile_pipeline_objects(p_resource_key, p_pipeline_resource, p_bindpoint_declarations);
     return CompileResult{.graphics_pipeline = compiled.graphics_pipeline,
-        .descriptor_sets = std::move(compiled.descriptor_sets),
         .descriptor_set_bindings = std::move(compiled.descriptor_set_bindings)};
 }
 
@@ -473,8 +472,8 @@ GraphicsPipelineCompilerVK::CompiledPipelineObjects GraphicsPipelineCompilerVK::
     CompiledPipelineObjects result;
     result.graphics_pipeline = compile_graphics_pipeline(
         p_resource_key, *p_pipeline_resource, vertex_shader, geometry_shader, fragment_shader, vertex_stage_entry, geometry_stage_entry, fragment_stage_entry, pipeline_layout);
-    result.descriptor_sets =
-        compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations);
+    result.graphics_pipeline->set_descriptor_sets(
+        compile_descriptor_sets(p_resource_key, descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations));
     result.descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings);
     return result;
 }
@@ -488,12 +487,8 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     std::string_view p_geometry_stage_entry,
     std::string_view p_fragment_stage_entry,
     Ref<ROPipelineLayoutVK> p_pipeline_layout) {
-    auto graphics_pipeline = get_registered_render_object<ROGraphicsPipelineVK>(
-        context.render_database, p_resource_key, TypeUUID<ROGraphicsPipelineVK>::UUID);
-    if (graphics_pipeline != MEM_NULL) {
-        // The final pipeline is keyed by the graphics pipeline resource itself.
-        return graphics_pipeline;
-    }
+    // Descriptor sets are pipeline-owned, so each compile result needs an independent runtime pipeline object. Shaders,
+    // descriptor-set layouts, and pipeline layouts remain cached by the shared compiler helpers.
     // Shader config connects compiled shader modules to their manifest-defined entry points.
     ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
     shader_config.set_shaders(p_vertex_shader, p_fragment_shader, p_vertex_stage_entry, p_fragment_stage_entry);
@@ -515,7 +510,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     pipeline_builder.config.depth_test.set_depth_test(p_pipeline_resource.depth_test ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.depth_test.set_depth_write(p_pipeline_resource.depth_write ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.rasterization.set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE);
-    graphics_pipeline = pipeline_builder.create_ref(context.render_data);
+    Ref<ROGraphicsPipelineVK> graphics_pipeline = pipeline_builder.create_ref(context.render_data);
     context.render_database->register_compiled_render_resource(
         p_resource_key, TypeUUID<ROGraphicsPipelineVK>::UUID, RefWeak<IRenderObject>(graphics_pipeline));
     return graphics_pipeline;

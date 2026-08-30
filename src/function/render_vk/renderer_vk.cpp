@@ -26,8 +26,10 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -136,9 +138,6 @@ RendererVK::~RendererVK() {
 void RendererVK::tick(double p_delta) {
     WBE_DEBUG_ASSERT(!(this_ref.is_null()));
 
-    // Run some jobs stored in the job buffer.
-    run_stored_jobs();
-
     execute_graph(active_graph, p_delta);
 }
 
@@ -149,6 +148,10 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         // No pipeline selected, continue.
         return;
     }
+
+    // Frame-local resource updates must run after the slot is selected and its fence has completed.
+    run_stored_jobs();
+
     run_delayed_calls();
     run_gpu_jobs();
     uint32_t frame_counter = *tick_frame_counter;
@@ -169,11 +172,12 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
     // Inject the current swap-chain image view into the active graph so tasks
-    // referencing REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK resolve to the correct
+    // referencing REND_RES_SWAP_CHAIN_IMAGE resolve to the correct
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
     p_graph->set_resource(
-        REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK, render_objects->swap_chain_image_views[image_index], TypeUUID<ROImageViewVK>::UUID);
+        REND_RES_SWAP_CHAIN_IMAGE,
+        make_ref<ROCSingleVK>(allocator, TypeUUID<ROImageViewVK>::UUID, render_objects->swap_chain_image_views[image_index]));
     set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
@@ -583,7 +587,7 @@ void RendererVK::create_gpu_job_command_buffer() {
 }
 
 void RendererVK::create_descriptor_pool() {
-    uint64_t descriptor_generation_capacity = static_cast<uint64_t>(frames_in_flight) + 2;
+    uint64_t descriptor_generation_capacity = static_cast<uint64_t>(frames_in_flight) * 2 + 2;
     auto scale_descriptor_capacity = [descriptor_generation_capacity](size_t p_capacity) -> uint32_t {
         uint64_t scaled_capacity = static_cast<uint64_t>(p_capacity) * descriptor_generation_capacity;
         if (scaled_capacity > std::numeric_limits<uint32_t>::max()) {
@@ -1178,6 +1182,21 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
     }
 
+    auto declare_runtime_resource = [&p_desc](std::string_view p_resource_id, RendResTID p_resource_type_id) {
+        for (const auto& resource : p_desc.resources) {
+            if (resource.res_id == p_resource_id) {
+                return;
+            }
+        }
+        p_desc.resources.push_back(RendResVK{.res_id = std::string(p_resource_id),
+            .res_type_id = p_resource_type_id,
+            .container = MEM_NULL});
+    };
+    declare_runtime_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID);
+    declare_runtime_resource(REND_RES_STATIC_VERTICES, TypeUUID<ROBufferVK>::UUID);
+    declare_runtime_resource(REND_RES_STATIC_INDICES, TypeUUID<ROBufferVK>::UUID);
+    declare_runtime_resource(REND_RES_STATIC_OBJECT_IDS, TypeUUID<ROBufferVK>::UUID);
+
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     graph->build_from_descriptor(*desc_ref);
@@ -1249,7 +1268,9 @@ void RendererVK::update_render_graph_resources(
         if (resource == MEM_NULL) {
             throw std::runtime_error(std::format("Render graph resource is not compatible with Vulkan: {}.", p_bindings[i].resource_id));
         }
-        graph_entry->second.graph->set_transient_resource(p_bindings[i].resource_id, std::move(resource), p_bindings[i].resource_type_id);
+        graph_entry->second.graph->set_transient_resource(
+            p_bindings[i].resource_id,
+            make_ref<ROCSingleVK>(allocator, p_bindings[i].resource_type_id, std::move(resource)));
     }
 }
 
@@ -1262,15 +1283,18 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
     // registration.
     if (render_objects->static_opaque_vertices != MEM_NULL) {
         p_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK, render_objects->static_opaque_vertices, TypeUUID<ROBufferVK>::UUID);
+            REND_RES_STATIC_VERTICES,
+            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_vertices));
     }
     if (render_objects->static_opaque_indices != MEM_NULL) {
         p_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK, render_objects->static_opaque_indices, TypeUUID<ROBufferVK>::UUID);
+            REND_RES_STATIC_INDICES,
+            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_indices));
     }
     if (render_objects->static_opaque_obj_ids != MEM_NULL) {
         p_graph->set_resource(
-            REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK, render_objects->static_opaque_obj_ids, TypeUUID<ROBufferVK>::UUID);
+            REND_RES_STATIC_OBJECT_IDS,
+            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_obj_ids));
     }
 }
 

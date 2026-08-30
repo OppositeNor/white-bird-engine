@@ -16,12 +16,10 @@
 #define WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
-#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <glm/ext/vector_float4.hpp>
@@ -63,12 +61,10 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_pipeline_id        Resource id of the graphics pipeline (read).
      * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
      * @param p_index_buffer_id    Optional resource id of the index buffer (read).
-     * @param p_descriptor_sets    Descriptor sets to bind in order.
      * @param p_indexed_draw_region Optional indexed subregion to draw.
      * @param p_color_attachment_load_op Load operation for the color attachment.
      * @param p_vertex_input Dynamic vertex-input state; empty for a vertex-less draw.
      * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
-     * @param p_additional_read_accesses Additional sampled/storage resources read by the shader stages.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
@@ -77,12 +73,10 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         std::string_view p_pipeline_id,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
         std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0,
-        std::span<const ResAccessVK> p_additional_read_accesses = {});
+        VkDeviceSize p_vertex_buffer_offset = 0);
 
     /**
      * @brief Constructor (multi-attachment).
@@ -99,13 +93,11 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_pipeline_id        Resource id of the graphics pipeline (read).
      * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
      * @param p_index_buffer_id    Optional resource id of the index buffer (read).
-     * @param p_descriptor_sets    Descriptor sets to bind in order.
      * @param p_indexed_draw_region Optional indexed subregion to draw.
      * @param p_color_attachment_load_op Load operation for every color attachment.
      * @param p_depth_attachment_load_op Load operation for the depth attachment.
      * @param p_vertex_input Dynamic vertex-input state; empty for a vertex-less draw.
      * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
-     * @param p_additional_read_accesses Additional sampled/storage resources read by the shader stages.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         std::span<const VkClearValue> p_clear_values,
@@ -115,17 +107,17 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         std::string_view p_pipeline_id,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
-        std::span<const Ref<RODescriptorSetVK>> p_descriptor_sets,
         std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
         VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0,
-        std::span<const ResAccessVK> p_additional_read_accesses = {});
+        VkDeviceSize p_vertex_buffer_offset = 0);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
+
+    virtual void validate_resources(const RendResViewVK& p_resources) const override;
 
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
@@ -147,9 +139,6 @@ private:
     std::optional<IndexedDrawRegionVK> indexed_draw_region;
     VertexInputDescriptionVK vertex_input;
     VkDeviceSize vertex_buffer_offset = 0;
-    Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
-    Vector<VkDescriptorSet, RenderAllocator> descriptor_sets_instances;
-    Vector<ResAccessVK, RenderAllocator> additional_read_accesses;
 };
 
 } // namespace WhiteBirdEngine

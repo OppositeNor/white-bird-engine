@@ -18,9 +18,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include <string>
 #include <string_view>
@@ -31,13 +31,15 @@ namespace WhiteBirdEngine {
  * @class ROComputePipelineVK
  * @brief Vulkan compute pipeline render object.
  */
-class WBE_META(WBE_RENDER_OBJECT) ROComputePipelineVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROComputePipelineVK final : public ROPipelineVK {
 public:
     /**
      * @class Builder
      * @brief Builder for compute pipeline render objects.
      */
     struct Builder {
+        friend ROComputePipelineVK;
+        friend ComputePipelineCompilerVK;
         /**
          * @class ShaderStage
          * @brief Compute shader stage configuration.
@@ -113,15 +115,6 @@ public:
     ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     /**
-     * @brief Get the Vulkan compute pipeline handle.
-     *
-     * @return The Vulkan compute pipeline handle.
-     */
-    VkPipeline get_compute_pipeline() const {
-        return compute_pipeline;
-    }
-
-    /**
      * @class ExposedFields
      * @brief Exposed fields of ROComputePipelineVK.
      */
@@ -130,10 +123,6 @@ public:
          * @brief Compute shader used by this pipeline.
          */
         Ref<const ROShaderVK> compute_shader;
-        /**
-         * @brief Pipeline layout used for descriptor set binding.
-         */
-        Ref<const ROPipelineLayoutVK> pipeline_layout;
     };
 
     const ExposedFields& fields() const {
@@ -142,7 +131,6 @@ public:
 
 private:
     ExposedFields exposed_fields;
-    VkPipeline compute_pipeline = VK_NULL_HANDLE;
 };
 
 } // namespace WhiteBirdEngine

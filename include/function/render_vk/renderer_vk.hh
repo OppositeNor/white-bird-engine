@@ -54,10 +54,10 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK = "REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK";
-inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK";
-inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK";
-inline constexpr std::string_view REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK = "REND_RES_STATIC_OPAQUE_TRIANGLES_OBJ_IDS_VK";
+inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE = "swap_chain_image";
+inline constexpr std::string_view REND_RES_STATIC_VERTICES = "static_vertices";
+inline constexpr std::string_view REND_RES_STATIC_INDICES = "static_indices";
+inline constexpr std::string_view REND_RES_STATIC_OBJECT_IDS = "static_object_ids";
 
 /**
  * @class RendererVK
@@ -355,7 +355,7 @@ private:
         // Global static-opaque mesh GPU buffers, populated by
         // RendererVK::update_static_opaque_triangles() from the RenderDatabase
         // and exposed to render tasks via the global resource IDs
-        // REND_RES_STATIC_OPAQUE_TRIANGLES_{VERTICES,INDICES,OBJ_IDS}_VK.
+        // REND_RES_STATIC_{VERTICES,INDICES,OBJECT_IDS}.
         Ref<ROBufferVK> static_opaque_vertices;
         Ref<ROBufferVK> static_opaque_indices;
         Ref<ROBufferVK> static_opaque_obj_ids;

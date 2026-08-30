@@ -44,19 +44,43 @@ struct RendResVK;
 class RendResViewVK;
 
 /**
+ * @class RendResUsageVK
+ * @brief Task-facing resource usage categories translated privately by the render graph into Vulkan synchronization scopes.
+ */
+enum class RendResUsageVK : uint32_t {
+    /** Shader-sampled image read. */
+    SAMPLED_IMAGE,
+    /** Color attachment read or write. */
+    COLOR_ATTACHMENT,
+    /** Depth/stencil attachment read or write. */
+    DEPTH_ATTACHMENT,
+    /** Shader storage image read or write. */
+    STORAGE_IMAGE,
+    /** Uniform buffer read. */
+    UNIFORM_BUFFER,
+    /** Shader storage buffer read or write. */
+    STORAGE_BUFFER,
+    /** Transfer source read. */
+    TRANSFER_SRC,
+    /** Transfer destination write. */
+    TRANSFER_DST,
+    /** Indirect command buffer read. */
+    INDIRECT_BUFFER,
+    /** Vertex buffer read. */
+    VERTEX_BUFFER,
+    /** Index buffer read. */
+    INDEX_BUFFER,
+};
+
+/**
  * @class ResAccessVK
- * @brief Per-resource access metadata declared by a Vulkan render task. The
- * render graph uses this to scope timeline-semaphore dependencies between
- * consumer and producer nodes that share the same resource.
+ * @brief Compact resource declaration emitted by a Vulkan render task or graph descriptor.
  */
 struct ResAccessVK {
-    // The id of the resource consumed/produced by the task.
+    /** Resource identifier used by the graph. */
     std::string res_id;
-    // Combined access flags for this access (read or write side as
-    // appropriate).
-    VkAccessFlags2 access = VK_ACCESS_2_NONE;
-    // Pipeline stage(s) at which the access occurs.
-    VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
+    /** Task-facing usage translated internally to Vulkan access and stage masks. */
+    RendResUsageVK usage = RendResUsageVK::SAMPLED_IMAGE;
 };
 
 /**
@@ -84,18 +108,26 @@ struct RenderTaskVK : public RenderTask {
     virtual QueueFamilyVK queue_family() const = 0;
 
     /**
-     * @brief The list of resources read by this task, with the access type and
-     * stage at which they are read. Used by the graph to build pipeline
-     * barriers from the producing task to this one.
+     * @brief Validate non-synchronizing graph-resource references used by this task.
+     *
+     * Pipeline objects and similar immutable references do not belong in read/write synchronization declarations, but must
+     * still be present and type-correct when the graph is built.
+     *
+     * @param p_resources Resources indexed by the graph descriptor.
+     */
+    virtual void validate_resources(const RendResViewVK& p_resources) const {
+        static_cast<void>(p_resources);
+    }
+
+    /**
+     * @brief The resources read intrinsically by this task.
      *
      * @return The resource access declarations for reads performed by this task.
      */
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const = 0;
 
     /**
-     * @brief The list of resources written by this task, with the access type
-     * and stage at which they are written. Used by the graph to build pipeline
-     * barriers from this task to its consumer(s).
+     * @brief The resources written intrinsically by this task.
      *
      * @return The resource access declarations for writes performed by this task.
      */

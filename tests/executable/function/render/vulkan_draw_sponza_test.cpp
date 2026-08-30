@@ -28,6 +28,7 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -44,7 +45,6 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -67,7 +67,7 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW = "REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW";
+constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW = "sponza_depth";
 
 } // namespace WhiteBirdEngine
 
@@ -115,9 +115,6 @@ private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::Ref<WBE::ROBufferVK> spot_light_info_ubo;
     WBE::Ref<WBE::ROBufferVK> spot_light_count_ubo;
-    std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> camera_descriptor_bindings;
-    std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> shadow_camera_descriptor_bindings;
-    std::vector<std::pair<WBE::Ref<WBE::RODescriptorSetVK>, uint32_t>> spot_light_descriptor_bindings;
     WBE::ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
@@ -252,35 +249,8 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
     WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
     WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
     add_render_job([this, camera_info, spot_light_info]() {
-        WBE::Ref<WBE::ROBufferVK> new_camera_info_ubo = WBE::ROBufferVK::Builder()
-                                                            .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                            .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                                            .set_size(sizeof(WBE::CameraInfoVKUBO))
-                                                            .create_ref(base_render_data);
-        new_camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
-        for (auto& [descriptor_set, binding] : camera_descriptor_bindings) {
-            descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-                new_camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
-        }
-
-        WBE::Ref<WBE::ROBufferVK> new_spot_light_info_ubo = WBE::ROBufferVK::Builder()
-                                                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                                                .set_size(sizeof(WBE::SpotLightInfoVKUBO))
-                                                                .create_ref(base_render_data);
-        new_spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
-        for (auto& [descriptor_set, binding] : shadow_camera_descriptor_bindings) {
-            descriptor_set->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-                new_spot_light_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
-        }
-        for (auto& [descriptor_set, binding] : spot_light_descriptor_bindings) {
-            descriptor_set->write_descriptor_set(
-                WBE::RODescriptorSetVK::Writer().set_binding(binding).set_dst_array_element(0).add_uniform_buffer_info(
-                    new_spot_light_info_ubo, 0, sizeof(WBE::SpotLightInfoVKUBO)));
-        }
-
-        camera_info_ubo = std::move(new_camera_info_ubo);
-        spot_light_info_ubo = std::move(new_spot_light_info_ubo);
+        camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
+        spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
     });
 }
 
@@ -412,9 +382,9 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRu
     spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
     for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
         auto [set, binding] = p_task.get_descriptor_binding(batch_index, "light_camera_info");
-        shadow_camera_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, set), binding);
-        p_task.get_descriptor_set(batch_index, set)
-            ->write_descriptor_set(WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
+        p_task.write_descriptor_set(batch_index,
+            set,
+            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
                 spot_light_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
     }
 }
@@ -441,54 +411,51 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
     for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
         auto write_uniform_buffer = [&p_task, batch_index](const char* p_name, WBE::Ref<WBE::ROBufferVK> p_buffer, size_t p_size) {
             auto [set, binding] = p_task.get_descriptor_binding(batch_index, p_name);
-            p_task.get_descriptor_set(batch_index, set)
-                ->write_descriptor_set(
-                    WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(p_buffer, 0, p_size));
+            p_task.write_descriptor_set(
+                batch_index, set, WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(p_buffer, 0, p_size));
         };
         write_uniform_buffer("camera_info", camera_info_ubo, sizeof(WBE::CameraInfoVKUBO));
-        auto [camera_set, camera_binding] = p_task.get_descriptor_binding(batch_index, "camera_info");
-        camera_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, camera_set), camera_binding);
         write_uniform_buffer("light.lights.info", spot_light_info_ubo, sizeof(WBE::SpotLightInfoVKUBO));
-        auto [light_set, light_binding] = p_task.get_descriptor_binding(batch_index, "light.lights.info");
-        spot_light_descriptor_bindings.emplace_back(p_task.get_descriptor_set(batch_index, light_set), light_binding);
         write_uniform_buffer("light.light_count", spot_light_count_ubo, sizeof(uint32_t));
 
         auto [shadowmap_set, shadowmap_binding] = p_task.get_descriptor_binding(batch_index, "light.lights.shadowmap");
-        p_task.get_descriptor_set(batch_index, shadowmap_set)
-            ->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
-                    .set_binding(shadowmap_binding)
-                    .set_dst_array_element(0)
-                    .add_sampled_image_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
-                        .image_view = shadow_depth_view,
-                        .image_layout = VK_IMAGE_LAYOUT_GENERAL,
-                    }));
+        p_task.write_descriptor_set(batch_index,
+            shadowmap_set,
+            WBE::RODescriptorSetVK::Writer()
+                .set_binding(shadowmap_binding)
+                .set_dst_array_element(0)
+                .add_sampled_image_info(WBE::RODescriptorSetVK::Writer::ImageInfo{
+                    .image_view = shadow_depth_view,
+                    .image_layout = VK_IMAGE_LAYOUT_GENERAL,
+                }));
         auto [shadow_sampler_set, shadow_sampler_binding] = p_task.get_descriptor_binding(batch_index, "light.lights.shadowmap_sampler");
-        p_task.get_descriptor_set(batch_index, shadow_sampler_set)
-            ->write_descriptor_set(WBE::RODescriptorSetVK::Writer()
-                    .set_binding(shadow_sampler_binding)
-                    .set_dst_array_element(0)
-                    .add_sampler_info(WBE::RODescriptorSetVK::Writer::ImageInfo{.sampler = shadow_sampler}));
+        p_task.write_descriptor_set(batch_index,
+            shadow_sampler_set,
+            WBE::RODescriptorSetVK::Writer()
+                .set_binding(shadow_sampler_binding)
+                .set_dst_array_element(0)
+                .add_sampler_info(WBE::RODescriptorSetVK::Writer::ImageInfo{.sampler = shadow_sampler}));
     }
 }
 
 void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
     WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_main_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK),
+    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = WBE::MEM_NULL});
+        .container = WBE::MEM_NULL});
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = main_depth_view});
+        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, main_depth_view)});
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = shadow_color_view});
+        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_color_view)});
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = shadow_depth_view});
+        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_depth_view)});
     pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
-    WBE::RendTaskDescVK main_task_desc(render_allocator, WBE::RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, std::move(p_main_task));
-    main_task_desc.prev.emplace_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
+    WBE::RendTaskDescVK main_task_desc(render_allocator, WBE::RT_RUN_STATIC_OPAQUE, std::move(p_main_task));
+    main_task_desc.after(WBE::RT_RUN_PIPELINE_SHADOWMAP);
     pipeline_desc.tasks.emplace_back(std::move(main_task_desc));
     renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
     renderer_vk->activate_render_graph("draw_sponza_pipeline");

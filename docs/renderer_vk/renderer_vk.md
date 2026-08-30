@@ -9,9 +9,9 @@ Tick render stages:
   `RendGraphDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
   in topological order. Each `RenderTaskVK` records into its own primary
   command buffer; cross-submit ordering between tasks is enforced with timeline
-  semaphores attached to the graph's execution edges, and per-resource hazards
-  are resolved with `vkCmdPipelineBarrier2` driven by each task's declared
-  `read_resources()` / `write_resources()` access and stage masks. After the
+  semaphores attached to the graph's execution edges. Per-resource ordering is
+  derived from compact `RendResUsageVK` declarations on the task and its
+  `RendTaskDescVK`; Vulkan access and stage masks remain graph-internal. After the
   last graphics submission the graph signals a terminal binary semaphore, which
   `RendererVK::present()` waits on before `vkQueuePresentKHR`.
 
@@ -78,7 +78,7 @@ state.
 compiles one logical Vulkan graphics pipeline per pipeline and attachment configuration, creates material descriptor data for each
 pipeline batch, and uploads the indirect commands. Flattened vertex data remains raw interleaved bytes. Geometry is merged only
 when its pipeline, material, and vertex layout match; command batches split whenever the layout or vertex-buffer byte offset
-changes. The task owns the compiled pipelines, descriptor sets, and indirect-command buffer.
+changes. Each compiled pipeline owns its descriptor sets, and the task retains the pipelines and indirect-command buffer.
 
 Before constructing the task:
 
@@ -87,7 +87,7 @@ Before constructing the task:
 3. Call `RendererVK::update_static_opaque_triangles()` so the database contains the flattened vertices, indices, materials, and
    graphics-pipeline batches consumed by the task.
 4. Create every attachment resource referenced by the task configuration. The swap-chain image view is represented in the
-   graph by a `REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK` resource with a null object; the renderer resolves it for each frame.
+   graph by a `REND_RES_SWAP_CHAIN_IMAGE` resource with a null object; the renderer resolves it for each frame.
 
 The default configuration draws to the swap chain at the swap-chain extent. It uses the graphics pipeline attached to each mesh
 material, the `default_material` fallback resource, and the `material_textures` and `material_params` shader variable names.
@@ -105,17 +105,12 @@ config.set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
 auto task = make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer, config);
 
 RendGraphDescVK graph_desc(render_allocator);
-graph_desc.resources.emplace_back(RendResVK{
-    .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK),
-    .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-    .res = MEM_NULL,
-});
-graph_desc.resources.emplace_back(RendResVK{
-    .res_id = "scene_depth_view",
-    .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-    .res = depth_image_view,
-});
-graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, std::move(task));
+graph_desc
+    .add_resource(REND_RES_SWAP_CHAIN_IMAGE,
+        TypeUUID<ROImageViewVK>::UUID,
+        Ref<RenderObjectContainerVK>(MEM_NULL))
+    .add_resource("scene_depth_view", TypeUUID<ROImageViewVK>::UUID, depth_image_view)
+    .add_task(RT_RUN_STATIC_OPAQUE, std::move(task));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
@@ -149,28 +144,67 @@ config.set_graphics_pipeline_resource_key("deferred_gbuffer")
     .set_depth_attachment("gbuffer_depth_view", VK_FORMAT_D32_SFLOAT);
 ```
 
-### Writing Application Descriptors
+### Writing Pipeline-Owned Descriptors
 
-Material descriptors are populated during construction. Other shader parameters, such as camera or light buffers, can be written
-before the task is transferred into its descriptor. Descriptor locations are reflected per compiled batch, so update every batch:
+Material descriptors are populated during construction. Higher-level tasks such as `RTRunStaticOpaqueTrianglesVK` may still expose
+reflected descriptor fields for application-provided uniform or sampled resources, but the descriptor objects remain
+pipeline-owned:
 
 ```cpp
 for (size_t batch_index = 0; batch_index < task->get_compiled_batch_count(); ++batch_index) {
     auto [set_index, binding] = task->get_descriptor_binding(batch_index, "camera_info");
-    task->get_descriptor_set(batch_index, set_index)
-        ->write_descriptor_set(RODescriptorSetVK::Writer()
-                .set_binding(binding)
-                .add_uniform_buffer_info(camera_buffer, 0, sizeof(CameraInfoVKUBO)));
+    task->write_descriptor_set(batch_index,
+        set_index,
+        RODescriptorSetVK::Writer()
+            .set_binding(binding)
+            .add_uniform_buffer_info(camera_buffer, 0, sizeof(CameraInfoVKUBO)));
 }
 ```
 
+For frame-local buffers, pass the `ROCPerFrameVK` container instead of resolving one buffer manually. Pipeline descriptor writes are
+versioned per frame slot, and the container retains the latest published bytes until every slot has applied them:
+
+```cpp
+task->write_descriptor_set(batch_index,
+    set_index,
+    RODescriptorSetVK::Writer()
+        .set_binding(binding)
+        .add_uniform_buffer_info(camera_buffers, 0, sizeof(CameraInfoVKUBO)));
+
+camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
+```
+
+Publish buffer contents from a render-thread job. The selected slot applies the newest pending bytes after its fence has completed,
+before its pipeline descriptor set is bound. A slot may skip intermediate versions, but it cannot miss the latest version.
+
 Field paths come from shader reflection. `get_descriptor_binding()` throws when the requested field is absent from a batch, so all
-pipelines selected for a pass must expose the application-managed fields that the pass writes.
+pipelines selected for a pass must expose the fields that the pass writes.
 
 To add an execution dependency, construct the descriptor explicitly before moving it into the graph:
 
 ```cpp
-RendTaskDescVK task_desc(render_allocator, RT_RUN_GBUFFER, std::move(task));
-task_desc.prev.emplace_back(RT_RUN_SHADOW);
+RendTaskDescVK task_desc(render_allocator, "run_gbuffer", std::move(task));
+task_desc.after("run_shadow")
+    .read("shadow_moments", RendResUsageVK::SAMPLED_IMAGE)
+    .write("gbuffer_albedo", RendResUsageVK::COLOR_ATTACHMENT);
 graph_desc.tasks.emplace_back(std::move(task_desc));
+```
+
+Compute and graphics pipeline-run tasks bind their pipeline-owned descriptor sets automatically. Shader resources that are not
+intrinsic task inputs are declared fluently on the task descriptor, and the graph derives queue-aware synchronization scopes from
+their compact usages:
+
+```cpp
+RendTaskDescVK lighting(render_allocator);
+lighting.task_id = "run_lighting";
+lighting.after("run_gbuffer")
+    .read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
+    .read("gbuffer_depth", RendResUsageVK::SAMPLED_IMAGE)
+    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
+lighting.create = [render_allocator, render_data]() -> Unique<RenderTaskVK> {
+    return make_unique<RTRunComputePipelineVK>(render_allocator,
+        render_data,
+        "lighting_pipeline",
+        VkExtent3D{.width = 160, .height = 90, .depth = 1});
+};
 ```

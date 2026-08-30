@@ -25,6 +25,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -51,7 +52,7 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW = "REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW";
+inline constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW = "sponza_depth";
 inline constexpr VkFormat DRAW_SPONZA_INDIRECT_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 
 class ApplicationVulkanDrawSponzaIndirectTest final : public ApplicationGame {
@@ -156,11 +157,13 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
 
     RendGraphDescVK graph_desc(render_allocator);
     graph_desc.resources.emplace_back(RendResVK{
-        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .res = MEM_NULL});
+        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
+        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
+        .container = MEM_NULL});
     graph_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-        .res = depth_view});
-    graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, std::move(task));
+        .container = make_ref<ROCSingleVK>(render_allocator, TypeUUID<ROImageViewVK>::UUID, depth_view)});
+    graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE, std::move(task));
     renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
     renderer_vk->activate_render_graph("draw_sponza_indirect_graph");
 }
@@ -191,9 +194,9 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStati
     camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
     for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
         auto [set_index, binding] = p_task.get_descriptor_binding(batch_index, "camera_info");
-        p_task.get_descriptor_set(batch_index, set_index)
-            ->write_descriptor_set(RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-                camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
+        p_task.write_descriptor_set(batch_index,
+            set_index,
+            RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
     }
 }
 

@@ -29,6 +29,7 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -111,12 +112,9 @@ private:
     WBE::RefRes<WBE::RUMaterial> default_material;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
 
-    // Kept alive for the lifetime of the test because the graph resources and
-    // the main pipeline's descriptor set reference these by raw handles.
+    // Kept alive for the lifetime of the test because graph resources and pipeline-owned descriptors retain these objects.
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_graphics_pipeline = WBE::MEM_NULL;
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_graphics_pipeline = WBE::MEM_NULL;
-    std::vector<WBE::Ref<WBE::RODescriptorSetVK>> shadow_descriptor_sets;
-    std::vector<WBE::Ref<WBE::RODescriptorSetVK>> main_descriptor_sets;
     WBE::GraphicsPipelineCompilerVK::DescriptorSetBindings main_descriptor_set_bindings;
     WBE::Ref<WBE::ROImageVK> shadow_depth_image;
     WBE::Ref<WBE::ROImageVK> shadow_color_image;
@@ -325,7 +323,6 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
     auto compiled =
         WBE::GraphicsPipelineCompilerVK(shadow_compiler_context).compile("shadowmap_spot", shadow_pipeline_resource, shadow_bindpoint_declarations);
     shadow_graphics_pipeline = compiled.graphics_pipeline;
-    shadow_descriptor_sets = std::move(compiled.descriptor_sets);
 }
 
 void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
@@ -353,14 +350,10 @@ void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
     auto compiled = WBE::GraphicsPipelineCompilerVK(main_compiler_context)
                         .compile(default_material->graphics_pipeline->resource_key, default_material->graphics_pipeline, main_bindpoint_declarations);
     main_graphics_pipeline = compiled.graphics_pipeline;
-    main_descriptor_sets = std::move(compiled.descriptor_sets);
     main_descriptor_set_bindings = std::move(compiled.descriptor_set_bindings);
 }
 
 void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
-    if (main_descriptor_sets.empty()) {
-        throw std::runtime_error("Failed to setup draw cube test: main pipeline produced no descriptor sets.");
-    }
     camera_info_ubo = WBE::ROBufferVK::Builder()
                           .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                           .set_domain(WBE::DeviceDomain::HOST_DEVICE)
@@ -369,7 +362,7 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
     WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
     camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     auto [set, binding] = main_descriptor_set_bindings.at("camera_info");
-    main_descriptor_sets[set]->write_descriptor_set(
+    main_graphics_pipeline->write_descriptor_set(set,
         WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(WBE::RODescriptorSetVK::Writer::BufferInfo{
             .buffer = camera_info_ubo,
             .offset = 0,
@@ -389,16 +382,21 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph() {
 void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const {
     p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-        .res = shadow_graphics_pipeline});
+        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator,
+            WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
+            shadow_graphics_pipeline)});
     p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = shadow_color_view});
+        .container =
+            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_color_view)});
     p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .res = shadow_depth_view});
+        .container =
+            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_depth_view)});
     p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE),
         .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-        .res = main_graphics_pipeline});
+        .container =
+            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID, main_graphics_pipeline)});
 }
 
 std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCubeTest::build_vertex_input_data(
@@ -429,7 +427,6 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
     shadow_task_desc.create = [task_render_allocator = render_allocator,
                                   task_base_render_data = base_render_data,
                                   task_shadow_extent = shadow_extent,
-                                  task_shadow_descriptor_sets = shadow_descriptor_sets,
                                   vertex_input,
                                   vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
         std::array<VkClearValue, 2> shadow_clear_values{};
@@ -443,9 +440,8 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
             std::span<const std::string_view>(shadow_color_attachment_ids.data(), shadow_color_attachment_ids.size()),
             WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
             WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
-            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_shadow_descriptor_sets.data(), task_shadow_descriptor_sets.size()),
+            WBE::REND_RES_STATIC_VERTICES,
+            WBE::REND_RES_STATIC_INDICES,
             std::nullopt,
             VK_ATTACHMENT_LOAD_OP_CLEAR,
             VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -459,21 +455,19 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const
     auto [vertex_input, vertex_buffer_offset] = build_vertex_input_data(default_material->graphics_pipeline);
     WBE::RendTaskDescVK main_task_desc(render_allocator);
     main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
-    main_task_desc.prev.push_back(WBE::RT_RUN_PIPELINE_SHADOWMAP);
+    main_task_desc.after(WBE::RT_RUN_PIPELINE_SHADOWMAP);
     main_task_desc.create = [task_render_allocator = render_allocator,
                                 task_base_render_data = base_render_data,
-                                task_main_descriptor_sets = main_descriptor_sets,
                                 vertex_input,
                                 vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
             task_base_render_data->swap_chain_extent,
-            WBE::REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK,
+            WBE::REND_RES_SWAP_CHAIN_IMAGE,
             WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
-            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_VERTICES_VK,
-            WBE::REND_RES_STATIC_OPAQUE_TRIANGLES_INDICES_VK,
-            std::span<const WBE::Ref<WBE::RODescriptorSetVK>>(task_main_descriptor_sets.data(), task_main_descriptor_sets.size()),
+            WBE::REND_RES_STATIC_VERTICES,
+            WBE::REND_RES_STATIC_INDICES,
             std::nullopt,
             VK_ATTACHMENT_LOAD_OP_CLEAR,
             vertex_input,

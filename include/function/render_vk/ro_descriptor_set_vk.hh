@@ -22,6 +22,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -29,9 +30,12 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include <cstdint>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
+
+class ROPipelineVK;
 
 /**
  * @class RODescriptorSetVK
@@ -107,6 +111,10 @@ public:
              */
             Ref<ROBufferVK> buffer = MEM_NULL;
             /**
+             * @brief Frame-resolved buffer container, used when buffer is null.
+             */
+            Ref<RenderObjectContainerVK> buffer_container = MEM_NULL;
+            /**
              * @brief The offset in the buffer.
              */
             VkDeviceSize offset = 0;
@@ -129,9 +137,17 @@ public:
              */
             Ref<ROImageViewVK> image_view = MEM_NULL;
             /**
+             * @brief Frame-resolved image-view container, used when image_view is null.
+             */
+            Ref<RenderObjectContainerVK> image_view_container = MEM_NULL;
+            /**
              * @brief Sampler to bind for sampler descriptors.
              */
             Ref<ROSamplerVK> sampler = MEM_NULL;
+            /**
+             * @brief Frame-resolved sampler container, used when sampler is null.
+             */
+            Ref<RenderObjectContainerVK> sampler_container = MEM_NULL;
             /**
              * @brief Image layout visible to the shader descriptor.
              */
@@ -235,6 +251,33 @@ public:
         }
 
         /**
+         * @brief Add frame-resolved uniform-buffer information.
+         * @param p_buffer_container Container resolving one buffer for each frame slot.
+         * @param p_offset Offset in the resolved buffer.
+         * @param p_range Range in the resolved buffer.
+         * @return *this.
+         */
+        Writer& add_uniform_buffer_info(
+            Ref<RenderObjectContainerVK> p_buffer_container, VkDeviceSize p_offset, VkDeviceSize p_range) {
+            uniform_buffer_infos.push_back(
+                {.buffer = MEM_NULL, .buffer_container = std::move(p_buffer_container), .offset = p_offset, .range = p_range});
+            return *this;
+        }
+
+        /**
+         * @brief Return whether any descriptor resource must be resolved for a frame slot.
+         * @return True when the writer contains a render-object container.
+         */
+        bool has_contextual_resources() const;
+
+        /**
+         * @brief Resolve every contextual resource for one frame slot.
+         * @param p_frame_slot Frame slot whose resources are required.
+         * @return Writer containing only concrete render objects.
+         */
+        Writer resolve(uint32_t p_frame_slot) const;
+
+        /**
          * @brief Add sampled image information.
          *
          * @param p_image_info The image info to add.
@@ -315,6 +358,8 @@ public:
     }
 
 private:
+    friend ROPipelineVK;
+
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
     uint32_t variable_descriptor_count = 0;
     mutable bool has_been_acquired = false;
@@ -327,6 +372,7 @@ private:
     VkDescriptorSet create_descriptor_set_for_write() const;
     void publish_descriptor_set(VkDescriptorSet p_descriptor_set);
     void retire_descriptor_set(VkDescriptorSet p_descriptor_set) const;
+    Ref<RODescriptorSetVK> create_copy() const;
 };
 
 } // namespace WhiteBirdEngine

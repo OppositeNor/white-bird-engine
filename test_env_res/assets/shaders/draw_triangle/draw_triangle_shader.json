@@ -7,7 +7,15 @@
             "src": "assets/shaders/draw_triangle/draw_triangle.slang",
             "dst": "assets/shaders/draw_triangle/draw_triangle.spv",
             "metadata": "assets/shaders/draw_triangle/draw_triangle.json"
+        },
+        {
+            "id": "draw_triangle_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "draw_triangle_shader",
+            "fragment_stage_id": "draw_triangle_shader",
+            "depth_test": false,
+            "depth_write": false,
+            "color_blend": false
         }
     ]
 }
-

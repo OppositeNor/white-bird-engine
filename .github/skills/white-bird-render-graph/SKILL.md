@@ -25,7 +25,7 @@ Do not use this skill for shader metadata contracts, material role resolution, o
 - `RendTaskDescVK` names one task with a `task_id`, an optional `prev` dependency list, and a one-shot `create` factory or transferred `Unique<RenderTaskVK>`.
 - `RendResVK` binds one graph-visible resource under a string `res_id` plus a runtime type id.
 - `RenderTaskVK` declares `queue_family()`, `read_resources()`, `write_resources()`, and `record()`.
-- `RenderGraphVK::build_from_descriptor()` instantiates tasks, creates execution edges from `prev`, infers resource edges from declared accesses, topologically sorts the graph, and allocates command buffers.
+- `RenderGraphVK::build_from_descriptor()` instantiates tasks, creates execution edges from `prev`, infers additional execution edges from declared accesses, topologically sorts the graph, and allocates command buffers.
 
 ## Procedure
 
@@ -36,7 +36,7 @@ Do not use this skill for shader metadata contracts, material role resolution, o
    - declare every graph-visible write in `write_resources()`
    - resolve runtime resources from `RendResViewVK` inside `record()`
 3. Add the task to a `RendGraphDescVK` using `RendTaskDescVK` and stable `task_id` values.
-4. Add explicit ordering with `prev` only for execution dependencies that are not implied well enough by resource access alone.
+4. Add explicit ordering with `prev` for execution dependencies that are not guaranteed by last-writer inference alone, especially write-after-write or phase boundaries.
 5. Add every externally supplied resource to `graph_desc.resources` with the correct `res_id` and `TypeUUID<T>::UUID`.
 6. For per-frame or temporary rebinding, use `RenderGraphVK::set_transient_resource()`; use `set_resource()` for persistent overrides.
 7. Register and activate the graph through `RendererVK` after the descriptor is complete.
@@ -48,13 +48,11 @@ Do not use this skill for shader metadata contracts, material role resolution, o
 ```cpp
 RendGraphDescVK graph_desc(render_allocator);
 
-graph_desc.resources.emplace_back(RendResVK{
-    .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE_VIEW_VK),
-    .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-    .res = MEM_NULL,
-});
-
-graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, std::move(task));
+graph_desc
+    .add_resource(REND_RES_SWAP_CHAIN_IMAGE,
+        TypeUUID<ROImageViewVK>::UUID,
+        Ref<RenderObjectContainerVK>(MEM_NULL))
+    .add_task(RT_RUN_STATIC_OPAQUE, std::move(task));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
@@ -62,7 +60,7 @@ renderer->activate_render_graph("scene");
 
 ### Task contract
 
-Declare only the resources the graph must synchronize. The graph builds resource edges from these declarations, not from Vulkan command inspection.
+Declare only the resources the graph must synchronize. The graph adds execution edges from these declarations and never infers hazards from Vulkan command inspection.
 
 ### Transient overrides
 
@@ -74,13 +72,13 @@ Declare only the resources the graph must synchronize. The graph builds resource
 - Resource type ids must remain consistent across `resources`, `set_resource()`, and `set_transient_resource()`.
 - Missing resources fail at lookup time with `Render graph resource was not bound`.
 - Cycles in `prev` dependencies fail during topological sort.
-- Barrier inference only knows about resources declared in `read_resources()` and `write_resources()`.
+- Dependency inference only knows about resources declared in `read_resources()` and `write_resources()`.
 - `RendTaskDescVK` direct-task construction is one-shot; build the descriptor once, then register the graph.
 - Queue-family selection matters because the graph maps it to Vulkan queues and command pools.
 
 ## Before changing support
 
-Read [references/system-and-extension.md](./references/system-and-extension.md) before changing graph construction, resource-edge inference, transient-resource semantics, command-buffer allocation, queue-family submission, or present interlock. Trace one real task from descriptor entry to `record()` before editing the graph core.
+Read [references/system-and-extension.md](./references/system-and-extension.md) before changing graph construction, dependency inference, transient-resource semantics, command-buffer allocation, queue-family submission, or present interlock. Trace one real task from descriptor entry to `record()` before editing the graph core.
 
 ## Validate
 

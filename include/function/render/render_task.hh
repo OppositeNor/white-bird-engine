@@ -15,15 +15,16 @@
 #ifndef WBE_FILE_RENDER_TASK_HH
 #define WBE_FILE_RENDER_TASK_HH
 
-#include "core/reflection/reflection_defs.hh"
 #include "utils/utils.hh"
+#include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
 using RendResTID = HashCode;
-using RendTaskID = HashCode;
+using RendTaskID = std::string;
 
-WBE_LABEL(RT_UNDEFINED, WBE_RENDER_TASK);
+inline constexpr std::string_view RT_UNDEFINED = "undefined";
 
 /**
  * @class RenderTask

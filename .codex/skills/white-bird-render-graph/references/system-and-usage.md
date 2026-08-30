@@ -4,19 +4,19 @@
 
 1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` factories.
 2. `RendererVK::register_render_graph` stores the descriptor and immediately builds a `RenderGraphVK`.
-3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds explicit `prev` edges, topologically sorts nodes, infers resource edges, allocates per-node command buffers, and creates terminal semaphores.
+3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds explicit predecessor edges, topologically sorts nodes, infers resource dependencies, allocates per-node command buffers, and creates terminal semaphores.
 4. Each frame, the renderer acquires a swap-chain image, binds current runtime resources, executes the graph, presents, and resets transient bindings.
 5. `RenderGraphVK::execute` records and submits nodes individually in topological order to their selected graphics or compute queue.
 
 ## Core APIs
 
 - `include/function/render_vk/render_graph_descriptor_vk.hh`
-  - `RendTaskDescVK`: `task_id`, predecessor IDs in `prev`, and a task factory in `create`.
+  - `RendTaskDescVK`: string `task_id`, fluent `after()` / `read()` / `write()` declarations, and a task factory in `create`.
   - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations.
 - `include/function/render_vk/render_task_vk.hh`
-  - `QueueFamilyVK`, `ResAccessVK`, and the `RenderTaskVK` contract.
+  - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `RenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
-  - Low-level node/edge construction, descriptor building, execution, runtime resource binding, and terminal semaphore access.
+  - Descriptor building, internal dependency inference, execution, runtime resource binding, and terminal semaphore access.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
   - General compute dispatch task with compute-queue default and additional resource accesses.
 - `include/function/render_vk/rt_generate_mipmaps_vk.hh`
@@ -24,24 +24,22 @@
 
 ## Descriptor pattern
 
-Declare resources before graph registration. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type. Type matching is checked when runtime resources are bound.
+Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type. Type matching is checked when runtime resources are bound.
 
-A task descriptor factory commonly captures the render allocator, base render data, and descriptor sets:
+A pipeline-run task descriptor captures only construction data; the pipeline owns and binds its descriptor sets:
 
 ```cpp
 RendTaskDescVK task_desc(render_allocator);
-task_desc.task_id = RT_RUN_LIGHTING;
-task_desc.prev.emplace_back(RT_RUN_GBUFFER);
+task_desc.task_id = "run_lighting";
+task_desc.after("run_gbuffer")
+    .read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
+    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
 task_desc.create = [task_render_allocator = render_allocator,
-                       task_base_render_data = base_render_data,
-                       task_descriptor_sets = descriptor_sets]() -> Unique<RenderTaskVK> {
+                       task_base_render_data = base_render_data]() -> Unique<RenderTaskVK> {
     return make_unique<RTRunComputePipelineVK>(task_render_allocator,
         task_base_render_data,
-        REND_RES_LIGHTING_PIPELINE,
-        dispatch_group_count,
-        std::span<const Ref<RODescriptorSetVK>>(task_descriptor_sets.data(), task_descriptor_sets.size()),
-        read_accesses,
-        write_accesses);
+        "lighting_pipeline",
+        dispatch_group_count);
 };
 ```
 
@@ -56,9 +54,9 @@ Keep task creation logic in the application class when it has meaningful setup. 
 - ordering with no named resource dependency;
 - a required compute-to-presentation path.
 
-After topological sorting, inference tracks the most recent writer for each resource. A later read creates an edge from that writer to the reader. A later write replaces the tracked writer. Read-read accesses do not create edges.
+After topological sorting, inference tracks the most recent writer for each resource. A later read creates an execution edge from that writer to the reader. A later write replaces the tracked writer. Read-read accesses do not create edges. The compact usage is translated internally to semaphore stage scopes and image-transition access masks filtered to the producer or consumer queue family.
 
-Every inferred resource edge creates or reuses an execution edge whose timeline semaphore supplies execution ordering and memory visibility. Explicit `prev` dependencies use the same execution-edge mechanism. Image layout transitions remain explicit image barriers; queue ownership transfers are not encoded by inferred edges.
+Every inferred dependency creates or reuses an execution edge whose timeline semaphore supplies execution ordering and memory visibility. Explicit predecessor dependencies use the same execution-edge mechanism. Image layout transitions remain explicit image barriers; queue ownership transfers are not encoded by inferred dependencies.
 
 ## Queue behavior
 
@@ -76,7 +74,7 @@ Presentation integration assumes at least one graphics node:
 - the last graphics node transitions the swap-chain image to `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`;
 - terminal binary semaphore signaling and the in-flight fence attach to the last graphics submission.
 
-Ensure every compute node whose completion matters to presentation reaches the final graphics node through inferred resource edges or explicit `prev` dependencies. The fence represents the dependent work leading to that last graphics submission, not unrelated graph branches.
+Ensure every compute node whose completion matters to presentation reaches the final graphics node through inferred execution edges or explicit `prev` dependencies. The fence represents the dependent work leading to that last graphics submission, not unrelated graph branches.
 
 ## Runtime lifecycle
 
@@ -89,7 +87,7 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - Confirm every read ID appears in the graph resource declarations.
 - Confirm runtime-bound object UUIDs match their `RendResVK` declarations.
 - Confirm task IDs and `prev` references are valid and acyclic.
-- Confirm access and stage masks describe the actual Vulkan command.
+- Confirm each compact usage describes the actual command and that reads and writes are declared on the correct side.
 - Add explicit ordering for write-write hazards and dependencies without a later read.
 - Confirm compute outputs reach a graphics node before presentation.
 - Preserve concurrent sharing for resources crossing distinct queue families.

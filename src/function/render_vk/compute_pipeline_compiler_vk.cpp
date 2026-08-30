@@ -202,10 +202,8 @@ const RenderBindpointSamplerDeclaration* find_sampler_binding(
     return nullptr;
 }
 
-const RenderBindpointBufferDeclaration* find_uniform_binding(const RenderBindpointDeclarations& p_bindpoint_declarations,
-    std::string_view p_field_path,
-    uint32_t p_array_index,
-    bool p_has_array_index) {
+const RenderBindpointBufferDeclaration* find_uniform_binding(
+    const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path, uint32_t p_array_index, bool p_has_array_index) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
         IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
         if (indexed_path.field_path != p_field_path) {
@@ -238,8 +236,7 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(const RenderBindpoi
     return nullptr;
 }
 
-std::vector<uint8_t> build_uniform_data(
-    const ShaderDescriptorBindingVK& p_descriptor_binding,
+std::vector<uint8_t> build_uniform_data(const ShaderDescriptorBindingVK& p_descriptor_binding,
     const RenderBindpointDeclarations& p_bindpoint_declarations,
     uint32_t p_array_index,
     bool p_has_array_index) {
@@ -300,22 +297,18 @@ ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
         compile_descriptor_set_layouts(p_resource_key, descriptor_bindings);
     Ref<ROPipelineLayoutVK> pipeline_layout = compile_pipeline_layout(p_resource_key, descriptor_set_layouts);
     Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry, pipeline_layout);
-    return CompileResult{.compute_pipeline = compute_pipeline,
-        .descriptor_sets = compile_descriptor_sets(descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations),
-        .descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings)};
+    compute_pipeline->set_descriptor_sets(compile_descriptor_sets(descriptor_set_layouts, descriptor_bindings, p_bindpoint_declarations));
+    return CompileResult{
+        .compute_pipeline = compute_pipeline, .descriptor_set_bindings = build_descriptor_set_bindings(descriptor_bindings)};
 }
 
 Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
     std::string_view p_resource_key, Ref<ROShaderVK> p_compute_shader, std::string_view p_compute_entry, Ref<ROPipelineLayoutVK> p_pipeline_layout) {
-    Ref<ROComputePipelineVK> compute_pipeline = get_registered_render_object<ROComputePipelineVK>(
-        context.render_database, p_resource_key, TypeUUID<ROComputePipelineVK>::UUID);
-    if (compute_pipeline != MEM_NULL) {
-        return compute_pipeline;
-    }
-    compute_pipeline = ROComputePipelineVK::Builder()
-                           .set_shader_stage(p_compute_shader, p_compute_entry)
-                           .set_pipeline_layout(p_pipeline_layout)
-                           .create_ref(context.render_data);
+    // Descriptor sets are pipeline-owned, so each compile result needs an independent runtime pipeline object. Shared
+    // shaders and layouts are still cached by PipelineCompilerVK.
+    ROComputePipelineVK::Builder pipeline_builder;
+    pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry).set_pipeline_layout(p_pipeline_layout);
+    Ref<ROComputePipelineVK> compute_pipeline = pipeline_builder.create_ref(context.render_data);
     context.render_database->register_compiled_render_resource(
         p_resource_key, TypeUUID<ROComputePipelineVK>::UUID, RefWeak<IRenderObject>(compute_pipeline));
     return compute_pipeline;

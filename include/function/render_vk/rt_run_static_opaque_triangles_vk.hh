@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
 #define WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -23,6 +24,7 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include <cstddef>
 #include <cstdint>
@@ -36,7 +38,7 @@ namespace WhiteBirdEngine {
 
 class RendererVK;
 
-WBE_LABEL(RT_RUN_STATIC_OPAQUE_TRIANGLES_INDIRECT_VK, WBE_RENDER_TASK);
+inline constexpr std::string_view RT_RUN_STATIC_OPAQUE = "run_static_opaque";
 
 /**
  * @class RTRunStaticOpaqueTrianglesVK
@@ -324,6 +326,8 @@ public:
 
     /** @copydoc RenderTaskVK::queue_family */
     virtual QueueFamilyVK queue_family() const override;
+    /** @copydoc RenderTaskVK::validate_resources */
+    virtual void validate_resources(const RendResViewVK& p_resources) const override;
     /** @copydoc RenderTaskVK::read_resources */
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
     /** @copydoc RenderTaskVK::write_resources */
@@ -338,13 +342,13 @@ public:
     size_t get_compiled_batch_count() const;
 
     /**
-     * @brief Get a descriptor set retained by a compiled batch.
+     * @brief Write a descriptor set owned by a compiled batch pipeline.
      * @param p_batch_index Compiled batch index.
      * @param p_set_index Descriptor-set index.
-     * @return Retained descriptor set.
+     * @param p_writer Descriptor update preserving copy-on-write behavior.
      * @throws std::runtime_error When either index is out of bounds.
      */
-    Ref<RODescriptorSetVK> get_descriptor_set(size_t p_batch_index, size_t p_set_index) const;
+    void write_descriptor_set(size_t p_batch_index, size_t p_set_index, const RODescriptorSetVK::Writer& p_writer);
 
     /**
      * @brief Find a reflected descriptor binding by field path.
@@ -364,7 +368,7 @@ private:
         CompiledBatch& operator=(const CompiledBatch&) = default;
         CompiledBatch& operator=(CompiledBatch&&) noexcept = default;
 
-        std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
+        Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
         GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
     };
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task;

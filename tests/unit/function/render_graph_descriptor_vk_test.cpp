@@ -12,7 +12,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/heap_allocator_aligned_pool_impl_list.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
@@ -62,18 +61,34 @@ private:
 TEST(WBERenderGraphDescriptorVKTest, DescriptorCopiesShareOneDirectTaskTransfer) {
     RenderAllocator allocator(WBE_KI_B(64));
     bool destroyed = false;
-    RendTaskDescVK descriptor(&allocator, 17, make_unique<DirectDescriptorRenderTaskVK>(&allocator, &allocator, &destroyed));
+    RendTaskDescVK descriptor(&allocator, "direct_task", make_unique<DirectDescriptorRenderTaskVK>(&allocator, &allocator, &destroyed));
     const RendTaskDescVK& descriptor_copy = descriptor;
 
     Unique<RenderTaskVK> task = descriptor_copy.create();
 
     EXPECT_FALSE(task.is_null());
-    EXPECT_EQ(descriptor.task_id, 17U);
+    EXPECT_EQ(descriptor.task_id, "direct_task");
     EXPECT_THROW(descriptor.create(), std::runtime_error);
     EXPECT_THROW(descriptor_copy.create(), std::runtime_error);
     EXPECT_FALSE(destroyed);
     task.reset();
     EXPECT_TRUE(destroyed);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, FluentResourceDeclarationsUseStringsAndCompactUsages) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendTaskDescVK descriptor(&allocator);
+    descriptor.task_id = "run_lighting";
+    descriptor.after("run_gbuffer").read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE).write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
+
+    ASSERT_EQ(descriptor.prev.size(), 1U);
+    EXPECT_EQ(descriptor.prev.front(), "run_gbuffer");
+    ASSERT_EQ(descriptor.reads.size(), 1U);
+    EXPECT_EQ(descriptor.reads.front().res_id, "gbuffer_albedo");
+    EXPECT_EQ(descriptor.reads.front().usage, RendResUsageVK::SAMPLED_IMAGE);
+    ASSERT_EQ(descriptor.writes.size(), 1U);
+    EXPECT_EQ(descriptor.writes.front().res_id, "lighting_output");
+    EXPECT_EQ(descriptor.writes.front().usage, RendResUsageVK::STORAGE_IMAGE);
 }
 
 } // namespace WhiteBirdEngine
