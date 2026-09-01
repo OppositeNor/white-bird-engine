@@ -127,6 +127,8 @@ public:
     ROImageVK& operator=(const ROImageVK&) = delete;
     ROImageVK& operator=(ROImageVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

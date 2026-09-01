@@ -14,6 +14,7 @@
 */
 
 #include "function/render_vk/ro_shader_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -29,6 +30,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROShaderVK::get_type_uuid() const {
+    return TypeUUID<ROShaderVK>::UUID;
+}
 
 ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::span<const uint32_t> p_code) {
     code = std::vector<uint32_t>(p_code.begin(), p_code.end());

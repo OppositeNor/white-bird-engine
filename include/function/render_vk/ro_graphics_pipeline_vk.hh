@@ -751,6 +751,8 @@ public:
     ROGraphicsPipelineVK& operator=(const ROGraphicsPipelineVK&) = delete;
     ROGraphicsPipelineVK& operator=(ROGraphicsPipelineVK&&) = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

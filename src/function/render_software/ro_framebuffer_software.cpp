@@ -16,8 +16,13 @@
 #include "function/render_software/ro_framebuffer_software.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_software/ro_image_software.hh"
+#include "generated/type_uuid.gen.hh"
 
 namespace WhiteBirdEngine {
+
+TypeID ROFramebufferSoftware::get_type_uuid() const {
+    return TypeUUID<ROFramebufferSoftware>::UUID;
+}
 
 ROFramebufferSoftware::ROFramebufferSoftware(Ref<ROImageSoftware> p_image) : image(p_image) {
 }

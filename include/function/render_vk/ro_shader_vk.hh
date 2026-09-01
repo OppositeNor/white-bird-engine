@@ -74,6 +74,8 @@ public:
     ROShaderVK& operator=(const ROShaderVK&) = delete;
     ROShaderVK& operator=(ROShaderVK&&) = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

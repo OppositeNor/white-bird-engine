@@ -160,9 +160,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
         .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = TypeUUID<ROImageViewVK>::UUID,
         .container = MEM_NULL});
-    graph_desc.resources.emplace_back(RendResVK{.res_id = std::string(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW),
-        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-        .container = make_ref<ROCSingleVK>(render_allocator, TypeUUID<ROImageViewVK>::UUID, depth_view)});
+    graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view);
     graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE, std::move(task));
     renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
     renderer_vk->activate_render_graph("draw_sponza_indirect_graph");

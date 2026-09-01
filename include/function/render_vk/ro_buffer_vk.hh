@@ -314,6 +314,8 @@ public:
     ROBufferVK& operator=(const ROBufferVK&) = delete;
     ROBufferVK& operator=(ROBufferVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Get the buffer instance.
      *

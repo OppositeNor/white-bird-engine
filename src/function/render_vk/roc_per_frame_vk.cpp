@@ -51,13 +51,13 @@ static Vector<uint64_t, RenderAllocator> create_applied_generations(const BaseRe
     return result;
 }
 
-ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, RendResTID p_resource_type_id)
-    : RenderObjectContainerVK(p_resource_type_id), render_data(p_render_data), resources(create_frame_resources(p_render_data)),
+ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data)
+    : render_data(p_render_data), resources(create_frame_resources(p_render_data)),
       applied_generations(create_applied_generations(p_render_data)), pending_buffer_data(p_render_data->allocator) {
 }
 
-ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, RendResTID p_resource_type_id, Factory p_factory)
-    : RenderObjectContainerVK(p_resource_type_id), render_data(p_render_data), resources(create_frame_resources(p_render_data)),
+ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory)
+    : render_data(p_render_data), resources(create_frame_resources(p_render_data)),
       applied_generations(create_applied_generations(p_render_data)), pending_buffer_data(p_render_data->allocator) {
     if (!p_factory) {
         throw std::runtime_error("ROCPerFrameVK: resource factory is empty.");
@@ -68,6 +68,7 @@ ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, RendResTID p
         if (resource_ref == MEM_NULL) {
             throw std::runtime_error(std::format("ROCPerFrameVK: resource factory returned null for frame slot {}.", frame_slot));
         }
+        retain_resource_type(resource_ref);
         resources[frame_slot] = std::move(resource_ref);
     }
 }
@@ -103,6 +104,7 @@ void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));
     }
+    retain_resource_type(p_resource);
     resources[p_frame_slot] = std::move(p_resource);
     applied_generations[p_frame_slot] = 0;
 }

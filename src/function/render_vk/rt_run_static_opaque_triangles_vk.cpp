@@ -706,8 +706,7 @@ StaticOpaqueCompiledPipelineBatchVK compile_pipeline_batch(const RenderDatabase:
         p_compiler_context.stencil_attachment_format);
     result.compiled = GraphicsPipelineCompilerVK(p_compiler_context)
                           .compile(result.resource_key, p_draw_batch.graphics_pipeline, material_data.bindpoints);
-    p_compiler_context.render_database->register_compiled_render_resource(
-        result.resource_key, TypeUUID<ROGraphicsPipelineVK>::UUID, RefWeak<IRenderObject>(result.compiled.graphics_pipeline));
+    p_compiler_context.render_database->register_compiled_render_resource(result.resource_key, result.compiled.graphics_pipeline);
     result.first_draw = p_draw_batch.first_draw;
     result.draw_count = p_draw_batch.draw_count;
     return result;

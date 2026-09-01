@@ -26,10 +26,12 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <memory>
+#include <type_traits>
 
 namespace WBE = WhiteBirdEngine;
 
 constexpr size_t APT_HEADER_SIZE = WBE::HeapAllocatorPool::HEADER_SIZE;
+static_assert(std::is_same_v<WBE::HeapAllocatorPool::Header, uint64_t>);
 
 TEST(WBEAllocPoolTest, TraitTest) {
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));

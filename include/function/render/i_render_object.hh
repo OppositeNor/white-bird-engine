@@ -15,7 +15,8 @@
 #ifndef WBE_FILE_I_RENDER_OBJECT_HH
 #define WBE_FILE_I_RENDER_OBJECT_HH
 
-#include "utils/defs.hh"
+#include "utils/utils.hh"
+
 namespace WhiteBirdEngine {
 
 /**
@@ -31,6 +32,12 @@ public:
     IRenderObject(IRenderObject&&) noexcept = delete;
     IRenderObject& operator=(const IRenderObject&) = delete;
     IRenderObject& operator=(IRenderObject&&) noexcept = delete;
+
+    /**
+     * @brief Get the concrete render-object type UUID.
+     * @return The generated UUID of the concrete render-object type.
+     */
+    virtual TypeID get_type_uuid() const = 0;
 };
 
 } // namespace WhiteBirdEngine

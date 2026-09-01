@@ -309,8 +309,7 @@ Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
     ROComputePipelineVK::Builder pipeline_builder;
     pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry).set_pipeline_layout(p_pipeline_layout);
     Ref<ROComputePipelineVK> compute_pipeline = pipeline_builder.create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(
-        p_resource_key, TypeUUID<ROComputePipelineVK>::UUID, RefWeak<IRenderObject>(compute_pipeline));
+    context.render_database->register_compiled_render_resource(p_resource_key, compute_pipeline);
     return compute_pipeline;
 }
 

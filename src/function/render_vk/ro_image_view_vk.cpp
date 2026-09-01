@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -24,6 +25,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROImageViewVK::get_type_uuid() const {
+    return TypeUUID<ROImageViewVK>::UUID;
+}
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
     image = p_image;

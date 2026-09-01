@@ -35,7 +35,7 @@ public:
     ROCSingleVK& operator=(const ROCSingleVK&) = delete;
     ROCSingleVK& operator=(ROCSingleVK&&) noexcept = delete;
 
-    ROCSingleVK(RendResTID p_resource_type_id, Ref<RenderObjectVK> p_resource);
+    explicit ROCSingleVK(Ref<RenderObjectVK> p_resource);
 
     Ref<RenderObjectVK> get() override;
     Ref<RenderObjectVK> get() const override;

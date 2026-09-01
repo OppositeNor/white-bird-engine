@@ -68,6 +68,8 @@ public:
     ROPipelineLayoutVK& operator=(const ROPipelineLayoutVK&) = delete;
     ROPipelineLayoutVK& operator=(ROPipelineLayoutVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

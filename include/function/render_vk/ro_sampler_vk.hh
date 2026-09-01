@@ -203,6 +203,8 @@ public:
     ROSamplerVK& operator=(const ROSamplerVK&) = delete;
     ROSamplerVK& operator=(ROSamplerVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

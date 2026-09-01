@@ -28,15 +28,11 @@ namespace WhiteBirdEngine {
  */
 class RenderObjectContainerVK {
 public:
-    RenderObjectContainerVK() = delete;
     virtual ~RenderObjectContainerVK() = default;
     RenderObjectContainerVK(const RenderObjectContainerVK&) = delete;
     RenderObjectContainerVK(RenderObjectContainerVK&&) noexcept = delete;
     RenderObjectContainerVK& operator=(const RenderObjectContainerVK&) = delete;
     RenderObjectContainerVK& operator=(RenderObjectContainerVK&&) noexcept = delete;
-
-    explicit RenderObjectContainerVK(RendResTID p_resource_type_id) : resource_type_id(p_resource_type_id) {
-    }
 
     virtual Ref<RenderObjectVK> get() = 0;
     virtual Ref<RenderObjectVK> get() const = 0;
@@ -58,6 +54,10 @@ public:
     RendResTID get_resource_type_id() const;
 
 protected:
+    RenderObjectContainerVK() = default;
+
+    void retain_resource_type(Ref<RenderObjectVK> p_resource);
+
     RendResTID resource_type_id = 0;
 };
 

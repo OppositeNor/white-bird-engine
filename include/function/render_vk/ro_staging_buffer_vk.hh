@@ -18,6 +18,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -29,7 +30,7 @@
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-class ROStagingBufferVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROStagingBufferVK final : public RenderObjectVK {
     friend class ROBufferVK;
 
 public:
@@ -137,6 +138,8 @@ public:
     ROStagingBufferVK(ROStagingBufferVK&&) noexcept = delete;
     ROStagingBufferVK& operator=(const ROStagingBufferVK&) = delete;
     ROStagingBufferVK& operator=(ROStagingBufferVK&&) noexcept = delete;
+
+    TypeID get_type_uuid() const override;
 
     /**
      * @brief Get the exposed fields.

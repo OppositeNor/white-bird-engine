@@ -380,23 +380,10 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph() {
 }
 
 void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE),
-        .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator,
-            WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-            shadow_graphics_pipeline)});
-    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container =
-            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_color_view)});
-    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container =
-            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_depth_view)});
-    p_pipeline_desc.resources.push_back({.res_id = std::string(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE),
-        .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-        .container =
-            WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID, main_graphics_pipeline)});
+    p_pipeline_desc.add_resource(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE, shadow_graphics_pipeline)
+        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE, main_graphics_pipeline);
 }
 
 std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCubeTest::build_vertex_input_data(

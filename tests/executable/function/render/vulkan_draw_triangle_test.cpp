@@ -116,11 +116,7 @@ public:
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
         const VkDeviceSize vertex_buffer_offset = triangles_info.draw_groups[0].vertex_buffer_byte_offset;
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE),
-            .res_type_id = WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-            .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator,
-                WBE::TypeUUID<WBE::ROGraphicsPipelineVK>::UUID,
-                graphics_pipeline)});
+        pipeline_desc.add_resource(WBE::REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, graphics_pipeline);
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = WBE::RT_RUN_PIPELINE;
         task_desc.create = [render_allocator, base_render_data, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {

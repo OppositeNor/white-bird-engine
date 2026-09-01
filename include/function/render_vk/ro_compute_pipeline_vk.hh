@@ -106,6 +106,8 @@ public:
     ROComputePipelineVK& operator=(const ROComputePipelineVK&) = delete;
     ROComputePipelineVK& operator=(ROComputePipelineVK&&) = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Construct a compute pipeline render object.
      *

@@ -264,6 +264,8 @@ public:
     ROImageViewVK& operator=(const ROImageViewVK&) = delete;
     ROImageViewVK& operator=(ROImageViewVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

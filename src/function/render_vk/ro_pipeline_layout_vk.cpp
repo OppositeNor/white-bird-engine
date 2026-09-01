@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -22,6 +23,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROPipelineLayoutVK::get_type_uuid() const {
+    return TypeUUID<ROPipelineLayoutVK>::UUID;
+}
 
 ROPipelineLayoutVK::Builder& ROPipelineLayoutVK::Builder::set_descriptor_set_layouts(
     const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts) {

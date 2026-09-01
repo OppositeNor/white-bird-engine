@@ -39,6 +39,8 @@ public:
     TestContextResourceVK& operator=(const TestContextResourceVK&) = delete;
     TestContextResourceVK& operator=(TestContextResourceVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     uint32_t context_id;
 };
 
@@ -48,13 +50,17 @@ struct TypeUUID<TestContextResourceVK> {
     static constexpr TypeID UUID = static_hash("TestContextResourceVK");
 };
 
+TypeID TestContextResourceVK::get_type_uuid() const {
+    return TypeUUID<TestContextResourceVK>::UUID;
+}
+
 TEST(WBEROCPerFrameVKTest, CreatesOneResourcePerFrameAndUsesCurrentFrameSlot) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 3;
     render_data.current_frame_slot = 1;
 
-    ROCPerFrameVK context(&render_data, TypeUUID<TestContextResourceVK>::UUID, [&render_data, &allocator](uint32_t p_context_id) {
+    ROCPerFrameVK context(&render_data, [&render_data, &allocator](uint32_t p_context_id) {
         return make_ref<TestContextResourceVK>(&allocator, &render_data, p_context_id).template dynamic_cast_ref<RenderObjectVK>();
     });
 
@@ -63,6 +69,7 @@ TEST(WBEROCPerFrameVKTest, CreatesOneResourcePerFrameAndUsesCurrentFrameSlot) {
 
     auto current_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
     ASSERT_NE(current_resource, MEM_NULL);
+    EXPECT_EQ(current_resource->get_type_uuid(), TypeUUID<TestContextResourceVK>::UUID);
     EXPECT_EQ(current_resource->context_id, 1U);
 
     auto explicit_resource = context.get(2).dynamic_cast_ref<TestContextResourceVK>();
@@ -75,8 +82,8 @@ TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
 
-    EXPECT_THROW(ROCPerFrameVK(&render_data, TypeUUID<TestContextResourceVK>::UUID, {}), std::runtime_error);
-    EXPECT_THROW(ROCPerFrameVK(&render_data, TypeUUID<TestContextResourceVK>::UUID, [](uint32_t /*p_context_id*/) { return Ref<RenderObjectVK>(MEM_NULL); }),
+    EXPECT_THROW(ROCPerFrameVK(&render_data, {}), std::runtime_error);
+    EXPECT_THROW(ROCPerFrameVK(&render_data, [](uint32_t /*p_context_id*/) { return Ref<RenderObjectVK>(MEM_NULL); }),
         std::runtime_error);
 }
 
@@ -86,7 +93,7 @@ TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
     render_data.frames_in_flight = 3;
     render_data.current_frame_slot = 2;
 
-    ROCPerFrameVK context(&render_data, TypeUUID<TestContextResourceVK>::UUID);
+    ROCPerFrameVK context(&render_data);
     auto frame_zero_resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<RenderObjectVK>();
     auto frame_two_resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<RenderObjectVK>();
 
@@ -108,7 +115,7 @@ TEST(WBEROCPerFrameVKTest, RejectsEmptyPublishedBufferUpdate) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
-    ROCPerFrameVK context(&render_data, TypeUUID<TestContextResourceVK>::UUID);
+    ROCPerFrameVK context(&render_data);
 
     EXPECT_THROW(context.publish_buffer_update(nullptr, 0, 1), std::runtime_error);
     uint8_t value = 0;
@@ -120,7 +127,7 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     BaseRenderDataVK render_data(&allocator);
 
     auto resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 7).template dynamic_cast_ref<RenderObjectVK>();
-    ROCSingleVK container(TypeUUID<TestContextResourceVK>::UUID, resource);
+    ROCSingleVK container(resource);
 
     EXPECT_EQ(container.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
 

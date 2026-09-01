@@ -94,6 +94,8 @@ public:
     RODescriptorSetLayoutVK& operator=(const RODescriptorSetLayoutVK&) = delete;
     RODescriptorSetLayoutVK& operator=(RODescriptorSetLayoutVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

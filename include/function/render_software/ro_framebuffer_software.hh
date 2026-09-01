@@ -12,8 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#ifndef WBE_FILE_RO_FRAMEBUFFER_SOFTWARE_HH
+#define WBE_FILE_RO_FRAMEBUFFER_SOFTWARE_HH
+
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render_software/ro_image_software.hh"
 
@@ -22,7 +26,7 @@ namespace WhiteBirdEngine {
  * @class ROFramebufferSoftware
  * @brief Framebuffer.
  */
-class ROFramebufferSoftware final : public IRenderObject {
+class WBE_META(WBE_RENDER_OBJECT) ROFramebufferSoftware final : public IRenderObject {
 public:
     ROFramebufferSoftware() = delete;
     virtual ~ROFramebufferSoftware() override = default;
@@ -31,6 +35,8 @@ public:
     ROFramebufferSoftware& operator=(const ROFramebufferSoftware&) = delete;
     ROFramebufferSoftware& operator=(ROFramebufferSoftware&&) = delete;
 
+    TypeID get_type_uuid() const override;
+
     ROFramebufferSoftware(Ref<ROImageSoftware> p_image);
 
     // TODO
@@ -38,3 +44,5 @@ private:
     Ref<ROImageSoftware> image = MEM_NULL;
 };
 } // namespace WhiteBirdEngine
+
+#endif

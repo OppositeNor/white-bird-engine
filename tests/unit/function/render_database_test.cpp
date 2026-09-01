@@ -35,6 +35,22 @@
 
 namespace WhiteBirdEngine {
 
+class RenderDatabaseTestRenderObject final : public IRenderObject {
+public:
+    RenderDatabaseTestRenderObject() = default;
+    ~RenderDatabaseTestRenderObject() override = default;
+    RenderDatabaseTestRenderObject(const RenderDatabaseTestRenderObject&) = delete;
+    RenderDatabaseTestRenderObject(RenderDatabaseTestRenderObject&&) noexcept = delete;
+    RenderDatabaseTestRenderObject& operator=(const RenderDatabaseTestRenderObject&) = delete;
+    RenderDatabaseTestRenderObject& operator=(RenderDatabaseTestRenderObject&&) noexcept = delete;
+
+    TypeID get_type_uuid() const override;
+};
+
+TypeID RenderDatabaseTestRenderObject::get_type_uuid() const {
+    return static_hash("RenderDatabaseTestRenderObject");
+}
+
 class RenderDatabaseTestResourceStorage {
 public:
     RenderDatabaseTestResourceStorage() = default;
@@ -139,6 +155,15 @@ protected:
     RenderDatabaseTestResourceStorage resource_storage;
     RenderDatabase render_database{&render_allocator};
 };
+
+TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObjectType) {
+    Ref<RenderDatabaseTestRenderObject> render_object = make_ref<RenderDatabaseTestRenderObject>(&render_allocator);
+
+    render_database.register_compiled_render_resource("test_resource", render_object);
+
+    EXPECT_TRUE(render_database.contains_compiled_render_resource("test_resource", render_object->get_type_uuid()));
+    EXPECT_EQ(render_database.get_compiled_render_resource("test_resource", render_object->get_type_uuid()), render_object);
+}
 
 TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     RefRes<RUGraphicsPipeline> pipeline_a = make_pipeline(resource_storage, "pipeline_a");

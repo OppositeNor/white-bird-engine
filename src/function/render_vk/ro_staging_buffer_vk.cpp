@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -29,6 +30,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROStagingBufferVK::get_type_uuid() const {
+    return TypeUUID<ROStagingBufferVK>::UUID;
+}
 
 ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : RenderObjectVK(p_render_data) {

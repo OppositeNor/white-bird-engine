@@ -86,28 +86,37 @@ RendGraphDescVK& RendGraphDescVK::add_task(std::string_view p_task_id, Unique<Re
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
+    if (p_resource.container != MEM_NULL) {
+        RendResTID concrete_type_id = p_resource.container->get_resource_type_id();
+        if (concrete_type_id == 0) {
+            throw std::runtime_error("Failed to add render graph resource: container has no concrete resource type.");
+        }
+        if (p_resource.res_type_id != 0 && p_resource.res_type_id != concrete_type_id) {
+            throw std::runtime_error("Failed to add render graph resource: container type does not match the declared type.");
+        }
+        p_resource.res_type_id = concrete_type_id;
+    }
     resources.emplace_back(std::move(p_resource));
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_resource(
-    std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectVK> p_resource) {
-    return add_resource(
-        p_resource_id, p_resource_type_id, make_ref<ROCSingleVK>(allocator, p_resource_type_id, std::move(p_resource)));
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectVK> p_resource) {
+    if (p_resource == MEM_NULL) {
+        throw std::runtime_error("Failed to add render graph resource: render object is null.");
+    }
+    return add_resource(p_resource_id, make_ref<ROCSingleVK>(allocator, std::move(p_resource)));
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id,
-    RendResTID p_resource_type_id,
     Ref<RenderObjectContainerVK> p_resource_container) {
-    if (p_resource_container != MEM_NULL && p_resource_container->get_resource_type_id() != p_resource_type_id) {
-        throw std::runtime_error("Failed to add render graph resource: container type does not match the declared type.");
+    if (p_resource_container == MEM_NULL) {
+        throw std::runtime_error("Failed to add render graph resource: resource container is null.");
     }
-    resources.emplace_back(RendResVK{
+    return add_resource(RendResVK{
         .res_id = std::string(p_resource_id),
-        .res_type_id = p_resource_type_id,
+        .res_type_id = p_resource_container->get_resource_type_id(),
         .container = std::move(p_resource_container),
     });
-    return *this;
 }
 
 } // namespace WhiteBirdEngine

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include <format>
 #include <stdexcept>
@@ -20,6 +21,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROAccelerationStructureVK::get_type_uuid() const {
+    return TypeUUID<ROAccelerationStructureVK>::UUID;
+}
 
 ROAccelerationStructureVK::ROAccelerationStructureVK(
     const BaseRenderDataVK* p_render_data, VkDeviceSize p_size, VkAccelerationStructureTypeKHR p_type)

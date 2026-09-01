@@ -13,12 +13,17 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROSamplerVK::get_type_uuid() const {
+    return TypeUUID<ROSamplerVK>::UUID;
+}
 
 ROSamplerVK::Builder& ROSamplerVK::Builder::set_filter(VkFilter p_min_filter, VkFilter p_mag_filter) {
     min_filter = p_min_filter;

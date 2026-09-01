@@ -123,22 +123,20 @@ struct RendGraphDescVK {
     RendGraphDescVK& add_resource(RendResVK p_resource);
 
     /**
-     * @brief Append a resource binding by id, type, and concrete render object.
+     * @brief Append a resource binding by id and concrete render object.
      * @param p_resource_id Graph resource identifier.
-     * @param p_resource_type_id Runtime type id of the resource.
      * @param p_resource The concrete render object bound to the id.
      * @return This graph descriptor.
      */
-    RendGraphDescVK& add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectVK> p_resource);
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectVK> p_resource);
 
     /**
-     * @brief Append a resource binding by id, type, and container.
+     * @brief Append a resource binding by id and container.
      * @param p_resource_id Graph resource identifier.
-     * @param p_resource_type_id Runtime type id of the resource.
      * @param p_resource_container The resource container bound to the id.
      * @return This graph descriptor.
      */
-    RendGraphDescVK& add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectContainerVK> p_resource_container);
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container);
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-

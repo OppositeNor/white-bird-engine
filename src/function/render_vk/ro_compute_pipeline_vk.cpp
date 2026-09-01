@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -22,6 +23,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROComputePipelineVK::get_type_uuid() const {
+    return TypeUUID<ROComputePipelineVK>::UUID;
+}
 
 ROComputePipelineVK::~ROComputePipelineVK() = default;
 

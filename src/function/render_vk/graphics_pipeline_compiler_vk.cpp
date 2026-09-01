@@ -511,8 +511,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     pipeline_builder.config.depth_test.set_depth_write(p_pipeline_resource.depth_write ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.rasterization.set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE);
     Ref<ROGraphicsPipelineVK> graphics_pipeline = pipeline_builder.create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(
-        p_resource_key, TypeUUID<ROGraphicsPipelineVK>::UUID, RefWeak<IRenderObject>(graphics_pipeline));
+    context.render_database->register_compiled_render_resource(p_resource_key, graphics_pipeline);
     return graphics_pipeline;
 }
 
@@ -629,8 +628,7 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(std::string_vi
             .set_subresource_range(VkImageSubresourceRange{
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
             .create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(
-        formatted_resource_key, TypeUUID<ROImageViewVK>::UUID, RefWeak<IRenderObject>(image_view));
+    context.render_database->register_compiled_render_resource(formatted_resource_key, image_view);
     return image_view;
 }
 
@@ -648,7 +646,7 @@ Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
                 .set_extent(VkExtent3D{.width = p_image_resource->width, .height = p_image_resource->height, .depth = 1})
                 .set_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                 .create_ref(context.render_data);
-    context.render_database->register_compiled_render_resource(p_resource_key, TypeUUID<ROImageVK>::UUID, RefWeak<IRenderObject>(image));
+    context.render_database->register_compiled_render_resource(p_resource_key, image);
 
     auto upload_data = build_image_upload_data(*p_image_resource);
     auto upload_buffer = ROBufferVK::Builder()

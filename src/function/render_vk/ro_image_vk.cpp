@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
@@ -35,6 +36,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROImageVK::get_type_uuid() const {
+    return TypeUUID<ROImageVK>::UUID;
+}
 
 ROImageVK::Builder& ROImageVK::Builder::set_image_type(VkImageType p_image_type) {
     image_type = p_image_type;

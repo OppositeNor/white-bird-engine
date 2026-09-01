@@ -51,8 +51,7 @@ Ref<ROShaderVK> PipelineCompilerVK::compile_shader(RefRes<RUShader> p_shader) {
         return registered_shader;
     }
     auto shader = ROShaderVK::Builder().set_code(p_shader).create_ref(base_context.render_data);
-    base_context.render_database->register_compiled_render_resource(
-        shader_key, TypeUUID<ROShaderVK>::UUID, RefWeak<IRenderObject>(shader));
+    base_context.render_database->register_compiled_render_resource(shader_key, shader);
     return shader;
 }
 
@@ -75,8 +74,7 @@ std::vector<Ref<RODescriptorSetLayoutVK>> PipelineCompilerVK::compile_descriptor
                     descriptor_set_layout_binding.binding_flags[binding_index]);
             }
             descriptor_set_layout = builder.create_ref(base_context.render_data);
-            base_context.render_database->register_compiled_render_resource(
-                descriptor_set_layout_key, TypeUUID<RODescriptorSetLayoutVK>::UUID, RefWeak<IRenderObject>(descriptor_set_layout));
+            base_context.render_database->register_compiled_render_resource(descriptor_set_layout_key, descriptor_set_layout);
         }
         result.push_back(descriptor_set_layout);
     }
@@ -96,8 +94,7 @@ Ref<ROPipelineLayoutVK> PipelineCompilerVK::compile_pipeline_layout(
         builder.add_descriptor_set_layout(descriptor_set_layout);
     }
     pipeline_layout = builder.create_ref(base_context.render_data);
-    base_context.render_database->register_compiled_render_resource(
-        pipeline_layout_key, TypeUUID<ROPipelineLayoutVK>::UUID, RefWeak<IRenderObject>(pipeline_layout));
+    base_context.render_database->register_compiled_render_resource(pipeline_layout_key, pipeline_layout);
     return pipeline_layout;
 }
 

@@ -14,6 +14,7 @@
 */
 
 #include "function/render_vk/ro_buffer_view_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -22,6 +23,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROBufferViewVK::get_type_uuid() const {
+    return TypeUUID<ROBufferViewVK>::UUID;
+}
 
 VkBufferView ROBufferViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkBufferViewCreateInfo create_info{};

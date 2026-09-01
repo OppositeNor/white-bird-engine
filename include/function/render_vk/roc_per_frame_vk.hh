@@ -41,8 +41,8 @@ public:
     ROCPerFrameVK& operator=(const ROCPerFrameVK&) = delete;
     ROCPerFrameVK& operator=(ROCPerFrameVK&&) noexcept = delete;
 
-    ROCPerFrameVK(const BaseRenderDataVK* p_render_data, RendResTID p_resource_type_id);
-    ROCPerFrameVK(const BaseRenderDataVK* p_render_data, RendResTID p_resource_type_id, Factory p_factory);
+    explicit ROCPerFrameVK(const BaseRenderDataVK* p_render_data);
+    ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory);
 
     Ref<RenderObjectVK> get() override;
     Ref<RenderObjectVK> get() const override;

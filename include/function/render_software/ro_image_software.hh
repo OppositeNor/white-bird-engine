@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_IMAGE_SOFTWARE
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "glm/ext/vector_float4.hpp"
@@ -30,7 +31,7 @@ namespace WhiteBirdEngine {
  * @class
  * @brief Image
  */
-class ROImageSoftware : public IRenderObject {
+class WBE_META(WBE_RENDER_OBJECT) ROImageSoftware : public IRenderObject {
 public:
     ROImageSoftware() = delete;
     virtual ~ROImageSoftware() override = default;
@@ -38,6 +39,8 @@ public:
     ROImageSoftware(ROImageSoftware&&) = delete;
     ROImageSoftware& operator=(const ROImageSoftware&) = delete;
     ROImageSoftware& operator=(ROImageSoftware&&) = delete;
+
+    TypeID get_type_uuid() const override;
 
     enum class Format {
         R8G8B8A8_UNORM,

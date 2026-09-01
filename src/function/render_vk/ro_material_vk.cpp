@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_material_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -32,6 +33,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROMaterialVK::get_type_uuid() const {
+    return TypeUUID<ROMaterialVK>::UUID;
+}
 namespace {
 
 ROMaterialVK::TextureBinding find_texture_binding(const std::vector<ROMaterialVK::TextureBinding>& p_texture_bindings,

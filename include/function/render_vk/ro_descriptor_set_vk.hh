@@ -329,6 +329,8 @@ public:
     RODescriptorSetVK& operator=(const RODescriptorSetVK&) = delete;
     RODescriptorSetVK& operator=(RODescriptorSetVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

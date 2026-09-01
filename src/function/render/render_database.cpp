@@ -278,17 +278,17 @@ RenderDatabase::RenderDatabase(AllocType* p_allocator)
     allocator = p_allocator;
 }
 
-void RenderDatabase::register_compiled_render_resource(
-    std::string_view p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object) {
+void RenderDatabase::register_compiled_render_resource(std::string_view p_resource_key, Ref<IRenderObject> p_render_object) {
     if (p_resource_key.empty()) {
         throw std::runtime_error("Failed to register compiled render resource: resource key is empty.");
     }
-    if (p_render_object.is_null()) {
+    if (p_render_object == MEM_NULL) {
         throw std::runtime_error("Failed to register compiled render resource: render object is null.");
     }
     compiled_render_resources.insert_or_assign(
-        CompiledRenderResourceKey{.resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object_type_id},
-        p_render_object);
+        CompiledRenderResourceKey{
+            .resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object->get_type_uuid()},
+        RefWeak<IRenderObject>(p_render_object));
 }
 
 Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id) {

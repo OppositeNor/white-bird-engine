@@ -29,8 +29,6 @@ namespace WhiteBirdEngine {
 struct RenderGraphResourceBinding {
     /** @brief Resource id used by the render graph descriptor; valid for the duration of the update call. */
     std::string_view resource_id;
-    /** @brief Runtime type id of the bound resource. */
-    RendResTID resource_type_id = 0;
     /** @brief Strong reference to the backend-neutral resource override. */
     Ref<IRenderObject> resource;
 };

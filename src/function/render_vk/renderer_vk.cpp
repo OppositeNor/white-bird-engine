@@ -177,7 +177,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     base_render_data.current_swap_chain_index = image_index;
     p_graph->set_resource(
         REND_RES_SWAP_CHAIN_IMAGE,
-        make_ref<ROCSingleVK>(allocator, TypeUUID<ROImageViewVK>::UUID, render_objects->swap_chain_image_views[image_index]));
+        make_ref<ROCSingleVK>(allocator, render_objects->swap_chain_image_views[image_index]));
     set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
@@ -1270,7 +1270,7 @@ void RendererVK::update_render_graph_resources(
         }
         graph_entry->second.graph->set_transient_resource(
             p_bindings[i].resource_id,
-            make_ref<ROCSingleVK>(allocator, p_bindings[i].resource_type_id, std::move(resource)));
+            make_ref<ROCSingleVK>(allocator, std::move(resource)));
     }
 }
 
@@ -1284,17 +1284,17 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
     if (render_objects->static_opaque_vertices != MEM_NULL) {
         p_graph->set_resource(
             REND_RES_STATIC_VERTICES,
-            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_vertices));
+            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_vertices));
     }
     if (render_objects->static_opaque_indices != MEM_NULL) {
         p_graph->set_resource(
             REND_RES_STATIC_INDICES,
-            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_indices));
+            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_indices));
     }
     if (render_objects->static_opaque_obj_ids != MEM_NULL) {
         p_graph->set_resource(
             REND_RES_STATIC_OBJECT_IDS,
-            make_ref<ROCSingleVK>(allocator, TypeUUID<ROBufferVK>::UUID, render_objects->static_opaque_obj_ids));
+            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_obj_ids));
     }
 }
 

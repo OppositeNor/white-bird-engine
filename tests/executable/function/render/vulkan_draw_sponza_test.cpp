@@ -444,15 +444,9 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .container = WBE::MEM_NULL});
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, main_depth_view)});
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_color_view)});
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container = WBE::make_ref<WBE::ROCSingleVK>(render_allocator, WBE::TypeUUID<WBE::ROImageViewVK>::UUID, shadow_depth_view)});
+    pipeline_desc.add_resource(WBE::REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
+        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
     pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
     WBE::RendTaskDescVK main_task_desc(render_allocator, WBE::RT_RUN_STATIC_OPAQUE, std::move(p_main_task));
     main_task_desc.after(WBE::RT_RUN_PIPELINE_SHADOWMAP);

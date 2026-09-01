@@ -13,11 +13,26 @@
    limitations under the License.
 */
 #include "function/render_vk/render_object_container_vk.hh"
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
 RendResTID RenderObjectContainerVK::get_resource_type_id() const {
     return resource_type_id;
+}
+
+void RenderObjectContainerVK::retain_resource_type(Ref<RenderObjectVK> p_resource) {
+    if (p_resource == MEM_NULL) {
+        return;
+    }
+    RendResTID concrete_type_id = p_resource->get_type_uuid();
+    if (resource_type_id == 0) {
+        resource_type_id = concrete_type_id;
+        return;
+    }
+    if (resource_type_id != concrete_type_id) {
+        throw std::runtime_error("Render object container resources must have the same concrete type.");
+    }
 }
 
 } // namespace WhiteBirdEngine

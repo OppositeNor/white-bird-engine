@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <algorithm>
@@ -24,6 +25,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID RODescriptorSetLayoutVK::get_type_uuid() const {
+    return TypeUUID<RODescriptorSetLayoutVK>::UUID;
+}
 
 RODescriptorSetLayoutVK::Builder& RODescriptorSetLayoutVK::Builder::set_bindings(const std::span<VkDescriptorSetLayoutBinding>& p_bindings) {
     bindings = std::vector<VkDescriptorSetLayoutBinding>(p_bindings.begin(), p_bindings.end());

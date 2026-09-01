@@ -270,11 +270,9 @@ public:
      * @brief Register or replace a compiled render object for a resource key.
      *
      * @param p_resource_key The source resource key or a derived compiler key.
-     * @param p_render_object_type_id The expected render object type id.
-     * @param p_render_object The compiled render object to keep weakly.
+     * @param p_render_object The compiled render object whose concrete type identifies the registry entry.
      */
-    void register_compiled_render_resource(
-        std::string_view p_resource_key, HashCode p_render_object_type_id, RefWeak<IRenderObject> p_render_object);
+    void register_compiled_render_resource(std::string_view p_resource_key, Ref<IRenderObject> p_render_object);
 
     /**
      * @brief Get a compiled render object by resource key and object type.

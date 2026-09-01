@@ -167,6 +167,8 @@ public:
     ROMaterialVK& operator=(const ROMaterialVK&) = delete;
     ROMaterialVK& operator=(ROMaterialVK&&) noexcept = delete;
 
+    TypeID get_type_uuid() const override;
+
     /**
      * @brief Constructor.
      *

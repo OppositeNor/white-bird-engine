@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
@@ -29,6 +30,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROBufferVK::get_type_uuid() const {
+    return TypeUUID<ROBufferVK>::UUID;
+}
 
 static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_domain) {
     VmaAllocationCreateInfo result{};

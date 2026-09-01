@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
@@ -27,6 +28,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID ROGraphicsPipelineVK::get_type_uuid() const {
+    return TypeUUID<ROGraphicsPipelineVK>::UUID;
+}
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : ROPipelineVK(p_render_data, p_builder.config.pipeline_layout) {

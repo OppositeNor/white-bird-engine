@@ -13,12 +13,16 @@
    limitations under the License.
 */
 #include "function/render_vk/roc_single_vk.hh"
+#include <stdexcept>
 #include <utility>
 
 namespace WhiteBirdEngine {
 
-ROCSingleVK::ROCSingleVK(RendResTID p_resource_type_id, Ref<RenderObjectVK> p_resource)
-    : RenderObjectContainerVK(p_resource_type_id), resource(std::move(p_resource)) {
+ROCSingleVK::ROCSingleVK(Ref<RenderObjectVK> p_resource) : resource(std::move(p_resource)) {
+    if (resource == MEM_NULL) {
+        throw std::runtime_error("ROCSingleVK: resource is null.");
+    }
+    retain_resource_type(resource);
 }
 
 Ref<RenderObjectVK> ROCSingleVK::get() {

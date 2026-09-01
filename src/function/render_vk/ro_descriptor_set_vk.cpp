@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
@@ -33,6 +34,10 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+TypeID RODescriptorSetVK::get_type_uuid() const {
+    return TypeUUID<RODescriptorSetVK>::UUID;
+}
 
 bool RODescriptorSetVK::Writer::has_contextual_resources() const {
     for (const BufferInfo& buffer_info : storage_buffer_infos) {

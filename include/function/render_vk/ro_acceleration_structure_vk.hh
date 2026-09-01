@@ -16,6 +16,7 @@
 #define WBE_FILE_RO_ACCELERATION_STRUCTURE_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -29,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * The owned Vulkan resources are neither copyable nor movable.
  */
-class ROAccelerationStructureVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROAccelerationStructureVK final : public RenderObjectVK {
 public:
     ROAccelerationStructureVK() = delete;
     /**
@@ -45,6 +46,8 @@ public:
     ROAccelerationStructureVK(ROAccelerationStructureVK&&) noexcept = delete;
     ROAccelerationStructureVK& operator=(const ROAccelerationStructureVK&) = delete;
     ROAccelerationStructureVK& operator=(ROAccelerationStructureVK&&) noexcept = delete;
+
+    TypeID get_type_uuid() const override;
 
     /**
      * @brief Get the owned Vulkan acceleration-structure handle.
