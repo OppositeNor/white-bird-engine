@@ -46,3 +46,6 @@
 [submodule "dependencies/KTX-Software"]
 	path = dependencies/KTX-Software
 	url = https://github.com/KhronosGroup/KTX-Software.git
+[submodule "dependencies/thread-pool"]
+	path = dependencies/thread-pool
+	url = https://github.com/bshoshany/thread-pool.git
