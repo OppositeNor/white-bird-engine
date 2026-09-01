@@ -15,10 +15,10 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -83,7 +83,10 @@ TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     render_data.frames_in_flight = 2;
 
     EXPECT_THROW(ROCPerFrameVK(&render_data, {}), std::runtime_error);
-    EXPECT_THROW(ROCPerFrameVK(&render_data, [](uint32_t /*p_context_id*/) { return Ref<RenderObjectVK>(MEM_NULL); }),
+    EXPECT_THROW(ROCPerFrameVK(&render_data,
+                     [](uint32_t /*p_context_id*/) {
+                         return Ref<RenderObjectVK>(MEM_NULL);
+                     }),
         std::runtime_error);
 }
 
@@ -94,8 +97,10 @@ TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
     render_data.current_frame_slot = 2;
 
     ROCPerFrameVK context(&render_data);
-    auto frame_zero_resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<RenderObjectVK>();
-    auto frame_two_resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<RenderObjectVK>();
+    auto frame_zero_resource =
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<RenderObjectVK>();
+    auto frame_two_resource =
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<RenderObjectVK>();
 
     context.set(0, frame_zero_resource);
     context.set(2, frame_two_resource);

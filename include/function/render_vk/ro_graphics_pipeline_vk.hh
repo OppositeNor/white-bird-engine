@@ -23,6 +23,7 @@
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <optional>
 #include <span>

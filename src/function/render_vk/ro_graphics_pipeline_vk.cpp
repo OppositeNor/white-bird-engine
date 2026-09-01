@@ -13,13 +13,14 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 #include <format>
 #include <stdexcept>
 #include <string>

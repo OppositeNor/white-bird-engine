@@ -233,8 +233,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
     ParserJSON parser;
-    parser.parse(
-        Path(Directory({"test_env", "res", "assets", "shaders", "vertex_input_attributes"}), "vertex_input_attributes.json"));
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "vertex_input_attributes"}), "vertex_input_attributes.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 

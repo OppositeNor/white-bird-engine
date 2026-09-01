@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_material_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -23,6 +22,8 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

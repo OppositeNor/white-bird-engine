@@ -29,9 +29,8 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -42,6 +41,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
@@ -82,9 +82,8 @@ namespace {
 
 Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
     RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
-    return make_ref<ROCPerFrameVK>(p_allocator,
-        p_render_data,
-        [p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<RenderObjectVK> {
+    return make_ref<ROCPerFrameVK>(
+        p_allocator, p_render_data, [p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<RenderObjectVK> {
             return ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                 .set_domain(DeviceDomain::HOST_DEVICE)
@@ -163,7 +162,8 @@ private:
 
     void control(double p_delta);
     void update_descriptors();
-    Ref<ROBufferVK> get_frame_uniform_buffer(Ref<ROCPerFrameVK> p_buffer_container, uint32_t p_frame_slot, std::string_view p_buffer_label) const;
+    Ref<ROBufferVK> get_frame_uniform_buffer(
+        Ref<ROCPerFrameVK> p_buffer_container, uint32_t p_frame_slot, std::string_view p_buffer_label) const;
     void write_task_uniform_bindings(
         std::span<const TaskUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container, VkDeviceSize p_buffer_size);
     void write_compute_uniform_bindings(
@@ -1035,50 +1035,31 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.add_resource(RendResVK{
-        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
-        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-        .container = MEM_NULL})
+    p_pipeline_desc
+        .add_resource(RendResVK{
+            .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL})
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_COMPUTE_PIPELINE,
             shadow_moments_summed_area_table_horizontal_compute_pipeline)
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL_COMPUTE_PIPELINE,
             shadow_moments_summed_area_table_vertical_compute_pipeline)
-        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_COMPUTE_PIPELINE,
-            direct_lighting_compute_pipeline)
-        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_SUMMED_AREA_TABLE_COMPUTE_PIPELINE,
-            direct_lighting_summed_area_table_compute_pipeline)
-        .add_resource(REND_RES_TEST_INDIRECT_LIGHTING_COMPUTE_PIPELINE,
-            indirect_lighting_compute_pipeline)
-        .add_resource(REND_RES_TEST_POST_PROCESSING_COMPUTE_PIPELINE,
-            post_processing_compute_pipeline)
-        .add_resource(REND_RES_TEST_PRESENT_POST_PROCESSING_GRAPHICS_PIPELINE,
-            present_post_processing_graphics_pipeline)
-        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
-            shadow_color_view)
-        .add_resource(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW,
-            shadow_normal_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW,
-            shadow_moments_attachment_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW,
-            shadow_moments_summed_area_table_horizontal_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW,
-            shadow_moments_summed_area_table_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-            shadow_depth_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW,
-            gbuffer_albedo_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW,
-            gbuffer_normal_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW,
-            gbuffer_rma_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW,
-            gbuffer_depth_view)
-        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW,
-            direct_lighting_view)
-        .add_resource(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW,
-            indirect_lighting_view)
-        .add_resource(REND_RES_TEST_POST_PROCESSED_IMAGE_VIEW,
-            post_processed_view);
+        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_COMPUTE_PIPELINE, direct_lighting_compute_pipeline)
+        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_SUMMED_AREA_TABLE_COMPUTE_PIPELINE, direct_lighting_summed_area_table_compute_pipeline)
+        .add_resource(REND_RES_TEST_INDIRECT_LIGHTING_COMPUTE_PIPELINE, indirect_lighting_compute_pipeline)
+        .add_resource(REND_RES_TEST_POST_PROCESSING_COMPUTE_PIPELINE, post_processing_compute_pipeline)
+        .add_resource(REND_RES_TEST_PRESENT_POST_PROCESSING_GRAPHICS_PIPELINE, present_post_processing_graphics_pipeline)
+        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
+        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
+        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, shadow_moments_summed_area_table_horizontal_view)
+        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, shadow_moments_summed_area_table_view)
+        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, gbuffer_albedo_view)
+        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, gbuffer_normal_view)
+        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, gbuffer_rma_view)
+        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, gbuffer_depth_view)
+        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
+        .add_resource(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
+        .add_resource(REND_RES_TEST_POST_PROCESSED_IMAGE_VIEW, post_processed_view);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_horizontal_task_desc() const {

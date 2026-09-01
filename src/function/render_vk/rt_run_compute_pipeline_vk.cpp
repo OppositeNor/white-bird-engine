@@ -40,8 +40,7 @@ Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::read_resources() co
 }
 
 void RTRunComputePipelineVK::validate_resources(const RendResViewVK& p_resources) const {
-    Ref<ROComputePipelineVK> compute_pipeline =
-        p_resources.get(pipeline_id).container->get().dynamic_cast_ref<ROComputePipelineVK>();
+    Ref<ROComputePipelineVK> compute_pipeline = p_resources.get(pipeline_id).container->get().dynamic_cast_ref<ROComputePipelineVK>();
     if (compute_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline resource has the wrong type.");
     }
@@ -53,8 +52,8 @@ Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::write_resources() c
 
 void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
     auto pipeline_resource = p_resources.get(pipeline_id).container;
-    auto compute_pipeline =
-        pipeline_resource == MEM_NULL ? Ref<ROComputePipelineVK>(MEM_NULL) : pipeline_resource->get().dynamic_cast_ref<ROComputePipelineVK>();
+    auto compute_pipeline = pipeline_resource == MEM_NULL ? Ref<ROComputePipelineVK>(MEM_NULL)
+                                                          : pipeline_resource->get().dynamic_cast_ref<ROComputePipelineVK>();
     if (compute_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline resource is missing.");
     }

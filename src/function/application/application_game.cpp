@@ -68,8 +68,7 @@ void ApplicationGame::init() {
     input_manager = make_ref<InputManager>(global_allocator());
     window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
     if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(
-            global_allocator(), renderer_allocator.get(), window, render_job_buffer, renderer_capabilities);
+        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer, renderer_capabilities);
     } else if (game_config.render_api == "dummy") {
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
     } else {
@@ -125,7 +124,7 @@ WindowProperties ApplicationGame::get_window_properties_from_game_config_options
         .title = p_game_config_options.game_name,
         .width = p_game_config_options.window_width,
         .height = p_game_config_options.window_height,
-        .is_resizable = false, // TODO
+        .is_resizable = false,  // TODO
         .is_full_screen = false // TODO
     };
     return properties;

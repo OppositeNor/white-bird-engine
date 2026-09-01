@@ -65,9 +65,9 @@ public:
     /**
      * @brief Publish the latest state for one pipeline-owned descriptor binding.
      *
-     * The state is applied lazily to each frame-slot descriptor set when that slot is next bound. Writers containing render-object
-     * containers resolve those containers for the selected frame slot. Calls must be externally synchronized with descriptor
-     * binding; logic-thread changes should publish through a render-thread job.
+     * The state is applied lazily to each frame-slot descriptor set when that slot is next bound. Writers containing
+     * render-object containers resolve those containers for the selected frame slot. Calls must be externally synchronized
+     * with descriptor binding; logic-thread changes should publish through a render-thread job.
      * @param p_set_index Descriptor-set index in pipeline layout order.
      * @param p_writer Descriptor update preserving copy-on-write behavior.
      * @throws std::runtime_error When the set index is invalid.

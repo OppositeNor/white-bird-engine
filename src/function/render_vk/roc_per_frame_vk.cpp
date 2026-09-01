@@ -16,6 +16,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -23,6 +24,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
@@ -137,7 +139,8 @@ void ROCPerFrameVK::synchronize(uint32_t p_frame_slot) const {
     }
     Ref<ROBufferVK> buffer = resource.dynamic_cast_ref<ROBufferVK>();
     if (buffer == MEM_NULL) {
-        throw std::runtime_error(std::format("ROCPerFrameVK: frame slot {} does not contain a buffer for its pending update.", p_frame_slot));
+        throw std::runtime_error(
+            std::format("ROCPerFrameVK: frame slot {} does not contain a buffer for its pending update.", p_frame_slot));
     }
     buffer->update_buffer(pending_buffer_data.data(), pending_buffer_dst_offset, pending_buffer_data.size());
     applied_generations[p_frame_slot] = update_generation;

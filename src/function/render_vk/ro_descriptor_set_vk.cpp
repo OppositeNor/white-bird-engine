@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
@@ -21,9 +20,12 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -58,8 +60,9 @@ bool RODescriptorSetVK::Writer::has_contextual_resources() const {
         }
         return false;
     };
-    return image_infos_have_contextual_resources(sampled_image_infos) || image_infos_have_contextual_resources(storage_image_infos) ||
-           image_infos_have_contextual_resources(sampler_infos) || image_infos_have_contextual_resources(combined_image_sampler_infos);
+    return image_infos_have_contextual_resources(sampled_image_infos) ||
+           image_infos_have_contextual_resources(storage_image_infos) || image_infos_have_contextual_resources(sampler_infos) ||
+           image_infos_have_contextual_resources(combined_image_sampler_infos);
 }
 
 RODescriptorSetVK::Writer RODescriptorSetVK::Writer::resolve(uint32_t p_frame_slot) const {
@@ -74,8 +77,8 @@ RODescriptorSetVK::Writer RODescriptorSetVK::Writer::resolve(uint32_t p_frame_sl
             }
             buffer_info.buffer = buffer_info.buffer_container->get(p_frame_slot).dynamic_cast_ref<ROBufferVK>();
             if (buffer_info.buffer == MEM_NULL) {
-                throw std::runtime_error(
-                    std::format("Failed to resolve descriptor buffer for frame slot {}: container did not contain a buffer.", p_frame_slot));
+                throw std::runtime_error(std::format(
+                    "Failed to resolve descriptor buffer for frame slot {}: container did not contain a buffer.", p_frame_slot));
             }
             buffer_info.buffer_container = MEM_NULL;
         }
@@ -99,8 +102,8 @@ RODescriptorSetVK::Writer RODescriptorSetVK::Writer::resolve(uint32_t p_frame_sl
             if (image_info.sampler_container != MEM_NULL) {
                 image_info.sampler = image_info.sampler_container->get(p_frame_slot).dynamic_cast_ref<ROSamplerVK>();
                 if (image_info.sampler == MEM_NULL) {
-                    throw std::runtime_error(
-                        std::format("Failed to resolve descriptor sampler for frame slot {}: container did not contain a sampler.", p_frame_slot));
+                    throw std::runtime_error(std::format(
+                        "Failed to resolve descriptor sampler for frame slot {}: container did not contain a sampler.", p_frame_slot));
                 }
                 image_info.sampler_container = MEM_NULL;
             }

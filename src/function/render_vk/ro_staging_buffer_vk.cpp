@@ -13,12 +13,12 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_staging_buffer_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>

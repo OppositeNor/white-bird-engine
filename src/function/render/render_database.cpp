@@ -285,9 +285,8 @@ void RenderDatabase::register_compiled_render_resource(std::string_view p_resour
     if (p_render_object == MEM_NULL) {
         throw std::runtime_error("Failed to register compiled render resource: render object is null.");
     }
-    compiled_render_resources.insert_or_assign(
-        CompiledRenderResourceKey{
-            .resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object->get_type_uuid()},
+    compiled_render_resources.insert_or_assign(CompiledRenderResourceKey{.resource_key = std::string(p_resource_key),
+                                                   .render_object_type_id = p_render_object->get_type_uuid()},
         RefWeak<IRenderObject>(p_render_object));
 }
 

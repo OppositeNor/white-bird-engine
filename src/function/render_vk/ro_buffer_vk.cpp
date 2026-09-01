@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
@@ -21,6 +20,8 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
 #include <format>

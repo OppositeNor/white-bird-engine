@@ -25,6 +25,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <string>
 #include <vector>

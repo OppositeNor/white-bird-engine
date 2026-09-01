@@ -17,6 +17,7 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"

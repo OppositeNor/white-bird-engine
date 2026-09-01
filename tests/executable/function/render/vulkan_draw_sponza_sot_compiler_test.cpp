@@ -25,13 +25,13 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
@@ -157,9 +157,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
 
     RendGraphDescVK graph_desc(render_allocator);
     graph_desc.resources.emplace_back(RendResVK{
-        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
-        .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-        .container = MEM_NULL});
+        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL});
     graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view);
     graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE, std::move(task));
     renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));

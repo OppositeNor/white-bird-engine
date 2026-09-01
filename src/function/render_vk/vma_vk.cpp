@@ -12,20 +12,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
 #pragma clang diagnostic ignored "-Wunused-variable"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
 
-#define VMA_IMPLEMENTATION
+#define VMA_IMPLEMENTATION // NOLINT
 #include "function/render_vk/vma_vk.hh"
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif

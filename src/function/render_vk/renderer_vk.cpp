@@ -29,7 +29,6 @@
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -38,6 +37,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
@@ -176,8 +176,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
     p_graph->set_resource(
-        REND_RES_SWAP_CHAIN_IMAGE,
-        make_ref<ROCSingleVK>(allocator, render_objects->swap_chain_image_views[image_index]));
+        REND_RES_SWAP_CHAIN_IMAGE, make_ref<ROCSingleVK>(allocator, render_objects->swap_chain_image_views[image_index]));
     set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
@@ -1188,9 +1187,8 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
                 return;
             }
         }
-        p_desc.resources.push_back(RendResVK{.res_id = std::string(p_resource_id),
-            .res_type_id = p_resource_type_id,
-            .container = MEM_NULL});
+        p_desc.resources.push_back(
+            RendResVK{.res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
     };
     declare_runtime_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID);
     declare_runtime_resource(REND_RES_STATIC_VERTICES, TypeUUID<ROBufferVK>::UUID);
@@ -1269,8 +1267,7 @@ void RendererVK::update_render_graph_resources(
             throw std::runtime_error(std::format("Render graph resource is not compatible with Vulkan: {}.", p_bindings[i].resource_id));
         }
         graph_entry->second.graph->set_transient_resource(
-            p_bindings[i].resource_id,
-            make_ref<ROCSingleVK>(allocator, std::move(resource)));
+            p_bindings[i].resource_id, make_ref<ROCSingleVK>(allocator, std::move(resource)));
     }
 }
 
@@ -1282,19 +1279,13 @@ void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
     // referencing the global resource IDs can resolve them without per-pipeline
     // registration.
     if (render_objects->static_opaque_vertices != MEM_NULL) {
-        p_graph->set_resource(
-            REND_RES_STATIC_VERTICES,
-            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_vertices));
+        p_graph->set_resource(REND_RES_STATIC_VERTICES, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_vertices));
     }
     if (render_objects->static_opaque_indices != MEM_NULL) {
-        p_graph->set_resource(
-            REND_RES_STATIC_INDICES,
-            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_indices));
+        p_graph->set_resource(REND_RES_STATIC_INDICES, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_indices));
     }
     if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-        p_graph->set_resource(
-            REND_RES_STATIC_OBJECT_IDS,
-            make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_obj_ids));
+        p_graph->set_resource(REND_RES_STATIC_OBJECT_IDS, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_obj_ids));
     }
 }
 

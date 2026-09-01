@@ -517,10 +517,9 @@ Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources
         if (resource_desc.res_id.empty()) {
             throw std::runtime_error("RenderGraphVK: resource id is empty.");
         }
-        if (resource_desc.container != MEM_NULL &&
-            resource_desc.container->get_resource_type_id() != resource_desc.res_type_id) {
-            throw std::runtime_error(std::format(
-                "RenderGraphVK: resource container type does not match declaration for '{}'.", resource_desc.res_id));
+        if (resource_desc.container != MEM_NULL && resource_desc.container->get_resource_type_id() != resource_desc.res_type_id) {
+            throw std::runtime_error(
+                std::format("RenderGraphVK: resource container type does not match declaration for '{}'.", resource_desc.res_id));
         }
         if (resources_by_id.contains(resource_desc.res_id)) {
             throw std::runtime_error(std::format("RenderGraphVK: duplicate resource id: {}.", resource_desc.res_id));

@@ -25,6 +25,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <set>

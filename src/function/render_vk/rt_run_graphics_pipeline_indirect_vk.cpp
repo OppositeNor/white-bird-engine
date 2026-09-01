@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"

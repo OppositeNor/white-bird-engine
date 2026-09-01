@@ -20,6 +20,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render_software/ro_image_software.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 /**

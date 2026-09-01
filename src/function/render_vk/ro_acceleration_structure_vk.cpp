@@ -13,8 +13,12 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
-#include "generated/type_uuid.gen.hh"
+#include "function/function_utils.hh"
+#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 #include <format>
 #include <stdexcept>
 #include <vulkan/vk_enum_string_helper.h>

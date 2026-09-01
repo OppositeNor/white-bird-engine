@@ -13,6 +13,10 @@
    limitations under the License.
 */
 #include "function/render_vk/render_object_container_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_task.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include <stdexcept>
 
 namespace WhiteBirdEngine {

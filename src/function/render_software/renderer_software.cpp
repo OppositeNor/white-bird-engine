@@ -15,7 +15,9 @@
 #include "function/render_software/renderer_software.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include <cstddef>
 #include <functional>

@@ -23,6 +23,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <set>

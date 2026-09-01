@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_RT_GENERATE_MIPMAPS_VK_HH
 #define WBE_FILE_RT_GENERATE_MIPMAPS_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>

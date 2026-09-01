@@ -21,6 +21,7 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <stdexcept>
@@ -31,9 +32,8 @@
 namespace WhiteBirdEngine {
 
 ROPipelineVK::ROPipelineVK(const BaseRenderDataVK* p_render_data, Ref<ROPipelineLayoutVK> p_pipeline_layout)
-    : RenderObjectVK(p_render_data), pipeline_layout(std::move(p_pipeline_layout)),
-      descriptor_sets(p_render_data->allocator), descriptor_writes(p_render_data->allocator),
-      descriptor_set_instances(p_render_data->allocator) {
+    : RenderObjectVK(p_render_data), pipeline_layout(std::move(p_pipeline_layout)), descriptor_sets(p_render_data->allocator),
+      descriptor_writes(p_render_data->allocator), descriptor_set_instances(p_render_data->allocator) {
     if (pipeline_layout == MEM_NULL) {
         throw std::runtime_error("Failed to create Vulkan pipeline: pipeline layout is missing.");
     }
@@ -130,8 +130,8 @@ void ROPipelineVK::synchronize_descriptor_sets(uint32_t p_frame_slot) {
     std::vector<DescriptorWrite*> pending_writes;
     for (DescriptorWrite& descriptor_write : descriptor_writes) {
         if (descriptor_write.applied_generations[p_frame_slot] == descriptor_write.generation) {
-            // Contextual resources have their own content generations. Resolve them even when the descriptor binding itself is
-            // current so ROCPerFrameVK can apply newly published bytes to the selected frame-slot buffer.
+            // Contextual resources have their own content generations. Resolve them even when the descriptor binding itself
+            // is current so ROCPerFrameVK can apply newly published bytes to the selected frame-slot buffer.
             if (descriptor_write.writer.has_contextual_resources()) {
                 static_cast<void>(descriptor_write.writer.resolve(p_frame_slot));
             }

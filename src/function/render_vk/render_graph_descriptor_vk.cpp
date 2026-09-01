@@ -13,13 +13,15 @@
    limitations under the License.
 */
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -107,8 +109,7 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, R
     return add_resource(p_resource_id, make_ref<ROCSingleVK>(allocator, std::move(p_resource)));
 }
 
-RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id,
-    Ref<RenderObjectContainerVK> p_resource_container) {
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container) {
     if (p_resource_container == MEM_NULL) {
         throw std::runtime_error("Failed to add render graph resource: resource container is null.");
     }

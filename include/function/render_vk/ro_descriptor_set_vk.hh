@@ -29,6 +29,7 @@
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "utils/utils.hh"
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -257,8 +258,7 @@ public:
          * @param p_range Range in the resolved buffer.
          * @return *this.
          */
-        Writer& add_uniform_buffer_info(
-            Ref<RenderObjectContainerVK> p_buffer_container, VkDeviceSize p_offset, VkDeviceSize p_range) {
+        Writer& add_uniform_buffer_info(Ref<RenderObjectContainerVK> p_buffer_container, VkDeviceSize p_offset, VkDeviceSize p_range) {
             uniform_buffer_infos.push_back(
                 {.buffer = MEM_NULL, .buffer_container = std::move(p_buffer_container), .offset = p_offset, .range = p_range});
             return *this;

@@ -78,7 +78,8 @@ Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::write_resources() cons
 void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
     // Resolve the graph image view and its underlying image for this frame.
     auto image_resource = p_resources.get(image_view_id).container;
-    auto image_view = image_resource == MEM_NULL ? Ref<ROImageViewVK>(MEM_NULL) : image_resource->get().dynamic_cast_ref<ROImageViewVK>();
+    auto image_view =
+        image_resource == MEM_NULL ? Ref<ROImageViewVK>(MEM_NULL) : image_resource->get().dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
         // Commands cannot be recorded without a bound image view and image.
         throw std::runtime_error("RTGenerateMipmapsVK: image-view resource is missing.");

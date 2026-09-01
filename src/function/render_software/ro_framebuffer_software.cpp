@@ -17,6 +17,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_software/ro_image_software.hh"
 #include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 

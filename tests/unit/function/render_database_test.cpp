@@ -14,6 +14,8 @@
 */
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
