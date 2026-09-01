@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 
+#include "job_test_utils.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "global/global.hh"
@@ -99,6 +100,24 @@ TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveSingleJob) {
     // Buffer should be empty again
     std::function<void()> empty = buffer.retrieve_job();
     EXPECT_EQ(empty, nullptr);
+}
+
+TEST_F(WBEJobBufferRingMPSCTest, HandleTracksBufferedJobCompletion) {
+    JobBufferRingMPSC buffer(get_allocator(), 5);
+
+    bool performed = false;
+    std::future<void> handle = buffer.add_job([&performed]() {
+        performed = true;
+    });
+
+    EXPECT_FALSE(is_future_ready(handle));
+
+    std::function<void()> retrieved = buffer.retrieve_job();
+    ASSERT_NE(retrieved, nullptr);
+    retrieved();
+
+    EXPECT_TRUE(performed);
+    EXPECT_TRUE(is_future_ready(handle));
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveMultipleJobs) {

@@ -15,14 +15,19 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 
+#include "job_test_utils.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_dummy/renderer_dummy.hh"
+#include "function/render_software/renderer_software.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include <atomic>
 #include <chrono>
 #include <functional>
 #include <gtest/gtest.h>
+#include <latch>
 #include <memory>
 #include <stdexcept>
 #include <thread>
@@ -97,6 +102,59 @@ TEST_F(WBEJobBufferRingSPSCTest, AddAndRetrieveSingleJob) {
     // Buffer should be empty again
     std::function<void()> empty = buffer.retrieve_job();
     EXPECT_EQ(empty, nullptr);
+}
+
+TEST_F(WBEJobBufferRingSPSCTest, HandleTracksBufferedJobCompletion) {
+    JobBufferRingSPSC buffer(get_allocator(), 5);
+
+    bool performed = false;
+    std::future<void> handle = buffer.add_job([&performed]() {
+        performed = true;
+    });
+
+    EXPECT_FALSE(is_future_ready(handle));
+
+    std::function<void()> retrieved = buffer.retrieve_job();
+    ASSERT_NE(retrieved, nullptr);
+    retrieved();
+
+    EXPECT_TRUE(performed);
+    EXPECT_TRUE(is_future_ready(handle));
+}
+
+TEST_F(WBEJobBufferRingSPSCTest, HandleWaitBlocksUntilBufferedJobExecutes) {
+    JobBufferRingSPSC buffer(get_allocator(), 5);
+
+    std::atomic<bool> performed{false};
+    std::latch wait_started(1);
+    std::latch allow_execution(1);
+    std::latch wait_finished(1);
+
+    std::future<void> handle = buffer.add_job([&performed]() {
+        performed.store(true, std::memory_order_release);
+    });
+
+    std::jthread wait_thread([&]() {
+        wait_started.count_down();
+        handle.wait();
+        wait_finished.count_down();
+    });
+
+    wait_started.wait();
+    EXPECT_FALSE(wait_finished.try_wait());
+
+    std::jthread execute_thread([&]() {
+        allow_execution.wait();
+        std::function<void()> retrieved = buffer.retrieve_job(true);
+        ASSERT_NE(retrieved, nullptr);
+        retrieved();
+    });
+
+    allow_execution.count_down();
+    wait_finished.wait();
+
+    EXPECT_TRUE(performed.load(std::memory_order_acquire));
+    EXPECT_TRUE(is_future_ready(handle));
 }
 
 TEST_F(WBEJobBufferRingSPSCTest, AddAndRetrieveMultipleJobs) {
@@ -425,6 +483,24 @@ TEST_F(WBEJobBufferRingSPSCTest, StressTestManyOperations) {
     // Verify all jobs were consumed
     EXPECT_EQ(perform_count.load(), NUM_JOBS);
     EXPECT_EQ(consumed.load(), NUM_JOBS);
+}
+
+TEST_F(WBEJobBufferRingSPSCTest, NoOpHandlersReturnReadyHandles) {
+    WBE::RendererCapabilities capabilities{.ray_tracing = true};
+    WBE::RenderAllocator render_allocator(WBE_MI_B(1));
+    WBE::RendererDummy dummy_renderer(&render_allocator, capabilities);
+
+    std::future<void> dummy_handle = dummy_renderer.add_job([]() {
+    });
+    EXPECT_TRUE(is_future_ready(dummy_handle));
+
+    WBE::RendererCapabilities software_capabilities{.ray_tracing = true};
+    auto software_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(1));
+    WBE::RendererSoftware software_renderer(software_allocator, software_capabilities);
+
+    std::future<void> software_handle = software_renderer.add_job([]() {
+    });
+    EXPECT_TRUE(is_future_ready(software_handle));
 }
 
 #endif

@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -82,8 +83,9 @@ public:
     virtual void update_static_opaque_triangles() override {
     }
 
-    virtual void add_job(std::function<void()> p_job) override {
+    virtual std::future<void> add_job(std::function<void()> p_job) override {
         (void)p_job;
+        return create_completed_job_future();
     }
 
 private:

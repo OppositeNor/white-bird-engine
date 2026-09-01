@@ -129,6 +129,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/stb
     ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
     ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
+    ${PROJECT_SOURCE_DIR}/dependencies/thread-pool/include
 )
 if (WBE_MAKE_TEST)
     set(include_dirs

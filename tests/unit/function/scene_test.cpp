@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <entt/entt.hpp>
 #include <functional>
+#include <future>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 #include <memory>
@@ -142,8 +143,9 @@ public:
     void update_static_opaque_triangles() override {
     }
 
-    void add_job(std::function<void()> p_job) override {
+    std::future<void> add_job(std::function<void()> p_job) override {
         (void)p_job;
+        return WBE::create_completed_job_future();
     }
 
     std::vector<std::string> registered_graphs;

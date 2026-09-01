@@ -73,6 +73,11 @@ struct WBE_META(WBE_CONFIG_OPTION, WBE_CLA_CONFIGURATION) EngineConfigOptions fi
      */
     WBE_META(WBE_REFLECT)
     size_t resource_mem_pool_size = WBE_MI_B(64);
+    /**
+     * @brief The number of worker threads. Zero selects the available CPU thread count after reserving render and logic threads.
+     */
+    WBE_META(WBE_REFLECT)
+    size_t worker_thread_count = 0;
 
     /**
      * @brief The utility name while running the program.

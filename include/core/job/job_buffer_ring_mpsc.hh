@@ -18,10 +18,12 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer.hh"
+#include "core/memory/reference_strong.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <future>
 #include <semaphore>
 namespace WhiteBirdEngine {
 
@@ -50,7 +52,7 @@ public:
     JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size);
 
     std::function<void()> retrieve_job(bool p_block = false);
-    void add_job(std::function<void()> p_job);
+    std::future<void> add_job(std::function<void()> p_job);
 
     /**
      * @brief Get the semaphore.
@@ -62,6 +64,7 @@ public:
     }
 
 private:
+    HeapAllocatorDefault* allocator;
     std::counting_semaphore<> semaphore{0};
     Vector<std::function<void()>, HeapAllocatorDefault> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;

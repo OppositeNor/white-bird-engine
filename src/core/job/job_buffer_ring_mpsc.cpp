@@ -14,24 +14,26 @@
 */
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
 #include "utils/utils.hh"
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <future>
 #include <stdexcept>
 #include <utility>
 
 namespace WhiteBirdEngine {
 
 JobBufferRingMPSC::JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
-    : buffer(p_allocator), head(0), tail(0) {
+    : allocator(p_allocator), buffer(p_allocator), head(0), tail(0) {
     if (p_buffer_size <= 1) {
         throw std::runtime_error("Buffer has to be at least size 2.");
     }
     buffer.resize(p_buffer_size);
 }
 
-void JobBufferRingMPSC::add_job(std::function<void()> p_job) {
+std::future<void> JobBufferRingMPSC::add_job(std::function<void()> p_job) {
     size_t head_l;
     size_t next;
 
@@ -46,9 +48,21 @@ void JobBufferRingMPSC::add_job(std::function<void()> p_job) {
             break;
         }
     }
-    buffer[head_l] = std::move(p_job);
+    Ref<std::promise<void>> completion_promise = make_ref<std::promise<void>>(allocator);
+    std::future<void> completion_future = completion_promise->get_future();
+    buffer[head_l] = [job = std::move(p_job), completion_promise]() mutable {
+        try {
+            job();
+            completion_promise->set_value();
+        } catch (...) {
+            // The returned future is backed by this promise, so job failures must be stored here instead of escaping as
+            // a broken-promise state with the original exception lost.
+            completion_promise->set_exception(std::current_exception());
+        }
+    };
     std::atomic_thread_fence(std::memory_order_release);
     semaphore.release();
+    return completion_future;
 }
 
 std::function<void()> JobBufferRingMPSC::retrieve_job(bool p_block) {

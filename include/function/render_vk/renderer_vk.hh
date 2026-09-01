@@ -128,8 +128,8 @@ public:
      */
     void register_gpu_job(GPUJobVK p_job);
 
-    virtual void add_job(std::function<void()> p_job) override {
-        job_buffer->add_job(std::move(p_job));
+    virtual std::future<void> add_job(std::function<void()> p_job) override {
+        return job_buffer->add_job(std::move(p_job));
     }
 
     /**

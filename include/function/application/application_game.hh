@@ -16,6 +16,7 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
+#include <future>
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/application/i_application.hh"
@@ -85,8 +86,8 @@ public:
     /**
      * @brief Add a job for the renderer.
      */
-    void add_render_job(std::function<void()> p_job) {
-        render_job_buffer->add_job(std::move(p_job));
+    std::future<void> add_render_job(std::function<void()> p_job) {
+        return renderer->add_job(std::move(p_job));
     }
 
 private:
