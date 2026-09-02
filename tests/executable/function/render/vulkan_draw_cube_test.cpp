@@ -38,11 +38,9 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "material_bindpoint_test_utils.hh"
 #include "platform/file_system/directory.hh"
@@ -67,7 +65,6 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -126,9 +123,9 @@ private:
     WBE::ComponentSpotLight spot_light_component{};
     VkExtent2D shadow_extent{};
     WBE::ComponentCamera camera_component{};
-    glm::vec3 camera_position = WBE::TEST_DEFAULT_CAMERA_POSITION;
-    float camera_yaw = WBE::default_test_camera_yaw();
-    float camera_pitch = WBE::default_test_camera_pitch();
+    glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
+    float camera_yaw = default_test_camera_yaw();
+    float camera_pitch = default_test_camera_pitch();
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -163,23 +160,23 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
 
     float delta = static_cast<float>(p_delta);
     if (input_manager->get_input_status(WBE::KEYCODE_LEFT).is_down()) {
-        camera_yaw -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_yaw -= TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_RIGHT).is_down()) {
-        camera_yaw += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_yaw += TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_UP).is_down()) {
-        camera_pitch += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_pitch += TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_DOWN).is_down()) {
-        camera_pitch -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_pitch -= TEST_CAMERA_TURN_SPEED * delta;
     }
-    camera_pitch = std::clamp(camera_pitch, -WBE::TEST_CAMERA_PITCH_LIMIT, WBE::TEST_CAMERA_PITCH_LIMIT);
+    camera_pitch = std::clamp(camera_pitch, -TEST_CAMERA_PITCH_LIMIT, TEST_CAMERA_PITCH_LIMIT);
 
-    glm::vec3 forward = WBE::test_camera_forward(camera_yaw, camera_pitch);
+    glm::vec3 forward = test_camera_forward(camera_yaw, camera_pitch);
     glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0F, 1.0F, 0.0F)));
     glm::vec3 up = glm::normalize(glm::cross(right, forward));
-    float move_delta = WBE::TEST_CAMERA_MOVE_SPEED * delta;
+    float move_delta = TEST_CAMERA_MOVE_SPEED * delta;
 
     if (input_manager->get_input_status(WBE::KEYCODE_W).is_down()) {
         camera_position += forward * move_delta;
@@ -200,13 +197,13 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
         camera_position -= up * move_delta;
     }
 
-    camera_component.view = WBE::test_camera_view(camera_position, camera_yaw, camera_pitch);
+    camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
 
     WBE::ROBufferVK* camera_info_buffer = camera_info_ubo.get();
     if (camera_info_buffer == nullptr) {
         return;
     }
-    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
+    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     add_render_job([camera_info, camera_info_buffer]() {
         camera_info_buffer->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     });
@@ -257,7 +254,7 @@ void ApplicationVulkanDrawCubeTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDrawCubeTest::setup_spot_light() {
-    spot_light_component = WBE::make_default_test_spot_light_component(32.0F);
+    spot_light_component = make_default_test_spot_light_component(32.0F);
     shadow_extent = VkExtent2D{
         .width = spot_light_component.shadow_map_resolution,
         .height = spot_light_component.shadow_map_resolution,
@@ -326,11 +323,11 @@ void ApplicationVulkanDrawCubeTest::compile_shadow_pipeline() {
 }
 
 void ApplicationVulkanDrawCubeTest::compile_main_pipeline() {
-    camera_component = WBE::make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio);
+    camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio);
     WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-    WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     uint32_t spot_light_count = 1;
-    auto material_params = WBE::add_material_texture_bindings(bindpoint_builder, default_material, default_material, material_sampler);
+    auto material_params = add_material_texture_bindings(bindpoint_builder, default_material, default_material, material_sampler);
     bindpoint_builder.add_buffer_decleration("camera_info.view", &camera_component.view, sizeof(camera_component.view))
         .add_buffer_decleration("camera_info.proj", &camera_component.proj, sizeof(camera_component.proj))
         .add_buffer_decleration("light.lights[0].info", &spot_light_info, sizeof(spot_light_info))
@@ -359,7 +356,7 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
                           .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                           .set_size(sizeof(WBE::CameraInfoVKUBO))
                           .create_ref(base_render_data);
-    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
+    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     auto [set, binding] = main_descriptor_set_bindings.at("camera_info");
     main_graphics_pipeline->write_descriptor_set(set,
@@ -380,10 +377,10 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph() {
 }
 
 void ApplicationVulkanDrawCubeTest::add_render_graph_resources(WBE::RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.add_resource(WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE, shadow_graphics_pipeline)
-        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
-        .add_resource(WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE, main_graphics_pipeline);
+    p_pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE, shadow_graphics_pipeline)
+        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE, main_graphics_pipeline);
 }
 
 std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCubeTest::build_vertex_input_data(
@@ -410,7 +407,7 @@ std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCube
 WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() const {
     auto [vertex_input, vertex_buffer_offset] = build_vertex_input_data(shadow_pipeline_resource);
     WBE::RendTaskDescVK shadow_task_desc(render_allocator);
-    shadow_task_desc.task_id = WBE::RT_RUN_PIPELINE_SHADOWMAP;
+    shadow_task_desc.task_id = RT_RUN_PIPELINE_SHADOWMAP;
     shadow_task_desc.create = [task_render_allocator = render_allocator,
                                   task_base_render_data = base_render_data,
                                   task_shadow_extent = shadow_extent,
@@ -419,14 +416,14 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
         std::array<VkClearValue, 2> shadow_clear_values{};
         shadow_clear_values[0].color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}};
         shadow_clear_values[1].depthStencil = {.depth = 0.0F, .stencil = 0};
-        std::array<std::string_view, 1> shadow_color_attachment_ids{WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
+        std::array<std::string_view, 1> shadow_color_attachment_ids{REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             std::span<const VkClearValue>(shadow_clear_values.data(), shadow_clear_values.size()),
             task_shadow_extent,
             std::span<const std::string_view>(shadow_color_attachment_ids.data(), shadow_color_attachment_ids.size()),
-            WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-            WBE::REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
+            REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
+            REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE,
             WBE::REND_RES_STATIC_VERTICES,
             WBE::REND_RES_STATIC_INDICES,
             std::nullopt,
@@ -441,8 +438,8 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_shadow_task_desc() con
 WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const {
     auto [vertex_input, vertex_buffer_offset] = build_vertex_input_data(default_material->graphics_pipeline);
     WBE::RendTaskDescVK main_task_desc(render_allocator);
-    main_task_desc.task_id = WBE::RT_RUN_PIPELINE;
-    main_task_desc.after(WBE::RT_RUN_PIPELINE_SHADOWMAP);
+    main_task_desc.task_id = RT_RUN_PIPELINE;
+    main_task_desc.after(RT_RUN_PIPELINE_SHADOWMAP);
     main_task_desc.create = [task_render_allocator = render_allocator,
                                 task_base_render_data = base_render_data,
                                 vertex_input,
@@ -452,7 +449,7 @@ WBE::RendTaskDescVK ApplicationVulkanDrawCubeTest::create_main_task_desc() const
             glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
             task_base_render_data->swap_chain_extent,
             WBE::REND_RES_SWAP_CHAIN_IMAGE,
-            WBE::REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
+            REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE,
             WBE::REND_RES_STATIC_VERTICES,
             WBE::REND_RES_STATIC_INDICES,
             std::nullopt,

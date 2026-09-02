@@ -155,6 +155,14 @@ public:
         return singleton;
     }
 
+    const StackAllocator& get_allocator() const {
+        return stack_allocator;
+    }
+
+    StackAllocator& get_allocator() {
+        return stack_allocator;
+    }
+
     ResourceChunkID global_res_chunk() const {
         return global_res_chunk_id;
     }

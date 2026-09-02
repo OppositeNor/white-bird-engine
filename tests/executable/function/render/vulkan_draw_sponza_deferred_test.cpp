@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/allocator/i_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -29,7 +30,6 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -51,6 +51,7 @@
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -493,7 +494,11 @@ void ApplicationVulkanDeferredPBRTest::setup_render_context() {
 
 void ApplicationVulkanDeferredPBRTest::load_resources() {
     auto* resource_manager = ResourceManager::get_singleton();
-    sponza_mesh = resource_manager->get_resource<RUMesh3D>("sponza.mesh");
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Loading render resources...");
+    auto resource_chunk = make_ref<ResourceChunkLoadFile>(global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
+    resource_manager->register_chunk(resource_chunk);
+    sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza.mesh");
     if (sponza_mesh == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: sponza mesh resource was not found.");
     }

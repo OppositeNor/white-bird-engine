@@ -14,10 +14,8 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
-#include "core/reflection/reflection_defs.hh"
 #include "function/ecs/components.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "utils/utils.hh"
 #include <algorithm>
 #include <cmath>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -29,7 +27,8 @@
 #include <glm/trigonometric.hpp>
 #include <string_view>
 
-namespace WhiteBirdEngine {
+namespace WBE = WhiteBirdEngine;
+
 inline constexpr std::string_view RT_RUN_PIPELINE = "run_pipeline";
 inline constexpr std::string_view RT_RUN_PIPELINE_SHADOWMAP = "run_shadowmap";
 inline constexpr std::string_view REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE = "draw_cube_pipeline";
@@ -66,8 +65,8 @@ inline glm::mat4 test_camera_view(const glm::vec3& p_position, float p_yaw, floa
     return glm::lookAt(p_position, p_position + forward, up);
 }
 
-inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_far_plane = 10.0F) {
-    ComponentCamera camera_component{
+inline WBE::ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_far_plane = 10.0F) {
+    WBE::ComponentCamera camera_component{
         .view = test_camera_view(TEST_DEFAULT_CAMERA_POSITION, default_test_camera_yaw(), default_test_camera_pitch()),
         .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), p_aspect_ratio, p_far_plane, 0.1F),
         .is_dirty = false,
@@ -76,16 +75,16 @@ inline ComponentCamera make_default_test_camera_component(float p_aspect_ratio, 
     return camera_component;
 }
 
-inline CameraInfoVKUBO make_camera_info_ubo(const ComponentCamera& p_camera_component) {
-    return CameraInfoVKUBO{
+inline WBE::CameraInfoVKUBO make_camera_info_ubo(const WBE::ComponentCamera& p_camera_component) {
+    return WBE::CameraInfoVKUBO{
         .view = p_camera_component.view,
         .proj = p_camera_component.proj,
         .world_position = glm::inverse(p_camera_component.view)[3],
     };
 }
 
-inline ComponentSpotLight make_default_test_spot_light_component(float p_intensity) {
-    ComponentSpotLight spot_light_component{
+inline WBE::ComponentSpotLight make_default_test_spot_light_component(float p_intensity) {
+    WBE::ComponentSpotLight spot_light_component{
         .position = glm::vec3(2.5F, 3.5F, 2.5F),
         .direction = glm::normalize(glm::vec3(-1.0F, -1.4F, -1.0F)),
         .color = glm::vec3(1.0F, 0.95F, 0.85F),
@@ -106,8 +105,8 @@ inline ComponentSpotLight make_default_test_spot_light_component(float p_intensi
     return spot_light_component;
 }
 
-inline SpotLightInfoVKUBO make_spot_light_info_ubo(const ComponentSpotLight& p_spot_light_component) {
-    return SpotLightInfoVKUBO{.view = p_spot_light_component.view,
+inline WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::ComponentSpotLight& p_spot_light_component) {
+    return WBE::SpotLightInfoVKUBO{.view = p_spot_light_component.view,
         .proj = p_spot_light_component.proj,
         .inv_view_proj = glm::inverse(p_spot_light_component.proj * p_spot_light_component.view),
         .position = p_spot_light_component.position,
@@ -119,7 +118,5 @@ inline SpotLightInfoVKUBO make_spot_light_info_ubo(const ComponentSpotLight& p_s
         .range = p_spot_light_component.range,
         .emitter_width = p_spot_light_component.emitter_width};
 }
-
-} // namespace WhiteBirdEngine
 
 #endif

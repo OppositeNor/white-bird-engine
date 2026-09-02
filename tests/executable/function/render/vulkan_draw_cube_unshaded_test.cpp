@@ -31,11 +31,9 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -55,9 +53,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-namespace WhiteBirdEngine {
 inline constexpr char REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE[] = "draw_cube_unshaded_pipeline";
-}
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
@@ -134,16 +130,16 @@ public:
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
         const VkDeviceSize vertex_buffer_offset = triangles_info.draw_groups[0].vertex_buffer_byte_offset;
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE, graphics_pipeline);
+        pipeline_desc.add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE, graphics_pipeline);
         WBE::RendTaskDescVK task_desc(render_allocator);
-        task_desc.task_id = WBE::RT_RUN_PIPELINE;
+        task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.create = [render_allocator, base_render_data, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 base_render_data->swap_chain_extent,
                 WBE::REND_RES_SWAP_CHAIN_IMAGE,
-                WBE::REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
+                REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
                 WBE::REND_RES_STATIC_VERTICES,
                 WBE::REND_RES_STATIC_INDICES,
                 std::nullopt,

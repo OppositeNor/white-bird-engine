@@ -21,7 +21,6 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
 #include <format>
@@ -30,7 +29,7 @@
 #include <string_view>
 #include <vector>
 
-namespace WhiteBirdEngine {
+namespace WBE = WhiteBirdEngine;
 
 inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_ALBEDO_INDEX = 0;
 inline constexpr int32_t MATERIAL_TEXTURE_DEFAULT_NORMAL_INDEX = 1;
@@ -45,8 +44,8 @@ struct MaterialParamsUBO {
     int32_t rma_index = MATERIAL_TEXTURE_DEFAULT_RMA_INDEX;
 };
 
-inline RefRes<RUImage> require_material_texture(RefRes<RUImage> p_texture, std::string_view p_texture_name) {
-    RefRes<RUImage> texture = p_texture;
+inline WBE::RefRes<WBE::RUImage> require_material_texture(WBE::RefRes<WBE::RUImage> p_texture, std::string_view p_texture_name) {
+    WBE::RefRes<WBE::RUImage> texture = p_texture;
     if (texture == nullptr) {
         throw std::runtime_error(
             std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_name));
@@ -54,43 +53,43 @@ inline RefRes<RUImage> require_material_texture(RefRes<RUImage> p_texture, std::
     return texture;
 }
 
-inline RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, std::string_view p_texture_role) {
+inline WBE::RefRes<WBE::RUImage> find_material_texture(WBE::RefRes<WBE::RUMaterial> p_material, std::string_view p_texture_role) {
     if (p_material == nullptr) {
-        return MEM_NULL;
+        return WBE::MEM_NULL;
     }
-    std::span<const RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
-    for (const RUMaterial::TextureSlot& texture_slot : texture_slots) {
+    std::span<const WBE::RUMaterial::TextureSlot> texture_slots(p_material->textures.get(), p_material->texture_count);
+    for (const WBE::RUMaterial::TextureSlot& texture_slot : texture_slots) {
         if (texture_slot.role.matches(p_texture_role)) {
             return texture_slot.texture;
         }
     }
-    return MEM_NULL;
+    return WBE::MEM_NULL;
 }
 
-inline void add_material_texture_binding(RenderBindpointDeclarationsBuilder& p_builder,
+inline void add_material_texture_binding(WBE::RenderBindpointDeclarationsBuilder& p_builder,
     int32_t p_default_index,
     int32_t p_bound_index,
-    RefRes<RUImage> p_default_texture,
-    RefRes<RUImage> p_material_texture) {
+    WBE::RefRes<WBE::RUImage> p_default_texture,
+    WBE::RefRes<WBE::RUImage> p_material_texture) {
     p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_default_index), p_default_texture);
     if (p_material_texture != nullptr) {
         p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_bound_index), p_material_texture);
     }
 }
 
-inline std::vector<uint8_t> add_material_texture_bindings(RenderBindpointDeclarationsBuilder& p_builder,
-    RefRes<RUMaterial> p_default_material,
-    RefRes<RUMaterial> p_material,
-    Ref<ROSamplerVK> p_sampler) {
+inline std::vector<uint8_t> add_material_texture_bindings(WBE::RenderBindpointDeclarationsBuilder& p_builder,
+    WBE::RefRes<WBE::RUMaterial> p_default_material,
+    WBE::RefRes<WBE::RUMaterial> p_material,
+    WBE::Ref<WBE::ROSamplerVK> p_sampler) {
     MaterialParamsUBO material_params;
 
-    RefRes<RUImage> default_albedo = require_material_texture(find_material_texture(p_default_material, "albedo"), "albedo");
-    RefRes<RUImage> default_normal = require_material_texture(find_material_texture(p_default_material, "normal"), "normal");
-    RefRes<RUImage> default_rma = require_material_texture(find_material_texture(p_default_material, "rma"), "rma");
+    WBE::RefRes<WBE::RUImage> default_albedo = require_material_texture(find_material_texture(p_default_material, "albedo"), "albedo");
+    WBE::RefRes<WBE::RUImage> default_normal = require_material_texture(find_material_texture(p_default_material, "normal"), "normal");
+    WBE::RefRes<WBE::RUImage> default_rma = require_material_texture(find_material_texture(p_default_material, "rma"), "rma");
 
-    RefRes<RUImage> albedo_texture = find_material_texture(p_material, "albedo");
-    RefRes<RUImage> normal_texture = find_material_texture(p_material, "normal");
-    RefRes<RUImage> rma_texture = find_material_texture(p_material, "rma");
+    WBE::RefRes<WBE::RUImage> albedo_texture = find_material_texture(p_material, "albedo");
+    WBE::RefRes<WBE::RUImage> normal_texture = find_material_texture(p_material, "normal");
+    WBE::RefRes<WBE::RUImage> rma_texture = find_material_texture(p_material, "rma");
 
     p_builder.add_sampler_decleration("material_textures.material_sampler", p_sampler);
     add_material_texture_binding(
@@ -107,7 +106,5 @@ inline std::vector<uint8_t> add_material_texture_bindings(RenderBindpointDeclara
     std::memcpy(result.data(), &material_params, result.size());
     return result;
 }
-
-} // namespace WhiteBirdEngine
 
 #endif

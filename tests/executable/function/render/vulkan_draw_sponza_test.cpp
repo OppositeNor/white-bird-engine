@@ -36,12 +36,12 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -66,10 +66,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-namespace WhiteBirdEngine {
 constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW = "sponza_depth";
-
-} // namespace WhiteBirdEngine
 
 namespace WBE = WhiteBirdEngine;
 
@@ -120,9 +117,9 @@ private:
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
     WBE::ComponentCamera camera_component{};
-    glm::vec3 camera_position = WBE::TEST_DEFAULT_CAMERA_POSITION;
-    float camera_yaw = WBE::default_test_camera_yaw();
-    float camera_pitch = WBE::default_test_camera_pitch();
+    glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
+    float camera_yaw = default_test_camera_yaw();
+    float camera_pitch = default_test_camera_pitch();
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -157,23 +154,23 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
 
     float delta = static_cast<float>(p_delta);
     if (input_manager->get_input_status(WBE::KEYCODE_LEFT).is_down()) {
-        camera_yaw -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_yaw -= TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_RIGHT).is_down()) {
-        camera_yaw += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_yaw += TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_UP).is_down()) {
-        camera_pitch += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_pitch += TEST_CAMERA_TURN_SPEED * delta;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_DOWN).is_down()) {
-        camera_pitch -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        camera_pitch -= TEST_CAMERA_TURN_SPEED * delta;
     }
-    camera_pitch = std::clamp(camera_pitch, -WBE::TEST_CAMERA_PITCH_LIMIT, WBE::TEST_CAMERA_PITCH_LIMIT);
+    camera_pitch = std::clamp(camera_pitch, -TEST_CAMERA_PITCH_LIMIT, TEST_CAMERA_PITCH_LIMIT);
 
-    glm::vec3 forward = WBE::test_camera_forward(camera_yaw, camera_pitch);
+    glm::vec3 forward = test_camera_forward(camera_yaw, camera_pitch);
     glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0F, 1.0F, 0.0F)));
     glm::vec3 up = glm::normalize(glm::cross(right, forward));
-    float move_delta = WBE::TEST_CAMERA_MOVE_SPEED * delta;
+    float move_delta = TEST_CAMERA_MOVE_SPEED * delta;
 
     if (input_manager->get_input_status(WBE::KEYCODE_W).is_down()) {
         camera_position += forward * move_delta;
@@ -220,34 +217,34 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_Y).is_down()) {
-        spot_light_pitch += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_pitch += TEST_CAMERA_TURN_SPEED * delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_P).is_down()) {
-        spot_light_pitch -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_pitch -= TEST_CAMERA_TURN_SPEED * delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_H).is_down()) {
-        spot_light_yaw -= WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_yaw -= TEST_CAMERA_TURN_SPEED * delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(WBE::KEYCODE_SEMICOLON).is_down()) {
-        spot_light_yaw += WBE::TEST_CAMERA_TURN_SPEED * delta;
+        spot_light_yaw += TEST_CAMERA_TURN_SPEED * delta;
         spot_light_changed = true;
     }
     if (spot_light_changed) {
-        spot_light_pitch = std::clamp(spot_light_pitch, -WBE::TEST_CAMERA_PITCH_LIMIT, WBE::TEST_CAMERA_PITCH_LIMIT);
-        spot_light_component.direction = WBE::test_camera_forward(spot_light_yaw, spot_light_pitch);
+        spot_light_pitch = std::clamp(spot_light_pitch, -TEST_CAMERA_PITCH_LIMIT, TEST_CAMERA_PITCH_LIMIT);
+        spot_light_component.direction = test_camera_forward(spot_light_yaw, spot_light_pitch);
         glm::vec3 light_up =
             std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
         spot_light_component.view =
             glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
     }
 
-    camera_component.view = WBE::test_camera_view(camera_position, camera_yaw, camera_pitch);
+    camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
 
-    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
-    WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
+    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     add_render_job([this, camera_info, spot_light_info]() {
         camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
         spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
@@ -268,8 +265,8 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     shadow_task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
-        .set_depth_attachment(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
+        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
+        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .add_clear_value(shadow_color_clear)
         .add_clear_value(shadow_depth_clear)
         .add_graphics_pipeline_override("forward_cook_torrance_pbr", "shadowmap_spot")
@@ -277,7 +274,7 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
     auto shadow_task = WBE::make_unique<WBE::RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, shadow_task_config);
     write_shadow_dynamic_descriptors(*shadow_task);
     WBE::RTRunStaticOpaqueTrianglesVK::Config task_config;
-    task_config.set_depth_attachment(WBE::REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
+    task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
     auto main_task = WBE::make_unique<WBE::RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
     write_main_dynamic_descriptors(*main_task);
     register_draw_sponza_render_graph(shadow_task, main_task);
@@ -288,11 +285,13 @@ void ApplicationVulkanDrawSponzaTest::setup_render_context() {
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = get_renderer_allocator().get();
     render_database = WBE::RenderDatabase::get_singleton();
-    camera_component = WBE::make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
+    camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
 }
 
 void ApplicationVulkanDrawSponzaTest::load_resources() {
     auto* resource_manager = WBE::ResourceManager::get_singleton();
+    auto resource_chunk = make_ref<WBE::ResourceChunkLoadFile>(WBE::global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
+    resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<WBE::RUMesh3D>("sponza.mesh");
     if (sponza_mesh == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: sponza mesh resource was not found.");
@@ -305,7 +304,7 @@ void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
-    spot_light_component = WBE::make_default_test_spot_light_component(128.0F);
+    spot_light_component = make_default_test_spot_light_component(128.0F);
     spot_light_yaw = std::atan2(spot_light_component.direction.z, spot_light_component.direction.x);
     spot_light_pitch = std::asin(std::clamp(spot_light_component.direction.y, -1.0F, 1.0F));
     shadow_extent = VkExtent2D{
@@ -378,7 +377,7 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRu
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                               .set_size(sizeof(WBE::SpotLightInfoVKUBO))
                               .create_ref(base_render_data);
-    WBE::SpotLightInfoVKUBO spot_light_info = WBE::make_spot_light_info_ubo(spot_light_component);
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
     for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
         auto [set, binding] = p_task.get_descriptor_binding(batch_index, "light_camera_info");
@@ -403,7 +402,7 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                                .set_size(sizeof(uint32_t))
                                .create_ref(base_render_data);
-    WBE::CameraInfoVKUBO camera_info = WBE::make_camera_info_ubo(camera_component);
+    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     uint32_t spot_light_count = 1;
     camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
     spot_light_count_ubo->update_buffer(&spot_light_count, sizeof(spot_light_count));
@@ -444,12 +443,12 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .container = WBE::MEM_NULL});
-    pipeline_desc.add_resource(WBE::REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
-        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(WBE::REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
-    pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
+    pipeline_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
+        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
+    pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
     WBE::RendTaskDescVK main_task_desc(render_allocator, WBE::RT_RUN_STATIC_OPAQUE, std::move(p_main_task));
-    main_task_desc.after(WBE::RT_RUN_PIPELINE_SHADOWMAP);
+    main_task_desc.after(RT_RUN_PIPELINE_SHADOWMAP);
     pipeline_desc.tasks.emplace_back(std::move(main_task_desc));
     renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
     renderer_vk->activate_render_graph("draw_sponza_pipeline");
