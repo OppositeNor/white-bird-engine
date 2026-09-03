@@ -45,7 +45,7 @@
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
+#include "function/render_vk/rt_run_static_triangle_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_transform.hpp"
 #include "global/global.hh"
@@ -147,7 +147,7 @@ private:
     };
 
     struct TaskUniformBinding {
-        RTRunStaticOpaqueTrianglesVK* task = nullptr;
+        RTRunStaticTriangleSetVK* task = nullptr;
         size_t batch_index = 0;
         uint32_t set_index = 0;
         uint32_t binding = 0;
@@ -177,16 +177,16 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
-    Unique<RTRunStaticOpaqueTrianglesVK> compile_shadow_task();
-    Unique<RTRunStaticOpaqueTrianglesVK> compile_gbuffer_task();
+    Unique<RTRunStaticTriangleSetVK> compile_shadow_task();
+    Unique<RTRunStaticTriangleSetVK> compile_gbuffer_task();
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
-    void write_dynamic_camera_descriptors(std::span<RTRunStaticOpaqueTrianglesVK* const> p_gbuffer_tasks);
-    void write_dynamic_light_descriptors(std::span<RTRunStaticOpaqueTrianglesVK* const> p_shadow_tasks);
+    void write_dynamic_camera_descriptors(std::span<RTRunStaticTriangleSetVK* const> p_gbuffer_tasks);
+    void write_dynamic_light_descriptors(std::span<RTRunStaticTriangleSetVK* const> p_shadow_tasks);
     void register_deferred_render_graph(std::string_view p_graph_id,
         bool p_use_summed_area_table,
-        Unique<RTRunStaticOpaqueTrianglesVK>& p_shadow_task,
-        Unique<RTRunStaticOpaqueTrianglesVK>& p_gbuffer_task);
+        Unique<RTRunStaticTriangleSetVK>& p_shadow_task,
+        Unique<RTRunStaticTriangleSetVK>& p_gbuffer_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_horizontal_task_desc() const;
@@ -458,8 +458,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     auto summed_area_table_shadow_task = compile_shadow_task();
     auto mipmap_gbuffer_task = compile_gbuffer_task();
     auto summed_area_table_gbuffer_task = compile_gbuffer_task();
-    std::array<RTRunStaticOpaqueTrianglesVK*, 2> gbuffer_tasks{mipmap_gbuffer_task.get(), summed_area_table_gbuffer_task.get()};
-    std::array<RTRunStaticOpaqueTrianglesVK*, 2> shadow_tasks{mipmap_shadow_task.get(), summed_area_table_shadow_task.get()};
+    std::array<RTRunStaticTriangleSetVK*, 2> gbuffer_tasks{mipmap_gbuffer_task.get(), summed_area_table_gbuffer_task.get()};
+    std::array<RTRunStaticTriangleSetVK*, 2> shadow_tasks{mipmap_shadow_task.get(), summed_area_table_shadow_task.get()};
     write_dynamic_camera_descriptors(gbuffer_tasks);
     write_dynamic_light_descriptors(shadow_tasks);
     register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, mipmap_shadow_task, mipmap_gbuffer_task);
@@ -468,8 +468,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
-Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_gbuffer_task() {
-    RTRunStaticOpaqueTrianglesVK::Config task_config;
+Unique<RTRunStaticTriangleSetVK> ApplicationVulkanDeferredPBRTest::compile_gbuffer_task() {
+    RTRunStaticTriangleSetVK::Config task_config;
     VkClearValue color_clear{};
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     task_config.set_graphics_pipeline_resource_key("deferred_gbuffer")
@@ -481,7 +481,7 @@ Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_g
         .add_clear_value(color_clear)
         .add_clear_value(color_clear)
         .add_clear_value(depth_clear);
-    return make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
+    return make_unique<RTRunStaticTriangleSetVK>(render_allocator, renderer_vk, task_config);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
@@ -495,7 +495,8 @@ void ApplicationVulkanDeferredPBRTest::setup_render_context() {
 void ApplicationVulkanDeferredPBRTest::load_resources() {
     auto* resource_manager = ResourceManager::get_singleton();
     stdout_log(WBE_CHANNEL_DEBUG)->message("Loading render resources...");
-    auto resource_chunk = make_ref<ResourceChunkLoadFile>(global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
+    auto resource_chunk = make_ref<ResourceChunkLoadFile>(
+        global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza.mesh");
@@ -536,8 +537,10 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
-    render_database->set_static_opaque_triangles(sponza_mesh.get());
-    renderer_vk->update_static_opaque_triangles();
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Setting static triangle set...");
+    render_database->set_static_triangle_set(sponza_mesh.get());
+    renderer_vk->update_static_triangle_set();
+    stdout_log(WBE_CHANNEL_DEBUG)->message("Static triangle set set.");
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -762,8 +765,8 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                            .create_ref(base_render_data);
 }
 
-Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task() {
-    RTRunStaticOpaqueTrianglesVK::Config task_config;
+Unique<RTRunStaticTriangleSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task() {
+    RTRunStaticTriangleSetVK::Config task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
     VkClearValue shadow_moments_clear{};
@@ -781,7 +784,7 @@ Unique<RTRunStaticOpaqueTrianglesVK> ApplicationVulkanDeferredPBRTest::compile_s
         .add_clear_value(shadow_depth_clear)
         .add_graphics_pipeline_override("forward_cook_torrance_pbr", "rsm_spot")
         .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "rsm_spot_masked");
-    auto task = make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
+    auto task = make_unique<RTRunStaticTriangleSetVK>(render_allocator, renderer_vk, task_config);
     return task;
 }
 
@@ -904,7 +907,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     present_post_processing_descriptor_set_bindings = std::move(present_compiled.descriptor_set_bindings);
 }
 
-void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::span<RTRunStaticOpaqueTrianglesVK* const> p_gbuffer_tasks) {
+void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::span<RTRunStaticTriangleSetVK* const> p_gbuffer_tasks) {
     if (p_gbuffer_tasks.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled pipelines produced no descriptor sets.");
     }
@@ -912,7 +915,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     gbuffer_camera_bindings.clear();
     gbuffer_camera_bindings.reserve(p_gbuffer_tasks.size());
-    for (RTRunStaticOpaqueTrianglesVK* gbuffer_task : p_gbuffer_tasks) {
+    for (RTRunStaticTriangleSetVK* gbuffer_task : p_gbuffer_tasks) {
         if (gbuffer_task == nullptr || gbuffer_task->get_compiled_batch_count() == 0) {
             throw std::runtime_error("Failed to setup deferred test: a G-buffer task produced no compiled batches.");
         }
@@ -963,7 +966,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
     write_compute_uniform_bindings(composition_camera_bindings, composition_camera_info_ubos, sizeof(CompositionCameraInfo));
 }
 
-void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span<RTRunStaticOpaqueTrianglesVK* const> p_shadow_tasks) {
+void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span<RTRunStaticTriangleSetVK* const> p_shadow_tasks) {
     if (p_shadow_tasks.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled light pipelines produced no descriptor sets.");
     }
@@ -971,7 +974,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     shadow_light_bindings.clear();
 
-    for (RTRunStaticOpaqueTrianglesVK* shadow_task : p_shadow_tasks) {
+    for (RTRunStaticTriangleSetVK* shadow_task : p_shadow_tasks) {
         for (size_t batch_index = 0; batch_index < shadow_task->get_compiled_batch_count(); ++batch_index) {
             auto [set, binding] = shadow_task->get_descriptor_binding(batch_index, "light_camera_info");
             shadow_light_bindings.push_back(TaskUniformBinding{
@@ -1018,8 +1021,8 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span
 
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::string_view p_graph_id,
     bool p_use_summed_area_table,
-    Unique<RTRunStaticOpaqueTrianglesVK>& p_shadow_task,
-    Unique<RTRunStaticOpaqueTrianglesVK>& p_gbuffer_task) {
+    Unique<RTRunStaticTriangleSetVK>& p_shadow_task,
+    Unique<RTRunStaticTriangleSetVK>& p_gbuffer_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
     pipeline_desc.add_task(RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));

@@ -116,10 +116,10 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
  * @throws std::runtime_error When attributes, roles, locations, formats, arguments, or resource layout metadata are invalid.
  */
 VertexInputDescriptionVK build_vertex_input_description_vk(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data);
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data);
 
 /**
- * @copydoc build_vertex_input_description_vk(const ShaderMetadata&, std::string_view, const RUVertexData&)
+ * @copydoc build_vertex_input_description_vk(const ShaderMetadata&, std::string_view, const RUVertexView&)
  */
 VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
     std::string_view p_entry_name,

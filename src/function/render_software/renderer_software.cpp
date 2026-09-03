@@ -62,7 +62,7 @@ void RendererSoftware::update_render_graph_resources(
     // TODO
     throw std::runtime_error("Not implemented.");
 }
-void RendererSoftware::update_static_opaque_triangles() {
+void RendererSoftware::update_static_triangle_set() {
     // TODO
 }
 std::future<void> RendererSoftware::add_job(std::function<void()> p_job) {

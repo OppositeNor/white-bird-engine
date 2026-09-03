@@ -118,10 +118,60 @@ struct MaterialParamsBuffer {
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
+/** Per-submesh metadata for one static-set draw entry. */
+struct SubmeshData {
+    /** Material table entry used by this submesh. */
+    uint material_id;
+    uint padding_0;
+    uint padding_1;
+    uint padding_2;
+};
+
+/** Per-node transform payload referenced by static-set instances. */
+struct NodeData {
+    /** Engine-space column-major global transform. */
+    float4x4 transform;
+};
+
+/** Per-drawn-instance metadata linking one submesh to one node transform. */
+struct InstanceData {
+    /** Index into the static_submeshes storage buffer. */
+    uint submesh_index;
+    /** Index into the static_nodes storage buffer. */
+    uint node_index;
+    uint padding_0;
+    uint padding_1;
+};
+
 /**
  * @brief Mathematical constant pi.
  */
 static const float WBE_PI = 3.14159265359;
+
+/**
+ * @brief Transform an object-space normal into world space for static geometry.
+ * @param p_transform Object-to-world transform.
+ * @param p_normal Object-space normal.
+ * @return Unit-length world-space normal.
+ */
+float3x3 inverse_3x3(float3x3 p_matrix) {
+    float3 row0 = p_matrix[0];
+    float3 row1 = p_matrix[1];
+    float3 row2 = p_matrix[2];
+    float3 cofactor0 = cross(row1, row2);
+    float3 cofactor1 = cross(row2, row0);
+    float3 cofactor2 = cross(row0, row1);
+    float determinant = dot(row0, cofactor0);
+    if (abs(determinant) < 0.000001) {
+        return float3x3(1.0);
+    }
+    return transpose(float3x3(cofactor0, cofactor1, cofactor2)) / determinant;
+}
+
+float3 transform_static_normal(float4x4 p_transform, float3 p_normal) {
+    float3x3 normal_transform = transpose(inverse_3x3((float3x3)p_transform));
+    return normalize(mul(normal_transform, p_normal));
+}
 
 /**
  * @brief Compute the Chebyshev upper bound for a value from its first two moments.

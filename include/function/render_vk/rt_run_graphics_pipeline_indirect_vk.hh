@@ -170,6 +170,21 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
 
     /**
+     * @brief Construct a task with task-owned pipelines and draw buffers.
+     */
+    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
+        std::span<const VkClearValue> p_clear_values,
+        VkExtent2D p_render_extent,
+        std::span<const std::string_view> p_color_attachment_ids,
+        std::optional<std::string_view> p_depth_attachment_id,
+        Ref<ROBufferVK> p_vertex_buffer,
+        Ref<ROBufferVK> p_index_buffer,
+        Ref<ROBufferVK> p_indirect_buffer,
+        std::span<const PipelineBatch> p_pipeline_batches,
+        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
+
+    /**
      * @brief Construct one render task containing multiple contiguous graphics-pipeline batches.
      *
      * @param p_render_data Renderer state used while recording.
@@ -217,6 +232,8 @@ private:
     std::string vertex_buffer_id;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
+    Ref<ROBufferVK> vertex_buffer = MEM_NULL;
+    Ref<ROBufferVK> index_buffer = MEM_NULL;
     Ref<ROBufferVK> indirect_buffer = MEM_NULL;
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
 };

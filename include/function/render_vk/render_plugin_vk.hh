@@ -130,7 +130,7 @@ public:
      * @param p_object_id_buffer Shared static-opaque object-id buffer.
      * @return An optional GPU job to enqueue after the shared buffers are updated.
      */
-    virtual GPUJobVK on_static_opaque_triangles_updated(BaseRenderDataVK* p_render_data,
+    virtual GPUJobVK on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
         const RenderDatabase::OpaqueTrianglesInfo& p_info,
         Ref<ROBufferVK> p_vertex_buffer,
         Ref<ROBufferVK> p_index_buffer,

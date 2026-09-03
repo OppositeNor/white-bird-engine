@@ -249,8 +249,8 @@ void ApplicationVulkanDrawCubeTest::load_resources() {
 }
 
 void ApplicationVulkanDrawCubeTest::setup_static_scene_resources() {
-    render_database->set_static_opaque_triangles(cube_mesh.get());
-    renderer_vk->update_static_opaque_triangles();
+    render_database->set_static_triangle_set(cube_mesh.get());
+    renderer_vk->update_static_triangle_set();
 }
 
 void ApplicationVulkanDrawCubeTest::setup_spot_light() {
@@ -388,7 +388,7 @@ std::pair<WBE::VertexInputDescriptionVK, VkDeviceSize> ApplicationVulkanDrawCube
     if (p_pipeline == nullptr || p_pipeline->vertex_stage == nullptr) {
         throw std::runtime_error("Failed to setup draw cube test: vertex shader resource is missing.");
     }
-    const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+    const auto& triangles_info = render_database->get_static_triangle_set_info();
     if (triangles_info.draw_groups.size() != 1) {
         throw std::runtime_error("Failed to setup draw cube test: expected one vertex draw group.");
     }

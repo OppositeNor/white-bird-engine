@@ -159,6 +159,42 @@ public:
         return static_opaque_mesh;
     }
 
+    /**
+     * @brief Set the non-owning static opaque set resource.
+     *
+     * @param p_set The non-owning static opaque set resource to publish for rendering.
+     */
+    void set_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) {
+        static_opaque_set = p_set;
+    }
+
+    /**
+     * @brief Get the non-owning static opaque set resource.
+     *
+     * @return The non-owning static opaque set resource, or null when no set is set.
+     */
+    RefRes<RUStaticOpaqueSet> get_static_opaque_set() const {
+        return static_opaque_set;
+    }
+
+    /**
+     * @brief Set the non-owning static masked set resource.
+     *
+     * @param p_set The non-owning static masked set resource to publish for rendering.
+     */
+    void set_static_masked_set(RefRes<RUStaticMaskedSet> p_set) {
+        static_masked_set = p_set;
+    }
+
+    /**
+     * @brief Get the non-owning static masked set resource.
+     *
+     * @return The non-owning static masked set resource, or null when no set is set.
+     */
+    RefRes<RUStaticMaskedSet> get_static_masked_set() const {
+        return static_masked_set;
+    }
+
 private:
     void cache_component_lists();
 
@@ -168,6 +204,8 @@ private:
     HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
     String<HeapAllocatorDefault> render_graph_resource_key;
     RefRes<RUMesh3D> static_opaque_mesh;
+    RefRes<RUStaticOpaqueSet> static_opaque_set;
+    RefRes<RUStaticMaskedSet> static_masked_set;
 };
 
 } // namespace WhiteBirdEngine

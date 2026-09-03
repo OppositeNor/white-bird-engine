@@ -1304,11 +1304,11 @@ static Ref<ROBufferVK> build_or_resize_host_visible_buffer(
     return buffer;
 }
 
-void RendererVK::update_static_opaque_triangles() {
+void RendererVK::update_static_triangle_set() {
     WBE_DEBUG_ASSERT(render_database != MEM_NULL);
     synchronize_gpu_and_flush_delayed_calls();
-    render_database->refresh_static_opaque_triangles();
-    const auto& info = render_database->get_static_opaque_triangles_info();
+    render_database->refresh_static_triangle_set();
+    const auto& info = render_database->get_static_triangle_set_info();
 
     VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
@@ -1323,7 +1323,7 @@ void RendererVK::update_static_opaque_triangles() {
     render_objects->static_opaque_obj_ids = build_or_resize_host_visible_buffer(
         &base_render_data, render_objects->static_opaque_obj_ids, info.obj_id, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     for (auto& plugin : registered_plugins) {
-        auto plugin_job = plugin->on_static_opaque_triangles_updated(&base_render_data,
+        auto plugin_job = plugin->on_static_triangle_set_updated(&base_render_data,
             info,
             render_objects->static_opaque_vertices,
             render_objects->static_opaque_indices,

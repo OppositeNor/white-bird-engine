@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
+#include "function/render_vk/rt_run_static_triangle_set_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
@@ -58,30 +58,30 @@
 
 namespace WhiteBirdEngine {
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_default_material_resource_key(std::string_view p_resource_key) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_default_material_resource_key(std::string_view p_resource_key) {
     default_material_resource_key = p_resource_key;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_material_textures_variable_name(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_textures_variable_name(
     std::string_view p_variable_name) {
     material_textures_variable_name = p_variable_name;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_material_params_variable_name(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_params_variable_name(
     std::string_view p_variable_name) {
     material_params_variable_name = p_variable_name;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_graphics_pipeline_resource_key(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_graphics_pipeline_resource_key(
     std::string_view p_resource_key) {
     graphics_pipeline_resource_key = p_resource_key;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::add_graphics_pipeline_override(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::add_graphics_pipeline_override(
     std::string_view p_source_resource_key, std::string_view p_target_resource_key) {
     PipelineOverride pipeline_override;
     pipeline_override.source_resource_key = p_source_resource_key;
@@ -90,136 +90,136 @@ RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::add_
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_render_extent(VkExtent2D p_render_extent) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_render_extent(VkExtent2D p_render_extent) {
     render_extent = p_render_extent;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::add_color_attachment(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::add_color_attachment(
     std::string_view p_resource_id, VkFormat p_format) {
     color_attachment_ids.emplace_back(p_resource_id);
     color_attachment_formats.push_back(p_format);
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_depth_attachment(
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_depth_attachment(
     std::string_view p_resource_id, VkFormat p_format) {
     depth_attachment_id = p_resource_id;
     depth_attachment_format = p_format;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_stencil_attachment_format(VkFormat p_format) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_stencil_attachment_format(VkFormat p_format) {
     stencil_attachment_format = p_format;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::add_clear_value(VkClearValue p_clear_value) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::add_clear_value(VkClearValue p_clear_value) {
     clear_values.push_back(p_clear_value);
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_color_attachment_load_op(VkAttachmentLoadOp p_load_op) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_color_attachment_load_op(VkAttachmentLoadOp p_load_op) {
     color_attachment_load_op = p_load_op;
     return *this;
 }
 
-RTRunStaticOpaqueTrianglesVK::Config& RTRunStaticOpaqueTrianglesVK::Config::set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op) {
     depth_attachment_load_op = p_load_op;
     return *this;
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_default_material_resource_key() const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_default_material_resource_key() const {
     return default_material_resource_key;
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_material_textures_variable_name() const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_material_textures_variable_name() const {
     return material_textures_variable_name;
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_material_params_variable_name() const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_material_params_variable_name() const {
     return material_params_variable_name;
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_graphics_pipeline_resource_key() const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_graphics_pipeline_resource_key() const {
     return graphics_pipeline_resource_key;
 }
 
-size_t RTRunStaticOpaqueTrianglesVK::Config::get_graphics_pipeline_override_count() const {
+size_t RTRunStaticTriangleSetVK::Config::get_graphics_pipeline_override_count() const {
     return graphics_pipeline_overrides.size();
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_graphics_pipeline_override_source(size_t p_index) const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_graphics_pipeline_override_source(size_t p_index) const {
     if (p_index >= graphics_pipeline_overrides.size()) {
         throw std::runtime_error("Failed to read static opaque task configuration: pipeline override index is out of bounds.");
     }
     return graphics_pipeline_overrides[p_index].source_resource_key;
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_graphics_pipeline_override_target(size_t p_index) const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_graphics_pipeline_override_target(size_t p_index) const {
     if (p_index >= graphics_pipeline_overrides.size()) {
         throw std::runtime_error("Failed to read static opaque task configuration: pipeline override index is out of bounds.");
     }
     return graphics_pipeline_overrides[p_index].target_resource_key;
 }
 
-VkExtent2D RTRunStaticOpaqueTrianglesVK::Config::get_render_extent() const {
+VkExtent2D RTRunStaticTriangleSetVK::Config::get_render_extent() const {
     return render_extent;
 }
 
-size_t RTRunStaticOpaqueTrianglesVK::Config::get_color_attachment_count() const {
+size_t RTRunStaticTriangleSetVK::Config::get_color_attachment_count() const {
     return color_attachment_ids.size();
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_color_attachment_id(size_t p_index) const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_color_attachment_id(size_t p_index) const {
     if (p_index >= color_attachment_ids.size()) {
         throw std::runtime_error("Failed to read static opaque task configuration: color attachment index is out of bounds.");
     }
     return color_attachment_ids[p_index];
 }
 
-VkFormat RTRunStaticOpaqueTrianglesVK::Config::get_color_attachment_format(size_t p_index) const {
+VkFormat RTRunStaticTriangleSetVK::Config::get_color_attachment_format(size_t p_index) const {
     if (p_index >= color_attachment_formats.size()) {
         throw std::runtime_error("Failed to read static opaque task configuration: color attachment index is out of bounds.");
     }
     return color_attachment_formats[p_index];
 }
 
-bool RTRunStaticOpaqueTrianglesVK::Config::has_depth_attachment() const {
+bool RTRunStaticTriangleSetVK::Config::has_depth_attachment() const {
     return depth_attachment_id.has_value();
 }
 
-std::string_view RTRunStaticOpaqueTrianglesVK::Config::get_depth_attachment_id() const {
+std::string_view RTRunStaticTriangleSetVK::Config::get_depth_attachment_id() const {
     if (!depth_attachment_id.has_value()) {
         throw std::runtime_error("Failed to read static opaque task configuration: no depth attachment is configured.");
     }
     return *depth_attachment_id;
 }
 
-VkFormat RTRunStaticOpaqueTrianglesVK::Config::get_depth_attachment_format() const {
+VkFormat RTRunStaticTriangleSetVK::Config::get_depth_attachment_format() const {
     return depth_attachment_format;
 }
 
-VkFormat RTRunStaticOpaqueTrianglesVK::Config::get_stencil_attachment_format() const {
+VkFormat RTRunStaticTriangleSetVK::Config::get_stencil_attachment_format() const {
     return stencil_attachment_format;
 }
 
-size_t RTRunStaticOpaqueTrianglesVK::Config::get_clear_value_count() const {
+size_t RTRunStaticTriangleSetVK::Config::get_clear_value_count() const {
     return clear_values.size();
 }
 
-VkClearValue RTRunStaticOpaqueTrianglesVK::Config::get_clear_value(size_t p_index) const {
+VkClearValue RTRunStaticTriangleSetVK::Config::get_clear_value(size_t p_index) const {
     if (p_index >= clear_values.size()) {
         throw std::runtime_error("Failed to read static opaque task configuration: clear value index is out of bounds.");
     }
     return clear_values[p_index];
 }
 
-VkAttachmentLoadOp RTRunStaticOpaqueTrianglesVK::Config::get_color_attachment_load_op() const {
+VkAttachmentLoadOp RTRunStaticTriangleSetVK::Config::get_color_attachment_load_op() const {
     return color_attachment_load_op;
 }
 
-VkAttachmentLoadOp RTRunStaticOpaqueTrianglesVK::Config::get_depth_attachment_load_op() const {
+VkAttachmentLoadOp RTRunStaticTriangleSetVK::Config::get_depth_attachment_load_op() const {
     return depth_attachment_load_op;
 }
 
@@ -299,7 +299,7 @@ const BaseRenderDataVK* get_render_data(RendererVK* p_renderer) {
     return p_renderer->get_base_render_data();
 }
 
-void validate_task_config(const RTRunStaticOpaqueTrianglesVK::Config& p_config) {
+void validate_task_config(const RTRunStaticTriangleSetVK::Config& p_config) {
     if (p_config.get_default_material_resource_key().empty() || p_config.get_material_textures_variable_name().empty() ||
         p_config.get_material_params_variable_name().empty()) {
         throw std::runtime_error("Failed to construct static opaque task: material contract base names must not be empty.");
@@ -389,7 +389,7 @@ void append_indirect_commands(StaticOpaqueDrawDataVK& p_draw_data, const RenderD
     }
 }
 
-void validate_pipeline_overrides(const RTRunStaticOpaqueTrianglesVK::Config& p_config) {
+void validate_pipeline_overrides(const RTRunStaticTriangleSetVK::Config& p_config) {
     for (size_t i = 0; i < p_config.get_graphics_pipeline_override_count(); ++i) {
         if (p_config.get_graphics_pipeline_override_source(i).empty() || p_config.get_graphics_pipeline_override_target(i).empty()) {
             throw std::runtime_error("Failed to construct static opaque task: pipeline override keys must not be empty.");
@@ -397,7 +397,7 @@ void validate_pipeline_overrides(const RTRunStaticOpaqueTrianglesVK::Config& p_c
     }
 }
 
-std::string resolve_target_pipeline_key(std::string_view p_source_pipeline_key, const RTRunStaticOpaqueTrianglesVK::Config& p_config) {
+std::string resolve_target_pipeline_key(std::string_view p_source_pipeline_key, const RTRunStaticTriangleSetVK::Config& p_config) {
     if (!p_config.get_graphics_pipeline_resource_key().empty()) {
         return std::string(p_config.get_graphics_pipeline_resource_key());
     }
@@ -429,7 +429,7 @@ void append_pipeline_batch(StaticOpaqueDrawDataVK& p_draw_data,
 
 void append_pipeline_batches(StaticOpaqueDrawDataVK& p_draw_data,
     const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config) {
+    const RTRunStaticTriangleSetVK::Config& p_config) {
     auto* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr) {
         throw std::runtime_error("Failed to construct static opaque task: resource manager is missing.");
@@ -462,7 +462,7 @@ void append_pipeline_batches(StaticOpaqueDrawDataVK& p_draw_data,
 }
 
 StaticOpaqueDrawDataVK build_draw_data(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config,
+    const RTRunStaticTriangleSetVK::Config& p_config,
     RenderAllocator* p_allocator) {
     validate_draw_data_source(p_triangles_info);
     StaticOpaqueDrawDataVK result(p_allocator);
@@ -528,7 +528,7 @@ int32_t append_material_texture_declaration(RenderBindpointDeclarationsBuilder& 
 
 std::vector<int32_t> append_default_material_textures(RenderBindpointDeclarationsBuilder& p_bindpoint_builder,
     const MaterialTextureContract& p_contract,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config,
+    const RTRunStaticTriangleSetVK::Config& p_config,
     const BaseRenderDataVK* p_render_data,
     RefRes<RUMaterial> p_default_material,
     RefRes<RUImage>& p_default_image) {
@@ -597,7 +597,7 @@ void append_material_texture_overrides(RenderBindpointDeclarationsBuilder& p_bin
 
 StaticOpaqueMaterialDataVK build_material_data(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
     const StaticOpaqueDrawDataVK::PipelineBatch& p_draw_batch,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config,
+    const RTRunStaticTriangleSetVK::Config& p_config,
     const BaseRenderDataVK* p_render_data,
     RefRes<RUMaterial> p_default_material,
     Ref<IRenderObject> p_material_sampler) {
@@ -624,7 +624,7 @@ StaticOpaqueMaterialDataVK build_material_data(const RenderDatabase::OpaqueTrian
     return result;
 }
 
-RefRes<RUMaterial> get_default_material(const RTRunStaticOpaqueTrianglesVK::Config& p_config) {
+RefRes<RUMaterial> get_default_material(const RTRunStaticTriangleSetVK::Config& p_config) {
     auto* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr) {
         throw std::runtime_error("Failed to construct static opaque task: resource manager is missing.");
@@ -646,7 +646,7 @@ void validate_indirect_draw_count(const StaticOpaqueDrawDataVK& p_draw_data, con
 }
 
 StaticOpaqueAttachmentDataVK build_attachment_data(
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
+    const RTRunStaticTriangleSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
     StaticOpaqueAttachmentDataVK result;
     result.render_extent = p_config.get_render_extent();
     for (size_t i = 0; i < p_config.get_color_attachment_count(); ++i) {
@@ -692,7 +692,7 @@ std::string make_pipeline_key(
 
 StaticOpaqueCompiledPipelineBatchVK compile_pipeline_batch(const RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
     const StaticOpaqueDrawDataVK::PipelineBatch& p_draw_batch,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config,
+    const RTRunStaticTriangleSetVK::Config& p_config,
     GraphicsPipelineCompilerVKContext p_compiler_context,
     RefRes<RUMaterial> p_default_material,
     Ref<IRenderObject> p_material_sampler) {
@@ -726,7 +726,7 @@ Ref<ROBufferVK> build_indirect_commands_buffer(const StaticOpaqueDrawDataVK& p_d
 Unique<RTRunGraphicsPipelineIndirectVK> build_indirect_task(RenderAllocator* p_allocator,
     const BaseRenderDataVK* p_render_data,
     StaticOpaqueAttachmentDataVK p_attachment_data,
-    const RTRunStaticOpaqueTrianglesVK::Config& p_config,
+    const RTRunStaticTriangleSetVK::Config& p_config,
     Ref<ROBufferVK> p_indirect_commands,
     std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch> p_pipeline_batches,
     VkAttachmentLoadOp p_color_load_op,
@@ -773,13 +773,13 @@ std::string_view get_vertex_stage_entry_name(RefRes<RUGraphicsPipeline> p_pipeli
 
 } // namespace
 
-RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_renderer, const Config& p_config) {
+RTRunStaticTriangleSetVK::RTRunStaticTriangleSetVK(RendererVK* p_renderer, const Config& p_config) {
     validate_task_config(p_config);
     const BaseRenderDataVK* render_data = get_render_data(p_renderer);
     Ref<RenderDatabase> render_database_ref = p_renderer->get_render_database();
     RenderDatabase* render_database = render_database_ref.get();
     RenderAllocator* render_allocator = render_data->allocator;
-    const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+    const auto& triangles_info = render_database->get_static_triangle_set_info();
     auto draw_data = build_draw_data(triangles_info, p_config, render_allocator);
     validate_indirect_draw_count(draw_data, render_data);
     auto attachment_data = build_attachment_data(p_config, render_data);
@@ -831,38 +831,38 @@ RTRunStaticOpaqueTrianglesVK::RTRunStaticOpaqueTrianglesVK(RendererVK* p_rendere
         p_config.get_depth_attachment_load_op());
 }
 
-QueueFamilyVK RTRunStaticOpaqueTrianglesVK::queue_family() const {
+QueueFamilyVK RTRunStaticTriangleSetVK::queue_family() const {
     return indirect_task->queue_family();
 }
 
-void RTRunStaticOpaqueTrianglesVK::validate_resources(const RendResViewVK& p_resources) const {
+void RTRunStaticTriangleSetVK::validate_resources(const RendResViewVK& p_resources) const {
     indirect_task->validate_resources(p_resources);
 }
 
-Vector<ResAccessVK, RenderAllocator> RTRunStaticOpaqueTrianglesVK::read_resources() const {
+Vector<ResAccessVK, RenderAllocator> RTRunStaticTriangleSetVK::read_resources() const {
     return indirect_task->read_resources();
 }
 
-Vector<ResAccessVK, RenderAllocator> RTRunStaticOpaqueTrianglesVK::write_resources() const {
+Vector<ResAccessVK, RenderAllocator> RTRunStaticTriangleSetVK::write_resources() const {
     return indirect_task->write_resources();
 }
 
-void RTRunStaticOpaqueTrianglesVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) {
+void RTRunStaticTriangleSetVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) {
     indirect_task->record(p_command_buffer, p_resources, p_delta);
 }
 
-size_t RTRunStaticOpaqueTrianglesVK::get_compiled_batch_count() const {
+size_t RTRunStaticTriangleSetVK::get_compiled_batch_count() const {
     return compiled_batches.size();
 }
 
-void RTRunStaticOpaqueTrianglesVK::write_descriptor_set(size_t p_batch_index, size_t p_set_index, const RODescriptorSetVK::Writer& p_writer) {
+void RTRunStaticTriangleSetVK::write_descriptor_set(size_t p_batch_index, size_t p_set_index, const RODescriptorSetVK::Writer& p_writer) {
     if (p_batch_index >= compiled_batches.size() || compiled_batches[p_batch_index].graphics_pipeline == MEM_NULL) {
         throw std::runtime_error("Failed to write static opaque task descriptor set: batch index is out of bounds.");
     }
     compiled_batches[p_batch_index].graphics_pipeline->write_descriptor_set(static_cast<uint32_t>(p_set_index), p_writer);
 }
 
-RTRunStaticOpaqueTrianglesVK::DescriptorBinding RTRunStaticOpaqueTrianglesVK::get_descriptor_binding(
+RTRunStaticTriangleSetVK::DescriptorBinding RTRunStaticTriangleSetVK::get_descriptor_binding(
     size_t p_batch_index, std::string_view p_field_path) const {
     if (p_batch_index >= compiled_batches.size()) {
         throw std::runtime_error("Failed to get static opaque task descriptor binding: batch index is out of bounds.");

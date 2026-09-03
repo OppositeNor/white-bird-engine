@@ -141,6 +141,35 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     }
 }
 
+RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, // NOLINT
+    std::span<const VkClearValue> p_clear_values,
+    VkExtent2D p_render_extent,
+    std::span<const std::string_view> p_color_attachment_ids,
+    std::optional<std::string_view> p_depth_attachment_id,
+    Ref<ROBufferVK> p_vertex_buffer,
+    Ref<ROBufferVK> p_index_buffer,
+    Ref<ROBufferVK> p_indirect_buffer,
+    std::span<const PipelineBatch> p_pipeline_batches,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VkAttachmentLoadOp p_depth_attachment_load_op)
+    : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
+      color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
+      render_extent(p_render_extent),
+      color_attachment_ids(p_color_attachment_ids.begin(), p_color_attachment_ids.end(), p_render_data->allocator),
+      depth_attachment_id(p_depth_attachment_id.has_value() ? std::optional<std::string>(*p_depth_attachment_id) : std::nullopt),
+      vertex_buffer(std::move(p_vertex_buffer)), index_buffer(std::move(p_index_buffer)),
+      indirect_buffer(std::move(p_indirect_buffer)),
+      pipeline_batches(p_pipeline_batches.begin(), p_pipeline_batches.end(), p_render_data->allocator) {
+    if (vertex_buffer == nullptr || index_buffer == nullptr || indirect_buffer == nullptr) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: task-owned draw buffers must not be null.");
+    }
+    for (const auto& batch : pipeline_batches) {
+        if (batch.graphics_pipeline == nullptr) {
+            throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: task-owned graphics pipeline is null.");
+        }
+    }
+}
+
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resources() const {
     Vector<ResAccessVK, RenderAllocator> read_accesses(render_data->allocator);
     for (const std::string& color_attachment_id : color_attachment_ids) {
@@ -151,8 +180,12 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resou
     if (depth_attachment_id.has_value() && depth_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
         read_accesses.push_back({.res_id = *depth_attachment_id, .usage = RendResUsageVK::DEPTH_ATTACHMENT});
     }
-    read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
-    read_accesses.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
+    if (vertex_buffer == nullptr) {
+        read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    }
+    if (index_buffer == nullptr) {
+        read_accesses.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
+    }
     if (indirect_buffer == nullptr) {
         read_accesses.push_back({.res_id = indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
     }
@@ -188,8 +221,15 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     VkCommandBuffer p_command_buffer,
     const RendResViewVK& p_resources,
     double /*p_delta*/) {
-    auto vertex_buffer = WBE_REQUIRES_VALID(p_resources.get(vertex_buffer_id).container->get().dynamic_cast_ref<ROBufferVK>());
-    auto index_buffer = WBE_REQUIRES_VALID(p_resources.get(index_buffer_id).container->get().dynamic_cast_ref<ROBufferVK>());
+    Ref<ROBufferVK> resolved_vertex_buffer = vertex_buffer;
+    if (resolved_vertex_buffer == nullptr) {
+        resolved_vertex_buffer =
+            WBE_REQUIRES_VALID(p_resources.get(vertex_buffer_id).container->get().dynamic_cast_ref<ROBufferVK>());
+    }
+    Ref<ROBufferVK> resolved_index_buffer = index_buffer;
+    if (resolved_index_buffer == nullptr) {
+        resolved_index_buffer = WBE_REQUIRES_VALID(p_resources.get(index_buffer_id).container->get().dynamic_cast_ref<ROBufferVK>());
+    }
     Ref<ROBufferVK> resolved_indirect_buffer = indirect_buffer;
     if (resolved_indirect_buffer == nullptr) {
         resolved_indirect_buffer =
@@ -255,7 +295,7 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     vkCmdSetViewport(p_command_buffer, 0, 1, &viewport);
     VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
-    vkCmdBindIndexBuffer(p_command_buffer, index_buffer->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(p_command_buffer, resolved_index_buffer->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
     if (render_data->command_set_vertex_input == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: dynamic vertex-input command is unavailable.");
     }
@@ -265,7 +305,7 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: pipeline batch attachment counts do not match.");
         }
         vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_pipeline());
-        VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
+        VkBuffer vertex_buffer_handle = resolved_vertex_buffer->get_buffer();
         vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &batch.vertex_buffer_offset);
         render_data->command_set_vertex_input(p_command_buffer,
             static_cast<uint32_t>(batch.vertex_input.bindings.size()),

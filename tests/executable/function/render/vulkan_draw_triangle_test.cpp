@@ -87,7 +87,7 @@ public:
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
                             .compile("draw_triangle_pipeline", pipeline_resource, bindpoint_builder.build());
         auto graphics_pipeline = compiled.graphics_pipeline;
-        // Setup time UBO
+        // Setup time uniform buffer
         time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator,
             base_render_data,
             WBE::ROBufferVK::Builder()
@@ -100,10 +100,10 @@ public:
             WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
                 WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = time_ubo, .offset = 0, .range = sizeof(WBE::TimeVKUBO)}));
         // Setup render task. The vertex/index data lives in the global static
-        // opaque mesh, populated by RendererVK::update_static_opaque_triangles()
+        // opaque mesh, populated by RendererVK::update_static_triangle_set()
         // from the RenderDatabase, and exposed to render tasks under the
         // REND_RES_STATIC_{VERTICES,INDICES} global IDs.
-        const auto& triangles_info = WBE::RenderDatabase::get_singleton()->get_static_opaque_triangles_info();
+        const auto& triangles_info = WBE::RenderDatabase::get_singleton()->get_static_triangle_set_info();
         if (triangles_info.draw_groups.size() != 1) {
             throw std::runtime_error("Failed to setup draw triangle test: expected one vertex draw group.");
         }
@@ -145,8 +145,8 @@ int main(int p_argc, char* p_argv[]) {
         ApplicationVulkanDrawPipelineTest game_application;
         // Setup triangle's mesh
         auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
-        WBE::RenderDatabase::get_singleton()->set_static_opaque_triangles(triangle_mesh.get());
-        game_application.get_renderer()->update_static_opaque_triangles();
+        WBE::RenderDatabase::get_singleton()->set_static_triangle_set(triangle_mesh.get());
+        game_application.get_renderer()->update_static_triangle_set();
         {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_graphics_pipeline();

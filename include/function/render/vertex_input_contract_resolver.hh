@@ -58,7 +58,7 @@ public:
      * @brief Resolve a vertex shader entry against a resource vertex block.
      * @throws std::runtime_error When shader annotations or the resource layout are malformed or incompatible.
      */
-    VertexInputContract resolve(const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data) const;
+    VertexInputContract resolve(const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const;
 
     /**
      * @brief Resolve a vertex shader entry against a copied render-database layout.

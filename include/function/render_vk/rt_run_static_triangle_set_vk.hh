@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
-#define WBE_FILE_RT_RUN_STATIC_OPAQUE_TRIANGLES_VK_HH
+#ifndef WBE_FILE_RT_RUN_STATIC_TRIANGLE_SET_VK_HH
+#define WBE_FILE_RT_RUN_STATIC_TRIANGLE_SET_VK_HH
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
@@ -41,14 +41,14 @@ class RendererVK;
 inline constexpr std::string_view RT_RUN_STATIC_OPAQUE = "run_static_opaque";
 
 /**
- * @class RTRunStaticOpaqueTrianglesVK
- * @brief Render task that compiles and draws the render database's static opaque triangles.
+ * @class RTRunStaticTriangleSetVK
+ * @brief Render task that compiles and draws the render database's static triangle set.
  *
  * The task compiles and retains its graphics pipelines, material descriptors, and indirect-command buffer. Populate
- * RenderDatabase and call RendererVK::update_static_opaque_triangles() before construction. Attachment resources configured
+ * RenderDatabase and call RendererVK::update_static_triangle_set() before construction. Attachment resources configured
  * by Config remain the render graph caller's responsibility.
  */
-class RTRunStaticOpaqueTrianglesVK final : public RenderTaskVK {
+class RTRunStaticTriangleSetVK final : public RenderTaskVK {
 public:
     /**
      * @class Config
@@ -300,17 +300,17 @@ public:
     };
 
     /** @brief Static opaque tasks require a renderer and configuration. */
-    RTRunStaticOpaqueTrianglesVK() = delete;
+    RTRunStaticTriangleSetVK() = delete;
     /** @brief Destroy the task and its retained render objects. */
-    virtual ~RTRunStaticOpaqueTrianglesVK() override = default;
+    virtual ~RTRunStaticTriangleSetVK() override = default;
     /** @brief Static opaque tasks are not copyable. */
-    RTRunStaticOpaqueTrianglesVK(const RTRunStaticOpaqueTrianglesVK&) = delete;
+    RTRunStaticTriangleSetVK(const RTRunStaticTriangleSetVK&) = delete;
     /** @brief Static opaque tasks are not movable. */
-    RTRunStaticOpaqueTrianglesVK(RTRunStaticOpaqueTrianglesVK&&) noexcept = delete;
+    RTRunStaticTriangleSetVK(RTRunStaticTriangleSetVK&&) noexcept = delete;
     /** @brief Static opaque tasks are not copy-assignable. */
-    RTRunStaticOpaqueTrianglesVK& operator=(const RTRunStaticOpaqueTrianglesVK&) = delete;
+    RTRunStaticTriangleSetVK& operator=(const RTRunStaticTriangleSetVK&) = delete;
     /** @brief Static opaque tasks are not move-assignable. */
-    RTRunStaticOpaqueTrianglesVK& operator=(RTRunStaticOpaqueTrianglesVK&&) noexcept = delete;
+    RTRunStaticTriangleSetVK& operator=(RTRunStaticTriangleSetVK&&) noexcept = delete;
 
     /**
      * @brief Compile the task from the renderer's database and generic Vulkan compiler.
@@ -322,7 +322,7 @@ public:
      * @throws std::runtime_error When renderer or resource state is missing, configuration is invalid, reflected material
      * contracts are incompatible, or device draw and descriptor limits are exceeded.
      */
-    RTRunStaticOpaqueTrianglesVK(RendererVK* p_renderer, const Config& p_config);
+    RTRunStaticTriangleSetVK(RendererVK* p_renderer, const Config& p_config);
 
     /** @copydoc RenderTaskVK::queue_family */
     virtual QueueFamilyVK queue_family() const override;

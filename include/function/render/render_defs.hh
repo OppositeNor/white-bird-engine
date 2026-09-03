@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <span>
 #include <string>
 #include <string_view>
@@ -48,6 +49,10 @@ struct RenderBindpointBufferDeclaration {
      * @brief Byte size inside the owning packed bindpoint buffer.
      */
     size_t size = 0;
+    /**
+     * @brief Render-object-backed buffer for storage-buffer descriptors.
+     */
+    Ref<IRenderObject> buffer_render_object = MEM_NULL;
 };
 
 /**
@@ -101,6 +106,7 @@ struct RenderBindpointDeclarationsBuilder {
             .field_path = std::string(p_field_path),
             .offset = declerations.buffer_data.size(),
             .size = p_data.size(),
+            .buffer_render_object = MEM_NULL,
         };
         declerations.buffer_data.resize(declerations.buffer_data.size() + p_data.size());
         if (!p_data.empty()) {
@@ -115,6 +121,18 @@ struct RenderBindpointDeclarationsBuilder {
      */
     RenderBindpointDeclarationsBuilder& add_buffer_decleration(std::string_view p_field_path, const void* p_data, size_t p_size) {
         return add_buffer_decleration(p_field_path, std::span<const uint8_t>(static_cast<const uint8_t*>(p_data), p_size));
+    }
+
+    /**
+     * @brief Add a render-object-backed storage buffer declaration.
+     */
+    RenderBindpointDeclarationsBuilder& add_storage_buffer_decleration(std::string_view p_field_path,
+        Ref<IRenderObject> p_buffer_render_object,
+        size_t p_offset = 0,
+        size_t p_size = std::numeric_limits<size_t>::max()) {
+        declerations.buffer_declerations.push_back(RenderBindpointBufferDeclaration{
+            .field_path = std::string(p_field_path), .offset = p_offset, .size = p_size, .buffer_render_object = p_buffer_render_object});
+        return *this;
     }
 
     /**

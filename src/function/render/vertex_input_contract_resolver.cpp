@@ -46,7 +46,7 @@ struct VertexLayoutView {
     size_t vertex_stride = 0;
 };
 
-static VertexLayoutView make_vertex_layout_view(const RUVertexData& p_vertex_data) {
+static VertexLayoutView make_vertex_layout_view(const RUVertexView& p_vertex_data) {
     if (p_vertex_data.attribute_count > 0 && p_vertex_data.attributes == nullptr) {
         throw std::runtime_error("Failed to resolve vertex input contract: resource attribute metadata is missing.");
     }
@@ -54,7 +54,7 @@ static VertexLayoutView make_vertex_layout_view(const RUVertexData& p_vertex_dat
     result.vertex_stride = p_vertex_data.vertex_stride;
     result.attributes.reserve(p_vertex_data.attribute_count);
     for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
-        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        const RUVertexView::Attribute& attribute = p_vertex_data.attributes.get()[i];
         result.attributes.push_back(VertexAttributeLayoutView{.role_name = attribute.role.get_name(),
             .role_hash = attribute.role.hash,
             .format = attribute.format,
@@ -221,7 +221,7 @@ static VertexInputContract resolve_vertex_input_contract(
 }
 
 VertexInputContract VertexInputContractResolver::resolve(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data) const {
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const {
     return resolve_vertex_input_contract(p_metadata, p_entry_name, make_vertex_layout_view(p_vertex_data));
 }
 

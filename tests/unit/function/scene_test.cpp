@@ -12,9 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/stack_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/engine_core.hh"
+#include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"
@@ -22,12 +24,14 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/scene/scene.hh"
 #include "function/scene/scene_manager.hh"
 #include "function/scene/scene_node.hh"
 #include "function/scene/world.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -140,7 +144,7 @@ public:
         (void)p_binding_count;
     }
 
-    void update_static_opaque_triangles() override {
+    void update_static_triangle_set() override {
     }
 
     std::future<void> add_job(std::function<void()> p_job) override {
@@ -192,6 +196,19 @@ TEST_F(WBEWorldTest, WorldOwnsRenderGraphResourceKey) {
     world.set_render_graph_resource_key("main_graph");
 
     EXPECT_EQ(world.get_render_graph_resource_key(), "main_graph");
+}
+
+TEST_F(WBEWorldTest, WorldOwnsStaticGeometrySetReferences) {
+    WBE::World world(get_allocator());
+    WBE::StackAllocator storage(WBE_KI_B(1));
+    WBE::RefRes<WBE::RUStaticOpaqueSet> opaque_set(storage.allocate(sizeof(WBE::RUStaticOpaqueSet)), &storage);
+    WBE::RefRes<WBE::RUStaticMaskedSet> masked_set(storage.allocate(sizeof(WBE::RUStaticMaskedSet)), &storage);
+
+    world.set_static_opaque_set(opaque_set);
+    world.set_static_masked_set(masked_set);
+
+    EXPECT_EQ(world.get_static_opaque_set(), opaque_set);
+    EXPECT_EQ(world.get_static_masked_set(), masked_set);
 }
 
 TEST_F(WBEWorldTest, WorldCachesComponentListsByComponentTypeId) {

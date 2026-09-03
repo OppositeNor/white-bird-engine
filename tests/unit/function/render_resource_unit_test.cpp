@@ -63,10 +63,10 @@ static RUSubmesh3D make_vertex_setter_submesh(StackAllocator& p_allocator) {
         {.role = "uint3_value", .format = RUVertexAttributeFormat::UINT3, .size = 12},
         {.role = "uint4_value", .format = RUVertexAttributeFormat::UINT4, .size = 16},
     }};
-    std::vector<RUVertexData::Attribute> attributes;
+    std::vector<RUVertexView::Attribute> attributes;
     size_t stride = 0;
     for (const VertexSetterTestSpec& spec : specs) {
-        attributes.push_back(RUVertexData::Attribute{
+        attributes.push_back(RUVertexView::Attribute{
             .role = make_test_shader_role(p_allocator, spec.role), .format = spec.format, .offset = stride, .size = spec.size});
         stride += spec.size;
     }
@@ -74,17 +74,18 @@ static RUSubmesh3D make_vertex_setter_submesh(StackAllocator& p_allocator) {
     std::fill(vertices.begin(), vertices.begin() + static_cast<std::ptrdiff_t>(stride), uint8_t{0x11});
     std::fill(vertices.begin() + static_cast<std::ptrdiff_t>(stride), vertices.end(), uint8_t{0x22});
 
-    RUVertexData vertex_data;
-    vertex_data.vertices = push_render_resource_test_data(p_allocator, vertices.size(), vertices.data()).force_cast<uint8_t>();
-    vertex_data.vertices_size = vertices.size();
-    vertex_data.attributes =
-        push_render_resource_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexData::Attribute>();
-    vertex_data.attribute_count = attributes.size();
-    vertex_data.vertex_stride = stride;
-    vertex_data.vertex_count = 2;
+    RUBinary binary;
+    binary.data = push_render_resource_test_data(p_allocator, vertices.size(), vertices.data());
+    binary.size = vertices.size();
 
     RUSubmesh3D result;
-    result.vertex_data = push_render_resource_test_data(p_allocator, sizeof(vertex_data), &vertex_data).force_cast<RUVertexData>();
+    result.vertices.binary.binary = push_render_resource_test_data(p_allocator, sizeof(binary), &binary).force_cast<RUBinary>();
+    result.vertices.binary.size = vertices.size();
+    result.vertices.attributes =
+        push_render_resource_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexView::Attribute>();
+    result.vertices.attribute_count = attributes.size();
+    result.vertices.vertex_stride = stride;
+    result.vertices.vertex_count = 2;
     return result;
 }
 
@@ -106,7 +107,7 @@ template <typename TValue>
 static TValue read_vertex_setter_value(const RUSubmesh3D& p_submesh, size_t p_vertex_index, std::string_view p_role) {
     TValue result{};
     const size_t offset = p_vertex_index * p_submesh.get_vertex_stride() + p_submesh.get_vertex_attribute_offset(p_role);
-    std::memcpy(&result, p_submesh.vertex_data->vertices.get() + offset, sizeof(result));
+    std::memcpy(&result, p_submesh.vertices.binary.binary->data.get() + p_submesh.vertices.binary.start + offset, sizeof(result));
     return result;
 }
 
@@ -118,8 +119,8 @@ TEST(WBERenderResourceUnitTest, SwapsVerticesAndSetsEverySupportedAttributeType)
     EXPECT_EQ(submesh.get_vertex_attribute_offset("float_value"), 0U);
 
     submesh.swap_vertices(0, 1);
-    EXPECT_EQ(submesh.vertex_data->vertices.get()[0], 0x22);
-    EXPECT_EQ(submesh.vertex_data->vertices.get()[stride], 0x11);
+    EXPECT_EQ(submesh.vertices.binary.binary->data.get()[submesh.vertices.binary.start], 0x22);
+    EXPECT_EQ(submesh.vertices.binary.binary->data.get()[submesh.vertices.binary.start + stride], 0x11);
 
     submesh.set_vertex_attribute(0, "float_value", 1.25F);
     submesh.set_vertex_attribute(0, "float2_value", glm::vec2(2.0F, 3.0F));
@@ -159,23 +160,23 @@ TEST(WBERenderResourceUnitTest, RejectsVertexBoundsRoleTypeAndLayoutFailures) {
     EXPECT_THROW(submesh.get_vertex_attribute_offset(""), std::runtime_error);
     EXPECT_THROW(submesh.get_vertex_attribute_offset("missing"), std::runtime_error);
 
-    ++submesh.vertex_data->vertices_size;
+    ++submesh.vertices.binary.size;
     EXPECT_THROW(submesh.get_vertex_stride(), std::runtime_error);
-    --submesh.vertex_data->vertices_size;
+    --submesh.vertices.binary.size;
 
-    submesh.vertex_data->attributes.get()[0].offset = submesh.get_vertex_stride();
+    submesh.vertices.attributes.get()[0].offset = submesh.get_vertex_stride();
     EXPECT_THROW(submesh.set_vertex_attribute(0, "float_value", 1.0F), std::runtime_error);
 
     RUSubmesh3D mismatched_hash_submesh = make_vertex_setter_submesh(allocator);
-    ++mismatched_hash_submesh.vertex_data->attributes.get()[0].role.hash;
+    ++mismatched_hash_submesh.vertices.attributes.get()[0].role.hash;
     EXPECT_THROW(mismatched_hash_submesh.get_vertex_stride(), std::runtime_error);
 
     constexpr std::string_view FIRST_COLLISION = "role_002876ae4c05a223";
     constexpr std::string_view SECOND_COLLISION = "role_2ffa43e2b7d24f56";
     static_assert(dynam_hash(FIRST_COLLISION) == dynam_hash(SECOND_COLLISION));
     RUSubmesh3D collision_submesh = make_vertex_setter_submesh(allocator);
-    collision_submesh.vertex_data->attributes.get()[0].role = make_test_shader_role(allocator, FIRST_COLLISION);
-    collision_submesh.vertex_data->attributes.get()[1].role = make_test_shader_role(allocator, SECOND_COLLISION);
+    collision_submesh.vertices.attributes.get()[0].role = make_test_shader_role(allocator, FIRST_COLLISION);
+    collision_submesh.vertices.attributes.get()[1].role = make_test_shader_role(allocator, SECOND_COLLISION);
     EXPECT_THROW(collision_submesh.get_vertex_stride(), std::runtime_error);
 
     RUSubmesh3D missing_vertex_data;

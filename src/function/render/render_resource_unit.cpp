@@ -57,24 +57,40 @@ bool RUShaderRole::matches(std::string_view p_name) const {
     return hash == dynam_hash(p_name) && retained_name == p_name;
 }
 
-static void validate_vertex_storage(const RUVertexData& p_vertex_data) {
+static void validate_binary_view(const RUBinaryView& p_binary_view, std::string_view p_context) {
+    if (p_binary_view.binary == nullptr) {
+        throw std::runtime_error(std::format("Failed to access {}: binary is missing.", p_context));
+    }
+    if (p_binary_view.start > p_binary_view.binary->size || p_binary_view.size > p_binary_view.binary->size - p_binary_view.start) {
+        throw std::runtime_error(std::format("Failed to access {}: binary view range exceeds binary size.", p_context));
+    }
+    if (p_binary_view.size > 0 && p_binary_view.binary->data == nullptr) {
+        throw std::runtime_error(std::format("Failed to access {}: binary data is missing.", p_context));
+    }
+}
+
+static uint8_t* get_binary_view_data(RUBinaryView& p_binary_view, std::string_view p_context) {
+    validate_binary_view(p_binary_view, p_context);
+    RefRes<char> binary_data = p_binary_view.binary->data;
+    return reinterpret_cast<uint8_t*>(binary_data.get()) + p_binary_view.start;
+}
+
+static void validate_vertex_storage(const RUVertexView& p_vertex_data) {
     if (p_vertex_data.vertex_stride == 0) {
-        if (p_vertex_data.vertex_count != 0 || p_vertex_data.vertices_size != 0) {
+        if (p_vertex_data.vertex_count != 0 || p_vertex_data.binary.size != 0) {
             throw std::runtime_error("Failed to access vertex data: zero stride has non-empty vertex storage.");
         }
     } else if (p_vertex_data.vertex_count > std::numeric_limits<size_t>::max() / p_vertex_data.vertex_stride ||
-               p_vertex_data.vertices_size != p_vertex_data.vertex_count * p_vertex_data.vertex_stride) {
+               p_vertex_data.binary.size != p_vertex_data.vertex_count * p_vertex_data.vertex_stride) {
         throw std::runtime_error("Failed to access vertex data: vertex storage size does not match its count and stride.");
     }
-    if (p_vertex_data.vertices_size > 0 && p_vertex_data.vertices == nullptr) {
-        throw std::runtime_error("Failed to access vertex data: vertex storage is missing.");
-    }
+    validate_binary_view(p_vertex_data.binary, "vertex data");
     if (p_vertex_data.attribute_count > 0 && p_vertex_data.attributes == nullptr) {
         throw std::runtime_error("Failed to access vertex data: attribute metadata storage is missing.");
     }
     size_t expected_offset = 0;
     for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
-        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        const RUVertexView::Attribute& attribute = p_vertex_data.attributes.get()[i];
         const std::string_view attribute_role_name = attribute.role.get_name();
         const size_t format_size = VertexAttributeFormatInfo::get_size(attribute.format);
         if (attribute.offset != expected_offset || attribute.size != format_size ||
@@ -97,15 +113,15 @@ static void validate_vertex_storage(const RUVertexData& p_vertex_data) {
     }
 }
 
-static const RUVertexData::Attribute& find_vertex_attribute(const RUVertexData& p_vertex_data, std::string_view p_role) {
+static const RUVertexView::Attribute& find_vertex_attribute(const RUVertexView& p_vertex_data, std::string_view p_role) {
     validate_vertex_storage(p_vertex_data);
     if (p_role.empty()) {
         throw std::runtime_error("Failed to access vertex attribute: role is empty.");
     }
     const HashCode role_hash = dynam_hash(p_role);
-    const RUVertexData::Attribute* result = nullptr;
+    const RUVertexView::Attribute* result = nullptr;
     for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
-        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        const RUVertexView::Attribute& attribute = p_vertex_data.attributes.get()[i];
         if (attribute.role.hash != role_hash || !attribute.role.matches(p_role)) {
             continue;
         }
@@ -123,24 +139,18 @@ static const RUVertexData::Attribute& find_vertex_attribute(const RUVertexData& 
     return *result;
 }
 
-static RUVertexData& get_submesh_vertex_data(RUSubmesh3D& p_submesh) {
-    if (p_submesh.vertex_data == nullptr) {
-        throw std::runtime_error("Failed to access submesh vertex data: vertex data is missing.");
-    }
-    return *p_submesh.vertex_data;
+static RUVertexView& get_submesh_vertex_data(RUSubmesh3D& p_submesh) {
+    return p_submesh.vertices;
 }
 
-static const RUVertexData& get_submesh_vertex_data(const RUSubmesh3D& p_submesh) {
-    if (p_submesh.vertex_data == nullptr) {
-        throw std::runtime_error("Failed to access submesh vertex data: vertex data is missing.");
-    }
-    return *p_submesh.vertex_data;
+static const RUVertexView& get_submesh_vertex_data(const RUSubmesh3D& p_submesh) {
+    return p_submesh.vertices;
 }
 
 template <typename TValue>
 static void set_vertex_attribute_value(
     RUSubmesh3D& p_submesh, size_t p_vertex_index, std::string_view p_role, RUVertexAttributeFormat p_expected_format, const TValue& p_value) {
-    RUVertexData& vertex_data = get_submesh_vertex_data(p_submesh);
+    RUVertexView& vertex_data = get_submesh_vertex_data(p_submesh);
     validate_vertex_storage(vertex_data);
     if (p_vertex_index >= vertex_data.vertex_count) {
         throw std::runtime_error(std::format("Failed to set vertex attribute '{}': vertex {} is out of bounds for {} vertices.",
@@ -148,20 +158,20 @@ static void set_vertex_attribute_value(
             p_vertex_index,
             vertex_data.vertex_count));
     }
-    const RUVertexData::Attribute& attribute = find_vertex_attribute(vertex_data, p_role);
+    const RUVertexView::Attribute& attribute = find_vertex_attribute(vertex_data, p_role);
     if (attribute.format != p_expected_format || attribute.size != sizeof(TValue)) {
         throw std::runtime_error(
             std::format("Failed to set vertex attribute '{}': value type does not match the resource layout.", p_role));
     }
     const size_t vertex_offset = p_vertex_index * vertex_data.vertex_stride;
-    if (vertex_offset > vertex_data.vertices_size || attribute.offset > vertex_data.vertices_size - vertex_offset ||
-        sizeof(TValue) > vertex_data.vertices_size - vertex_offset - attribute.offset) {
+    if (vertex_offset > vertex_data.binary.size || attribute.offset > vertex_data.binary.size - vertex_offset ||
+        sizeof(TValue) > vertex_data.binary.size - vertex_offset - attribute.offset) {
         throw std::runtime_error(std::format("Failed to set vertex attribute '{}': target storage is out of bounds.", p_role));
     }
-    std::memcpy(vertex_data.vertices.get() + vertex_offset + attribute.offset, &p_value, sizeof(TValue));
+    std::memcpy(get_binary_view_data(vertex_data.binary, "vertex data") + vertex_offset + attribute.offset, &p_value, sizeof(TValue));
 }
 
-void RUVertexData::swap_vertices(size_t p_first, size_t p_second) {
+void RUVertexView::swap_vertices(size_t p_first, size_t p_second) {
     validate_vertex_storage(*this);
     if (p_first >= vertex_count || p_second >= vertex_count) {
         throw std::runtime_error(std::format(
@@ -170,14 +180,15 @@ void RUVertexData::swap_vertices(size_t p_first, size_t p_second) {
     if (p_first == p_second) {
         return;
     }
-    uint8_t* first_vertex = vertices.get() + p_first * vertex_stride;
-    uint8_t* second_vertex = vertices.get() + p_second * vertex_stride;
+    uint8_t* vertex_data = get_binary_view_data(binary, "vertex data");
+    uint8_t* first_vertex = vertex_data + p_first * vertex_stride;
+    uint8_t* second_vertex = vertex_data + p_second * vertex_stride;
     for (size_t i = 0; i < vertex_stride; ++i) {
         std::swap(first_vertex[i], second_vertex[i]);
     }
 }
 
-size_t RUVertexData::get_vertex_attribute_offset(std::string_view p_role) const {
+size_t RUVertexView::get_vertex_attribute_offset(std::string_view p_role) const {
     return find_vertex_attribute(*this, p_role).offset;
 }
 
@@ -238,13 +249,13 @@ size_t RUSubmesh3D::get_vertex_attribute_offset(std::string_view p_role) const {
 }
 
 size_t RUSubmesh3D::get_vertex_stride() const {
-    const RUVertexData& vertex_data = get_submesh_vertex_data(*this);
+    const RUVertexView& vertex_data = get_submesh_vertex_data(*this);
     validate_vertex_storage(vertex_data);
     return vertex_data.vertex_stride;
 }
 
 size_t RUSubmesh3D::get_vertices_num() const {
-    const RUVertexData& vertex_data = get_submesh_vertex_data(*this);
+    const RUVertexView& vertex_data = get_submesh_vertex_data(*this);
     validate_vertex_storage(vertex_data);
     return vertex_data.vertex_count;
 }

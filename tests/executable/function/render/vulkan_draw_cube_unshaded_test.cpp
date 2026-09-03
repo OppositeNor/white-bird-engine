@@ -73,9 +73,9 @@ public:
 
         // Setup cube's mesh
         auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
-        render_database->set_static_opaque_triangles(cube_mesh.get());
+        render_database->set_static_triangle_set(cube_mesh.get());
         renderer->add_job([renderer]() {
-            renderer->update_static_opaque_triangles();
+            renderer->update_static_triangle_set();
         });
 
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
@@ -103,7 +103,7 @@ public:
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
                             .compile("draw_cube_unshaded_pipeline", pipeline_resource, bindpoint_builder.build());
         auto graphics_pipeline = compiled.graphics_pipeline;
-        // Setup time UBO
+        // Setup time uniform buffer
         camera_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
@@ -118,10 +118,10 @@ public:
                 .range = sizeof(WBE::CameraInfoVKUBO),
             }));
         // Setup render task. The vertex/index data lives in the global static
-        // opaque mesh, populated by RendererVK::update_static_opaque_triangles()
+        // opaque mesh, populated by RendererVK::update_static_triangle_set()
         // from the RenderDatabase, and exposed to render tasks under the
         // REND_RES_STATIC_{VERTICES,INDICES} global IDs.
-        const auto& triangles_info = render_database->get_static_opaque_triangles_info();
+        const auto& triangles_info = render_database->get_static_triangle_set_info();
         if (triangles_info.draw_groups.size() != 1) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: expected one vertex draw group.");
         }

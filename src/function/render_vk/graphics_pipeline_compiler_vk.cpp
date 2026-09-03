@@ -15,9 +15,7 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/reference_weak.hh"
 #include "function/function_utils.hh"
-#include "function/render/i_render_object.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -45,7 +43,6 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
-#include <functional>
 #include <glm/ext/matrix_float3x3.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
@@ -124,6 +121,13 @@ VkFormat image_format_from_resource(const RUImage& p_image) {
     return p_image.color_space == ColorSpace::SRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
 }
 
+std::string image_resource_cache_key(RefRes<RUImage> p_image_resource) {
+    if (p_image_resource == nullptr) {
+        throw std::runtime_error("Failed to build image cache key: image resource is missing.");
+    }
+    return std::format("image_resource_{}", reinterpret_cast<uintptr_t>(p_image_resource.get()));
+}
+
 std::vector<uint8_t> build_image_upload_data(const RUImage& p_image) {
     // Convert serialized image data into the byte layout consumed by the staging upload buffer.
     if (p_image.image_data == nullptr) {
@@ -198,6 +202,9 @@ void validate_bindpoint_declarations(const RenderBindpointDeclarations& p_bindpo
             throw std::runtime_error("Failed to compile graphics pipeline: uniform binding field path is empty.");
         }
         parse_indexed_field_path(bindpoint_declaration.field_path);
+        if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
         if (bindpoint_declaration.offset + bindpoint_declaration.size > p_bindpoint_declarations.buffer_data.size()) {
             throw std::runtime_error(std::format("Failed to compile graphics pipeline: uniform binding '{}' exceeds the packed buffer range.",
                 bindpoint_declaration.field_path));
@@ -221,7 +228,7 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(
     const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
     // The binding list is small and call-site ordered, so a linear scan keeps ownership and lifetime simple.
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
-        if (bindpoint_declaration.field_path == p_field_path) {
+        if (bindpoint_declaration.field_path == p_field_path && bindpoint_declaration.buffer_render_object == MEM_NULL) {
             return &bindpoint_declaration;
         }
     }
@@ -231,6 +238,9 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(
 const RenderBindpointBufferDeclaration* find_indexed_uniform_binding(
     const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path, uint32_t p_array_index) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
+        if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
         IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
         if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == p_array_index) {
             return &bindpoint_declaration;
@@ -241,6 +251,9 @@ const RenderBindpointBufferDeclaration* find_indexed_uniform_binding(
 
 bool has_unindexed_uniform_binding(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
+        if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
         IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
         if (indexed_path.field_path == p_field_path && !indexed_path.array_index.has_value()) {
             return true;
@@ -302,7 +315,7 @@ std::vector<uint8_t> build_uniform_data(
     std::vector<uint8_t> uniform_data(p_descriptor_binding.buffer_size, 0);
     const auto* direct_bindpoint_declaration = find_uniform_binding(p_bindpoint_declarations, p_descriptor_binding.parameter_name);
     if (direct_bindpoint_declaration != nullptr) {
-        // A declaration keyed by the descriptor parameter name replaces field-by-field packing for complex UBO layouts.
+        // A declaration keyed by the descriptor parameter name replaces field-by-field packing for complex uniform-buffer layouts.
         UniformDataView data_view = get_uniform_data(p_bindpoint_declarations, *direct_bindpoint_declaration);
         if (data_view.size > uniform_data.size()) {
             throw std::runtime_error(std::format("Failed to bind uniform buffer '{}': program buffer size {} exceeds shader buffer size {}.",
@@ -525,7 +538,6 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
     }
     validate_texture_bindpoint_sources(
         p_resource_key, p_descriptor_bindings, p_bindpoint_declarations, context.default_image_resource != nullptr);
-
     std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
     descriptor_sets.reserve(p_descriptor_set_layouts.size());
     for (uint32_t set_index = 0; set_index < p_descriptor_set_layouts.size(); ++set_index) {
@@ -538,7 +550,8 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
                 : compile_texture_descriptor_set(
                       p_resource_key, p_descriptor_set_layouts[set_index], p_descriptor_bindings, set_index, p_bindpoint_declarations);
         // Uniform descriptors are written after material bindings so both sources can populate the same descriptor set.
-        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
+        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations, build_uniform_data);
+        write_storage_buffer_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
         descriptor_sets.push_back(descriptor_set);
     }
     return descriptor_sets;
@@ -556,7 +569,8 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
         .set_descriptor_bindings(p_descriptor_bindings)
         .set_default_sampler(default_sampler);
     if (context.default_image_resource != nullptr) {
-        builder.set_default_texture(compile_image_view(std::format("{}#default_texture", p_resource_key), context.default_image_resource),
+        builder.set_default_texture(
+            compile_image_view(image_resource_cache_key(context.default_image_resource), context.default_image_resource),
             VK_IMAGE_LAYOUT_GENERAL);
     }
     add_direct_texture_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
@@ -576,10 +590,8 @@ void GraphicsPipelineCompilerVK::add_direct_texture_bindpoints(
             .image_layout = VK_IMAGE_LAYOUT_GENERAL,
         };
         if (bindpoint_declaration.image_resource != nullptr) {
-            size_t image_resource_hash = std::hash<RefRes<RUImage>>{}(bindpoint_declaration.image_resource);
-            std::string image_view_resource_key =
-                std::format("{}#texture_{}#resource_{}", p_resource_key, bindpoint_declaration.field_path, image_resource_hash);
-            texture_binding.image_view = compile_image_view(image_view_resource_key, bindpoint_declaration.image_resource);
+            texture_binding.image_view = compile_image_view(
+                image_resource_cache_key(bindpoint_declaration.image_resource), bindpoint_declaration.image_resource);
         } else {
             auto image_view = bindpoint_declaration.image_render_object.dynamic_cast_ref<ROImageViewVK>();
             if (image_view == MEM_NULL) {
@@ -665,39 +677,6 @@ Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
         image->set_image_data_immediate(p_command_buffer, upload_buffer, region_info);
     });
     return image;
-}
-
-void GraphicsPipelineCompilerVK::write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
-    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-    uint32_t p_set_index,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) const {
-    // Scan all reflected bindings and write only uniform buffers belonging to this descriptor set index.
-    for (const auto& descriptor_binding : p_descriptor_bindings) {
-        if (descriptor_binding.set_index != p_set_index ||
-            descriptor_binding.layout_binding.descriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-            // Non-uniform descriptors are handled by material compilation; other sets are written in their own iteration.
-            continue;
-        }
-        // Allocate one host-visible buffer per reflected uniform descriptor and write it into the descriptor set.
-        auto uniform_data = build_uniform_data(descriptor_binding, p_bindpoint_declarations);
-        auto uniform_buffer = ROBufferVK::Builder()
-                                  .set_domain(DeviceDomain::HOST_DEVICE)
-                                  .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                  .set_size(uniform_data.size())
-                                  .create_ref(context.render_data);
-        uniform_buffer->update_buffer(uniform_data.data(), uniform_data.size());
-        RODescriptorSetVK::Writer writer;
-        writer.set_binding(descriptor_binding.layout_binding.binding);
-        uint32_t descriptor_count = std::max(descriptor_binding.layout_binding.descriptorCount, 1U);
-        for (uint32_t i = 0; i < descriptor_count; ++i) {
-            writer.add_uniform_buffer_info(RODescriptorSetVK::Writer::BufferInfo{
-                .buffer = uniform_buffer,
-                .offset = descriptor_binding.buffer_size * i,
-                .range = descriptor_binding.buffer_size,
-            });
-        }
-        p_descriptor_set->write_descriptor_set(writer);
-    }
 }
 
 } // namespace WhiteBirdEngine

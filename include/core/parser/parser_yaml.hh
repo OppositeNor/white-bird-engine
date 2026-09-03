@@ -14,6 +14,8 @@
 */
 #ifndef WBE_FILE_PARSER_YAML_HH
 #define WBE_FILE_PARSER_YAML_HH
+#include "glm/detail/qualifier.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
@@ -108,6 +110,13 @@ public:
             node[p_key]["y"] = p_value.y;
             node[p_key]["z"] = p_value.z;
             node[p_key]["w"] = p_value.w;
+        } else if constexpr (std::same_as<Type, glm::mat4>) {
+            node[p_key] = Yaml();
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    node[p_key].push_back(p_value[column][row]);
+                }
+            }
         } else {
             node[p_key] = std::forward<T>(p_value);
         }
@@ -161,6 +170,13 @@ public:
             node["y"] = p_value.y;
             node["z"] = p_value.z;
             node["w"] = p_value.w;
+        } else if constexpr (std::same_as<Type, glm::mat4>) {
+            node = Yaml();
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    node.push_back(p_value[column][row]);
+                }
+            }
         } else {
             node = std::forward<T>(p_value);
         }
@@ -207,6 +223,15 @@ public:
             p_value = glm::vec4(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
         } else if constexpr (std::same_as<T, glm::quat>) {
             p_value = glm::quat(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
+        } else if constexpr (std::same_as<T, glm::mat4>) {
+            if (!node.IsSequence() || node.size() != 16) {
+                throw std::runtime_error("Failed to get glm::mat4: expected a sequence containing exactly 16 values.");
+            }
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    p_value[column][row] = node[column * 4 + row].as<float>();
+                }
+            }
         } else if constexpr (std::same_as<T, YAMLData>) {
             p_value = YAMLData(node.as<Yaml>());
         } else {
@@ -241,6 +266,16 @@ public:
         } else if constexpr (std::same_as<T, glm::vec4>) {
             p_value = glm::vec4(
                 node[p_key]["x"].as<float>(), node[p_key]["y"].as<float>(), node[p_key]["z"].as<float>(), node[p_key]["w"].as<float>());
+        } else if constexpr (std::same_as<T, glm::mat4>) {
+            const Yaml& matrix_node = node[p_key];
+            if (!matrix_node.IsSequence() || matrix_node.size() != 16) {
+                throw std::runtime_error("Failed to get glm::mat4: expected a sequence containing exactly 16 values.");
+            }
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    p_value[column][row] = matrix_node[column * 4 + row].as<float>();
+                }
+            }
         } else if constexpr (std::same_as<T, YAMLData>) {
             p_value = YAMLData(node[p_key].as<Yaml>());
         } else {

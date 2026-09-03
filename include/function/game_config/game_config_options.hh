@@ -102,7 +102,7 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
      * @brief The size of the render allocator.
      */
     WBE_META(WBE_REFLECT)
-    uint64_t render_mem_pool_size = WBE_MI_B(64);
+    uint64_t render_mem_pool_size = WBE_KI_B(64);
 };
 
 } // namespace WhiteBirdEngine

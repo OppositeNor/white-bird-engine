@@ -116,7 +116,7 @@ public:
         return render_database;
     }
 
-    virtual void update_static_opaque_triangles() override;
+    virtual void update_static_triangle_set() override;
 
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
@@ -353,7 +353,7 @@ private:
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
         // Global static-opaque mesh GPU buffers, populated by
-        // RendererVK::update_static_opaque_triangles() from the RenderDatabase
+        // RendererVK::update_static_triangle_set() from the RenderDatabase
         // and exposed to render tasks via the global resource IDs
         // REND_RES_STATIC_{VERTICES,INDICES,OBJECT_IDS}.
         Ref<ROBufferVK> static_opaque_vertices;

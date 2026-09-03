@@ -17,6 +17,7 @@
 #include <barrier>
 #include <cstddef>
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -31,6 +32,15 @@ TEST(WBEInputManagerTest, TracksSingletonLifetime) {
     }
 
     EXPECT_EQ(InputManager::get_singleton(), nullptr);
+}
+
+TEST(WBEInputManagerTest, RejectedDuplicateDoesNotPoisonSingletonLifetime) {
+    {
+        InputManager input_manager;
+        EXPECT_THROW({ InputManager duplicate_input_manager; }, std::runtime_error);
+    }
+
+    EXPECT_NO_THROW({ InputManager recovered_input_manager; });
 }
 
 TEST(WBEInputManagerTest, InitializesEveryKeyAsUp) {

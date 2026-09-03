@@ -225,13 +225,18 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DGeneral) {
             "type": "material"
         },
         "material_id": "mat_ref_01",
-        "geometry_path": "assets/meshes/test_submesh_01.bin",
-        "geometry_sections": [
-            {"slot": "position", "start": 0, "size": 36, "type": "vec3"},
-            {"slot": "normal", "start": 36, "size": 36, "type": "vec3"},
-            {"slot": "uv", "start": 72, "size": 24, "type": "vec2"},
-            {"slot": "index", "start": 96, "size": 12, "type": "uint32"}
-        ]
+        "vertices": {
+            "binary": {"binary_id": "test_submesh_01.geometry", "start": 0, "size": 96},
+            "stride": 32,
+            "attributes": [
+                {"role": "position", "type": "vec3", "offset": 0},
+                {"role": "normal", "type": "vec3", "offset": 12},
+                {"role": "uv", "type": "vec2", "offset": 24}
+            ]
+        },
+        "indices": {
+            "binary": {"binary_id": "test_submesh_01.geometry", "start": 96, "size": 12}
+        }
     }
     )";
     WBE::ParserJSON parser;
@@ -245,16 +250,20 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DGeneral) {
     ASSERT_EQ(scheme.material.value().type, "material");
     ASSERT_TRUE(scheme.material_id.has_value());
     ASSERT_EQ(scheme.material_id.value(), "mat_ref_01");
-    ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_01.bin");
-    ASSERT_EQ(scheme.geometry_sections.size(), 4U);
-    ASSERT_EQ(scheme.geometry_sections[0].slot, "position");
-    ASSERT_EQ(scheme.geometry_sections[0].start, 0U);
-    ASSERT_EQ(scheme.geometry_sections[0].size, 36U);
-    ASSERT_EQ(scheme.geometry_sections[0].type, "vec3");
-    ASSERT_EQ(scheme.geometry_sections[3].slot, "index");
-    ASSERT_EQ(scheme.geometry_sections[3].start, 96U);
-    ASSERT_EQ(scheme.geometry_sections[3].size, 12U);
-    ASSERT_EQ(scheme.geometry_sections[3].type, "uint32");
+    ASSERT_EQ(scheme.vertices.binary.binary_id, "test_submesh_01.geometry");
+    ASSERT_EQ(scheme.vertices.binary.start, 0U);
+    ASSERT_EQ(scheme.vertices.binary.size, 96U);
+    ASSERT_EQ(scheme.vertices.stride, 32U);
+    ASSERT_EQ(scheme.vertices.attributes.size(), 3U);
+    ASSERT_EQ(scheme.vertices.attributes[0].role, "position");
+    ASSERT_EQ(scheme.vertices.attributes[0].type, "vec3");
+    ASSERT_EQ(scheme.vertices.attributes[0].offset, 0U);
+    ASSERT_EQ(scheme.vertices.attributes[2].role, "uv");
+    ASSERT_EQ(scheme.vertices.attributes[2].type, "vec2");
+    ASSERT_EQ(scheme.vertices.attributes[2].offset, 24U);
+    ASSERT_EQ(scheme.indices.binary.binary_id, "test_submesh_01.geometry");
+    ASSERT_EQ(scheme.indices.binary.start, 96U);
+    ASSERT_EQ(scheme.indices.binary.size, 12U);
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DMinimal) {
@@ -262,8 +271,16 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DMinimal) {
     {
         "id": "test_submesh_minimal",
         "type": "submesh3d",
-        "geometry_path": "assets/meshes/test_submesh_minimal.bin",
-        "geometry_sections": []
+        "vertices": {
+            "binary": {"binary_id": "test_submesh_minimal.geometry", "start": 0, "size": 12},
+            "stride": 12,
+            "attributes": [
+                {"role": "position", "type": "vec3", "offset": 0}
+            ]
+        },
+        "indices": {
+            "binary": {"binary_id": "test_submesh_minimal.geometry", "start": 12, "size": 0}
+        }
     }
     )";
     WBE::ParserJSON parser;
@@ -272,8 +289,12 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSubmesh3DMinimal) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_submesh_minimal");
     ASSERT_EQ(scheme.type, "submesh3d");
-    ASSERT_EQ(scheme.geometry_path, "assets/meshes/test_submesh_minimal.bin");
-    ASSERT_TRUE(scheme.geometry_sections.empty());
+    ASSERT_EQ(scheme.vertices.binary.binary_id, "test_submesh_minimal.geometry");
+    ASSERT_EQ(scheme.vertices.stride, 12U);
+    ASSERT_EQ(scheme.vertices.attributes.size(), 1U);
+    ASSERT_EQ(scheme.indices.binary.binary_id, "test_submesh_minimal.geometry");
+    ASSERT_EQ(scheme.indices.binary.start, 12U);
+    ASSERT_EQ(scheme.indices.binary.size, 0U);
     ASSERT_FALSE(scheme.material_id.has_value());
     ASSERT_FALSE(scheme.material.has_value());
 }
@@ -287,14 +308,22 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
             {
                 "id": "submesh_01",
                 "type": "submesh3d",
-                "geometry_path": "assets/meshes/submesh_01.bin",
-                "geometry_sections": []
+                "vertices": {
+                    "binary": {"binary_id": "mesh.geometry", "start": 0, "size": 12},
+                    "stride": 12,
+                    "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
+                },
+                "indices": {"binary": {"binary_id": "mesh.geometry", "start": 12, "size": 0}}
             },
             {
                 "id": "submesh_02",
                 "type": "submesh3d",
-                "geometry_path": "assets/meshes/submesh_02.bin",
-                "geometry_sections": []
+                "vertices": {
+                    "binary": {"binary_id": "mesh.geometry", "start": 12, "size": 12},
+                    "stride": 12,
+                    "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
+                },
+                "indices": {"binary": {"binary_id": "mesh.geometry", "start": 24, "size": 0}}
             }
         ],
         "submeshes_id": ["submesh_ref_01", "submesh_ref_02"]
@@ -329,6 +358,70 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshEmpty) {
     ASSERT_EQ(scheme.type, "mesh");
     ASSERT_TRUE(scheme.submeshes.empty());
     ASSERT_TRUE(scheme.submeshes_id.empty());
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
+    std::string json_buffer = R"(
+    {
+        "id": "static_set_01",
+        "type": "static_opaque_set",
+        "submeshes": [
+            {
+                "material_id": "material_01",
+                "vertices": {
+                    "binary": {"binary_id": "static_set_01.geometry", "start": 0, "size": 36},
+                    "stride": 12,
+                    "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
+                },
+                "indices": {"binary": {"binary_id": "static_set_01.geometry", "start": 36, "size": 12}},
+                "first_instance": 1,
+                "instance_count": 2
+            }
+        ],
+        "instances": [
+            {"global_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+            {"global_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 3, 4, 1]}
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaStaticOpaqueSet scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_EQ(scheme.id, "static_set_01");
+    ASSERT_EQ(scheme.type, "static_opaque_set");
+    ASSERT_EQ(scheme.submeshes.size(), 1U);
+    ASSERT_TRUE(scheme.submeshes[0].material_id.has_value());
+    ASSERT_EQ(scheme.submeshes[0].material_id.value(), "material_01");
+    ASSERT_EQ(scheme.submeshes[0].vertices.binary.binary_id, "static_set_01.geometry");
+    ASSERT_EQ(scheme.submeshes[0].vertices.stride, 12U);
+    ASSERT_EQ(scheme.submeshes[0].vertices.attributes[0].role, "position");
+    ASSERT_EQ(scheme.submeshes[0].indices.binary.start, 36U);
+    ASSERT_EQ(scheme.submeshes[0].first_instance, 1U);
+    ASSERT_EQ(scheme.submeshes[0].instance_count, 2U);
+    ASSERT_EQ(scheme.instances.size(), 2U);
+    ASSERT_EQ(scheme.instances[1].global_transform[3][0], 2.0F);
+    ASSERT_EQ(scheme.instances[1].global_transform[3][1], 3.0F);
+    ASSERT_EQ(scheme.instances[1].global_transform[3][2], 4.0F);
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticMaskedSetEmpty) {
+    std::string json_buffer = R"(
+    {
+        "id": "static_masked_set_01",
+        "type": "static_masked_set",
+        "submeshes": [],
+        "instances": []
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaStaticMaskedSet scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_EQ(scheme.id, "static_masked_set_01");
+    ASSERT_EQ(scheme.type, "static_masked_set");
+    ASSERT_TRUE(scheme.submeshes.empty());
+    ASSERT_TRUE(scheme.instances.empty());
 }
 
 // Basic tests for TODO schemes to ensure they can be deserialized

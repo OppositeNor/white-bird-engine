@@ -16,6 +16,8 @@
 #define WBE_FILE_PARSER_YAML_TEST_HH
 
 #include "core/parser/parser_yaml.hh"
+#include "glm/detail/qualifier.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
@@ -692,6 +694,29 @@ v4:
     ASSERT_THROW(parser.get_value<glm::vec2>("v2"), std::exception);
     ASSERT_THROW(parser.get_value<glm::vec3>("v3"), std::exception);
     ASSERT_THROW(parser.get_value<glm::vec4>("v4"), std::exception);
+}
+
+TEST(ParserYAMLTest, GLMMat4RoundTripAndValidation) {
+    WBE::ParserYAML parser;
+    parser.parse_from_buffer("matrix: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]");
+
+    glm::mat4 matrix = parser.get_value<glm::mat4>("matrix");
+    for (glm::length_t column = 0; column < 4; ++column) {
+        for (glm::length_t row = 0; row < 4; ++row) {
+            ASSERT_FLOAT_EQ(matrix[column][row], static_cast<float>(column * 4 + row + 1));
+        }
+    }
+
+    WBE::YAMLData keyed_data;
+    keyed_data.set_value("matrix", matrix);
+    EXPECT_EQ(keyed_data.get_value<glm::mat4>("matrix"), matrix);
+
+    WBE::YAMLData root_data;
+    root_data.set(matrix);
+    EXPECT_EQ(root_data.get<glm::mat4>(), matrix);
+
+    parser.parse_from_buffer("matrix: [1, 2, 3]");
+    EXPECT_THROW(parser.get_value<glm::mat4>("matrix"), std::runtime_error);
 }
 
 TEST(ParserYAMLTest, YAMLDataSetMethod) {

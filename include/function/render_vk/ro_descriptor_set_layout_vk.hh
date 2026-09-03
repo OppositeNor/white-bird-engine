@@ -66,7 +66,7 @@ public:
         Builder& add_binding(const VkDescriptorSetLayoutBinding& p_binding, VkDescriptorBindingFlags p_binding_flags);
 
         /**
-         * @brief Add a UBO binding.
+         * @brief Add a uniform-buffer binding.
          *
          * @param p_binding The binding number of this entry.
          * @param p_descriptor_count The number of descriptors contained in this

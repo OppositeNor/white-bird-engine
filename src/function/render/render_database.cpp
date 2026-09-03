@@ -45,27 +45,38 @@ struct DrawGroupMeshInfo {
     std::string_view graphics_pipeline_key;
     std::string_view material_key;
     RefRes<RUMaterial> material;
-    const RUVertexData* vertex_data = nullptr;
+    const RUVertexView* vertex_data = nullptr;
     Vector<RUSubmesh3D*, RenderAllocator> submeshes;
 };
 
-void validate_vertex_data(const RUVertexData& p_vertex_data) {
+const uint8_t* get_binary_view_data(const RUBinaryView& p_binary_view, std::string_view p_context) {
+    if (p_binary_view.binary == nullptr) {
+        throw std::runtime_error(std::format("Failed to set opaque triangles: {} binary is missing.", p_context));
+    }
+    if (p_binary_view.start > p_binary_view.binary->size || p_binary_view.size > p_binary_view.binary->size - p_binary_view.start) {
+        throw std::runtime_error(std::format("Failed to set opaque triangles: {} binary view range exceeds binary size.", p_context));
+    }
+    if (p_binary_view.size > 0 && p_binary_view.binary->data == nullptr) {
+        throw std::runtime_error(std::format("Failed to set opaque triangles: {} binary data is missing.", p_context));
+    }
+    return reinterpret_cast<const uint8_t*>(p_binary_view.binary->data.get()) + p_binary_view.start;
+}
+
+void validate_vertex_data(const RUVertexView& p_vertex_data) {
     if (p_vertex_data.vertex_stride == 0) {
         throw std::runtime_error("Failed to set opaque triangles: vertex stride is zero.");
     }
     if (p_vertex_data.vertex_count > std::numeric_limits<size_t>::max() / p_vertex_data.vertex_stride ||
-        p_vertex_data.vertices_size != p_vertex_data.vertex_count * p_vertex_data.vertex_stride) {
+        p_vertex_data.binary.size != p_vertex_data.vertex_count * p_vertex_data.vertex_stride) {
         throw std::runtime_error("Failed to set opaque triangles: vertex storage size does not match its count and stride.");
     }
-    if (p_vertex_data.vertices_size > 0 && p_vertex_data.vertices == nullptr) {
-        throw std::runtime_error("Failed to set opaque triangles: vertex storage is missing.");
-    }
+    get_binary_view_data(p_vertex_data.binary, "vertex");
     if (p_vertex_data.attribute_count > 0 && p_vertex_data.attributes == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: vertex attribute metadata is missing.");
     }
     size_t expected_attribute_offset = 0;
     for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
-        const RUVertexData::Attribute& attribute = p_vertex_data.attributes.get()[i];
+        const RUVertexView::Attribute& attribute = p_vertex_data.attributes.get()[i];
         const std::string_view role_name = attribute.role.get_name();
         if (attribute.size != VertexAttributeFormatInfo::get_size(attribute.format) || attribute.offset != expected_attribute_offset ||
             attribute.size > std::numeric_limits<size_t>::max() - expected_attribute_offset) {
@@ -73,7 +84,7 @@ void validate_vertex_data(const RUVertexData& p_vertex_data) {
                 "Failed to set opaque triangles: vertex attribute '{}' does not fit its declared format and stride.", role_name));
         }
         for (size_t previous_index = 0; previous_index < i; ++previous_index) {
-            const RUVertexData::Attribute& previous = p_vertex_data.attributes.get()[previous_index];
+            const RUVertexView::Attribute& previous = p_vertex_data.attributes.get()[previous_index];
             if (previous.role.get_name() == role_name) {
                 throw std::runtime_error(
                     std::format("Failed to set opaque triangles: vertex attribute role '{}' is duplicated.", role_name));
@@ -90,13 +101,26 @@ void validate_vertex_data(const RUVertexData& p_vertex_data) {
     }
 }
 
-bool vertex_layouts_equal(const RUVertexData& p_left, const RUVertexData& p_right) {
+void validate_index_data(const RUSubmesh3D& p_submesh) {
+    if (p_submesh.indices.index_count > 0 && p_submesh.indices.binary.size == 0) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh index storage is missing.");
+    }
+    if (p_submesh.indices.binary.size != p_submesh.indices.index_count * sizeof(uint32_t)) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh index storage size does not match its count.");
+    }
+    if (p_submesh.indices.index_count % 3 != 0) {
+        throw std::runtime_error("Failed to set opaque triangles: submesh index count is not a multiple of three.");
+    }
+    get_binary_view_data(p_submesh.indices.binary, "index");
+}
+
+bool vertex_layouts_equal(const RUVertexView& p_left, const RUVertexView& p_right) {
     if (p_left.vertex_stride != p_right.vertex_stride || p_left.attribute_count != p_right.attribute_count) {
         return false;
     }
     for (size_t i = 0; i < p_left.attribute_count; ++i) {
-        const RUVertexData::Attribute& left = p_left.attributes.get()[i];
-        const RUVertexData::Attribute& right = p_right.attributes.get()[i];
+        const RUVertexView::Attribute& left = p_left.attributes.get()[i];
+        const RUVertexView::Attribute& right = p_right.attributes.get()[i];
         if (left.role.hash != right.role.hash || left.format != right.format || left.offset != right.offset ||
             left.size != right.size || left.role.get_name() != right.role.get_name()) {
             return false;
@@ -105,7 +129,7 @@ bool vertex_layouts_equal(const RUVertexData& p_left, const RUVertexData& p_righ
     return true;
 }
 
-bool vertex_layout_less(const RUVertexData& p_left, const RUVertexData& p_right) {
+bool vertex_layout_less(const RUVertexView& p_left, const RUVertexView& p_right) {
     if (p_left.vertex_stride != p_right.vertex_stride) {
         return p_left.vertex_stride < p_right.vertex_stride;
     }
@@ -113,8 +137,8 @@ bool vertex_layout_less(const RUVertexData& p_left, const RUVertexData& p_right)
         return p_left.attribute_count < p_right.attribute_count;
     }
     for (size_t i = 0; i < p_left.attribute_count; ++i) {
-        const RUVertexData::Attribute& left = p_left.attributes.get()[i];
-        const RUVertexData::Attribute& right = p_right.attributes.get()[i];
+        const RUVertexView::Attribute& left = p_left.attributes.get()[i];
+        const RUVertexView::Attribute& right = p_right.attributes.get()[i];
         const std::string_view left_role = left.role.get_name();
         const std::string_view right_role = right.role.get_name();
         if (left_role != right_role) {
@@ -145,38 +169,30 @@ void register_draw_group_submesh(
     if (material->graphics_pipeline == nullptr || material->graphics_pipeline->resource_key == nullptr) {
         throw std::runtime_error("Failed to set opaque triangles: submesh material graphics pipeline should not be NULL.");
     }
-    if (p_submesh.vertex_data == nullptr) {
-        throw std::runtime_error("Failed to set opaque triangles: submesh vertex data should not be NULL.");
-    }
-    validate_vertex_data(*p_submesh.vertex_data);
-    if (p_submesh.index_count > 0 && p_submesh.indices == nullptr) {
-        throw std::runtime_error("Failed to set opaque triangles: submesh index storage is missing.");
-    }
-    if (p_submesh.index_count % 3 != 0) {
-        throw std::runtime_error("Failed to set opaque triangles: submesh index count is not a multiple of three.");
-    }
+    validate_vertex_data(p_submesh.vertices);
+    validate_index_data(p_submesh);
     std::string_view material_key = material->resource_key;
     std::string_view graphics_pipeline_key = material->graphics_pipeline->resource_key;
     auto draw_group = std::find_if(p_draw_group_infos.begin(), p_draw_group_infos.end(), [&](const DrawGroupMeshInfo& p_info) {
         return p_info.graphics_pipeline_key == graphics_pipeline_key && p_info.material_key == material_key &&
-               vertex_layouts_equal(*p_info.vertex_data, *p_submesh.vertex_data);
+               vertex_layouts_equal(*p_info.vertex_data, p_submesh.vertices);
     });
     if (draw_group == p_draw_group_infos.end()) {
         p_draw_group_infos.push_back(DrawGroupMeshInfo{.graphics_pipeline_key = graphics_pipeline_key,
             .material_key = material_key,
             .material = material,
-            .vertex_data = p_submesh.vertex_data.get(),
+            .vertex_data = &p_submesh.vertices,
             .submeshes = Vector<RUSubmesh3D*, RenderAllocator>(p_allocator)});
         draw_group = p_draw_group_infos.end() - 1;
     }
     draw_group->submeshes.push_back(&p_submesh);
 }
 
-void copy_vertex_layout(RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_target, const RUVertexData& p_vertex_data) {
+void copy_vertex_layout(RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_target, const RUVertexView& p_vertex_data) {
     p_target.vertex_stride = p_vertex_data.vertex_stride;
     p_target.attributes.reserve(p_vertex_data.attribute_count);
     for (size_t i = 0; i < p_vertex_data.attribute_count; ++i) {
-        const RUVertexData::Attribute& source = p_vertex_data.attributes.get()[i];
+        const RUVertexView::Attribute& source = p_vertex_data.attributes.get()[i];
         p_target.attributes.push_back(RenderDatabase::OpaqueTrianglesInfo::VertexAttribute{
             .role = ShaderRole(source.role.get_name()), .format = source.format, .offset = source.offset, .size = source.size});
     }
@@ -184,27 +200,30 @@ void copy_vertex_layout(RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_tar
 
 void append_submesh_geometry(
     RenderDatabase::OpaqueTrianglesInfo& p_triangles_info, const RUSubmesh3D& p_submesh, uint32_t p_first_vertex, uint32_t p_obj_id) {
-    const RUVertexData& vertex_data = *p_submesh.vertex_data;
+    const RUVertexView& vertex_data = p_submesh.vertices;
     if (vertex_data.vertex_count > std::numeric_limits<uint32_t>::max() - p_first_vertex) {
         throw std::runtime_error("Failed to set opaque triangles: merged draw-group vertex count exceeds uint32.");
     }
     const size_t vertex_start = p_triangles_info.vertices.size();
-    if (vertex_data.vertices_size > std::numeric_limits<size_t>::max() - vertex_start) {
+    if (vertex_data.binary.size > std::numeric_limits<size_t>::max() - vertex_start) {
         throw std::runtime_error("Failed to set opaque triangles: merged vertex byte size overflows.");
     }
-    p_triangles_info.vertices.resize(vertex_start + vertex_data.vertices_size);
-    if (vertex_data.vertices_size > 0) {
-        std::memcpy(p_triangles_info.vertices.data() + vertex_start, vertex_data.vertices.get(), vertex_data.vertices_size);
+    p_triangles_info.vertices.resize(vertex_start + vertex_data.binary.size);
+    if (vertex_data.binary.size > 0) {
+        std::memcpy(p_triangles_info.vertices.data() + vertex_start,
+            get_binary_view_data(vertex_data.binary, "vertex"),
+            vertex_data.binary.size);
     }
-    for (size_t i = 0; i < p_submesh.index_count; ++i) {
-        const uint32_t index = p_submesh.indices.get()[i];
+    const auto* indices = reinterpret_cast<const uint32_t*>(get_binary_view_data(p_submesh.indices.binary, "index"));
+    for (size_t i = 0; i < p_submesh.indices.index_count; ++i) {
+        const uint32_t index = indices[i];
         if (index >= vertex_data.vertex_count) {
             throw std::runtime_error(std::format(
                 "Failed to set opaque triangles: submesh index {} is out of bounds for {} vertices.", index, vertex_data.vertex_count));
         }
         p_triangles_info.indices.push_back(p_first_vertex + index);
     }
-    if (p_submesh.index_count > 0) {
+    if (p_submesh.indices.index_count > 0) {
         p_triangles_info.obj_id.push_back(p_obj_id);
     }
 }
@@ -224,7 +243,7 @@ size_t get_or_append_material(RenderDatabase::OpaqueTrianglesInfo& p_triangles_i
 
 bool draw_group_has_indices(const DrawGroupMeshInfo& p_draw_group_info) {
     return std::ranges::any_of(p_draw_group_info.submeshes, [](const RUSubmesh3D* p_submesh) {
-        return p_submesh->index_count > 0;
+        return p_submesh->indices.index_count > 0;
     });
 }
 
@@ -249,7 +268,7 @@ bool append_draw_group(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
 
     uint32_t first_vertex = 0;
     for (const auto* submesh : p_draw_group_info.submeshes) {
-        if (submesh->index_count == 0) {
+        if (submesh->indices.index_count == 0) {
             continue;
         }
         uint32_t object_id = new_object_id;
@@ -260,7 +279,7 @@ bool append_draw_group(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
             object_id = p_preserved_object_ids[p_preserved_object_id_index++];
         }
         append_submesh_geometry(p_triangles_info, *submesh, first_vertex, object_id);
-        first_vertex += static_cast<uint32_t>(submesh->vertex_data->vertex_count);
+        first_vertex += static_cast<uint32_t>(submesh->vertices.vertex_count);
     }
     draw_group.index_sub_region.size = p_triangles_info.indices.size() - draw_group.index_sub_region.starting_index;
     p_triangles_info.draw_groups.push_back(std::move(draw_group));
@@ -305,7 +324,7 @@ bool RenderDatabase::contains_compiled_render_resource(std::string_view p_resour
     return entry != compiled_render_resources.end() && entry->second.is_valid();
 }
 
-void RenderDatabase::refresh_static_opaque_triangles() {
+void RenderDatabase::refresh_static_triangle_set() {
     if (static_opaque_mesh != nullptr) {
         Vector<uint32_t> object_ids(static_opaque.obj_id.begin(), static_opaque.obj_id.end(), allocator);
         set_opaque_triangles_linear(static_opaque, static_opaque_mesh, object_ids.data(), object_ids.size());
@@ -333,7 +352,7 @@ void RenderDatabase::set_opaque_triangles_linear(
             throw std::runtime_error("Failed to set opaque triangles: submesh should not be NULL.");
         }
         register_draw_group_submesh(draw_group_infos, *submesh, allocator);
-        total_triangles += submesh->index_count / 3;
+        total_triangles += submesh->indices.index_count / 3;
     }
     p_triangles_info.obj_id.reserve(submeshes.size());
     p_triangles_info.indices.reserve(total_triangles * 3);

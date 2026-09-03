@@ -30,9 +30,7 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
-#include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -76,14 +74,6 @@ private:
         Ref<ROPipelineLayoutVK> p_pipeline_layout);
     std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
         const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        const RenderBindpointDeclarations& p_bindpoint_declarations) const;
-    void write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
-        const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        uint32_t p_set_index,
-        const RenderBindpointDeclarations& p_bindpoint_declarations) const;
-    void write_image_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
-        const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        uint32_t p_set_index,
         const RenderBindpointDeclarations& p_bindpoint_declarations) const;
 };
 

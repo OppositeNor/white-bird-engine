@@ -81,7 +81,7 @@ public:
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const override;
     virtual VkBufferUsageFlags get_static_opaque_vertex_buffer_usage() const override;
     virtual VkBufferUsageFlags get_static_opaque_index_buffer_usage() const override;
-    virtual GPUJobVK on_static_opaque_triangles_updated(BaseRenderDataVK* p_render_data,
+    virtual GPUJobVK on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
         const RenderDatabase::OpaqueTrianglesInfo& p_info,
         Ref<ROBufferVK> p_vertex_buffer,
         Ref<ROBufferVK> p_index_buffer,

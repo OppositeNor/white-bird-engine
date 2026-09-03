@@ -538,7 +538,7 @@ GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
     return create_static_opaque_build_job(std::move(build_data));
 }
 
-GPUJobVK RayTracingPluginVK::on_static_opaque_triangles_updated(BaseRenderDataVK* p_render_data,
+GPUJobVK RayTracingPluginVK::on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
     const RenderDatabase::OpaqueTrianglesInfo& p_info,
     Ref<ROBufferVK> p_vertex_buffer,
     Ref<ROBufferVK> p_index_buffer,

@@ -15,17 +15,21 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_TEST_HH
 
-#include "job_test_utils.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_spsc.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_dummy/renderer_dummy.hh"
 #include "function/render_software/renderer_software.hh"
 #include "global/global.hh"
+#include "job_test_utils.hh"
 #include "platform/file_system/directory.hh"
+#include "utils/defs.hh"
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <future>
 #include <gtest/gtest.h>
 #include <latch>
 #include <memory>
@@ -486,13 +490,15 @@ TEST_F(WBEJobBufferRingSPSCTest, StressTestManyOperations) {
 }
 
 TEST_F(WBEJobBufferRingSPSCTest, NoOpHandlersReturnReadyHandles) {
-    WBE::RendererCapabilities capabilities{.ray_tracing = true};
-    WBE::RenderAllocator render_allocator(WBE_MI_B(1));
-    WBE::RendererDummy dummy_renderer(&render_allocator, capabilities);
+    {
+        WBE::RendererCapabilities capabilities{.ray_tracing = true};
+        WBE::RenderAllocator render_allocator(WBE_MI_B(1));
+        WBE::RendererDummy dummy_renderer(&render_allocator, capabilities);
 
-    std::future<void> dummy_handle = dummy_renderer.add_job([]() {
-    });
-    EXPECT_TRUE(is_future_ready(dummy_handle));
+        std::future<void> dummy_handle = dummy_renderer.add_job([]() {
+        });
+        EXPECT_TRUE(is_future_ready(dummy_handle));
+    }
 
     WBE::RendererCapabilities software_capabilities{.ray_tracing = true};
     auto software_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(1));

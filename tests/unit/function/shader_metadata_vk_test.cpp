@@ -231,6 +231,25 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
     }
 }
 
+TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetadata) {
+    ParserJSON parser;
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}),
+        "forward_cook_torrance_pbr_static_vertex.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    const std::array<std::string_view, 3> expected_names{"static_submeshes", "static_nodes", "static_instances"};
+    for (std::string_view expected_name : expected_names) {
+        auto parameter = std::ranges::find_if(metadata.parameters, [expected_name](const ShaderMetadataParameter& p_parameter) {
+            return p_parameter.name == expected_name;
+        });
+        ASSERT_NE(parameter, metadata.parameters.end());
+        EXPECT_EQ(parameter->type.kind, "resource");
+        EXPECT_EQ(parameter->type.scalar_type, "structuredBuffer");
+        EXPECT_EQ(parameter->binding.kind, "descriptorTableSlot");
+    }
+}
+
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
     ParserJSON parser;
     parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "vertex_input_attributes"}), "vertex_input_attributes.json"));

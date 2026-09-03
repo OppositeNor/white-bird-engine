@@ -103,37 +103,53 @@ void append_bytes(std::vector<uint8_t>& p_target, const std::vector<uint8_t>& p_
     p_target.insert(p_target.end(), p_source.begin(), p_source.end());
 }
 
-RefRes<RUVertexData> make_vertex_data(RenderDatabaseTestResourceStorage& p_storage,
+RUBinaryView make_binary_view(RenderDatabaseTestResourceStorage& p_storage, const std::vector<uint8_t>& p_bytes) {
+    RefRes<RUBinary> binary = p_storage.make_object<RUBinary>();
+    binary->data = p_storage.make_array<uint8_t>(p_bytes).force_cast<char>();
+    binary->size = p_bytes.size();
+    return RUBinaryView{.binary = binary, .start = 0, .size = p_bytes.size()};
+}
+
+RUVertexView make_vertex_data(RenderDatabaseTestResourceStorage& p_storage,
     std::string_view p_role,
     RUVertexAttributeFormat p_format,
     size_t p_stride,
     size_t p_vertex_count,
     const std::vector<uint8_t>& p_vertices) {
-    RefRes<RUVertexData::Attribute> attribute = p_storage.make_object<RUVertexData::Attribute>();
+    RefRes<RUVertexView::Attribute> attribute = p_storage.make_object<RUVertexView::Attribute>();
     attribute->role.name = p_storage.make_string(p_role);
     attribute->role.hash = dynam_hash(p_role);
     attribute->format = p_format;
     attribute->size = p_stride;
 
-    RefRes<RUVertexData> result = p_storage.make_object<RUVertexData>();
-    result->vertices = p_storage.make_array<uint8_t>(p_vertices);
-    result->vertices_size = p_vertices.size();
-    result->attributes = attribute;
-    result->attribute_count = 1;
-    result->vertex_stride = p_stride;
-    result->vertex_count = p_vertex_count;
+    RUVertexView result;
+    result.binary = make_binary_view(p_storage, p_vertices);
+    result.attributes = attribute;
+    result.attribute_count = 1;
+    result.vertex_stride = p_stride;
+    result.vertex_count = p_vertex_count;
+    return result;
+}
+
+RUIndexView make_index_data(RenderDatabaseTestResourceStorage& p_storage, std::span<const uint32_t> p_indices) {
+    std::vector<uint8_t> bytes(sizeof(uint32_t) * p_indices.size());
+    if (!bytes.empty()) {
+        std::memcpy(bytes.data(), p_indices.data(), bytes.size());
+    }
+    RUIndexView result;
+    result.binary = make_binary_view(p_storage, bytes);
+    result.index_count = p_indices.size();
     return result;
 }
 
 RefRes<RUSubmesh3D> make_submesh(RenderDatabaseTestResourceStorage& p_storage,
     RefRes<RUMaterial> p_material,
-    RefRes<RUVertexData> p_vertex_data,
+    RUVertexView p_vertex_data,
     const std::array<uint32_t, 3>& p_indices) {
     RefRes<RUSubmesh3D> result = p_storage.make_object<RUSubmesh3D>();
     result->material = p_material;
-    result->vertex_data = p_vertex_data;
-    result->indices = p_storage.make_array<uint32_t>(p_indices);
-    result->index_count = p_indices.size();
+    result->vertices = p_vertex_data;
+    result->indices = make_index_data(p_storage, p_indices);
     return result;
 }
 
@@ -167,6 +183,19 @@ TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObject
     EXPECT_EQ(render_database.get_compiled_render_resource("test_resource", render_object->get_type_uuid()), render_object);
 }
 
+TEST_F(WBERenderDatabaseTest, StoresStaticGeometrySetReferences) {
+    RefRes<RUStaticOpaqueSet> opaque_set = resource_storage.make_object<RUStaticOpaqueSet>();
+    RefRes<RUStaticMaskedSet> masked_set = resource_storage.make_object<RUStaticMaskedSet>();
+
+    render_database.set_static_opaque_set(opaque_set);
+    render_database.set_static_masked_set(masked_set);
+
+    EXPECT_EQ(render_database.get_static_opaque_set(), opaque_set);
+    EXPECT_EQ(render_database.get_static_masked_set(), masked_set);
+    EXPECT_THROW(render_database.set_static_opaque_set(MEM_NULL), std::runtime_error);
+    EXPECT_THROW(render_database.set_static_masked_set(MEM_NULL), std::runtime_error);
+}
+
 TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     RefRes<RUGraphicsPipeline> pipeline_a = make_pipeline(resource_storage, "pipeline_a");
     RefRes<RUGraphicsPipeline> pipeline_b = make_pipeline(resource_storage, "pipeline_b");
@@ -184,16 +213,15 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
         make_vertex_bytes(std::array<float, 9>{28.0F, 29.0F, 30.0F, 31.0F, 32.0F, 33.0F, 34.0F, 35.0F, 36.0F});
     const std::vector<uint8_t> uv_vertices = make_vertex_bytes(std::array<float, 6>{0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 1.0F});
 
-    RefRes<RUVertexData> position_a =
+    RUVertexView position_a =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 3, position_vertices_a);
-    RefRes<RUVertexData> position_b =
+    RUVertexView position_b =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 3, position_vertices_b);
-    RefRes<RUVertexData> position_c =
+    RUVertexView position_c =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 3, position_vertices_c);
-    RefRes<RUVertexData> position_d =
+    RUVertexView position_d =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 3, position_vertices_d);
-    RefRes<RUVertexData> uv =
-        make_vertex_data(resource_storage, "uv", RUVertexAttributeFormat::FLOAT2, sizeof(float) * 2, 3, uv_vertices);
+    RUVertexView uv = make_vertex_data(resource_storage, "uv", RUVertexAttributeFormat::FLOAT2, sizeof(float) * 2, 3, uv_vertices);
 
     RefRes<RUSubmesh3D> material_a_position_first =
         make_submesh(resource_storage, material_a, position_a, std::array<uint32_t, 3>{0, 1, 2});
@@ -211,8 +239,8 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    render_database.set_static_opaque_triangles(mesh.get());
-    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_opaque_triangles_info();
+    render_database.set_static_triangle_set(mesh.get());
+    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_triangle_set_info();
 
     ASSERT_EQ(info.materials.size(), 3U);
     EXPECT_EQ(info.materials[0].material, material_a);
@@ -273,7 +301,7 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     std::memcpy(&flattened_position, info.vertices.data() + info.draw_groups[1].vertex_buffer_byte_offset, sizeof(flattened_position));
     EXPECT_NE(flattened_position, updated_position);
 
-    render_database.refresh_static_opaque_triangles();
+    render_database.refresh_static_triangle_set();
     std::memcpy(&flattened_position, info.vertices.data() + info.draw_groups[1].vertex_buffer_byte_offset, sizeof(flattened_position));
     EXPECT_EQ(flattened_position, updated_position);
     EXPECT_TRUE(std::equal(info.obj_id.begin(), info.obj_id.end(), object_ids.begin(), object_ids.end()));
@@ -283,19 +311,20 @@ TEST_F(WBERenderDatabaseTest, IgnoresEmptyIndexGroupsWithoutRegisteringTheirMate
     RefRes<RUGraphicsPipeline> pipeline = make_pipeline(resource_storage, "pipeline");
     RefRes<RUMaterial> material = make_material(resource_storage, "material", pipeline);
     const std::vector<uint8_t> vertices = make_vertex_bytes(std::array<float, 3>{1.0F, 2.0F, 3.0F});
-    RefRes<RUVertexData> vertex_data =
+    RUVertexView vertex_data =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 1, vertices);
     RefRes<RUSubmesh3D> submesh = resource_storage.make_object<RUSubmesh3D>();
     submesh->material = material;
-    submesh->vertex_data = vertex_data;
+    submesh->vertices = vertex_data;
+    submesh->indices = make_index_data(resource_storage, std::span<const uint32_t>());
     const std::array<RefRes<RUSubmesh3D>, 1> submeshes{submesh};
     RefRes<RUMesh3D> mesh = resource_storage.make_object<RUMesh3D>();
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    render_database.set_static_opaque_triangles(mesh.get());
+    render_database.set_static_triangle_set(mesh.get());
 
-    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_opaque_triangles_info();
+    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_triangle_set_info();
     EXPECT_TRUE(info.vertices.empty());
     EXPECT_TRUE(info.indices.empty());
     EXPECT_TRUE(info.obj_id.empty());
@@ -308,7 +337,7 @@ TEST_F(WBERenderDatabaseTest, RejectsOutOfRangeLocalIndex) {
     RefRes<RUGraphicsPipeline> pipeline = make_pipeline(resource_storage, "pipeline");
     RefRes<RUMaterial> material = make_material(resource_storage, "material", pipeline);
     const std::vector<uint8_t> vertices = make_vertex_bytes(std::array<float, 3>{1.0F, 2.0F, 3.0F});
-    RefRes<RUVertexData> vertex_data =
+    RUVertexView vertex_data =
         make_vertex_data(resource_storage, "position", RUVertexAttributeFormat::FLOAT3, sizeof(float) * 3, 1, vertices);
     RefRes<RUSubmesh3D> submesh = make_submesh(resource_storage, material, vertex_data, std::array<uint32_t, 3>{0, 1, 0});
     const std::array<RefRes<RUSubmesh3D>, 1> submeshes{submesh};
@@ -316,7 +345,7 @@ TEST_F(WBERenderDatabaseTest, RejectsOutOfRangeLocalIndex) {
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    EXPECT_THROW(render_database.set_static_opaque_triangles(mesh.get()), std::runtime_error);
+    EXPECT_THROW(render_database.set_static_triangle_set(mesh.get()), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

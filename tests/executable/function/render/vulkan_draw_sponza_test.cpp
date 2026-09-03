@@ -36,7 +36,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
+#include "function/render_vk/rt_run_static_triangle_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
@@ -92,10 +92,10 @@ private:
     void setup_spot_light();
     void create_shadow_map_resources();
     void create_main_depth_resources();
-    void write_shadow_dynamic_descriptors(WBE::RTRunStaticOpaqueTrianglesVK& p_task);
-    void write_main_dynamic_descriptors(WBE::RTRunStaticOpaqueTrianglesVK& p_task);
-    void register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_shadow_task,
-        WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_main_task);
+    void write_shadow_dynamic_descriptors(WBE::RTRunStaticTriangleSetVK& p_task);
+    void write_main_dynamic_descriptors(WBE::RTRunStaticTriangleSetVK& p_task);
+    void register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticTriangleSetVK>& p_shadow_task,
+        WBE::Unique<WBE::RTRunStaticTriangleSetVK>& p_main_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
@@ -261,7 +261,7 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
     setup_spot_light();
     create_shadow_map_resources();
     create_main_depth_resources();
-    WBE::RTRunStaticOpaqueTrianglesVK::Config shadow_task_config;
+    WBE::RTRunStaticTriangleSetVK::Config shadow_task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     shadow_task_config.set_render_extent(shadow_extent)
@@ -271,11 +271,11 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
         .add_clear_value(shadow_depth_clear)
         .add_graphics_pipeline_override("forward_cook_torrance_pbr", "shadowmap_spot")
         .add_graphics_pipeline_override("forward_cook_torrance_pbr_masked", "shadowmap_spot_masked");
-    auto shadow_task = WBE::make_unique<WBE::RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, shadow_task_config);
+    auto shadow_task = WBE::make_unique<WBE::RTRunStaticTriangleSetVK>(render_allocator, renderer_vk, shadow_task_config);
     write_shadow_dynamic_descriptors(*shadow_task);
-    WBE::RTRunStaticOpaqueTrianglesVK::Config task_config;
+    WBE::RTRunStaticTriangleSetVK::Config task_config;
     task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
-    auto main_task = WBE::make_unique<WBE::RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
+    auto main_task = WBE::make_unique<WBE::RTRunStaticTriangleSetVK>(render_allocator, renderer_vk, task_config);
     write_main_dynamic_descriptors(*main_task);
     register_draw_sponza_render_graph(shadow_task, main_task);
 }
@@ -299,8 +299,8 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
-    render_database->set_static_opaque_triangles(sponza_mesh.get());
-    renderer_vk->update_static_opaque_triangles();
+    render_database->set_static_triangle_set(sponza_mesh.get());
+    renderer_vk->update_static_triangle_set();
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
@@ -371,7 +371,7 @@ void ApplicationVulkanDrawSponzaTest::create_main_depth_resources() {
                           .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticOpaqueTrianglesVK& p_task) {
+void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticTriangleSetVK& p_task) {
     spot_light_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
@@ -388,7 +388,7 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRu
     }
 }
 
-void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunStaticOpaqueTrianglesVK& p_task) {
+void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunStaticTriangleSetVK& p_task) {
     if (p_task.get_compiled_batch_count() == 0) {
         throw std::runtime_error("Failed to setup draw sponza test: main pipeline produced no descriptor sets.");
     }
@@ -438,7 +438,7 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
 }
 
 void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
-    WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticOpaqueTrianglesVK>& p_main_task) {
+    WBE::Unique<WBE::RTRunStaticTriangleSetVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticTriangleSetVK>& p_main_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/allocator/i_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/application/application_game.hh"
@@ -20,7 +21,6 @@
 #include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
-#include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -31,11 +31,12 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/rt_run_static_opaque_triangles_vk.hh"
+#include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -63,12 +64,12 @@ public:
 
 private:
     void create_depth_resources();
-    void write_camera_descriptor(RTRunStaticOpaqueTrianglesVK& p_task);
+    void write_camera_descriptor(RTRunStaticSetVK& p_task);
 
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
-    RefRes<RUMesh3D> sponza_mesh;
+    RefRes<RUStaticOpaqueSet> sponza_set;
     Ref<ROImageVK> depth_image;
     Ref<ROImageViewVK> depth_view;
     Ref<ROBufferVK> camera_info_buffer;
@@ -140,25 +141,31 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = get_renderer_allocator().get();
 
-    sponza_mesh = ResourceManager::get_singleton()->get_resource<RUMesh3D>("sponza.mesh");
-    if (sponza_mesh == nullptr) {
-        throw std::runtime_error("Failed to setup indirect Sponza test: sponza mesh resource was not found.");
+    ResourceManager* resource_manager = ResourceManager::get_singleton();
+    auto resource_chunk = make_ref<ResourceChunkLoadFile>(
+        global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
+    resource_manager->register_chunk(resource_chunk);
+    sponza_set = resource_manager->get_resource<RUStaticOpaqueSet>("sponza_static.static_opaque_set");
+    if (sponza_set == nullptr) {
+        throw std::runtime_error("Failed to setup indirect Sponza test: static opaque set resource was not found.");
     }
-    renderer_vk->get_render_database()->set_static_opaque_triangles(sponza_mesh.get());
-    renderer_vk->update_static_opaque_triangles();
+    RefRes<RUGraphicsPipeline> graphics_pipeline = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
+    if (graphics_pipeline == nullptr) {
+        throw std::runtime_error("Failed to setup indirect Sponza test: static graphics pipeline resource was not found.");
+    }
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
     create_depth_resources();
 
-    RTRunStaticOpaqueTrianglesVK::Config task_config;
+    RTRunStaticSetVK::Config task_config;
     task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
-    auto task = make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer_vk, task_config);
+    auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_set, graphics_pipeline, task_config);
     write_camera_descriptor(*task);
 
     RendGraphDescVK graph_desc(render_allocator);
     graph_desc.resources.emplace_back(RendResVK{
         .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL});
     graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view);
-    graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_OPAQUE, std::move(task));
+    graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_SET, std::move(task));
     renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
     renderer_vk->activate_render_graph("draw_sponza_indirect_graph");
 }
@@ -179,7 +186,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
             .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStaticOpaqueTrianglesVK& p_task) {
+void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStaticSetVK& p_task) {
     camera_info_buffer = ROBufferVK::Builder()
                              .set_domain(DeviceDomain::HOST_DEVICE)
                              .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -187,12 +194,9 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStati
                              .create_ref(base_render_data);
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
-    for (size_t batch_index = 0; batch_index < p_task.get_compiled_batch_count(); ++batch_index) {
-        auto [set_index, binding] = p_task.get_descriptor_binding(batch_index, "camera_info");
-        p_task.write_descriptor_set(batch_index,
-            set_index,
-            RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
-    }
+    auto [set_index, binding] = p_task.get_descriptor_binding("camera_info");
+    p_task.write_descriptor_set(set_index,
+        RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
 }
 
 } // namespace WhiteBirdEngine

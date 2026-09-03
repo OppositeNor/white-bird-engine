@@ -82,7 +82,7 @@ struct WBE_META(WBE_COMPONENT) ComponentTransformMats {
  * @class ComponentCamera
  * @brief Render-facing camera component mirror used by gameplay code.
  *
- * This mirrors the Vulkan camera UBO payload and adds a placeholder dirty
+ * This mirrors the Vulkan camera uniform-buffer payload and adds a placeholder dirty
  * bit for future scene synchronization.
  */
 struct WBE_META(WBE_COMPONENT) ComponentCamera {

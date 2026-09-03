@@ -5,18 +5,35 @@
             "id": "model_cube",
             "source_type": "model",
             "source_file": "assets/models/Cube/glTF/Cube.gltf",
+            "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
+            "texture_output_dir": "assets/images"
+        },
+        {
+            "id": "model_cube_static",
+            "source_type": "static_geometry",
+            "source_file": "assets/models/Cube/glTF/Cube.gltf",
+            "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
+            "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
             "texture_output_dir": "assets/images"
         },
         {
             "id": "sponza",
             "source_type": "model",
             "source_file": "assets/models/Sponza/glTF/Sponza.gltf",
-            "scale_vertex_pos": 0.01,
+            "combine_nodes": true,
+            "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
+            "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
+            "texture_output_dir": "assets/images"
+        },
+        {
+            "id": "intel_sponza",
+            "source_type": "model",
+            "source_file": "assets/models/IntelSponza/NewSponza_Main_glTF_003.gltf",
+            "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
             "texture_output_dir": "assets/images"
         }
-
     ]
 }

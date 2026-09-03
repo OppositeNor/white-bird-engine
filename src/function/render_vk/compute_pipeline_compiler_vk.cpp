@@ -15,25 +15,19 @@
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/reference_weak.hh"
 #include "function/function_utils.hh"
-#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_layout_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <cstddef>
@@ -93,6 +87,9 @@ void validate_bindpoint_declarations(const RenderBindpointDeclarations& p_bindpo
             throw std::runtime_error("Failed to compile compute pipeline: uniform binding field path is empty.");
         }
         parse_indexed_field_path(bindpoint_declaration.field_path);
+        if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
         if (bindpoint_declaration.offset + bindpoint_declaration.size > p_bindpoint_declarations.buffer_data.size()) {
             throw std::runtime_error(std::format("Failed to compile compute pipeline: uniform binding '{}' exceeds the packed buffer range.",
                 bindpoint_declaration.field_path));
@@ -127,76 +124,8 @@ std::string resolve_compute_stage_entry(RefRes<RUShader> p_shader_resource, cons
 const RenderBindpointBufferDeclaration* find_uniform_binding(
     const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
-        if (bindpoint_declaration.field_path == p_field_path) {
+        if (bindpoint_declaration.field_path == p_field_path && bindpoint_declaration.buffer_render_object == MEM_NULL) {
             return &bindpoint_declaration;
-        }
-    }
-    return nullptr;
-}
-
-const RenderBindpointImageDeclaration* find_image_binding(
-    const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path, uint32_t p_array_index, bool p_has_array_index) {
-    for (const auto& bindpoint_declaration : p_bindpoint_declarations.image_declerations) {
-        IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-        if (indexed_path.field_path != p_field_path) {
-            continue;
-        }
-        if (indexed_path.array_index.has_value() != p_has_array_index) {
-            continue;
-        }
-        if (indexed_path.array_index.has_value() && *indexed_path.array_index != p_array_index) {
-            continue;
-        }
-        return &bindpoint_declaration;
-    }
-    if (p_has_array_index && p_array_index > 0) {
-        for (const auto& bindpoint_declaration : p_bindpoint_declarations.image_declerations) {
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
-                return &bindpoint_declaration;
-            }
-        }
-    }
-    if (!p_has_array_index && p_array_index == 0) {
-        for (const auto& bindpoint_declaration : p_bindpoint_declarations.image_declerations) {
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
-                return &bindpoint_declaration;
-            }
-        }
-    }
-    return nullptr;
-}
-
-const RenderBindpointSamplerDeclaration* find_sampler_binding(
-    const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path, uint32_t p_array_index, bool p_has_array_index) {
-    for (const auto& bindpoint_declaration : p_bindpoint_declarations.sampler_declerations) {
-        IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-        if (indexed_path.field_path != p_field_path) {
-            continue;
-        }
-        if (indexed_path.array_index.has_value() != p_has_array_index) {
-            continue;
-        }
-        if (indexed_path.array_index.has_value() && *indexed_path.array_index != p_array_index) {
-            continue;
-        }
-        return &bindpoint_declaration;
-    }
-    if (p_has_array_index && p_array_index > 0) {
-        for (const auto& bindpoint_declaration : p_bindpoint_declarations.sampler_declerations) {
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
-                return &bindpoint_declaration;
-            }
-        }
-    }
-    if (!p_has_array_index && p_array_index == 0) {
-        for (const auto& bindpoint_declaration : p_bindpoint_declarations.sampler_declerations) {
-            IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
-            if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
-                return &bindpoint_declaration;
-            }
         }
     }
     return nullptr;
@@ -205,6 +134,9 @@ const RenderBindpointSamplerDeclaration* find_sampler_binding(
 const RenderBindpointBufferDeclaration* find_uniform_binding(
     const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path, uint32_t p_array_index, bool p_has_array_index) {
     for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
+        if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
         IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
         if (indexed_path.field_path != p_field_path) {
             continue;
@@ -219,6 +151,9 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(
     }
     if (p_has_array_index && p_array_index > 0) {
         for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
+            if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+                continue;
+            }
             IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
             if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
                 return &bindpoint_declaration;
@@ -227,6 +162,9 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(
     }
     if (!p_has_array_index && p_array_index == 0) {
         for (const auto& bindpoint_declaration : p_bindpoint_declarations.buffer_declerations) {
+            if (bindpoint_declaration.buffer_render_object != MEM_NULL) {
+                continue;
+            }
             IndexedFieldPath indexed_path = parse_indexed_field_path(bindpoint_declaration.field_path);
             if (indexed_path.field_path == p_field_path && indexed_path.array_index.has_value() && *indexed_path.array_index == 0) {
                 return &bindpoint_declaration;
@@ -236,7 +174,7 @@ const RenderBindpointBufferDeclaration* find_uniform_binding(
     return nullptr;
 }
 
-std::vector<uint8_t> build_uniform_data(const ShaderDescriptorBindingVK& p_descriptor_binding,
+std::vector<uint8_t> build_uniform_element_data(const ShaderDescriptorBindingVK& p_descriptor_binding,
     const RenderBindpointDeclarations& p_bindpoint_declarations,
     uint32_t p_array_index,
     bool p_has_array_index) {
@@ -265,6 +203,19 @@ std::vector<uint8_t> build_uniform_data(const ShaderDescriptorBindingVK& p_descr
         std::memcpy(uniform_data.data() + field.offset,
             p_bindpoint_declarations.buffer_data.data() + bindpoint_declaration->offset,
             field.size);
+    }
+    return uniform_data;
+}
+
+std::vector<uint8_t> build_uniform_data(
+    const ShaderDescriptorBindingVK& p_descriptor_binding, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    uint32_t descriptor_count = std::max(p_descriptor_binding.layout_binding.descriptorCount, 1U);
+    bool has_array_index = p_descriptor_binding.layout_binding.descriptorCount > 1;
+    std::vector<uint8_t> uniform_data(p_descriptor_binding.buffer_size * descriptor_count);
+    for (uint32_t array_index = 0; array_index < descriptor_count; ++array_index) {
+        std::vector<uint8_t> element_data =
+            build_uniform_element_data(p_descriptor_binding, p_bindpoint_declarations, array_index, has_array_index);
+        std::memcpy(uniform_data.data() + p_descriptor_binding.buffer_size * array_index, element_data.data(), element_data.size());
     }
     return uniform_data;
 }
@@ -322,91 +273,12 @@ std::vector<Ref<RODescriptorSetVK>> ComputePipelineCompilerVK::compile_descripto
     for (uint32_t set_index = 0; set_index < p_descriptor_set_layouts.size(); ++set_index) {
         Ref<RODescriptorSetVK> descriptor_set =
             RODescriptorSetVK::Builder().add_descriptor_set_layout(p_descriptor_set_layouts[set_index]).create_ref(context.render_data);
-        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
+        write_uniform_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations, build_uniform_data);
+        write_storage_buffer_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
         write_image_descriptors(descriptor_set, p_descriptor_bindings, set_index, p_bindpoint_declarations);
         descriptor_sets.push_back(descriptor_set);
     }
     return descriptor_sets;
-}
-
-void ComputePipelineCompilerVK::write_uniform_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
-    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-    uint32_t p_set_index,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) const {
-    for (const auto& descriptor_binding : p_descriptor_bindings) {
-        if (descriptor_binding.set_index != p_set_index ||
-            descriptor_binding.layout_binding.descriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-            continue;
-        }
-        uint32_t descriptor_count = std::max(descriptor_binding.layout_binding.descriptorCount, 1U);
-        bool has_array_index = descriptor_binding.layout_binding.descriptorCount > 1;
-        for (uint32_t array_index = 0; array_index < descriptor_count; ++array_index) {
-            std::vector<uint8_t> uniform_data =
-                build_uniform_data(descriptor_binding, p_bindpoint_declarations, array_index, has_array_index);
-            Ref<ROBufferVK> uniform_buffer = ROBufferVK::Builder()
-                                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                                 .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                                 .set_size(uniform_data.size())
-                                                 .create_ref(context.render_data);
-            uniform_buffer->update_buffer(uniform_data.data(), uniform_data.size());
-            p_descriptor_set->write_descriptor_set(RODescriptorSetVK::Writer()
-                    .set_binding(descriptor_binding.layout_binding.binding)
-                    .set_dst_array_element(array_index)
-                    .add_uniform_buffer_info(uniform_buffer, 0, descriptor_binding.buffer_size));
-        }
-    }
-}
-
-void ComputePipelineCompilerVK::write_image_descriptors(Ref<RODescriptorSetVK> p_descriptor_set,
-    const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-    uint32_t p_set_index,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) const {
-    for (const auto& descriptor_binding : p_descriptor_bindings) {
-        if (descriptor_binding.set_index != p_set_index) {
-            continue;
-        }
-        VkDescriptorType descriptor_type = descriptor_binding.layout_binding.descriptorType;
-        if (descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_IMAGE &&
-            descriptor_type != VK_DESCRIPTOR_TYPE_SAMPLER) {
-            continue;
-        }
-        RODescriptorSetVK::Writer writer;
-        writer.set_binding(descriptor_binding.layout_binding.binding);
-        uint32_t descriptor_count = std::max(descriptor_binding.layout_binding.descriptorCount, 1U);
-        for (uint32_t array_index = 0; array_index < descriptor_count; ++array_index) {
-            bool has_array_index = descriptor_binding.layout_binding.descriptorCount > 1;
-            if (descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLER) {
-                const auto* sampler_binding =
-                    find_sampler_binding(p_bindpoint_declarations, descriptor_binding.parameter_name, array_index, has_array_index);
-                if (sampler_binding == nullptr) {
-                    throw std::runtime_error(std::format("Failed to bind compute sampler '{}'.", descriptor_binding.parameter_name));
-                }
-                auto sampler = sampler_binding->sampler_render_object.dynamic_cast_ref<ROSamplerVK>();
-                if (sampler == MEM_NULL) {
-                    throw std::runtime_error(std::format("Failed to bind compute sampler '{}': sampler object is missing.",
-                        descriptor_binding.parameter_name));
-                }
-                writer.add_sampler_info({.sampler = sampler, .image_layout = VK_IMAGE_LAYOUT_GENERAL});
-                continue;
-            }
-            const auto* image_binding =
-                find_image_binding(p_bindpoint_declarations, descriptor_binding.parameter_name, array_index, has_array_index);
-            if (image_binding == nullptr) {
-                throw std::runtime_error(std::format("Failed to bind compute image '{}'.", descriptor_binding.parameter_name));
-            }
-            auto image_view = image_binding->image_render_object.dynamic_cast_ref<ROImageViewVK>();
-            if (image_view == MEM_NULL) {
-                throw std::runtime_error(std::format("Failed to bind compute image '{}': image view render object is missing.",
-                    descriptor_binding.parameter_name));
-            }
-            if (descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-                writer.add_storage_image_info({.image_view = image_view, .image_layout = VK_IMAGE_LAYOUT_GENERAL});
-            } else {
-                writer.add_sampled_image_info({.image_view = image_view, .image_layout = VK_IMAGE_LAYOUT_GENERAL});
-            }
-        }
-        p_descriptor_set->write_descriptor_set(writer);
-    }
 }
 
 } // namespace WhiteBirdEngine

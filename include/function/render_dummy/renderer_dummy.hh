@@ -80,7 +80,7 @@ public:
             std::string("RendererDummy does not support render graph resource updates: ") + std::string(p_resource_key));
     }
 
-    virtual void update_static_opaque_triangles() override {
+    virtual void update_static_triangle_set() override {
     }
 
     virtual std::future<void> add_job(std::function<void()> p_job) override {

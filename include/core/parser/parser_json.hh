@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_PARSER_JSON_HH
 #define WBE_FILE_PARSER_JSON_HH
 
+#include "glm/detail/qualifier.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
@@ -105,6 +107,13 @@ public:
             data[p_key]["y"] = p_value.y;
             data[p_key]["z"] = p_value.z;
             data[p_key]["w"] = p_value.w;
+        } else if constexpr (std::same_as<Type, glm::mat4>) {
+            data[p_key] = Json::array();
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    data[p_key].push_back(p_value[column][row]);
+                }
+            }
         } else {
             data[p_key] = std::forward<T>(p_value);
         }
@@ -152,6 +161,13 @@ public:
             data["y"] = p_value.y;
             data["z"] = p_value.z;
             data["w"] = p_value.w;
+        } else if constexpr (std::same_as<Type, glm::mat4>) {
+            data = Json::array();
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    data.push_back(p_value[column][row]);
+                }
+            }
         } else {
             data = std::forward<T>(p_value);
         }
@@ -201,6 +217,15 @@ public:
             p_value = glm::vec3(data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>());
         } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
             p_value = T(data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>(), data.at("w").get<float>());
+        } else if constexpr (std::same_as<T, glm::mat4>) {
+            if (!data.is_array() || data.size() != 16) {
+                throw std::runtime_error("Failed to get glm::mat4: expected an array containing exactly 16 values.");
+            }
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    p_value[column][row] = data.at(column * 4 + row).get<float>();
+                }
+            }
         } else if constexpr (std::same_as<T, JSONData>) {
             p_value = JSONData(data.get<Json>());
         } else {
@@ -242,6 +267,16 @@ public:
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>(),
                 data.at(p_key).at("w").get<float>());
+        } else if constexpr (std::same_as<T, glm::mat4>) {
+            const auto& matrix_data = data.at(p_key);
+            if (!matrix_data.is_array() || matrix_data.size() != 16) {
+                throw std::runtime_error("Failed to get glm::mat4: expected an array containing exactly 16 values.");
+            }
+            for (glm::length_t column = 0; column < 4; ++column) {
+                for (glm::length_t row = 0; row < 4; ++row) {
+                    p_value[column][row] = matrix_data.at(column * 4 + row).get<float>();
+                }
+            }
         } else if constexpr (std::same_as<T, JSONData>) {
             p_value = JSONData(data.at(p_key).get<Json>());
         } else {

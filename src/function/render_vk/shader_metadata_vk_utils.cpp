@@ -61,6 +61,9 @@ VkDescriptorType descriptor_type_from_parameter(const ShaderMetadataParameter& p
     if (p_parameter.type.kind == "constantBuffer") {
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     }
+    if (p_parameter.type.kind == "structuredBuffer" || p_parameter.type.kind == "byteAddressBuffer") {
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    }
     if (p_parameter.type.kind == "resource" && p_parameter.type.scalar_type.starts_with("texture")) {
         return p_parameter.type.access == "readWrite" ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     }
@@ -74,6 +77,11 @@ VkDescriptorType descriptor_type_from_parameter(const ShaderMetadataParameter& p
 VkDescriptorType descriptor_type_from_field(std::string_view p_field_path, const ShaderMetadataTypeField& p_field) {
     if (p_field.type.kind == "constantBuffer" || (p_field.type.kind == "array" && p_field.type.element_scalar_type == "constantBuffer")) {
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    }
+    if (p_field.type.kind == "structuredBuffer" || p_field.type.kind == "byteAddressBuffer" ||
+        (p_field.type.kind == "array" &&
+            (p_field.type.element_scalar_type == "structuredBuffer" || p_field.type.element_scalar_type == "byteAddressBuffer"))) {
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     }
     if ((p_field.type.kind == "resource" && p_field.type.scalar_type.starts_with("texture")) ||
         (p_field.type.kind == "array" && p_field.type.element_scalar_type.starts_with("texture"))) {
@@ -249,7 +257,7 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 }
 
 VertexInputDescriptionVK build_vertex_input_description_vk(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexData& p_vertex_data) {
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) {
     const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_data);
     return VertexInputDescriptionVK::from_contract(contract);
 }

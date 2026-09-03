@@ -110,8 +110,16 @@ void Scene::update(double p_delta) {
         }
         RefRes<RUMesh3D> static_opaque_mesh = active_world->get_static_opaque_mesh();
         if (static_opaque_mesh != MEM_NULL) {
-            renderer->get_render_database()->set_static_opaque_triangles(static_opaque_mesh.get());
-            renderer->update_static_opaque_triangles();
+            renderer->get_render_database()->set_static_triangle_set(static_opaque_mesh.get());
+            renderer->update_static_triangle_set();
+        }
+        RefRes<RUStaticOpaqueSet> static_opaque_set = active_world->get_static_opaque_set();
+        if (static_opaque_set != MEM_NULL) {
+            renderer->get_render_database()->set_static_opaque_set(static_opaque_set);
+        }
+        RefRes<RUStaticMaskedSet> static_masked_set = active_world->get_static_masked_set();
+        if (static_masked_set != MEM_NULL) {
+            renderer->get_render_database()->set_static_masked_set(static_masked_set);
         }
     }
 

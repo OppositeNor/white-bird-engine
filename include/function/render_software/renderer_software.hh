@@ -59,7 +59,7 @@ public:
     virtual void activate_render_graph(std::string_view p_resource_key) override;
     virtual void update_render_graph_resources(
         std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override;
-    virtual void update_static_opaque_triangles() override;
+    virtual void update_static_triangle_set() override;
     virtual std::future<void> add_job(std::function<void()> p_job) override;
 
 private:

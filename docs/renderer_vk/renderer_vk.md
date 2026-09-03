@@ -39,14 +39,20 @@ validated texture table.
 
 ## Vertex Resource Layout
 
-Mesh sidecar files keep geometry attributes as separate arrays. When a submesh resource is loaded, its non-index
-`geometry_sections` are packed in declaration order into one tightly interleaved vertex buffer. Every section supplies an open
-string role, and every section must contain the same number of elements. Indices remain a contiguous `uint32` array.
+Mesh and static-geometry sidecar files are represented by `RUBinary` resources. Submeshes store `vertices` and `indices` views
+into those binaries rather than owning copied geometry arrays. Vertex views are already tightly interleaved; every attribute
+supplies an open string role, a byte offset within the stride, and a reflected scalar/vector type. Index views contain contiguous
+`uint32` indices.
 
 Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `ivec3`, `ivec4`, `uint`, `uvec2`, `uvec3`, and
 `uvec4`. The resulting attribute offsets, byte sizes, stride, and vertex count are fixed after loading. Attribute values may be
-changed through `RUSubmesh3D`, but mutation is not thread-safe. Call `RendererVK::update_static_opaque_triangles()` after a
-mutation to rebuild and upload the current interleaved data before subsequent draws.
+changed through `RUSubmesh3D`, but mutation is not thread-safe. Call `RendererVK::update_static_triangle_set()` after a
+legacy mesh mutation to rebuild and upload the current interleaved data before subsequent draws.
+
+Static geometry resources use `RUStaticGeometrySet`, with distinct `RUStaticOpaqueSet` and `RUStaticMaskedSet` resource types.
+Each set stores declared submeshes and shared instance transforms. A submesh references a material, a vertex view, an index view,
+and a `[first_instance, instance_count)` range into the set's transform array. Instance transforms are exactly 16 column-major
+floats in the serialized resource and are loaded as `glm::mat4`.
 
 Vertex shader fields opt into resource matching with `WBE_VERTEX_INPUT`. An explicit string selects a resource role, while an
 omitted argument uses the annotated field name:
@@ -72,9 +78,9 @@ extension and feature are rejected; there is no static vertex-input fallback. Di
 reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
 state.
 
-## Static Opaque Triangles Task
+## Static Triangle Set Task
 
-`RTRunStaticOpaqueTrianglesVK` compiles the render database's static opaque mesh into one indexed-indirect draw task. Construction
+`RTRunStaticTriangleSetVK` is the legacy compatibility task that compiles the render database's static opaque mesh into one indexed-indirect draw task. Construction
 compiles one logical Vulkan graphics pipeline per pipeline and attachment configuration, creates material descriptor data for each
 pipeline batch, and uploads the indirect commands. Flattened vertex data remains raw interleaved bytes. Geometry is merged only
 when its pipeline, material, and vertex layout match; command batches split whenever the layout or vertex-buffer byte offset
@@ -83,8 +89,8 @@ changes. Each compiled pipeline owns its descriptor sets, and the task retains t
 Before constructing the task:
 
 1. Load the mesh, materials, images, shaders, and graphics pipelines through `ResourceManager`.
-2. Store the mesh in `RenderDatabase` with `set_static_opaque_triangles()`.
-3. Call `RendererVK::update_static_opaque_triangles()` so the database contains the flattened vertices, indices, materials, and
+2. Store the mesh in `RenderDatabase` with `set_static_triangle_set()`.
+3. Call `RendererVK::update_static_triangle_set()` so the database contains the flattened vertices, indices, materials, and
    graphics-pipeline batches consumed by the task.
 4. Create every attachment resource referenced by the task configuration. The swap-chain image view is represented in the
    graph by a `REND_RES_SWAP_CHAIN_IMAGE` resource with a null object; the renderer resolves it for each frame.
@@ -97,12 +103,12 @@ RendererVK* renderer = RendererVK::get_singleton();
 RenderAllocator* render_allocator = renderer->get_base_render_data()->allocator;
 
 RefRes<RUMesh3D> mesh = ResourceManager::get_singleton()->get_resource<RUMesh3D>("scene.mesh");
-renderer->get_render_database()->set_static_opaque_triangles(mesh.get());
-renderer->update_static_opaque_triangles();
+renderer->get_render_database()->set_static_triangle_set(mesh.get());
+renderer->update_static_triangle_set();
 
-RTRunStaticOpaqueTrianglesVK::Config config;
+RTRunStaticTriangleSetVK::Config config;
 config.set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
-auto task = make_unique<RTRunStaticOpaqueTrianglesVK>(render_allocator, renderer, config);
+auto task = make_unique<RTRunStaticTriangleSetVK>(render_allocator, renderer, config);
 
 RendGraphDescVK graph_desc(render_allocator);
 graph_desc
@@ -137,7 +143,7 @@ one-shot, matching the renderer's one-time descriptor build during `register_ren
 For a shadow, G-buffer, or other replacement pass, set a single pipeline resource and the pass attachments:
 
 ```cpp
-RTRunStaticOpaqueTrianglesVK::Config config;
+RTRunStaticTriangleSetVK::Config config;
 config.set_graphics_pipeline_resource_key("deferred_gbuffer")
     .add_color_attachment("gbuffer_albedo_view", VK_FORMAT_R8G8B8A8_SRGB)
     .add_color_attachment("gbuffer_normal_view", VK_FORMAT_R16G16B16A16_SFLOAT)
@@ -146,7 +152,7 @@ config.set_graphics_pipeline_resource_key("deferred_gbuffer")
 
 ### Writing Pipeline-Owned Descriptors
 
-Material descriptors are populated during construction. Higher-level tasks such as `RTRunStaticOpaqueTrianglesVK` may still expose
+Material descriptors are populated during construction. Higher-level tasks such as `RTRunStaticTriangleSetVK` may still expose
 reflected descriptor fields for application-provided uniform or sampled resources, but the descriptor objects remain
 pipeline-owned:
 

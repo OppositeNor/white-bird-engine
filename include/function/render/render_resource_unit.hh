@@ -17,6 +17,7 @@
 
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
@@ -154,22 +155,61 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
 };
 
 /**
- * @class RUSchemaSubmesh3DGeometrySection
- * @brief Byte-addressed geometry section inside a submesh sidecar binary.
+ * @class RUSchemaBinaryView
+ * @brief Byte range view into a binary resource.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3DGeometrySection {
-    // The geometry slot stored by this section.
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaBinaryView {
+    /** Resource id of the binary backing this view. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string slot;
-    // Byte offset from the beginning of the sidecar binary.
+    std::string binary_id;
+    /** Byte offset from the beginning of the binary. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     size_t start = 0;
-    // Byte length of this section.
+    /** Byte length of this view. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     size_t size = 0;
-    // The element type expected by the slot.
+};
+
+/**
+ * @class RUSchemaVertexAttribute
+ * @brief One vertex attribute inside a binary-backed interleaved vertex view.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaVertexAttribute {
+    /** Exact shader-defined vertex role. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string role;
+    /** Exact 32-bit scalar or vector attribute type. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string type;
+    /** Byte offset inside one interleaved vertex. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t offset = 0;
+};
+
+/**
+ * @class RUSchemaVertexView
+ * @brief Binary-backed interleaved vertex view.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaVertexView {
+    /** Backing binary byte range. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaBinaryView binary;
+    /** Byte stride between vertices. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t stride = 0;
+    /** Ordered vertex attributes. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaVertexAttribute> attributes;
+};
+
+/**
+ * @class RUSchemaIndexView
+ * @brief Binary-backed uint32 index view.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaIndexView {
+    /** Backing binary byte range. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaBinaryView binary;
 };
 
 /**
@@ -184,12 +224,12 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaSubmesh3D : public RUSchema {
     // A string referencing unpopulated material.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> material_id;
-    // Resource-relative path to the sidecar geometry binary.
+    /** Binary-backed vertex data. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string geometry_path;
-    // Byte-addressed sections inside the geometry binary.
+    RUSchemaVertexView vertices;
+    /** Binary-backed uint32 indices. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaSubmesh3DGeometrySection> geometry_sections;
+    RUSchemaIndexView indices;
 };
 
 /**
@@ -204,6 +244,69 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
     // Submesh ids referencing unpopulated submeshes.
     WBE_META(WBE_REFLECT)
     std::vector<std::string> submeshes_id;
+};
+
+/**
+ * @class RUSchemaStaticGeometrySubmesh
+ * @brief One material and geometry draw range in a static geometry set.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometrySubmesh {
+    /** Inline material for this submesh. */
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaMaterial> material;
+    /** Referenced material for this submesh. */
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> material_id;
+    /** Binary-backed vertex data. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaVertexView vertices;
+    /** Binary-backed uint32 indices. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaIndexView indices;
+    /** First transform entry used by this submesh. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t first_instance = 0;
+    /** Number of transform entries used by this submesh. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    size_t instance_count = 0;
+};
+
+/**
+ * @class RUSchemaStaticGeometryInstance
+ * @brief One static geometry instance transform.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometryInstance {
+    /** Column-major global transform. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 global_transform{1.0F};
+};
+
+/**
+ * @class RUSchemaStaticOpaqueSet
+ * @brief Resource schema for opaque static geometry.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueSet : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueSet)
+    /** Static submeshes in declared draw order. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
+    /** Shared static instance transforms. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometryInstance> instances;
+};
+
+/**
+ * @class RUSchemaStaticMaskedSet
+ * @brief Resource schema for masked static geometry.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticMaskedSet : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticMaskedSet)
+    /** Static submeshes in declared draw order. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
+    /** Shared static instance transforms. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometryInstance> instances;
 };
 
 /**
@@ -363,14 +466,27 @@ enum class RUVertexAttributeFormat : uint8_t {
 };
 
 /**
- * @class RUVertexData
- * @brief Chunk-owned mutable interleaved vertex data and its fixed layout.
+ * @class RUBinaryView
+ * @brief Non-owning byte range view into a chunk-owned binary resource.
+ */
+struct RUBinaryView {
+    /** Resolved backing binary. */
+    RefRes<RUBinary> binary;
+    /** Byte offset from the beginning of the binary. */
+    size_t start = 0;
+    /** Byte length of this view. */
+    size_t size = 0;
+};
+
+/**
+ * @class RUVertexView
+ * @brief Binary-backed mutable interleaved vertex data and its fixed layout.
  *
  * The layout is immutable after loading. Vertex bytes may be changed by the mutation methods, which are not thread-safe. A
  * renderer update is required before changes reach the GPU. The resource is a non-owning view into its resource chunk and is
  * copyable and movable with shallow chunk references.
  */
-struct RUVertexData : public ResourceUnit {
+struct RUVertexView {
     /**
      * @brief One attribute in declaration and packing order.
      */
@@ -386,9 +502,7 @@ struct RUVertexData : public ResourceUnit {
     };
 
     /** Mutable tightly interleaved vertex bytes. */
-    RefRes<uint8_t> vertices;
-    /** Total byte size of vertices. */
-    size_t vertices_size = 0;
+    RUBinaryView binary;
     /** Ordered fixed-layout attributes. */
     RefRes<Attribute> attributes;
     /** Number of entries in attributes. */
@@ -411,6 +525,17 @@ struct RUVertexData : public ResourceUnit {
 };
 
 /**
+ * @class RUIndexView
+ * @brief Binary-backed uint32 index view.
+ */
+struct RUIndexView {
+    /** Backing byte range containing uint32 indices. */
+    RUBinaryView binary;
+    /** Number of entries in indices. */
+    size_t index_count = 0;
+};
+
+/**
  * @class RUSubmesh3D
  * @brief 3D submesh resource unit.
  *
@@ -422,15 +547,13 @@ struct RUVertexData : public ResourceUnit {
 struct RUSubmesh3D : public ResourceUnit {
     // A reference to the material.
     RefRes<RUMaterial> material;
-    /** Chunk-owned interleaved vertices and fixed layout. */
-    RefRes<RUVertexData> vertex_data;
-    /** Chunk-owned contiguous uint32 indices. */
-    RefRes<uint32_t> indices;
-    /** Number of entries in indices. */
-    size_t index_count = 0;
+    /** Binary-backed interleaved vertices and fixed layout. */
+    RUVertexView vertices;
+    /** Binary-backed uint32 indices. */
+    RUIndexView indices;
 
     /**
-     * @copydoc RUVertexData::swap_vertices
+     * @copydoc RUVertexView::swap_vertices
      */
     void swap_vertices(size_t p_first, size_t p_second);
     /** Set an exact float scalar attribute. */
@@ -458,7 +581,7 @@ struct RUSubmesh3D : public ResourceUnit {
     /** Set an exact unsigned 32-bit integer4 attribute. */
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec4& p_value);
     /**
-     * @copydoc RUVertexData::get_vertex_attribute_offset
+     * @copydoc RUVertexView::get_vertex_attribute_offset
      */
     size_t get_vertex_attribute_offset(std::string_view p_role) const;
     /**
@@ -481,6 +604,59 @@ struct RUMesh3D : public ResourceUnit {
     // The submeshes.
     RefRes<RefRes<RUSubmesh3D>> submeshes;
 };
+
+/**
+ * @class RUStaticGeometrySubmesh
+ * @brief One material, geometry range, and instance range in a static geometry set.
+ */
+struct RUStaticGeometrySubmesh {
+    /** Referenced material. */
+    RefRes<RUMaterial> material;
+    /** Binary-backed interleaved vertices and fixed layout. */
+    RUVertexView vertices;
+    /** Binary-backed uint32 indices. */
+    RUIndexView indices;
+    /** First transform entry used by this submesh. */
+    size_t first_instance = 0;
+    /** Number of transform entries used by this submesh. */
+    size_t instance_count = 0;
+};
+
+/**
+ * @class RUStaticGeometryInstance
+ * @brief One global static geometry transform.
+ */
+struct RUStaticGeometryInstance {
+    /** Column-major global transform. */
+    glm::mat4 global_transform{1.0F};
+};
+
+/**
+ * @class RUStaticGeometrySet
+ * @brief Shared representation for static geometry set resources.
+ */
+struct RUStaticGeometrySet : public ResourceUnit {
+    /** Static submeshes in declared draw order. */
+    RefRes<RUStaticGeometrySubmesh> submeshes;
+    /** Number of entries in submeshes. */
+    size_t submesh_count = 0;
+    /** Shared static instance transforms. */
+    RefRes<RUStaticGeometryInstance> instances;
+    /** Number of entries in instances. */
+    size_t instance_count = 0;
+};
+
+/**
+ * @class RUStaticOpaqueSet
+ * @brief Opaque static geometry set resource.
+ */
+struct RUStaticOpaqueSet : public RUStaticGeometrySet {};
+
+/**
+ * @class RUStaticMaskedSet
+ * @brief Masked static geometry set resource.
+ */
+struct RUStaticMaskedSet : public RUStaticGeometrySet {};
 
 } // namespace WhiteBirdEngine
 

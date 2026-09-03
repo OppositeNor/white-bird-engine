@@ -49,8 +49,8 @@ static RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_
     return RefRes<char>(memory, &p_allocator);
 }
 
-static RUVertexData make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
-    std::vector<RUVertexData::Attribute> attributes;
+static RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
+    std::vector<RUVertexView::Attribute> attributes;
     attributes.reserve(p_specs.size());
     for (const VertexAttributeTestSpec& spec : p_specs) {
         RefRes<char> role_name = push_vertex_test_data(p_allocator, spec.role.size() + 1, spec.role.data());
@@ -58,12 +58,12 @@ static RUVertexData make_vertex_test_data(StackAllocator& p_allocator, std::span
         RUShaderRole role;
         role.name = role_name;
         role.hash = dynam_hash(spec.role);
-        attributes.push_back(RUVertexData::Attribute{.role = role, .format = spec.format, .offset = spec.offset, .size = spec.size});
+        attributes.push_back(RUVertexView::Attribute{.role = role, .format = spec.format, .offset = spec.offset, .size = spec.size});
     }
-    RUVertexData result;
+    RUVertexView result;
     if (!attributes.empty()) {
         result.attributes =
-            push_vertex_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexData::Attribute>();
+            push_vertex_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexView::Attribute>();
     }
     result.attribute_count = attributes.size();
     result.vertex_stride = p_stride;
@@ -178,6 +178,46 @@ TEST(WBEShaderMetadataVKUtilsTest, MapsReadWriteTextureResourcesToStorageImageDe
     ASSERT_EQ(bindings.size(), 1U);
     EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
     EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_COMPUTE_BIT);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, MapsStorageBuffersToStorageBufferDescriptors) {
+    ShaderMetadataParameter instance_buffer;
+    instance_buffer.name = "static_instances";
+    instance_buffer.binding.kind = "descriptorTableSlot";
+    instance_buffer.binding.index = 0;
+    instance_buffer.type.kind = "structuredBuffer";
+
+    ShaderMetadataParameter draw_info_block;
+    draw_info_block.name = "static_draw_info";
+    draw_info_block.binding.kind = "subElementRegisterSpace";
+    draw_info_block.binding.index = 1;
+    draw_info_block.type.kind = "parameterBlock";
+
+    ShaderMetadataTypeField draw_infos;
+    draw_infos.name = "draws";
+    draw_infos.binding.kind = "descriptorTableSlot";
+    draw_infos.binding.index = 2;
+    draw_infos.type.kind = "array";
+    draw_infos.type.element_count = 1;
+    draw_infos.type.element_scalar_type = "structuredBuffer";
+    draw_info_block.type.fields.push_back(draw_infos);
+
+    ShaderMetadata metadata;
+    metadata.parameters.push_back(instance_buffer);
+    metadata.parameters.push_back(draw_info_block);
+    ShaderMetadataEntryPoint entry_point;
+    entry_point.name = "vertex_main";
+    entry_point.stage = "vertex";
+    metadata.entry_points.push_back(entry_point);
+
+    std::vector<ShaderDescriptorBindingVK> bindings = collect_shader_descriptor_bindings(metadata, "vertex", "vertex_main");
+
+    ASSERT_EQ(bindings.size(), 2U);
+    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_VERTEX_BIT);
+    EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    EXPECT_EQ(bindings[1].set_index, 1U);
+    EXPECT_EQ(bindings[1].layout_binding.binding, 2U);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, SharesVariableDescriptorBudgetAcrossDescriptorSets) {
@@ -301,7 +341,7 @@ TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat)
         StackAllocator allocator(WBE_KI_B(8));
         const VertexAttributeTestSpec spec{
             .role = "value", .format = format_case.resource_format, .offset = 0, .size = format_case.size};
-        RUVertexData vertex_data =
+        RUVertexView vertex_data =
             make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), format_case.size);
         const ShaderMetadataTypeField field =
             make_vertex_shader_field("value", "", 3, format_case.kind, format_case.scalar_type, format_case.component_count);
@@ -322,7 +362,7 @@ TEST(WBEShaderMetadataVKUtilsTest, MatchesShaderSubsetAndAllowsExtraResourceAttr
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
     }};
-    RUVertexData vertex_data = make_vertex_test_data(allocator, specs, 20);
+    RUVertexView vertex_data = make_vertex_test_data(allocator, specs, 20);
     const ShaderMetadataTypeField field = make_vertex_shader_field("input_position", "position", 5, "vector", "float32", 3);
     ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&field, 1));
 
@@ -337,7 +377,7 @@ TEST(WBEShaderMetadataVKUtilsTest, MatchesShaderSubsetAndAllowsExtraResourceAttr
 TEST(WBEShaderMetadataVKUtilsTest, FindsAnnotatedFieldsInNestedVertexStructs) {
     StackAllocator allocator(WBE_KI_B(8));
     const VertexAttributeTestSpec spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
-    RUVertexData vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), 12);
+    RUVertexView vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), 12);
     ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 2, "vector", "float32", 3);
     ShaderMetadataTypeField nested;
     nested.name = "nested";
@@ -358,7 +398,7 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
     }};
-    RUVertexData vertex_data = make_vertex_test_data(allocator, specs, 20);
+    RUVertexView vertex_data = make_vertex_test_data(allocator, specs, 20);
 
     ShaderMetadataTypeField missing = make_vertex_shader_field("missing", "missing", 0, "vector", "float32", 3);
     ShaderMetadata missing_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&missing, 1));
@@ -401,7 +441,7 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 12, .size = 12},
     }};
-    RUVertexData duplicate_resource = make_vertex_test_data(allocator, duplicate_specs, 24);
+    RUVertexView duplicate_resource = make_vertex_test_data(allocator, duplicate_specs, 24);
     ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 0, "vector", "float32", 3);
     ShaderMetadata position_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&position, 1));
     EXPECT_THROW(build_vertex_input_description_vk(position_metadata, "vertex_main", duplicate_resource), std::runtime_error);
@@ -409,7 +449,7 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
 
 TEST(WBEShaderMetadataVKUtilsTest, BuildsEmptyStateForVertexlessEntry) {
     StackAllocator allocator(WBE_KI_B(4));
-    RUVertexData vertex_data = make_vertex_test_data(allocator, {}, 0);
+    RUVertexView vertex_data = make_vertex_test_data(allocator, {}, 0);
     ShaderMetadata metadata = make_vertex_shader_metadata({});
     VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
     EXPECT_TRUE(description.bindings.empty());
