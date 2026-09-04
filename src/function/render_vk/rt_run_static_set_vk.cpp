@@ -20,6 +20,8 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/function_utils.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
@@ -35,6 +37,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
@@ -204,12 +207,33 @@ Ref<ROBufferVK> build_static_binary_buffer(const BaseRenderDataVK* p_render_data
     if (p_binary == nullptr || p_binary->data == nullptr || p_binary->size == 0) {
         throw std::runtime_error("Failed to construct static set task: drawable binary data is missing.");
     }
+    if (p_binary->resource_key == nullptr || p_binary->resource_key[0] == '\0') {
+        throw std::runtime_error("Failed to construct static set task: drawable binary resource key is missing.");
+    }
+    if (p_render_data->render_database == nullptr) {
+        throw std::runtime_error("Failed to construct static set task: render database is missing.");
+    }
+
+    Ref<IRenderObject> registered_buffer = p_render_data->render_database->get_compiled_render_resource(
+        p_binary->resource_key, TypeUUID<ROBufferVK>::UUID);
+    if (registered_buffer != MEM_NULL) {
+        Ref<ROBufferVK> result = registered_buffer.dynamic_cast_ref<ROBufferVK>();
+        if (result == MEM_NULL) {
+            throw std::runtime_error("Failed to construct static set task: registered geometry buffer has the wrong type.");
+        }
+        if (result->fields().buffer_size != p_binary->size) {
+            throw std::runtime_error("Failed to construct static set task: registered geometry buffer size does not match its binary resource.");
+        }
+        return result;
+    }
+
     Ref<ROBufferVK> result = ROBufferVK::Builder()
                                  .set_domain(DeviceDomain::HOST_DEVICE)
                                  .set_size(p_binary->size)
                                  .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
                                  .create_ref(p_render_data);
     result->update_buffer(p_binary->data.get(), p_binary->size);
+    p_render_data->render_database->register_compiled_render_resource(p_binary->resource_key, result);
     return result;
 }
 
