@@ -18,6 +18,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -68,30 +69,32 @@ struct BaseRenderDataVK {
     PFN_vkGetAccelerationStructureDeviceAddressKHR get_acceleration_structure_device_address = nullptr;
     /** Non-owning handle for the current static-opaque bottom-level acceleration structure. */
     VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
-    // The VMA allocator used for owned Vulkan buffers and images.
+    /** The VMA allocator used for owned Vulkan buffers and images. */
     VmaAllocator vma_allocator = VK_NULL_HANDLE;
-    // The image format of the swap chain.
+    /** The image format of the swap chain. */
     VkFormat swap_chain_format = VK_FORMAT_UNDEFINED;
-    // The size of the swap chain.
+    /** The size of the swap chain. */
     VkExtent2D swap_chain_extent{};
-    // The aspect ratio of the swap chain.
+    /** The aspect ratio of the swap chain. */
     float swap_chain_aspect_ratio = 1.0F;
-    // Callback for allocator.
+    /** Callback for allocator. */
     VkAllocationCallbacks* allocation_callbacks = nullptr;
-    // Graphics queue family.
+    /** Graphics queue family. */
     VkQueue graphics_queue = VK_NULL_HANDLE;
-    // Compute queue family.
+    /** Compute queue family. */
     VkQueue compute_queue = VK_NULL_HANDLE;
-    // The viewport for the final presentation.
+    /** The viewport for the final presentation. */
     VkViewport viewport{};
-    // The scissor for the final presentation.
+    /** The scissor for the final presentation. */
     VkRect2D scissor{};
 
-    // Graphics command pool.
+    /** Graphics command pool. */
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
-    // Compute command pool.
+    /** Compute command pool. */
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
-    // Descriptor pool.
+    /** Non-owning libktx Vulkan upload context owned by RendererVK. */
+    KTXVulkanDeviceInfoVK* ktx_vulkan_device_info = nullptr;
+    /** Descriptor pool. */
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
     /**
      * @brief Maximum sampled-image descriptors allowed for a variable-count binding.
@@ -108,27 +111,27 @@ struct BaseRenderDataVK {
     /** Maximum primitives accepted by one acceleration structure. */
     uint64_t max_acceleration_structure_primitive_count = 0;
 
-    // The fence that blocks every render tick.
+    /** The fence that blocks every render tick. */
     VkFence in_flight_fence = VK_NULL_HANDLE;
-    // The current swap chain index. This is useful to trach which frame in
-    // flight it is right now.
+    /** The current swap chain index. This is useful to trach which frame in
+     * flight it is right now. */
     uint32_t current_swap_chain_index = 0;
-    // The number of images owned by the current swap chain.
+    /** The number of images owned by the current swap chain. */
     uint32_t swap_chain_images_count = 0;
-    // The current frame-in-flight slot (matches `in_flight_fence` slot index).
+    /** The current frame-in-flight slot (matches `in_flight_fence` slot index). */
     uint32_t current_frame_slot = 0;
-    // Frames in flight.
+    /** Frames in flight. */
     uint32_t frames_in_flight = 0;
 
-    // The current number of frames.
+    /** The current number of frames. */
     uint64_t current_frame = 0;
-    // The maximum depth of the render graph in the current pipeline.
+    /** The maximum depth of the render graph in the current pipeline. */
     uint64_t max_depth = 0;
 
-    // The queue family indices.
+    /** The queue family indices. */
     Set<uint32_t, RenderAllocator> queue_family_indices;
 
-    // Function to register a delayed call.
+    /** Function to register a delayed call. */
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;
 };
 

@@ -255,7 +255,7 @@ std::string_view get_vertex_stage_entry_name(RefRes<RUGraphicsPipeline> p_pipeli
     return {};
 }
 
-RefRes<RUImage> get_default_image(std::string_view p_default_material_key) {
+RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr || p_default_material_key.empty()) {
         return MEM_NULL;
@@ -349,7 +349,7 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
         .render_data = render_data,
         .render_database = p_renderer->get_render_database(),
         .renderer = p_renderer,
-        .default_image_resource = get_default_image(p_config.get_default_material_resource_key()),
+        .default_texture_resource = get_default_image(p_config.get_default_material_resource_key()),
         .color_attachment_formats = get_color_attachment_formats(p_config, render_data),
         .depth_attachment_format = p_config.get_depth_attachment_format(),
         .stencil_attachment_format = p_config.get_stencil_attachment_format(),

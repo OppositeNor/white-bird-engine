@@ -7,7 +7,8 @@
             "source_file": "assets/models/Cube/glTF/Cube.gltf",
             "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
-            "texture_output_dir": "assets/images"
+            "texture_output_dir": "assets/textures",
+            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
         },
         {
             "id": "model_cube_static",
@@ -15,7 +16,8 @@
             "source_file": "assets/models/Cube/glTF/Cube.gltf",
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
-            "texture_output_dir": "assets/images"
+            "texture_output_dir": "assets/textures",
+            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
         },
         {
             "id": "sponza",
@@ -24,7 +26,8 @@
             "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
-            "texture_output_dir": "assets/images"
+            "texture_output_dir": "assets/textures",
+            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
         },
         {
             "id": "intel_sponza",
@@ -33,7 +36,8 @@
             "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
-            "texture_output_dir": "assets/images"
+            "texture_output_dir": "assets/textures",
+            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
         }
     ]
 }

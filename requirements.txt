@@ -3,4 +3,7 @@ GitPython
 Jinja2
 pydantic
 matplotlib
+cffi
+numpy
+Pillow
 ./dependencies/wbe-utils-model-compiler

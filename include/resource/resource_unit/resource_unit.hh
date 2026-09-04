@@ -19,11 +19,13 @@
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "resource/ktx_texture.hh"
 #include "utils/utils.hh"
 #include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 namespace WhiteBirdEngine {
 
@@ -142,6 +144,17 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaImage : public RUSchema {
     WBE_META(WBE_REFLECT)
     std::string color_space = "srgb";
     // The path to the image file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+};
+
+/**
+ * @class RUSchemaTexture
+ * @brief The scheme of RUTexture.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaTexture : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaTexture)
+    /** Path to a KTX 2 texture file. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
 };
@@ -267,6 +280,27 @@ struct RUImage : public ResourceUnit {
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The image data.
     RefRes<char> image_data;
+};
+
+/**
+ * @class RUTexture
+ * @brief Chunk-owned KTX 2 sampled-texture resource.
+ *
+ * The unit is move-only and releases its libktx object when its resource chunk
+ * is unloaded.
+ */
+struct RUTexture : public ResourceUnit {
+    RUTexture() = delete;
+    explicit RUTexture(std::string_view p_path) : texture(p_path) {
+    }
+    ~RUTexture() = default;
+    RUTexture(const RUTexture&) = delete;
+    RUTexture(RUTexture&&) noexcept = default;
+    RUTexture& operator=(const RUTexture&) = delete;
+    RUTexture& operator=(RUTexture&&) noexcept = default;
+
+    /** Loaded KTX 2 texture data. */
+    KTXTexture2 texture;
 };
 
 /**

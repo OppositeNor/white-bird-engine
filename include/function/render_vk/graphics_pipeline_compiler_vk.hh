@@ -75,7 +75,7 @@ struct GraphicsPipelineCompilerVKContext {
     /**
      * @brief Optional valid image used for sampled-image descriptors that the caller leaves unset.
      */
-    RefRes<RUImage> default_image_resource = MEM_NULL;
+    RefRes<RUTexture> default_texture_resource = MEM_NULL;
     /**
      * @brief Dynamic-rendering color attachment formats.
      */
@@ -161,8 +161,8 @@ private:
         std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
     void add_direct_sampler_bindpoints(
         std::string_view p_resource_key, ROMaterialVK::Builder& p_builder, const RenderBindpointDeclarations& p_bindpoint_declarations);
-    Ref<ROImageViewVK> compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource);
-    Ref<ROImageVK> compile_image(std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format);
+    Ref<ROImageViewVK> compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource);
+    Ref<ROImageVK> compile_texture(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource);
 };
 
 } // namespace WhiteBirdEngine

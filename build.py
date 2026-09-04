@@ -27,6 +27,7 @@ metaparser_clang_args: list[str] = [
     "-std=c++20",
     f"-I{build_setup.include_dir}",
     f"-I{build_setup.per_target_include_dir}",
+    f"-I{os.path.join(build_setup.dependencies_dir, 'KTX-Software', 'lib', 'include')}",
     "-DWBE_REFLECTION_PARSER"
 ]
 
@@ -56,6 +57,22 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     if build_info.get("additional-cmake-args") is not None:
         result.append(build_info["additional-cmake-args"])
     return result
+
+def _configure_cmake(build_info: dict[str, Any]) -> None:
+    result = subprocess.run(_get_cmake_command_from_info(build_info), check=False)
+    if result.returncode != 0:
+        raise RuntimeError("Failed to setup cmake build.")
+
+def _build_cmake_target(target: str | None = None) -> None:
+    build_command = ["cmake", "--build", build_setup.build_dir]
+    if target is not None:
+        build_command.extend(["--target", target])
+    if os.cpu_count() is not None:
+        build_command.extend(["-j", str(os.cpu_count())])
+    result = subprocess.run(build_command, check=False)
+    if result.returncode != 0:
+        target_description = target if target is not None else "project"
+        raise RuntimeError(f"Failed to build CMake target {target_description}.")
 
 def _gather_license() -> None:
     # Get white bird engine license
@@ -105,6 +122,9 @@ if __name__ == "__main__":
     # Gather sources for reflection
     try:
         print(f"WBEBuilder: Building target: {build_setup.args.target}.")
+        print("WBEBuilder: Configuring texture compiler dependencies...")
+        build_setup.acp_dependencies_compiler.compile()
+        build_setup.setup_acp_compilers()
         print("WBEBuilder: Running asset conditioning pipeline...")
         build_setup.acp.process_resources()
         if build_setup.build_target["generate-tests"]:
@@ -127,15 +147,8 @@ if __name__ == "__main__":
 
         # Build project with CMake
         print("WBEBuilder: Running cmake...")
-        result = subprocess.run(_get_cmake_command_from_info(build_setup.build_target))
-        if result.returncode != 0:
-            raise RuntimeError("Failed to setup cmake build.")
-        build_command = ["cmake", "--build", build_setup.build_dir]
-        if os.cpu_count() is not None:
-            build_command.extend(["-j", str(os.cpu_count())])
-        result = subprocess.run(build_command)
-        if result.returncode != 0:
-            raise RuntimeError("Failed to build with CMake.")
+        _configure_cmake(build_setup.build_target)
+        _build_cmake_target()
 
         # Keep compile database available in both conventional locations used by tooling.
         compile_commands_path = os.path.join(build_setup.build_dir, "compile_commands.json")

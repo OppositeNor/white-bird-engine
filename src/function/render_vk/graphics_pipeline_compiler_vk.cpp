@@ -15,16 +15,14 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/function_utils.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
+#include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_layout_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -37,7 +35,6 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -103,75 +100,11 @@ IndexedFieldPath parse_indexed_field_path(std::string_view p_field_path) {
     return IndexedFieldPath{.field_path = std::move(result), .array_index = array_index};
 }
 
-uint32_t image_upload_channel_count(const RUImage& p_image) {
-    // Material textures are uploaded as RGBA because Vulkan format selection and descriptor writes expect four channels here.
-    if (p_image.channel_count == 3 || p_image.channel_count == 4) {
-        return 4;
+std::string texture_resource_cache_key(RefRes<RUTexture> p_texture_resource) {
+    if (p_texture_resource == nullptr) {
+        throw std::runtime_error("Failed to build texture cache key: texture resource is missing.");
     }
-    throw std::runtime_error(std::format("Failed to compile material texture: unsupported image channel count {}.", p_image.channel_count));
-}
-
-VkFormat image_format_from_resource(const RUImage& p_image) {
-    // Reuse channel validation before choosing the Vulkan format so unsupported images fail at the format boundary.
-    image_upload_channel_count(p_image);
-    if (p_image.config.test(RUImage::IS_HDR)) {
-        // HDR image data is stored as float channels and uploaded through the matching float RGBA format.
-        return VK_FORMAT_R32G32B32A32_SFLOAT;
-    }
-    return p_image.color_space == ColorSpace::SRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
-}
-
-std::string image_resource_cache_key(RefRes<RUImage> p_image_resource) {
-    if (p_image_resource == nullptr) {
-        throw std::runtime_error("Failed to build image cache key: image resource is missing.");
-    }
-    return std::format("image_resource_{}", reinterpret_cast<uintptr_t>(p_image_resource.get()));
-}
-
-std::vector<uint8_t> build_image_upload_data(const RUImage& p_image) {
-    // Convert serialized image data into the byte layout consumed by the staging upload buffer.
-    if (p_image.image_data == nullptr) {
-        throw std::runtime_error("Failed to compile material texture: image data is missing.");
-    }
-
-    const uint32_t source_channels = p_image.channel_count;
-    const uint32_t target_channels = image_upload_channel_count(p_image);
-    const size_t pixel_count = static_cast<size_t>(p_image.width) * static_cast<size_t>(p_image.height);
-    const size_t channel_size = p_image.config.test(RUImage::IS_HDR) ? sizeof(float) : sizeof(uint8_t);
-    const auto* source_data = reinterpret_cast<const uint8_t*>(p_image.image_data.get());
-    std::vector<uint8_t> upload_data(pixel_count * target_channels * channel_size);
-
-    if (source_channels == target_channels) {
-        // Already-RGBA data can be copied directly without per-pixel expansion.
-        std::memcpy(upload_data.data(), source_data, upload_data.size());
-        return upload_data;
-    }
-
-    if (p_image.config.test(RUImage::IS_HDR)) {
-        // RGB float textures are expanded to RGBA by appending an opaque alpha float to every pixel.
-        const float alpha = 1.0F;
-        const size_t source_stride = static_cast<size_t>(source_channels) * sizeof(float);
-        const size_t target_stride = static_cast<size_t>(target_channels) * sizeof(float);
-        for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
-            // Copy the source float channels first, then append alpha at the end of the target pixel.
-            const size_t source_offset = pixel_index * source_stride;
-            const size_t target_offset = pixel_index * target_stride;
-            std::memcpy(upload_data.data() + target_offset, source_data + source_offset, source_stride);
-            std::memcpy(upload_data.data() + target_offset + source_stride, &alpha, sizeof(alpha));
-        }
-        return upload_data;
-    }
-
-    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
-        // RGB byte textures are expanded to RGBA by copying color channels and setting alpha to fully opaque.
-        const size_t source_offset = pixel_index * source_channels;
-        const size_t target_offset = pixel_index * target_channels;
-        upload_data[target_offset + 0] = source_data[source_offset + 0];
-        upload_data[target_offset + 1] = source_data[source_offset + 1];
-        upload_data[target_offset + 2] = source_data[source_offset + 2];
-        upload_data[target_offset + 3] = UINT8_MAX;
-    }
-    return upload_data;
+    return std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(p_texture_resource.get()));
 }
 
 bool has_texture_bindpoint(const RenderBindpointDeclarations& p_bindpoint_declarations, std::string_view p_field_path) {
@@ -537,7 +470,7 @@ std::vector<Ref<RODescriptorSetVK>> GraphicsPipelineCompilerVK::compile_descript
         return {};
     }
     validate_texture_bindpoint_sources(
-        p_resource_key, p_descriptor_bindings, p_bindpoint_declarations, context.default_image_resource != nullptr);
+        p_resource_key, p_descriptor_bindings, p_bindpoint_declarations, context.default_texture_resource != nullptr);
     std::vector<Ref<RODescriptorSetVK>> descriptor_sets;
     descriptor_sets.reserve(p_descriptor_set_layouts.size());
     for (uint32_t set_index = 0; set_index < p_descriptor_set_layouts.size(); ++set_index) {
@@ -568,9 +501,9 @@ Ref<RODescriptorSetVK> GraphicsPipelineCompilerVK::compile_texture_descriptor_se
         .set_set_index(p_set_index)
         .set_descriptor_bindings(p_descriptor_bindings)
         .set_default_sampler(default_sampler);
-    if (context.default_image_resource != nullptr) {
+    if (context.default_texture_resource != nullptr) {
         builder.set_default_texture(
-            compile_image_view(image_resource_cache_key(context.default_image_resource), context.default_image_resource),
+            compile_texture_view(texture_resource_cache_key(context.default_texture_resource), context.default_texture_resource),
             VK_IMAGE_LAYOUT_GENERAL);
     }
     add_direct_texture_bindpoints(p_resource_key, builder, p_bindpoint_declarations);
@@ -590,8 +523,8 @@ void GraphicsPipelineCompilerVK::add_direct_texture_bindpoints(
             .image_layout = VK_IMAGE_LAYOUT_GENERAL,
         };
         if (bindpoint_declaration.image_resource != nullptr) {
-            texture_binding.image_view = compile_image_view(
-                image_resource_cache_key(bindpoint_declaration.image_resource), bindpoint_declaration.image_resource);
+            texture_binding.image_view = compile_texture_view(
+                texture_resource_cache_key(bindpoint_declaration.image_resource), bindpoint_declaration.image_resource);
         } else {
             auto image_view = bindpoint_declaration.image_render_object.dynamic_cast_ref<ROImageViewVK>();
             if (image_view == MEM_NULL) {
@@ -621,8 +554,8 @@ void GraphicsPipelineCompilerVK::add_direct_sampler_bindpoints(
     }
 }
 
-Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(std::string_view p_resource_key, RefRes<RUImage> p_image_resource) {
-    // Image views use a derived key because several shader bindings may point at the same image resource.
+Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
+    // Texture views use a derived key because several shader bindings may point at the same texture resource.
     std::string formatted_resource_key = std::format("{}{}", p_resource_key, "#image_view");
     auto image_view = get_registered_render_object<ROImageViewVK>(
         context.render_database, formatted_resource_key, TypeUUID<ROImageViewVK>::UUID);
@@ -630,52 +563,35 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_image_view(std::string_vi
         // Reuse the view together with its already-compiled backing image.
         return image_view;
     }
-    VkFormat image_format = image_format_from_resource(*p_image_resource);
-    auto image = compile_image(formatted_resource_key, p_image_resource, image_format);
-    image_view =
-        ROImageViewVK::Builder()
-            .set_image(image)
-            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-            .set_format(image_format)
-            .set_subresource_range(VkImageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
-            .create_ref(context.render_data);
+    auto image = compile_texture(formatted_resource_key, p_texture_resource);
+    const ROImageVK::ExposedFields& image_fields = image->fields();
+    image_view = ROImageViewVK::Builder()
+                     .set_image(image)
+                     .set_view_type(image_fields.view_type)
+                     .set_format(image_fields.format)
+                     .set_subresource_range(VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                         .baseMipLevel = 0,
+                         .levelCount = image_fields.mipmap_levels,
+                         .baseArrayLayer = 0,
+                         .layerCount = image_fields.layers_count})
+                     .create_ref(context.render_data);
     context.render_database->register_compiled_render_resource(formatted_resource_key, image_view);
     return image_view;
 }
 
-Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_image(
-    std::string_view p_resource_key, RefRes<RUImage> p_image_resource, VkFormat p_image_format) {
+Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_texture(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
     // Texture images are cached independently from image views so later bindings can reuse uploaded GPU data.
     auto image = get_registered_render_object<ROImageVK>(context.render_database, p_resource_key, TypeUUID<ROImageVK>::UUID);
     if (image != MEM_NULL) {
-        // Cached images already have their upload task scheduled or completed by the original compile.
+        // Cached textures were uploaded synchronously by the original compile.
         return image;
     }
-    image = ROImageVK::Builder()
-                .set_image_type(VK_IMAGE_TYPE_2D)
-                .set_format(p_image_format)
-                .set_extent(VkExtent3D{.width = p_image_resource->width, .height = p_image_resource->height, .depth = 1})
-                .set_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                .create_ref(context.render_data);
+    if (context.render_data->ktx_vulkan_device_info == nullptr) {
+        throw std::runtime_error("Failed to compile texture: libktx Vulkan device info is unavailable.");
+    }
+    ktxVulkanTexture uploaded_texture = context.render_data->ktx_vulkan_device_info->upload(p_texture_resource->texture.get());
+    image = make_ref<ROImageVK>(context.render_data->allocator, context.render_data, uploaded_texture);
     context.render_database->register_compiled_render_resource(p_resource_key, image);
-
-    auto upload_data = build_image_upload_data(*p_image_resource);
-    auto upload_buffer = ROBufferVK::Builder()
-                             .set_domain(DeviceDomain::HOST)
-                             .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                             .set_size(upload_data.size())
-                             .create_ref(context.render_data);
-    upload_buffer->update_buffer(upload_data.data(), upload_data.size());
-    context.renderer->register_gpu_job([image, upload_buffer, width = p_image_resource->width, height = p_image_resource->height](
-                                           VkCommandBuffer p_command_buffer) mutable {
-        // Defer the image copy until the renderer resolves the upload job at frame start.
-        VkBufferImageCopy region_info{};
-        region_info.imageSubresource =
-            VkImageSubresourceLayers{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
-        region_info.imageExtent = VkExtent3D{.width = width, .height = height, .depth = 1};
-        image->set_image_data_immediate(p_command_buffer, upload_buffer, region_info);
-    });
     return image;
 }
 

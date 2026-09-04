@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <functional>
 #include <future>
+#include <mutex>
 #include <semaphore>
 namespace WhiteBirdEngine {
 
@@ -67,6 +68,7 @@ private:
     HeapAllocatorDefault* allocator;
     std::counting_semaphore<> semaphore{0};
     Vector<std::function<void()>, HeapAllocatorDefault> buffer;
+    std::mutex producer_mutex;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };

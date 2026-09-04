@@ -129,10 +129,10 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
     /** Non-empty shader-defined texture role. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string texture_role;
-    /** Inline texture data. Exactly one of texture and texture_id must be present. */
+    /** Inline KTX 2 texture schema. Exactly one of texture and texture_id must be present. */
     WBE_META(WBE_REFLECT)
-    std::optional<RUSchemaImage> texture;
-    /** Reference to an already populated texture. Exactly one of texture and texture_id must be present. */
+    std::optional<RUSchemaTexture> texture;
+    /** Resource ID of an already populated texture. Exactly one of texture and texture_id must be present. */
     WBE_META(WBE_REFLECT)
     std::optional<std::string> texture_id;
 };
@@ -438,7 +438,7 @@ struct RUMaterial : public ResourceUnit {
         /** Exact shader-defined texture role. */
         RUShaderRole role;
         /** Resolved texture resource. */
-        RefRes<RUImage> texture;
+        RefRes<RUTexture> texture;
     };
     /** Chunk-owned contiguous texture-slot storage. */
     RefRes<TextureSlot> textures;

@@ -19,10 +19,7 @@ import sys
 import shutil
 import build_config
 from build_script.resource.acp.acp import WBEACP
-from build_script.resource.acp.acp_compiler_mesh import WBEACPCompilerMesh
-from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
-from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
-from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
+from build_script.resource.acp.acp_dependencies_compiler import WBEACPDependenciesCompiler
 
 # SETUP
 print("WBEBuilder: Setting up...")
@@ -79,14 +76,38 @@ shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
 shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
+acp_dependencies_compiler = WBEACPDependenciesCompiler(
+    Path(root_dir), Path(build_root_dir), Path(dependencies_dir), build_target)
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
-acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
-acp.add_compiler(WBEACPCompilerModel(Path(model_compiler_cache_dir)))
-acp.add_compiler(WBEACPCompilerMesh())
-acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-
 test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
-test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
-test_env_acp.add_compiler(WBEACPCompilerModel(Path(model_compiler_cache_dir)))
-test_env_acp.add_compiler(WBEACPCompilerMesh())
-test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+acp_compilers_configured = False
+
+
+def setup_acp_compilers() -> None:
+    global acp_compilers_configured
+    if acp_compilers_configured:
+        return
+    python_package_path = acp_dependencies_compiler.get_python_package_dir().resolve().as_posix()
+    if python_package_path not in sys.path:
+        sys.path.insert(0, python_package_path)
+
+    from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
+    from build_script.resource.acp.acp_compiler_mesh import WBEACPCompilerMesh
+    from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
+    from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
+    from build_script.resource.acp.acp_compiler_texture import TextureCompilerPyKTX, WBEACPCompilerTexture
+
+    texture_compiler = TextureCompilerPyKTX(
+        acp_dependencies_compiler.get_ktx_library_dir(), acp_dependencies_compiler.get_python_package_dir())
+    acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
+    acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
+    acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
+    acp.add_compiler(WBEACPCompilerMesh())
+    acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+
+    test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
+    test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
+    test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
+    test_env_acp.add_compiler(WBEACPCompilerMesh())
+    test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+    acp_compilers_configured = True

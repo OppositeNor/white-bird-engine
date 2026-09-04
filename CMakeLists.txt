@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23)
 
 project(WhiteBirdEngine LANGUAGES C CXX)
 
@@ -54,6 +54,35 @@ set(VMA_BUILD_DOCUMENTATION OFF)
 set(VMA_BUILD_SAMPLES OFF)
 add_subdirectory(dependencies/VulkanMemoryAllocator)
 
+set(KTX_FEATURE_DOC OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_JNI OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_PY OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TESTS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TOOLS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TOOLS_CTS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_LOADTEST_APPS OFF CACHE STRING "" FORCE)
+set(LIBKTX_FEATURE_GL_UPLOAD OFF CACHE BOOL "" FORCE)
+set(LIBKTX_FEATURE_VK_UPLOAD ON CACHE BOOL "" FORCE)
+set(LIBKTX_VERSION_FULL ON CACHE BOOL "" FORCE)
+set(LIBKTX_VERSION_READ_ONLY OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+add_subdirectory(dependencies/KTX-Software)
+set(KTX_PUBLIC_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/ktx_public_include)
+file(MAKE_DIRECTORY ${KTX_PUBLIC_INCLUDE_DIR}/KHR)
+configure_file(
+    dependencies/KTX-Software/external/dfdutils/KHR/khr_df.h
+    ${KTX_PUBLIC_INCLUDE_DIR}/KHR/khr_df.h
+    COPYONLY
+)
+set_target_properties(ktx PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${WBE_BINARY_DIR}/libs
+    LIBRARY_OUTPUT_DIRECTORY ${WBE_BINARY_DIR}/libs
+    RUNTIME_OUTPUT_DIRECTORY ${WBE_BINARY_DIR}/libs
+    # KTX exports all of external/dfdutils for khr_df.h, but that directory also
+    # contains an older Vulkan header which would shadow the project's Vulkan SDK.
+    INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/dependencies/KTX-Software/lib/include>;$<BUILD_INTERFACE:${KTX_PUBLIC_INCLUDE_DIR}>;$<INSTALL_INTERFACE:include>"
+)
+
 set(YAML_BUILD_SHARED_LIBS OFF)
 set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
@@ -61,6 +90,9 @@ add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
 add_subdirectory(dependencies/boost)
 if (WBE_MAKE_TEST)
+    # KTX enables the global BUILD_SHARED_LIBS option. GoogleTest must remain static because
+    # test discovery runs the executable before the project's deployed-library layout exists.
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     set(BENCHMARK_ENABLE_TESTING OFF)
     add_compile_options(-Wno-c2y-extensions)
     add_subdirectory(dependencies/googletest)
@@ -157,6 +189,7 @@ set(libs ${libs}
     boost_thread
     boost_program_options
     WBE_MINIAUDIO_BUILD_LIB
+    ktx
 )
 
 # Add engine source

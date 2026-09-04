@@ -63,20 +63,17 @@ RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_default_
     return *this;
 }
 
-RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_textures_variable_name(
-    std::string_view p_variable_name) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_textures_variable_name(std::string_view p_variable_name) {
     material_textures_variable_name = p_variable_name;
     return *this;
 }
 
-RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_params_variable_name(
-    std::string_view p_variable_name) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_material_params_variable_name(std::string_view p_variable_name) {
     material_params_variable_name = p_variable_name;
     return *this;
 }
 
-RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_graphics_pipeline_resource_key(
-    std::string_view p_resource_key) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_graphics_pipeline_resource_key(std::string_view p_resource_key) {
     graphics_pipeline_resource_key = p_resource_key;
     return *this;
 }
@@ -95,15 +92,13 @@ RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_render_e
     return *this;
 }
 
-RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::add_color_attachment(
-    std::string_view p_resource_id, VkFormat p_format) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::add_color_attachment(std::string_view p_resource_id, VkFormat p_format) {
     color_attachment_ids.emplace_back(p_resource_id);
     color_attachment_formats.push_back(p_format);
     return *this;
 }
 
-RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_depth_attachment(
-    std::string_view p_resource_id, VkFormat p_format) {
+RTRunStaticTriangleSetVK::Config& RTRunStaticTriangleSetVK::Config::set_depth_attachment(std::string_view p_resource_id, VkFormat p_format) {
     depth_attachment_id = p_resource_id;
     depth_attachment_format = p_format;
     return *this;
@@ -260,7 +255,7 @@ struct StaticOpaqueMaterialDataVK {
     StaticOpaqueMaterialDataVK& operator=(StaticOpaqueMaterialDataVK&&) noexcept = default;
 
     RenderBindpointDeclarations bindpoints;
-    RefRes<RUImage> default_image = MEM_NULL;
+    RefRes<RUTexture> default_image = MEM_NULL;
 };
 
 struct StaticOpaqueAttachmentDataVK {
@@ -325,11 +320,11 @@ std::optional<MaterialTextureContract> reflect_pipeline_material_texture_contrac
         p_material_params_variable_name);
 }
 
-RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, const ShaderRole& p_texture_role) {
+RefRes<RUTexture> find_material_texture(RefRes<RUMaterial> p_material, const ShaderRole& p_texture_role) {
     if (p_material == nullptr || (p_material->texture_count > 0 && p_material->textures == nullptr)) {
         throw std::runtime_error("Failed to construct static opaque task: material texture storage is missing.");
     }
-    RefRes<RUImage> result = MEM_NULL;
+    RefRes<RUTexture> result = MEM_NULL;
     for (size_t i = 0; i < p_material->texture_count; ++i) {
         const RUMaterial::TextureSlot& texture_slot = p_material->textures.get()[i];
         if (!texture_slot.role.matches(p_texture_role.get_name())) {
@@ -343,7 +338,7 @@ RefRes<RUImage> find_material_texture(RefRes<RUMaterial> p_material, const Shade
     return result;
 }
 
-RefRes<RUImage> find_first_material_texture(RefRes<RUMaterial> p_material) {
+RefRes<RUTexture> find_first_material_texture(RefRes<RUMaterial> p_material) {
     if (p_material == nullptr || p_material->texture_count == 0 || p_material->textures == nullptr) {
         return MEM_NULL;
     }
@@ -515,7 +510,7 @@ void validate_material_data_range(const RenderDatabase::OpaqueTrianglesInfo& p_t
 
 int32_t append_material_texture_declaration(RenderBindpointDeclarationsBuilder& p_bindpoint_builder,
     std::string_view p_material_textures_variable_name,
-    RefRes<RUImage> p_texture,
+    RefRes<RUTexture> p_texture,
     const BaseRenderDataVK* p_render_data) {
     size_t texture_index = p_bindpoint_builder.declerations.image_declerations.size();
     if (texture_index >= p_render_data->max_variable_sampled_image_descriptor_count ||
@@ -531,11 +526,11 @@ std::vector<int32_t> append_default_material_textures(RenderBindpointDeclaration
     const RTRunStaticTriangleSetVK::Config& p_config,
     const BaseRenderDataVK* p_render_data,
     RefRes<RUMaterial> p_default_material,
-    RefRes<RUImage>& p_default_image) {
+    RefRes<RUTexture>& p_default_image) {
     std::vector<int32_t> result;
     result.reserve(p_contract.texture_fields.size());
     for (const MaterialTextureContract::TextureField& texture_field : p_contract.texture_fields) {
-        RefRes<RUImage> texture = find_material_texture(p_default_material, texture_field.role);
+        RefRes<RUTexture> texture = find_material_texture(p_default_material, texture_field.role);
         if (texture == nullptr) {
             throw std::runtime_error(std::format("Failed to construct static opaque task: default material '{}' is missing texture role '{}'.",
                 p_config.get_default_material_resource_key(),
@@ -584,7 +579,7 @@ void append_material_texture_overrides(RenderBindpointDeclarationsBuilder& p_bin
         processed_materials[material_index] = true;
         RefRes<RUMaterial> material = p_triangles_info.materials[material_index].material;
         for (const MaterialTextureContract::TextureField& texture_field : p_contract.texture_fields) {
-            RefRes<RUImage> texture = find_material_texture(material, texture_field.role);
+            RefRes<RUTexture> texture = find_material_texture(material, texture_field.role);
             if (texture == nullptr) {
                 continue;
             }
@@ -645,8 +640,7 @@ void validate_indirect_draw_count(const StaticOpaqueDrawDataVK& p_draw_data, con
     }
 }
 
-StaticOpaqueAttachmentDataVK build_attachment_data(
-    const RTRunStaticTriangleSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
+StaticOpaqueAttachmentDataVK build_attachment_data(const RTRunStaticTriangleSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
     StaticOpaqueAttachmentDataVK result;
     result.render_extent = p_config.get_render_extent();
     for (size_t i = 0; i < p_config.get_color_attachment_count(); ++i) {
@@ -698,7 +692,7 @@ StaticOpaqueCompiledPipelineBatchVK compile_pipeline_batch(const RenderDatabase:
     Ref<IRenderObject> p_material_sampler) {
     StaticOpaqueMaterialDataVK material_data = build_material_data(
         p_triangles_info, p_draw_batch, p_config, p_compiler_context.render_data, p_default_material, p_material_sampler);
-    p_compiler_context.default_image_resource = material_data.default_image;
+    p_compiler_context.default_texture_resource = material_data.default_image;
     StaticOpaqueCompiledPipelineBatchVK result;
     result.resource_key = make_pipeline_key(p_draw_batch.graphics_pipeline_key,
         p_compiler_context.color_attachment_formats,

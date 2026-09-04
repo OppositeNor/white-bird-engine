@@ -31,6 +31,7 @@
 #include "glm/ext/vector_uint4.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include "resource/ktx_texture.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
@@ -40,6 +41,7 @@
 #include "utils/utils.hh"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -288,6 +290,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderBinary binary_loader;
     WBE::ResourceUnitLoaderFont font_loader;
     WBE::ResourceUnitLoaderImage image_loader;
+    WBE::ResourceUnitLoaderTexture texture_loader;
     WBE::ResourceUnitLoaderText text_loader;
     WBE::ResourceUnitLoaderVideo video_loader;
     WBE::ResourceUnitLoaderShader shader_loader;
@@ -301,10 +304,11 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 17> loaders = {&audio_loader,
+    const std::array<const WBE::IResourceUnitLoader*, 18> loaders = {&audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
+        &texture_loader,
         &text_loader,
         &video_loader,
         &shader_loader,
@@ -318,10 +322,11 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &prefab_loader,
         &world_loader,
         &scene_loader};
-    const std::array<std::string_view, 17> expected_resource_types = {"audio",
+    const std::array<std::string_view, 18> expected_resource_types = {"audio",
         "binary",
         "font",
         "image",
+        "texture",
         "text",
         "video",
         "shader",
@@ -345,6 +350,19 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         EXPECT_EQ(first_resource_types.front(), expected_resource_types[i]);
         EXPECT_EQ(first_resource_types.data(), second_resource_types.data());
     }
+}
+
+TEST_F(ResourcePopulatorTest, TextureResourceOwnershipContract) {
+    static_assert(!std::is_default_constructible_v<WBE::KTXTexture2>);
+    static_assert(!std::is_copy_constructible_v<WBE::KTXTexture2>);
+    static_assert(!std::is_copy_assignable_v<WBE::KTXTexture2>);
+    static_assert(std::is_nothrow_move_constructible_v<WBE::KTXTexture2>);
+    static_assert(std::is_nothrow_move_assignable_v<WBE::KTXTexture2>);
+    static_assert(!std::is_default_constructible_v<WBE::RUTexture>);
+    static_assert(!std::is_copy_constructible_v<WBE::RUTexture>);
+    static_assert(std::is_nothrow_move_constructible_v<WBE::RUTexture>);
+
+    EXPECT_THROW(WBE::KTXTexture2("test_env_res/assets/missing_texture.ktx2"), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
@@ -761,7 +779,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     std::vector<uint8_t> binary_data_storage;
     WBE::RefRes<WBE::RUBinary> captured_ru_binary = WBE::MEM_NULL;
     WBE::RUSchemaBinary binary_scheme;
-    binary_scheme.path = "assets/images/default_albedo.png";
+    binary_scheme.path = "assets/meshes/triangle.submesh.0.geometry.bin";
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback([&binary_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
                              binary_data_storage.resize(p_res_size);
@@ -855,6 +873,39 @@ TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
     EXPECT_EQ(captured_ru_image->color_space, WBE::get_color_space_from_str("srgb"));
 }
 
+TEST_F(ResourcePopulatorTest, TextureResourceGeneral) {
+    WBE::ResourceUnitLoaderTexture loader;
+    std::stringstream stream;
+    WBE::StackAllocator stack_allocator(1024);
+    WBE::RefRes<WBE::RUTexture> captured_texture = WBE::MEM_NULL;
+    void* destructor_resource = nullptr;
+    void (*destructor)(void*) = nullptr;
+    WBE::RUSchemaTexture texture_scheme;
+    texture_scheme.path = "assets/textures/default_albedo.ktx2";
+    auto resource_chunk = MockResourceChunk::Builder()
+                              .set_reserve_res_unit_storage_callback(
+                                  [&captured_texture, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                      EXPECT_EQ(p_size, sizeof(WBE::RUTexture));
+                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                      captured_texture = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUTexture>();
+                                      return captured_texture.force_cast<char>();
+                                  })
+                              .set_register_res_unit_destructor_callback(
+                                  [&destructor_resource, &destructor](void* p_resource, void (*p_destructor)(void*)) {
+                                      destructor_resource = p_resource;
+                                      destructor = p_destructor;
+                                  })
+                              .build(stream);
+
+    loader.populate_scheme(*resource_chunk, texture_scheme);
+
+    ASSERT_NE(captured_texture, nullptr);
+    EXPECT_NE(captured_texture->texture.get(), nullptr);
+    ASSERT_NE(destructor_resource, nullptr);
+    ASSERT_NE(destructor, nullptr);
+    destructor(destructor_resource);
+}
+
 TEST_F(ResourcePopulatorTest, AudioResourceGeneral) {
     // TODO: loader is not implemented yet.
 }
@@ -878,11 +929,8 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
 
     WBE::RUGraphicsPipeline graphics_pipeline;
     auto graphics_pipeline_ref = push_to_stack(sizeof(graphics_pipeline), &graphics_pipeline).force_cast<WBE::RUGraphicsPipeline>();
-    WBE::RUImage referenced_texture;
-    referenced_texture.width = 4;
-    referenced_texture.height = 4;
-    referenced_texture.channel_count = 3;
-    auto referenced_texture_ref = push_to_stack(sizeof(referenced_texture), &referenced_texture).force_cast<WBE::RUImage>();
+    std::array<std::byte, sizeof(WBE::RUTexture)> referenced_texture{};
+    auto referenced_texture_ref = push_to_stack(referenced_texture.size(), referenced_texture.data()).force_cast<WBE::RUTexture>();
     std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
         {"main_pipeline", graphics_pipeline_ref.force_cast<char>()},
         {"shadow_pipeline", graphics_pipeline_ref.force_cast<char>()},
@@ -922,13 +970,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
             },
             {
                 "texture_role": "albedo",
-                "texture": {
-                    "id": "albedo_texture",
-                    "type": "image",
-                    "path": "assets/images/test_ppm3.ppm",
-                    "color_space": "srgb",
-                    "channel_count": 3
-                }
+                "texture_id": "normal_texture"
             }
         ]
     }
@@ -949,13 +991,11 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     EXPECT_EQ(captured_material->textures.get()[0].texture.get(), referenced_texture_ref.get());
     EXPECT_STREQ(captured_material->textures.get()[1].role.name.get(), "albedo");
     EXPECT_EQ(captured_material->textures.get()[1].role.hash, WBE::dynam_hash("albedo"));
-    ASSERT_NE(captured_material->textures.get()[1].texture, nullptr);
-    EXPECT_EQ(captured_material->textures.get()[1].texture->width, 16U);
-    EXPECT_EQ(captured_material->textures.get()[1].texture->height, 16U);
-    EXPECT_EQ(captured_material->textures.get()[1].texture->channel_count, 3U);
-    ASSERT_EQ(created_ref_keys.size(), 2U);
+    EXPECT_EQ(captured_material->textures.get()[1].texture.get(), referenced_texture_ref.get());
+    ASSERT_EQ(created_ref_keys.size(), 3U);
     EXPECT_EQ(created_ref_keys[0], "main_pipeline");
     EXPECT_EQ(created_ref_keys[1], "normal_texture");
+    EXPECT_EQ(created_ref_keys[2], "normal_texture");
 }
 
 TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {

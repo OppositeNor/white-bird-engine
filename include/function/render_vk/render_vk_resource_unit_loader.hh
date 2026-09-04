@@ -53,9 +53,6 @@ public:
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
-
-private:
-    ResourceUnitLoaderImage image_loader;
 };
 
 class ResourceUnitLoaderMesh final : public IResourceUnitLoader {

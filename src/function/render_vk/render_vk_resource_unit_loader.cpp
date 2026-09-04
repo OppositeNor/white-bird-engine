@@ -197,13 +197,13 @@ RefRes<char> populate_text(IResourceChunk& p_res_chunk, std::string_view p_str) 
     return result;
 }
 
-RefRes<RUImage> populate_image_resource(IResourceChunk& p_res_chunk, const RUSchemaImage& p_scheme) {
+RefRes<RUTexture> populate_texture_resource(IResourceChunk& p_res_chunk, const RUSchemaTexture& p_scheme) {
     if (p_scheme.path.empty()) {
-        throw std::runtime_error("Failed to populate image resource: inline image requires path.");
+        throw std::runtime_error("Failed to populate texture resource: inline texture requires path.");
     }
-    ResourceUnitLoaderImage image_loader;
-    return std::any_cast<RefRes<RUImage>>(
-        static_cast<const IResourceUnitLoader&>(image_loader).populate_scheme_ptr(p_res_chunk, p_scheme));
+    ResourceUnitLoaderTexture texture_loader;
+    return std::any_cast<RefRes<RUTexture>>(
+        static_cast<const IResourceUnitLoader&>(texture_loader).populate_scheme_ptr(p_res_chunk, p_scheme));
 }
 
 RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemaShader& p_scheme) {
@@ -347,7 +347,7 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
         if (texture_scheme.texture_id.has_value()) {
             texture_ids.push_back(*texture_scheme.texture_id);
         } else {
-            texture_slot.texture = populate_image_resource(p_res_chunk, *texture_scheme.texture);
+            texture_slot.texture = populate_texture_resource(p_res_chunk, *texture_scheme.texture);
             texture_ids.emplace_back();
         }
         texture_slots.push_back(texture_slot);

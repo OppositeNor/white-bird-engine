@@ -25,6 +25,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
@@ -44,6 +45,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -226,6 +228,7 @@ private:
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice logical_device = VK_NULL_HANDLE;
     VmaAllocator vma_allocator = VK_NULL_HANDLE;
+    Unique<KTXVulkanDeviceInfoVK> ktx_vulkan_device_info;
 
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
@@ -382,6 +385,7 @@ private:
     void create_swap_chain();
     void clean_up_swap_chain();
     void create_command_pools();
+    void create_ktx_vulkan_device_info();
     void create_gpu_job_command_buffer();
     void create_descriptor_pool();
     void create_async_objects();

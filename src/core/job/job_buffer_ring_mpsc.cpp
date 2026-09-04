@@ -18,8 +18,10 @@
 #include "utils/utils.hh"
 #include <atomic>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <future>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 
@@ -34,19 +36,11 @@ JobBufferRingMPSC::JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p
 }
 
 std::future<void> JobBufferRingMPSC::add_job(std::function<void()> p_job) {
-    size_t head_l;
-    size_t next;
-
-    // Use CAS for lock free increment.
-    while (true) {
-        head_l = head.load(std::memory_order_relaxed);
-        next = ring_increment(head_l, buffer.size());
-        if (next == tail.load(std::memory_order_acquire)) {
-            throw std::runtime_error("Job buffer overflow.");
-        }
-        if (head.compare_exchange_weak(head_l, next, std::memory_order_acquire, std::memory_order_relaxed)) {
-            break;
-        }
+    std::scoped_lock lock(producer_mutex);
+    size_t head_l = head.load(std::memory_order_relaxed);
+    size_t next = ring_increment(head_l, buffer.size());
+    if (next == tail.load(std::memory_order_acquire)) {
+        throw std::runtime_error("Job buffer overflow.");
     }
     Ref<std::promise<void>> completion_promise = make_ref<std::promise<void>>(allocator);
     std::future<void> completion_future = completion_promise->get_future();
@@ -60,7 +54,7 @@ std::future<void> JobBufferRingMPSC::add_job(std::function<void()> p_job) {
             completion_promise->set_exception(std::current_exception());
         }
     };
-    std::atomic_thread_fence(std::memory_order_release);
+    head.store(next, std::memory_order_relaxed);
     semaphore.release();
     return completion_future;
 }

@@ -108,6 +108,19 @@ protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
+/**
+ * @class ResourceUnitLoaderTexture
+ * @brief Loads KTX 2 texture resources.
+ */
+class ResourceUnitLoaderTexture final : public IResourceUnitLoader {
+public:
+    virtual std::span<const std::string> get_supported_resource_types() const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
+};
+
 class ResourceUnitLoaderText final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;

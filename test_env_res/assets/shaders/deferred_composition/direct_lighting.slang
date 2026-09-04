@@ -42,10 +42,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float4 albedo_matid = gbuffer_albedo.SampleLevel(gbuffer_sampler, uv, 0.0);
     float2 octa = gbuffer_octa_normal.SampleLevel(gbuffer_sampler, uv, 0.0);
     float4 rma_flags = gbuffer_rma.SampleLevel(gbuffer_sampler, uv, 0.0);
-    // TEST
     float3 base_color = albedo_matid.rgb;
-    direct_lighting_output[dispatch_thread_id] = float4(base_color, 1.0);
-    return;
     float3 normal = octahedron_decode(octa);
     float roughness = clamp(rma_flags.r, 0.04, 1.0);
     float metallic = clamp(rma_flags.g, 0.0, 1.0);

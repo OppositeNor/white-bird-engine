@@ -61,7 +61,7 @@ struct RenderBindpointBufferDeclaration {
  */
 struct RenderBindpointImageDeclaration {
     std::string field_path;
-    RefRes<RUImage> image_resource = MEM_NULL;
+    RefRes<RUTexture> image_resource = MEM_NULL;
     Ref<IRenderObject> image_render_object = MEM_NULL;
 };
 
@@ -138,7 +138,7 @@ struct RenderBindpointDeclarationsBuilder {
     /**
      * @brief Add an image decleration backed by a resource unit.
      */
-    RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, RefRes<RUImage> p_image_resource) {
+    RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, RefRes<RUTexture> p_image_resource) {
         declerations.image_declerations.push_back(
             {.field_path = std::string(p_field_path), .image_resource = p_image_resource, .image_render_object = MEM_NULL});
         return *this;

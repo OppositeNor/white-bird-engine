@@ -13,21 +13,16 @@
 # limitations under the License.
 
 from pathlib import Path
-import sys
 from typing import override
 from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
 
-_VENDORED_COMPILER_DIR = Path(__file__).resolve().parents[3] / "dependencies" / "wbe-utils-model-compiler"
-if _VENDORED_COMPILER_DIR.exists():
-    sys.path.insert(0, _VENDORED_COMPILER_DIR.as_posix())
-
-from wbe_utils_model_compiler import WBEUtilsModelCompiler
+from wbe_utils_model_compiler import TextureCompiler, WBEUtilsModelCompiler
 
 class WBEACPCompilerModel(WBEACPCompiler):
     """The model compiler.
     """
-    def __init__(self, cache_dir: Path | None = None) -> None:
-        self._utils_mesh_compiler = WBEUtilsModelCompiler(cache_dir=cache_dir)
+    def __init__(self, texture_compiler: TextureCompiler, cache_dir: Path | None = None) -> None:
+        self._utils_mesh_compiler = WBEUtilsModelCompiler(texture_compiler=texture_compiler, cache_dir=cache_dir)
 
     @override
     def get_supported_resource_types(self) -> list[str]:

@@ -198,6 +198,23 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageDefaults) {
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }
 
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextureGeneral) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_texture_01",
+        "type": "texture",
+        "path": "textures/test_texture_01.ktx2"
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaTexture scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_EQ(scheme.id, "test_texture_01");
+    ASSERT_EQ(scheme.type, "texture");
+    ASSERT_EQ(scheme.path, "textures/test_texture_01.ktx2");
+}
+
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaBinaryGeneral) {
     std::string json_buffer = R"(
     {
@@ -472,10 +489,8 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
                 "texture_role": "normal",
                 "texture": {
                     "id": "normal_texture",
-                    "type": "image",
-                    "path": "images/normal.png",
-                    "color_space": "rgb",
-                    "channel_count": 3
+                    "type": "texture",
+                    "path": "textures/normal.ktx2"
                 }
             }
         ]
@@ -499,10 +514,8 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     ASSERT_FALSE(scheme.textures[1].texture_id.has_value());
     ASSERT_TRUE(scheme.textures[1].texture.has_value());
     ASSERT_EQ(scheme.textures[1].texture->id, "normal_texture");
-    ASSERT_EQ(scheme.textures[1].texture->type, "image");
-    ASSERT_EQ(scheme.textures[1].texture->path, "images/normal.png");
-    ASSERT_EQ(scheme.textures[1].texture->color_space, "rgb");
-    ASSERT_EQ(scheme.textures[1].texture->channel_count, 3U);
+    ASSERT_EQ(scheme.textures[1].texture->type, "texture");
+    ASSERT_EQ(scheme.textures[1].texture->path, "textures/normal.ktx2");
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaBaseMissingType) {
@@ -588,6 +601,19 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageMissingRequiredFields)
     parser.parse_from_buffer(json_buffer);
     WBE::RUSchemaImage scheme;
     // Should throw because channel_count, color_space, is_hdr, and path are required
+    EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextureMissingPath) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_texture_error",
+        "type": "texture"
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaTexture scheme;
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 

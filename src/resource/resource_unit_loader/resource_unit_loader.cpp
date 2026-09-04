@@ -157,6 +157,23 @@ void ResourceUnitLoaderImage::populate_scheme_from_data(IResourceChunk& p_res_ch
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
+std::span<const std::string> ResourceUnitLoaderTexture::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"texture"};
+    return supported_resource_types;
+}
+
+std::any ResourceUnitLoaderTexture::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaTexture>(p_scheme, "texture");
+    auto file_path = get_resource_path(typed_scheme.path);
+    return p_res_chunk.emplace_res_unit<RUTexture>(typed_scheme.id, static_cast<std::string>(file_path));
+}
+
+void ResourceUnitLoaderTexture::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemaTexture scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
+}
+
 std::span<const std::string> ResourceUnitLoaderText::get_supported_resource_types() const {
     static const std::array<std::string, 1> supported_resource_types = {"text"};
     return supported_resource_types;

@@ -17,8 +17,8 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
-#include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -183,11 +183,35 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
     allocation = VK_NULL_HANDLE;
     exposed_fileds.image_layout = p_initial_image_layout;
     exposed_fileds.is_swap_chain_image = true;
+    ownership = Ownership::SWAP_CHAIN;
+}
+
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture) : RenderObjectVK(p_render_data) {
+    if (p_texture.image == VK_NULL_HANDLE || p_texture.deviceMemory == VK_NULL_HANDLE) {
+        ktxVulkanTexture_Destruct(&p_texture, p_render_data->logic_device, p_render_data->allocation_callbacks);
+        throw std::runtime_error("Failed to adopt libktx Vulkan texture: image or device memory is null.");
+    }
+    ktx_texture = p_texture;
+    exposed_fileds.image = p_texture.image;
+    exposed_fileds.image_memory = p_texture.deviceMemory;
+    exposed_fileds.image_layout = p_texture.imageLayout;
+    exposed_fileds.format = p_texture.imageFormat;
+    exposed_fileds.extent = VkExtent3D{.width = p_texture.width, .height = p_texture.height, .depth = p_texture.depth};
+    exposed_fileds.view_type = p_texture.viewType;
+    exposed_fileds.mipmap_levels = p_texture.levelCount;
+    exposed_fileds.layers_count = p_texture.layerCount;
+    ownership = Ownership::KTX;
 }
 
 ROImageVK::~ROImageVK() {
     // Deallocate resource after frames in flight.
-    if (!exposed_fileds.is_swap_chain_image && (exposed_fileds.image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)) {
+    if (ownership == Ownership::KTX && ktx_texture.image != VK_NULL_HANDLE) {
+        render_data->register_delayed_call(
+            [render_data = render_data, texture = ktx_texture]() mutable {
+                ktxVulkanTexture_Destruct(&texture, render_data->logic_device, render_data->allocation_callbacks);
+            },
+            render_data->frames_in_flight);
+    } else if (ownership == Ownership::VMA && (exposed_fileds.image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)) {
         render_data->register_delayed_call(
             [render_data = render_data, image = exposed_fileds.image, allocation = allocation]() {
                 vmaDestroyImage(render_data->vma_allocator, image, allocation);
@@ -237,6 +261,11 @@ void ROImageVK::init(const Builder& p_builder) {
         throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
     }
     exposed_fileds.image_memory = allocation_info.deviceMemory;
+    exposed_fileds.format = WBE_REQUIRED(p_builder.format);
+    exposed_fileds.extent = WBE_REQUIRED(p_builder.extent);
+    exposed_fileds.view_type = WBE_REQUIRED(p_builder.image_type) == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
+    exposed_fileds.mipmap_levels = p_builder.mipmap_level;
+    exposed_fileds.layers_count = p_builder.layers_count;
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {

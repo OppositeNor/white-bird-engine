@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/ecs/components.hh"
+#include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -148,6 +149,16 @@ public:
     ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
 
     /**
+     * @brief Adopt a Vulkan image and device-memory allocation created by libktx.
+     *
+     * The image is destroyed with ktxVulkanTexture_Destruct after the configured frames in flight.
+     *
+     * @param p_render_data The base render data.
+     * @param p_texture The libktx texture allocation whose ownership is transferred to this object.
+     */
+    ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture);
+
+    /**
      * @brief Get image instance.
      *
      * @return The image instance.
@@ -189,6 +200,16 @@ public:
          * @brief The image's current layout after all pending transitions.
          */
         VkImageLayout image_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        /** Format reported by the image creator, when available. */
+        VkFormat format = VK_FORMAT_UNDEFINED;
+        /** Image extent reported by the image creator, when available. */
+        VkExtent3D extent{};
+        /** Default view type for the complete image. */
+        VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
+        /** Number of mip levels in the image. */
+        uint32_t mipmap_levels = 1;
+        /** Number of array layers in the image. */
+        uint32_t layers_count = 1;
     };
 
     /**
@@ -358,8 +379,16 @@ public:
     };
 
 private:
+    enum class Ownership {
+        VMA,
+        KTX,
+        SWAP_CHAIN,
+    };
+
     ExposedFields exposed_fileds{};
     VmaAllocation allocation = VK_NULL_HANDLE;
+    ktxVulkanTexture ktx_texture{};
+    Ownership ownership = Ownership::VMA;
 
     void init(const Builder& p_builder);
 };

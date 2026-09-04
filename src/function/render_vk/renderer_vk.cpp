@@ -27,6 +27,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -262,6 +263,7 @@ void RendererVK::terminate() {
     image_available_semaphores.clear();
 
     synchronize_gpu_and_flush_delayed_calls();
+    ktx_vulkan_device_info.reset();
     for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
@@ -286,6 +288,7 @@ void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_vma_allocator();
     create_swap_chain();
     create_command_pools();
+    create_ktx_vulkan_device_info();
     create_gpu_job_command_buffer();
     create_descriptor_pool();
     create_async_objects();
@@ -316,6 +319,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
+    base_render_data.ktx_vulkan_device_info = ktx_vulkan_device_info.get();
     base_render_data.descriptor_pool = descriptor_pool;
     VkPhysicalDeviceProperties2 physical_device_properties{};
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -574,6 +578,11 @@ void RendererVK::create_command_pools() {
     }
 }
 
+void RendererVK::create_ktx_vulkan_device_info() {
+    ktx_vulkan_device_info = make_unique<KTXVulkanDeviceInfoVK>(
+        allocator, vk_instance, physical_device, logical_device, graphics_queue, graphics_command_pool, get_allocation_callbacks());
+}
+
 void RendererVK::create_gpu_job_command_buffer() {
     VkCommandBufferAllocateInfo allocate_info{};
     allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -683,12 +692,15 @@ void RendererVK::create_logical_device() {
     create_info.enabledExtensionCount = enabled_device_extensions.size();
     create_info.ppEnabledExtensionNames = enabled_device_extensions.data();
     // Setup physical device features.
+    VkPhysicalDeviceFeatures supported_device_features{};
+    vkGetPhysicalDeviceFeatures(physical_device, &supported_device_features);
     VkPhysicalDeviceFeatures device_features{};
     device_features.depthClamp = VK_TRUE;
     device_features.multiDrawIndirect = VK_TRUE;
     device_features.drawIndirectFirstInstance = VK_TRUE;
     device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     device_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
+    device_features.textureCompressionBC = supported_device_features.textureCompressionBC;
     create_info.pEnabledFeatures = &device_features;
 
     VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features{};

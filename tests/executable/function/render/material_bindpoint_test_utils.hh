@@ -44,8 +44,8 @@ struct MaterialParamsUBO {
     int32_t rma_index = MATERIAL_TEXTURE_DEFAULT_RMA_INDEX;
 };
 
-inline WBE::RefRes<WBE::RUImage> require_material_texture(WBE::RefRes<WBE::RUImage> p_texture, std::string_view p_texture_name) {
-    WBE::RefRes<WBE::RUImage> texture = p_texture;
+inline WBE::RefRes<WBE::RUTexture> require_material_texture(WBE::RefRes<WBE::RUTexture> p_texture, std::string_view p_texture_name) {
+    WBE::RefRes<WBE::RUTexture> texture = p_texture;
     if (texture == nullptr) {
         throw std::runtime_error(
             std::format("Failed to bind test material textures: default material is missing '{}' texture.", p_texture_name));
@@ -53,7 +53,7 @@ inline WBE::RefRes<WBE::RUImage> require_material_texture(WBE::RefRes<WBE::RUIma
     return texture;
 }
 
-inline WBE::RefRes<WBE::RUImage> find_material_texture(WBE::RefRes<WBE::RUMaterial> p_material, std::string_view p_texture_role) {
+inline WBE::RefRes<WBE::RUTexture> find_material_texture(WBE::RefRes<WBE::RUMaterial> p_material, std::string_view p_texture_role) {
     if (p_material == nullptr) {
         return WBE::MEM_NULL;
     }
@@ -69,8 +69,8 @@ inline WBE::RefRes<WBE::RUImage> find_material_texture(WBE::RefRes<WBE::RUMateri
 inline void add_material_texture_binding(WBE::RenderBindpointDeclarationsBuilder& p_builder,
     int32_t p_default_index,
     int32_t p_bound_index,
-    WBE::RefRes<WBE::RUImage> p_default_texture,
-    WBE::RefRes<WBE::RUImage> p_material_texture) {
+    WBE::RefRes<WBE::RUTexture> p_default_texture,
+    WBE::RefRes<WBE::RUTexture> p_material_texture) {
     p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_default_index), p_default_texture);
     if (p_material_texture != nullptr) {
         p_builder.add_image_decleration(std::format("material_textures.textures[{}]", p_bound_index), p_material_texture);
@@ -83,13 +83,13 @@ inline std::vector<uint8_t> add_material_texture_bindings(WBE::RenderBindpointDe
     WBE::Ref<WBE::ROSamplerVK> p_sampler) {
     MaterialParamsUBO material_params;
 
-    WBE::RefRes<WBE::RUImage> default_albedo = require_material_texture(find_material_texture(p_default_material, "albedo"), "albedo");
-    WBE::RefRes<WBE::RUImage> default_normal = require_material_texture(find_material_texture(p_default_material, "normal"), "normal");
-    WBE::RefRes<WBE::RUImage> default_rma = require_material_texture(find_material_texture(p_default_material, "rma"), "rma");
+    WBE::RefRes<WBE::RUTexture> default_albedo = require_material_texture(find_material_texture(p_default_material, "albedo"), "albedo");
+    WBE::RefRes<WBE::RUTexture> default_normal = require_material_texture(find_material_texture(p_default_material, "normal"), "normal");
+    WBE::RefRes<WBE::RUTexture> default_rma = require_material_texture(find_material_texture(p_default_material, "rma"), "rma");
 
-    WBE::RefRes<WBE::RUImage> albedo_texture = find_material_texture(p_material, "albedo");
-    WBE::RefRes<WBE::RUImage> normal_texture = find_material_texture(p_material, "normal");
-    WBE::RefRes<WBE::RUImage> rma_texture = find_material_texture(p_material, "rma");
+    WBE::RefRes<WBE::RUTexture> albedo_texture = find_material_texture(p_material, "albedo");
+    WBE::RefRes<WBE::RUTexture> normal_texture = find_material_texture(p_material, "normal");
+    WBE::RefRes<WBE::RUTexture> rma_texture = find_material_texture(p_material, "rma");
 
     p_builder.add_sampler_decleration("material_textures.material_sampler", p_sampler);
     add_material_texture_binding(
