@@ -19,7 +19,6 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
@@ -56,19 +55,6 @@ public:
      */
     class Config {
     public:
-        /** @brief Construct configuration with the default material contract and swap-chain attachment settings. */
-        Config() = default;
-        /** @brief Destroy the configuration. */
-        ~Config() = default;
-        /** @brief Copy configuration. */
-        Config(const Config&) = default;
-        /** @brief Move configuration. */
-        Config(Config&&) noexcept = default;
-        /** @brief Copy configuration. */
-        Config& operator=(const Config&) = default;
-        /** @brief Move configuration. */
-        Config& operator=(Config&&) noexcept = default;
-
         /**
          * @brief Set the resource key of the material supplying fallback textures for shader-reflected roles.
          * @param p_resource_key Material resource key. It must provide every WBE_TEXTURE role consumed by a pipeline batch.

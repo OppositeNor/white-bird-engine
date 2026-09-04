@@ -43,7 +43,7 @@ Do not introduce a closed texture-role enum or branch on roles such as `albedo`,
 
 ## Before changing support
 
-Read [references/system-and-extension.md](./references/system-and-extension.md) when the task asks what is supported, touches the ACP normalizer or serialized metadata schema, adds an annotation contract, changes field paths, or adds a Vulkan descriptor/type mapping. Trace one real Slang declaration through raw reflection, normalization, deserialization, and its final consumer before editing.
+Read [references/system-and-extension.md](references/system-and-extension.md) when the task asks what is supported, touches the ACP normalizer or serialized metadata schema, adds an annotation contract, changes field paths, or adds a Vulkan descriptor/type mapping. Trace one real Slang declaration through raw reflection, normalization, deserialization, and its final consumer before editing.
 
 Make the smallest layer-correct change. Add tests at every boundary that changes, and never edit generated serialization files or compiled reflection fixtures by hand; regenerate them through the normal build/resource pipeline.
 
