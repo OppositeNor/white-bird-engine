@@ -135,11 +135,15 @@ named storage buffers into the reflected shader contract:
 The task still uses shader reflection for material fallback textures. `get_default_image()` resolves the configured default
 material, and `GraphicsPipelineCompilerVK` binds any reflected texture and parameter resources needed by the selected pipeline.
 
-`build_static_set_draw_data()` then converts each drawable submesh into one `VkDrawIndexedIndirectCommand`. The command stores:
+`StaticSetDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
+layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their
+relative vertex offsets fit `int32_t`. Groups follow first appearance and retain source order within each group. Each group
+binds its minimum vertex-view byte offset, and is split at the device's `maxDrawIndirectCount` limit. Each submesh retains one
+`VkDrawIndexedIndirectCommand`; each batch submits several commands through one `vkCmdDrawIndexedIndirect` call. Commands store:
 
 - `indexCount` from the submesh's index view.
 - `firstIndex` from the index-view byte offset divided by `sizeof(uint32_t)`.
-- `vertexOffset` from the vertex-view byte offset divided by its stride.
+- `vertexOffset` from the vertex-view byte offset relative to its batch's binding offset, divided by its stride.
 - `firstInstance` from the precomputed first-instance table.
 - `instanceCount` from the submesh's instance count.
 

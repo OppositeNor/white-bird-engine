@@ -48,7 +48,8 @@ inline constexpr std::string_view RT_RUN_STATIC_SET = "run_static_set";
  *
  * The caller supplies the source geometry set and the graphics pipeline explicitly. Empty sets record a no-draw
  * rendering pass that still honors attachment load and clear operations. Non-empty sets compile one graphics pipeline,
- * retain descriptor bindings, and record indirect indexed draws from the set's declared submesh order.
+ * retain descriptor bindings, and group indirect indexed draws by compatible vertex input. Groups follow first appearance,
+ * preserving source order within each group; submesh and material identity remains in the original instance tables.
  */
 class RTRunStaticSetVK final : public RenderTaskVK {
 public:

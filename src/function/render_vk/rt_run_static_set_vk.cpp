@@ -37,8 +37,8 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
+#include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "function/render_vk/static_set_material_binding_builder_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
@@ -279,7 +279,7 @@ bool is_empty_set(const RUStaticGeometrySet& p_set) {
 }
 
 
-Ref<ROBufferVK> build_indirect_buffer(const BaseRenderDataVK* p_render_data, const std::vector<VkDrawIndexedIndirectCommand>& p_commands) {
+Ref<ROBufferVK> build_indirect_buffer(const BaseRenderDataVK* p_render_data, std::span<const VkDrawIndexedIndirectCommand> p_commands) {
     if (p_commands.empty()) {
         return MEM_NULL;
     }
@@ -475,60 +475,6 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
     return GraphicsPipelineCompilerVK(compiler_context).compile(compiled_pipeline_key, p_graphics_pipeline, bindpoints);
 }
 
-void validate_drawable_static_submesh(const RUStaticGeometrySubmesh& p_submesh) {
-    if (p_submesh.indices.index_count > std::numeric_limits<uint32_t>::max() ||
-        p_submesh.indices.binary.start / sizeof(uint32_t) > std::numeric_limits<uint32_t>::max() ||
-        p_submesh.instance_count > std::numeric_limits<uint32_t>::max() ||
-        p_submesh.first_instance > std::numeric_limits<uint32_t>::max()) {
-        throw std::runtime_error("Failed to construct static set task: draw command exceeds Vulkan uint32 limits.");
-    }
-}
-
-void append_static_submesh_draw(const RUStaticGeometrySubmesh& p_submesh,
-    uint32_t p_first_instance,
-    Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
-    const ShaderMetadata& p_vertex_metadata,
-    std::string_view p_vertex_entry_name,
-    RenderAllocator* p_allocator,
-    std::vector<VkDrawIndexedIndirectCommand>& p_indirect_commands,
-    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch>& p_pipeline_batches) {
-    if (p_submesh.indices.index_count == 0 || p_submesh.instance_count == 0) {
-        return;
-    }
-    validate_drawable_static_submesh(p_submesh);
-    p_indirect_commands.push_back(VkDrawIndexedIndirectCommand{
-        .indexCount = static_cast<uint32_t>(p_submesh.indices.index_count),
-        .instanceCount = static_cast<uint32_t>(p_submesh.instance_count),
-        .firstIndex = static_cast<uint32_t>(p_submesh.indices.binary.start / sizeof(uint32_t)),
-        .vertexOffset = 0,
-        .firstInstance = p_first_instance,
-    });
-    RTRunGraphicsPipelineIndirectVK::PipelineBatch pipeline_batch(p_allocator);
-    pipeline_batch.graphics_pipeline = p_graphics_pipeline;
-    pipeline_batch.first_draw = static_cast<uint32_t>(p_indirect_commands.size() - 1);
-    pipeline_batch.draw_count = 1;
-    pipeline_batch.vertex_input = build_vertex_input_description_vk(p_vertex_metadata, p_vertex_entry_name, p_submesh.vertices);
-    pipeline_batch.vertex_buffer_offset = p_submesh.vertices.binary.start;
-    p_pipeline_batches.push_back(std::move(pipeline_batch));
-}
-
-void build_static_set_draw_data(RefRes<RUStaticGeometrySet> p_set,
-    Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
-    const ShaderMetadata& p_vertex_metadata,
-    std::string_view p_vertex_entry_name,
-    const std::vector<uint32_t>& p_first_instances,
-    RenderAllocator* p_allocator,
-    std::vector<VkDrawIndexedIndirectCommand>& p_indirect_commands,
-    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch>& p_pipeline_batches) {
-    p_indirect_commands.reserve(p_set->submesh_count);
-    p_pipeline_batches.reserve(p_set->submesh_count);
-    for (size_t i = 0; i < p_set->submesh_count; ++i) {
-        const RUStaticGeometrySubmesh& submesh = p_set->submeshes.get()[i];
-        append_static_submesh_draw(
-            submesh, p_first_instances[i], p_graphics_pipeline, p_vertex_metadata, p_vertex_entry_name, p_allocator, p_indirect_commands, p_pipeline_batches);
-    }
-}
-
 std::vector<std::string_view> color_attachment_id_views(const StaticSetAttachmentDataVK& p_attachment_data) {
     std::vector<std::string_view> result;
     result.reserve(p_attachment_data.color_attachment_ids.size());
@@ -572,17 +518,24 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
     result.descriptor_set_bindings = compiled_pipeline.descriptor_set_bindings;
     ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
     const std::string_view vertex_entry_name = get_vertex_stage_entry_name(p_graphics_pipeline);
-    std::vector<VkDrawIndexedIndirectCommand> indirect_commands;
-    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch> pipeline_batches;
-    build_static_set_draw_data(p_set,
-        compiled_pipeline.graphics_pipeline,
+    auto draw_plan = StaticSetDrawBatchPlannerVK().build(render_data->allocator,
+        std::span<const RUStaticGeometrySubmesh>(p_set->submeshes.get(), p_set->submesh_count),
+        instance_data.first_instances,
         vertex_metadata,
         vertex_entry_name,
-        instance_data.first_instances,
-        render_data->allocator,
-        indirect_commands,
-        pipeline_batches);
-    Ref<ROBufferVK> indirect_buffer = build_indirect_buffer(render_data, indirect_commands);
+        render_data->max_draw_indirect_count);
+    Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> pipeline_batches(render_data->allocator);
+    pipeline_batches.reserve(draw_plan.batches.size());
+    for (auto& batch : draw_plan.batches) {
+        RTRunGraphicsPipelineIndirectVK::PipelineBatch pipeline_batch(render_data->allocator);
+        pipeline_batch.graphics_pipeline = compiled_pipeline.graphics_pipeline;
+        pipeline_batch.first_draw = batch.first_draw;
+        pipeline_batch.draw_count = batch.draw_count;
+        pipeline_batch.vertex_input = std::move(batch.vertex_input);
+        pipeline_batch.vertex_buffer_offset = batch.vertex_buffer_offset;
+        pipeline_batches.push_back(std::move(pipeline_batch));
+    }
+    Ref<ROBufferVK> indirect_buffer = build_indirect_buffer(render_data, draw_plan.commands);
     if (indirect_buffer == nullptr) {
         return result;
     }
