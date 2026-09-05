@@ -12,40 +12,35 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/engine_core.hh"
 #include "core/logging/log.hh"
+#include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
-#include "function/render/render_database.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata_loader.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/rt_run_static_set_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
-#include "render_test.hh"
+#include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <memory>
-#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -68,15 +63,16 @@ public:
     void setup_graphics_pipeline() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
-        auto* render_database = WBE::RenderDatabase::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
+        auto* resource_manager = WBE::ResourceManager::get_singleton();
 
-        // Setup cube's mesh
-        auto cube_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("cube");
-        render_database->set_static_triangle_set(cube_mesh.get());
-        renderer->add_job([renderer]() {
-            renderer->update_static_triangle_set();
-        });
+        auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
+            WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
+        resource_manager->register_chunk(resource_chunk);
+        WBE::RefRes<WBE::RUStaticOpaqueSet> cube_set = resource_manager->get_resource<WBE::RUStaticOpaqueSet>("model_cube_static.static_opaque_set");
+        if (cube_set == nullptr) {
+            throw std::runtime_error("Failed to setup draw cube unshaded test: static opaque set resource was not found.");
+        }
 
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
         camera_info = WBE::CameraInfoVKUBO{
@@ -86,68 +82,29 @@ public:
         };
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
-        auto pipeline_resource =
-            WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_cube_unshaded_pipeline");
+        auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("draw_cube_unshaded_static_pipeline");
         if (pipeline_resource == nullptr) {
-            throw std::runtime_error("Failed to setup draw cube unshaded test: graphics pipeline resource was not found.");
+            throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }
-        WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-        bindpoint_builder.add_buffer_decleration("camera_info", &camera_info, sizeof(camera_info));
-        WBE::GraphicsPipelineCompilerVKContext compiler_context{
-            .allocator = render_allocator,
-            .render_data = base_render_data,
-            .render_database = renderer->get_render_database(),
-            .renderer = renderer,
-            .color_attachment_formats = {base_render_data->swap_chain_format},
-        };
-        auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
-                            .compile("draw_cube_unshaded_pipeline", pipeline_resource, bindpoint_builder.build());
-        auto graphics_pipeline = compiled.graphics_pipeline;
-        // Setup time uniform buffer
+
         camera_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                               .set_size(sizeof(WBE::CameraInfoVKUBO))
                               .create_ref(base_render_data);
         camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
-        auto [set_index, binding] = compiled.descriptor_set_bindings.at("camera_info");
-        graphics_pipeline->write_descriptor_set(set_index,
-            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(WBE::RODescriptorSetVK::Writer::BufferInfo{
-                .buffer = camera_info_ubo,
-                .offset = 0,
-                .range = sizeof(WBE::CameraInfoVKUBO),
-            }));
-        // Setup render task. The vertex/index data lives in the global static
-        // opaque mesh, populated by RendererVK::update_static_triangle_set()
-        // from the RenderDatabase, and exposed to render tasks under the
-        // REND_RES_STATIC_{VERTICES,INDICES} global IDs.
-        const auto& triangles_info = render_database->get_static_triangle_set_info();
-        if (triangles_info.draw_groups.size() != 1) {
-            throw std::runtime_error("Failed to setup draw cube unshaded test: expected one vertex draw group.");
-        }
-        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_cube_unshaded_shader");
-        WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
-            WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangles_info.draw_groups[0].vertex_layout);
-        const VkDeviceSize vertex_buffer_offset = triangles_info.draw_groups[0].vertex_buffer_byte_offset;
+
+        WBE::RTRunStaticSetVK::Config task_config;
+        auto task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer, cube_set, pipeline_resource, task_config);
+        auto [set_index, binding] = task->get_descriptor_binding("camera_info");
+        task->write_descriptor_set(set_index,
+            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
+
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE, graphics_pipeline);
-        WBE::RendTaskDescVK task_desc(render_allocator);
-        task_desc.task_id = RT_RUN_PIPELINE;
-        task_desc.create = [render_allocator, base_render_data, vertex_input, vertex_buffer_offset]() -> WBE::Unique<WBE::RenderTaskVK> {
-            return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
-                base_render_data,
-                glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
-                base_render_data->swap_chain_extent,
-                WBE::REND_RES_SWAP_CHAIN_IMAGE,
-                REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE,
-                WBE::REND_RES_STATIC_VERTICES,
-                WBE::REND_RES_STATIC_INDICES,
-                std::nullopt,
-                VK_ATTACHMENT_LOAD_OP_CLEAR,
-                vertex_input,
-                vertex_buffer_offset);
-        };
-        pipeline_desc.tasks.emplace_back(std::move(task_desc));
+        pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
+            .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
+            .container = WBE::MEM_NULL});
+        pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_STATIC_SET, std::move(task));
         WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

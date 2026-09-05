@@ -234,19 +234,26 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
 TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetadata) {
     ParserJSON parser;
     parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}),
-        "forward_cook_torrance_pbr_static_vertex.json"));
+        "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
-    const std::array<std::string_view, 3> expected_names{"static_submeshes", "static_nodes", "static_instances"};
-    for (std::string_view expected_name : expected_names) {
-        auto parameter = std::ranges::find_if(metadata.parameters, [expected_name](const ShaderMetadataParameter& p_parameter) {
-            return p_parameter.name == expected_name;
-        });
-        ASSERT_NE(parameter, metadata.parameters.end());
-        EXPECT_EQ(parameter->type.kind, "resource");
-        EXPECT_EQ(parameter->type.scalar_type, "structuredBuffer");
-        EXPECT_EQ(parameter->binding.kind, "descriptorTableSlot");
+    auto parameter = std::ranges::find_if(metadata.parameters, [](const ShaderMetadataParameter& p_parameter) {
+        return p_parameter.name == "static_set";
+    });
+    ASSERT_NE(parameter, metadata.parameters.end());
+    EXPECT_EQ(parameter->type.kind, "parameterBlock");
+    EXPECT_EQ(parameter->binding.kind, "subElementRegisterSpace");
+
+    const std::array<std::string_view, 3> expected_names{"submeshes", "nodes", "instances"};
+    ASSERT_EQ(parameter->type.fields.size(), expected_names.size());
+    for (size_t i = 0; i < expected_names.size(); ++i) {
+        const ShaderMetadataTypeField& field = parameter->type.fields[i];
+        EXPECT_EQ(field.name, expected_names[i]);
+        EXPECT_EQ(field.type.kind, "resource");
+        EXPECT_EQ(field.type.scalar_type, "structuredBuffer");
+        EXPECT_EQ(field.binding.kind, "descriptorTableSlot");
+        EXPECT_EQ(field.binding.index, static_cast<int32_t>(i));
     }
 }
 

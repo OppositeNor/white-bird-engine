@@ -108,11 +108,6 @@ void Scene::update(double p_delta) {
         if (!graph_key.empty()) {
             renderer->activate_render_graph(graph_key);
         }
-        RefRes<RUMesh3D> static_opaque_mesh = active_world->get_static_opaque_mesh();
-        if (static_opaque_mesh != MEM_NULL) {
-            renderer->get_render_database()->set_static_triangle_set(static_opaque_mesh.get());
-            renderer->update_static_triangle_set();
-        }
         RefRes<RUStaticOpaqueSet> static_opaque_set = active_world->get_static_opaque_set();
         if (static_opaque_set != MEM_NULL) {
             renderer->get_render_database()->set_static_opaque_set(static_opaque_set);

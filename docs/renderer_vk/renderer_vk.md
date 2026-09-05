@@ -78,93 +78,150 @@ extension and feature are rejected; there is no static vertex-input fallback. Di
 reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
 state.
 
-## Static Triangle Set Task
+## Static Set Tasks
 
-`RTRunStaticTriangleSetVK` is the legacy compatibility task that compiles the render database's static opaque mesh into one indexed-indirect draw task. Construction
-compiles one logical Vulkan graphics pipeline per pipeline and attachment configuration, creates material descriptor data for each
-pipeline batch, and uploads the indirect commands. Flattened vertex data remains raw interleaved bytes. Geometry is merged only
-when its pipeline, material, and vertex layout match; command batches split whenever the layout or vertex-buffer byte offset
-changes. Each compiled pipeline owns its descriptor sets, and the task retains the pipelines and indirect-command buffer.
+`RTRunStaticSetVK` is the current Vulkan path for static geometry. One task instance consumes exactly one explicit
+`RUStaticGeometrySet` resource and one explicit `RUGraphicsPipeline` resource. If a pass needs separate opaque and masked
+pipelines, build two tasks and order them in the render graph. The second task should normally use `VK_ATTACHMENT_LOAD_OP_LOAD`
+for the attachments written by the first task.
+
+### Loading Static Geometry
+
+Static geometry resources are loaded through the normal chunk pipeline. `ResourceUnitLoaderBinary` loads the shared `RUBinary`
+payload, and `register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderStaticOpaqueSet` and
+`ResourceUnitLoaderStaticMaskedSet` so `static_opaque_set` and `static_masked_set` schemas resolve into `RUStaticOpaqueSet` and
+`RUStaticMaskedSet` resources.
+
+Each static set stores:
+
+- A list of submeshes.
+- For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
+- One shared instance array containing `glm::mat4` transforms.
+
+All drawable submeshes in one `RTRunStaticSetVK` task must reference the same `RUBinary` resource. The task validates that each
+vertex view and index view stays within the binary bounds before it creates any Vulkan buffers.
+
+### Vertex Assembly And Upload
+
+`RTRunStaticSetVK` does not flatten mesh data through `RenderDatabase`. Instead, construction follows this path in
+`src/function/render_vk/rt_run_static_set_vk.cpp`:
+
+1. `validate_static_set_and_get_binary()` verifies submesh storage, material presence, vertex stride, vertex byte ranges, index
+  ranges, and instance ranges. It also enforces that every drawable submesh shares one `RUBinary`.
+2. `build_static_binary_buffer()` uploads that binary once into an `ROBufferVK` with
+  `VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT`.
+3. The upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource key, so later tasks can
+  reuse the same Vulkan buffer instead of re-uploading identical geometry bytes.
+4. `build_static_instance_buffer_data()` assembles three CPU-side tables from the set declaration:
+  `StaticSetSubmeshGPU`, `StaticSetNodeGPU`, and `StaticSetInstanceGPU`.
+5. `build_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
+  indirection.
+
+The important distinction is that vertex and index bytes stay in their original binary layout. The task uploads the binary as-is,
+then uploads side-band metadata buffers that tell the shader which submesh and instance transform to use for each indirect draw.
+
+### Feeding The Graphics Pipeline
+
+After buffer creation, `compile_static_set_pipeline()` compiles the selected graphics pipeline once for the task and binds three
+named storage buffers into the reflected shader contract:
+
+- `static_submeshes`
+- `static_nodes`
+- `static_instances`
+
+The task still uses shader reflection for material fallback textures. `get_default_image()` resolves the configured default
+material, and `GraphicsPipelineCompilerVK` binds any reflected texture and parameter resources needed by the selected pipeline.
+
+`build_static_set_draw_data()` then converts each drawable submesh into one `VkDrawIndexedIndirectCommand`. The command stores:
+
+- `indexCount` from the submesh's index view.
+- `firstIndex` from the index-view byte offset divided by `sizeof(uint32_t)`.
+- `vertexOffset` from the vertex-view byte offset divided by its stride.
+- `firstInstance` from the precomputed first-instance table.
+- `instanceCount` from the submesh's instance count.
+
+`build_indirect_buffer()` uploads that command array, and `build_non_empty_indirect_task()` packages the geometry buffer, indirect
+buffer, pipeline batch, attachment ids, clear values, and load ops into one `RTRunGraphicsPipelineIndirectVK`. During recording,
+`RTRunStaticSetVK::record()` delegates to that indirect task, which binds the compiled graphics pipeline, binds the cached binary
+buffer as vertex and index input, binds the pipeline-owned descriptor sets, and issues the indirect indexed draws.
 
 Before constructing the task:
 
-1. Load the mesh, materials, images, shaders, and graphics pipelines through `ResourceManager`.
-2. Store the mesh in `RenderDatabase` with `set_static_triangle_set()`.
-3. Call `RendererVK::update_static_triangle_set()` so the database contains the flattened vertices, indices, materials, and
-   graphics-pipeline batches consumed by the task.
-4. Create every attachment resource referenced by the task configuration. The swap-chain image view is represented in the
-   graph by a `REND_RES_SWAP_CHAIN_IMAGE` resource with a null object; the renderer resolves it for each frame.
-
-The default configuration draws to the swap chain at the swap-chain extent. It uses the graphics pipeline attached to each mesh
-material, the `default_material` fallback resource, and the `material_textures` and `material_params` shader variable names.
+1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
+2. Create every attachment resource referenced by the task configuration. The swap-chain image view is represented in the graph by
+  a `REND_RES_SWAP_CHAIN_IMAGE` resource with a null object; the renderer resolves it for each frame.
+3. Construct one `RTRunStaticSetVK` per set-plus-pipeline combination and order them explicitly with `RendTaskDescVK::after()`.
 
 ```cpp
 RendererVK* renderer = RendererVK::get_singleton();
 RenderAllocator* render_allocator = renderer->get_base_render_data()->allocator;
+ResourceManager* resource_manager = ResourceManager::get_singleton();
 
-RefRes<RUMesh3D> mesh = ResourceManager::get_singleton()->get_resource<RUMesh3D>("scene.mesh");
-renderer->get_render_database()->set_static_triangle_set(mesh.get());
-renderer->update_static_triangle_set();
+RefRes<RUStaticOpaqueSet> opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("scene.static_opaque_set");
+RefRes<RUGraphicsPipeline> opaque_pipeline = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
 
-RTRunStaticTriangleSetVK::Config config;
+RTRunStaticSetVK::Config config;
 config.set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
-auto task = make_unique<RTRunStaticTriangleSetVK>(render_allocator, renderer, config);
+auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer, opaque_set, opaque_pipeline, config);
 
 RendGraphDescVK graph_desc(render_allocator);
 graph_desc
-    .add_resource(REND_RES_SWAP_CHAIN_IMAGE,
-        TypeUUID<ROImageViewVK>::UUID,
-        Ref<RenderObjectContainerVK>(MEM_NULL))
-    .add_resource("scene_depth_view", TypeUUID<ROImageViewVK>::UUID, depth_image_view)
-    .add_task(RT_RUN_STATIC_OPAQUE, std::move(task));
+   .add_resource(REND_RES_SWAP_CHAIN_IMAGE,
+      TypeUUID<ROImageViewVK>::UUID,
+      Ref<RenderObjectContainerVK>(MEM_NULL))
+   .add_resource("scene_depth_view", TypeUUID<ROImageViewVK>::UUID, depth_image_view)
+   .add_task(RT_RUN_STATIC_SET, std::move(task));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
 ```
 
-The application adds only the color and depth attachment resources named in `Config`; the task retains its private rendering
-resources directly. The direct-task `RendTaskDescVK` constructor transfers unique ownership when the graph is built. Its factory is
-one-shot, matching the renderer's one-time descriptor build during `register_render_graph()`.
+The application contributes only graph-visible attachments and any later descriptor writes. The task retains its compiled Vulkan
+objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
 
-### Configuring Passes
+### Configuring Explicit Passes
 
-- `set_graphics_pipeline_resource_key()` replaces every material pipeline with one resource. When set, it takes precedence over
-  per-pipeline overrides.
-- `add_graphics_pipeline_override()` replaces only batches whose source pipeline key matches. Unmatched batches keep their material
-  pipeline.
 - `add_color_attachment()` adds color attachments in rendering order. With no explicit color attachment, the swap-chain image view
   and format are used.
 - `set_depth_attachment()` requires both a graph resource id and its Vulkan format. `set_render_extent()` overrides the swap-chain
   extent.
 - `add_clear_value()` follows attachment order: all color values first, then depth. Missing color values default to opaque black;
-  when depth is configured and only the color values are supplied, depth defaults to `1.0` and stencil to `0`.
-- Task ids and dependencies belong to `RendTaskDescVK`, not the task configuration.
+  when depth is configured and only the color values are supplied, depth defaults to `0.0` and stencil to `0`.
+- `set_color_attachment_load_op()` and `set_depth_attachment_load_op()` control how a follow-up task in the same logical pass
+  reuses attachments produced by an earlier task.
+- Task ids, resource usages, and dependencies belong to `RendTaskDescVK`, not the task configuration.
 
-For a shadow, G-buffer, or other replacement pass, set a single pipeline resource and the pass attachments:
+### Legacy Flattened Path
 
-```cpp
-RTRunStaticTriangleSetVK::Config config;
-config.set_graphics_pipeline_resource_key("deferred_gbuffer")
-    .add_color_attachment("gbuffer_albedo_view", VK_FORMAT_R8G8B8A8_SRGB)
-    .add_color_attachment("gbuffer_normal_view", VK_FORMAT_R16G16B16A16_SFLOAT)
-    .set_depth_attachment("gbuffer_depth_view", VK_FORMAT_D32_SFLOAT);
-```
+Older code used a compatibility path that started from `RUMesh3D` and `RenderDatabase::OpaqueTrianglesInfo`. That path relied on
+implicit batching by material pipeline and has been replaced by explicit `RTRunStaticSetVK` composition.
+
+The legacy upload path is different:
+
+1. `RenderDatabase::set_static_triangle_set()` calls `set_opaque_triangles_linear()`.
+2. `register_draw_group_submesh()` groups submeshes by source graphics pipeline, material, and exact vertex layout.
+3. `append_submesh_geometry()` copies vertex bytes into one flat `vertices` array and remaps indices into one flat `indices`
+  array.
+4. `RendererVK::update_static_triangle_set()` refreshes that flattened representation after mesh mutation.
+5. The old Vulkan task layer converted the flattened draw groups into one indirect draw stream with one compiled pipeline batch
+  per selected material pipeline or override target.
+
+This historical path is still useful for understanding older renderer/database code, but new work should use `RTRunStaticSetVK`
+and explicit task composition.
 
 ### Writing Pipeline-Owned Descriptors
 
-Material descriptors are populated during construction. Higher-level tasks such as `RTRunStaticTriangleSetVK` may still expose
-reflected descriptor fields for application-provided uniform or sampled resources, but the descriptor objects remain
-pipeline-owned:
+Material descriptors are populated during construction. Static-set tasks may still expose reflected descriptor fields for
+application-provided uniform or sampled resources, but the descriptor objects remain pipeline-owned.
+
+For `RTRunStaticSetVK`, field lookup is per-task because there is exactly one compiled pipeline:
 
 ```cpp
-for (size_t batch_index = 0; batch_index < task->get_compiled_batch_count(); ++batch_index) {
-    auto [set_index, binding] = task->get_descriptor_binding(batch_index, "camera_info");
-    task->write_descriptor_set(batch_index,
-        set_index,
-        RODescriptorSetVK::Writer()
-            .set_binding(binding)
-            .add_uniform_buffer_info(camera_buffer, 0, sizeof(CameraInfoVKUBO)));
-}
+auto [set_index, binding] = task->get_descriptor_binding("camera_info");
+task->write_descriptor_set(set_index,
+   RODescriptorSetVK::Writer()
+      .set_binding(binding)
+      .add_uniform_buffer_info(camera_buffer, 0, sizeof(CameraInfoVKUBO)));
 ```
 
 For frame-local buffers, pass the `ROCPerFrameVK` container instead of resolving one buffer manually. Pipeline descriptor writes are

@@ -20,19 +20,30 @@ ParameterBlock<LightParams> light;
 ParameterBlock<MaterialTextures> material_textures;
 
 /**
- * @brief Transform a textured vertex into clip space and pass per-vertex attributes through to the fragment stage.
- * @param p_input The incoming vertex attributes.
- * @return The vertex output for the forward Cook-Torrance PBR pass.
+ * @brief Static geometry tables shared by both pipeline stages.
+ */
+ParameterBlock<StaticSet> static_set;
+
+/**
+ * @brief Transform a static-set vertex and resolve its bindless material identifier.
+ * @param p_input Incoming vertex attributes.
+ * @param p_instance_id Index into static_set.instances.
+ * @return Vertex output in world and clip space.
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
+    InstanceData instance = static_set.instances[p_instance_id];
+    NodeData node = static_set.nodes[instance.node_index];
+    SubmeshData submesh = static_set.submeshes[instance.submesh_index];
+    float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
+    float3x3 direction_transform = (float3x3)node.transform;
+
     VSOutput output;
-    float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position = mul(camera_info.proj, mul(camera_info.view, world_position));
-    output.world_position = float4(p_input.position, float(p_instance_id));
-    output.normal = p_input.normal;
-    output.tangent = p_input.tangent;
-    output.bitangent = p_input.bitangent;
+    output.world_position = float4(world_position.xyz, float(submesh.material_id));
+    output.normal = transform_static_normal(node.transform, p_input.normal);
+    output.tangent = normalize(mul(direction_transform, p_input.tangent));
+    output.bitangent = normalize(mul(direction_transform, p_input.bitangent));
     output.uv = p_input.uv;
     if (light.light_count > 0) {
         output.light_space_pos = mul(light.lights[0].info.proj, mul(light.lights[0].info.view, world_position));
@@ -78,8 +89,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
  * @return The linear shaded color with alpha = 1.0.
  */
 float4 shade_fragment(VSOutput p_input, bool p_masked) {
-    // The instance id crosses the rasterizer in world_position.w. Round away interpolation error before using it as a table
-    // index.
+    // The submesh material id crosses the rasterizer in world_position.w. Round before using it as a table index.
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);

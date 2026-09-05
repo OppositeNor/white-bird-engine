@@ -9,13 +9,6 @@
             "metadata": "assets/shaders/deferred_gbuffer/deferred_gbuffer.json"
         },
         {
-            "id": "deferred_gbuffer_static_vertex_shader",
-            "source_type": "shader",
-            "src": "assets/shaders/deferred_gbuffer/deferred_gbuffer_static_vertex.slang",
-            "dst": "assets/shaders/deferred_gbuffer/deferred_gbuffer_static_vertex.spv",
-            "metadata": "assets/shaders/deferred_gbuffer/deferred_gbuffer_static_vertex.json"
-        },
-        {
             "id": "deferred_gbuffer",
             "type": "graphics_pipeline",
             "vertex_stage_id": "deferred_gbuffer_shader",
@@ -27,7 +20,7 @@
         {
             "id": "deferred_gbuffer_static",
             "type": "graphics_pipeline",
-            "vertex_stage_id": "deferred_gbuffer_static_vertex_shader",
+            "vertex_stage_id": "deferred_gbuffer_shader",
             "fragment_stage_id": "deferred_gbuffer_shader",
             "depth_test": true,
             "depth_write": true,

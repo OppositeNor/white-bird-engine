@@ -27,10 +27,13 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/rt_run_static_triangle_set_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -41,18 +44,70 @@ inline constexpr std::string_view RT_RUN_STATIC_SET = "run_static_set";
 
 /**
  * @class RTRunStaticSetVK
- * @brief Minimal Vulkan bridge for explicit static-geometry set tasks.
+ * @brief Vulkan render task for an explicit static geometry set and graphics pipeline.
  *
- * This bridge reuses the existing static-opaque attachment Config surface so callers can move to the explicit static-set
- * task API before the Vulkan geometry upload and draw path is implemented. Empty sets record a no-draw rendering pass
- * that still honors attachment load and clear operations. Recording a non-empty set currently throws.
+ * The caller supplies the source geometry set and the graphics pipeline explicitly. Empty sets record a no-draw
+ * rendering pass that still honors attachment load and clear operations. Non-empty sets compile one graphics pipeline,
+ * retain descriptor bindings, and record indirect indexed draws from the set's declared submesh order.
  */
 class RTRunStaticSetVK final : public RenderTaskVK {
 public:
-    /** @brief Reused attachment and material-contract configuration. */
-    using Config = RTRunStaticTriangleSetVK::Config;
-    /** @brief Reflected descriptor location within the compiled static-set pipeline. */
-    using DescriptorBinding = RTRunStaticTriangleSetVK::DescriptorBinding;
+    /**
+     * @class Config
+     * @brief Attachment configuration and compatibility material-contract settings for the task.
+     */
+    class Config {
+    public:
+        Config& set_default_material_resource_key(std::string_view p_resource_key);
+        Config& set_material_textures_variable_name(std::string_view p_variable_name);
+        Config& set_material_params_variable_name(std::string_view p_variable_name);
+        Config& set_render_extent(VkExtent2D p_render_extent);
+        Config& add_color_attachment(std::string_view p_resource_id, VkFormat p_format);
+        Config& set_depth_attachment(std::string_view p_resource_id, VkFormat p_format);
+        Config& set_stencil_attachment_format(VkFormat p_format);
+        Config& add_clear_value(VkClearValue p_clear_value);
+        Config& set_color_attachment_load_op(VkAttachmentLoadOp p_load_op);
+        Config& set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op);
+
+        std::string_view get_default_material_resource_key() const;
+        std::string_view get_material_textures_variable_name() const;
+        std::string_view get_material_params_variable_name() const;
+        VkExtent2D get_render_extent() const;
+        size_t get_color_attachment_count() const;
+        std::string_view get_color_attachment_id(size_t p_index) const;
+        VkFormat get_color_attachment_format(size_t p_index) const;
+        bool has_depth_attachment() const;
+        std::string_view get_depth_attachment_id() const;
+        VkFormat get_depth_attachment_format() const;
+        VkFormat get_stencil_attachment_format() const;
+        size_t get_clear_value_count() const;
+        VkClearValue get_clear_value(size_t p_index) const;
+        VkAttachmentLoadOp get_color_attachment_load_op() const;
+        VkAttachmentLoadOp get_depth_attachment_load_op() const;
+
+    private:
+        std::string default_material_resource_key = "default_material";
+        std::string material_textures_variable_name = "material_textures";
+        std::string material_params_variable_name = "material_params";
+        VkExtent2D render_extent{};
+        std::vector<std::string> color_attachment_ids;
+        std::optional<std::string> depth_attachment_id;
+        std::vector<VkFormat> color_attachment_formats;
+        VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED;
+        VkFormat stencil_attachment_format = VK_FORMAT_UNDEFINED;
+        std::vector<VkClearValue> clear_values;
+        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    };
+
+    /**
+     * @struct DescriptorBinding
+     * @brief Reflected descriptor location within the compiled static-set pipeline.
+     */
+    struct DescriptorBinding {
+        uint32_t set_index;
+        uint32_t binding;
+    };
 
     RTRunStaticSetVK() = delete;
     virtual ~RTRunStaticSetVK() override = default;
@@ -64,13 +119,14 @@ public:
     /**
      * @brief Construct an explicit static-set task.
      *
-     * The task retains the source static-geometry set and the selected graphics-pipeline resource for the future full
-     * Vulkan implementation. The current bridge supports empty-set passes only.
+     * The task retains the source static-geometry set and the selected graphics-pipeline resource. For non-empty sets it
+     * builds one compiled pipeline and one indirect draw task. Callers that need multiple pipelines for one logical pass
+     * must compose multiple render-graph tasks explicitly.
      *
      * @param p_renderer Renderer providing Vulkan state.
      * @param p_set Static geometry set resource to render.
-     * @param p_graphics_pipeline Graphics pipeline resource selected by the caller.
-     * @param p_config Attachment and material-contract configuration.
+     * @param p_graphics_pipeline Graphics pipeline resource selected by the caller for this task instance.
+     * @param p_config Attachment configuration and compatibility material-contract settings.
      */
     RTRunStaticSetVK(
         RendererVK* p_renderer, RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline, const Config& p_config);

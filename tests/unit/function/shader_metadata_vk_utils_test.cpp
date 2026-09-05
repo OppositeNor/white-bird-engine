@@ -181,17 +181,18 @@ TEST(WBEShaderMetadataVKUtilsTest, MapsReadWriteTextureResourcesToStorageImageDe
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, MapsStorageBuffersToStorageBufferDescriptors) {
-    ShaderMetadataParameter instance_buffer;
-    instance_buffer.name = "static_instances";
+    ShaderMetadataParameter static_set;
+    static_set.name = "static_set";
+    static_set.binding.kind = "subElementRegisterSpace";
+    static_set.binding.index = 1;
+    static_set.type.kind = "parameterBlock";
+
+    ShaderMetadataTypeField instance_buffer;
+    instance_buffer.name = "instances";
     instance_buffer.binding.kind = "descriptorTableSlot";
     instance_buffer.binding.index = 0;
-    instance_buffer.type.kind = "structuredBuffer";
-
-    ShaderMetadataParameter draw_info_block;
-    draw_info_block.name = "static_draw_info";
-    draw_info_block.binding.kind = "subElementRegisterSpace";
-    draw_info_block.binding.index = 1;
-    draw_info_block.type.kind = "parameterBlock";
+    instance_buffer.type.kind = "resource";
+    instance_buffer.type.scalar_type = "structuredBuffer";
 
     ShaderMetadataTypeField draw_infos;
     draw_infos.name = "draws";
@@ -200,11 +201,11 @@ TEST(WBEShaderMetadataVKUtilsTest, MapsStorageBuffersToStorageBufferDescriptors)
     draw_infos.type.kind = "array";
     draw_infos.type.element_count = 1;
     draw_infos.type.element_scalar_type = "structuredBuffer";
-    draw_info_block.type.fields.push_back(draw_infos);
+    static_set.type.fields.push_back(instance_buffer);
+    static_set.type.fields.push_back(draw_infos);
 
     ShaderMetadata metadata;
-    metadata.parameters.push_back(instance_buffer);
-    metadata.parameters.push_back(draw_info_block);
+    metadata.parameters.push_back(static_set);
     ShaderMetadataEntryPoint entry_point;
     entry_point.name = "vertex_main";
     entry_point.stage = "vertex";
@@ -215,7 +216,11 @@ TEST(WBEShaderMetadataVKUtilsTest, MapsStorageBuffersToStorageBufferDescriptors)
     ASSERT_EQ(bindings.size(), 2U);
     EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_VERTEX_BIT);
+    EXPECT_EQ(bindings[0].parameter_name, "static_set.instances");
+    EXPECT_EQ(bindings[0].set_index, 1U);
+    EXPECT_EQ(bindings[0].layout_binding.binding, 0U);
     EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    EXPECT_EQ(bindings[1].parameter_name, "static_set.draws");
     EXPECT_EQ(bindings[1].set_index, 1U);
     EXPECT_EQ(bindings[1].layout_binding.binding, 2U);
 }

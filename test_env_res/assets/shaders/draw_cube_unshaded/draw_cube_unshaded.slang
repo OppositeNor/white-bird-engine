@@ -42,18 +42,25 @@ struct Vertex3DUnshadedInput {
 ConstantBuffer<CameraInfo> camera_info;
 
 /**
- * @brief Transform a textured vertex into clip space and forward the normal and uv attributes to the fragment stage.
- * @param p_input The incoming vertex attributes.
- * @return The vertex output for the unshaded cube debug pass.
+ * @brief Static geometry tables shared by both pipeline stages.
+ */
+ParameterBlock<StaticSet> static_set;
+
+/**
+ * @brief Transform an unshaded static-set vertex into clip space.
+ * @param p_input Incoming vertex attributes.
+ * @param p_instance_id Index into static_set.instances.
+ * @return Vertex output for the unshaded fragment stage.
  */
 [shader("vertex")]
-VSOutput vertex_main(Vertex3DUnshadedInput p_input) {
+VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
+    InstanceData instance = static_set.instances[p_instance_id];
+    NodeData node = static_set.nodes[instance.node_index];
+    float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     VSOutput output;
-    float4 pos = float4(p_input.position.xyz, 1.0);
-    output.position = mul(camera_info.proj, mul(camera_info.view, pos));
-    output.normal = p_input.normal;
+    output.position = mul(camera_info.proj, mul(camera_info.view, world_position));
+    output.normal = transform_static_normal(node.transform, p_input.normal);
     output.uv = p_input.uv;
-
     return output;
 }
 

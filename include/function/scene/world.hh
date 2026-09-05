@@ -142,24 +142,6 @@ public:
     }
 
     /**
-     * @brief Set the non-owning static opaque mesh resource.
-     *
-     * @param p_mesh The non-owning mesh resource to publish for rendering.
-     */
-    void set_static_opaque_mesh(RefRes<RUMesh3D> p_mesh) {
-        static_opaque_mesh = p_mesh;
-    }
-
-    /**
-     * @brief Get the non-owning static opaque mesh resource.
-     *
-     * @return The non-owning static opaque mesh resource, or null when no mesh is set.
-     */
-    RefRes<RUMesh3D> get_static_opaque_mesh() const {
-        return static_opaque_mesh;
-    }
-
-    /**
      * @brief Set the non-owning static opaque set resource.
      *
      * @param p_set The non-owning static opaque set resource to publish for rendering.
@@ -203,7 +185,6 @@ private:
     HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
     HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
     String<HeapAllocatorDefault> render_graph_resource_key;
-    RefRes<RUMesh3D> static_opaque_mesh;
     RefRes<RUStaticOpaqueSet> static_opaque_set;
     RefRes<RUStaticMaskedSet> static_masked_set;
 };

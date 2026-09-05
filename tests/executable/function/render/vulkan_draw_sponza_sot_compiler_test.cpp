@@ -145,7 +145,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     auto resource_chunk = make_ref<ResourceChunkLoadFile>(
         global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
-    sponza_set = resource_manager->get_resource<RUStaticOpaqueSet>("sponza_static.static_opaque_set");
+    sponza_set = resource_manager->get_resource<RUStaticOpaqueSet>("sponza.static_opaque_set");
     if (sponza_set == nullptr) {
         throw std::runtime_error("Failed to setup indirect Sponza test: static opaque set resource was not found.");
     }

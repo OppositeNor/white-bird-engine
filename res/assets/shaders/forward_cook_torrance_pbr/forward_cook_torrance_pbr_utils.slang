@@ -28,19 +28,19 @@ struct VSOutput {
      */
     float4 position         : SV_Position;
     /**
- * @brief World-space position in xyz. The w component stores the draw instance id used as the material table location.
+ * @brief World-space position in xyz. The w component stores the submesh material id used as the material table location.
      */
     float4 world_position   : TEXCOORD0;
     /**
- * @brief Object-space normal interpolated from the vertex attribute.
+ * @brief World-space normal transformed from the vertex attribute.
      */
     float3 normal           : TEXCOORD1;
     /**
- * @brief Object-space tangent interpolated from the vertex attribute.
+ * @brief World-space tangent transformed from the vertex attribute.
      */
     float3 tangent          : TEXCOORD2;
     /**
- * @brief Object-space bitangent interpolated from the vertex attribute.
+ * @brief World-space bitangent transformed from the vertex attribute.
      */
     float3 bitangent        : TEXCOORD3;
     /**

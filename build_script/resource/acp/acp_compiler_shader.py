@@ -215,7 +215,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
         ])
         if build_setup.build_target["generate-tests"]:
             cmd.extend(["-g3"])
-        print("Compiling:", shader_file)
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print("Failed to compile", shader_file)

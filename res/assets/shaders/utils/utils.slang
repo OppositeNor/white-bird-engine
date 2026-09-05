@@ -135,12 +135,30 @@ struct NodeData {
 
 /** Per-drawn-instance metadata linking one submesh to one node transform. */
 struct InstanceData {
-    /** Index into the static_submeshes storage buffer. */
+    /** Index into the static_set.submeshes storage buffer. */
     uint submesh_index;
-    /** Index into the static_nodes storage buffer. */
+    /** Index into the static_set.nodes storage buffer. */
     uint node_index;
     uint padding_0;
     uint padding_1;
+};
+
+/**
+ * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
+ */
+struct StaticSet {
+    /**
+     * @brief Material table identifiers indexed by InstanceData.submesh_index.
+     */
+    StructuredBuffer<SubmeshData> submeshes;
+    /**
+     * @brief Object-to-world transforms indexed by InstanceData.node_index.
+     */
+    StructuredBuffer<NodeData> nodes;
+    /**
+     * @brief Draw instances indexed by SV_VulkanInstanceID, including the indirect firstInstance offset.
+     */
+    StructuredBuffer<InstanceData> instances;
 };
 
 /**

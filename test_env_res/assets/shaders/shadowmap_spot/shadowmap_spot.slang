@@ -28,14 +28,21 @@ struct ShadowVSOutput {
 ConstantBuffer<CameraInfo> light_camera_info;
 
 /**
- * @brief Transform a vertex into the spot light's clip space for depth-only rendering.
- * @param p_input The incoming vertex attributes.
- * @return The clip-space vertex output for the shadow map pass.
+ * @brief Static geometry tables shared by both pipeline stages.
+ */
+ParameterBlock<StaticSet> static_set;
+
+/**
+ * @brief Transform a static-set vertex into spot-light clip space.
+ * @param p_input Incoming vertex attributes.
+ * @param p_instance_id Index into static_set.instances.
+ * @return Clip-space vertex output.
  */
 [shader("vertex")]
-ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input) {
+ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
+    InstanceData instance = static_set.instances[p_instance_id];
+    float4 world_position = mul(static_set.nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
     ShadowVSOutput output;
-    float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position = mul(light_camera_info.proj, mul(light_camera_info.view, world_position));
     return output;
 }

@@ -386,11 +386,11 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
             {
                 "material_id": "material_01",
                 "vertices": {
-                    "binary": {"binary_id": "static_set_01.geometry", "start": 0, "size": 36},
+                    "binary": {"binary_id": "static_set_01.vertices", "start": 0, "size": 36},
                     "stride": 12,
                     "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
                 },
-                "indices": {"binary": {"binary_id": "static_set_01.geometry", "start": 36, "size": 12}},
+                "indices": {"binary": {"binary_id": "static_set_01.indices", "start": 0, "size": 12}},
                 "first_instance": 1,
                 "instance_count": 2
             }
@@ -410,10 +410,11 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
     ASSERT_EQ(scheme.submeshes.size(), 1U);
     ASSERT_TRUE(scheme.submeshes[0].material_id.has_value());
     ASSERT_EQ(scheme.submeshes[0].material_id.value(), "material_01");
-    ASSERT_EQ(scheme.submeshes[0].vertices.binary.binary_id, "static_set_01.geometry");
+    ASSERT_EQ(scheme.submeshes[0].vertices.binary.binary_id, "static_set_01.vertices");
     ASSERT_EQ(scheme.submeshes[0].vertices.stride, 12U);
     ASSERT_EQ(scheme.submeshes[0].vertices.attributes[0].role, "position");
-    ASSERT_EQ(scheme.submeshes[0].indices.binary.start, 36U);
+    ASSERT_EQ(scheme.submeshes[0].indices.binary.binary_id, "static_set_01.indices");
+    ASSERT_EQ(scheme.submeshes[0].indices.binary.start, 0U);
     ASSERT_EQ(scheme.submeshes[0].first_instance, 1U);
     ASSERT_EQ(scheme.submeshes[0].instance_count, 2U);
     ASSERT_EQ(scheme.instances.size(), 2U);

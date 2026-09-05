@@ -24,7 +24,7 @@ struct VSOutput {
      */
     float4 position : SV_Position;
     /**
- * @brief Object-space normal interpolated from the vertex attribute.
+ * @brief World-space normal transformed from the vertex attribute.
      */
     float3 normal   : TEXCOORD0;
     /**

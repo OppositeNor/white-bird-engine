@@ -31,15 +31,15 @@ struct VSOutput {
      */
     float4 world_position : TEXCOORD0;
     /**
- * @brief Object-space normal interpolated from the vertex attribute.
+ * @brief World-space normal transformed from the vertex attribute.
      */
     float3 normal         : TEXCOORD1;
     /**
- * @brief Object-space tangent interpolated from the vertex attribute.
+ * @brief World-space tangent transformed from the vertex attribute.
      */
     float3 tangent        : TEXCOORD2;
     /**
- * @brief Object-space bitangent interpolated from the vertex attribute.
+ * @brief World-space bitangent transformed from the vertex attribute.
      */
     float3 bitangent      : TEXCOORD3;
     /**

@@ -25,13 +25,25 @@ ConstantBuffer<CameraInfo> light_camera_info;
 ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<MaterialTextures> material_textures;
 
+/**
+ * @brief Static geometry tables shared by both pipeline stages.
+ */
+ParameterBlock<StaticSet> static_set;
+
+/**
+ * @brief Transform a masked static-set vertex and resolve its material identifier.
+ * @param p_input Incoming vertex attributes.
+ * @param p_instance_id Index into static_set.instances.
+ * @return Clip-space vertex output with material metadata.
+ */
 [shader("vertex")]
 MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
+    InstanceData instance = static_set.instances[p_instance_id];
+    float4 world_position = mul(static_set.nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
     MaskedShadowVSOutput output;
-    float4 world_position = float4(p_input.position.xyz, 1.0);
     output.position = mul(light_camera_info.proj, mul(light_camera_info.view, world_position));
     output.uv = p_input.uv;
-    output.material_index = float(p_instance_id);
+    output.material_index = float(static_set.submeshes[instance.submesh_index].material_id);
     return output;
 }
 
@@ -48,4 +60,3 @@ float4 fragment_main(MaskedShadowVSOutput p_input) : SV_Target0 {
     }
     return float4(0.0, 0.0, 0.0, 1.0);
 }
-
