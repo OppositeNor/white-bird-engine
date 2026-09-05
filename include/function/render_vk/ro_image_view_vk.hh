@@ -50,7 +50,8 @@ public:
             .b = VK_COMPONENT_SWIZZLE_IDENTITY,
             .a = VK_COMPONENT_SWIZZLE_IDENTITY};
         // Subresource range.
-        VkImageSubresourceRange subresource_range{.baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+        VkImageSubresourceRange subresource_range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 
         // Set the source image.
         Builder& set_image(Ref<ROImageVK> p_image);
@@ -64,6 +65,10 @@ public:
         Builder& set_components(VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a);
         // Set subresource range.
         Builder& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
+        // Set aspect mask of the subresource range.
+        Builder& set_aspect_mask(VkImageAspectFlags p_aspect_mask);
+        // Set mip level count.
+        Builder& set_mip_level_count(uint32_t p_level_count);
         // Set from image configurations. All features are default to match to
         // the image config.
         Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/allocator/stack_allocator.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"

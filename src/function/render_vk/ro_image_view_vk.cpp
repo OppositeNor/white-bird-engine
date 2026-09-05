@@ -19,7 +19,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -58,6 +57,16 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(
 
 ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkImageSubresourceRange& p_subresource_range) {
     subresource_range = p_subresource_range;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_aspect_mask(VkImageAspectFlags p_aspect_mask) {
+    subresource_range.aspectMask = p_aspect_mask;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_mip_level_count(uint32_t p_level_count) {
+    subresource_range.levelCount = p_level_count;
     return *this;
 }
 

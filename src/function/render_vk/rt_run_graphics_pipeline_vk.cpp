@@ -37,6 +37,14 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+        const glm::vec4& p_clear_color,
+        VkExtent2D p_render_extent,
+        std::string_view p_color_attachment_id,
+        std::string_view p_pipeline_id,
+        VkAttachmentLoadOp p_color_attachment_load_op)
+    : RTRunGraphicsPipelineVK(p_render_data, p_clear_color, p_render_extent, p_color_attachment_id,
+            p_pipeline_id, std::nullopt, std::nullopt, std::nullopt, p_color_attachment_load_op) {}
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
     const glm::vec4& p_clear_color,
@@ -214,7 +222,8 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
         }
         vkCmdDrawIndexed(p_command_buffer, index_count, 1, first_index, vertex_offset, 0);
     } else {
-        // Screen-triangle / no vertex binding case.
+        // No vertex binding case. In some cases, such as terrain rendering, or screen triangle, we
+        // don't have a vertex/index buffer as input.
         if (render_data->command_set_vertex_input == nullptr) {
             throw std::runtime_error("RTRunGraphicsPipelineVK: dynamic vertex-input command is unavailable.");
         }

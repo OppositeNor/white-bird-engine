@@ -67,7 +67,6 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
-#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -114,9 +113,7 @@ constexpr std::string_view REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW = "direct_li
 constexpr std::string_view REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
 constexpr std::string_view REND_RES_TEST_POST_PROCESSED_IMAGE_VIEW = "post_processed";
 inline constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
-inline constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_MASKED = "run_gbuffer_masked";
 inline constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
-inline constexpr std::string_view RT_RUN_DEFERRED_SHADOW_MASKED = "run_shadow_masked";
 inline constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
 inline constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL = "build_shadow_sat_horizontal";
 inline constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL = "build_shadow_sat_vertical";
@@ -187,9 +184,7 @@ private:
     void register_deferred_render_graph(std::string_view p_graph_id,
         bool p_use_summed_area_table,
         Unique<RTRunStaticSetVK>& p_shadow_opaque_task,
-        Unique<RTRunStaticSetVK>& p_shadow_masked_task,
-        Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task,
-        Unique<RTRunStaticSetVK>& p_gbuffer_masked_task);
+        Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_horizontal_task_desc() const;
@@ -204,11 +199,8 @@ private:
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUStaticOpaqueSet> sponza_opaque_set;
-    RefRes<RUStaticMaskedSet> sponza_masked_set;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
-    RefRes<RUGraphicsPipeline> shadow_masked_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
-    RefRes<RUGraphicsPipeline> gbuffer_masked_pipeline_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_horizontal_shader_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
     RefRes<RUShader> direct_lighting_shader_resource;
@@ -461,36 +453,28 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
-    auto mipmap_shadow_masked_task = compile_shadow_task(sponza_masked_set, shadow_masked_pipeline_resource, true);
     auto summed_area_table_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
-    auto summed_area_table_shadow_masked_task = compile_shadow_task(sponza_masked_set, shadow_masked_pipeline_resource, true);
     auto mipmap_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
-    auto mipmap_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_masked_pipeline_resource, true);
     auto summed_area_table_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
-    auto summed_area_table_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_masked_pipeline_resource, true);
-    std::array<RTRunStaticSetVK*, 4> gbuffer_tasks{mipmap_gbuffer_opaque_task.get(),
-        mipmap_gbuffer_masked_task.get(),
+    std::array<RTRunStaticSetVK*, 2> gbuffer_tasks {
+        mipmap_gbuffer_opaque_task.get(),
         summed_area_table_gbuffer_opaque_task.get(),
-        summed_area_table_gbuffer_masked_task.get()};
-    std::array<RTRunStaticSetVK*, 4> shadow_tasks{mipmap_shadow_opaque_task.get(),
-        mipmap_shadow_masked_task.get(),
+    };
+    std::array<RTRunStaticSetVK*, 2> shadow_tasks {
+        mipmap_shadow_opaque_task.get(),
         summed_area_table_shadow_opaque_task.get(),
-        summed_area_table_shadow_masked_task.get()};
+    };
     write_dynamic_camera_descriptors(gbuffer_tasks);
     write_dynamic_light_descriptors(shadow_tasks);
     register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH,
         false,
         mipmap_shadow_opaque_task,
-        mipmap_shadow_masked_task,
-        mipmap_gbuffer_opaque_task,
-        mipmap_gbuffer_masked_task);
+        mipmap_gbuffer_opaque_task);
     register_deferred_render_graph(
         DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH,
         true,
         summed_area_table_shadow_opaque_task,
-        summed_area_table_shadow_masked_task,
-        summed_area_table_gbuffer_opaque_task,
-        summed_area_table_gbuffer_masked_task);
+        summed_area_table_gbuffer_opaque_task);
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
@@ -525,29 +509,17 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
-    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("sponza.static_opaque_set");
+    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("intel_sponza.static_opaque_set");
     if (sponza_opaque_set == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: static opaque set resource was not found.");
-    }
-    sponza_masked_set = resource_manager->get_resource<RUStaticMaskedSet>("sponza.static_masked_set");
-    if (sponza_masked_set == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: static masked set resource was not found.");
     }
     shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_static");
     if (shadow_opaque_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: 'rsm_spot_static' graphics pipeline resource not found.");
     }
-    shadow_masked_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_masked_static");
-    if (shadow_masked_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'rsm_spot_masked_static' graphics pipeline resource not found.");
-    }
     gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
     if (gbuffer_opaque_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: 'deferred_gbuffer_static' graphics pipeline resource not found.");
-    }
-    gbuffer_masked_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_masked_static");
-    if (gbuffer_masked_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'deferred_gbuffer_masked_static' graphics pipeline resource not found.");
     }
     shadow_moments_summed_area_table_horizontal_shader_resource =
         resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_horizontal_shader");
@@ -625,64 +597,42 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
                                                  .image_2d(shadow_extent)
                                                  .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                                  .create_ref(base_render_data);
-
-    VkImageSubresourceRange depth_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
-    VkImageSubresourceRange color_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
     shadow_depth_view = ROImageViewVK::Builder()
                             .set_image(shadow_depth_image)
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                            .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
                             .set_format(SHADOWMAP_DEPTH_FORMAT)
-                            .set_subresource_range(depth_subresource)
                             .create_ref(base_render_data);
     shadow_color_view = ROImageViewVK::Builder()
                             .set_image(shadow_color_image)
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                             .set_format(RSM_FLUX_FORMAT)
-                            .set_subresource_range(color_subresource)
                             .create_ref(base_render_data);
     shadow_normal_view = ROImageViewVK::Builder()
                              .set_image(shadow_normal_image)
                              .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                              .set_format(RSM_NORMAL_FORMAT)
-                             .set_subresource_range(color_subresource)
                              .create_ref(base_render_data);
     shadow_moments_attachment_view = ROImageViewVK::Builder()
                                          .set_image(shadow_moments_image)
                                          .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                          .set_format(SHADOW_MOMENTS_FORMAT)
-                                         .set_subresource_range(color_subresource)
                                          .create_ref(base_render_data);
-    VkImageSubresourceRange moments_sampled_subresource = color_subresource;
-    moments_sampled_subresource.levelCount = shadow_mipmap_level_count;
     shadow_moments_sampled_view = ROImageViewVK::Builder()
                                       .set_image(shadow_moments_image)
                                       .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                       .set_format(SHADOW_MOMENTS_FORMAT)
-                                      .set_subresource_range(moments_sampled_subresource)
+                                      .set_mip_level_count(shadow_mipmap_level_count)
                                       .create_ref(base_render_data);
     shadow_moments_summed_area_table_horizontal_view = ROImageViewVK::Builder()
                                                            .set_image(shadow_moments_summed_area_table_horizontal_image)
                                                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                                            .set_format(SHADOW_MOMENTS_FORMAT)
-                                                           .set_subresource_range(color_subresource)
                                                            .create_ref(base_render_data);
     shadow_moments_summed_area_table_view = ROImageViewVK::Builder()
                                                 .set_image(shadow_moments_summed_area_table_image)
                                                 .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                                 .set_format(SHADOW_MOMENTS_FORMAT)
-                                                .set_subresource_range(color_subresource)
                                                 .create_ref(base_render_data);
     shadow_sampler = ROSamplerVK::Builder()
                          .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
@@ -714,44 +664,26 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
                               .image_2d(extent)
                               .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                               .create_ref(base_render_data);
-
-    VkImageSubresourceRange color_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
-    VkImageSubresourceRange depth_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
     gbuffer_albedo_view = ROImageViewVK::Builder()
                               .set_image(gbuffer_albedo_image)
                               .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                               .set_format(GBUFFER_ALBEDO_FORMAT)
-                              .set_subresource_range(color_subresource)
                               .create_ref(base_render_data);
     gbuffer_normal_view = ROImageViewVK::Builder()
                               .set_image(gbuffer_normal_image)
                               .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                               .set_format(GBUFFER_NORMAL_FORMAT)
-                              .set_subresource_range(color_subresource)
                               .create_ref(base_render_data);
     gbuffer_rma_view = ROImageViewVK::Builder()
                            .set_image(gbuffer_rma_image)
                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                            .set_format(GBUFFER_RMA_FORMAT)
-                           .set_subresource_range(color_subresource)
                            .create_ref(base_render_data);
     gbuffer_depth_view = ROImageViewVK::Builder()
                              .set_image(gbuffer_depth_image)
                              .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                              .set_format(GBUFFER_DEPTH_FORMAT)
-                             .set_subresource_range(depth_subresource)
+                             .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
                              .create_ref(base_render_data);
     gbuffer_sampler = ROSamplerVK::Builder()
                           .set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST)
@@ -761,13 +693,6 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
 
 void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     VkExtent2D extent = base_render_data->swap_chain_extent;
-    VkImageSubresourceRange color_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
     direct_lighting_image = ROImageVK::Builder()
                                 .set_format(LIGHTING_OUTPUT_FORMAT)
                                 .image_2d(extent)
@@ -787,19 +712,16 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                                .set_image(direct_lighting_image)
                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                .set_format(LIGHTING_OUTPUT_FORMAT)
-                               .set_subresource_range(color_subresource)
                                .create_ref(base_render_data);
     indirect_lighting_view = ROImageViewVK::Builder()
                                  .set_image(indirect_lighting_image)
                                  .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                  .set_format(LIGHTING_OUTPUT_FORMAT)
-                                 .set_subresource_range(color_subresource)
                                  .create_ref(base_render_data);
     post_processed_view = ROImageViewVK::Builder()
                               .set_image(post_processed_image)
                               .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                               .set_format(LIGHTING_OUTPUT_FORMAT)
-                              .set_subresource_range(color_subresource)
                               .create_ref(base_render_data);
     lighting_sampler = ROSamplerVK::Builder()
                            .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
@@ -1056,15 +978,10 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::string_view p_graph_id,
     bool p_use_summed_area_table,
     Unique<RTRunStaticSetVK>& p_shadow_opaque_task,
-    Unique<RTRunStaticSetVK>& p_shadow_masked_task,
-    Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task,
-    Unique<RTRunStaticSetVK>& p_gbuffer_masked_task) {
+    Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
     pipeline_desc.add_task(RT_RUN_DEFERRED_SHADOW_OPAQUE, std::move(p_shadow_opaque_task));
-    RendTaskDescVK shadow_masked_task_desc(render_allocator, RT_RUN_DEFERRED_SHADOW_MASKED, std::move(p_shadow_masked_task));
-    shadow_masked_task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
-    pipeline_desc.add_task(std::move(shadow_masked_task_desc));
     if (p_use_summed_area_table) {
         pipeline_desc.add_task(create_shadow_moments_summed_area_table_horizontal_task_desc())
             .add_task(create_shadow_moments_summed_area_table_vertical_task_desc());
@@ -1072,11 +989,9 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
         pipeline_desc.add_task(create_shadow_mipmap_task_desc());
     }
     RendTaskDescVK gbuffer_opaque_task_desc(render_allocator, RT_RUN_DEFERRED_GBUFFER, std::move(p_gbuffer_opaque_task));
-    gbuffer_opaque_task_desc.after(RT_RUN_DEFERRED_SHADOW_MASKED);
+    gbuffer_opaque_task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     pipeline_desc.add_task(std::move(gbuffer_opaque_task_desc));
-    RendTaskDescVK gbuffer_masked_task_desc(render_allocator, RT_RUN_DEFERRED_GBUFFER_MASKED, std::move(p_gbuffer_masked_task));
-    gbuffer_masked_task_desc.after(RT_RUN_DEFERRED_GBUFFER);
-    pipeline_desc.add_task(std::move(gbuffer_masked_task_desc))
+    pipeline_desc
         .add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_indirect_lighting_task_desc())
         .add_task(create_post_processing_task_desc())
@@ -1115,7 +1030,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_horizontal_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_MASKED)
+    task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE)
         .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .write(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
@@ -1137,7 +1052,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_MASKED);
+    task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
@@ -1177,7 +1092,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_desc(bool p_use_summed_area_table) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER_MASKED)
+    task_desc.after(RT_RUN_DEFERRED_GBUFFER)
         .after(p_use_summed_area_table ? RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL : RT_GENERATE_SHADOW_MIPMAPS)
         .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -1208,7 +1123,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER_MASKED)
+    task_desc.after(RT_RUN_DEFERRED_GBUFFER)
         .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -1263,12 +1178,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_post_processing_
             task_base_render_data->swap_chain_extent,
             REND_RES_SWAP_CHAIN_IMAGE,
             REND_RES_TEST_PRESENT_POST_PROCESSING_GRAPHICS_PIPELINE,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt,
-            VK_ATTACHMENT_LOAD_OP_CLEAR,
-            VertexInputDescriptionVK{},
-            0);
+            VK_ATTACHMENT_LOAD_OP_CLEAR);
     };
     return task_desc;
 }
