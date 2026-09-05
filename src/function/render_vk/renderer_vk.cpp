@@ -25,6 +25,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
@@ -39,7 +40,9 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
@@ -178,7 +181,6 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     base_render_data.current_swap_chain_index = image_index;
     p_graph->set_resource(
         REND_RES_SWAP_CHAIN_IMAGE, make_ref<ROCSingleVK>(allocator, render_objects->swap_chain_image_views[image_index]));
-    set_graph_static_opaque_resources(p_graph);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
@@ -389,7 +391,6 @@ void RendererVK::create_instance() {
             })) {
         throw std::runtime_error("Required Vulkan instance extensions are not supported.");
     }
-
     create_info.enabledExtensionCount = required_extensions.size();
     create_info.ppEnabledExtensionNames = required_extensions.data();
 
@@ -420,8 +421,9 @@ void RendererVK::create_device(RendererCapabilities& p_capabilities) {
 void RendererVK::create_vma_allocator() {
     VmaAllocatorCreateFlags allocator_flags = 0;
     for (auto& plugin : registered_plugins) {
-        if ((plugin->get_static_opaque_vertex_buffer_usage() & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0 ||
-            (plugin->get_static_opaque_index_buffer_usage() & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0) {
+        StaticGeometryBufferUsageVK buffer_usage = plugin->get_static_geometry_buffer_usage();
+        if ((buffer_usage.vertex_buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0 ||
+            (buffer_usage.index_buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0) {
             allocator_flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
         }
     }
@@ -1205,14 +1207,10 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
             RendResVK{.res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
     };
     declare_runtime_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID);
-    declare_runtime_resource(REND_RES_STATIC_VERTICES, TypeUUID<ROBufferVK>::UUID);
-    declare_runtime_resource(REND_RES_STATIC_INDICES, TypeUUID<ROBufferVK>::UUID);
-    declare_runtime_resource(REND_RES_STATIC_OBJECT_IDS, TypeUUID<ROBufferVK>::UUID);
 
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     graph->build_from_descriptor(*desc_ref);
-    set_graph_static_opaque_resources(graph);
 
     render_graphs.emplace(std::string(p_resource_key),
         RegisteredRenderGraph{
@@ -1262,7 +1260,6 @@ void RendererVK::activate_render_graph(std::string_view p_resource_key) {
     }
 
     active_graph = graph_entry->second.graph;
-    set_graph_static_opaque_resources(active_graph);
 }
 
 void RendererVK::update_render_graph_resources(
@@ -1285,71 +1282,41 @@ void RendererVK::update_render_graph_resources(
     }
 }
 
-void RendererVK::set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph) {
-    if (p_graph == MEM_NULL) {
-        return;
-    }
-    // Re-inject the global static-opaque mesh buffers so render tasks
-    // referencing the global resource IDs can resolve them without per-pipeline
-    // registration.
-    if (render_objects->static_opaque_vertices != MEM_NULL) {
-        p_graph->set_resource(REND_RES_STATIC_VERTICES, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_vertices));
-    }
-    if (render_objects->static_opaque_indices != MEM_NULL) {
-        p_graph->set_resource(REND_RES_STATIC_INDICES, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_indices));
-    }
-    if (render_objects->static_opaque_obj_ids != MEM_NULL) {
-        p_graph->set_resource(REND_RES_STATIC_OBJECT_IDS, make_ref<ROCSingleVK>(allocator, render_objects->static_opaque_obj_ids));
-    }
-}
-
-template <typename T, typename SrcAlloc>
-static Ref<ROBufferVK> build_or_resize_host_visible_buffer(
-    const BaseRenderDataVK* p_render_data, Ref<ROBufferVK> p_existing, const Vector<T, SrcAlloc>& p_data, VkBufferUsageFlags p_usage) {
-    const size_t size_in_bytes = p_data.size() * sizeof(T);
-    if (size_in_bytes == 0) {
-        return p_existing;
-    }
-    Ref<ROBufferVK> buffer = p_existing;
-    if (buffer == MEM_NULL || size_in_bytes > buffer->fields().buffer_size) {
-        buffer = ROBufferVK::Builder().set_domain(DeviceDomain::HOST_DEVICE).set_size(size_in_bytes).set_usage(p_usage).create_ref(p_render_data);
-    }
-    buffer->update_buffer(p_data.data(), size_in_bytes);
-    return buffer;
-}
-
-void RendererVK::update_static_triangle_set() {
+void RendererVK::update_static_geometry_sets() {
     WBE_DEBUG_ASSERT(render_database != MEM_NULL);
     synchronize_gpu_and_flush_delayed_calls();
-    render_database->refresh_static_triangle_set();
-    const auto& info = render_database->get_static_triangle_set_info();
 
-    VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    for (auto& plugin : registered_plugins) {
-        vertex_usage |= plugin->get_static_opaque_vertex_buffer_usage();
-        index_usage |= plugin->get_static_opaque_index_buffer_usage();
+    RefRes<RUStaticOpaqueSet> static_opaque_set = render_database->get_static_opaque_set();
+    if (static_opaque_set != nullptr) {
+        VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        for (auto& plugin : registered_plugins) {
+            StaticGeometryBufferUsageVK buffer_usage = plugin->get_static_geometry_buffer_usage();
+            vertex_usage |= buffer_usage.vertex_buffer_usage;
+            index_usage |= buffer_usage.index_buffer_usage;
+        }
+        StaticSetBufferCompilerVK::BuildResult geometry_buffers =
+            StaticSetBufferCompilerVK(&base_render_data).build(static_opaque_set, vertex_usage, index_usage);
+        render_objects->static_opaque_vertices = geometry_buffers.vertex_buffer;
+        render_objects->static_opaque_indices = geometry_buffers.index_buffer;
+        for (auto& plugin : registered_plugins) {
+            auto plugin_job =
+                plugin->on_static_opaque_set_updated(&base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer);
+            if (plugin_job) {
+                register_gpu_job(std::move(plugin_job));
+            }
+        }
+        return;
     }
-    render_objects->static_opaque_vertices =
-        build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_vertices, info.vertices, vertex_usage);
-    render_objects->static_opaque_indices =
-        build_or_resize_host_visible_buffer(&base_render_data, render_objects->static_opaque_indices, info.indices, index_usage);
-    render_objects->static_opaque_obj_ids = build_or_resize_host_visible_buffer(
-        &base_render_data, render_objects->static_opaque_obj_ids, info.obj_id, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    render_objects->static_opaque_vertices = MEM_NULL;
+    render_objects->static_opaque_indices = MEM_NULL;
     for (auto& plugin : registered_plugins) {
-        auto plugin_job = plugin->on_static_triangle_set_updated(&base_render_data,
-            info,
-            render_objects->static_opaque_vertices,
-            render_objects->static_opaque_indices,
-            render_objects->static_opaque_obj_ids);
+        auto plugin_job = plugin->on_static_opaque_set_updated(&base_render_data, MEM_NULL, MEM_NULL, MEM_NULL);
         if (plugin_job) {
             register_gpu_job(std::move(plugin_job));
         }
     }
-
-    // Publish the buffers under the global resource IDs so render tasks in the
-    // active graph can resolve them without per-pipeline registration.
-    set_graph_static_opaque_resources(active_graph);
 }
 
 } // namespace WhiteBirdEngine

@@ -77,10 +77,10 @@ struct GBufferOutput {
 /**
  * @brief Sample the active material and pack its surface data into the G-buffer outputs.
  * @param p_input The interpolated vertex output.
+ * @param p_masked Whether alpha-cutout discard should be applied.
  * @return The packed G-buffer attachments for this fragment.
  */
-[shader("fragment")]
-GBufferOutput fragment_main(VSOutput p_input) {
+static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
     GBufferOutput output;
 
     uint material_index = uint(round(p_input.world_position.w));
@@ -94,7 +94,7 @@ GBufferOutput fragment_main(VSOutput p_input) {
 
     float4 albedo_sample =
         material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
-    if (albedo_sample.a < 0.5) {
+    if (p_masked && albedo_sample.a < 0.5) {
         discard;
     }
     float material_id_unorm = float(material_index) / 255.0;
@@ -112,4 +112,14 @@ GBufferOutput fragment_main(VSOutput p_input) {
     output.rma_flags = float4(rma, flags);
 
     return output;
+}
+
+[shader("fragment")]
+GBufferOutput fragment_main(VSOutput p_input) {
+    return shade_fragment(p_input, false);
+}
+
+[shader("fragment")]
+GBufferOutput fragment_masked_main(VSOutput p_input) {
+    return shade_fragment(p_input, true);
 }

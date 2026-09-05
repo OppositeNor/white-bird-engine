@@ -257,6 +257,30 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
     }
 }
 
+static void expect_deferred_masked_static_pipeline_resource(const Directory& p_directory) {
+    ParserJSON parser;
+    parser.parse(Path(p_directory, "deferred_gbuffer_shader.json"));
+
+    std::vector<JSONData> resources = parser.get_value<std::vector<JSONData>>("resources");
+    auto resource = std::ranges::find_if(resources, [](const JSONData& p_resource) {
+        return p_resource.contains("id") && p_resource.get_value<std::string>("id") == "deferred_gbuffer_masked_static";
+    });
+    ASSERT_NE(resource, resources.end());
+    EXPECT_EQ(resource->get_value<std::string>("type"), "graphics_pipeline");
+    EXPECT_EQ(resource->get_value<std::string>("vertex_stage_id"), "deferred_gbuffer_shader");
+    EXPECT_FALSE(resource->contains("vertex_stage_entry"));
+    EXPECT_EQ(resource->get_value<std::string>("fragment_stage_id"), "deferred_gbuffer_shader");
+    EXPECT_EQ(resource->get_value<std::string>("fragment_stage_entry"), "fragment_masked_main");
+    EXPECT_TRUE(resource->get_value<bool>("depth_test"));
+    EXPECT_TRUE(resource->get_value<bool>("depth_write"));
+    EXPECT_TRUE(resource->get_value<bool>("cull_backfaces") == false);
+}
+
+TEST(WBEShaderMetadataVKTest, DeferredMaskedStaticPipelineResourceUsesMaskedFragmentEntry) {
+    expect_deferred_masked_static_pipeline_resource(Directory({"test_env_res", "assets", "shaders", "deferred_gbuffer"}));
+    expect_deferred_masked_static_pipeline_resource(Directory({"res", "assets", "shaders", "deferred_gbuffer"}));
+}
+
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
     ParserJSON parser;
     parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "vertex_input_attributes"}), "vertex_input_attributes.json"));

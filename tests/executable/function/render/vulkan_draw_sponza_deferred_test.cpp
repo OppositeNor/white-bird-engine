@@ -207,7 +207,8 @@ private:
     RefRes<RUStaticMaskedSet> sponza_masked_set;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
     RefRes<RUGraphicsPipeline> shadow_masked_pipeline_resource;
-    RefRes<RUGraphicsPipeline> gbuffer_pipeline_resource;
+    RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
+    RefRes<RUGraphicsPipeline> gbuffer_masked_pipeline_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_horizontal_shader_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
     RefRes<RUShader> direct_lighting_shader_resource;
@@ -463,10 +464,10 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     auto mipmap_shadow_masked_task = compile_shadow_task(sponza_masked_set, shadow_masked_pipeline_resource, true);
     auto summed_area_table_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
     auto summed_area_table_shadow_masked_task = compile_shadow_task(sponza_masked_set, shadow_masked_pipeline_resource, true);
-    auto mipmap_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_pipeline_resource, false);
-    auto mipmap_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_pipeline_resource, true);
-    auto summed_area_table_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_pipeline_resource, false);
-    auto summed_area_table_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_pipeline_resource, true);
+    auto mipmap_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
+    auto mipmap_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_masked_pipeline_resource, true);
+    auto summed_area_table_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
+    auto summed_area_table_gbuffer_masked_task = compile_gbuffer_task(sponza_masked_set, gbuffer_masked_pipeline_resource, true);
     std::array<RTRunStaticSetVK*, 4> gbuffer_tasks{mipmap_gbuffer_opaque_task.get(),
         mipmap_gbuffer_masked_task.get(),
         summed_area_table_gbuffer_opaque_task.get(),
@@ -540,9 +541,13 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     if (shadow_masked_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: 'rsm_spot_masked_static' graphics pipeline resource not found.");
     }
-    gbuffer_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
-    if (gbuffer_pipeline_resource == nullptr) {
+    gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
+    if (gbuffer_opaque_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup deferred test: 'deferred_gbuffer_static' graphics pipeline resource not found.");
+    }
+    gbuffer_masked_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_masked_static");
+    if (gbuffer_masked_pipeline_resource == nullptr) {
+        throw std::runtime_error("Failed to setup deferred test: 'deferred_gbuffer_masked_static' graphics pipeline resource not found.");
     }
     shadow_moments_summed_area_table_horizontal_shader_resource =
         resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_horizontal_shader");

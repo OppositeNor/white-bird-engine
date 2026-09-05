@@ -17,15 +17,17 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/i_singleton.hh"
 
 #include <cstddef>
 #include <span>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -79,28 +81,26 @@ public:
     virtual void on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
 
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const override;
-    virtual VkBufferUsageFlags get_static_opaque_vertex_buffer_usage() const override;
-    virtual VkBufferUsageFlags get_static_opaque_index_buffer_usage() const override;
-    virtual GPUJobVK on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
-        const RenderDatabase::OpaqueTrianglesInfo& p_info,
+    virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const override;
+    virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
+        RefRes<RUStaticOpaqueSet> p_set,
         Ref<ROBufferVK> p_vertex_buffer,
-        Ref<ROBufferVK> p_index_buffer,
-        Ref<ROBufferVK> p_object_id_buffer) override;
+        Ref<ROBufferVK> p_index_buffer) override;
 
     /**
      * @brief Update the static-opaque bottom-level acceleration structure for the current static mesh buffers.
      *
-     * @param p_info Static-opaque mesh metadata from the render database.
+        * @param p_set Static-opaque geometry set published by the scene.
      * @param p_vertex_buffer Shared static-opaque vertex buffer.
      * @param p_index_buffer Shared static-opaque index buffer.
      * @return A GPU job that records the build, or an empty job when there is no geometry.
      */
 private:
+    struct StaticOpaqueBottomLevelBuild;
     struct StaticOpaqueBuildData;
-    struct StaticOpaqueTopLevelBuildData;
 
     const BaseRenderDataVK* render_data = nullptr;
-    Ref<ROAccelerationStructureVK> static_opaque_bottom_level_acceleration_structure;
+    std::vector<Ref<ROAccelerationStructureVK>> static_opaque_bottom_level_acceleration_structures;
     Ref<ROAccelerationStructureVK> static_opaque_top_level_acceleration_structure;
     Ref<ROBufferVK> static_opaque_top_level_instance_buffer;
     bool enabled = false;
@@ -110,14 +110,12 @@ private:
 
     VkDeviceAddress get_buffer_device_address(Ref<ROBufferVK> p_buffer) const;
     VkDeviceAddress get_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const;
-    StaticOpaqueBuildData build_static_opaque_data(const RenderDatabase::OpaqueTrianglesInfo& p_info,
+    StaticOpaqueBuildData build_static_opaque_data(RefRes<RUStaticOpaqueSet> p_set,
         VkDeviceAddress p_vertex_buffer_address,
         VkDeviceAddress p_index_buffer_address) const;
-    StaticOpaqueTopLevelBuildData build_static_opaque_top_level_data(
-        Ref<ROAccelerationStructureVK> p_bottom_level_acceleration_structure) const;
     GPUJobVK create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data);
     GPUJobVK update_static_opaque_acceleration_structure(
-        const RenderDatabase::OpaqueTrianglesInfo& p_info, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer);
+        RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer);
 
     inline static RayTracingPluginVK* singleton = nullptr;
 };

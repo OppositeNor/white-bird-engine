@@ -20,10 +20,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/function_utils.hh"
-#include "function/render/i_render_object.hh"
-#include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/material_texture_contract_resolver.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
@@ -35,9 +34,11 @@
 #include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/render_vk/static_set_buffer_compiler_vk.hh"
+#include "function/render_vk/static_set_material_binding_builder_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
@@ -214,17 +215,13 @@ struct StaticInstanceBufferData {
     std::vector<StaticSetNodeGPU> nodes;
     std::vector<StaticSetInstanceGPU> instances;
     std::vector<uint32_t> first_instances;
+    std::vector<RefRes<RUMaterial>> ordered_materials;
 };
 
 struct NonEmptyStaticSetTaskBuild {
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task = MEM_NULL;
     Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
     GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
-};
-
-struct StaticSetDrawBinaries {
-    RefRes<RUBinary> vertex_binary = MEM_NULL;
-    RefRes<RUBinary> index_binary = MEM_NULL;
 };
 
 StaticSetAttachmentDataVK build_attachment_data(const RTRunStaticSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
@@ -281,97 +278,6 @@ bool is_empty_set(const RUStaticGeometrySet& p_set) {
     return p_set.submesh_count == 0 || p_set.instance_count == 0;
 }
 
-void validate_binary_view(const RUBinaryView& p_view, std::string_view p_context) {
-    if (p_view.binary == nullptr) {
-        throw std::runtime_error(std::format("Failed to construct static set task: {} binary is missing.", p_context));
-    }
-    if (p_view.start > p_view.binary->size || p_view.size > p_view.binary->size - p_view.start) {
-        throw std::runtime_error(std::format("Failed to construct static set task: {} binary view exceeds binary size.", p_context));
-    }
-    if (p_view.size > 0 && p_view.binary->data == nullptr) {
-        throw std::runtime_error(std::format("Failed to construct static set task: {} binary data is missing.", p_context));
-    }
-}
-
-StaticSetDrawBinaries validate_static_set_and_get_binaries(const RUStaticGeometrySet& p_set) {
-    if (p_set.submesh_count > 0 && p_set.submeshes == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: submesh storage is missing.");
-    }
-    if (p_set.instance_count > 0 && p_set.instances == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: instance storage is missing.");
-    }
-    StaticSetDrawBinaries binaries;
-    for (size_t i = 0; i < p_set.submesh_count; ++i) {
-        const RUStaticGeometrySubmesh& submesh = p_set.submeshes.get()[i];
-        if (submesh.material == nullptr) {
-            throw std::runtime_error("Failed to construct static set task: submesh material is missing.");
-        }
-        validate_binary_view(submesh.vertices.binary, "vertex");
-        validate_binary_view(submesh.indices.binary, "index");
-        if (submesh.vertices.vertex_stride == 0 ||
-            submesh.vertices.binary.size != submesh.vertices.vertex_count * submesh.vertices.vertex_stride) {
-            throw std::runtime_error("Failed to construct static set task: vertex view count, stride, and size do not match.");
-        }
-        if (submesh.indices.binary.start % sizeof(uint32_t) != 0 ||
-            submesh.indices.binary.size != submesh.indices.index_count * sizeof(uint32_t)) {
-            throw std::runtime_error("Failed to construct static set task: index view is not a uint32 range.");
-        }
-        if (submesh.first_instance > p_set.instance_count || submesh.instance_count > p_set.instance_count - submesh.first_instance) {
-            throw std::runtime_error("Failed to construct static set task: submesh instance range is out of bounds.");
-        }
-        if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
-            continue;
-        }
-        if (binaries.vertex_binary == nullptr) {
-            binaries.vertex_binary = submesh.vertices.binary.binary;
-        }
-        if (binaries.index_binary == nullptr) {
-            binaries.index_binary = submesh.indices.binary.binary;
-        }
-        if (submesh.vertices.binary.binary != binaries.vertex_binary) {
-            throw std::runtime_error("Failed to construct static set task: all drawable submeshes must share one vertex binary resource.");
-        }
-        if (submesh.indices.binary.binary != binaries.index_binary) {
-            throw std::runtime_error("Failed to construct static set task: all drawable submeshes must share one index binary resource.");
-        }
-    }
-    return binaries;
-}
-
-Ref<ROBufferVK> build_static_binary_buffer(
-    const BaseRenderDataVK* p_render_data, RefRes<RUBinary> p_binary, VkBufferUsageFlags p_usage, std::string_view p_resource_kind) {
-    if (p_binary == nullptr || p_binary->data == nullptr || p_binary->size == 0) {
-        throw std::runtime_error(std::format("Failed to construct static set task: {} binary data is missing.", p_resource_kind));
-    }
-    if (p_binary->resource_key == nullptr || p_binary->resource_key[0] == '\0') {
-        throw std::runtime_error(std::format("Failed to construct static set task: {} binary resource key is missing.", p_resource_kind));
-    }
-    if (p_render_data->render_database == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: render database is missing.");
-    }
-
-    Ref<IRenderObject> registered_buffer = p_render_data->render_database->get_compiled_render_resource(
-        p_binary->resource_key, TypeUUID<ROBufferVK>::UUID);
-    if (registered_buffer != MEM_NULL) {
-        Ref<ROBufferVK> result = registered_buffer.dynamic_cast_ref<ROBufferVK>();
-        if (result == MEM_NULL) {
-            throw std::runtime_error("Failed to construct static set task: registered geometry buffer has the wrong type.");
-        }
-        if (result->fields().buffer_size != p_binary->size) {
-            throw std::runtime_error("Failed to construct static set task: registered geometry buffer size does not match its binary resource.");
-        }
-        return result;
-    }
-
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
-                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                 .set_size(p_binary->size)
-                                 .set_usage(p_usage)
-                                 .create_ref(p_render_data);
-    result->update_buffer(p_binary->data.get(), p_binary->size);
-    p_render_data->render_database->register_compiled_render_resource(p_binary->resource_key, result);
-    return result;
-}
 
 Ref<ROBufferVK> build_indirect_buffer(const BaseRenderDataVK* p_render_data, const std::vector<VkDrawIndexedIndirectCommand>& p_commands) {
     if (p_commands.empty()) {
@@ -415,12 +321,16 @@ std::string_view get_vertex_stage_entry_name(RefRes<RUGraphicsPipeline> p_pipeli
     return {};
 }
 
-RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
+RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr || p_default_material_key.empty()) {
         return MEM_NULL;
     }
-    RefRes<RUMaterial> material = resource_manager->get_resource<RUMaterial>(std::string(p_default_material_key));
+    return resource_manager->get_resource<RUMaterial>(std::string(p_default_material_key));
+}
+
+RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
+    RefRes<RUMaterial> material = get_default_material(p_default_material_key);
     if (material == nullptr || material->texture_count == 0 || material->textures == nullptr) {
         return MEM_NULL;
     }
@@ -465,12 +375,11 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
     result.nodes.reserve(p_set->instance_count);
     result.instances.reserve(p_set->instance_count);
     result.first_instances.reserve(p_set->submesh_count);
+    result.ordered_materials.reserve(p_set->submesh_count);
     for (size_t i = 0; i < p_set->instance_count; ++i) {
         result.nodes.push_back(StaticSetNodeGPU{.transform = p_set->instances.get()[i].global_transform});
     }
 
-    std::vector<RefRes<RUMaterial>> materials;
-    materials.reserve(p_set->submesh_count);
     for (size_t submesh_index = 0; submesh_index < p_set->submesh_count; ++submesh_index) {
         const RUStaticGeometrySubmesh& submesh = p_set->submeshes.get()[submesh_index];
         if (result.instances.size() > std::numeric_limits<uint32_t>::max()) {
@@ -480,7 +389,7 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
         if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
             continue;
         }
-        const uint32_t material_index = get_or_append_material_index(materials, submesh.material);
+        const uint32_t material_index = get_or_append_material_index(result.ordered_materials, submesh.material);
         result.submeshes.push_back(StaticSetSubmeshGPU{.material_id = material_index});
         const uint32_t drawable_submesh_index = static_cast<uint32_t>(result.submeshes.size() - 1);
         for (size_t instance_index = 0; instance_index < submesh.instance_count; ++instance_index) {
@@ -500,10 +409,26 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
 GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK* p_renderer,
     RefRes<RUGraphicsPipeline> p_graphics_pipeline,
     const RTRunStaticSetVK::Config& p_config,
+    std::span<const RefRes<RUMaterial>> p_materials,
     Ref<ROBufferVK> p_submesh_buffer,
     Ref<ROBufferVK> p_node_buffer,
     Ref<ROBufferVK> p_instance_buffer) {
     const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
+    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
+    std::optional<ShaderMetadata> geometry_metadata;
+    if (p_graphics_pipeline->geometry_stage != nullptr) {
+        geometry_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->geometry_stage);
+    }
+    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->fragment_stage);
+    const std::optional<MaterialTextureContract> material_contract = MaterialTextureContractResolver().resolve(vertex_metadata,
+        geometry_metadata.has_value() ? &*geometry_metadata : nullptr,
+        fragment_metadata,
+        p_config.get_material_textures_variable_name(),
+        p_config.get_material_params_variable_name());
+    Ref<ROSamplerVK> material_sampler = MEM_NULL;
+    if (material_contract.has_value()) {
+        material_sampler = ROSamplerVK::Builder().create_ref(render_data);
+    }
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_data->allocator,
         .render_data = render_data,
@@ -520,6 +445,33 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
                                                  .add_storage_buffer_decleration("static_set.nodes", p_node_buffer)
                                                  .add_storage_buffer_decleration("static_set.instances", p_instance_buffer)
                                                  .build();
+    RenderBindpointDeclarations material_bindpoints = StaticSetMaterialBindingBuilderVK().build(material_contract,
+        p_materials,
+        get_default_material(p_config.get_default_material_resource_key()),
+        p_config.get_material_textures_variable_name(),
+        p_config.get_material_params_variable_name(),
+        render_data->max_variable_sampled_image_descriptor_count,
+        material_sampler);
+    if (!material_bindpoints.buffer_data.empty()) {
+        const size_t buffer_data_offset = bindpoints.buffer_data.size();
+        bindpoints.buffer_data.insert(bindpoints.buffer_data.end(), material_bindpoints.buffer_data.begin(), material_bindpoints.buffer_data.end());
+        for (RenderBindpointBufferDeclaration& declaration : material_bindpoints.buffer_declerations) {
+            if (declaration.buffer_render_object == MEM_NULL) {
+                declaration.offset += buffer_data_offset;
+            }
+            bindpoints.buffer_declerations.push_back(std::move(declaration));
+        }
+    } else {
+        for (RenderBindpointBufferDeclaration& declaration : material_bindpoints.buffer_declerations) {
+            bindpoints.buffer_declerations.push_back(std::move(declaration));
+        }
+    }
+    for (RenderBindpointImageDeclaration& declaration : material_bindpoints.image_declerations) {
+        bindpoints.image_declerations.push_back(std::move(declaration));
+    }
+    for (RenderBindpointSamplerDeclaration& declaration : material_bindpoints.sampler_declerations) {
+        bindpoints.sampler_declerations.push_back(std::move(declaration));
+    }
     return GraphicsPipelineCompilerVK(compiler_context).compile(compiled_pipeline_key, p_graphics_pipeline, bindpoints);
 }
 
@@ -600,20 +552,22 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
     const StaticSetAttachmentDataVK& p_attachment_data) {
     NonEmptyStaticSetTaskBuild result;
     const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
-    StaticSetDrawBinaries binaries = validate_static_set_and_get_binaries(*p_set);
-    if (binaries.vertex_binary == nullptr || binaries.index_binary == nullptr) {
+    for (size_t i = 0; i < p_set->submesh_count; ++i) {
+        if (p_set->submeshes.get()[i].material == nullptr) {
+            throw std::runtime_error("Failed to construct static set task: submesh material is missing.");
+        }
+    }
+    StaticSetBufferCompilerVK::BuildResult geometry_buffers =
+        StaticSetBufferCompilerVK(render_data).build(p_set, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    if (geometry_buffers.vertex_buffer == MEM_NULL || geometry_buffers.index_buffer == MEM_NULL) {
         return result;
     }
-    Ref<ROBufferVK> vertex_buffer =
-        build_static_binary_buffer(render_data, binaries.vertex_binary, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, "vertex");
-    Ref<ROBufferVK> index_buffer =
-        build_static_binary_buffer(render_data, binaries.index_binary, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, "index");
     StaticInstanceBufferData instance_data = build_static_instance_buffer_data(p_set);
     Ref<ROBufferVK> submesh_buffer = build_storage_buffer(render_data, instance_data.submeshes);
     Ref<ROBufferVK> node_buffer = build_storage_buffer(render_data, instance_data.nodes);
     Ref<ROBufferVK> instance_buffer = build_storage_buffer(render_data, instance_data.instances);
-    GraphicsPipelineCompilerVK::CompileResult compiled_pipeline =
-        compile_static_set_pipeline(p_renderer, p_graphics_pipeline, p_config, submesh_buffer, node_buffer, instance_buffer);
+    GraphicsPipelineCompilerVK::CompileResult compiled_pipeline = compile_static_set_pipeline(
+        p_renderer, p_graphics_pipeline, p_config, instance_data.ordered_materials, submesh_buffer, node_buffer, instance_buffer);
     result.graphics_pipeline = compiled_pipeline.graphics_pipeline;
     result.descriptor_set_bindings = compiled_pipeline.descriptor_set_bindings;
     ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
@@ -639,8 +593,8 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
         p_attachment_data.render_extent,
         std::span<const std::string_view>(color_attachment_ids.data(), color_attachment_ids.size()),
         depth_attachment_id_view(p_attachment_data),
-        vertex_buffer,
-        index_buffer,
+        geometry_buffers.vertex_buffer,
+        geometry_buffers.index_buffer,
         indirect_buffer,
         std::span<const RTRunGraphicsPipelineIndirectVK::PipelineBatch>(pipeline_batches.data(), pipeline_batches.size()),
         p_config.get_color_attachment_load_op(),

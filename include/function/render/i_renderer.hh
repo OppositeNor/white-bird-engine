@@ -115,9 +115,9 @@ public:
         std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) = 0;
 
     /**
-     * @brief Update the static triangle set data.
+     * @brief Rebuild renderer-owned derived state from the currently published static geometry sets.
      */
-    virtual void update_static_triangle_set() = 0;
+    virtual void update_static_geometry_sets() = 0;
 };
 
 } // namespace WhiteBirdEngine

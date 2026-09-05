@@ -57,9 +57,6 @@
 namespace WhiteBirdEngine {
 
 inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE = "swap_chain_image";
-inline constexpr std::string_view REND_RES_STATIC_VERTICES = "static_vertices";
-inline constexpr std::string_view REND_RES_STATIC_INDICES = "static_indices";
-inline constexpr std::string_view REND_RES_STATIC_OBJECT_IDS = "static_object_ids";
 
 /**
  * @class RendererVK
@@ -118,7 +115,7 @@ public:
         return render_database;
     }
 
-    virtual void update_static_triangle_set() override;
+    virtual void update_static_geometry_sets() override;
 
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
@@ -356,13 +353,9 @@ private:
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
-        // Global static-opaque mesh GPU buffers, populated by
-        // RendererVK::update_static_triangle_set() from the RenderDatabase
-        // and exposed to render tasks via the global resource IDs
-        // REND_RES_STATIC_{VERTICES,INDICES,OBJECT_IDS}.
+        // Shared static-opaque mesh GPU buffers used by plugin-owned features such as ray tracing.
         Ref<ROBufferVK> static_opaque_vertices;
         Ref<ROBufferVK> static_opaque_indices;
-        Ref<ROBufferVK> static_opaque_obj_ids;
     };
     Unique<RenderObjects> render_objects;
 
@@ -416,7 +409,6 @@ private:
     void run_gpu_jobs();
     void synchronize_gpu_and_flush_delayed_calls();
     void submit_gpu_job_command_buffer();
-    void set_graph_static_opaque_resources(Ref<RenderGraphVK> p_graph);
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
 };
 

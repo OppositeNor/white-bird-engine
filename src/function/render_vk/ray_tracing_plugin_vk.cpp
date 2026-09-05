@@ -14,22 +14,23 @@
 */
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
 #include "core/allocator/i_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <glm/glm.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <limits>
 #include <set>
 #include <span>
@@ -96,36 +97,16 @@ static bool check_extension_support(std::span<const char* const> p_extensions,
     return unsupported_extensions.empty();
 }
 
-struct RayTracingPluginVK::StaticOpaqueBuildData {
-    StaticOpaqueBuildData() = delete;
-    ~StaticOpaqueBuildData() = default;
-    StaticOpaqueBuildData(const StaticOpaqueBuildData&) = delete;
-    StaticOpaqueBuildData(StaticOpaqueBuildData&&) noexcept = default;
-    StaticOpaqueBuildData& operator=(const StaticOpaqueBuildData&) = delete;
-    StaticOpaqueBuildData& operator=(StaticOpaqueBuildData&&) noexcept = default;
-
-    explicit StaticOpaqueBuildData(RenderAllocator* p_allocator)
-        : geometries(p_allocator), build_ranges(p_allocator), primitive_counts(p_allocator) {
-    }
-
-    Vector<VkAccelerationStructureGeometryKHR, RenderAllocator> geometries;
-    Vector<VkAccelerationStructureBuildRangeInfoKHR, RenderAllocator> build_ranges;
-    Vector<uint32_t, RenderAllocator> primitive_counts;
-    uint64_t total_primitive_count = 0;
+struct RayTracingPluginVK::StaticOpaqueBottomLevelBuild {
+    VkAccelerationStructureGeometryKHR geometry{};
+    VkAccelerationStructureBuildRangeInfoKHR build_range{};
+    uint32_t primitive_count = 0;
+    std::vector<VkTransformMatrixKHR> instance_transforms;
+    Ref<ROAccelerationStructureVK> acceleration_structure = MEM_NULL;
 };
 
-struct RayTracingPluginVK::StaticOpaqueTopLevelBuildData {
-    StaticOpaqueTopLevelBuildData() = delete;
-    ~StaticOpaqueTopLevelBuildData() = default;
-    StaticOpaqueTopLevelBuildData(const StaticOpaqueTopLevelBuildData&) = delete;
-    StaticOpaqueTopLevelBuildData(StaticOpaqueTopLevelBuildData&&) noexcept = default;
-    StaticOpaqueTopLevelBuildData& operator=(const StaticOpaqueTopLevelBuildData&) = delete;
-    StaticOpaqueTopLevelBuildData& operator=(StaticOpaqueTopLevelBuildData&&) noexcept = default;
-
-    explicit StaticOpaqueTopLevelBuildData(RenderAllocator* p_allocator) : instances(p_allocator) {
-    }
-
-    Vector<VkAccelerationStructureInstanceKHR, RenderAllocator> instances;
+struct RayTracingPluginVK::StaticOpaqueBuildData {
+    std::vector<StaticOpaqueBottomLevelBuild> bottom_level_builds;
 };
 
 static VkAccelerationStructureBuildGeometryInfoKHR make_bottom_level_build_info(
@@ -277,14 +258,12 @@ void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data
     p_render_data->max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
 }
 
-VkBufferUsageFlags RayTracingPluginVK::get_static_opaque_vertex_buffer_usage() const {
+StaticGeometryBufferUsageVK RayTracingPluginVK::get_static_geometry_buffer_usage() const {
     WBE_DEBUG_ASSERT(enabled);
-    return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-}
-
-VkBufferUsageFlags RayTracingPluginVK::get_static_opaque_index_buffer_usage() const {
-    WBE_DEBUG_ASSERT(enabled);
-    return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    return StaticGeometryBufferUsageVK{
+        .vertex_buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        .index_buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    };
 }
 
 VkDeviceAddress RayTracingPluginVK::get_buffer_device_address(Ref<ROBufferVK> p_buffer) const {
@@ -301,128 +280,172 @@ VkDeviceAddress RayTracingPluginVK::get_acceleration_structure_device_address(Re
     return render_data->get_acceleration_structure_device_address(render_data->logic_device, &address_info);
 }
 
+static VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform) {
+    VkTransformMatrixKHR result{};
+    result.matrix[0][0] = p_transform[0][0];
+    result.matrix[0][1] = p_transform[1][0];
+    result.matrix[0][2] = p_transform[2][0];
+    result.matrix[0][3] = p_transform[3][0];
+    result.matrix[1][0] = p_transform[0][1];
+    result.matrix[1][1] = p_transform[1][1];
+    result.matrix[1][2] = p_transform[2][1];
+    result.matrix[1][3] = p_transform[3][1];
+    result.matrix[2][0] = p_transform[0][2];
+    result.matrix[2][1] = p_transform[1][2];
+    result.matrix[2][2] = p_transform[2][2];
+    result.matrix[2][3] = p_transform[3][2];
+    return result;
+}
+
 RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaque_data(
-    const RenderDatabase::OpaqueTrianglesInfo& p_info, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const {
-    StaticOpaqueBuildData result(render_data->allocator);
-    result.geometries.reserve(p_info.draw_groups.size());
-    result.build_ranges.reserve(p_info.draw_groups.size());
-    result.primitive_counts.reserve(p_info.draw_groups.size());
-    // Translate each valid draw group into BLAS geometry while validating the mesh layout and index ranges.
-    for (size_t i = 0; i < p_info.draw_groups.size(); ++i) {
-        const auto& draw_group = p_info.draw_groups[i];
-        if (draw_group.index_sub_region.size == 0) {
+    RefRes<RUStaticOpaqueSet> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const {
+    if (p_set == nullptr) {
+        throw std::runtime_error("Failed to build static-opaque acceleration structure: static set is missing.");
+    }
+    if (p_set->submesh_count > 0 && p_set->submeshes == nullptr) {
+        throw std::runtime_error("Failed to build static-opaque acceleration structure: submesh storage is missing.");
+    }
+    if (p_set->instance_count > 0 && p_set->instances == nullptr) {
+        throw std::runtime_error("Failed to build static-opaque acceleration structure: instance storage is missing.");
+    }
+
+    StaticOpaqueBuildData result;
+    result.bottom_level_builds.reserve(p_set->submesh_count);
+    for (size_t submesh_index = 0; submesh_index < p_set->submesh_count; ++submesh_index) {
+        const RUStaticGeometrySubmesh& submesh = p_set->submeshes.get()[submesh_index];
+        if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
             continue;
         }
+        if (submesh.indices.index_count % 3 != 0) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: index count must form complete triangles.");
+        }
+        if (submesh.vertices.attribute_count == 0 || submesh.vertices.attributes == nullptr) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: vertex attributes are missing.");
+        }
+        if (submesh.vertices.vertex_stride == 0 ||
+            submesh.vertices.binary.size != submesh.vertices.vertex_count * submesh.vertices.vertex_stride) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid vertex range.");
+        }
+        if (submesh.indices.binary.start % sizeof(uint32_t) != 0 ||
+            submesh.indices.binary.size != submesh.indices.index_count * sizeof(uint32_t)) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid index range.");
+        }
+        if (submesh.first_instance > p_set->instance_count || submesh.instance_count > p_set->instance_count - submesh.first_instance) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: instance range is out of bounds.");
+        }
 
-        const auto position_attribute = std::ranges::find_if(draw_group.vertex_layout.attributes, [](const auto& p_attribute) {
+        std::span<const RUVertexView::Attribute> attributes(submesh.vertices.attributes.get(), submesh.vertices.attribute_count);
+        auto position_attribute = std::ranges::find_if(attributes, [](const RUVertexView::Attribute& p_attribute) {
             return p_attribute.role.get_name() == "position";
         });
-        if (position_attribute == draw_group.vertex_layout.attributes.end()) {
-            throw std::runtime_error("Failed to build static-opaque acceleration structure: a draw group has no position attribute.");
+        if (position_attribute == attributes.end()) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: a submesh has no position attribute.");
         }
         if (position_attribute->format != RUVertexAttributeFormat::FLOAT3) {
             throw std::runtime_error("Failed to build static-opaque acceleration structure: position attributes must use FLOAT3 format.");
         }
-
-        const size_t next_vertex_byte_offset =
-            i + 1 < p_info.draw_groups.size() ? p_info.draw_groups[i + 1].vertex_buffer_byte_offset : p_info.vertices.size();
-        if (next_vertex_byte_offset < draw_group.vertex_buffer_byte_offset) {
-            throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid vertex-buffer offsets.");
-        }
-        const size_t vertex_byte_size = next_vertex_byte_offset - draw_group.vertex_buffer_byte_offset;
-        if (draw_group.vertex_layout.vertex_stride == 0 || vertex_byte_size % draw_group.vertex_layout.vertex_stride != 0) {
-            throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid draw-group vertex range.");
-        }
-        const size_t vertex_count = vertex_byte_size / draw_group.vertex_layout.vertex_stride;
-        if (vertex_count == 0 || vertex_count - 1 > std::numeric_limits<uint32_t>::max()) {
+        if (submesh.vertices.vertex_count == 0 || submesh.vertices.vertex_count - 1 > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error("Failed to build static-opaque acceleration structure: vertex count exceeds uint32.");
         }
-        const size_t primitive_count = draw_group.index_sub_region.size / 3;
-        if (primitive_count > std::numeric_limits<uint32_t>::max()) {
-            throw std::runtime_error("Failed to build static-opaque acceleration structure: primitive count exceeds uint32.");
+
+        StaticOpaqueBottomLevelBuild build;
+        build.geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        build.geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        build.geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        build.geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+        build.geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        build.geometry.geometry.triangles.vertexData.deviceAddress =
+            p_vertex_buffer_address + submesh.vertices.binary.start + position_attribute->offset;
+        build.geometry.geometry.triangles.vertexStride = submesh.vertices.vertex_stride;
+        build.geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(submesh.vertices.vertex_count - 1);
+        build.geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+        build.geometry.geometry.triangles.indexData.deviceAddress = p_index_buffer_address + submesh.indices.binary.start;
+        build.primitive_count = static_cast<uint32_t>(submesh.indices.index_count / 3);
+        build.build_range = VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = build.primitive_count};
+        build.instance_transforms.reserve(submesh.instance_count);
+        for (size_t instance_index = 0; instance_index < submesh.instance_count; ++instance_index) {
+            build.instance_transforms.push_back(build_vk_transform(p_set->instances.get()[submesh.first_instance + instance_index].global_transform));
         }
-        if (primitive_count > std::numeric_limits<uint64_t>::max() - result.total_primitive_count) {
-            throw std::runtime_error("Failed to build static-opaque acceleration structure: total primitive count overflowed.");
-        }
-        VkAccelerationStructureGeometryKHR geometry{};
-        geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-        geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-        geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-        geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-        geometry.geometry.triangles.vertexData.deviceAddress =
-            p_vertex_buffer_address + draw_group.vertex_buffer_byte_offset + position_attribute->offset;
-        geometry.geometry.triangles.vertexStride = draw_group.vertex_layout.vertex_stride;
-        geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(vertex_count - 1);
-        geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-        geometry.geometry.triangles.indexData.deviceAddress =
-            p_index_buffer_address + draw_group.index_sub_region.starting_index * sizeof(uint32_t);
-        result.geometries.push_back(geometry);
-        result.build_ranges.push_back(VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = static_cast<uint32_t>(primitive_count)});
-        result.primitive_counts.push_back(static_cast<uint32_t>(primitive_count));
-        result.total_primitive_count += primitive_count;
+        result.bottom_level_builds.push_back(std::move(build));
     }
-    return result;
-}
-
-RayTracingPluginVK::StaticOpaqueTopLevelBuildData RayTracingPluginVK::build_static_opaque_top_level_data(
-    Ref<ROAccelerationStructureVK> p_bottom_level_acceleration_structure) const {
-    StaticOpaqueTopLevelBuildData result(render_data->allocator);
-
-    // Build a single identity TLAS instance that references the generated bottom-level acceleration structure.
-    VkAccelerationStructureInstanceKHR instance{};
-    instance.transform.matrix[0][0] = 1.0F;
-    instance.transform.matrix[1][1] = 1.0F;
-    instance.transform.matrix[2][2] = 1.0F;
-    instance.instanceCustomIndex = 0;
-    instance.mask = 0xFF;
-    instance.instanceShaderBindingTableRecordOffset = 0;
-    instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    instance.accelerationStructureReference = get_acceleration_structure_device_address(p_bottom_level_acceleration_structure);
-    result.instances.push_back(instance);
     return result;
 }
 
 GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data) {
-    if (p_build_data.geometries.size() > std::numeric_limits<uint32_t>::max() ||
-        p_build_data.geometries.size() > render_data->max_acceleration_structure_geometry_count ||
-        p_build_data.total_primitive_count > render_data->max_acceleration_structure_primitive_count) {
-        throw std::runtime_error("Failed to build static-opaque acceleration structure: device geometry limits exceeded.");
+    if (p_build_data.bottom_level_builds.empty()) {
+        static_opaque_bottom_level_acceleration_structures.clear();
+        static_opaque_top_level_acceleration_structure = MEM_NULL;
+        static_opaque_top_level_instance_buffer = MEM_NULL;
+        return nullptr;
     }
-    VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info = make_bottom_level_build_info(p_build_data.geometries);
-    VkAccelerationStructureBuildSizesInfoKHR bottom_level_build_sizes =
-        get_build_sizes(render_data, bottom_level_build_info, p_build_data.primitive_counts);
-
-    Ref<ROAccelerationStructureVK> bottom_level_acceleration_structure = make_ref<ROAccelerationStructureVK>(
-        render_data->allocator, render_data, bottom_level_build_sizes.accelerationStructureSize, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     const VkDeviceSize scratch_alignment = render_data->min_acceleration_structure_scratch_offset_alignment;
-    if (scratch_alignment == 0 ||
-        bottom_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
+    if (scratch_alignment == 0) {
         throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid scratch-buffer size or alignment.");
     }
+
+    std::vector<Ref<ROAccelerationStructureVK>> bottom_level_acceleration_structures;
+    bottom_level_acceleration_structures.reserve(p_build_data.bottom_level_builds.size());
+    VkDeviceSize max_bottom_level_scratch_size = 1;
+    size_t total_instance_count = 0;
+    for (StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
+        std::array<uint32_t, 1> primitive_counts{build.primitive_count};
+        VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info =
+            make_bottom_level_build_info(std::span<const VkAccelerationStructureGeometryKHR>(&build.geometry, 1));
+        VkAccelerationStructureBuildSizesInfoKHR bottom_level_build_sizes = get_build_sizes(render_data, bottom_level_build_info, primitive_counts);
+        if (bottom_level_build_info.geometryCount > render_data->max_acceleration_structure_geometry_count ||
+            build.primitive_count > render_data->max_acceleration_structure_primitive_count) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: device geometry limits exceeded.");
+        }
+        if (bottom_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
+            throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid scratch-buffer size or alignment.");
+        }
+        build.acceleration_structure = make_ref<ROAccelerationStructureVK>(render_data->allocator,
+            render_data,
+            bottom_level_build_sizes.accelerationStructureSize,
+            VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
+        bottom_level_acceleration_structures.push_back(build.acceleration_structure);
+        VkDeviceSize required_scratch_size = std::max(bottom_level_build_sizes.buildScratchSize, static_cast<VkDeviceSize>(1));
+        max_bottom_level_scratch_size = std::max(max_bottom_level_scratch_size, required_scratch_size);
+        total_instance_count += build.instance_transforms.size();
+    }
+
+    if (total_instance_count == 0 || total_instance_count > render_data->max_acceleration_structure_primitive_count) {
+        throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: device geometry limits exceeded.");
+    }
+
     Ref<ROBufferVK> bottom_level_scratch_buffer =
         ROBufferVK::Builder()
             .set_domain(DeviceDomain::DEVICE)
-            .set_size(std::max<VkDeviceSize>(bottom_level_build_sizes.buildScratchSize, 1) + scratch_alignment - 1)
+            .set_size(max_bottom_level_scratch_size + scratch_alignment - 1)
             .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
             .create_ref(render_data);
-    bottom_level_build_info.dstAccelerationStructure = bottom_level_acceleration_structure->get_acceleration_structure();
     const VkDeviceAddress bottom_level_scratch_buffer_address = get_buffer_device_address(bottom_level_scratch_buffer);
-    bottom_level_build_info.scratchData.deviceAddress =
+    const VkDeviceAddress aligned_bottom_level_scratch_buffer_address =
         ((bottom_level_scratch_buffer_address + scratch_alignment - 1) / scratch_alignment) * scratch_alignment;
-    bottom_level_build_info.pGeometries = nullptr;
 
-    StaticOpaqueTopLevelBuildData top_level_build_data = build_static_opaque_top_level_data(bottom_level_acceleration_structure);
+    std::vector<VkAccelerationStructureInstanceKHR> top_level_instances;
+    top_level_instances.reserve(total_instance_count);
+    for (const StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
+        const uint64_t acceleration_structure_address = get_acceleration_structure_device_address(build.acceleration_structure);
+        for (const VkTransformMatrixKHR& transform : build.instance_transforms) {
+            VkAccelerationStructureInstanceKHR instance{};
+            instance.transform = transform;
+            instance.instanceCustomIndex = 0;
+            instance.mask = 0xFF;
+            instance.instanceShaderBindingTableRecordOffset = 0;
+            instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+            instance.accelerationStructureReference = acceleration_structure_address;
+            top_level_instances.push_back(instance);
+        }
+    }
 
-    // Prepare the TLAS build inputs and scratch resources after sizing and allocating the BLAS.
     Ref<ROBufferVK> top_level_instance_buffer =
         ROBufferVK::Builder()
             .set_domain(DeviceDomain::HOST)
-            .set_size(sizeof(VkAccelerationStructureInstanceKHR) * top_level_build_data.instances.size())
+            .set_size(sizeof(VkAccelerationStructureInstanceKHR) * top_level_instances.size())
             .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
             .create_ref(render_data);
-    top_level_instance_buffer->update_buffer(top_level_build_data.instances.data(),
-        sizeof(VkAccelerationStructureInstanceKHR) * top_level_build_data.instances.size());
+    top_level_instance_buffer->update_buffer(top_level_instances.data(), sizeof(VkAccelerationStructureInstanceKHR) * top_level_instances.size());
 
     VkAccelerationStructureGeometryKHR top_level_geometry{};
     top_level_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -431,13 +454,12 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     top_level_geometry.geometry.instances.arrayOfPointers = VK_FALSE;
     top_level_geometry.geometry.instances.data.deviceAddress = get_buffer_device_address(top_level_instance_buffer);
 
-    Vector<uint32_t, RenderAllocator> top_level_primitive_counts(render_data->allocator);
-    top_level_primitive_counts.push_back(static_cast<uint32_t>(top_level_build_data.instances.size()));
-    VkAccelerationStructureBuildGeometryInfoKHR top_level_build_info = make_top_level_build_info(&top_level_geometry);
+    std::array<uint32_t, 1> top_level_primitive_counts{static_cast<uint32_t>(top_level_instances.size())};
+    VkAccelerationStructureBuildGeometryInfoKHR top_level_sizing_info = make_top_level_build_info(&top_level_geometry);
     VkAccelerationStructureBuildSizesInfoKHR top_level_build_sizes =
-        get_build_sizes(render_data, top_level_build_info, top_level_primitive_counts);
-    if (top_level_build_info.geometryCount > render_data->max_acceleration_structure_geometry_count ||
-        top_level_build_data.instances.size() > render_data->max_acceleration_structure_primitive_count) {
+        get_build_sizes(render_data, top_level_sizing_info, top_level_primitive_counts);
+    if (top_level_sizing_info.geometryCount > render_data->max_acceleration_structure_geometry_count ||
+        top_level_instances.size() > render_data->max_acceleration_structure_primitive_count) {
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: device geometry limits exceeded.");
     }
     if (top_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
@@ -451,38 +473,53 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
             .set_size(std::max<VkDeviceSize>(top_level_build_sizes.buildScratchSize, 1) + scratch_alignment - 1)
             .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
             .create_ref(render_data);
-    top_level_build_info.dstAccelerationStructure = top_level_acceleration_structure->get_acceleration_structure();
     const VkDeviceAddress top_level_scratch_buffer_address = get_buffer_device_address(top_level_scratch_buffer);
-    top_level_build_info.scratchData.deviceAddress =
+    const VkDeviceAddress aligned_top_level_scratch_buffer_address =
         ((top_level_scratch_buffer_address + scratch_alignment - 1) / scratch_alignment) * scratch_alignment;
-    top_level_build_info.pGeometries = &top_level_geometry;
 
-    Vector<VkAccelerationStructureBuildRangeInfoKHR, RenderAllocator> top_level_build_ranges(render_data->allocator);
-    top_level_build_ranges.push_back(VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = top_level_primitive_counts[0]});
+    const std::array<VkAccelerationStructureBuildRangeInfoKHR, 1> top_level_build_ranges{
+        VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = top_level_primitive_counts[0]}};
 
     const auto command_build_acceleration_structures = render_data->command_build_acceleration_structures;
-    GPUJobVK build_job = [bottom_level_acceleration_structure,
+    GPUJobVK build_job = [bottom_level_acceleration_structures,
                              bottom_level_scratch_buffer,
-                             bottom_level_build_info,
-                             bottom_level_geometries = std::move(p_build_data.geometries),
-                             bottom_level_build_ranges = std::move(p_build_data.build_ranges),
+                             bottom_level_builds = std::move(p_build_data.bottom_level_builds),
+                             aligned_bottom_level_scratch_buffer_address,
                              top_level_acceleration_structure,
                              top_level_instance_buffer,
                              top_level_scratch_buffer,
-                             top_level_build_info,
                              top_level_geometry,
-                             top_level_build_ranges = std::move(top_level_build_ranges),
+                             aligned_top_level_scratch_buffer_address,
+                             top_level_build_ranges,
                              command_build_acceleration_structures](VkCommandBuffer p_command_buffer) mutable {
         // Keep all build inputs, scratch storage, and acceleration structures alive until the queued build completes.
-        (void)bottom_level_acceleration_structure;
+        (void)bottom_level_acceleration_structures;
         (void)bottom_level_scratch_buffer;
         (void)top_level_acceleration_structure;
         (void)top_level_instance_buffer;
         (void)top_level_scratch_buffer;
-        // Record BLAS build, synchronize its writes, then build the TLAS and expose it to ray-tracing shaders.
-        bottom_level_build_info.pGeometries = bottom_level_geometries.data();
-        const VkAccelerationStructureBuildRangeInfoKHR* bottom_level_build_range_pointer = bottom_level_build_ranges.data();
-        command_build_acceleration_structures(p_command_buffer, 1, &bottom_level_build_info, &bottom_level_build_range_pointer);
+        for (size_t build_index = 0; build_index < bottom_level_builds.size(); ++build_index) {
+            VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info =
+                make_bottom_level_build_info(std::span<const VkAccelerationStructureGeometryKHR>(&bottom_level_builds[build_index].geometry, 1));
+            bottom_level_build_info.dstAccelerationStructure = bottom_level_builds[build_index].acceleration_structure->get_acceleration_structure();
+            bottom_level_build_info.scratchData.deviceAddress = aligned_bottom_level_scratch_buffer_address;
+            const VkAccelerationStructureBuildRangeInfoKHR* bottom_level_build_range_pointer = &bottom_level_builds[build_index].build_range;
+            command_build_acceleration_structures(p_command_buffer, 1, &bottom_level_build_info, &bottom_level_build_range_pointer);
+            if (build_index + 1 < bottom_level_builds.size()) {
+                VkMemoryBarrier2 between_blas_barrier{};
+                between_blas_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+                between_blas_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+                between_blas_barrier.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+                between_blas_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+                between_blas_barrier.dstAccessMask =
+                    VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+                VkDependencyInfo between_blas_dependency_info{};
+                between_blas_dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                between_blas_dependency_info.memoryBarrierCount = 1;
+                between_blas_dependency_info.pMemoryBarriers = &between_blas_barrier;
+                vkCmdPipelineBarrier2(p_command_buffer, &between_blas_dependency_info);
+            }
+        }
 
         VkMemoryBarrier2 build_barrier{};
         build_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
@@ -496,7 +533,9 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         build_dependency_info.pMemoryBarriers = &build_barrier;
         vkCmdPipelineBarrier2(p_command_buffer, &build_dependency_info);
 
-        top_level_build_info.pGeometries = &top_level_geometry;
+        VkAccelerationStructureBuildGeometryInfoKHR top_level_build_info = make_top_level_build_info(&top_level_geometry);
+        top_level_build_info.dstAccelerationStructure = top_level_acceleration_structure->get_acceleration_structure();
+        top_level_build_info.scratchData.deviceAddress = aligned_top_level_scratch_buffer_address;
         const VkAccelerationStructureBuildRangeInfoKHR* top_level_build_range_pointer = top_level_build_ranges.data();
         command_build_acceleration_structures(p_command_buffer, 1, &top_level_build_info, &top_level_build_range_pointer);
 
@@ -512,25 +551,25 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         shader_read_dependency_info.pMemoryBarriers = &shader_read_barrier;
         vkCmdPipelineBarrier2(p_command_buffer, &shader_read_dependency_info);
     };
-    static_opaque_bottom_level_acceleration_structure = bottom_level_acceleration_structure;
+    static_opaque_bottom_level_acceleration_structures = bottom_level_acceleration_structures;
     static_opaque_top_level_acceleration_structure = top_level_acceleration_structure;
     static_opaque_top_level_instance_buffer = top_level_instance_buffer;
     return build_job;
 }
 
 GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
-    const RenderDatabase::OpaqueTrianglesInfo& p_info, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) {
-    if (p_info.draw_groups.empty() || p_vertex_buffer == MEM_NULL || p_index_buffer == MEM_NULL) {
-        static_opaque_bottom_level_acceleration_structure = MEM_NULL;
+    RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) {
+    if (p_set == nullptr || p_vertex_buffer == MEM_NULL || p_index_buffer == MEM_NULL) {
+        static_opaque_bottom_level_acceleration_structures.clear();
         static_opaque_top_level_acceleration_structure = MEM_NULL;
         static_opaque_top_level_instance_buffer = MEM_NULL;
         return nullptr;
     }
 
     StaticOpaqueBuildData build_data =
-        build_static_opaque_data(p_info, get_buffer_device_address(p_vertex_buffer), get_buffer_device_address(p_index_buffer));
-    if (build_data.geometries.empty()) {
-        static_opaque_bottom_level_acceleration_structure = MEM_NULL;
+        build_static_opaque_data(p_set, get_buffer_device_address(p_vertex_buffer), get_buffer_device_address(p_index_buffer));
+    if (build_data.bottom_level_builds.empty()) {
+        static_opaque_bottom_level_acceleration_structures.clear();
         static_opaque_top_level_acceleration_structure = MEM_NULL;
         static_opaque_top_level_instance_buffer = MEM_NULL;
         return nullptr;
@@ -538,15 +577,14 @@ GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
     return create_static_opaque_build_job(std::move(build_data));
 }
 
-GPUJobVK RayTracingPluginVK::on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
-    const RenderDatabase::OpaqueTrianglesInfo& p_info,
+GPUJobVK RayTracingPluginVK::on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
+    RefRes<RUStaticOpaqueSet> p_set,
     Ref<ROBufferVK> p_vertex_buffer,
-    Ref<ROBufferVK> p_index_buffer,
-    Ref<ROBufferVK> /*p_object_id_buffer*/) {
+    Ref<ROBufferVK> p_index_buffer) {
     WBE_DEBUG_ASSERT(enabled);
 
     render_data = p_render_data;
-    GPUJobVK build_job = update_static_opaque_acceleration_structure(p_info, p_vertex_buffer, p_index_buffer);
+    GPUJobVK build_job = update_static_opaque_acceleration_structure(p_set, p_vertex_buffer, p_index_buffer);
     p_render_data->static_opaque_acceleration_structure =
         static_opaque_top_level_acceleration_structure == MEM_NULL
             ? VK_NULL_HANDLE

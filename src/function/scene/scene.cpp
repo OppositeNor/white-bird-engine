@@ -103,19 +103,23 @@ void Scene::update(double p_delta) {
     }
 
     Ref<World> active_world = get_active_world();
+    RefRes<RUStaticOpaqueSet> static_opaque_set = MEM_NULL;
+    RefRes<RUStaticMaskedSet> static_masked_set = MEM_NULL;
     if (active_world != MEM_NULL) {
         std::string_view graph_key = active_world->get_render_graph_resource_key();
         if (!graph_key.empty()) {
             renderer->activate_render_graph(graph_key);
         }
-        RefRes<RUStaticOpaqueSet> static_opaque_set = active_world->get_static_opaque_set();
-        if (static_opaque_set != MEM_NULL) {
-            renderer->get_render_database()->set_static_opaque_set(static_opaque_set);
-        }
-        RefRes<RUStaticMaskedSet> static_masked_set = active_world->get_static_masked_set();
-        if (static_masked_set != MEM_NULL) {
-            renderer->get_render_database()->set_static_masked_set(static_masked_set);
-        }
+        static_opaque_set = active_world->get_static_opaque_set();
+        static_masked_set = active_world->get_static_masked_set();
+    }
+
+    if (static_opaque_set != published_static_opaque_set || static_masked_set != published_static_masked_set) {
+        renderer->get_render_database()->set_static_opaque_set(static_opaque_set);
+        renderer->get_render_database()->set_static_masked_set(static_masked_set);
+        renderer->update_static_geometry_sets();
+        published_static_opaque_set = static_opaque_set;
+        published_static_masked_set = static_masked_set;
     }
 
     for (auto& world : worlds) {
@@ -135,6 +139,13 @@ void Scene::teardown() {
         if (!graph_key.empty() && is_first_graph_key(i - 1)) {
             renderer->unregister_render_graph(graph_key);
         }
+    }
+    if (published_static_opaque_set != MEM_NULL || published_static_masked_set != MEM_NULL) {
+        renderer->get_render_database()->set_static_opaque_set(MEM_NULL);
+        renderer->get_render_database()->set_static_masked_set(MEM_NULL);
+        renderer->update_static_geometry_sets();
+        published_static_opaque_set = MEM_NULL;
+        published_static_masked_set = MEM_NULL;
     }
     lifecycle_state = LifecycleState::TORN_DOWN;
 }

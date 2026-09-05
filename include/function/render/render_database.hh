@@ -27,7 +27,6 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -224,41 +223,18 @@ public:
     RenderDatabase(AllocType* p_allocator);
 
     /**
-     * @brief Set the static triangle set.
-     *
-     * @param p_mesh The mesh containing the triangles' data.
-     */
-    void set_static_triangle_set(RUMesh3D* p_mesh) {
-        set_opaque_triangles_linear(static_opaque, p_mesh, nullptr, 0);
-        static_opaque_mesh = p_mesh;
-    }
-
-    /**
-     * @brief Rebuild static opaque data from its current resource values.
-     *
-     * Does nothing before a static opaque mesh has been set. The source mesh must remain alive until it is replaced.
-     */
-    void refresh_static_triangle_set();
-
-    /**
-     * @brief Set the static opaque geometry set.
-     * @param p_set Static opaque set resource. It must outlive the render database reference.
+     * @brief Set or clear the published static opaque geometry set.
+     * @param p_set Static opaque set resource, or null to clear the publication.
      */
     void set_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) {
-        if (p_set == nullptr) {
-            throw std::runtime_error("Failed to set static opaque set: resource should not be NULL.");
-        }
         static_opaque_set = p_set;
     }
 
     /**
-     * @brief Set the static masked geometry set.
-     * @param p_set Static masked set resource. It must outlive the render database reference.
+     * @brief Set or clear the published static masked geometry set.
+     * @param p_set Static masked set resource, or null to clear the publication.
      */
     void set_static_masked_set(RefRes<RUStaticMaskedSet> p_set) {
-        if (p_set == nullptr) {
-            throw std::runtime_error("Failed to set static masked set: resource should not be NULL.");
-        }
         static_masked_set = p_set;
     }
 
@@ -269,15 +245,6 @@ public:
      */
     void set_dynamic_opaque_triangles(RUMesh3D* p_mesh) {
         set_opaque_triangles_linear(dynamic_opaque, p_mesh, nullptr, 0);
-    }
-
-    /**
-     * @brief Get the static triangle set's info.
-     *
-     * @return The static triangle set's info.
-     */
-    const OpaqueTrianglesInfo& get_static_triangle_set_info() const {
-        return static_opaque;
     }
 
     /**
@@ -339,9 +306,7 @@ private:
 
     Map<CompiledRenderResourceKey, RefWeak<IRenderObject>> compiled_render_resources;
 
-    OpaqueTrianglesInfo static_opaque;
     OpaqueTrianglesInfo dynamic_opaque;
-    RUMesh3D* static_opaque_mesh = nullptr;
     RefRes<RUStaticOpaqueSet> static_opaque_set;
     RefRes<RUStaticMaskedSet> static_masked_set;
     void set_opaque_triangles_linear(

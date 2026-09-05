@@ -18,9 +18,10 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "resource/resource_unit/resource_unit.hh"
 
 #include <cstddef>
 #include <span>
@@ -29,6 +30,15 @@
 namespace WhiteBirdEngine {
 
 class ROBufferVK;
+
+/**
+ * @class StaticGeometryBufferUsageVK
+ * @brief Additional Vulkan usage bits required for shared static-geometry vertex and index buffers.
+ */
+struct StaticGeometryBufferUsageVK {
+    VkBufferUsageFlags vertex_buffer_usage = 0;
+    VkBufferUsageFlags index_buffer_usage = 0;
+};
 
 /**
  * @class RenderPluginVK
@@ -107,34 +117,23 @@ public:
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const = 0;
 
     /**
-     * @brief Add extra usage bits required by this plugin for the shared static-opaque vertex buffer.
-     *
-     * @return Additional Vulkan buffer-usage flags. Returns zero when none are required.
+     * @brief Add extra usage bits required by this plugin for shared static-geometry buffers.
      */
-    virtual VkBufferUsageFlags get_static_opaque_vertex_buffer_usage() const = 0;
+    virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const = 0;
 
     /**
-     * @brief Add extra usage bits required by this plugin for the shared static-opaque index buffer.
-     *
-     * @return Additional Vulkan buffer-usage flags. Returns zero when none are required.
-     */
-    virtual VkBufferUsageFlags get_static_opaque_index_buffer_usage() const = 0;
-
-    /**
-     * @brief React to refreshed static-opaque mesh buffers.
+     * @brief React to an explicit static opaque set update.
      *
      * @param p_render_data Renderer state shared with render objects.
-     * @param p_info Refreshed render-database geometry metadata.
+     * @param p_set Published static opaque set, or null to clear derived state.
      * @param p_vertex_buffer Shared static-opaque vertex buffer.
      * @param p_index_buffer Shared static-opaque index buffer.
-     * @param p_object_id_buffer Shared static-opaque object-id buffer.
      * @return An optional GPU job to enqueue after the shared buffers are updated.
      */
-    virtual GPUJobVK on_static_triangle_set_updated(BaseRenderDataVK* p_render_data,
-        const RenderDatabase::OpaqueTrianglesInfo& p_info,
+    virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
+        RefRes<RUStaticOpaqueSet> p_set,
         Ref<ROBufferVK> p_vertex_buffer,
-        Ref<ROBufferVK> p_index_buffer,
-        Ref<ROBufferVK> p_object_id_buffer) = 0;
+        Ref<ROBufferVK> p_index_buffer) = 0;
 };
 
 /**

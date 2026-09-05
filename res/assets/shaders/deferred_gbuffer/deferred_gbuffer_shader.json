@@ -18,12 +18,34 @@
             "color_blend": false
         },
         {
+            "id": "deferred_gbuffer_masked",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "deferred_gbuffer_shader",
+            "fragment_stage_id": "deferred_gbuffer_shader",
+            "fragment_stage_entry": "fragment_masked_main",
+            "depth_test": true,
+            "depth_write": true,
+            "cull_backfaces": false,
+            "color_blend": false
+        },
+        {
             "id": "deferred_gbuffer_static",
             "type": "graphics_pipeline",
             "vertex_stage_id": "deferred_gbuffer_shader",
             "fragment_stage_id": "deferred_gbuffer_shader",
             "depth_test": true,
             "depth_write": true,
+            "color_blend": false
+        },
+        {
+            "id": "deferred_gbuffer_masked_static",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "deferred_gbuffer_shader",
+            "fragment_stage_id": "deferred_gbuffer_shader",
+            "fragment_stage_entry": "fragment_masked_main",
+            "depth_test": true,
+            "depth_write": true,
+            "cull_backfaces": false,
             "color_blend": false
         }
     ]

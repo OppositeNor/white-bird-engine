@@ -144,7 +144,10 @@ public:
         (void)p_binding_count;
     }
 
-    void update_static_triangle_set() override {
+    void update_static_geometry_sets() override {
+        ++static_geometry_update_count;
+        published_opaque_set = render_database->get_static_opaque_set();
+        published_masked_set = render_database->get_static_masked_set();
     }
 
     std::future<void> add_job(std::function<void()> p_job) override {
@@ -155,6 +158,9 @@ public:
     std::vector<std::string> registered_graphs;
     std::vector<std::string> unregistered_graphs;
     std::vector<std::string> activated_graphs;
+    size_t static_geometry_update_count = 0;
+    WBE::RefRes<WBE::RUStaticOpaqueSet> published_opaque_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUStaticMaskedSet> published_masked_set = WBE::MEM_NULL;
 
 private:
     WBE::Ref<WBE::RenderDatabase> render_database;
@@ -397,6 +403,7 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndDistinctRenderGraphs) {
     EXPECT_EQ(renderer->activated_graphs[0], "main_graph");
     ASSERT_EQ(renderer->unregistered_graphs.size(), 1);
     EXPECT_EQ(renderer->unregistered_graphs[0], "main_graph");
+    EXPECT_EQ(renderer->static_geometry_update_count, 0U);
     for (const SceneDriverState* state : {&first_state, &second_state}) {
         EXPECT_EQ(state->setup_count, 1);
         EXPECT_EQ(state->ready_count, 1);
@@ -406,6 +413,51 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndDistinctRenderGraphs) {
     }
     EXPECT_THROW(scene->update(0.5), std::runtime_error);
     EXPECT_THROW(scene->teardown(), std::runtime_error);
+}
+
+TEST_F(WBEWorldTest, ScenePublishesStaticGeometryChangesAndClearsThem) {
+    auto render_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(4));
+    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), render_allocator.get());
+    auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer);
+    auto populated_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
+    auto empty_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
+    WBE::StackAllocator storage(WBE_KI_B(1));
+    WBE::RefRes<WBE::RUStaticOpaqueSet> opaque_set(storage.allocate(sizeof(WBE::RUStaticOpaqueSet)), &storage);
+    WBE::RefRes<WBE::RUStaticMaskedSet> masked_set(storage.allocate(sizeof(WBE::RUStaticMaskedSet)), &storage);
+
+    populated_world->set_static_opaque_set(opaque_set);
+    populated_world->set_static_masked_set(masked_set);
+    scene->add_world(populated_world);
+    scene->add_world(empty_world);
+
+    scene->setup();
+    scene->ready();
+
+    scene->set_active_world(0);
+    scene->update(0.0);
+    EXPECT_EQ(renderer->static_geometry_update_count, 1U);
+    EXPECT_EQ(renderer->published_opaque_set, opaque_set);
+    EXPECT_EQ(renderer->published_masked_set, masked_set);
+
+    scene->update(0.0);
+    EXPECT_EQ(renderer->static_geometry_update_count, 1U);
+
+    scene->set_active_world(1);
+    scene->update(0.0);
+    EXPECT_EQ(renderer->static_geometry_update_count, 2U);
+    EXPECT_EQ(renderer->published_opaque_set, WBE::MEM_NULL);
+    EXPECT_EQ(renderer->published_masked_set, WBE::MEM_NULL);
+
+    scene->set_active_world(0);
+    scene->update(0.0);
+    EXPECT_EQ(renderer->static_geometry_update_count, 3U);
+    EXPECT_EQ(renderer->published_opaque_set, opaque_set);
+    EXPECT_EQ(renderer->published_masked_set, masked_set);
+
+    scene->teardown();
+    EXPECT_EQ(renderer->static_geometry_update_count, 4U);
+    EXPECT_EQ(renderer->published_opaque_set, WBE::MEM_NULL);
+    EXPECT_EQ(renderer->published_masked_set, WBE::MEM_NULL);
 }
 
 TEST_F(WBEWorldTest, SceneManagerTransitionsScenesInLifecycleOrder) {

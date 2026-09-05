@@ -231,13 +231,60 @@ protected:
             .build(p_stream);
     }
 
-    WBE::RUSchemaStaticGeometrySubmesh make_static_geometry_submesh_scheme() {
+    std::unique_ptr<MockResourceChunk> create_split_static_set_test_chunk(
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUStaticOpaqueSet>& p_captured_set) {
+        return MockResourceChunk::Builder()
+            .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                if (p_size == 0) {
+                    return WBE::MEM_NULL;
+                }
+                WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
+                std::memcpy(p_stack_allocator.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &p_stack_allocator);
+            })
+            .set_reserve_res_unit_storage_callback(
+                [&p_stack_allocator, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
+                    if (p_id == "loaded_static_set") {
+                        p_captured_set = resource.force_cast<WBE::RUStaticOpaqueSet>();
+                    }
+                    return resource;
+                })
+            .set_create_ref_to_callback(
+                [this, &p_stack_allocator](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                    if (p_key == "loaded_vertices") {
+                        std::array<uint8_t, sizeof(float) * 9> data{};
+                        WBE::RUBinary binary;
+                        binary.data = push_test_object(p_stack_allocator, data).force_cast<char>();
+                        binary.size = data.size();
+                        p_assign_ref(push_test_object(p_stack_allocator, binary).force_cast<char>());
+                        return;
+                    }
+                    if (p_key == "loaded_indices") {
+                        std::array<uint8_t, sizeof(uint32_t) * 3> data{};
+                        WBE::RUBinary binary;
+                        binary.data = push_test_object(p_stack_allocator, data).force_cast<char>();
+                        binary.size = data.size();
+                        p_assign_ref(push_test_object(p_stack_allocator, binary).force_cast<char>());
+                        return;
+                    }
+                    if (p_key == "loaded_material") {
+                        WBE::RUMaterial material;
+                        p_assign_ref(push_test_object(p_stack_allocator, material).force_cast<char>());
+                    }
+                })
+            .build(p_stream);
+    }
+
+    WBE::RUSchemaStaticGeometrySubmesh make_static_geometry_submesh_scheme(
+        std::string_view p_vertex_binary_id = "loaded_geometry", std::string_view p_index_binary_id = "loaded_geometry") {
         WBE::RUSchemaStaticGeometrySubmesh scheme;
         scheme.material_id = "loaded_material";
-        scheme.vertices.binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 9};
+        scheme.vertices.binary = {.binary_id = std::string(p_vertex_binary_id), .start = 0, .size = sizeof(float) * 9};
         scheme.vertices.stride = sizeof(float) * 3;
         scheme.vertices.attributes = {{.role = "position", .type = "vec3", .offset = 0}};
-        scheme.indices.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 9, .size = sizeof(uint32_t) * 3};
+        scheme.indices.binary = {.binary_id = std::string(p_index_binary_id), .start = 0, .size = sizeof(uint32_t) * 3};
         scheme.first_instance = 1;
         scheme.instance_count = 2;
         return scheme;
@@ -629,6 +676,36 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSubmeshViewsAndInstances) {
     scheme.submeshes[0].instance_count = 3;
     EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
     scheme.submeshes[0].instance_count = 2;
+}
+
+TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSeparateVertexAndIndexBinaries) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUStaticOpaqueSet> captured_set = WBE::MEM_NULL;
+    auto resource_chunk = create_split_static_set_test_chunk(stack_allocator, stream, captured_set);
+    WBE::RUSchemaStaticOpaqueSet scheme;
+    scheme.id = "loaded_static_set";
+    scheme.type = "static_opaque_set";
+    scheme.submeshes = {make_static_geometry_submesh_scheme("loaded_vertices", "loaded_indices")};
+    scheme.instances = {
+        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
+        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
+        {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
+    };
+    WBE::ResourceUnitLoaderStaticOpaqueSet loader;
+
+    loader.populate_scheme(*resource_chunk, scheme);
+
+    ASSERT_NE(captured_set, nullptr);
+    ASSERT_EQ(captured_set->submesh_count, 1U);
+    const WBE::RUStaticGeometrySubmesh& submesh = captured_set->submeshes.get()[0];
+    ASSERT_NE(submesh.vertices.binary.binary, nullptr);
+    ASSERT_NE(submesh.indices.binary.binary, nullptr);
+    EXPECT_NE(submesh.vertices.binary.binary, submesh.indices.binary.binary);
+    EXPECT_EQ(submesh.vertices.binary.size, sizeof(float) * 9);
+    EXPECT_EQ(submesh.indices.binary.size, sizeof(uint32_t) * 3);
+    EXPECT_EQ(submesh.vertices.binary.start, 0U);
+    EXPECT_EQ(submesh.indices.binary.start, 0U);
 }
 
 TEST_F(ResourcePopulatorTest, StaticMaskedSetLoadsEmptyCategory) {

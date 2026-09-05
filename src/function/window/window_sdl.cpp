@@ -15,10 +15,12 @@
 
 #include "function/window/window_sdl.hh"
 #include "SDL.h"
+#include "SDL_error.h"
 #include "SDL_events.h"
 #include "SDL_stdinc.h"
 #include "SDL_video.h"
 #include "function/input_manager/input_manager.hh"
+#include "function/input_manager/key_codes.hh"
 #include "function/window/i_window.hh"
 #include <SDL_vulkan.h>
 #include <atomic>
@@ -26,9 +28,18 @@
 #include <format>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
+
+static std::string build_sdl_error_message(std::string_view p_prefix) {
+    const char* error_message = SDL_GetError();
+    if (error_message == nullptr || error_message[0] == '\0') {
+        return std::format("{} SDL did not report additional details.", p_prefix);
+    }
+    return std::format("{} SDL error: {}.", p_prefix, error_message);
+}
 
 WindowSDL::WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties)
     : window_properties(p_window_properties), input_manager(p_input_manager) {
@@ -324,12 +335,13 @@ void WindowSDL::get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) {
 
 void WindowSDL::init_vulkan(VkInstance p_instance) {
     if (window_type != WindowType::UNKNOWN) {
-        throw std::runtime_error("Failed to initialize SDL window for Vulkan: "
-                                 "Window already initialized.");
+        throw std::runtime_error("Failed to initialize SDL window for Vulkan: Window already initialized.");
     }
-    SDL_Vulkan_LoadLibrary(nullptr);
+    if (SDL_Vulkan_LoadLibrary(nullptr) != 0) {
+        throw std::runtime_error(build_sdl_error_message("Failed to load SDL Vulkan library."));
+    }
     if (SDL_Vulkan_CreateSurface(window, p_instance, &vulkan_surface) != SDL_TRUE) {
-        throw std::runtime_error("Failed to create Vulkan surface.");
+        throw std::runtime_error(build_sdl_error_message("Failed to create Vulkan surface."));
     }
     window_type = WindowType::VULKAN;
 }

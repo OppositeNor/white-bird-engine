@@ -192,11 +192,14 @@ TEST_F(WBERenderDatabaseTest, StoresStaticGeometrySetReferences) {
 
     EXPECT_EQ(render_database.get_static_opaque_set(), opaque_set);
     EXPECT_EQ(render_database.get_static_masked_set(), masked_set);
-    EXPECT_THROW(render_database.set_static_opaque_set(MEM_NULL), std::runtime_error);
-    EXPECT_THROW(render_database.set_static_masked_set(MEM_NULL), std::runtime_error);
+
+    render_database.set_static_opaque_set(MEM_NULL);
+    render_database.set_static_masked_set(MEM_NULL);
+    EXPECT_EQ(render_database.get_static_opaque_set(), MEM_NULL);
+    EXPECT_EQ(render_database.get_static_masked_set(), MEM_NULL);
 }
 
-TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
+TEST_F(WBERenderDatabaseTest, FlattensDynamicLayoutAwareDrawGroupsAndReusesMaterials) {
     RefRes<RUGraphicsPipeline> pipeline_a = make_pipeline(resource_storage, "pipeline_a");
     RefRes<RUGraphicsPipeline> pipeline_b = make_pipeline(resource_storage, "pipeline_b");
     RefRes<RUMaterial> material_a = make_material(resource_storage, "material_a", pipeline_a);
@@ -239,8 +242,8 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    render_database.set_static_triangle_set(mesh.get());
-    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_triangle_set_info();
+    render_database.set_dynamic_opaque_triangles(mesh.get());
+    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_dynamic_opaque_triangle_vertices();
 
     ASSERT_EQ(info.materials.size(), 3U);
     EXPECT_EQ(info.materials[0].material, material_a);
@@ -293,7 +296,6 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     EXPECT_EQ(info.graphics_pipelines[1].draw_group_sub_region.starting_index, 3U);
     EXPECT_EQ(info.graphics_pipelines[1].draw_group_sub_region.size, 1U);
     EXPECT_EQ(info.obj_id.size(), submeshes.size());
-    const std::vector<uint32_t> object_ids(info.obj_id.begin(), info.obj_id.end());
 
     const glm::vec3 updated_position(40.0F, 41.0F, 42.0F);
     material_a_position_first->set_vertex_attribute(0, "position", updated_position);
@@ -301,13 +303,12 @@ TEST_F(WBERenderDatabaseTest, FlattensLayoutAwareDrawGroupsAndReusesMaterials) {
     std::memcpy(&flattened_position, info.vertices.data() + info.draw_groups[1].vertex_buffer_byte_offset, sizeof(flattened_position));
     EXPECT_NE(flattened_position, updated_position);
 
-    render_database.refresh_static_triangle_set();
+    render_database.set_dynamic_opaque_triangles(mesh.get());
     std::memcpy(&flattened_position, info.vertices.data() + info.draw_groups[1].vertex_buffer_byte_offset, sizeof(flattened_position));
     EXPECT_EQ(flattened_position, updated_position);
-    EXPECT_TRUE(std::equal(info.obj_id.begin(), info.obj_id.end(), object_ids.begin(), object_ids.end()));
 }
 
-TEST_F(WBERenderDatabaseTest, IgnoresEmptyIndexGroupsWithoutRegisteringTheirMaterials) {
+TEST_F(WBERenderDatabaseTest, IgnoresEmptyDynamicIndexGroupsWithoutRegisteringTheirMaterials) {
     RefRes<RUGraphicsPipeline> pipeline = make_pipeline(resource_storage, "pipeline");
     RefRes<RUMaterial> material = make_material(resource_storage, "material", pipeline);
     const std::vector<uint8_t> vertices = make_vertex_bytes(std::array<float, 3>{1.0F, 2.0F, 3.0F});
@@ -322,9 +323,9 @@ TEST_F(WBERenderDatabaseTest, IgnoresEmptyIndexGroupsWithoutRegisteringTheirMate
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    render_database.set_static_triangle_set(mesh.get());
+    render_database.set_dynamic_opaque_triangles(mesh.get());
 
-    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_static_triangle_set_info();
+    const RenderDatabase::OpaqueTrianglesInfo& info = render_database.get_dynamic_opaque_triangle_vertices();
     EXPECT_TRUE(info.vertices.empty());
     EXPECT_TRUE(info.indices.empty());
     EXPECT_TRUE(info.obj_id.empty());
@@ -333,7 +334,7 @@ TEST_F(WBERenderDatabaseTest, IgnoresEmptyIndexGroupsWithoutRegisteringTheirMate
     EXPECT_TRUE(info.graphics_pipelines.empty());
 }
 
-TEST_F(WBERenderDatabaseTest, RejectsOutOfRangeLocalIndex) {
+TEST_F(WBERenderDatabaseTest, RejectsOutOfRangeDynamicLocalIndex) {
     RefRes<RUGraphicsPipeline> pipeline = make_pipeline(resource_storage, "pipeline");
     RefRes<RUMaterial> material = make_material(resource_storage, "material", pipeline);
     const std::vector<uint8_t> vertices = make_vertex_bytes(std::array<float, 3>{1.0F, 2.0F, 3.0F});
@@ -345,7 +346,7 @@ TEST_F(WBERenderDatabaseTest, RejectsOutOfRangeLocalIndex) {
     mesh->submeshes = resource_storage.make_array<RefRes<RUSubmesh3D>>(submeshes);
     mesh->submesh_count = submeshes.size();
 
-    EXPECT_THROW(render_database.set_static_triangle_set(mesh.get()), std::runtime_error);
+    EXPECT_THROW(render_database.set_dynamic_opaque_triangles(mesh.get()), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

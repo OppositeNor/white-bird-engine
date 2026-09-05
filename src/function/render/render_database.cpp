@@ -288,8 +288,7 @@ bool append_draw_group(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
 
 } // namespace
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator)
-    : compiled_render_resources(p_allocator), static_opaque(p_allocator), dynamic_opaque(p_allocator) {
+RenderDatabase::RenderDatabase(AllocType* p_allocator) : compiled_render_resources(p_allocator), dynamic_opaque(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");
@@ -322,13 +321,6 @@ bool RenderDatabase::contains_compiled_render_resource(std::string_view p_resour
     auto entry = compiled_render_resources.find(
         CompiledRenderResourceKey{.resource_key = std::string(p_resource_key), .render_object_type_id = p_render_object_type_id});
     return entry != compiled_render_resources.end() && entry->second.is_valid();
-}
-
-void RenderDatabase::refresh_static_triangle_set() {
-    if (static_opaque_mesh != nullptr) {
-        Vector<uint32_t> object_ids(static_opaque.obj_id.begin(), static_opaque.obj_id.end(), allocator);
-        set_opaque_triangles_linear(static_opaque, static_opaque_mesh, object_ids.data(), object_ids.size());
-    }
 }
 
 void RenderDatabase::clear_compiled_render_resources() {

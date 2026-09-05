@@ -58,6 +58,13 @@ public:
      */
     class Config {
     public:
+        Config() = default;
+        ~Config() = default;
+        Config(const Config&) = default;
+        Config(Config&&) noexcept = default;
+        Config& operator=(const Config&) = default;
+        Config& operator=(Config&&) noexcept = default;
+
         Config& set_default_material_resource_key(std::string_view p_resource_key);
         Config& set_material_textures_variable_name(std::string_view p_variable_name);
         Config& set_material_params_variable_name(std::string_view p_variable_name);

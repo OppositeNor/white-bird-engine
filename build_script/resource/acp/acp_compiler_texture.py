@@ -142,6 +142,10 @@ class TextureCompilerPyKTX(TextureCompiler):
         }[p_request.target_format]
         with Image.open(p_request.source_path) as image:
             rgba_pixels = numpy.asarray(image.convert("RGBA"), dtype=numpy.uint8)
+        if p_request.flip_h:
+            rgba_pixels = numpy.flip(rgba_pixels, axis=1)
+        if p_request.flip_v:
+            rgba_pixels = numpy.flip(rgba_pixels, axis=0)
         linear_pixels = self._decode_transfer(rgba_pixels, p_request.source_format, numpy)
         base_format = "srgb" if p_request.target_format in {"srgb", "sbc7"} else "rgb"
         vk_format = (
@@ -237,6 +241,8 @@ class WBEACPCompilerTexture(WBEACPCompiler):
             source_format = resource.get("source_format")
             target_format = resource.get("target_format")
             generate_mipmap = resource.get("generate_mipmap")
+            flip_h = resource.get("flip_h", False)
+            flip_v = resource.get("flip_v", False)
             if not isinstance(source_value, str) or not source_value:
                 raise RuntimeError(f"image_texture requires a non-empty src in {manifest_path}.")
             if not isinstance(destination_value, str) or not destination_value:
@@ -247,6 +253,8 @@ class WBEACPCompilerTexture(WBEACPCompiler):
                 raise RuntimeError(f"image_texture target_format must be rgb, srgb, bc7, or sbc7 in {manifest_path}.")
             if not isinstance(generate_mipmap, bool):
                 raise RuntimeError(f"image_texture generate_mipmap must be a boolean in {manifest_path}.")
+            if not isinstance(flip_h, bool) or not isinstance(flip_v, bool):
+                raise RuntimeError(f"image_texture flip_h and flip_v must be booleans in {manifest_path}.")
             source_path, _ = self._resolve_resource_file_path(source_value, manifest_path, res_dir)
             if source_path.suffix.lower() in {".ktx", ".ktx2"}:
                 raise RuntimeError(f"image_texture does not accept KTX input in {manifest_path}.")
@@ -257,6 +265,8 @@ class WBEACPCompilerTexture(WBEACPCompiler):
                 source_format=source_format,
                 target_format=target_format,
                 generate_mipmap=generate_mipmap,
+                flip_h=flip_h,
+                flip_v=flip_v,
             ))
         else:
             raise RuntimeError(f"Unsupported texture source type in {manifest_path}: {source_type}.")

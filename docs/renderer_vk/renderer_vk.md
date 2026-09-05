@@ -22,7 +22,7 @@ Material texture semantics are shader metadata, not renderer-wide enums. Integer
 argument uses the annotated field name. `rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel
 pack.
 
-The static opaque task reflects this contract independently for every graphics pipeline batch. It builds that batch's
+The static-set task reflects this contract independently for every graphics pipeline batch. It builds that batch's
 bindless `MaterialTextures.textures` descriptor array, initializes missing slots from the configured default material, and writes
 indices into `MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture
 roles.
@@ -46,8 +46,9 @@ supplies an open string role, a byte offset within the stride, and a reflected s
 
 Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `ivec3`, `ivec4`, `uint`, `uvec2`, `uvec3`, and
 `uvec4`. The resulting attribute offsets, byte sizes, stride, and vertex count are fixed after loading. Attribute values may be
-changed through `RUSubmesh3D`, but mutation is not thread-safe. Call `RendererVK::update_static_triangle_set()` after a
-legacy mesh mutation to rebuild and upload the current interleaved data before subsequent draws.
+changed through `RUSubmesh3D`, but mutation is not thread-safe. Publish the updated `RUStaticOpaqueSet` or `RUStaticMaskedSet`
+through the scene/render database and call `RendererVK::update_static_geometry_sets()` only when derived geometry state such as
+ray tracing must be rebuilt.
 
 Static geometry resources use `RUStaticGeometrySet`, with distinct `RUStaticOpaqueSet` and `RUStaticMaskedSet` resource types.
 Each set stores declared submeshes and shared instance transforms. A submesh references a material, a vertex view, an index view,
@@ -98,27 +99,29 @@ Each static set stores:
 - For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
 - One shared instance array containing `glm::mat4` transforms.
 
-All drawable submeshes in one `RTRunStaticSetVK` task must reference the same `RUBinary` resource. The task validates that each
-vertex view and index view stays within the binary bounds before it creates any Vulkan buffers.
+All drawable submeshes in one `RTRunStaticSetVK` task must reference the same vertex `RUBinary` resource and the same index
+`RUBinary` resource. Vertex and index binaries may be distinct from each other. The task validates that each vertex view and
+index view stays within its binary bounds before it creates any Vulkan buffers.
 
 ### Vertex Assembly And Upload
 
 `RTRunStaticSetVK` does not flatten mesh data through `RenderDatabase`. Instead, construction follows this path in
 `src/function/render_vk/rt_run_static_set_vk.cpp`:
 
-1. `validate_static_set_and_get_binary()` verifies submesh storage, material presence, vertex stride, vertex byte ranges, index
-  ranges, and instance ranges. It also enforces that every drawable submesh shares one `RUBinary`.
-2. `build_static_binary_buffer()` uploads that binary once into an `ROBufferVK` with
-  `VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT`.
-3. The upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource key, so later tasks can
-  reuse the same Vulkan buffer instead of re-uploading identical geometry bytes.
+1. `StaticSetBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
+  also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
+2. `build_static_binary_buffer()` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
+  the index binary into a separate `ROBufferVK` with the effective index usage flags.
+3. Each upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource identity plus Vulkan
+  usage flags, so later tasks and renderer plugins can reuse compatible buffers without re-uploading identical geometry bytes.
 4. `build_static_instance_buffer_data()` assembles three CPU-side tables from the set declaration:
   `StaticSetSubmeshGPU`, `StaticSetNodeGPU`, and `StaticSetInstanceGPU`.
 5. `build_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
   indirection.
 
-The important distinction is that vertex and index bytes stay in their original binary layout. The task uploads the binary as-is,
-then uploads side-band metadata buffers that tell the shader which submesh and instance transform to use for each indirect draw.
+The important distinction is that vertex and index bytes stay in their original binary layouts. The task uploads those binaries
+as-is into separate buffers, then uploads side-band metadata buffers that tell the shader which submesh and instance transform to
+use for each indirect draw.
 
 ### Feeding The Graphics Pipeline
 
@@ -191,23 +194,25 @@ objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
   reuses attachments produced by an earlier task.
 - Task ids, resource usages, and dependencies belong to `RendTaskDescVK`, not the task configuration.
 
-### Legacy Flattened Path
+### Static Geometry Updates
 
-Older code used a compatibility path that started from `RUMesh3D` and `RenderDatabase::OpaqueTrianglesInfo`. That path relied on
-implicit batching by material pipeline and has been replaced by explicit `RTRunStaticSetVK` composition.
+`RendererVK::update_static_geometry_sets()` no longer rebuilds raster draw tasks or flatten `RUMesh3D` data. Raster passes stay
+application-owned through explicit `RTRunStaticSetVK` tasks. The renderer-side update path exists only for derived shared state
+that is keyed by the published static sets.
 
-The legacy upload path is different:
+The current opaque update flow is:
 
-1. `RenderDatabase::set_static_triangle_set()` calls `set_opaque_triangles_linear()`.
-2. `register_draw_group_submesh()` groups submeshes by source graphics pipeline, material, and exact vertex layout.
-3. `append_submesh_geometry()` copies vertex bytes into one flat `vertices` array and remaps indices into one flat `indices`
-  array.
-4. `RendererVK::update_static_triangle_set()` refreshes that flattened representation after mesh mutation.
-5. The old Vulkan task layer converted the flattened draw groups into one indirect draw stream with one compiled pipeline batch
-  per selected material pipeline or override target.
+1. `Scene::update()` publishes `RUStaticOpaqueSet` and `RUStaticMaskedSet` references into `RenderDatabase`, including null clears.
+2. `RendererVK::update_static_geometry_sets()` reads the published opaque set and asks each enabled Vulkan plugin for any extra
+  shared-buffer usage bits.
+3. `StaticSetBufferCompilerVK` validates the set's shared binaries, caches vertex/index uploads by binary identity plus effective
+  Vulkan usage flags, and returns reusable `ROBufferVK` objects.
+4. The renderer invokes `RenderPluginVK::on_static_opaque_set_updated()` once with the explicit set and the shared vertex/index
+  buffers.
+5. `RayTracingPluginVK` builds one BLAS per drawable submesh and one TLAS instance per published transform, then publishes the
+  resulting `VkAccelerationStructureKHR` through `BaseRenderDataVK::static_opaque_acceleration_structure`.
 
-This historical path is still useful for understanding older renderer/database code, but new work should use `RTRunStaticSetVK`
-and explicit task composition.
+Null, empty, and fully skipped sets clear the published acceleration structure without zero-sized allocations.
 
 ### Writing Pipeline-Owned Descriptors
 

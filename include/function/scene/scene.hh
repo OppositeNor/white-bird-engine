@@ -18,6 +18,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_resource_unit.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -134,6 +136,8 @@ private:
     Vector<Ref<World>, HeapAllocatorDefault> worlds;
     String<HeapAllocatorDefault> resource_manifest_key;
     size_t active_world_index = 0;
+    RefRes<RUStaticOpaqueSet> published_static_opaque_set = MEM_NULL;
+    RefRes<RUStaticMaskedSet> published_static_masked_set = MEM_NULL;
     LifecycleState lifecycle_state = LifecycleState::CONSTRUCTED;
 };
 
