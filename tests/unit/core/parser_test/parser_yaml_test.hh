@@ -543,7 +543,14 @@ TEST(ParserYAMLTest, ErrorHandlingAndValidation) {
     WBE::ParserYAML parser;
 
     // Test malformed YAML handling
-    ASSERT_THROW(parser.parse_from_buffer("invalid: yaml: content: ["), std::exception);
+    try {
+        parser.parse_from_buffer("invalid: yaml: content: [");
+        FAIL() << "Expected malformed YAML parsing to fail.";
+    } catch (const std::runtime_error& exception) {
+        const std::string_view message = exception.what();
+        EXPECT_NE(message.find("Failed to parse YAML from buffer."), std::string_view::npos);
+        EXPECT_NE(message.find("yaml-cpp: error at line"), std::string_view::npos);
+    }
 
     // Test valid YAML with various edge cases
     parser.parse_from_buffer(R"(

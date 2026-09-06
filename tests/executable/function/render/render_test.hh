@@ -16,8 +16,10 @@
 #define WBE_FILE_RENDER_TEST_HH
 #include "function/ecs/components.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "platform/os/os.hh"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -25,6 +27,9 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
+#include <iostream>
+#include <limits>
+#include <print>
 #include <string_view>
 
 namespace WBE = WhiteBirdEngine;
@@ -41,6 +46,23 @@ inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_TARGET = glm::vec3(0.0F, 0.0F, 0.
 inline constexpr float TEST_CAMERA_MOVE_SPEED = 3.0F;
 inline constexpr float TEST_CAMERA_TURN_SPEED = glm::radians(90.0F);
 inline constexpr float TEST_CAMERA_PITCH_LIMIT = glm::radians(89.0F);
+
+namespace WhiteBirdEngine {
+
+/**
+ * @brief Waits for the Enter key when process injection is requested through the environment.
+ */
+inline void wait_for_process_inject() {
+    const char* wait_process_inject = std::getenv("WBE_WAIT_PROCESS_INJECT");
+    if (wait_process_inject == nullptr || std::string_view(wait_process_inject) != "1") {
+        return;
+    }
+
+    std::println("WBE_WAIT_PROCESS_INJECT is set. Running on PID: {}, Press Enter to continue...", OS::get_pid());
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+}
+
+} // namespace WhiteBirdEngine
 
 inline glm::vec3 default_test_camera_direction() {
     return glm::normalize(TEST_DEFAULT_CAMERA_TARGET - TEST_DEFAULT_CAMERA_POSITION);

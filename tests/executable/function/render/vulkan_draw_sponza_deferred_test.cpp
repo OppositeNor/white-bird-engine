@@ -1195,6 +1195,7 @@ ApplicationVulkanDeferredPBRTest::CompositionCameraInfo ApplicationVulkanDeferre
 namespace WBE = WhiteBirdEngine;
 
 int main(int p_argc, char* p_argv[]) {
+    WBE::wait_for_process_inject();
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         WBE::ApplicationVulkanDeferredPBRTest game_application;

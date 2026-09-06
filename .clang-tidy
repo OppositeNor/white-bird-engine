@@ -17,6 +17,7 @@ Checks: >
   -objc-*,
   -openmp-*,
   -portability-*,
+  -concurrency-mt-unsafe,
   -performance-unnecessary-value-param,
   -readability-magic-numbers,
   -readability-named-parameter,
