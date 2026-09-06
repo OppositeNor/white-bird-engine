@@ -105,8 +105,8 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
         discard;
     }
     float3 base_color = albedo_sample.rgb;
-    float3 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float2 sampled_normal =
+        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
     float3 rma = material_textures.textures[rma_descriptor_index]
                      .Sample(material_textures.material_sampler, p_input.uv)
                      .rgb;

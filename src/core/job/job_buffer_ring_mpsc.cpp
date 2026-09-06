@@ -33,18 +33,13 @@ JobBufferRingMPSC::JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p
         throw std::runtime_error("Buffer has to be at least size 2.");
     }
     buffer.resize(p_buffer_size);
+    available_slot_semaphore.release(static_cast<std::ptrdiff_t>(p_buffer_size - 1));
 }
 
 std::future<void> JobBufferRingMPSC::add_job(std::function<void()> p_job) {
-    std::scoped_lock lock(producer_mutex);
-    size_t head_l = head.load(std::memory_order_relaxed);
-    size_t next = ring_increment(head_l, buffer.size());
-    if (next == tail.load(std::memory_order_acquire)) {
-        throw std::runtime_error("Job buffer overflow.");
-    }
     Ref<std::promise<void>> completion_promise = make_ref<std::promise<void>>(allocator);
     std::future<void> completion_future = completion_promise->get_future();
-    buffer[head_l] = [job = std::move(p_job), completion_promise]() mutable {
+    std::function<void()> wrapped_job = [job = std::move(p_job), completion_promise]() mutable {
         try {
             job();
             completion_promise->set_value();
@@ -54,6 +49,14 @@ std::future<void> JobBufferRingMPSC::add_job(std::function<void()> p_job) {
             completion_promise->set_exception(std::current_exception());
         }
     };
+
+    // Block if the buffer is full.
+    available_slot_semaphore.acquire();
+    std::scoped_lock lock(producer_mutex);
+    size_t head_l = head.load(std::memory_order_relaxed);
+    size_t next = ring_increment(head_l, buffer.size());
+    WBE_DEBUG_ASSERT(next != tail.load(std::memory_order_acquire));
+    buffer[head_l] = std::move(wrapped_job);
     head.store(next, std::memory_order_relaxed);
     semaphore.release();
     return completion_future;
@@ -70,6 +73,7 @@ std::function<void()> JobBufferRingMPSC::retrieve_job(bool p_block) {
     std::function<void()> result = std::move(buffer[tail_l]);
     buffer[tail_l] = nullptr;
     tail.store(ring_increment(tail_l, buffer.size()), std::memory_order_release);
+    available_slot_semaphore.release();
     return result;
 }
 

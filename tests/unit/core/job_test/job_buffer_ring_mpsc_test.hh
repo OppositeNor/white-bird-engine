@@ -22,7 +22,9 @@
 #include "platform/file_system/directory.hh"
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <functional>
+#include <future>
 #include <gtest/gtest.h>
 #include <memory>
 #include <mutex>
@@ -147,21 +149,33 @@ TEST_F(WBEJobBufferRingMPSCTest, AddAndRetrieveMultipleJobs) {
     EXPECT_EQ(empty, nullptr);
 }
 
-TEST_F(WBEJobBufferRingMPSCTest, BufferOverflow) {
-    JobBufferRingMPSC buffer(get_allocator(), 3); // Small buffer
-
-    auto job1 = std::function<void()>([]() {
-    });
-    auto job2 = std::function<void()>([]() {
+TEST_F(WBEJobBufferRingMPSCTest, JobSubmissionWaitsWhenFull) {
+    JobBufferRingMPSC buffer(get_allocator(), 2);
+    buffer.add_job([]() {
     });
 
-    EXPECT_NO_THROW(buffer.add_job(job1));
-    EXPECT_NO_THROW(buffer.add_job(job2));
-
-    // This should cause overflow
-    auto job3 = std::function<void()>([]() {
+    std::promise<void> submission_started_promise;
+    std::future<void> submission_started_future = submission_started_promise.get_future();
+    std::promise<void> submission_finished_promise;
+    std::future<void> submission_finished_future = submission_finished_promise.get_future();
+    std::jthread producer([&]() {
+        submission_started_promise.set_value();
+        buffer.add_job([]() {
+        });
+        submission_finished_promise.set_value();
     });
-    EXPECT_THROW(buffer.add_job(job3), std::runtime_error);
+
+    submission_started_future.wait();
+    EXPECT_EQ(submission_finished_future.wait_for(std::chrono::milliseconds(50)), std::future_status::timeout);
+
+    std::function<void()> first_job = buffer.retrieve_job();
+    ASSERT_NE(first_job, nullptr);
+    first_job();
+
+    EXPECT_EQ(submission_finished_future.wait_for(std::chrono::seconds(1)), std::future_status::ready);
+    std::function<void()> second_job = buffer.retrieve_job();
+    ASSERT_NE(second_job, nullptr);
+    second_job();
 }
 
 TEST_F(WBEJobBufferRingMPSCTest, RingBufferWrapAround) {

@@ -12,7 +12,7 @@
                         "src": "assets/images/default_normal.png",
                         "dst": "assets/textures/default_normal.ktx2",
                         "source_format": "rgb",
-                        "target_format": "bc7",
+                        "target_format": "bc5",
                         "generate_mipmap": true
                     }
                 },
@@ -23,7 +23,7 @@
                         "src": "assets/images/default_albedo.png",
                         "dst": "assets/textures/default_albedo.ktx2",
                         "source_format": "srgb",
-                        "target_format": "sbc7",
+                        "target_format": "bc7",
                         "generate_mipmap": true
                     }
                 },

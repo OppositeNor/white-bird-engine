@@ -96,8 +96,8 @@ RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
     if (albedo_sample.a < 0.5) {
         discard;
     }
-    float3 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float2 sampled_normal =
+        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
     float3 rma = material_textures.textures[rma_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
     float3 world_normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     float3 rsm_flux = compute_rsm_flux(p_input.world_position, world_normal, albedo_sample.rgb, clamp(rma.g, 0.0, 1.0));

@@ -155,13 +155,13 @@ float3 fresnel_schlick(float p_cos_theta, float3 p_f0) {
 
 /**
  * @brief Compute a world-space surface normal from a tangent-space normal map sample, falling back to a derived tangent frame when the supplied tangent or bitangent is degenerate.
- * @param p_sampled_normal The normal-map sample with components in [0, 1].
+ * @param p_sampled_normal The encoded normal-map X and Y components in [0, 1].
  * @param p_normal The interpolated surface normal.
  * @param p_tangent The interpolated surface tangent (may be degenerate).
  * @param p_bitangent The interpolated surface bitangent (may be degenerate).
  * @return The unit-length world-space normal.
  */
-float3 normal_from_texture(float3 p_sampled_normal, float3 p_normal, float3 p_tangent, float3 p_bitangent) {
+float3 normal_from_texture(float2 p_sampled_normal, float3 p_normal, float3 p_tangent, float3 p_bitangent) {
     float3 normal = normalize(p_normal);
     float3 tangent = p_tangent;
     float3 bitangent = p_bitangent;
@@ -174,7 +174,7 @@ float3 normal_from_texture(float3 p_sampled_normal, float3 p_normal, float3 p_ta
         bitangent = normalize(bitangent);
     }
 
-    float3 texture_normal = p_sampled_normal * 2.0 - 1.0;
+    float3 texture_normal = decode_normal_map(p_sampled_normal);
     return normalize(tangent * texture_normal.x + bitangent * texture_normal.y + normal * texture_normal.z);
 }
 

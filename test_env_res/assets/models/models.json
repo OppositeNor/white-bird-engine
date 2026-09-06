@@ -8,7 +8,7 @@
             "combine_nodes": true,
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "texture_output_dir": "assets/textures",
-            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
+            "texture_config": {"default": {"target_format": "bc7", "generate_mipmap": true}, "roles": {"normal": {"target_format": "bc5", "generate_mipmap": true}}}
         },
         {
             "id": "model_cube_static",
@@ -17,7 +17,7 @@
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
             "texture_output_dir": "assets/textures",
-            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
+            "texture_config": {"default": {"target_format": "bc7", "generate_mipmap": true}, "roles": {"normal": {"target_format": "bc5", "generate_mipmap": true}}}
         },
         {
             "id": "sponza",
@@ -26,7 +26,7 @@
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
             "texture_output_dir": "assets/textures",
-            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
+            "texture_config": {"default": {"target_format": "bc7", "generate_mipmap": true}, "roles": {"normal": {"target_format": "bc5", "generate_mipmap": true}}}
         },
         {
             "id": "intel_sponza",
@@ -35,7 +35,7 @@
             "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
             "masked_graphics_pipeline_ids": ["forward_cook_torrance_pbr_masked"],
             "texture_output_dir": "assets/textures",
-            "texture_config": {"target_format": "bc7", "generate_mipmap": true}
+            "texture_config": {"default": {"target_format": "bc7", "generate_mipmap": true}, "roles": {"normal": {"target_format": "bc5", "generate_mipmap": true}}}
         }
     ]
 }

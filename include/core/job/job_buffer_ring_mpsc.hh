@@ -18,7 +18,6 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer.hh"
-#include "core/memory/reference_strong.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
@@ -53,6 +52,13 @@ public:
     JobBufferRingMPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size);
 
     std::function<void()> retrieve_job(bool p_block = false);
+
+    /**
+     * @brief Add a job, waiting until the consumer frees capacity when the buffer is full.
+     *
+     * @param p_job The job to add.
+     * @return A future that becomes ready after the job finishes.
+     */
     std::future<void> add_job(std::function<void()> p_job);
 
     /**
@@ -67,6 +73,7 @@ public:
 private:
     HeapAllocatorDefault* allocator;
     std::counting_semaphore<> semaphore{0};
+    std::counting_semaphore<> available_slot_semaphore{0};
     Vector<std::function<void()>, HeapAllocatorDefault> buffer;
     std::mutex producer_mutex;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;

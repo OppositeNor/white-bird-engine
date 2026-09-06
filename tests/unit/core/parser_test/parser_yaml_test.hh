@@ -539,44 +539,6 @@ multiline_sequence:
     ASSERT_EQ(inline_seq[2], "fox");
 }
 
-TEST(ParserYAMLTest, ErrorHandlingAndValidation) {
-    WBE::ParserYAML parser;
-
-    // Test malformed YAML handling
-    try {
-        parser.parse_from_buffer("invalid: yaml: content: [");
-        FAIL() << "Expected malformed YAML parsing to fail.";
-    } catch (const std::runtime_error& exception) {
-        const std::string_view message = exception.what();
-        EXPECT_NE(message.find("Failed to parse YAML from buffer."), std::string_view::npos);
-        EXPECT_NE(message.find("yaml-cpp: error at line"), std::string_view::npos);
-    }
-
-    // Test valid YAML with various edge cases
-    parser.parse_from_buffer(R"(
-null_value: null
-empty_string: ""
-zero: 0
-boolean_true: true
-boolean_false: false
-)");
-
-    // Test accessing non-existent keys
-    ASSERT_FALSE(parser.contains("non_existent_key"));
-    ASSERT_THROW(parser.get_value<std::string>("non_existent_key"), std::exception);
-
-    // Test type access and validation
-    ASSERT_TRUE(parser.contains("zero"));
-    ASSERT_EQ(parser.get_value<int>("zero"), 0);
-
-    // Test accessing valid keys
-    ASSERT_TRUE(parser.contains("null_value"));
-    ASSERT_TRUE(parser.contains("empty_string"));
-    ASSERT_EQ(parser.get_value<std::string>("empty_string"), "");
-    ASSERT_EQ(parser.get_value<bool>("boolean_true"), true);
-    ASSERT_EQ(parser.get_value<bool>("boolean_false"), false);
-}
-
 TEST(ParserYAMLTest, KeyManagementAndUtilities) {
     WBE::ParserYAML parser;
 

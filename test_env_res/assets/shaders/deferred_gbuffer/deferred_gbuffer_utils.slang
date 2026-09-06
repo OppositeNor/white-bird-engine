@@ -50,13 +50,13 @@ struct VSOutput {
 
 /**
  * @brief Compute a world-space surface normal from a tangent-space normal map sample.
- * @param p_sampled_normal The normal-map sample with components in [0, 1].
+ * @param p_sampled_normal The encoded normal-map X and Y components in [0, 1].
  * @param p_normal The interpolated surface normal.
  * @param p_tangent The interpolated surface tangent.
  * @param p_bitangent The interpolated surface bitangent.
  * @return The unit-length world-space normal.
  */
-float3 normal_from_texture(float3 p_sampled_normal, float3 p_normal, float3 p_tangent, float3 p_bitangent) {
+float3 normal_from_texture(float2 p_sampled_normal, float3 p_normal, float3 p_tangent, float3 p_bitangent) {
     float3 normal = normalize(p_normal);
     float3 tangent = p_tangent;
     float3 bitangent = p_bitangent;
@@ -69,7 +69,7 @@ float3 normal_from_texture(float3 p_sampled_normal, float3 p_normal, float3 p_ta
         float handedness = dot(cross(normal, tangent), bitangent) < 0.0 ? -1.0 : 1.0;
         bitangent = normalize(cross(normal, tangent)) * handedness;
     }
-    float3 tangent_space_normal = normalize(p_sampled_normal * 2.0 - 1.0);
+    float3 tangent_space_normal = decode_normal_map(p_sampled_normal);
     return normalize(tangent * tangent_space_normal.x + bitangent * tangent_space_normal.y + normal * tangent_space_normal.z);
 }
 

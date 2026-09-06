@@ -31,7 +31,7 @@ from build_script.resource.acp.acp_compiler import (
 from wbe_utils_model_compiler import TextureCompileRequest, TextureCompiler
 
 
-_FORMATS = {"rgb", "srgb", "bc7", "sbc7"}
+_FORMATS = {"rgb", "srgb", "bc5", "bc7", "sbc7"}
 _KTX2_IDENTIFIER = b"\xABKTX 20\xBB\r\n\x1A\n"
 
 
@@ -116,9 +116,9 @@ class TextureCompilerPyKTX(TextureCompiler):
 
     def compile_texture(self, p_request: TextureCompileRequest) -> None:
         if p_request.source_format not in _FORMATS:
-            raise ValueError("Texture source_format must be one of rgb, srgb, bc7, or sbc7.")
+            raise ValueError("Texture source_format must be one of rgb, srgb, bc5, bc7, or sbc7.")
         if p_request.target_format not in _FORMATS:
-            raise ValueError("Texture target_format must be one of rgb, srgb, bc7, or sbc7.")
+            raise ValueError("Texture target_format must be one of rgb, srgb, bc5, bc7, or sbc7.")
         if p_request.source_path.suffix.lower() in {".ktx", ".ktx2"}:
             raise ValueError("Raster texture compilation does not accept KTX input.")
         if p_request.destination_path.suffix.lower() != ".ktx2":
@@ -137,6 +137,7 @@ class TextureCompilerPyKTX(TextureCompiler):
         expected_format = {
             "rgb": pyktx.VkFormat.VK_FORMAT_R8G8B8A8_UNORM,
             "srgb": pyktx.VkFormat.VK_FORMAT_R8G8B8A8_SRGB,
+            "bc5": pyktx.VkFormat.VK_FORMAT_BC5_UNORM_BLOCK,
             "bc7": pyktx.VkFormat.VK_FORMAT_BC7_UNORM_BLOCK,
             "sbc7": pyktx.VkFormat.VK_FORMAT_BC7_SRGB_BLOCK,
         }[p_request.target_format]
@@ -148,11 +149,15 @@ class TextureCompilerPyKTX(TextureCompiler):
             rgba_pixels = numpy.flip(rgba_pixels, axis=0)
         linear_pixels = self._decode_transfer(rgba_pixels, p_request.source_format, numpy)
         base_format = "srgb" if p_request.target_format in {"srgb", "sbc7"} else "rgb"
-        vk_format = (
-            pyktx.VkFormat.VK_FORMAT_R8G8B8A8_SRGB
-            if base_format == "srgb"
-            else pyktx.VkFormat.VK_FORMAT_R8G8B8A8_UNORM
-        )
+        if p_request.target_format == "bc5":
+            vk_format = pyktx.VkFormat.VK_FORMAT_R8G8_UNORM
+            linear_pixels = linear_pixels[..., :2]
+        else:
+            vk_format = (
+                pyktx.VkFormat.VK_FORMAT_R8G8B8A8_SRGB
+                if base_format == "srgb"
+                else pyktx.VkFormat.VK_FORMAT_R8G8B8A8_UNORM
+            )
         create_info = pyktx.KtxTextureCreateInfo(
             gl_internal_format=None,
             base_width=width,
@@ -173,15 +178,26 @@ class TextureCompilerPyKTX(TextureCompiler):
                 texture.set_image_from_memory(level, 0, 0, self._encode_transfer(mip_pixels, base_format, numpy))
                 mip_pixels = self._downsample(mip_pixels, numpy)
 
-            if p_request.target_format in {"bc7", "sbc7"}:
+            if p_request.target_format in {"bc5", "bc7", "sbc7"}:
+                uastc_flags = int(pyktx.KtxPackUastcFlagBits.FASTEST)
+                if p_request.target_format in {"bc7", "sbc7"}:
+                    uastc_flags |= int(pyktx.KtxPackUastcFlagBits.FAVOR_BC7_ERROR)
                 basis_params = pyktx.KtxBasisParams(
                     codec=pyktx.KtxBasisCodec.UASTC_LDR_4x4,
                     thread_count=min(16, os.cpu_count() or 1),
-                    uastc_flags=int(pyktx.KtxPackUastcFlagBits.FASTEST) | int(pyktx.KtxPackUastcFlagBits.FAVOR_BC7_ERROR),
+                    uastc_flags=uastc_flags,
                     uastc_rdo=False,
+                    # This will map R from source to R in basis, and G from source to A in basis. the BC5 transcoder then 
+                    # is going to map R -> R and A -> G, so we're preserving the R and G channels.
+                    normal_map=p_request.target_format == "bc5",
                 )
                 texture.compress_basis(basis_params)
-                texture.transcode_basis(pyktx.KtxTranscodeFmt.BC7_RGBA)
+                transcode_format = (
+                    pyktx.KtxTranscodeFmt.BC5_RG
+                    if p_request.target_format == "bc5"
+                    else pyktx.KtxTranscodeFmt.BC7_RGBA
+                )
+                texture.transcode_basis(transcode_format)
 
             if texture.vk_format != expected_format or texture.num_levels != mip_count:
                 raise RuntimeError("libktx produced texture metadata that does not match the compile request.")
@@ -248,9 +264,9 @@ class WBEACPCompilerTexture(WBEACPCompiler):
             if not isinstance(destination_value, str) or not destination_value:
                 raise RuntimeError(f"image_texture requires a non-empty dst in {manifest_path}.")
             if source_format not in _FORMATS:
-                raise RuntimeError(f"image_texture source_format must be rgb, srgb, bc7, or sbc7 in {manifest_path}.")
+                raise RuntimeError(f"image_texture source_format must be rgb, srgb, bc5, bc7, or sbc7 in {manifest_path}.")
             if target_format not in _FORMATS:
-                raise RuntimeError(f"image_texture target_format must be rgb, srgb, bc7, or sbc7 in {manifest_path}.")
+                raise RuntimeError(f"image_texture target_format must be rgb, srgb, bc5, bc7, or sbc7 in {manifest_path}.")
             if not isinstance(generate_mipmap, bool):
                 raise RuntimeError(f"image_texture generate_mipmap must be a boolean in {manifest_path}.")
             if not isinstance(flip_h, bool) or not isinstance(flip_v, bool):

@@ -49,8 +49,11 @@ public:
     /**
      * @brief Add a job to the buffer.
      *
-     * @throws std::runtime_error If buffer overflow.
      * @param p_job The job to add to the buffer.
+     * @return A future that becomes ready after the job finishes.
+     *
+     * The concrete buffer determines whether submission blocks or throws when
+     * its capacity is exhausted.
      */
     std::future<void> add_job(std::function<void()> p_job) {
         return static_cast<ChildT*>(this)->add_job(std::move(p_job));

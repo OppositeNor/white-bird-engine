@@ -100,8 +100,8 @@ static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
     float material_id_unorm = float(material_index) / 255.0;
     output.albedo_matid = float4(albedo_sample.rgb, material_id_unorm);
 
-    float3 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float2 sampled_normal =
+        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
     float3 normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     output.octahedron_normal = octahedron_encode(normal);
 

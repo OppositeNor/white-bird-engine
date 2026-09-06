@@ -167,6 +167,17 @@ struct StaticSet {
 static const float WBE_PI = 3.14159265359;
 
 /**
+ * @brief Decode a two-channel tangent-space normal map sample and reconstruct its positive Z component.
+ * @param p_encoded_normal Encoded tangent-space X and Y components in [0, 1].
+ * @return The decoded tangent-space normal on the positive-Z hemisphere.
+ */
+float3 decode_normal_map(float2 p_encoded_normal) {
+    float2 normal_xy = p_encoded_normal * 2.0 - 1.0;
+    float normal_z = sqrt(saturate(1.0 - dot(normal_xy, normal_xy)));
+    return float3(normal_xy, normal_z);
+}
+
+/**
  * @brief Transform an object-space normal into world space for static geometry.
  * @param p_transform Object-to-world transform.
  * @param p_normal Object-space normal.
