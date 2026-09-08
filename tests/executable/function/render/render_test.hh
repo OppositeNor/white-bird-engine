@@ -14,8 +14,11 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
+#include "core/logging/log.hh"
 #include "function/ecs/components.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "platform/os/os.hh"
 #include <algorithm>
 #include <cmath>
@@ -140,5 +143,28 @@ inline WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::ComponentSpot
         .range = p_spot_light_component.range,
         .emitter_width = p_spot_light_component.emitter_width};
 }
+
+inline void log_uniform_buffer_descriptors(
+    const WBE::BaseRenderDataVK* p_render_data, WBE::Ref<WBE::ROCPerFrameVK> p_buffers, std::string_view p_label) {
+    for (uint32_t frame_slot = 0; frame_slot < p_buffers->get_context_count(); ++frame_slot) {
+        WBE::Ref<WBE::ROBufferVK> buffer = p_buffers->get(frame_slot).dynamic_cast_ref<WBE::ROBufferVK>();
+        if (buffer == WBE::MEM_NULL) {
+            throw std::runtime_error("Failed to log deferred camera buffer descriptor: frame resource is not a buffer.");
+        }
+        VkBufferDeviceAddressInfo address_info{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+            .buffer = buffer->get_buffer(),
+        };
+        uint32_t descriptor_index = buffer->get_uniform_view_index();
+        VkDeviceAddress device_address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info);
+        WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
+            ->message(std::format("{} frame slot {}: resource descriptor index {}, device address 0x{:x}.",
+                p_label,
+                frame_slot,
+                descriptor_index,
+                device_address));
+    }
+}
+
 
 #endif

@@ -15,11 +15,22 @@
 #ifndef WBE_FILE_UTILS_SLANG
 #define WBE_FILE_UTILS_SLANG
 
+#ifndef WBE_REFLECTION_METADATA
+#define WBE_REFLECTION_METADATA 0
+#endif
+
 /** Marks a vertex entry-point field and selects a resource attribute by role. */
 [__AttributeUsage(_AttributeTargets.Var)]
 struct WBE_VERTEX_INPUTAttribute {
     /** Vertex attribute role; an empty value selects the annotated field name. */
     string vertex_role = "";
+};
+
+/** Marks a push-data uint2 as an index into one descriptor-heap arena. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_DESCRIPTORAttribute {
+    /** Descriptor category interpreted by the Vulkan pipeline compiler. */
+    string descriptor_type;
 };
 
 /**
@@ -91,13 +102,21 @@ struct WBE_TEXTUREAttribute {
     string texture_role = "";
 };
 
-/** Fixed bindless texture table contract. Applications may only vary the parameter's base variable name. */
-struct MaterialTextures {
-    /** Sampler shared by all material textures. */
+/** Descriptor-heap indices shared by material shaders. */
+struct MaterialDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 material_params;
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 material_sampler;
+};
+
+#if WBE_REFLECTION_METADATA
+/** Reflection-only view of the material texture contract. */
+struct MaterialTextureContractMetadata {
     SamplerState material_sampler;
-    /** Bindless texture array indexed through MaterialParams. */
     Texture2D<float4> textures[];
 };
+#endif
 
 /** Fixed descriptor indices for one material's textures. */
 struct MaterialParams {
@@ -146,19 +165,13 @@ struct InstanceData {
 /**
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
  */
-struct StaticSet {
-    /**
-     * @brief Material table identifiers indexed by InstanceData.submesh_index.
-     */
-    StructuredBuffer<SubmeshData> submeshes;
-    /**
-     * @brief Object-to-world transforms indexed by InstanceData.node_index.
-     */
-    StructuredBuffer<NodeData> nodes;
-    /**
-     * @brief Draw instances indexed by SV_VulkanInstanceID, including the indirect firstInstance offset.
-     */
-    StructuredBuffer<InstanceData> instances;
+struct StaticSetDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 submeshes;
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 nodes;
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 instances;
 };
 
 /**

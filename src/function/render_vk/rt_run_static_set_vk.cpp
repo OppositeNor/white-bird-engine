@@ -25,13 +25,13 @@
 #include "function/render/material_texture_contract_resolver.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
@@ -221,7 +221,6 @@ struct StaticInstanceBufferData {
 struct NonEmptyStaticSetTaskBuild {
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task = MEM_NULL;
     Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
-    GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
 };
 
 StaticSetAttachmentDataVK build_attachment_data(const RTRunStaticSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
@@ -294,16 +293,18 @@ Ref<ROBufferVK> build_indirect_buffer(const BaseRenderDataVK* p_render_data, std
 }
 
 template <typename TValue>
-Ref<ROBufferVK> build_storage_buffer(const BaseRenderDataVK* p_render_data, const std::vector<TValue>& p_values) {
+Ref<ROBufferVK> build_storage_buffer(
+    const BaseRenderDataVK* p_render_data, const std::vector<TValue>& p_values, std::optional<uint32_t> p_descriptor_index) {
     if (p_values.empty()) {
         return MEM_NULL;
     }
     const size_t buffer_size = p_values.size() * sizeof(TValue);
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
-                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                 .set_size(buffer_size)
-                                 .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                                 .create_ref(p_render_data);
+    ROBufferVK::Builder builder;
+    builder.set_domain(DeviceDomain::HOST_DEVICE).set_size(buffer_size).set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    if (p_descriptor_index.has_value()) {
+        builder.set_storage_view_index(*p_descriptor_index);
+    }
+    Ref<ROBufferVK> result = builder.create_ref(p_render_data);
     result->update_buffer(p_values.data(), buffer_size);
     return result;
 }
@@ -427,7 +428,8 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
         p_config.get_material_params_variable_name());
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
     if (material_contract.has_value()) {
-        material_sampler = ROSamplerVK::Builder().create_ref(render_data);
+        uint32_t sampler_index = render_data->descriptor_heap_allocator->allocate_sampler();
+        material_sampler = ROSamplerVK::Builder().set_sampler_index(sampler_index).create_ref(render_data);
     }
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_data->allocator,
@@ -439,6 +441,8 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
         .depth_attachment_format = p_config.get_depth_attachment_format(),
         .stencil_attachment_format = p_config.get_stencil_attachment_format(),
     };
+    GraphicsPipelineCompilerVK pipeline_compiler(compiler_context);
+    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> material_texture_views;
     const std::string compiled_pipeline_key = std::format("{}#static_set", pipeline_resource_key(p_graphics_pipeline));
     RenderBindpointDeclarations bindpoints = RenderBindpointDeclarationsBuilder()
                                                  .add_storage_buffer_decleration("static_set.submeshes", p_submesh_buffer)
@@ -450,8 +454,49 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
         get_default_material(p_config.get_default_material_resource_key()),
         p_config.get_material_textures_variable_name(),
         p_config.get_material_params_variable_name(),
-        render_data->max_variable_sampled_image_descriptor_count,
-        material_sampler);
+        DescriptorHeapAllocatorVK::SAMPLED_IMAGE_CAPACITY,
+        material_sampler,
+        [&pipeline_compiler, &material_texture_views](RefRes<RUTexture> p_texture) {
+            for (const auto& [texture, image_view] : material_texture_views) {
+                if (texture == p_texture) {
+                    return image_view->get_sampled_view_index();
+                }
+            }
+            Ref<ROImageViewVK> image_view = pipeline_compiler.compile_texture_view(
+                std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(p_texture.get())), p_texture);
+            uint32_t sampled_view_index = image_view->get_sampled_view_index();
+            material_texture_views.emplace_back(p_texture, std::move(image_view));
+            return sampled_view_index;
+        });
+    for (RenderBindpointImageDeclaration& declaration : material_bindpoints.image_declerations) {
+        for (const auto& [texture, image_view] : material_texture_views) {
+            if (texture == declaration.image_resource) {
+                declaration.image_render_object = image_view;
+                declaration.image_resource = MEM_NULL;
+                break;
+            }
+        }
+        if (declaration.image_render_object == MEM_NULL) {
+            throw std::runtime_error("Failed to compile static-set material texture: resolved image view is missing.");
+        }
+    }
+    for (RenderBindpointBufferDeclaration& declaration : material_bindpoints.buffer_declerations) {
+        if (declaration.buffer_render_object != MEM_NULL) {
+            continue;
+        }
+        std::span<const uint8_t> buffer_data = material_bindpoints.get_buffer_data(declaration);
+        uint32_t uniform_view_index = render_data->descriptor_heap_allocator->allocate_buffer();
+        Ref<ROBufferVK> material_params_buffer = ROBufferVK::Builder()
+                                                     .set_domain(DeviceDomain::HOST_DEVICE)
+                                                     .set_size(buffer_data.size())
+                                                     .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                                     .set_uniform_view_index(uniform_view_index)
+                                                     .create_ref(render_data);
+        material_params_buffer->update_buffer(buffer_data.data(), buffer_data.size());
+        declaration.buffer_render_object = material_params_buffer;
+        declaration.offset = 0;
+        declaration.size = std::numeric_limits<size_t>::max();
+    }
     if (!material_bindpoints.buffer_data.empty()) {
         const size_t buffer_data_offset = bindpoints.buffer_data.size();
         bindpoints.buffer_data.insert(bindpoints.buffer_data.end(), material_bindpoints.buffer_data.begin(), material_bindpoints.buffer_data.end());
@@ -472,7 +517,7 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
     for (RenderBindpointSamplerDeclaration& declaration : material_bindpoints.sampler_declerations) {
         bindpoints.sampler_declerations.push_back(std::move(declaration));
     }
-    return GraphicsPipelineCompilerVK(compiler_context).compile(compiled_pipeline_key, p_graphics_pipeline, bindpoints);
+    return pipeline_compiler.compile(compiled_pipeline_key, p_graphics_pipeline, bindpoints);
 }
 
 std::vector<std::string_view> color_attachment_id_views(const StaticSetAttachmentDataVK& p_attachment_data) {
@@ -509,13 +554,29 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
         return result;
     }
     StaticInstanceBufferData instance_data = build_static_instance_buffer_data(p_set);
-    Ref<ROBufferVK> submesh_buffer = build_storage_buffer(render_data, instance_data.submeshes);
-    Ref<ROBufferVK> node_buffer = build_storage_buffer(render_data, instance_data.nodes);
-    Ref<ROBufferVK> instance_buffer = build_storage_buffer(render_data, instance_data.instances);
+    uint32_t storage_descriptor_count = static_cast<uint32_t>(!instance_data.submeshes.empty()) +
+                                        static_cast<uint32_t>(!instance_data.nodes.empty()) +
+                                        static_cast<uint32_t>(!instance_data.instances.empty());
+    std::optional<uint32_t> next_storage_descriptor_index;
+    if (storage_descriptor_count > 0) {
+        next_storage_descriptor_index = render_data->descriptor_heap_allocator->allocate_buffer(storage_descriptor_count);
+    }
+    auto take_storage_descriptor_index =
+        [&next_storage_descriptor_index](bool p_has_buffer) -> std::optional<uint32_t> {
+        if (!p_has_buffer || !next_storage_descriptor_index.has_value()) {
+            return std::nullopt;
+        }
+        return (*next_storage_descriptor_index)++;
+    };
+    Ref<ROBufferVK> submesh_buffer = build_storage_buffer(
+        render_data, instance_data.submeshes, take_storage_descriptor_index(!instance_data.submeshes.empty()));
+    Ref<ROBufferVK> node_buffer =
+        build_storage_buffer(render_data, instance_data.nodes, take_storage_descriptor_index(!instance_data.nodes.empty()));
+    Ref<ROBufferVK> instance_buffer = build_storage_buffer(
+        render_data, instance_data.instances, take_storage_descriptor_index(!instance_data.instances.empty()));
     GraphicsPipelineCompilerVK::CompileResult compiled_pipeline = compile_static_set_pipeline(
         p_renderer, p_graphics_pipeline, p_config, instance_data.ordered_materials, submesh_buffer, node_buffer, instance_buffer);
     result.graphics_pipeline = compiled_pipeline.graphics_pipeline;
-    result.descriptor_set_bindings = compiled_pipeline.descriptor_set_bindings;
     ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
     const std::string_view vertex_entry_name = get_vertex_stage_entry_name(p_graphics_pipeline);
     auto draw_plan = StaticSetDrawBatchPlannerVK().build(render_data->allocator,
@@ -568,7 +629,6 @@ RTRunStaticSetVK::RTRunStaticSetVK(
             build_non_empty_indirect_task(p_renderer, geometry_set, graphics_pipeline, config, attachment_data);
         indirect_task = std::move(built_task.indirect_task);
         compiled_graphics_pipeline = std::move(built_task.graphics_pipeline);
-        descriptor_set_bindings = std::move(built_task.descriptor_set_bindings);
     }
 }
 
@@ -672,21 +732,19 @@ void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, const RendResVie
     vkCmdEndRendering(p_command_buffer);
 }
 
-void RTRunStaticSetVK::write_descriptor_set(size_t p_set_index, const RODescriptorSetVK::Writer& p_writer) {
+void RTRunStaticSetVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource) {
     if (compiled_graphics_pipeline == MEM_NULL) {
-        throw std::runtime_error("Failed to write static set task descriptor set: no compiled graphics pipeline is available.");
+        throw std::runtime_error("Failed to set static-set descriptor binding: compiled graphics pipeline is unavailable.");
     }
-    compiled_graphics_pipeline->write_descriptor_set(static_cast<uint32_t>(p_set_index), p_writer);
+    compiled_graphics_pipeline->set_descriptor_binding(p_field_path, std::move(p_resource));
 }
 
-RTRunStaticSetVK::DescriptorBinding RTRunStaticSetVK::get_descriptor_binding(std::string_view p_field_path) const {
-    auto binding_it = descriptor_set_bindings.find(std::string(p_field_path));
-    if (binding_it == descriptor_set_bindings.end()) {
-        throw std::runtime_error(
-            std::format("Failed to get static set task descriptor binding: field path '{}' was not found.", p_field_path));
+void RTRunStaticSetVK::set_descriptor_binding(
+    std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container) {
+    if (compiled_graphics_pipeline == MEM_NULL) {
+        throw std::runtime_error("Failed to set static-set descriptor binding: compiled graphics pipeline is unavailable.");
     }
-    auto [set_index, binding] = binding_it->second;
-    return DescriptorBinding{.set_index = set_index, .binding = binding};
+    compiled_graphics_pipeline->set_descriptor_binding(p_field_path, std::move(p_resource_container));
 }
 
 } // namespace WhiteBirdEngine

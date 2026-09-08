@@ -23,15 +23,9 @@
 #include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_descriptor_set_layout_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include <cstdint>
 #include <string_view>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -51,12 +45,8 @@ struct ComputePipelineCompilerVKContext {
  */
 class ComputePipelineCompilerVK : public PipelineCompilerVK {
 public:
-    using DescriptorSetBinding = PipelineCompilerVK::DescriptorSetBinding;
-    using DescriptorSetBindings = PipelineCompilerVK::DescriptorSetBindings;
-
     struct CompileResult {
         Ref<ROComputePipelineVK> compute_pipeline = MEM_NULL;
-        DescriptorSetBindings descriptor_set_bindings;
     };
 
     explicit ComputePipelineCompilerVK(const ComputePipelineCompilerVKContext& p_context);
@@ -70,11 +60,7 @@ private:
 
     Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_key,
         Ref<ROShaderVK> p_compute_shader,
-        std::string_view p_compute_entry,
-        Ref<ROPipelineLayoutVK> p_pipeline_layout);
-    std::vector<Ref<RODescriptorSetVK>> compile_descriptor_sets(const std::vector<Ref<RODescriptorSetLayoutVK>>& p_descriptor_set_layouts,
-        const std::vector<ShaderDescriptorBindingVK>& p_descriptor_bindings,
-        const RenderBindpointDeclarations& p_bindpoint_declarations) const;
+        std::string_view p_compute_entry);
 };
 
 } // namespace WhiteBirdEngine

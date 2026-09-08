@@ -237,8 +237,6 @@ struct WBE_META(WBE_SERIALIZABLE) ShaderMetadata final : public Serializable {
     std::vector<ShaderMetadataParameter> parameters;
     WBE_META(WBE_REFLECT)
     std::vector<ShaderMetadataEntryPoint> entry_points;
-    WBE_META(WBE_REFLECT)
-    int32_t bindless_space_index = 0;
 };
 } // namespace WhiteBirdEngine
 

@@ -28,7 +28,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
@@ -194,9 +193,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStati
                              .create_ref(base_render_data);
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
-    auto [set_index, binding] = p_task.get_descriptor_binding("camera_info");
-    p_task.write_descriptor_set(set_index,
-        RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_buffer, 0, sizeof(CameraInfoVKUBO)));
+    p_task.set_descriptor_binding("camera_info", camera_info_buffer);
 }
 
 } // namespace WhiteBirdEngine

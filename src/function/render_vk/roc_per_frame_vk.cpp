@@ -109,6 +109,12 @@ void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource) {
     applied_generations[p_frame_slot] = 0;
 }
 
+void ROCPerFrameVK::clear() {
+    for (Ref<RenderObjectVK>& resource : resources) {
+        resource = MEM_NULL;
+    }
+}
+
 uint32_t ROCPerFrameVK::get_context_count() const {
     return static_cast<uint32_t>(resources.size());
 }

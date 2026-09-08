@@ -13,30 +13,23 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_pipeline_vk.hh"
-#include "core/allocator/i_allocator.hh"
-#include "core/core_utils.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
-#include <iterator>
+#include <cstring>
+#include <string_view>
 #include <stdexcept>
 #include <utility>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROPipelineVK::ROPipelineVK(const BaseRenderDataVK* p_render_data, Ref<ROPipelineLayoutVK> p_pipeline_layout)
-    : RenderObjectVK(p_render_data), pipeline_layout(std::move(p_pipeline_layout)), descriptor_sets(p_render_data->allocator),
-      descriptor_writes(p_render_data->allocator), descriptor_set_instances(p_render_data->allocator) {
-    if (pipeline_layout == MEM_NULL) {
-        throw std::runtime_error("Failed to create Vulkan pipeline: pipeline layout is missing.");
-    }
+ROPipelineVK::ROPipelineVK(const BaseRenderDataVK* p_render_data)
+    : RenderObjectVK(p_render_data), descriptor_index_data(p_render_data->allocator), descriptor_resources(p_render_data->allocator),
+      descriptor_resource_containers(p_render_data->allocator), descriptor_fields(p_render_data->allocator) {
 }
 
 ROPipelineVK::~ROPipelineVK() {
@@ -50,104 +43,130 @@ ROPipelineVK::~ROPipelineVK() {
         render_data->frames_in_flight);
 }
 
-VkPipelineLayout ROPipelineVK::get_pipeline_layout() const {
-    return pipeline_layout->get_pipeline_layout();
+void ROPipelineVK::set_descriptor_layout(const ShaderDescriptorHeapLayoutVK& p_layout) {
+    if (p_layout.size > render_data->descriptor_heap_properties.maxPushDataSize) {
+        throw std::runtime_error("Failed to set pipeline descriptor layout: reflected push data exceeds the device limit.");
+    }
+    descriptor_fields.assign(p_layout.fields.begin(), p_layout.fields.end());
+    descriptor_index_data.assign(p_layout.size, 0);
+    descriptor_resources.assign(p_layout.fields.size(), MEM_NULL);
+    descriptor_resource_containers.assign(p_layout.fields.size(), MEM_NULL);
 }
 
-void ROPipelineVK::write_descriptor_set(uint32_t p_set_index, const RODescriptorSetVK::Writer& p_writer) {
-    if (p_set_index >= descriptor_set_count) {
-        throw std::runtime_error("Failed to write pipeline descriptor set: set index is out of bounds.");
+void ROPipelineVK::retain_descriptor_resource(Ref<IRenderObject> p_resource) {
+    if (p_resource == MEM_NULL) {
+        throw std::runtime_error("Failed to retain pipeline descriptor resource: resource is missing.");
     }
-    const uint32_t binding = WBE_REQUIRED(p_writer.binding);
-    for (DescriptorWrite& descriptor_write : descriptor_writes) {
-        if (descriptor_write.set_index != p_set_index || descriptor_write.binding != binding ||
-            descriptor_write.dst_array_element != p_writer.dst_array_element) {
-            continue;
+    descriptor_resources.push_back(std::move(p_resource));
+}
+
+void ROPipelineVK::set_descriptor_index(uint32_t p_offset, uint32_t p_index, Ref<IRenderObject> p_resource) {
+    constexpr size_t descriptor_index_size = sizeof(uint32_t) * 2;
+    if (p_offset > descriptor_index_data.size() || descriptor_index_size > descriptor_index_data.size() - p_offset) {
+        throw std::runtime_error("Failed to set pipeline descriptor index: reflected push-data offset is out of bounds.");
+    }
+    if (p_resource == MEM_NULL) {
+        throw std::runtime_error("Failed to set pipeline descriptor index: resource is missing.");
+    }
+    const uint32_t descriptor_index[2] = {p_index, 0};
+    std::memcpy(descriptor_index_data.data() + p_offset, descriptor_index, descriptor_index_size);
+    auto field = std::ranges::find_if(
+        descriptor_fields, [p_offset](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.offset == p_offset; });
+    if (field == descriptor_fields.end()) {
+        throw std::runtime_error("Failed to set pipeline descriptor index: reflected field is missing.");
+    }
+    descriptor_resources[static_cast<size_t>(field - descriptor_fields.begin())] = std::move(p_resource);
+}
+
+void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource) {
+    auto field = std::ranges::find_if(descriptor_fields,
+        [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.field_path == p_field_path; });
+    if (field == descriptor_fields.end()) {
+        throw std::runtime_error("Failed to set pipeline descriptor binding: reflected field path was not found.");
+    }
+    uint32_t index = 0;
+    switch (field->type) {
+    case ShaderDescriptorHeapTypeVK::UniformBuffer: {
+        Ref<ROBufferVK> buffer = p_resource.dynamic_cast_ref<ROBufferVK>();
+        if (buffer == MEM_NULL) {
+            throw std::runtime_error("Failed to set uniform-buffer descriptor binding: resource type is invalid.");
         }
-        descriptor_write.writer = p_writer;
-        descriptor_write.generation = ++descriptor_generation;
+        index = buffer->get_uniform_view_index();
+        break;
+    }
+    case ShaderDescriptorHeapTypeVK::StorageBuffer: {
+        Ref<ROBufferVK> buffer = p_resource.dynamic_cast_ref<ROBufferVK>();
+        if (buffer == MEM_NULL) {
+            throw std::runtime_error("Failed to set storage-buffer descriptor binding: resource type is invalid.");
+        }
+        index = buffer->get_storage_view_index();
+        break;
+    }
+    case ShaderDescriptorHeapTypeVK::SampledImage: {
+        Ref<ROImageViewVK> image_view = p_resource.dynamic_cast_ref<ROImageViewVK>();
+        if (image_view == MEM_NULL) {
+            throw std::runtime_error("Failed to set sampled-image descriptor binding: resource type is invalid.");
+        }
+        index = image_view->get_sampled_view_index();
+        break;
+    }
+    case ShaderDescriptorHeapTypeVK::StorageImage: {
+        Ref<ROImageViewVK> image_view = p_resource.dynamic_cast_ref<ROImageViewVK>();
+        if (image_view == MEM_NULL) {
+            throw std::runtime_error("Failed to set storage-image descriptor binding: resource type is invalid.");
+        }
+        index = image_view->get_storage_view_index();
+        break;
+    }
+    case ShaderDescriptorHeapTypeVK::Sampler: {
+        Ref<ROSamplerVK> sampler = p_resource.dynamic_cast_ref<ROSamplerVK>();
+        if (sampler == MEM_NULL) {
+            throw std::runtime_error("Failed to set sampler descriptor binding: resource type is invalid.");
+        }
+        index = sampler->get_sampler_index();
+        break;
+    }
+    }
+    set_descriptor_index(field->offset, index, std::move(p_resource));
+    descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = MEM_NULL;
+}
+
+void ROPipelineVK::set_descriptor_binding(
+    std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container) {
+    if (p_resource_container == MEM_NULL) {
+        throw std::runtime_error("Failed to set pipeline descriptor binding: resource container is missing.");
+    }
+    auto field = std::ranges::find_if(descriptor_fields,
+        [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.field_path == p_field_path; });
+    if (field == descriptor_fields.end()) {
+        throw std::runtime_error("Failed to set pipeline descriptor binding: reflected field path was not found.");
+    }
+    Ref<RenderObjectVK> resource = p_resource_container->get(render_data->current_frame_slot);
+    set_descriptor_binding(p_field_path, resource);
+    descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = std::move(p_resource_container);
+}
+
+void ROPipelineVK::push_descriptor_indices(VkCommandBuffer p_command_buffer) {
+    if (descriptor_index_data.empty()) {
         return;
     }
-    DescriptorWrite descriptor_write(render_data->allocator);
-    descriptor_write.set_index = p_set_index;
-    descriptor_write.binding = binding;
-    descriptor_write.dst_array_element = p_writer.dst_array_element;
-    descriptor_write.generation = ++descriptor_generation;
-    descriptor_write.writer = p_writer;
-    descriptor_write.applied_generations.resize(render_data->frames_in_flight, 0);
-    descriptor_writes.push_back(std::move(descriptor_write));
-}
-
-void ROPipelineVK::bind_descriptor_sets(VkCommandBuffer p_command_buffer, VkPipelineBindPoint p_bind_point) {
-    const uint32_t frame_slot = render_data->current_frame_slot;
-    synchronize_descriptor_sets(frame_slot);
-    descriptor_set_instances.clear();
-    for (uint32_t set_index = 0; set_index < descriptor_set_count; ++set_index) {
-        Ref<RODescriptorSetVK> descriptor_set = get_descriptor_set(frame_slot, set_index);
-        if (descriptor_set == MEM_NULL) {
-            throw std::runtime_error("Failed to bind pipeline descriptor sets: descriptor set is missing.");
-        }
-        descriptor_set_instances.push_back(descriptor_set->get_descriptor_set());
-    }
-    if (descriptor_set_instances.empty()) {
-        return;
-    }
-    vkCmdBindDescriptorSets(p_command_buffer,
-        p_bind_point,
-        get_pipeline_layout(),
-        0,
-        static_cast<uint32_t>(descriptor_set_instances.size()),
-        descriptor_set_instances.data(),
-        0,
-        nullptr);
-}
-
-void ROPipelineVK::set_descriptor_sets(std::vector<Ref<RODescriptorSetVK>> p_descriptor_sets) {
-    descriptor_set_count = static_cast<uint32_t>(p_descriptor_sets.size());
-    descriptor_sets.clear();
-    descriptor_writes.clear();
-    descriptor_generation = 0;
-    descriptor_sets.reserve(static_cast<size_t>(descriptor_set_count) * render_data->frames_in_flight);
-    descriptor_sets.insert(
-        descriptor_sets.end(), std::make_move_iterator(p_descriptor_sets.begin()), std::make_move_iterator(p_descriptor_sets.end()));
-    for (uint32_t frame_slot = 1; frame_slot < render_data->frames_in_flight; ++frame_slot) {
-        for (uint32_t set_index = 0; set_index < descriptor_set_count; ++set_index) {
-            descriptor_sets.push_back(get_descriptor_set(0, set_index)->create_copy());
-        }
-    }
-    descriptor_set_instances.clear();
-    descriptor_set_instances.reserve(descriptor_set_count);
-}
-
-Ref<RODescriptorSetVK> ROPipelineVK::get_descriptor_set(uint32_t p_frame_slot, uint32_t p_set_index) const {
-    if (p_frame_slot >= render_data->frames_in_flight || p_set_index >= descriptor_set_count) {
-        throw std::runtime_error("Failed to access pipeline descriptor set: frame slot or set index is out of bounds.");
-    }
-    return descriptor_sets[static_cast<size_t>(p_frame_slot) * descriptor_set_count + p_set_index];
-}
-
-void ROPipelineVK::synchronize_descriptor_sets(uint32_t p_frame_slot) {
-    std::vector<DescriptorWrite*> pending_writes;
-    for (DescriptorWrite& descriptor_write : descriptor_writes) {
-        if (descriptor_write.applied_generations[p_frame_slot] == descriptor_write.generation) {
-            // Contextual resources have their own content generations. Resolve them even when the descriptor binding itself
-            // is current so ROCPerFrameVK can apply newly published bytes to the selected frame-slot buffer.
-            if (descriptor_write.writer.has_contextual_resources()) {
-                static_cast<void>(descriptor_write.writer.resolve(p_frame_slot));
-            }
+    for (size_t i = 0; i < descriptor_fields.size(); ++i) {
+        if (descriptor_resource_containers[i] == MEM_NULL) {
             continue;
         }
-        pending_writes.push_back(&descriptor_write);
+        Ref<RenderObjectVK> resource = descriptor_resource_containers[i]->get(render_data->current_frame_slot);
+        Ref<RenderObjectContainerVK> container = descriptor_resource_containers[i];
+        set_descriptor_binding(descriptor_fields[i].field_path, resource);
+        descriptor_resource_containers[i] = std::move(container);
     }
-    std::sort(pending_writes.begin(), pending_writes.end(), [](const DescriptorWrite* p_lhs, const DescriptorWrite* p_rhs) {
-        return p_lhs->generation < p_rhs->generation;
-    });
-    for (DescriptorWrite* descriptor_write : pending_writes) {
-        RODescriptorSetVK::Writer resolved_writer = descriptor_write->writer.resolve(p_frame_slot);
-        Ref<RODescriptorSetVK> descriptor_set = get_descriptor_set(p_frame_slot, descriptor_write->set_index);
-        descriptor_set->write_descriptor_set(resolved_writer);
-        descriptor_write->applied_generations[p_frame_slot] = descriptor_write->generation;
+    VkPushDataInfoEXT push_data_info{};
+    push_data_info.sType = VK_STRUCTURE_TYPE_PUSH_DATA_INFO_EXT;
+    push_data_info.data.address = descriptor_index_data.data();
+    push_data_info.data.size = descriptor_index_data.size();
+    if (render_data->command_push_data == nullptr) {
+        throw std::runtime_error("Failed to push pipeline descriptor indices: descriptor heap command is unavailable.");
     }
+    render_data->command_push_data(p_command_buffer, &push_data_info);
 }
 
 } // namespace WhiteBirdEngine

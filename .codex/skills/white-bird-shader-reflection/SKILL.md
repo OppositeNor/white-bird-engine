@@ -7,6 +7,8 @@ description: Use and extend White Bird Engine's Slang shader-reflection pipeline
 
 Use the backend-neutral reflection model for inspection and contracts. Keep Vulkan translation in `function/render_vk` and keep resource acquisition, metadata loading, and querying separate.
 
+For Vulkan work, the current contract is descriptor-heap based. Reflection consumers should expect explicit heap-index push-data fields rather than descriptor-set or bindless-space metadata.
+
 ## Acquire metadata from a shader resource
 
 Given a resource key, acquire the shader resource and load its normalized reflection sidecar:
@@ -36,16 +38,22 @@ Treat pointers and references returned by `ShaderMetadataQuery` as views into `S
 - For annotation roles, use `ShaderRoleFieldResolver`; do not hand-roll attribute parsing or role hashing.
 - For vertex inputs, use `VertexInputContractResolver` and `WBE_VERTEX_INPUT`.
 - For material texture indices, use `MaterialTextureContractResolver` and `WBE_TEXTURE`.
-- For Vulkan descriptor layouts, use the translation utilities in `function/render_vk/shader_metadata_vk_utils.*`.
-- For pipeline data binding, use reflected bindpoint paths through the existing pipeline compiler rather than duplicating packing logic.
+- For Vulkan descriptor-heap push-data layouts, use `collect_shader_descriptor_heap_layout()` and `collect_graphics_pipeline_descriptor_heap_layout()` from `function/render_vk/shader_metadata_vk_utils.*`.
+- For pipeline data binding, use reflected field paths through the pipeline compiler or `ROPipelineVK::set_descriptor_binding()` rather than writing heap indices by hand.
 
 Do not introduce a closed texture-role enum or branch on roles such as `albedo`, `normal`, or `rma`. Roles are shader-defined strings. An attribute with no explicit string argument uses the annotated field name as its role.
 
+Do not add new descriptor-set, binding-number, or bindless-space fields to `ShaderMetadata`. The Vulkan path now binds through renderer-owned descriptor heaps. Reflected descriptor fields must be aligned eight-byte `uint2` values in the entry point's single push-data block, with exactly one `WBE_DESCRIPTOR` argument: `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. Nested structs and fixed-size struct arrays are supported.
+
 ## Before changing support
 
-Read [references/system-and-extension.md](references/system-and-extension.md) when the task asks what is supported, touches the ACP normalizer or serialized metadata schema, adds an annotation contract, changes field paths, or adds a Vulkan descriptor/type mapping. Trace one real Slang declaration through raw reflection, normalization, deserialization, and its final consumer before editing.
+Read [references/system-and-extension.md](references/system-and-extension.md) when the task asks what is supported, touches the ACP normalizer or serialized metadata schema, adds an annotation contract, changes field paths, or adds a Vulkan descriptor/type mapping. Trace one real Slang declaration through raw reflection, normalization, deserialization, descriptor-heap layout collection, and its final consumer before editing.
 
 Make the smallest layer-correct change. Add tests at every boundary that changes, and never edit generated serialization files or compiled reflection fixtures by hand; regenerate them through the normal build/resource pipeline.
+
+Render objects and Vulkan backend helpers are rendering-thread-confined. Route cross-thread resource updates or binding changes through `IRenderer::add_job()`.
+
+When changing Slang compilation or reflection fixtures, preserve the descriptor-heap compile profile used by ACP: `spirv_1_6+spvDescriptorHeapEXT` with `-spirv-unified-descriptor-heap-stride`.
 
 ## Validate
 
@@ -55,4 +63,4 @@ Use the repository validation wrapper and a focused filter first:
 python validation.py -t debug -- --gtest_filter='WBEShaderMetadataVKTest*'
 ```
 
-Select additional resolver or Vulkan utility tests named in the reference when those consumers change. The wrapper runs the full unit test binary after the focused test passes. Do not run lint automatically.
+Select additional resolver or Vulkan utility tests named in the reference when those consumers change. Descriptor-heap layout changes should also run `WBEShaderMetadataVKUtilsTest*`. The wrapper runs the full unit test binary after the focused test passes. Do not run lint automatically.

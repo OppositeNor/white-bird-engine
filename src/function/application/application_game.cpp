@@ -86,8 +86,13 @@ void ApplicationGame::init() {
             ->warning(std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
     }
+    // TEST
+    if (false) {
+        worker = make_ref<Worker>(
+                global_allocator(), get_worker_thread_count(engine_config.worker_thread_count, renderer->get_worker_nums()));
+    }
     worker = make_ref<Worker>(
-        global_allocator(), get_worker_thread_count(engine_config.worker_thread_count, renderer->get_worker_nums()));
+        global_allocator(), 1);
     // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
     ResourceManager::get_singleton()->load_global_resource("res_chunks/global_resources.json");
 }

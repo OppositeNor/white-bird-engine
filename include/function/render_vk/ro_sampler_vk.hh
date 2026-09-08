@@ -21,6 +21,7 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "utils/utils.hh"
+#include <optional>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -98,6 +99,7 @@ public:
          * @brief Whether coordinates are unnormalized.
          */
         VkBool32 unnormalized_coordinates = VK_FALSE;
+        std::optional<uint32_t> sampler_index;
 
         /**
          * @brief Set minification and magnification filters.
@@ -184,6 +186,13 @@ public:
          * @brief Set whether texture coordinates are unnormalized.
          */
         Builder& set_unnormalized_coordinates(VkBool32 p_unnormalized_coordinates);
+        /**
+         * @brief Transfer an allocated sampler descriptor index to the created sampler.
+         *
+         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+         * release the index after construction succeeds.
+         */
+        Builder& set_sampler_index(uint32_t p_index);
 
         Ref<ROSamplerVK> create_ref(const BaseRenderDataVK* p_render_data) const {
             return make_ref<ROSamplerVK>(p_render_data->allocator, p_render_data, *this);
@@ -221,8 +230,15 @@ public:
         return sampler;
     }
 
+    /**
+     * @brief Get or lazily create the sampler descriptor index.
+     */
+    uint32_t get_sampler_index() const;
+
 private:
     VkSampler sampler = VK_NULL_HANDLE;
+    VkSamplerCreateInfo create_info{};
+    mutable std::optional<uint32_t> sampler_index;
 };
 
 } // namespace WhiteBirdEngine

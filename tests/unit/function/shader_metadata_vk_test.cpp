@@ -198,6 +198,50 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].integer_value, 7);
 }
 
+TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlangMetadata) {
+    ParserJSON parser;
+    parser.parse(Path(
+        Directory({"test_env", "res", "assets", "shaders", "descriptor_heap_reflection"}), "descriptor_heap_reflection.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    ASSERT_EQ(metadata.parameters.size(), 1U);
+    const ShaderMetadataParameter& push_data = metadata.parameters[0];
+    EXPECT_EQ(push_data.name, "descriptor_indices");
+    EXPECT_EQ(push_data.binding.kind, "pushConstantBuffer");
+    EXPECT_EQ(push_data.type.kind, "constantBuffer");
+    ASSERT_EQ(push_data.type.fields.size(), 4U);
+
+    const ShaderMetadataTypeField& uniform_buffer = push_data.type.fields[0];
+    EXPECT_EQ(uniform_buffer.name, "uniform_buffer");
+    EXPECT_EQ(uniform_buffer.type.kind, "vector");
+    EXPECT_EQ(uniform_buffer.type.element_scalar_type, "uint32");
+    EXPECT_EQ(uniform_buffer.type.element_count, 2);
+    EXPECT_EQ(uniform_buffer.binding.offset, 0);
+    EXPECT_EQ(uniform_buffer.binding.size, 8);
+    ASSERT_EQ(uniform_buffer.user_attributes.size(), 1U);
+    EXPECT_EQ(uniform_buffer.user_attributes[0].name, "WBE_DESCRIPTOR");
+    ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[0].string_value, "uniform_buffer");
+
+    const ShaderMetadataTypeField& images = push_data.type.fields[1];
+    EXPECT_EQ(images.name, "images");
+    EXPECT_EQ(images.binding.offset, 8);
+    EXPECT_EQ(images.binding.size, 16);
+    ASSERT_EQ(images.fields.size(), 2U);
+    EXPECT_EQ(images.fields[0].name, "sampled_image");
+    EXPECT_EQ(images.fields[0].binding.offset, 0);
+    EXPECT_EQ(images.fields[0].user_attributes[0].arguments[0].string_value, "sampled_image");
+    EXPECT_EQ(images.fields[1].name, "storage_image");
+    EXPECT_EQ(images.fields[1].binding.offset, 8);
+    EXPECT_EQ(images.fields[1].user_attributes[0].arguments[0].string_value, "storage_image");
+
+    EXPECT_EQ(push_data.type.fields[2].binding.offset, 24);
+    EXPECT_EQ(push_data.type.fields[2].user_attributes[0].arguments[0].string_value, "storage_buffer");
+    EXPECT_EQ(push_data.type.fields[3].binding.offset, 32);
+    EXPECT_EQ(push_data.type.fields[3].user_attributes[0].arguments[0].string_value, "sampler");
+}
+
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
     ParserJSON parser;
     parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
@@ -239,21 +283,32 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
     metadata.deserialize(parser.get_data());
 
     auto parameter = std::ranges::find_if(metadata.parameters, [](const ShaderMetadataParameter& p_parameter) {
-        return p_parameter.name == "static_set";
+        return p_parameter.name == "descriptor_indices";
     });
     ASSERT_NE(parameter, metadata.parameters.end());
-    EXPECT_EQ(parameter->type.kind, "parameterBlock");
-    EXPECT_EQ(parameter->binding.kind, "subElementRegisterSpace");
+    EXPECT_EQ(parameter->type.kind, "constantBuffer");
+    EXPECT_EQ(parameter->binding.kind, "pushConstantBuffer");
+
+    auto static_set = std::ranges::find_if(parameter->type.fields, [](const ShaderMetadataTypeField& p_field) {
+        return p_field.name == "static_set";
+    });
+    ASSERT_NE(static_set, parameter->type.fields.end());
+    EXPECT_EQ(static_set->type.kind, "struct");
 
     const std::array<std::string_view, 3> expected_names{"submeshes", "nodes", "instances"};
-    ASSERT_EQ(parameter->type.fields.size(), expected_names.size());
+    ASSERT_EQ(static_set->fields.size(), expected_names.size());
     for (size_t i = 0; i < expected_names.size(); ++i) {
-        const ShaderMetadataTypeField& field = parameter->type.fields[i];
+        const ShaderMetadataTypeField& field = static_set->fields[i];
         EXPECT_EQ(field.name, expected_names[i]);
-        EXPECT_EQ(field.type.kind, "resource");
-        EXPECT_EQ(field.type.scalar_type, "structuredBuffer");
-        EXPECT_EQ(field.binding.kind, "descriptorTableSlot");
-        EXPECT_EQ(field.binding.index, static_cast<int32_t>(i));
+        EXPECT_EQ(field.type.kind, "vector");
+        EXPECT_EQ(field.type.element_scalar_type, "uint32");
+        EXPECT_EQ(field.type.element_count, 2);
+        EXPECT_EQ(field.binding.kind, "uniform");
+        EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(uint32_t) * 2));
+        ASSERT_EQ(field.user_attributes.size(), 1U);
+        EXPECT_EQ(field.user_attributes[0].name, "WBE_DESCRIPTOR");
+        ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
+        EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
     }
 }
 

@@ -17,6 +17,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -88,6 +89,16 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROIm
     return *this;
 }
 
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_sampled_view_index(uint32_t p_index) {
+    sampled_view_index = p_index;
+    return *this;
+}
+
+ROImageViewVK::Builder& ROImageViewVK::Builder::set_storage_view_index(uint32_t p_index) {
+    storage_view_index = p_index;
+    return *this;
+}
+
 VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -115,16 +126,89 @@ ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builde
 ROImageViewVK::~ROImageViewVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data, image_view = image_view]() {
+        [render_data = render_data,
+            image_view = image_view,
+            sampled_view_index = sampled_view_index,
+            storage_view_index = storage_view_index]() {
+            if (sampled_view_index.has_value()) {
+                render_data->descriptor_heap_allocator->deallocate_sampled_image(*sampled_view_index);
+            }
+            if (storage_view_index.has_value()) {
+                render_data->descriptor_heap_allocator->deallocate_storage_image(*storage_view_index);
+            }
             vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }
 
 void ROImageViewVK::init(const Builder& p_builder) {
-    image_view = p_builder.create_vk_object(render_data);
     exposed_fields.image = p_builder.image;
     exposed_fields.subresource_range = p_builder.subresource_range;
+    create_info = VkImageViewCreateInfo{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = WBE_REQUIRED(p_builder.image).get_image(),
+        .viewType = WBE_REQUIRED(p_builder.view_type),
+        .format = WBE_REQUIRED(p_builder.format),
+        .components = p_builder.components,
+        .subresourceRange = p_builder.subresource_range};
+    if (p_builder.sampled_view_index.has_value()) {
+        if ((exposed_fields.image->fields().usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
+            throw std::runtime_error("Failed to adopt sampled-image descriptor index: image does not have sampled usage.");
+        }
+        if (render_data->descriptor_heap_allocator == nullptr ||
+            !render_data->descriptor_heap_allocator->owns_sampled_image_range(*p_builder.sampled_view_index)) {
+            throw std::runtime_error("Failed to adopt sampled-image descriptor index: the index is not allocated by the sampled-image arena.");
+        }
+    }
+    if (p_builder.storage_view_index.has_value()) {
+        if ((exposed_fields.image->fields().usage & VK_IMAGE_USAGE_STORAGE_BIT) == 0) {
+            throw std::runtime_error("Failed to adopt storage-image descriptor index: image does not have storage usage.");
+        }
+        if (render_data->descriptor_heap_allocator == nullptr ||
+            !render_data->descriptor_heap_allocator->owns_storage_image_range(*p_builder.storage_view_index)) {
+            throw std::runtime_error("Failed to adopt storage-image descriptor index: the index is not allocated by the storage-image arena.");
+        }
+    }
+    image_view = p_builder.create_vk_object(render_data);
+    if (p_builder.sampled_view_index.has_value()) {
+        sampled_view_index = p_builder.sampled_view_index;
+        render_data->descriptor_heap_allocator->write_sampled_image_descriptor(
+            *sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+    }
+    if (p_builder.storage_view_index.has_value()) {
+        storage_view_index = p_builder.storage_view_index;
+        render_data->descriptor_heap_allocator->write_storage_image_descriptor(
+            *storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+    }
+}
+
+uint32_t ROImageViewVK::get_sampled_view_index() const {
+    if ((exposed_fields.image->fields().usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
+        throw std::runtime_error("Failed to create sampled-image descriptor: image does not have sampled usage.");
+    }
+    if (!sampled_view_index.has_value()) {
+        DescriptorHeapAllocatorVK* allocator = render_data->descriptor_heap_allocator;
+        if (allocator == nullptr) {
+            throw std::runtime_error("Failed to create sampled-image descriptor: descriptor heap allocator is unavailable.");
+        }
+        sampled_view_index = allocator->allocate_sampled_image();
+        allocator->write_sampled_image_descriptor(*sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+    }
+    return *sampled_view_index;
+}
+
+uint32_t ROImageViewVK::get_storage_view_index() const {
+    if ((exposed_fields.image->fields().usage & VK_IMAGE_USAGE_STORAGE_BIT) == 0) {
+        throw std::runtime_error("Failed to create storage-image descriptor: image does not have storage usage.");
+    }
+    if (!storage_view_index.has_value()) {
+        DescriptorHeapAllocatorVK* allocator = render_data->descriptor_heap_allocator;
+        if (allocator == nullptr) {
+            throw std::runtime_error("Failed to create storage-image descriptor: descriptor heap allocator is unavailable.");
+        }
+        storage_view_index = allocator->allocate_storage_image();
+        allocator->write_storage_image_descriptor(*storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+    }
+    return *storage_view_index;
 }
 
 } // namespace WhiteBirdEngine

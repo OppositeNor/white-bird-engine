@@ -24,7 +24,6 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -108,15 +107,6 @@ public:
         VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     };
 
-    /**
-     * @struct DescriptorBinding
-     * @brief Reflected descriptor location within the compiled static-set pipeline.
-     */
-    struct DescriptorBinding {
-        uint32_t set_index;
-        uint32_t binding;
-    };
-
     RTRunStaticSetVK() = delete;
     virtual ~RTRunStaticSetVK() override = default;
     RTRunStaticSetVK(const RTRunStaticSetVK&) = delete;
@@ -145,8 +135,14 @@ public:
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
     virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
 
-    void write_descriptor_set(size_t p_set_index, const RODescriptorSetVK::Writer& p_writer);
-    DescriptorBinding get_descriptor_binding(std::string_view p_field_path) const;
+    /**
+     * @brief Replace one reflected descriptor-heap binding on the compiled pipeline.
+     */
+    void set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource);
+    /**
+     * @brief Replace one reflected binding with a context-resolved resource.
+     */
+    void set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container);
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
@@ -155,7 +151,6 @@ private:
     Config config;
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task = MEM_NULL;
     Ref<ROGraphicsPipelineVK> compiled_graphics_pipeline = MEM_NULL;
-    GraphicsPipelineCompilerVK::DescriptorSetBindings descriptor_set_bindings;
 };
 
 } // namespace WhiteBirdEngine

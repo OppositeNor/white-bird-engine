@@ -210,6 +210,8 @@ public:
         uint32_t mipmap_levels = 1;
         /** Number of array layers in the image. */
         uint32_t layers_count = 1;
+        /** Usage flags supplied when the image was created or adopted. */
+        VkImageUsageFlags usage = 0;
     };
 
     /**

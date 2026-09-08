@@ -14,18 +14,31 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 
-ConstantBuffer<CompositionCamera> camera_info;
-ParameterBlock<LightParams> light;
-Texture2D<float4> gbuffer_albedo;
-Texture2D<float2> gbuffer_octa_normal;
-Texture2D<float4> gbuffer_rma;
-Texture2D<float> gbuffer_depth;
-SamplerState gbuffer_sampler;
-RWTexture2D<float4> indirect_lighting_output;
+struct IndirectLightingDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")] uint2 camera_info;
+    LightParamsDescriptorIndices light;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_albedo;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_octa_normal;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_rma;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_depth;
+    [WBE_DESCRIPTOR("sampler")] uint2 gbuffer_sampler;
+    [WBE_DESCRIPTOR("storage_image")] uint2 indirect_lighting_output;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<IndirectLightingDescriptorIndices> descriptor_indices;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+    ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[descriptor_indices.gbuffer_albedo.x];
+    Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[descriptor_indices.gbuffer_octa_normal.x];
+    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
+    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[descriptor_indices.gbuffer_depth.x];
+    SamplerState gbuffer_sampler = SamplerDescriptorHeap[descriptor_indices.gbuffer_sampler.x];
+    RWTexture2D<float4> indirect_lighting_output = ResourceDescriptorHeap[descriptor_indices.indirect_lighting_output.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
@@ -47,9 +60,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float metallic = clamp(rma_flags.g, 0.0, 1.0);
     float3 world_pos = world_position_from_depth(uv, depth, camera_info.inv_view_proj);
     float3 indirect_irradiance = float3(0.0);
-    uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+    uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        indirect_irradiance += compute_rsm_indirect(light, spot_light_index, uv, world_pos, normal);
+        indirect_irradiance += compute_rsm_indirect(descriptor_indices.light, spot_light_index, uv, world_pos, normal);
     }
     float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
     indirect_lighting_output[dispatch_thread_id] = float4(indirect_lighting, 1.0);

@@ -193,7 +193,7 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
 
-    graphics_pipeline->bind_descriptor_sets(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
+    graphics_pipeline->push_descriptor_indices(p_command_buffer);
 
     if (vertex_buffer != MEM_NULL && index_buffer != MEM_NULL) {
         if (render_data->command_set_vertex_input == nullptr) {

@@ -20,7 +20,6 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
@@ -660,8 +659,6 @@ public:
         DynamicStateConfig dynamic_state{};
         // Attachment configuration.
         AttachmentConfig attachment_config{};
-        // Pipeline layout. Manual setup needed!
-        Ref<ROPipelineLayoutVK> pipeline_layout;
         // Indicate which subpass this graphics pipeline uses.
         uint32_t subpass_index = 0;
     };
@@ -703,22 +700,19 @@ public:
          * @brief Apply default opaque-rendering pipeline configuration.
          *
          * This helper configures empty static vertex input, viewport/scissor
-         * from render data, pipeline layout, a default color attachment state,
+         * from render data, a default color attachment state,
          * swap chain color format, and dynamic vertex input state.
          *
          * @param p_render_data Base render data for viewport/scissor defaults.
          * @param p_shader_config Shader stage configuration.
-         * @param p_pipeline_layout Pipeline layout instance.
          * @return *this.
          */
-        Builder& default_render_opaque_configuration(
-            const BaseRenderDataVK* p_render_data, const Config::ShaderConfig& p_shader_config, Ref<ROPipelineLayoutVK> p_pipeline_layout) {
+        Builder& default_render_opaque_configuration(const BaseRenderDataVK* p_render_data, const Config::ShaderConfig& p_shader_config) {
 
             config.shader = p_shader_config;
             config.vertex_input = {};
             config.viewport.viewports = {p_render_data->viewport};
             config.viewport.scissors = {p_render_data->scissor};
-            config.pipeline_layout = p_pipeline_layout;
             config.color_blend.add_default_color_attachment();
             config.attachment_config.add_color_format(p_render_data->swap_chain_format).set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
             config.dynamic_state.add_default_dynamic_states().add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);

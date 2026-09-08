@@ -14,23 +14,30 @@
 */
 #include "deferred_gbuffer/deferred_gbuffer_utils.slang"
 
+#if WBE_REFLECTION_METADATA
+ConstantBuffer<MaterialParamsBuffer> material_params;
+ParameterBlock<MaterialTextureContractMetadata> material_textures;
+#endif
+
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
-ConstantBuffer<CameraInfo> camera_info;
-/**
- * @brief Descriptor indices for all materials rendered by the indirect draw batch.
- */
-ConstantBuffer<MaterialParamsBuffer> material_params;
-/**
- * @brief Bindless material texture table and sampler.
- */
-ParameterBlock<MaterialTextures> material_textures;
+struct MaterialSamplerDescriptorIndices {
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 material_sampler;
+};
 
-/**
- * @brief Static geometry tables shared by both pipeline stages.
- */
-ParameterBlock<StaticSet> static_set;
+struct DeferredGBufferDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 camera_info;
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 material_params;
+    MaterialSamplerDescriptorIndices material_textures;
+    StaticSetDescriptorIndices static_set;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<DeferredGBufferDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Transform a static-set vertex for the deferred G-buffer pass.
@@ -40,9 +47,13 @@ ParameterBlock<StaticSet> static_set;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    InstanceData instance = static_set.instances[p_instance_id];
-    NodeData node = static_set.nodes[instance.node_index];
-    SubmeshData submesh = static_set.submeshes[instance.submesh_index];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    InstanceData instance = instances[p_instance_id];
+    NodeData node = nodes[instance.node_index];
+    SubmeshData submesh = submeshes[instance.submesh_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
 
@@ -82,6 +93,8 @@ struct GBufferOutput {
  */
 static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
     GBufferOutput output;
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
 
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];
@@ -92,22 +105,21 @@ static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
     uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
     uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
 
-    float4 albedo_sample =
-        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
+    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_descriptor_index];
+    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_descriptor_index];
+    float4 albedo_sample = albedo_texture.Sample(material_sampler, p_input.uv);
     if (p_masked && albedo_sample.a < 0.5) {
         discard;
     }
     float material_id_unorm = float(material_index) / 255.0;
     output.albedo_matid = float4(albedo_sample.rgb, material_id_unorm);
 
-    float2 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
+    float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
     float3 normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     output.octahedron_normal = octahedron_encode(normal);
 
-    float3 rma = material_textures.textures[rma_descriptor_index]
-                     .Sample(material_textures.material_sampler, p_input.uv)
-                     .rgb;
+    float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
     float flags = 0.0;
     output.rma_flags = float4(rma, flags);
 

@@ -14,16 +14,33 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 
-Texture2D<float4> gbuffer_rma;
-Texture2D<float> gbuffer_depth;
-Texture2D<float4> direct_lighting_texture;
-Texture2D<float4> indirect_lighting_texture;
-SamplerState gbuffer_sampler;
-RWTexture2D<float4> post_processed_output;
+struct PostProcessingDescriptorIndices {
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 gbuffer_rma;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 gbuffer_depth;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 direct_lighting_texture;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 indirect_lighting_texture;
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 gbuffer_sampler;
+    [WBE_DESCRIPTOR("storage_image")]
+    uint2 post_processed_output;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<PostProcessingDescriptorIndices> descriptor_indices;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
+    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[descriptor_indices.gbuffer_depth.x];
+    Texture2D<float4> direct_lighting_texture = ResourceDescriptorHeap[descriptor_indices.direct_lighting_texture.x];
+    Texture2D<float4> indirect_lighting_texture = ResourceDescriptorHeap[descriptor_indices.indirect_lighting_texture.x];
+    SamplerState gbuffer_sampler = SamplerDescriptorHeap[descriptor_indices.gbuffer_sampler.x];
+    RWTexture2D<float4> post_processed_output = ResourceDescriptorHeap[descriptor_indices.post_processed_output.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);

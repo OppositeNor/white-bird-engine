@@ -32,11 +32,8 @@ TypeID ROComputePipelineVK::get_type_uuid() const {
 ROComputePipelineVK::~ROComputePipelineVK() = default;
 
 ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : ROPipelineVK(p_render_data, p_builder.pipeline_layout) {
+    : ROPipelineVK(p_render_data) {
     const auto& shader_stage = WBE_REQUIRED(p_builder.shader_stage);
-    if (p_builder.pipeline_layout == MEM_NULL) {
-        throw std::runtime_error("Failed to create compute pipeline: pipeline layout is missing.");
-    }
     VkPipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -44,8 +41,12 @@ ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, 
     shader_stage_create_info.pName = shader_stage.entry_function.c_str();
     VkComputePipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    VkPipelineCreateFlags2CreateInfo create_flags{};
+    create_flags.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO;
+    create_flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.pNext = &create_flags;
     create_info.stage = shader_stage_create_info;
-    create_info.layout = p_builder.pipeline_layout->get_pipeline_layout();
+    create_info.layout = VK_NULL_HANDLE;
     VkPipeline compute_pipeline = VK_NULL_HANDLE;
     if (vkCreateComputePipelines(
             render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &compute_pipeline) != VK_SUCCESS) {

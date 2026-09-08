@@ -15,6 +15,11 @@
 #include "forward_cook_torrance_pbr/forward_cook_torrance_pbr_utils.slang"
 #include "utils.slang"
 
+#if WBE_REFLECTION_METADATA
+ConstantBuffer<MaterialParamsBuffer> material_params;
+ParameterBlock<MaterialTextureContractMetadata> material_textures;
+#endif
+
 struct RSMVSOutput {
     float4 position : SV_Position;
     float3 world_position : TEXCOORD0;
@@ -25,9 +30,22 @@ struct RSMVSOutput {
     float material_index : TEXCOORD5;
 };
 
-ConstantBuffer<SpotLightInfo> light_camera_info;
-ConstantBuffer<MaterialParamsBuffer> material_params;
-ParameterBlock<MaterialTextures> material_textures;
+struct MaterialSamplerDescriptorIndices {
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 material_sampler;
+};
+
+struct RSMDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 light_camera_info;
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 material_params;
+    MaterialSamplerDescriptorIndices material_textures;
+    StaticSetDescriptorIndices static_set;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<RSMDescriptorIndices> descriptor_indices;
 
 struct RSMFragmentOutput {
     float4 flux : SV_Target0;
@@ -36,6 +54,7 @@ struct RSMFragmentOutput {
 };
 
 float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p_base_color, float p_metallic) {
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
     float3 to_light = light_camera_info.position - p_world_position;
     float light_distance = length(to_light);
     float3 light_direction = to_light / max(light_distance, 0.0001);
@@ -52,11 +71,6 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
 }
 
 /**
- * @brief Static geometry tables shared by both pipeline stages.
- */
-ParameterBlock<StaticSet> static_set;
-
-/**
  * @brief Transform a static-set vertex for reflective shadow-map rendering.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into static_set.instances.
@@ -64,8 +78,12 @@ ParameterBlock<StaticSet> static_set;
  */
 [shader("vertex")]
 RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    InstanceData instance = static_set.instances[p_instance_id];
-    NodeData node = static_set.nodes[instance.node_index];
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    InstanceData instance = instances[p_instance_id];
+    NodeData node = nodes[instance.node_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
 
@@ -76,12 +94,15 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
     output.tangent = normalize(mul(direction_transform, p_input.tangent));
     output.bitangent = normalize(mul(direction_transform, p_input.bitangent));
     output.uv = p_input.uv;
-    output.material_index = float(static_set.submeshes[instance.submesh_index].material_id);
+    output.material_index = float(submeshes[instance.submesh_index].material_id);
     return output;
 }
 
 [shader("fragment")]
 RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
@@ -91,14 +112,15 @@ RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
     uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
     uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
 
-    float4 albedo_sample =
-        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
+    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_descriptor_index];
+    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_descriptor_index];
+    float4 albedo_sample = albedo_texture.Sample(material_sampler, p_input.uv);
     if (albedo_sample.a < 0.5) {
         discard;
     }
-    float2 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
-    float3 rma = material_textures.textures[rma_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rgb;
+    float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
+    float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
     float3 world_normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     float3 rsm_flux = compute_rsm_flux(p_input.world_position, world_normal, albedo_sample.rgb, clamp(rma.g, 0.0, 1.0));
     RSMFragmentOutput output;

@@ -28,6 +28,7 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vulkan/vulkan_core.h>
@@ -70,6 +71,8 @@ public:
         std::set<uint32_t> queue_family_indices;
         // The domain where this buffer's memory will be allocated.
         Required<DeviceDomain> domain;
+        std::optional<uint32_t> uniform_view_index;
+        std::optional<uint32_t> storage_view_index;
 
         /**
          * @brief The domain where the memory of this buffer will be allocated.
@@ -116,6 +119,28 @@ public:
             } else {
                 usage = p_usage;
             }
+            return *this;
+        }
+
+        /**
+         * @brief Transfer an allocated uniform-buffer descriptor index to the created buffer.
+         *
+         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+         * release the index after construction succeeds.
+         */
+        Builder& set_uniform_view_index(uint32_t p_index) {
+            uniform_view_index = p_index;
+            return *this;
+        }
+
+        /**
+         * @brief Transfer an allocated storage-buffer descriptor index to the created buffer.
+         *
+         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+         * release the index after construction succeeds.
+         */
+        Builder& set_storage_view_index(uint32_t p_index) {
+            storage_view_index = p_index;
             return *this;
         }
 
@@ -327,6 +352,16 @@ public:
     }
 
     /**
+     * @brief Get or lazily create the whole-buffer uniform descriptor index.
+     */
+    uint32_t get_uniform_view_index() const;
+
+    /**
+     * @brief Get or lazily create the whole-buffer storage descriptor index.
+     */
+    uint32_t get_storage_view_index() const;
+
+    /**
      * @brief Update the buffer. Updating from main memory must specify the
      * device domain as host.
      *
@@ -401,6 +436,9 @@ private:
     VkBuffer buffer = VK_NULL_HANDLE;
     VmaAllocation allocation = VK_NULL_HANDLE;
     ExposedFields exposed_fields{};
+    VkBufferUsageFlags usage = 0;
+    mutable std::optional<uint32_t> uniform_view_index;
+    mutable std::optional<uint32_t> storage_view_index;
 };
 } // namespace WhiteBirdEngine
 

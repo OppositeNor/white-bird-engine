@@ -24,6 +24,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/utils.hh"
+#include <optional>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -52,6 +53,8 @@ public:
         // Subresource range.
         VkImageSubresourceRange subresource_range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+        std::optional<uint32_t> sampled_view_index;
+        std::optional<uint32_t> storage_view_index;
 
         // Set the source image.
         Builder& set_image(Ref<ROImageVK> p_image);
@@ -72,6 +75,20 @@ public:
         // Set from image configurations. All features are default to match to
         // the image config.
         Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);
+        /**
+         * @brief Transfer an allocated sampled-image descriptor index to the created image view.
+         *
+         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+         * release the index after construction succeeds.
+         */
+        Builder& set_sampled_view_index(uint32_t p_index);
+        /**
+         * @brief Transfer an allocated storage-image descriptor index to the created image view.
+         *
+         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+         * release the index after construction succeeds.
+         */
+        Builder& set_storage_view_index(uint32_t p_index);
 
         Ref<ROImageViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
             return make_ref<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
@@ -290,6 +307,16 @@ public:
     }
 
     /**
+     * @brief Get or lazily create the sampled-image descriptor index.
+     */
+    uint32_t get_sampled_view_index() const;
+
+    /**
+     * @brief Get or lazily create the storage-image descriptor index.
+     */
+    uint32_t get_storage_view_index() const;
+
+    /**
      * @class ExposedFields
      * @brief Exposed fields of ROImageViewVK.
      *
@@ -315,6 +342,9 @@ private:
     VkImageView image_view = VK_NULL_HANDLE;
 
     ExposedFields exposed_fields{};
+    VkImageViewCreateInfo create_info{};
+    mutable std::optional<uint32_t> sampled_view_index;
+    mutable std::optional<uint32_t> storage_view_index;
 
     void init(const Builder& p_builder);
 };

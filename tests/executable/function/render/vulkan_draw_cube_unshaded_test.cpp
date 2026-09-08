@@ -26,7 +26,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -96,9 +95,7 @@ public:
 
         WBE::RTRunStaticSetVK::Config task_config;
         auto task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer, cube_set, pipeline_resource, task_config);
-        auto [set_index, binding] = task->get_descriptor_binding("camera_info");
-        task->write_descriptor_set(set_index,
-            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(camera_info_ubo, 0, sizeof(WBE::CameraInfoVKUBO)));
+        task->set_descriptor_binding("camera_info", camera_info_ubo);
 
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),

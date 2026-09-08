@@ -103,7 +103,8 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
     std::string_view p_material_textures_variable_name,
     std::string_view p_material_params_variable_name,
     uint32_t p_max_texture_descriptor_count,
-    Ref<IRenderObject> p_material_sampler) const {
+    Ref<IRenderObject> p_material_sampler,
+    const TextureDescriptorIndexResolver& p_texture_descriptor_index_resolver) const {
     if (!p_material_contract.has_value()) {
         return {};
     }
@@ -160,10 +161,27 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
         }
     }
 
+    if (p_texture_descriptor_index_resolver) {
+        for (size_t material_index = 0; material_index < material_contract.material_count; ++material_index) {
+            const size_t row_offset = material_contract.table_offset + material_index * material_contract.table_stride;
+            for (const MaterialTextureContract::TextureField& texture_field : material_contract.texture_fields) {
+                int32_t texture_index = 0;
+                std::memcpy(&texture_index, material_params_data.data() + row_offset + texture_field.offset, sizeof(texture_index));
+                if (texture_index < 0 || static_cast<size_t>(texture_index) >= unique_textures.size()) {
+                    throw std::runtime_error("Failed to build static-set material bindings: generated texture index is invalid.");
+                }
+                write_texture_index(material_params_data,
+                    row_offset + texture_field.offset,
+                    p_texture_descriptor_index_resolver(unique_textures[static_cast<size_t>(texture_index)]));
+            }
+        }
+    }
+
     builder.add_buffer_decleration(p_material_params_variable_name, material_params_data.data(), material_params_data.size());
     builder.add_sampler_decleration(std::format("{}.material_sampler", p_material_textures_variable_name), p_material_sampler);
     for (size_t texture_index = 0; texture_index < unique_textures.size(); ++texture_index) {
-        builder.add_image_decleration(std::format("{}.textures[{}]", p_material_textures_variable_name, texture_index), unique_textures[texture_index]);
+        builder.add_image_decleration(
+            std::format("{}.textures[{}]", p_material_textures_variable_name, texture_index), unique_textures[texture_index]);
     }
     return builder.build();
 }

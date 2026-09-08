@@ -12,8 +12,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-Texture2D<float2> shadow_moments_horizontal_input;
-RWTexture2D<float2> shadow_moments_summed_area_table_output;
+#include "utils.slang"
+
+struct ShadowMomentsVerticalDescriptorIndices {
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 shadow_moments_horizontal_input;
+    [WBE_DESCRIPTOR("storage_image")]
+    uint2 shadow_moments_summed_area_table_output;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<ShadowMomentsVerticalDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Complete a shadow-moment summed-area table from horizontal prefix sums.
@@ -22,6 +31,10 @@ RWTexture2D<float2> shadow_moments_summed_area_table_output;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
+    Texture2D<float2> shadow_moments_horizontal_input =
+        ResourceDescriptorHeap[descriptor_indices.shadow_moments_horizontal_input.x];
+    RWTexture2D<float2> shadow_moments_summed_area_table_output =
+        ResourceDescriptorHeap[descriptor_indices.shadow_moments_summed_area_table_output.x];
     uint width;
     uint height;
     shadow_moments_horizontal_input.GetDimensions(width, height);

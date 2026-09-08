@@ -9,9 +9,10 @@ Tick render stages:
   `RendGraphDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
   in topological order. Each `RenderTaskVK` records into its own primary
   command buffer; cross-submit ordering between tasks is enforced with timeline
-  semaphores attached to the graph's execution edges. Per-resource ordering is
-  derived from compact `RendResUsageVK` declarations on the task and its
-  `RendTaskDescVK`; Vulkan access and stage masks remain graph-internal. After the
+  semaphores attached to the graph's explicit execution edges. Compact
+  `RendResUsageVK` declarations describe accesses but do not create edges;
+  `RendTaskDescVK::after()` must establish a path for every conflicting access pair.
+  Vulkan access and stage masks remain graph-internal. After the
   last graphics submission the graph signals a terminal binary semaphore, which
   `RendererVK::present()` waits on before `vkQueuePresentKHR`.
 
@@ -22,20 +23,38 @@ Material texture semantics are shader metadata, not renderer-wide enums. Integer
 argument uses the annotated field name. `rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel
 pack.
 
-The static-set task reflects this contract independently for every graphics pipeline batch. It builds that batch's
-bindless `MaterialTextures.textures` descriptor array, initializes missing slots from the configured default material, and writes
-indices into `MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture
-roles.
+The static-set task reflects this contract independently for every graphics pipeline. It resolves each texture to a global
+sampled-image descriptor-heap index, initializes missing roles from the configured default material, and writes those indices into
+`MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture roles.
 
-The nested contract member names are fixed in `utils/utils.slang`: `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and
-`MaterialParamsBuffer.materials`. Application configuration may vary only the `material_textures` and `material_params` base
-variable names and the `default_material` resource key. Materials do not carry a separate `material_type`; the selected graphics
-pipeline defines the shader model.
+The contract member names are fixed in `utils/utils.slang`: the reflection-only
+`MaterialTextureContractMetadata.material_sampler` and `MaterialTextureContractMetadata.textures` members describe the resource
+shape, while `MaterialParamsBuffer.materials` is the runtime material table. Application configuration may vary only the
+`material_textures` and `material_params` base variable names and the `default_material` resource key. Materials do not carry a
+separate `material_type`; the selected graphics pipeline defines the shader model.
 
 Texture and vertex annotations use one backend-neutral role resolver. Exact role names are authoritative and hashes are only a
 matching acceleration, so duplicate names and distinct-name hash collisions are rejected consistently. Separate material and
 vertex contract resolvers then apply their domain rules; Vulkan code only translates the validated vertex contract or binds the
 validated texture table.
+
+## Descriptor Heap Binding
+
+The Vulkan backend requires `VK_EXT_descriptor_heap`, shader untyped pointers, maintenance5, buffer device address, and memory that
+is both host-visible and device-local for heap storage. `DescriptorHeapAllocatorVK` owns one resource heap divided into buffer,
+sampled-image, and storage-image arenas plus a separate sampler heap. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` own indices
+allocated lazily by their descriptor getters or transferred through their builders, and defer release for the configured frames
+in flight.
+
+Shaders represent each resource as an aligned `uint2` field in push data marked with `WBE_DESCRIPTOR("uniform_buffer")`,
+`storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. The render graph binds both heaps before each task records, and
+`ROPipelineVK` pushes the reflected index block before dispatch or draw. Pipeline binding paths are relative to that push-data
+block and may traverse nested structs and fixed-size struct arrays.
+
+Vulkan plugins contribute creation requirements through `RenderPluginVK::on_before_instance_creation()` and
+`on_before_device_creation()`. Device-feature requests should use the protected feature helper so plugins merge an existing
+`pNext` structure instead of appending duplicate structure types. `on_device_created()` remains the point for loading commands and
+finishing plugin setup after logical-device creation.
 
 ## Vertex Resource Layout
 
@@ -128,9 +147,9 @@ use for each indirect draw.
 After buffer creation, `compile_static_set_pipeline()` compiles the selected graphics pipeline once for the task and binds three
 named storage buffers into the reflected shader contract:
 
-- `static_submeshes`
-- `static_nodes`
-- `static_instances`
+- `static_set.submeshes`
+- `static_set.nodes`
+- `static_set.instances`
 
 The task still uses shader reflection for material fallback textures. `get_default_image()` resolves the configured default
 material, and `GraphicsPipelineCompilerVK` binds any reflected texture and parameter resources needed by the selected pipeline.
@@ -150,7 +169,7 @@ binds its minimum vertex-view byte offset, and is split at the device's `maxDraw
 `build_indirect_buffer()` uploads that command array, and `build_non_empty_indirect_task()` packages the geometry buffer, indirect
 buffer, pipeline batch, attachment ids, clear values, and load ops into one `RTRunGraphicsPipelineIndirectVK`. During recording,
 `RTRunStaticSetVK::record()` delegates to that indirect task, which binds the compiled graphics pipeline, binds the cached binary
-buffer as vertex and index input, binds the pipeline-owned descriptor sets, and issues the indirect indexed draws.
+buffer as vertex and index input, pushes the pipeline's descriptor-heap indices, and issues the indirect indexed draws.
 
 Before constructing the task:
 
@@ -183,7 +202,7 @@ renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
 ```
 
-The application contributes only graph-visible attachments and any later descriptor writes. The task retains its compiled Vulkan
+The application contributes only graph-visible attachments and any later descriptor binding replacements. The task retains its compiled Vulkan
 objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
 
 ### Configuring Explicit Passes
@@ -218,39 +237,29 @@ The current opaque update flow is:
 
 Null, empty, and fully skipped sets clear the published acceleration structure without zero-sized allocations.
 
-### Writing Pipeline-Owned Descriptors
+### Replacing Pipeline Descriptor Bindings
 
-Material descriptors are populated during construction. Static-set tasks may still expose reflected descriptor fields for
-application-provided uniform or sampled resources, but the descriptor objects remain pipeline-owned.
-
-For `RTRunStaticSetVK`, field lookup is per-task because there is exactly one compiled pipeline:
+Material and static-set bindings are populated during construction. An application may replace a reflected binding on the task's
+compiled pipeline by field path:
 
 ```cpp
-auto [set_index, binding] = task->get_descriptor_binding("camera_info");
-task->write_descriptor_set(set_index,
-   RODescriptorSetVK::Writer()
-      .set_binding(binding)
-      .add_uniform_buffer_info(camera_buffer, 0, sizeof(CameraInfoVKUBO)));
+task->set_descriptor_binding("camera_info", camera_buffer);
+task->set_descriptor_binding("light.lights.shadowmap", shadow_depth_view);
 ```
 
-For frame-local buffers, pass the `ROCPerFrameVK` container instead of resolving one buffer manually. Pipeline descriptor writes are
-versioned per frame slot, and the container retains the latest published bytes until every slot has applied them:
+The resource type must match the field's `WBE_DESCRIPTOR` category. Buffers bind as complete `ROBufferVK` objects; image fields
+take `ROImageViewVK`, and sampler fields take `ROSamplerVK`. The pipeline retains directly bound resources for its lifetime.
+
+For frame-local resources, pass an `ROCPerFrameVK` container instead of resolving one slot manually:
 
 ```cpp
-task->write_descriptor_set(batch_index,
-    set_index,
-    RODescriptorSetVK::Writer()
-        .set_binding(binding)
-        .add_uniform_buffer_info(camera_buffers, 0, sizeof(CameraInfoVKUBO)));
-
+task->set_descriptor_binding("camera_info", camera_buffers);
 camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
 ```
 
-Publish buffer contents from a render-thread job. The selected slot applies the newest pending bytes after its fence has completed,
-before its pipeline descriptor set is bound. A slot may skip intermediate versions, but it cannot miss the latest version.
-
-Field paths come from shader reflection. `get_descriptor_binding()` throws when the requested field is absent from a batch, so all
-pipelines selected for a pass must expose the fields that the pass writes.
+At record time, the pipeline resolves the container from `current_frame_slot` and pushes that resource's descriptor index.
+Publish buffer contents and replace bindings on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
+Field lookup comes from shader reflection and throws when the requested path is absent or the resource type is incompatible.
 
 To add an execution dependency, construct the descriptor explicitly before moving it into the graph:
 
@@ -262,9 +271,9 @@ task_desc.after("run_shadow")
 graph_desc.tasks.emplace_back(std::move(task_desc));
 ```
 
-Compute and graphics pipeline-run tasks bind their pipeline-owned descriptor sets automatically. Shader resources that are not
-intrinsic task inputs are declared fluently on the task descriptor, and the graph derives queue-aware synchronization scopes from
-their compact usages:
+Compute and graphics pipeline-run tasks push their pipeline-owned descriptor-index blocks automatically after the graph binds the
+global heaps. Shader resources that are not intrinsic task inputs are declared fluently on the task descriptor. These declarations
+validate explicit dependency paths and narrow queue-aware synchronization scopes; they do not create execution edges:
 
 ```cpp
 RendTaskDescVK lighting(render_allocator);

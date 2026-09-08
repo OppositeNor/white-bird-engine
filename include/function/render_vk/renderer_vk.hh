@@ -26,6 +26,7 @@
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
@@ -34,7 +35,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -56,7 +57,7 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE = "swap_chain_image";
+static constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE = "swap_chain_image";
 
 /**
  * @class RendererVK
@@ -127,6 +128,15 @@ public:
      */
     void register_gpu_job(GPUJobVK p_job);
 
+    /**
+     * @brief Submit work from another thread for execution on the rendering thread.
+     *
+     * Render objects are render-thread-confined. Cross-thread callers must use this job buffer instead of operating on them
+     * directly.
+     *
+     * @param p_job Work to execute on the rendering thread.
+     * @return Future completed after the job runs.
+     */
     virtual std::future<void> add_job(std::function<void()> p_job) override {
         return job_buffer->add_job(std::move(p_job));
     }
@@ -168,6 +178,10 @@ public:
         return &base_render_data;
     }
 
+    Ref<ROCPerFrameVK> get_swap_chain_image_container() const {
+        return swap_chain_image_container;
+    }
+
     /**
      * @brief Register a task to be called after a number of frames. This could
      * be used for resource deallocation to prevent destroying resources that
@@ -189,13 +203,6 @@ public:
     }
 
 private:
-    static constexpr size_t MAX_DESCRIPTOR_SET_COUNT = 1024;
-    static constexpr size_t MAX_UNIFORM_DESCRIPTOR_COUNT = 16;
-    static constexpr size_t MAX_STORAGE_BUFFER_DESCRIPTOR_COUNT = 256;
-    static constexpr size_t MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT = 256;
-    static constexpr size_t MAX_STORAGE_IMAGE_DESCRIPTOR_COUNT = 64;
-    static constexpr size_t MAX_SAMPLER_DESCRIPTOR_COUNT = 256;
-    static constexpr size_t MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT = 32;
     Ref<JobBufferRingMPSC> job_buffer;
 
     template <typename T>
@@ -246,7 +253,8 @@ private:
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
-    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+    Unique<DescriptorHeapAllocatorVK> descriptor_heap_allocator;
+    Ref<ROCPerFrameVK> swap_chain_image_container;
 
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
@@ -276,6 +284,9 @@ private:
     std::vector<const char*> enabled_device_extensions{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME,
+        VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
+        VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME,
+        VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
 
         // To make VK_IMAGE_LAYOUT_GENERAL works as well as other layouts.
         VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
@@ -345,8 +356,6 @@ private:
         RenderObjects(RenderObjects&&) noexcept = delete;
         RenderObjects& operator=(const RenderObjects&) = delete;
         RenderObjects& operator=(RenderObjects&&) noexcept = delete;
-        // Graphics pipeline layout.
-        Ref<ROPipelineLayoutVK> graphics_pipeline_layout;
         // Swap chain images
         Vector<Ref<ROImageVK>> swap_chain_images;
         // Swap chain image views.
@@ -381,7 +390,7 @@ private:
     void create_command_pools();
     void create_ktx_vulkan_device_info();
     void create_gpu_job_command_buffer();
-    void create_descriptor_pool();
+    void create_descriptor_heap_allocator();
     void create_async_objects();
 
     bool check_layer_support();
@@ -408,6 +417,7 @@ private:
     void run_delayed_calls();
     void run_gpu_jobs();
     void synchronize_gpu_and_flush_delayed_calls();
+    void flush_delayed_calls();
     void submit_gpu_job_command_buffer();
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
 };

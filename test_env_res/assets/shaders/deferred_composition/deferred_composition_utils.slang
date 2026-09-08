@@ -50,20 +50,20 @@ struct CompositionCamera {
     float4 camera_world_pos;
 };
 
-struct LightParam {
-    ConstantBuffer<SpotLightInfo> info;
-    Texture2D<float2> shadowmap;
+struct LightParamDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")] uint2 info;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    Texture2D<float2> shadow_moments_summed_area_table;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 shadow_moments_summed_area_table;
 #endif
-    Texture2D<float4> rsm_flux;
-    Texture2D<float2> rsm_octa_normal;
-    SamplerState shadowmap_sampler;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 rsm_flux;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 rsm_octa_normal;
+    [WBE_DESCRIPTOR("sampler")] uint2 shadowmap_sampler;
 };
 
-struct LightParams {
-    LightParam lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    ConstantBuffer<uint> light_count;
+struct LightParamsDescriptorIndices {
+    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    [WBE_DESCRIPTOR("uniform_buffer")] uint2 light_count;
 };
 
 VSOutput build_fullscreen_triangle(uint p_vertex_id) {
@@ -123,11 +123,13 @@ float3 world_position_from_depth(float2 p_uv, float p_depth, float4x4 p_inv_view
  */
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
 float2 load_shadow_moments_summed_area_table(
-    ParameterBlock<LightParams> p_light, uint p_spot_light_index, int2 p_texel) {
+    LightParamsDescriptorIndices p_light, uint p_spot_light_index, int2 p_texel) {
     if (any(p_texel < int2(0))) {
         return float2(0.0);
     }
-    return p_light.lights[p_spot_light_index].shadow_moments_summed_area_table.Load(int3(p_texel, 0));
+    Texture2D<float2> shadow_moments_summed_area_table =
+        ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadow_moments_summed_area_table.x];
+    return shadow_moments_summed_area_table.Load(int3(p_texel, 0));
 }
 
 /**
@@ -139,7 +141,7 @@ float2 load_shadow_moments_summed_area_table(
  * @param p_shadow_size The shadow-map extent in texels.
  * @return The mean first and second moments in the clamped filter rectangle.
  */
-float2 sample_shadow_moments_summed_area_table(ParameterBlock<LightParams> p_light,
+float2 sample_shadow_moments_summed_area_table(LightParamsDescriptorIndices p_light,
     uint p_spot_light_index,
     float2 p_center_uv,
     float p_radius_uv,
@@ -174,7 +176,7 @@ float2 sample_shadow_moments_summed_area_table(ParameterBlock<LightParams> p_lig
  * @param p_shadow_size The shadow-map extent in texels.
  * @return The filtered first and second moments.
  */
-float2 sample_shadow_moments_mipmap(ParameterBlock<LightParams> p_light,
+float2 sample_shadow_moments_mipmap(LightParamsDescriptorIndices p_light,
     uint p_spot_light_index,
     float2 p_center_uv,
     float p_radius_uv,
@@ -183,8 +185,9 @@ float2 sample_shadow_moments_mipmap(ParameterBlock<LightParams> p_light,
     // L = log2(filter_width_texels).
     float maximum_mip_level = floor(log2(float(max(p_shadow_size.x, p_shadow_size.y))));
     float mip_level = clamp(log2(filter_width_texels), 0.0, maximum_mip_level);
-    return p_light.lights[p_spot_light_index].shadowmap.SampleLevel(
-        p_light.lights[p_spot_light_index].shadowmap_sampler, p_center_uv, mip_level);
+    Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
+    SamplerState shadowmap_sampler = SamplerDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap_sampler.x];
+    return shadowmap.SampleLevel(shadowmap_sampler, p_center_uv, mip_level);
 }
 
 float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uint p_sample_index) {
@@ -196,8 +199,12 @@ float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uin
     return float2(cos(angle), sin(angle)) * radius;
 }
 
-float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_light_index, float2 p_receiver_uv, float3 p_world_position, float3 p_normal) {
-    SpotLightInfo spot_light_info = p_light.lights[p_spot_light_index].info;
+float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_light_index, float2 p_receiver_uv, float3 p_world_position, float3 p_normal) {
+    ConstantBuffer<SpotLightInfo> spot_light_info_buffer = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    SpotLightInfo spot_light_info = spot_light_info_buffer;
+    Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
+    Texture2D<float4> rsm_flux = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_flux.x];
+    Texture2D<float2> rsm_octa_normal = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_octa_normal.x];
     float4 light_space_position = mul(spot_light_info.proj, mul(spot_light_info.view, float4(p_world_position, 1.0)));
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
     float2 center_uv = ndc.xy * 0.5 + 0.5;
@@ -206,7 +213,7 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
     }
     uint shadow_width;
     uint shadow_height;
-    p_light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
+    shadowmap.GetDimensions(shadow_width, shadow_height);
     float2 texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
     float3 indirect_irradiance = float3(0.0);
     float maximum_sample_distance_squared = 0.0;
@@ -219,15 +226,15 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
         }
         int2 sample_texel = int2(sample_uv * float2(shadow_width, shadow_height));
         float2 sample_texel_uv = (float2(sample_texel) + 0.5) * texel_size;
-        float sample_depth = p_light.lights[p_spot_light_index].shadowmap.Load(int3(sample_texel, 0)).x;
+        float sample_depth = shadowmap.Load(int3(sample_texel, 0)).x;
         if (sample_depth <= 0.0) {
             continue;
         }
-        float3 sample_flux = p_light.lights[p_spot_light_index].rsm_flux.Load(int3(sample_texel, 0)).rgb;
+        float3 sample_flux = rsm_flux.Load(int3(sample_texel, 0)).rgb;
         if (dot(sample_flux, sample_flux) < 0.000001) {
             continue;
         }
-        float2 sample_octa_normal = p_light.lights[p_spot_light_index].rsm_octa_normal.Load(int3(sample_texel, 0));
+        float2 sample_octa_normal = rsm_octa_normal.Load(int3(sample_texel, 0));
         float3 shadow_ray_position = world_position_from_depth(sample_texel_uv, 1.0, spot_light_info.inv_view_proj);
         float3 shadow_ray_direction = normalize(shadow_ray_position - spot_light_info.position);
         float3 sample_world_position = spot_light_info.position + shadow_ray_direction * sample_depth * spot_light_info.range;
@@ -249,10 +256,12 @@ float3 compute_rsm_indirect(ParameterBlock<LightParams> p_light, uint p_spot_lig
     return indirect_irradiance * (2.0 * maximum_sample_distance_squared / float(WBE_RSM_SAMPLE_COUNT));
 }
 
-float compute_spot_shadow(ParameterBlock<LightParams> p_light,
+float compute_spot_shadow(LightParamsDescriptorIndices p_light,
     uint p_spot_light_index,
     float3 p_world_position) {
-    SpotLightInfo spot_light_info = p_light.lights[p_spot_light_index].info;
+    ConstantBuffer<SpotLightInfo> spot_light_info_buffer = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    SpotLightInfo spot_light_info = spot_light_info_buffer;
+    Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     float4 light_space_position = mul(spot_light_info.proj, mul(spot_light_info.view, float4(p_world_position, 1.0)));
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
     float2 uv = ndc.xy * 0.5 + 0.5;
@@ -267,7 +276,7 @@ float compute_spot_shadow(ParameterBlock<LightParams> p_light,
     float current_depth = clamp(receiver_distance / max(spot_light_info.range, 0.0001) - bias, 0.0, 1.0);
     uint shadow_width;
     uint shadow_height;
-    p_light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
+    shadowmap.GetDimensions(shadow_width, shadow_height);
     float emitter_width = max(spot_light_info.emitter_width, 0.0);
     float3 light_near_position = world_position_from_depth(float2(0.5, 0.5), 1.0, spot_light_info.inv_view_proj);
     float light_near_distance = max(length(light_near_position - spot_light_info.position), 0.0001);

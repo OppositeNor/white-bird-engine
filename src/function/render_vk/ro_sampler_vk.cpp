@@ -15,6 +15,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
@@ -137,6 +138,11 @@ ROSamplerVK::Builder& ROSamplerVK::Builder::set_unnormalized_coordinates(VkBool3
     return *this;
 }
 
+ROSamplerVK::Builder& ROSamplerVK::Builder::set_sampler_index(uint32_t p_index) {
+    sampler_index = p_index;
+    return *this;
+}
+
 VkSampler ROSamplerVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
     VkSamplerCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -164,15 +170,56 @@ VkSampler ROSamplerVK::Builder::create_vk_object(const BaseRenderDataVK* p_rende
 }
 
 ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
+    create_info = VkSamplerCreateInfo{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = p_builder.mag_filter,
+        .minFilter = p_builder.min_filter,
+        .mipmapMode = p_builder.mipmap_mode,
+        .addressModeU = p_builder.address_mode_u,
+        .addressModeV = p_builder.address_mode_v,
+        .addressModeW = p_builder.address_mode_w,
+        .mipLodBias = p_builder.mip_lod_bias,
+        .anisotropyEnable = p_builder.anisotropy_enable,
+        .maxAnisotropy = p_builder.max_anisotropy,
+        .compareEnable = p_builder.compare_enable,
+        .compareOp = p_builder.compare_op,
+        .minLod = p_builder.min_lod,
+        .maxLod = p_builder.max_lod,
+        .borderColor = p_builder.border_color,
+        .unnormalizedCoordinates = p_builder.unnormalized_coordinates};
+    if (p_builder.sampler_index.has_value()) {
+        if (render_data->descriptor_heap_allocator == nullptr ||
+            !render_data->descriptor_heap_allocator->owns_sampler_range(*p_builder.sampler_index)) {
+            throw std::runtime_error("Failed to adopt sampler descriptor index: the index is not allocated by the sampler arena.");
+        }
+    }
     sampler = p_builder.create_vk_object(p_render_data);
+    if (p_builder.sampler_index.has_value()) {
+        sampler_index = p_builder.sampler_index;
+        render_data->descriptor_heap_allocator->write_sampler_descriptor(*sampler_index, create_info);
+    }
 }
 
 ROSamplerVK::~ROSamplerVK() {
     render_data->register_delayed_call(
-        [render_data = render_data, sampler = sampler]() {
+        [render_data = render_data, sampler = sampler, sampler_index = sampler_index]() {
+            if (sampler_index.has_value()) {
+                render_data->descriptor_heap_allocator->deallocate_sampler(*sampler_index);
+            }
             vkDestroySampler(render_data->logic_device, sampler, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
+}
+
+uint32_t ROSamplerVK::get_sampler_index() const {
+    if (!sampler_index.has_value()) {
+        DescriptorHeapAllocatorVK* allocator = render_data->descriptor_heap_allocator;
+        if (allocator == nullptr) {
+            throw std::runtime_error("Failed to create sampler descriptor: descriptor heap allocator is unavailable.");
+        }
+        sampler_index = allocator->allocate_sampler();
+        allocator->write_sampler_descriptor(*sampler_index, create_info);
+    }
+    return *sampler_index;
 }
 
 } // namespace WhiteBirdEngine

@@ -11,7 +11,7 @@ Treat a render graph as a statically built DAG of `RenderTaskVK` nodes operating
 
 1. Add one `RendResVK` declaration for every resource ID that tasks read. Set its type to `TypeUUID<ConcreteRenderObject>::UUID`.
 2. Add task descriptors with unique lower-snake-case string `task_id` values and factories that return `Unique<RenderTaskVK>`.
-3. Use `after()` for phase ordering and dependencies that resource inference cannot establish.
+3. Use `after()` to establish every required execution path. Declared resource accesses do not create execution edges.
 4. Use descriptor `read()` / `write()` calls for shader resources not declared intrinsically by the task.
 5. Register and activate the graph through `RendererVK`; do not manually drive graph execution from application code.
 
@@ -21,9 +21,9 @@ Task factories run while the graph is built. Capture only data that remains vali
 
 Every task implements `queue_family()`, `read_resources()`, `write_resources()`, and `record()`. Each `ResAccessVK` uses the exact graph resource ID plus a compact `RendResUsageVK`. Vulkan access and pipeline-stage masks are derived privately by the graph.
 
-Resource inference tracks the last writer in topological order and adds read-after-write execution edges. It does not infer read-read ordering or reliably express arbitrary write-write phase ordering. Use `prev` whenever ordering is required independently of a read from the prior writer. Undeclared read resource IDs make graph construction fail.
+The graph validates declared accesses against explicit execution paths. Every read-write, write-read, or write-write conflict between tasks must be ordered transitively through `prev`; otherwise graph construction fails. Read-read pairs do not conflict. Undeclared resource IDs also make graph construction fail. Prefer a direct `prev` edge when two tasks share a hazard so its semaphore stage scopes can be tightened to the declared usages.
 
-Prefer existing task types such as `RTRunComputePipelineVK` and graphics task implementations before adding a new `RenderTaskVK`. Pipeline-run tasks bind pipeline-owned descriptor sets automatically; higher-level tasks may expose reflected write points when they retain private compiled pipelines. `RTRunComputePipelineVK` defaults to `QueueFamilyVK::COMPUTE`; do not override it to graphics without a concrete queue constraint.
+Prefer existing task types such as `RTRunComputePipelineVK` and graphics task implementations before adding a new `RenderTaskVK`. Render-graph command buffers bind the renderer-owned descriptor heaps before task recording, and pipeline-run tasks push their reflected descriptor indices automatically. Higher-level tasks may expose `set_descriptor_binding()` when they retain private compiled pipelines. `RTRunComputePipelineVK` defaults to `QueueFamilyVK::COMPUTE`; do not override it to graphics without a concrete queue constraint.
 
 ## Use queues and resources safely
 
@@ -39,6 +39,8 @@ Register static graph resources in the descriptor when possible. Let the rendere
 
 Graph rebuild frees existing command buffers and waits for the device to become idle. Unregistration defers destruction for the configured frames in flight. Preserve recreatable task factories when a descriptor may be rebuilt.
 
+Render objects and Vulkan backend helpers are confined to the rendering thread. Submit cross-thread updates through `IRenderer::add_job()`; do not add locks to these objects merely to permit direct cross-thread access.
+
 ## Validate
 
 Use the repository wrapper and select the smallest relevant render test filter first:
@@ -51,4 +53,4 @@ The wrapper runs the complete unit suite after the focused tests pass. Do not in
 
 ## Advanced work
 
-Read [references/system-and-usage.md](references/system-and-usage.md) before changing dependency inference, synchronization, queue behavior, resource binding, graph rebuilding, or presentation integration. It also identifies canonical graphics and deferred-compute examples.
+Read [references/system-and-usage.md](references/system-and-usage.md) before changing dependency validation, synchronization, queue behavior, descriptor-heap binding, resource binding, graph rebuilding, or presentation integration. It also identifies canonical graphics and deferred-compute examples.

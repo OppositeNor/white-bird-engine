@@ -35,7 +35,7 @@ TypeID ROGraphicsPipelineVK::get_type_uuid() const {
 }
 
 ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : ROPipelineVK(p_render_data, p_builder.config.pipeline_layout) {
+    : ROPipelineVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
@@ -89,7 +89,11 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
 
     VkGraphicsPipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    create_info.pNext = &(state_create_info.pipeline_rendering);
+    VkPipelineCreateFlags2CreateInfo create_flags{};
+    create_flags.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO;
+    create_flags.pNext = &(state_create_info.pipeline_rendering);
+    create_flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.pNext = &create_flags;
     create_info.stageCount = shader_stages.size();
     create_info.pStages = shader_stages.data();
     create_info.pVertexInputState = &(state_create_info.vertex_input_state);
@@ -103,7 +107,7 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
     create_info.pColorBlendState = &(state_create_info.color_blend_state);
     create_info.pDynamicState = &(state_create_info.dynamic_state);
-    create_info.layout = WBE_REQUIRED(p_config.pipeline_layout).get_pipeline_layout();
+    create_info.layout = VK_NULL_HANDLE;
     // Using dynamic rendering.
     create_info.renderPass = VK_NULL_HANDLE;
     create_info.subpass = p_config.subpass_index;

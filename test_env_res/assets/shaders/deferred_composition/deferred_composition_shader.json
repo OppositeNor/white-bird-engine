@@ -40,13 +40,6 @@
             "metadata": "assets/shaders/deferred_composition/indirect_lighting.json"
         },
         {
-            "id": "post_processing_shader",
-            "source_type": "shader",
-            "src": "assets/shaders/deferred_composition/post_processing.slang",
-            "dst": "assets/shaders/deferred_composition/post_processing.spv",
-            "metadata": "assets/shaders/deferred_composition/post_processing.json"
-        },
-        {
             "id": "present_post_processing_shader",
             "source_type": "shader",
             "src": "assets/shaders/deferred_composition/present_post_processing.slang",

@@ -57,9 +57,8 @@ void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, const Rend
     if (compute_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline resource is missing.");
     }
-
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline->get_pipeline());
-    compute_pipeline->bind_descriptor_sets(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE);
+    compute_pipeline->push_descriptor_indices(p_command_buffer);
     vkCmdDispatch(p_command_buffer, dispatch_group_count.width, dispatch_group_count.height, dispatch_group_count.depth);
 }
 

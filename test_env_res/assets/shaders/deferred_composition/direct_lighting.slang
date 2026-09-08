@@ -14,18 +14,31 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 
-ConstantBuffer<CompositionCamera> camera_info;
-ParameterBlock<LightParams> light;
-Texture2D<float4> gbuffer_albedo;
-Texture2D<float2> gbuffer_octa_normal;
-Texture2D<float4> gbuffer_rma;
-Texture2D<float> gbuffer_depth;
-SamplerState gbuffer_sampler;
-RWTexture2D<float4> direct_lighting_output;
+struct DirectLightingDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")] uint2 camera_info;
+    LightParamsDescriptorIndices light;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_albedo;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_octa_normal;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_rma;
+    [WBE_DESCRIPTOR("sampled_image")] uint2 gbuffer_depth;
+    [WBE_DESCRIPTOR("sampler")] uint2 gbuffer_sampler;
+    [WBE_DESCRIPTOR("storage_image")] uint2 direct_lighting_output;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<DirectLightingDescriptorIndices> descriptor_indices;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+    ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[descriptor_indices.gbuffer_albedo.x];
+    Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[descriptor_indices.gbuffer_octa_normal.x];
+    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
+    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[descriptor_indices.gbuffer_depth.x];
+    SamplerState gbuffer_sampler = SamplerDescriptorHeap[descriptor_indices.gbuffer_sampler.x];
+    RWTexture2D<float4> direct_lighting_output = ResourceDescriptorHeap[descriptor_indices.direct_lighting_output.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
@@ -50,9 +63,11 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 view_direction = normalize(camera_info.camera_world_pos.xyz - world_pos);
     float3 f0 = lerp(float3(0.04), base_color, metallic);
     float3 direct_lighting = float3(0.0);
-    uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+    uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLightInfo spot_light_info = light.lights[spot_light_index].info;
+        ConstantBuffer<SpotLightInfo> spot_light_info_buffer =
+            ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
+        SpotLightInfo spot_light_info = spot_light_info_buffer;
         float3 to_light = spot_light_info.position - world_pos;
         float light_distance = length(to_light);
         float3 light_direction = to_light / max(light_distance, 0.0001);
@@ -70,7 +85,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         float3 specular = ndf * geometry * fresnel / max(4.0 * max(dot(normal, view_direction), 0.0) * ndotl, 0.0001);
         float3 diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / WBE_PI;
         float3 radiance = spot_light_info.color * spot_light_info.intensity * cone_falloff * distance_falloff;
-        float shadow = compute_spot_shadow(light, spot_light_index, world_pos);
+        float shadow = compute_spot_shadow(descriptor_indices.light, spot_light_index, world_pos);
         direct_lighting += (diffuse + specular) * radiance * ndotl * shadow;
     }
     direct_lighting_output[dispatch_thread_id] = float4(direct_lighting, 1.0);

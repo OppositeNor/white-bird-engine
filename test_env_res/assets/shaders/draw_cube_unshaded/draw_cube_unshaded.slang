@@ -39,12 +39,14 @@ struct Vertex3DUnshadedInput {
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
-ConstantBuffer<CameraInfo> camera_info;
+struct DrawCubeUnshadedDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 camera_info;
+    StaticSetDescriptorIndices static_set;
+};
 
-/**
- * @brief Static geometry tables shared by both pipeline stages.
- */
-ParameterBlock<StaticSet> static_set;
+[[vk::push_constant]]
+ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Transform an unshaded static-set vertex into clip space.
@@ -54,8 +56,11 @@ ParameterBlock<StaticSet> static_set;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    InstanceData instance = static_set.instances[p_instance_id];
-    NodeData node = static_set.nodes[instance.node_index];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    InstanceData instance = instances[p_instance_id];
+    NodeData node = nodes[instance.node_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     VSOutput output;
     output.position = mul(camera_info.proj, mul(camera_info.view, world_position));

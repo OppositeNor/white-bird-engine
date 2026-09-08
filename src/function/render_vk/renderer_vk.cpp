@@ -29,6 +29,7 @@
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_vk.hh"
@@ -38,6 +39,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
@@ -65,59 +67,6 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-
-template <VkStructureType StructureType, typename FeatureType>
-static bool check_device_feature_support(VkPhysicalDevice p_device, VkBool32 FeatureType::* p_feature) {
-    FeatureType feature{};
-    feature.sType = StructureType;
-
-    VkPhysicalDeviceFeatures2 device_features{};
-    device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    device_features.pNext = &feature;
-    vkGetPhysicalDeviceFeatures2(p_device, &device_features);
-
-    return feature.*p_feature == VK_TRUE;
-}
-
-template <typename EnumerateFunction>
-static bool check_extension_support(std::span<const char* const> p_extensions,
-    std::span<const char* const> p_enabled_layers,
-    const EnumerateFunction& p_enumerate_extensions) {
-    std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
-
-    auto remove_supported_extensions = [&](const char* p_layer_name) {
-        VkResult result = VK_SUCCESS;
-        do {
-            uint32_t extension_count = 0;
-            result = p_enumerate_extensions(p_layer_name, &extension_count, nullptr);
-            if (result != VK_SUCCESS) {
-                return false;
-            }
-
-            std::vector<VkExtensionProperties> extension_properties(extension_count);
-            result = p_enumerate_extensions(p_layer_name, &extension_count, extension_properties.data());
-            if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
-                return false;
-            }
-            if (result == VK_SUCCESS) {
-                for (const auto& extension : extension_properties) {
-                    unsupported_extensions.erase(extension.extensionName);
-                }
-            }
-        } while (result == VK_INCOMPLETE);
-        return true;
-    };
-
-    if (!remove_supported_extensions(nullptr)) {
-        return false;
-    }
-    for (const char* layer_name : p_enabled_layers) {
-        if (!remove_supported_extensions(layer_name)) {
-            return false;
-        }
-    }
-    return unsupported_extensions.empty();
-}
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
@@ -179,8 +128,11 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     // referencing REND_RES_SWAP_CHAIN_IMAGE resolve to the correct
     // per-frame target.
     base_render_data.current_swap_chain_index = image_index;
-    p_graph->set_resource(
-        REND_RES_SWAP_CHAIN_IMAGE, make_ref<ROCSingleVK>(allocator, render_objects->swap_chain_image_views[image_index]));
+    if (swap_chain_image_container == MEM_NULL) {
+        throw std::runtime_error("RendererVK: swap-chain image container is unavailable.");
+    }
+    swap_chain_image_container->set(base_render_data.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
+    p_graph->set_resource(REND_RES_SWAP_CHAIN_IMAGE, swap_chain_image_container);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
@@ -191,6 +143,9 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
     present(image_index, p_graph);
+    if (base_render_data.in_flight_fence != VK_NULL_HANDLE) {
+        vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
+    }
     p_graph->reset_transient_resources();
 
     ++(base_render_data.current_frame);
@@ -234,6 +189,8 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     init_vulkan(p_capabilities);
     base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
+    swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data);
+    create_descriptor_heap_allocator();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
     // setup_base_render_data() (which is also re-invoked on swap chain
@@ -251,6 +208,9 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
 void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
     registered_plugins.clear();
+    if (swap_chain_image_container != MEM_NULL) {
+        swap_chain_image_container->clear();
+    }
     render_objects.reset();
     base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
 
@@ -263,13 +223,15 @@ void RendererVK::terminate() {
     render_graphs.clear();
     render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
+    swap_chain_image_container = MEM_NULL;
 
     synchronize_gpu_and_flush_delayed_calls();
+    base_render_data.descriptor_heap_allocator = nullptr;
+    descriptor_heap_allocator.reset();
     ktx_vulkan_device_info.reset();
     for (auto* fence : in_flight_fences) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
     }
-    vkDestroyDescriptorPool(logical_device, descriptor_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -292,7 +254,6 @@ void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_command_pools();
     create_ktx_vulkan_device_info();
     create_gpu_job_command_buffer();
-    create_descriptor_pool();
     create_async_objects();
 }
 
@@ -302,6 +263,7 @@ void RendererVK::recreate_swap_chain() {
     create_swap_chain();
     init_swap_chain_image_views();
     setup_base_render_data();
+    swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data);
 }
 
 void RendererVK::setup_base_render_data() {
@@ -322,14 +284,16 @@ void RendererVK::setup_base_render_data() {
     base_render_data.graphics_command_pool = graphics_command_pool;
     base_render_data.compute_command_pool = compute_command_pool;
     base_render_data.ktx_vulkan_device_info = ktx_vulkan_device_info.get();
-    base_render_data.descriptor_pool = descriptor_pool;
+    base_render_data.descriptor_heap_allocator = descriptor_heap_allocator.get();
+    base_render_data.descriptor_heap_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT;
     VkPhysicalDeviceProperties2 physical_device_properties{};
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    physical_device_properties.pNext = &base_render_data.descriptor_heap_properties;
     vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
-    base_render_data.max_variable_sampled_image_descriptor_count = std::min({static_cast<uint32_t>(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT),
-        physical_device_properties.properties.limits.maxPerStageDescriptorSampledImages,
-        physical_device_properties.properties.limits.maxDescriptorSetSampledImages,
-        physical_device_properties.properties.limits.maxPerStageResources});
+    base_render_data.resource_descriptor_stride =
+        std::max(base_render_data.descriptor_heap_properties.bufferDescriptorSize,
+            base_render_data.descriptor_heap_properties.imageDescriptorSize);
+    base_render_data.sampler_descriptor_stride = base_render_data.descriptor_heap_properties.samplerDescriptorSize;
     base_render_data.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
     for (auto& plugin : registered_plugins) {
         plugin->update_base_render_data(&base_render_data, physical_device);
@@ -384,7 +348,7 @@ void RendererVK::create_instance() {
             required_extensions.push_back(required_extension);
         }
     }
-    if (!check_extension_support(required_extensions,
+    if (!RenderPluginVK::check_extension_support(required_extensions,
             enabled_layers,
             [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                 return vkEnumerateInstanceExtensionProperties(p_layer_name, p_extension_count, p_extension_properties);
@@ -394,9 +358,14 @@ void RendererVK::create_instance() {
     create_info.enabledExtensionCount = required_extensions.size();
     create_info.ppEnabledExtensionNames = required_extensions.data();
 
+    for (auto& plugin : registered_plugins) {
+        plugin->on_before_instance_creation(&create_info);
+    }
+
     // Create instance.
-    if (vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create vulkan instance.");
+    auto result = vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create vulkan instance: {}.", string_VkResult(result)));
     }
     window->init_vulkan(vk_instance);
     surface = window->get_vulkan_surface();
@@ -419,14 +388,7 @@ void RendererVK::create_device(RendererCapabilities& p_capabilities) {
 }
 
 void RendererVK::create_vma_allocator() {
-    VmaAllocatorCreateFlags allocator_flags = 0;
-    for (auto& plugin : registered_plugins) {
-        StaticGeometryBufferUsageVK buffer_usage = plugin->get_static_geometry_buffer_usage();
-        if ((buffer_usage.vertex_buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0 ||
-            (buffer_usage.index_buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0) {
-            allocator_flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-        }
-    }
+    VmaAllocatorCreateFlags allocator_flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     VmaAllocatorCreateInfo create_info{
         .flags = allocator_flags,
         .physicalDevice = physical_device,
@@ -492,7 +454,7 @@ void RendererVK::create_swap_chain() {
 
     VkResult result = vkCreateSwapchainKHR(logical_device, &create_info, get_allocation_callbacks(), &swap_chain);
     if (result != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create swap chain.");
+        throw std::runtime_error(std::format("Failed to create swap chain: {}.", string_VkResult(result)));
     }
 
     // Create swap chain images.
@@ -510,9 +472,7 @@ void RendererVK::create_swap_chain() {
     frames_in_flight = game_config.frames_in_flight;
     if (frames_in_flight < swap_chain_images_count) {
         stdout_log(WBE_CHANNEL_RENDER)
-            ->warning(std::format("frames_in_flight is required to be at least number of swap "
-                                  "chain images; but get {} frames_in_flight and {} images. "
-                                  "Resizing frames_in_flight to {}.",
+            ->warning(std::format("frames_in_flight is required to be at least number of swap chain images; but get {} frames_in_flight and {} images. Resizing frames_in_flight to {}.",
                 frames_in_flight,
                 swap_chain_images_count,
                 swap_chain_images_count));
@@ -535,8 +495,12 @@ void RendererVK::create_swap_chain() {
 }
 
 void RendererVK::clean_up_swap_chain() {
+    if (swap_chain_image_container != MEM_NULL) {
+        swap_chain_image_container->clear();
+    }
     render_objects->swap_chain_image_views.clear();
     render_objects->swap_chain_images.clear();
+    flush_delayed_calls();
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
 }
 
@@ -568,15 +532,17 @@ void RendererVK::create_command_pools() {
     graphics_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     graphics_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     graphics_pool_create_info.queueFamilyIndex = queue_family_indices.get_graphics();
-    if (vkCreateCommandPool(logical_device, &graphics_pool_create_info, get_allocation_callbacks(), &graphics_command_pool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create graphics command pool.");
+    auto result = vkCreateCommandPool(logical_device, &graphics_pool_create_info, get_allocation_callbacks(), &graphics_command_pool);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create graphics command pool: {}.", string_VkResult(result)));
     }
     VkCommandPoolCreateInfo compute_pool_create_info{};
     compute_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     compute_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     compute_pool_create_info.queueFamilyIndex = queue_family_indices.get_compute();
-    if (vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create compute command pool.");
+    result = vkCreateCommandPool(logical_device, &compute_pool_create_info, get_allocation_callbacks(), &compute_command_pool);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create compute command pool: {}.", string_VkResult(result)));
     }
 }
 
@@ -591,43 +557,15 @@ void RendererVK::create_gpu_job_command_buffer() {
     allocate_info.commandPool = graphics_command_pool;
     allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocate_info.commandBufferCount = 1;
-    if (vkAllocateCommandBuffers(logical_device, &allocate_info, &gpu_job_command_buffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate GPU-job command buffer.");
+    auto result = vkAllocateCommandBuffers(logical_device, &allocate_info, &gpu_job_command_buffer);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to allocate GPU-job command buffer: {}.", string_VkResult(result)));
     }
 }
 
-void RendererVK::create_descriptor_pool() {
-    uint64_t descriptor_generation_capacity = static_cast<uint64_t>(frames_in_flight) * 2 + 2;
-    auto scale_descriptor_capacity = [descriptor_generation_capacity](size_t p_capacity) -> uint32_t {
-        uint64_t scaled_capacity = static_cast<uint64_t>(p_capacity) * descriptor_generation_capacity;
-        if (scaled_capacity > std::numeric_limits<uint32_t>::max()) {
-            throw std::runtime_error("Failed to create descriptor pool: generation capacity exceeds Vulkan limits.");
-        }
-        return static_cast<uint32_t>(scaled_capacity);
-    };
-    std::array<VkDescriptorPoolSize, 6> pool_sizes{
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = scale_descriptor_capacity(MAX_UNIFORM_DESCRIPTOR_COUNT)},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = scale_descriptor_capacity(MAX_STORAGE_BUFFER_DESCRIPTOR_COUNT)},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = scale_descriptor_capacity(MAX_SAMPLED_IMAGE_DESCRIPTOR_COUNT)},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = scale_descriptor_capacity(MAX_STORAGE_IMAGE_DESCRIPTOR_COUNT)},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = scale_descriptor_capacity(MAX_SAMPLER_DESCRIPTOR_COUNT)},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = scale_descriptor_capacity(MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTOR_COUNT)},
-    };
-
-    VkDescriptorPoolCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    create_info.maxSets = scale_descriptor_capacity(MAX_DESCRIPTOR_SET_COUNT);
-    create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
-    create_info.pPoolSizes = pool_sizes.data();
-    if (vkCreateDescriptorPool(logical_device, &create_info, get_allocation_callbacks(), &descriptor_pool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor pool.");
-    }
+void RendererVK::create_descriptor_heap_allocator() {
+    descriptor_heap_allocator = make_unique<DescriptorHeapAllocatorVK>(allocator, allocator, &base_render_data);
+    base_render_data.descriptor_heap_allocator = descriptor_heap_allocator.get();
 }
 
 void RendererVK::create_async_objects() {
@@ -639,8 +577,9 @@ void RendererVK::create_async_objects() {
     in_flight_fences.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         VkFence fence = VK_NULL_HANDLE;
-        if (vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create in flight fence");
+        auto result = vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to create in flight fence: {}.", string_VkResult(result)));
         }
         in_flight_fences.push_back(fence);
     }
@@ -722,37 +661,58 @@ void RendererVK::create_logical_device() {
     dynamic_rendering_features.dynamicRendering = VK_TRUE;
     sync2_features.pNext = &dynamic_rendering_features;
 
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{};
-    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-    descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-    descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
-    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
-    dynamic_rendering_features.pNext = &descriptor_indexing_features;
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
+    buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+    dynamic_rendering_features.pNext = &buffer_device_address_features;
+
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures shader_demote_features{};
+    shader_demote_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
+    shader_demote_features.shaderDemoteToHelperInvocation = VK_TRUE;
+    buffer_device_address_features.pNext = &shader_demote_features;
+
+    VkPhysicalDeviceShaderUntypedPointersFeaturesKHR shader_untyped_pointers_features{};
+    shader_untyped_pointers_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR;
+    shader_untyped_pointers_features.shaderUntypedPointers = VK_TRUE;
+    shader_demote_features.pNext = &shader_untyped_pointers_features;
+
+    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptor_heap_features{};
+    descriptor_heap_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT;
+    descriptor_heap_features.descriptorHeap = VK_TRUE;
+    shader_untyped_pointers_features.pNext = &descriptor_heap_features;
 
     VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state_features{};
     vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
     vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
-    descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
-    VkBaseOutStructure* feature_chain_tail = reinterpret_cast<VkBaseOutStructure*>(&vertex_input_dynamic_state_features);
+    descriptor_heap_features.pNext = &vertex_input_dynamic_state_features;
     for (auto& plugin : registered_plugins) {
-        VkBaseOutStructure* plugin_feature_chain = plugin->get_device_feature_chain();
-        if (plugin_feature_chain == nullptr) {
-            continue;
-        }
-        feature_chain_tail->pNext = plugin_feature_chain;
-        while (feature_chain_tail->pNext != nullptr) {
-            feature_chain_tail = feature_chain_tail->pNext;
-        }
+        plugin->on_before_device_creation(physical_device, &create_info);
     }
 
     // Create logical device.
-    if (vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create logical device.");
+    auto result = vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create logical device: {}.", string_VkResult(result)));
     }
     base_render_data.command_set_vertex_input =
         reinterpret_cast<PFN_vkCmdSetVertexInputEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdSetVertexInputEXT"));
     if (base_render_data.command_set_vertex_input == nullptr) {
         throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
+    }
+    base_render_data.write_resource_descriptors =
+        reinterpret_cast<PFN_vkWriteResourceDescriptorsEXT>(vkGetDeviceProcAddr(logical_device, "vkWriteResourceDescriptorsEXT"));
+    base_render_data.write_sampler_descriptors =
+        reinterpret_cast<PFN_vkWriteSamplerDescriptorsEXT>(vkGetDeviceProcAddr(logical_device, "vkWriteSamplerDescriptorsEXT"));
+    base_render_data.command_bind_resource_heap =
+        reinterpret_cast<PFN_vkCmdBindResourceHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindResourceHeapEXT"));
+    base_render_data.command_bind_sampler_heap =
+        reinterpret_cast<PFN_vkCmdBindSamplerHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindSamplerHeapEXT"));
+    base_render_data.command_push_data =
+        reinterpret_cast<PFN_vkCmdPushDataEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdPushDataEXT"));
+    if (base_render_data.write_resource_descriptors == nullptr || base_render_data.write_sampler_descriptors == nullptr ||
+        base_render_data.command_bind_resource_heap == nullptr || base_render_data.command_bind_sampler_heap == nullptr ||
+        base_render_data.command_push_data == nullptr) {
+        throw std::runtime_error("Failed to load VK_EXT_descriptor_heap device commands.");
     }
     for (auto& plugin : registered_plugins) {
         plugin->on_device_created(&base_render_data, physical_device, logical_device);
@@ -847,7 +807,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (!device_indices.is_complete()) {
         return false;
     }
-    if (!check_extension_support(enabled_device_extensions,
+    if (!RenderPluginVK::check_extension_support(enabled_device_extensions,
             enabled_layers,
             [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                 return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
@@ -858,23 +818,48 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     if (swap_chain_support_details.formats.empty() || swap_chain_support_details.present_modes.empty()) {
         return false;
     }
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{};
-    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
     VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state_features{};
     vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
-    descriptor_indexing_features.pNext = &vertex_input_dynamic_state_features;
+    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptor_heap_features{};
+    descriptor_heap_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT;
+    descriptor_heap_features.pNext = &vertex_input_dynamic_state_features;
+    VkPhysicalDeviceShaderUntypedPointersFeaturesKHR shader_untyped_pointers_features{};
+    shader_untyped_pointers_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR;
+    shader_untyped_pointers_features.pNext = &descriptor_heap_features;
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures shader_demote_features{};
+    shader_demote_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
+    shader_demote_features.pNext = &shader_untyped_pointers_features;
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
+    buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    buffer_device_address_features.pNext = &shader_demote_features;
     VkPhysicalDeviceFeatures2 device_features{};
     device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    device_features.pNext = &descriptor_indexing_features;
+    device_features.pNext = &buffer_device_address_features;
     vkGetPhysicalDeviceFeatures2(p_device, &device_features);
     if (device_features.features.depthClamp != VK_TRUE || device_features.features.multiDrawIndirect != VK_TRUE ||
         device_features.features.drawIndirectFirstInstance != VK_TRUE ||
         device_features.features.shaderSampledImageArrayDynamicIndexing != VK_TRUE ||
         device_features.features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE ||
-        descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
-        descriptor_indexing_features.descriptorBindingVariableDescriptorCount != VK_TRUE ||
-        descriptor_indexing_features.runtimeDescriptorArray != VK_TRUE ||
+        buffer_device_address_features.bufferDeviceAddress != VK_TRUE ||
+        shader_demote_features.shaderDemoteToHelperInvocation != VK_TRUE ||
+        shader_untyped_pointers_features.shaderUntypedPointers != VK_TRUE ||
+        descriptor_heap_features.descriptorHeap != VK_TRUE ||
         vertex_input_dynamic_state_features.vertexInputDynamicState != VK_TRUE) {
+        return false;
+    }
+
+    VkPhysicalDeviceMemoryProperties memory_properties{};
+    vkGetPhysicalDeviceMemoryProperties(p_device, &memory_properties);
+    bool has_host_device_memory = false;
+    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
+        constexpr VkMemoryPropertyFlags REQUIRED_FLAGS =
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        if ((memory_properties.memoryTypes[i].propertyFlags & REQUIRED_FLAGS) == REQUIRED_FLAGS) {
+            has_host_device_memory = true;
+            break;
+        }
+    }
+    if (!has_host_device_memory) {
         return false;
     }
 
@@ -1086,14 +1071,16 @@ void RendererVK::run_gpu_jobs() {
         return;
     }
 
-    if (vkResetCommandBuffer(gpu_job_command_buffer, 0) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to reset GPU-job command buffer.");
+    auto result = vkResetCommandBuffer(gpu_job_command_buffer, 0);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to reset GPU-job command buffer: {}.", string_VkResult(result)));
     }
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if (vkBeginCommandBuffer(gpu_job_command_buffer, &begin_info) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to begin GPU-job command buffer.");
+    result = vkBeginCommandBuffer(gpu_job_command_buffer, &begin_info);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to begin GPU-job command buffer: {}.", string_VkResult(result)));
     }
     Vector<GPUJobVK> running_jobs(allocator);
     for (auto& gpu_job : gpu_jobs) {
@@ -1119,8 +1106,9 @@ void RendererVK::submit_gpu_job_command_buffer() {
     dependency_info.memoryBarrierCount = 1;
     dependency_info.pMemoryBarriers = &barrier;
     vkCmdPipelineBarrier2(gpu_job_command_buffer, &dependency_info);
-    if (vkEndCommandBuffer(gpu_job_command_buffer) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to end GPU-job command buffer.");
+    auto result = vkEndCommandBuffer(gpu_job_command_buffer);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to end GPU-job command buffer: {}.", string_VkResult(result)));
     }
 
     VkCommandBufferSubmitInfo command_buffer_info{};
@@ -1133,27 +1121,35 @@ void RendererVK::submit_gpu_job_command_buffer() {
     VkFence fence = VK_NULL_HANDLE;
     VkFenceCreateInfo fence_info{};
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    if (vkCreateFence(logical_device, &fence_info, get_allocation_callbacks(), &fence) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create GPU-job fence.");
+    result = vkCreateFence(logical_device, &fence_info, get_allocation_callbacks(), &fence);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create GPU-job fence: {}.", string_VkResult(result)));
     }
-    if (vkQueueSubmit2(graphics_queue, 1, &submit_info, fence) != VK_SUCCESS) {
+    result = vkQueueSubmit2(graphics_queue, 1, &submit_info, fence);
+    if (result != VK_SUCCESS) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
-        throw std::runtime_error("Failed to submit GPU jobs.");
+        throw std::runtime_error(std::format("Failed to submit GPU jobs: {}", string_VkResult(result)));
     }
-    if (vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+    result = vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX);
+    if (result != VK_SUCCESS) {
         vkDestroyFence(logical_device, fence, get_allocation_callbacks());
-        throw std::runtime_error("Failed to submit GPU jobs.");
+        throw std::runtime_error(std::format("Failed to submit GPU jobs: {}.", string_VkResult(result)));
     }
     vkDestroyFence(logical_device, fence, get_allocation_callbacks());
 }
 
 void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
     for (VkFence fence : in_flight_fences) {
-        if (vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to synchronize GPU work before flushing delayed calls.");
+        auto result = vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to synchronize GPU work before flushing delayed calls: {}.", string_VkResult(result)));
         }
     }
     run_gpu_jobs();
+    flush_delayed_calls();
+}
+
+void RendererVK::flush_delayed_calls() {
     bool ran_any = true;
     while (ran_any) {
         ran_any = false;

@@ -28,7 +28,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -78,12 +77,18 @@ public:
         }
 
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
+        time_ubo = WBE::ROBufferVK::Builder()
+                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                       .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                       .set_size(sizeof(WBE::TimeVKUBO))
+                       .create_ref(base_render_data);
+        time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
         auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
         if (pipeline_resource == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
         }
         WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-        bindpoint_builder.add_buffer_decleration("time", &time_ubo_data, sizeof(time_ubo_data));
+        bindpoint_builder.add_storage_buffer_decleration("time", time_ubo);
         WBE::GraphicsPipelineCompilerVKContext compiler_context{
             .allocator = render_allocator,
             .render_data = base_render_data,
@@ -94,19 +99,6 @@ public:
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
                             .compile("draw_triangle_pipeline", pipeline_resource, bindpoint_builder.build());
         auto graphics_pipeline = compiled.graphics_pipeline;
-        // Setup time uniform buffer
-        time_ubo = WBE::make_ref<WBE::ROBufferVK>(render_allocator,
-            base_render_data,
-            WBE::ROBufferVK::Builder()
-                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                .set_size(sizeof(WBE::TimeVKUBO)));
-        time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
-        auto [set_index, binding] = compiled.descriptor_set_bindings.at("time");
-        graphics_pipeline->write_descriptor_set(set_index,
-            WBE::RODescriptorSetVK::Writer().set_binding(binding).add_uniform_buffer_info(
-                WBE::RODescriptorSetVK::Writer::BufferInfo{.buffer = time_ubo, .offset = 0, .range = sizeof(WBE::TimeVKUBO)}));
-
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
         WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangle_submesh->vertices);

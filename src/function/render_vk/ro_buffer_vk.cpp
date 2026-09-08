@@ -18,6 +18,7 @@
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -57,11 +58,25 @@ static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_doma
     return result;
 }
 
+static VkDeviceAddressRangeEXT get_buffer_address_range(
+    const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
+    VkBufferDeviceAddressInfo address_info{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = p_buffer};
+    return VkDeviceAddressRangeEXT{.address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info), .size = p_size};
+}
+
 ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
+    if (p_builder.uniform_view_index.has_value() && p_builder.storage_view_index.has_value() &&
+        p_builder.uniform_view_index == p_builder.storage_view_index) {
+        throw std::runtime_error("Failed to create buffer: uniform and storage descriptors cannot adopt the same heap index.");
+    }
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = p_builder.size;
-    create_info.usage = WBE_REQUIRED(p_builder.usage);
+    usage = WBE_REQUIRED(p_builder.usage);
+    if ((usage & (VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) != 0) {
+        usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
+    create_info.usage = usage;
     std::vector<uint32_t> initial_queues;
     if (p_builder.queue_family_indices.empty()) {
         initial_queues =
@@ -78,6 +93,24 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     }
     exposed_fields.buffer_size = p_builder.size;
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
+    if (p_builder.uniform_view_index.has_value()) {
+        if ((usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) == 0) {
+            throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: buffer does not have uniform-buffer usage.");
+        }
+        if (render_data->descriptor_heap_allocator == nullptr ||
+            !render_data->descriptor_heap_allocator->owns_buffer_range(*p_builder.uniform_view_index)) {
+            throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: the index is not allocated by the buffer arena.");
+        }
+    }
+    if (p_builder.storage_view_index.has_value()) {
+        if ((usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) == 0) {
+            throw std::runtime_error("Failed to adopt storage-buffer descriptor index: buffer does not have storage-buffer usage.");
+        }
+        if (render_data->descriptor_heap_allocator == nullptr ||
+            !render_data->descriptor_heap_allocator->owns_buffer_range(*p_builder.storage_view_index)) {
+            throw std::runtime_error("Failed to adopt storage-buffer descriptor index: the index is not allocated by the buffer arena.");
+        }
+    }
     VmaAllocationCreateInfo allocation_create_info = buffer_allocation_create_info(exposed_fields.domain);
     VmaAllocationInfo allocation_info{};
     VkResult result =
@@ -86,15 +119,69 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
         throw std::runtime_error(std::format("Failed to create Vulkan buffer: {}.", string_VkResult(result)));
     }
     mapped_memory = allocation_info.pMappedData;
+    if (p_builder.uniform_view_index.has_value()) {
+        uniform_view_index = p_builder.uniform_view_index;
+        render_data->descriptor_heap_allocator->write_buffer_descriptor(
+            *uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+    }
+    if (p_builder.storage_view_index.has_value()) {
+        storage_view_index = p_builder.storage_view_index;
+        render_data->descriptor_heap_allocator->write_buffer_descriptor(
+            *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+    }
 }
 
 ROBufferVK::~ROBufferVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data, buffer = buffer, allocation = allocation]() {
+        [render_data = render_data,
+            buffer = buffer,
+            allocation = allocation,
+            uniform_view_index = uniform_view_index,
+            storage_view_index = storage_view_index]() {
+            if (uniform_view_index.has_value()) {
+                render_data->descriptor_heap_allocator->deallocate_buffer(*uniform_view_index);
+            }
+            if (storage_view_index.has_value()) {
+                render_data->descriptor_heap_allocator->deallocate_buffer(*storage_view_index);
+            }
             vmaDestroyBuffer(render_data->vma_allocator, buffer, allocation);
         },
         render_data->frames_in_flight);
+}
+
+uint32_t ROBufferVK::get_uniform_view_index() const {
+    if ((usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) == 0) {
+        throw std::runtime_error("Failed to create uniform-buffer descriptor: buffer does not have uniform-buffer usage.");
+    }
+    if (!uniform_view_index.has_value()) {
+        DescriptorHeapAllocatorVK* allocator = render_data->descriptor_heap_allocator;
+        if (allocator == nullptr) {
+            throw std::runtime_error("Failed to create uniform-buffer descriptor: descriptor heap allocator is unavailable.");
+        }
+        uniform_view_index = allocator->allocate_buffer();
+        allocator->write_buffer_descriptor(*uniform_view_index,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+    }
+    return *uniform_view_index;
+}
+
+uint32_t ROBufferVK::get_storage_view_index() const {
+    if ((usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) == 0) {
+        throw std::runtime_error("Failed to create storage-buffer descriptor: buffer does not have storage-buffer usage.");
+    }
+    if (!storage_view_index.has_value()) {
+        DescriptorHeapAllocatorVK* allocator = render_data->descriptor_heap_allocator;
+        if (allocator == nullptr) {
+            throw std::runtime_error("Failed to create storage-buffer descriptor: descriptor heap allocator is unavailable.");
+        }
+        storage_view_index = allocator->allocate_buffer();
+        allocator->write_buffer_descriptor(*storage_view_index,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+    }
+    return *storage_view_index;
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {

@@ -24,12 +24,17 @@
 #include "resource/resource_unit/resource_unit.hh"
 
 #include <cstddef>
+#include <set>
 #include <span>
+#include <stdexcept>
+#include <string>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 class ROBufferVK;
+class RendererVK;
 
 /**
  * @class StaticGeometryBufferUsageVK
@@ -93,11 +98,21 @@ public:
     virtual std::span<const char* const> get_required_device_extensions() const = 0;
 
     /**
-     * @brief Get the head of the plugin-owned device-feature pNext chain.
+     * @brief Update instance creation immediately before vkCreateInstance.
      *
-     * @return The first feature structure to append, or null when none.
+     * @param p_create_info Mutable instance create info whose referenced storage remains valid through creation.
      */
-    virtual VkBaseOutStructure* get_device_feature_chain() = 0;
+    virtual void on_before_instance_creation(VkInstanceCreateInfo* p_create_info) = 0;
+
+    /**
+     * @brief Update device creation immediately before vkCreateDevice.
+     *
+     * Implementations use enable_device_feature() to merge feature requirements without duplicating structure types.
+     *
+     * @param p_physical_device Physical device whose feature support is queried.
+     * @param p_create_info Mutable device create info whose referenced storage remains valid through creation.
+     */
+    virtual void on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) = 0;
 
     /**
      * @brief Finish plugin setup after the logical device has been created.
@@ -134,6 +149,114 @@ public:
         RefRes<RUStaticOpaqueSet> p_set,
         Ref<ROBufferVK> p_vertex_buffer,
         Ref<ROBufferVK> p_index_buffer) = 0;
+
+protected:
+    friend class RendererVK;
+
+    /**
+     * @brief Check one Boolean Vulkan device feature through a features2 query.
+     *
+     * @tparam StructureType Structure type identifying FeatureType.
+     * @tparam FeatureType Vulkan feature structure containing the requested member.
+     * @param p_physical_device Physical device to query.
+     * @param p_feature Boolean feature member to inspect.
+     * @return True when the feature is supported.
+     */
+    template <VkStructureType StructureType, typename FeatureType>
+    static bool check_device_feature_support(VkPhysicalDevice p_physical_device, VkBool32 FeatureType::* p_feature) {
+        FeatureType feature{};
+        feature.sType = StructureType;
+        VkPhysicalDeviceFeatures2 device_features{};
+        device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        device_features.pNext = &feature;
+        vkGetPhysicalDeviceFeatures2(p_physical_device, &device_features);
+        return feature.*p_feature == VK_TRUE;
+    }
+
+    /**
+     * @brief Enable one supported Boolean device feature without duplicating its structure type.
+     *
+     * The method searches p_create_info by StructureType. It sets the requested member on an existing structure or appends
+     * p_fallback_feature when absent.
+     *
+     * @tparam StructureType Structure type identifying FeatureType.
+     * @tparam FeatureType Vulkan feature structure containing the requested member.
+     * @param p_physical_device Physical device whose support is required.
+     * @param p_create_info Device create info whose feature chain is updated.
+     * @param p_fallback_feature Plugin-owned fallback structure retained through device creation.
+     * @param p_feature Boolean feature member to enable.
+     * @throws std::runtime_error If the arguments are invalid or the feature is unsupported.
+     */
+    template <VkStructureType StructureType, typename FeatureType>
+    static void enable_device_feature(VkPhysicalDevice p_physical_device,
+        VkDeviceCreateInfo* p_create_info,
+        FeatureType* p_fallback_feature,
+        VkBool32 FeatureType::* p_feature) {
+        if (p_physical_device == VK_NULL_HANDLE || p_create_info == nullptr || p_fallback_feature == nullptr || p_feature == nullptr) {
+            throw std::runtime_error("Failed to enable Vulkan device feature: invalid arguments.");
+        }
+        if (!check_device_feature_support<StructureType>(p_physical_device, p_feature)) {
+            throw std::runtime_error("Failed to enable Vulkan device feature: requested feature is not supported.");
+        }
+        auto* feature = reinterpret_cast<VkBaseOutStructure*>(const_cast<void*>(p_create_info->pNext));
+        VkBaseOutStructure* tail = nullptr;
+        while (feature != nullptr) {
+            if (feature->sType == StructureType) {
+                reinterpret_cast<FeatureType*>(feature)->*p_feature = VK_TRUE;
+                return;
+            }
+            tail = feature;
+            feature = feature->pNext;
+        }
+        p_fallback_feature->sType = StructureType;
+        p_fallback_feature->pNext = nullptr;
+        p_fallback_feature->*p_feature = VK_TRUE;
+        if (tail == nullptr) {
+            p_create_info->pNext = p_fallback_feature;
+        } else {
+            tail->pNext = reinterpret_cast<VkBaseOutStructure*>(p_fallback_feature);
+        }
+    }
+
+    /**
+     * @brief Check that every requested extension is exposed globally or by an enabled layer.
+     */
+    template <typename EnumerateFunction>
+    static bool check_extension_support(std::span<const char* const> p_extensions,
+        std::span<const char* const> p_enabled_layers,
+        const EnumerateFunction& p_enumerate_extensions) {
+        std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
+        auto remove_supported_extensions = [&](const char* p_layer_name) {
+            VkResult result = VK_SUCCESS;
+            do {
+                uint32_t extension_count = 0;
+                result = p_enumerate_extensions(p_layer_name, &extension_count, nullptr);
+                if (result != VK_SUCCESS) {
+                    return false;
+                }
+                std::vector<VkExtensionProperties> extension_properties(extension_count);
+                result = p_enumerate_extensions(p_layer_name, &extension_count, extension_properties.data());
+                if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
+                    return false;
+                }
+                if (result == VK_SUCCESS) {
+                    for (const auto& extension : extension_properties) {
+                        unsupported_extensions.erase(extension.extensionName);
+                    }
+                }
+            } while (result == VK_INCOMPLETE);
+            return true;
+        };
+        if (!remove_supported_extensions(nullptr)) {
+            return false;
+        }
+        for (const char* layer_name : p_enabled_layers) {
+            if (!remove_supported_extensions(layer_name)) {
+                return false;
+            }
+        }
+        return unsupported_extensions.empty();
+    }
 };
 
 /**

@@ -29,76 +29,40 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class ShaderDescriptorFieldBindingVK
- * @brief Reflected field inside a descriptor-backed shader struct.
+ * @brief Resource category selected by a reflected WBE_DESCRIPTOR annotation.
  */
-struct ShaderDescriptorFieldBindingVK {
-    /**
-     * @brief Field path relative to the shader parameter, e.g. "camera_info.view".
-     */
+enum class ShaderDescriptorHeapTypeVK : uint8_t {
+    UniformBuffer,
+    StorageBuffer,
+    SampledImage,
+    StorageImage,
+    Sampler,
+};
+
+/**
+ * @class ShaderDescriptorHeapFieldVK
+ * @brief One descriptor-heap index stored in reflected pipeline push data.
+ */
+struct ShaderDescriptorHeapFieldVK {
+    /** Path relative to the push-data parameter. */
     std::string field_path;
-    /**
-     * @brief Byte offset inside the descriptor buffer.
-     */
-    VkDeviceSize offset = 0;
-    /**
-     * @brief Byte size of the reflected field.
-     */
-    VkDeviceSize size = 0;
+    /** Descriptor heap category required by this field. */
+    ShaderDescriptorHeapTypeVK type = ShaderDescriptorHeapTypeVK::UniformBuffer;
+    /** Byte offset of the explicit uint2 inside push data. */
+    uint32_t offset = 0;
 };
 
 /**
- * @class ShaderDescriptorBindingVK
- * @brief Vulkan descriptor binding translated from shader reflection metadata.
+ * @class ShaderDescriptorHeapLayoutVK
+ * @brief Reflected descriptor-index push-data contract for one pipeline.
  */
-struct ShaderDescriptorBindingVK {
-    /**
-     * @brief Reflected shader parameter name used to match bindpoint field paths.
-     */
-    std::string parameter_name;
-    /**
-     * @brief Reflected shader type name for this descriptor.
-     */
-    std::string type_name;
-    /**
-     * @brief Byte size of a descriptor-backed buffer.
-     */
-    VkDeviceSize buffer_size = 0;
-    /**
-     * @brief Reflected fields inside a descriptor-backed buffer.
-     */
-    std::vector<ShaderDescriptorFieldBindingVK> fields;
-    /**
-     * @brief Descriptor set index from the shader binding space.
-     */
-    uint32_t set_index = 0;
-    /**
-     * @brief Vulkan layout binding for this parameter.
-     */
-    VkDescriptorSetLayoutBinding layout_binding{};
-    /**
-     * @brief Whether this binding is a runtime array allocated with a variable descriptor count.
-     */
-    bool variable_descriptor_count = false;
-};
-
-/**
- * @class ShaderDescriptorSetLayoutVK
- * @brief Descriptor layout bindings grouped by Vulkan descriptor set index.
- */
-struct ShaderDescriptorSetLayoutVK {
-    /**
-     * @brief Descriptor set index.
-     */
-    uint32_t set_index = 0;
-    /**
-     * @brief Sorted bindings that belong to this set.
-     */
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    /**
-     * @brief Descriptor indexing flags aligned with bindings.
-     */
-    std::vector<VkDescriptorBindingFlags> binding_flags;
+struct ShaderDescriptorHeapLayoutVK {
+    /** Total byte size required by the reflected push-data block. */
+    uint32_t size = 0;
+    /** Shader stages which consume this push-data contract. */
+    VkShaderStageFlags stage_flags = 0;
+    /** Descriptor-index fields in declaration order. */
+    std::vector<ShaderDescriptorHeapFieldVK> fields;
 };
 
 /**
@@ -126,43 +90,29 @@ VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata&
     const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout);
 
 /**
- * @brief Collect descriptor bindings used by one shader entry point.
+ * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.
+ *
+ * A descriptor-free entry point produces an empty layout. Otherwise it may use exactly one pushConstantBuffer parameter.
+ * Annotated fields must be eight-byte uint2 values with one supported WBE_DESCRIPTOR string argument.
+ *
+ * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.
  */
-std::vector<ShaderDescriptorBindingVK> collect_shader_descriptor_bindings(
+ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name);
 
 /**
- * @brief Collect and merge descriptor bindings from all supported graphics stages.
+ * @brief Collect and merge explicit descriptor-heap push-data contracts from all supported graphics stages.
+ *
+ * Equal field paths must agree on descriptor category and byte offset. Distinct fields must not overlap in push data.
+ *
+ * @throws std::runtime_error When stage contracts conflict.
  */
-std::vector<ShaderDescriptorBindingVK> collect_graphics_pipeline_descriptor_bindings(const ShaderMetadata& p_vertex_shader_metadata,
+ShaderDescriptorHeapLayoutVK collect_graphics_pipeline_descriptor_heap_layout(const ShaderMetadata& p_vertex_shader_metadata,
     std::string_view p_vertex_stage_entry,
     const ShaderMetadata* p_geometry_shader_metadata,
     std::string_view p_geometry_stage_entry,
     const ShaderMetadata& p_fragment_shader_metadata,
     std::string_view p_fragment_stage_entry);
-
-/**
- * @brief Build descriptor set layout inputs for a graphics pipeline resource.
- */
-std::vector<ShaderDescriptorSetLayoutVK> build_graphics_pipeline_descriptor_set_layout_bindings(
-    const std::vector<ShaderDescriptorBindingVK>& p_bindings);
-
-/**
- * @brief Build descriptor set layout inputs for any reflected pipeline resource.
- */
-std::vector<ShaderDescriptorSetLayoutVK> build_shader_descriptor_set_layout_bindings(
-    const std::vector<ShaderDescriptorBindingVK>& p_bindings);
-
-/**
- * @brief Assign a stable upper bound shared by all variable-count bindings in the pipeline layouts.
- *
- * Fixed descriptors are reserved first. The remaining descriptor budget is divided between variable bindings so the declared
- * layout maxima remain within the supplied device/engine resource cap.
- *
- * @param p_set_layouts Descriptor set layouts to update.
- * @param p_max_descriptor_count Maximum descriptor resource budget available to the pipeline.
- */
-void set_variable_descriptor_count_upper_bounds(std::vector<ShaderDescriptorSetLayoutVK>& p_set_layouts, uint32_t p_max_descriptor_count);
 
 } // namespace WhiteBirdEngine
 

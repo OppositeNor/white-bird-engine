@@ -91,15 +91,19 @@ struct SpotLightInfoBuffer {
     uint spot_light_count;
 };
 
-struct LightParam {
-    ConstantBuffer<SpotLightInfo> info;
-    Texture2D<float> shadowmap;
-    SamplerState shadowmap_sampler;
+struct LightParamDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 info;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 shadowmap;
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 shadowmap_sampler;
 };
 
-struct LightParams {
-    LightParam lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    ConstantBuffer<uint> light_count;
+struct LightParamsDescriptorIndices {
+    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 light_count;
 };
 
 /**

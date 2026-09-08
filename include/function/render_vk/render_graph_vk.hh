@@ -117,7 +117,9 @@ struct RGNode {
  * @class RGExecEdge
  * @brief An edge of execution flow between two graph nodes. A timeline
  * semaphore is allocated per edge: the producer signals it; the consumer
- * waits on it.
+ * waits on it. When the edge directly orders a resource hazard, its wait and
+ * signal stage scopes are tightened to the relevant producer and consumer
+ * resource usage.
  */
 struct RGExecEdge {
     // The node before this edge.
@@ -137,9 +139,11 @@ struct RGExecEdge {
 /**
  * @class RenderGraphVK
  * @brief Vulkan-specific render graph. Manages per-task command buffers on
- * the appropriate queue family and uses timeline-semaphore execution edges
- * inferred from declared resource accesses or explicit dependencies to
- * sequence submits and make memory visible.
+ * the appropriate queue family and uses explicit timeline-semaphore
+ * execution edges to sequence submits and make memory visible. Declared
+ * resource accesses are validated against those explicit edges during graph
+ * build; conflicting accesses that are not ordered by an execution path make
+ * graph construction fail.
  *
  * The graph is built once from a RendGraphDescVK; thereafter, execute()
  * may be called every frame.
@@ -162,9 +166,9 @@ public:
 
     /**
      * @brief Build the graph from a high-level descriptor: instantiate every
-     * task, infer resource and execution edges from the union of read/write
-     * accesses, and add explicit execution edges based on `prev`. After this
-     * call, the graph is ready to execute().
+     * task, add explicit execution edges based on `prev`, validate that those
+     * edges order every conflicting declared resource access, and allocate the
+     * command buffers. After this call, the graph is ready to execute().
      *
      * @param p_desc The render graph descriptor.
      */
@@ -173,8 +177,9 @@ public:
     /**
      * @brief Execute every node in topological order, submitting each to the
      * command buffer of its queue family and signals/waits the timeline
-     * semaphore on each execution edge. Resource dependencies are synchronized
-     * by inferred execution edges; image layout transitions remain explicit.
+     * semaphore on each execution edge. Resource hazards must already be
+     * ordered by explicit execution paths established during graph build;
+     * image layout transitions remain explicit.
      *
      * Wait/signal semaphores in p_extra_waits_first_submit and
      * p_extra_signals_last_submit are attached to the first and last
@@ -268,7 +273,8 @@ private:
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
     void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void infer_resource_dependencies();
+    void validate_explicit_resource_dependencies();
+    bool has_exec_path(Ref<RGNode> p_from, Ref<RGNode> p_to) const;
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta, bool p_record_present_transition);

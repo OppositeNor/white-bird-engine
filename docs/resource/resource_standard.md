@@ -67,7 +67,7 @@ Materials do not declare a `material_type`; their graphics pipeline and reflecte
   as identity. Resource units do not use closed role enums.
 - A texture role may appear at most once in a material.
 - Each slot must provide exactly one of `texture` for an inline image or `texture_id` for an existing image resource.
-- Regular materials may omit slots; bindless compilation uses the corresponding shader-selected role from the configured default material.
+- Regular materials may omit slots; static-set compilation uses the corresponding shader-selected role from the configured default material.
 - The default material must provide every texture role selected by each material shader used by the pass.
 - `rma` is the canonical texture role and project abbreviation for the roughness, metallic, and ambient-occlusion channel pack.
 
@@ -82,10 +82,11 @@ int albedo_index; // Selects texture_role "albedo".
 int detail_index; // Selects texture_role "detail_index".
 ```
 
-The static opaque pipeline reflects these attributes independently for each graphics pipeline, assembles the corresponding
-bindless texture array, and writes descriptor indices at the reflected field offsets. `material_sampler`, `textures`, and
-`materials` remain fixed members of the global contract in `utils/utils.slang`; applications may configure only the base variable names
-for `material_textures` and `material_params`, plus the `default_material` resource key.
+The static opaque pipeline reflects these attributes independently for each graphics pipeline, resolves each texture to its global
+sampled-image descriptor-heap index, and writes that index at the reflected material-field offset. The metadata-only
+`material_sampler` and `textures` members and runtime `materials` table remain fixed contracts in `utils/utils.slang`; applications
+may configure only the base variable names for `material_textures` and `material_params`, plus the `default_material` resource key. Runtime shaders receive
+the material parameter buffer and sampler through `WBE_DESCRIPTOR` push-data fields and access textures through the global heap.
 
 `WBE_TEXTURE` and `WBE_VERTEX_INPUT` share the same open-role annotation resolver: both accept one optional string, default to the
 annotated field name, retain exact names for diagnostics, and reject duplicate roles and distinct-name hash collisions. Their

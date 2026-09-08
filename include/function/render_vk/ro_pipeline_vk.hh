@@ -17,13 +17,13 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_descriptor_set_vk.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <cstdint>
-#include <vector>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -33,11 +33,7 @@ class ComputePipelineCompilerVK;
 
 /**
  * @class ROPipelineVK
- * @brief Shared Vulkan pipeline runtime ownership and descriptor binding support.
- *
- * The pipeline retains its layout and one descriptor-set instance per frame slot. Writes publish versioned descriptor state;
- * binding synchronizes the selected, fence-safe frame slot before command recording. Descriptor publication retains
- * RODescriptorSetVK copy-on-write and delayed-destruction behavior.
+ * @brief Shared Vulkan pipeline runtime ownership.
  */
 class ROPipelineVK : public RenderObjectVK {
 public:
@@ -57,37 +53,41 @@ public:
     }
 
     /**
-     * @brief Return the retained Vulkan pipeline layout.
-     * @return Pipeline layout handle.
-     */
-    VkPipelineLayout get_pipeline_layout() const;
-
-    /**
-     * @brief Publish the latest state for one pipeline-owned descriptor binding.
+     * @brief Write one explicit uint2 descriptor index into push data.
      *
-     * The state is applied lazily to each frame-slot descriptor set when that slot is next bound. Writers containing
-     * render-object containers resolve those containers for the selected frame slot. Calls must be externally synchronized
-     * with descriptor binding; logic-thread changes should publish through a render-thread job.
-     * @param p_set_index Descriptor-set index in pipeline layout order.
-     * @param p_writer Descriptor update preserving copy-on-write behavior.
-     * @throws std::runtime_error When the set index is invalid.
+     * The retained resource keeps the object named by the descriptor alive.
+     *
+     * @param p_offset Reflected byte offset of the uint2.
+     * @param p_index Descriptor heap index written into the x component.
+     * @param p_resource Resource retained for the lifetime of the pipeline.
      */
-    void write_descriptor_set(uint32_t p_set_index, const RODescriptorSetVK::Writer& p_writer);
+    void set_descriptor_index(uint32_t p_offset, uint32_t p_index, Ref<IRenderObject> p_resource);
 
     /**
-     * @brief Bind every pipeline-owned descriptor set in layout order.
-     * @param p_command_buffer Command buffer receiving the binding.
-     * @param p_bind_point Graphics or compute pipeline bind point.
+     * @brief Bind a resource-owned descriptor to a reflected push-data field.
+     *
+     * @param p_field_path Path relative to the shader push-data block.
+     * @param p_resource Buffer, image view, or sampler owning the descriptor.
      */
-    void bind_descriptor_sets(VkCommandBuffer p_command_buffer, VkPipelineBindPoint p_bind_point);
+    void set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource);
+
+    /**
+     * @brief Bind a context-resolved resource container to a reflected field.
+     */
+    void set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container);
+
+    /**
+     * @brief Push the current descriptor-index block into a command buffer.
+     * @param p_command_buffer Command buffer receiving the push data.
+     */
+    void push_descriptor_indices(VkCommandBuffer p_command_buffer);
 
 protected:
     /**
-     * @brief Construct shared runtime state and allocate default descriptor sets from the layout.
+     * @brief Construct shared runtime state.
      * @param p_render_data Base Vulkan render data.
-     * @param p_pipeline_layout Retained pipeline layout.
      */
-    ROPipelineVK(const BaseRenderDataVK* p_render_data, Ref<ROPipelineLayoutVK> p_pipeline_layout);
+    explicit ROPipelineVK(const BaseRenderDataVK* p_render_data);
 
     /**
      * @brief Publish the created Vulkan pipeline handle to the shared owner.
@@ -97,34 +97,18 @@ protected:
         pipeline = p_pipeline;
     }
 
-    Ref<ROPipelineLayoutVK> pipeline_layout;
-
 private:
-    friend GraphicsPipelineCompilerVK;
-    friend ComputePipelineCompilerVK;
+    friend class PipelineCompilerVK;
+    friend class GraphicsPipelineCompilerVK;
 
-    void set_descriptor_sets(std::vector<Ref<RODescriptorSetVK>> p_descriptor_sets);
-    Ref<RODescriptorSetVK> get_descriptor_set(uint32_t p_frame_slot, uint32_t p_set_index) const;
-    void synchronize_descriptor_sets(uint32_t p_frame_slot);
-
-    struct DescriptorWrite {
-        uint32_t set_index = 0;
-        uint32_t binding = 0;
-        uint32_t dst_array_element = 0;
-        uint64_t generation = 0;
-        RODescriptorSetVK::Writer writer;
-        Vector<uint64_t, RenderAllocator> applied_generations;
-
-        explicit DescriptorWrite(RenderAllocator* p_allocator) : applied_generations(p_allocator) {
-        }
-    };
+    void set_descriptor_layout(const ShaderDescriptorHeapLayoutVK& p_layout);
+    void retain_descriptor_resource(Ref<IRenderObject> p_resource);
 
     VkPipeline pipeline = VK_NULL_HANDLE;
-    uint32_t descriptor_set_count = 0;
-    uint64_t descriptor_generation = 0;
-    Vector<Ref<RODescriptorSetVK>, RenderAllocator> descriptor_sets;
-    Vector<DescriptorWrite, RenderAllocator> descriptor_writes;
-    Vector<VkDescriptorSet, RenderAllocator> descriptor_set_instances;
+    Vector<uint8_t, RenderAllocator> descriptor_index_data;
+    Vector<Ref<IRenderObject>, RenderAllocator> descriptor_resources;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> descriptor_resource_containers;
+    Vector<ShaderDescriptorHeapFieldVK, RenderAllocator> descriptor_fields;
 };
 
 } // namespace WhiteBirdEngine

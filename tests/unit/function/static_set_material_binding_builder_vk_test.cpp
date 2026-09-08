@@ -163,6 +163,29 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, BuildsPackedRowsAndDeduplicatesTe
     EXPECT_EQ(read_int32(packed_data, 48), 0);
     EXPECT_EQ(read_int32(packed_data, 52), 1);
     EXPECT_EQ(read_int32(packed_data, 56), 2);
+
+    RenderBindpointDeclarations heap_declarations = StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
+        std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
+        default_material,
+        "custom_textures",
+        "custom_params",
+        8,
+        MEM_NULL,
+        [&](RefRes<RUTexture> p_texture) {
+            for (size_t i = 0; i < declarations.image_declerations.size(); ++i) {
+                if (declarations.image_declerations[i].image_resource == p_texture) {
+                    return static_cast<uint32_t>(100 + i);
+                }
+            }
+            throw std::runtime_error("Unexpected texture in descriptor-index resolver test.");
+        });
+    EXPECT_EQ(heap_declarations.image_declerations.size(), 5U);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 16), 103);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 20), 101);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 24), 104);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 48), 100);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 52), 101);
+    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 56), 102);
 }
 
 TEST(WBEStaticSetMaterialBindingBuilderVKTest, MatchesFallbackFieldRoleNames) {

@@ -109,214 +109,173 @@ static ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadata
     return metadata;
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MarksRuntimeSampledImageArrayAsVariableDescriptorBinding) {
-    ShaderMetadataParameter material_textures;
-    material_textures.name = "material_textures";
-    material_textures.binding.kind = "subElementRegisterSpace";
-    material_textures.binding.index = 2;
-    material_textures.type.kind = "parameterBlock";
-
-    ShaderMetadataTypeField sampler;
-    sampler.name = "material_sampler";
-    sampler.type.kind = "samplerState";
-    sampler.binding.kind = "descriptorTableSlot";
-    sampler.binding.index = 0;
-    material_textures.type.fields.push_back(sampler);
-
-    ShaderMetadataTypeField textures;
-    textures.name = "textures";
-    textures.type.kind = "array";
-    textures.type.element_count = 0;
-    textures.type.element_scalar_type = "texture2D";
-    textures.binding.kind = "descriptorTableSlot";
-    textures.binding.index = 1;
-    material_textures.type.fields.push_back(textures);
-
-    ShaderMetadata metadata;
-    metadata.parameters.push_back(material_textures);
-    ShaderMetadataEntryPoint entry_point;
-    entry_point.name = "fragment_main";
-    entry_point.stage = "fragment";
-    metadata.entry_points.push_back(entry_point);
-
-    std::vector<ShaderDescriptorBindingVK> bindings = collect_shader_descriptor_bindings(metadata, "fragment", "fragment_main");
-    ASSERT_EQ(bindings.size(), 2);
-    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLER);
-    EXPECT_FALSE(bindings[0].variable_descriptor_count);
-    EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
-    EXPECT_EQ(bindings[1].layout_binding.descriptorCount, 0);
-    EXPECT_TRUE(bindings[1].variable_descriptor_count);
-
-    std::vector<ShaderDescriptorSetLayoutVK> set_layouts = build_graphics_pipeline_descriptor_set_layout_bindings(bindings);
-    ASSERT_EQ(set_layouts.size(), 3);
-    ASSERT_EQ(set_layouts[2].bindings.size(), 2);
-    ASSERT_EQ(set_layouts[2].binding_flags.size(), 2);
-    EXPECT_EQ(set_layouts[2].binding_flags[0], 0);
-    EXPECT_EQ(set_layouts[2].binding_flags[1], VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);
-
-    set_variable_descriptor_count_upper_bounds(set_layouts, 10);
-    EXPECT_EQ(set_layouts[2].bindings[1].descriptorCount, 9);
+static ShaderMetadataTypeField make_descriptor_heap_field(
+    std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset) {
+    ShaderMetadataTypeField field;
+    field.name = p_name;
+    field.type.kind = "vector";
+    field.type.element_scalar_type = "uint32";
+    field.type.element_count = 2;
+    field.binding.kind = "uniform";
+    field.binding.offset = p_offset;
+    field.binding.size = 8;
+    field.binding.element_stride = 4;
+    ShaderMetadataUserAttribute attribute;
+    attribute.name = "WBE_DESCRIPTOR";
+    ShaderMetadataUserAttributeArgument argument;
+    argument.kind = "string";
+    argument.string_value = p_descriptor_type;
+    attribute.arguments.push_back(argument);
+    field.user_attributes.push_back(attribute);
+    return field;
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MapsReadWriteTextureResourcesToStorageImageDescriptors) {
+static ShaderMetadata make_descriptor_heap_metadata(
+    std::string_view p_stage, std::string_view p_entry_name, std::span<const ShaderMetadataTypeField> p_fields) {
     ShaderMetadata metadata;
-    ShaderMetadataParameter output_image;
-    output_image.name = "output_image";
-    output_image.binding.kind = "descriptorTableSlot";
-    output_image.binding.index = 0;
-    output_image.type.kind = "resource";
-    output_image.type.scalar_type = "texture2D";
-    output_image.type.access = "readWrite";
-    metadata.parameters.push_back(output_image);
+    ShaderMetadataParameter push_data;
+    push_data.name = "descriptor_indices";
+    push_data.binding.kind = "pushConstantBuffer";
+    push_data.type.kind = "constantBuffer";
+    push_data.type.fields.assign(p_fields.begin(), p_fields.end());
+    metadata.parameters.push_back(push_data);
+    ShaderMetadataEntryPoint entry_point;
+    entry_point.name = p_entry_name;
+    entry_point.stage = p_stage;
+    entry_point.bindings.push_back(push_data.binding);
+    metadata.entry_points.push_back(entry_point);
+    return metadata;
+}
 
+TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
+    ShaderMetadataTypeField images;
+    images.name = "images";
+    images.type.kind = "struct";
+    images.binding.kind = "uniform";
+    images.binding.offset = 8;
+    images.binding.size = 16;
+    images.fields.push_back(make_descriptor_heap_field("sampled", "sampled_image", 0));
+    images.fields.push_back(make_descriptor_heap_field("storage", "storage_image", 8));
+    const std::array<ShaderMetadataTypeField, 4> fields{{
+        make_descriptor_heap_field("uniform", "uniform_buffer", 0),
+        images,
+        make_descriptor_heap_field("storage", "storage_buffer", 24),
+        make_descriptor_heap_field("sampler", "sampler", 32),
+    }};
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    EXPECT_EQ(layout.size, 40U);
+    EXPECT_EQ(layout.stage_flags, VK_SHADER_STAGE_COMPUTE_BIT);
+    ASSERT_EQ(layout.fields.size(), 5U);
+    EXPECT_EQ(layout.fields[0].field_path, "uniform");
+    EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UniformBuffer);
+    EXPECT_EQ(layout.fields[0].offset, 0U);
+    EXPECT_EQ(layout.fields[1].field_path, "images.sampled");
+    EXPECT_EQ(layout.fields[1].type, ShaderDescriptorHeapTypeVK::SampledImage);
+    EXPECT_EQ(layout.fields[1].offset, 8U);
+    EXPECT_EQ(layout.fields[2].field_path, "images.storage");
+    EXPECT_EQ(layout.fields[2].type, ShaderDescriptorHeapTypeVK::StorageImage);
+    EXPECT_EQ(layout.fields[2].offset, 16U);
+    EXPECT_EQ(layout.fields[3].type, ShaderDescriptorHeapTypeVK::StorageBuffer);
+    EXPECT_EQ(layout.fields[4].type, ShaderDescriptorHeapTypeVK::Sampler);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPaths) {
+    ShaderMetadataTypeField lights;
+    lights.name = "lights";
+    lights.type.kind = "array";
+    lights.type.element_count = 2;
+    lights.binding.kind = "uniform";
+    lights.binding.offset = 8;
+    lights.binding.size = 32;
+    lights.binding.element_stride = 16;
+    lights.fields.push_back(make_descriptor_heap_field("info", "uniform_buffer", 0));
+    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 8));
+    ShaderMetadata metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&lights, 1));
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "fragment", "fragment_main");
+
+    EXPECT_EQ(layout.size, 40U);
+    ASSERT_EQ(layout.fields.size(), 4U);
+    EXPECT_EQ(layout.fields[0].field_path, "lights[0].info");
+    EXPECT_EQ(layout.fields[0].offset, 8U);
+    EXPECT_EQ(layout.fields[1].field_path, "lights[0].shadowmap");
+    EXPECT_EQ(layout.fields[1].offset, 16U);
+    EXPECT_EQ(layout.fields[2].field_path, "lights[1].info");
+    EXPECT_EQ(layout.fields[2].offset, 24U);
+    EXPECT_EQ(layout.fields[3].field_path, "lights[1].shadowmap");
+    EXPECT_EQ(layout.fields[3].offset, 32U);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, ReturnsEmptyLayoutForDescriptorFreeEntryPoint) {
+    ShaderMetadata metadata;
     ShaderMetadataEntryPoint entry_point;
     entry_point.name = "compute_main";
     entry_point.stage = "compute";
     metadata.entry_points.push_back(entry_point);
 
-    std::vector<ShaderDescriptorBindingVK> bindings = collect_shader_descriptor_bindings(metadata, "compute", "compute_main");
-    ASSERT_EQ(bindings.size(), 1U);
-    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_COMPUTE_BIT);
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    EXPECT_EQ(layout.size, 0U);
+    EXPECT_EQ(layout.stage_flags, 0U);
+    EXPECT_TRUE(layout.fields.empty());
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MapsStorageBuffersToStorageBufferDescriptors) {
-    ShaderMetadataParameter static_set;
-    static_set.name = "static_set";
-    static_set.binding.kind = "subElementRegisterSpace";
-    static_set.binding.index = 1;
-    static_set.type.kind = "parameterBlock";
+TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedDescriptorHeapFields) {
+    ShaderMetadataTypeField malformed = make_descriptor_heap_field("value", "sampled_image", 0);
+    malformed.type.element_count = 1;
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    ShaderMetadataTypeField instance_buffer;
-    instance_buffer.name = "instances";
-    instance_buffer.binding.kind = "descriptorTableSlot";
-    instance_buffer.binding.index = 0;
-    instance_buffer.type.kind = "resource";
-    instance_buffer.type.scalar_type = "structuredBuffer";
+    malformed = make_descriptor_heap_field("value", "unknown", 0);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    ShaderMetadataTypeField draw_infos;
-    draw_infos.name = "draws";
-    draw_infos.binding.kind = "descriptorTableSlot";
-    draw_infos.binding.index = 2;
-    draw_infos.type.kind = "array";
-    draw_infos.type.element_count = 1;
-    draw_infos.type.element_scalar_type = "structuredBuffer";
-    static_set.type.fields.push_back(instance_buffer);
-    static_set.type.fields.push_back(draw_infos);
+    malformed = make_descriptor_heap_field("value", "sampler", 4);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    ShaderMetadata metadata;
-    metadata.parameters.push_back(static_set);
-    ShaderMetadataEntryPoint entry_point;
-    entry_point.name = "vertex_main";
-    entry_point.stage = "vertex";
-    metadata.entry_points.push_back(entry_point);
+    malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed.user_attributes[0].arguments.clear();
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    std::vector<ShaderDescriptorBindingVK> bindings = collect_shader_descriptor_bindings(metadata, "vertex", "vertex_main");
-
-    ASSERT_EQ(bindings.size(), 2U);
-    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_VERTEX_BIT);
-    EXPECT_EQ(bindings[0].parameter_name, "static_set.instances");
-    EXPECT_EQ(bindings[0].set_index, 1U);
-    EXPECT_EQ(bindings[0].layout_binding.binding, 0U);
-    EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    EXPECT_EQ(bindings[1].parameter_name, "static_set.draws");
-    EXPECT_EQ(bindings[1].set_index, 1U);
-    EXPECT_EQ(bindings[1].layout_binding.binding, 2U);
+    malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed.user_attributes.push_back(malformed.user_attributes[0]);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, SharesVariableDescriptorBudgetAcrossDescriptorSets) {
-    ShaderDescriptorSetLayoutVK first_set;
-    first_set.set_index = 0;
-    first_set.bindings.push_back(VkDescriptorSetLayoutBinding{
-        .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .descriptorCount = 2,
-    });
-    first_set.binding_flags.push_back(0);
-    first_set.bindings.push_back(VkDescriptorSetLayoutBinding{
-        .binding = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-    });
-    first_set.binding_flags.push_back(VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);
+TEST(WBEShaderMetadataVKUtilsTest, RejectsMultiplePushDataParameters) {
+    ShaderMetadataTypeField field = make_descriptor_heap_field("value", "uniform_buffer", 0);
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&field, 1));
+    metadata.parameters.push_back(metadata.parameters[0]);
 
-    ShaderDescriptorSetLayoutVK second_set;
-    second_set.set_index = 1;
-    second_set.bindings.push_back(VkDescriptorSetLayoutBinding{
-        .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = 1,
-    });
-    second_set.binding_flags.push_back(0);
-    second_set.bindings.push_back(VkDescriptorSetLayoutBinding{
-        .binding = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-    });
-    second_set.binding_flags.push_back(VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);
-
-    std::vector<ShaderDescriptorSetLayoutVK> set_layouts{first_set, second_set};
-    set_variable_descriptor_count_upper_bounds(set_layouts, 10);
-    EXPECT_EQ(set_layouts[0].bindings[1].descriptorCount, 3);
-    EXPECT_EQ(set_layouts[1].bindings[1].descriptorCount, 3);
-
-    EXPECT_THROW(set_variable_descriptor_count_upper_bounds(set_layouts, 4), std::runtime_error);
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MergesGeometryStageDescriptorBindingsIntoGraphicsPipelineLayouts) {
-    ShaderMetadata vertex_metadata;
-    ShaderMetadataParameter vertex_uniform;
-    vertex_uniform.name = "vertex_ubo";
-    vertex_uniform.binding.kind = "descriptorTableSlot";
-    vertex_uniform.binding.space = 0;
-    vertex_uniform.binding.index = 0;
-    vertex_uniform.binding.size = 64;
-    vertex_uniform.type.kind = "constantBuffer";
-    vertex_metadata.parameters.push_back(vertex_uniform);
-    ShaderMetadataEntryPoint vertex_entry_point;
-    vertex_entry_point.name = "vertex_main";
-    vertex_entry_point.stage = "vertex";
-    vertex_metadata.entry_points.push_back(vertex_entry_point);
+TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
+    ShaderMetadataTypeField uniform = make_descriptor_heap_field("uniform", "uniform_buffer", 0);
+    ShaderMetadata vertex_metadata = make_descriptor_heap_metadata("vertex", "vertex_main", std::span(&uniform, 1));
+    ShaderMetadata fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&uniform, 1));
+    ShaderMetadataTypeField sampler = make_descriptor_heap_field("sampler", "sampler", 8);
+    ShaderMetadata geometry_metadata = make_descriptor_heap_metadata("geometry", "geometry_main", std::span(&sampler, 1));
 
-    ShaderMetadata geometry_metadata;
-    ShaderMetadataParameter geometry_texture;
-    geometry_texture.name = "geometry_texture";
-    geometry_texture.binding.kind = "descriptorTableSlot";
-    geometry_texture.binding.space = 1;
-    geometry_texture.binding.index = 2;
-    geometry_texture.type.kind = "resource";
-    geometry_texture.type.scalar_type = "texture2D";
-    geometry_metadata.parameters.push_back(geometry_texture);
-    ShaderMetadataEntryPoint geometry_entry_point;
-    geometry_entry_point.name = "geometry_main";
-    geometry_entry_point.stage = "geometry";
-    geometry_metadata.entry_points.push_back(geometry_entry_point);
-
-    ShaderMetadata fragment_metadata;
-    ShaderMetadataParameter fragment_sampler;
-    fragment_sampler.name = "fragment_sampler";
-    fragment_sampler.binding.kind = "descriptorTableSlot";
-    fragment_sampler.binding.space = 1;
-    fragment_sampler.binding.index = 3;
-    fragment_sampler.type.kind = "samplerState";
-    fragment_metadata.parameters.push_back(fragment_sampler);
-    ShaderMetadataEntryPoint fragment_entry_point;
-    fragment_entry_point.name = "fragment_main";
-    fragment_entry_point.stage = "fragment";
-    fragment_metadata.entry_points.push_back(fragment_entry_point);
-
-    std::vector<ShaderDescriptorBindingVK> bindings = collect_graphics_pipeline_descriptor_bindings(
+    ShaderDescriptorHeapLayoutVK layout = collect_graphics_pipeline_descriptor_heap_layout(
         vertex_metadata, "vertex_main", &geometry_metadata, "geometry_main", fragment_metadata, "fragment_main");
 
-    ASSERT_EQ(bindings.size(), 3U);
-    EXPECT_EQ(bindings[0].parameter_name, "vertex_ubo");
-    EXPECT_EQ(bindings[0].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    EXPECT_EQ(bindings[0].layout_binding.stageFlags, VK_SHADER_STAGE_VERTEX_BIT);
-    EXPECT_EQ(bindings[1].parameter_name, "geometry_texture");
-    EXPECT_EQ(bindings[1].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
-    EXPECT_EQ(bindings[1].layout_binding.stageFlags, VK_SHADER_STAGE_GEOMETRY_BIT);
-    EXPECT_EQ(bindings[2].parameter_name, "fragment_sampler");
-    EXPECT_EQ(bindings[2].layout_binding.descriptorType, VK_DESCRIPTOR_TYPE_SAMPLER);
-    EXPECT_EQ(bindings[2].layout_binding.stageFlags, VK_SHADER_STAGE_FRAGMENT_BIT);
+    EXPECT_EQ(layout.size, 16U);
+    EXPECT_EQ(layout.stage_flags, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    ASSERT_EQ(layout.fields.size(), 2U);
+    EXPECT_EQ(layout.fields[0].field_path, "uniform");
+    EXPECT_EQ(layout.fields[1].field_path, "sampler");
+
+    fragment_metadata.parameters[0].type.fields[0].type.element_count = 1;
+    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(
+                     vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+        std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat) {

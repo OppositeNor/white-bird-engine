@@ -25,6 +25,9 @@ namespace WhiteBirdEngine {
  * @class RenderObjectVK
  * @brief Vulkan render object.
  *
+ * All methods are confined to the rendering thread and do not provide internal synchronization. Callers on other threads
+ * must submit operations through the renderer job buffer.
+ *
  */
 class RenderObjectVK : public IRenderObject {
 public:

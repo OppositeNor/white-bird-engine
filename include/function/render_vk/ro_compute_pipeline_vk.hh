@@ -19,7 +19,6 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_pipeline_layout_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
@@ -54,8 +53,6 @@ public:
 
         // Compute shader stage.
         Required<ShaderStage> shader_stage;
-        // Pipeline layout.
-        Ref<ROPipelineLayoutVK> pipeline_layout;
 
         /**
          * @brief Set the compute shader stage.
@@ -66,17 +63,6 @@ public:
          */
         Builder& set_shader_stage(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
             shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader};
-            return *this;
-        }
-
-        /**
-         * @brief Set the pipeline layout.
-         *
-         * @param p_pipeline_layout The pipeline layout instance.
-         * @return *this.
-         */
-        Builder& set_pipeline_layout(Ref<ROPipelineLayoutVK> p_pipeline_layout) {
-            pipeline_layout = p_pipeline_layout;
             return *this;
         }
 

@@ -50,6 +50,12 @@ public:
     Ref<RenderObjectVK> get(uint32_t p_frame_slot) override;
     Ref<RenderObjectVK> get(uint32_t p_frame_slot) const override;
     void set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource);
+
+    /**
+     * @brief Release the resources retained for all frame slots.
+     */
+    void clear();
+
     uint32_t get_context_count() const;
 
     /**

@@ -312,7 +312,7 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
             batch.vertex_input.bindings.data(),
             static_cast<uint32_t>(batch.vertex_input.attributes.size()),
             batch.vertex_input.attributes.data());
-        graphics_pipeline->bind_descriptor_sets(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
+        graphics_pipeline->push_descriptor_indices(p_command_buffer);
         VkDeviceSize indirect_offset = static_cast<VkDeviceSize>(batch.first_draw) * sizeof(VkDrawIndexedIndirectCommand);
         vkCmdDrawIndexedIndirect(
             p_command_buffer, resolved_indirect_buffer->get_buffer(), indirect_offset, batch.draw_count, sizeof(VkDrawIndexedIndirectCommand));

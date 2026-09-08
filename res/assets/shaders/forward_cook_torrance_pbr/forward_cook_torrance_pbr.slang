@@ -14,15 +14,28 @@
 */
 #include "forward_cook_torrance_pbr/forward_cook_torrance_pbr_utils.slang"
 
-ConstantBuffer<CameraInfo> camera_info;
+#if WBE_REFLECTION_METADATA
 ConstantBuffer<MaterialParamsBuffer> material_params;
-ParameterBlock<LightParams> light;
-ParameterBlock<MaterialTextures> material_textures;
+ParameterBlock<MaterialTextureContractMetadata> material_textures;
+#endif
 
-/**
- * @brief Static geometry tables shared by both pipeline stages.
- */
-ParameterBlock<StaticSet> static_set;
+struct MaterialSamplerDescriptorIndices {
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 material_sampler;
+};
+
+struct ForwardDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 camera_info;
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 material_params;
+    LightParamsDescriptorIndices light;
+    MaterialSamplerDescriptorIndices material_textures;
+    StaticSetDescriptorIndices static_set;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<ForwardDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Transform a static-set vertex and resolve its bindless material identifier.
@@ -32,9 +45,14 @@ ParameterBlock<StaticSet> static_set;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    InstanceData instance = static_set.instances[p_instance_id];
-    NodeData node = static_set.nodes[instance.node_index];
-    SubmeshData submesh = static_set.submeshes[instance.submesh_index];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    InstanceData instance = instances[p_instance_id];
+    NodeData node = nodes[instance.node_index];
+    SubmeshData submesh = submeshes[instance.submesh_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
 
@@ -45,8 +63,9 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     output.tangent = normalize(mul(direction_transform, p_input.tangent));
     output.bitangent = normalize(mul(direction_transform, p_input.bitangent));
     output.uv = p_input.uv;
-    if (light.light_count > 0) {
-        output.light_space_pos = mul(light.lights[0].info.proj, mul(light.lights[0].info.view, world_position));
+    if (light_count > 0) {
+        ConstantBuffer<SpotLightInfo> light_info = ResourceDescriptorHeap[descriptor_indices.light.lights[0].info.x];
+        output.light_space_pos = mul(light_info.proj, mul(light_info.view, world_position));
     } else {
         output.light_space_pos = world_position;
     }
@@ -59,6 +78,9 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
  * @return 1.0 if the fragment is fully lit, 0.0 if fully in shadow, or an interpolated PCF value.
  */
 float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
+    Texture2D<float> shadowmap = ResourceDescriptorHeap[descriptor_indices.light.lights[p_spot_light_index].shadowmap.x];
+    SamplerState shadowmap_sampler =
+        SamplerDescriptorHeap[descriptor_indices.light.lights[p_spot_light_index].shadowmap_sampler.x];
     float3 ndc = p_light_space_pos.xyz / max(p_light_space_pos.w, 0.0001);
     float2 uv = ndc.xy * 0.5 + 0.5;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z < 0.0 || ndc.z > 1.0) {
@@ -69,13 +91,12 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
     float2 texel_size;
     uint shadow_width;
     uint shadow_height;
-    light.lights[p_spot_light_index].shadowmap.GetDimensions(shadow_width, shadow_height);
+    shadowmap.GetDimensions(shadow_width, shadow_height);
     texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
     float visibility = 0.0;
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
-            float sampled = light.lights[p_spot_light_index].shadowmap.Sample(
-                light.lights[p_spot_light_index].shadowmap_sampler, uv + float2(x, y) * texel_size).r;
+            float sampled = shadowmap.Sample(shadowmap_sampler, uv + float2(x, y) * texel_size).r;
             visibility += current_depth >= sampled ? 1.0 : 0.0;
         }
     }
@@ -89,6 +110,10 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
  * @return The linear shaded color with alpha = 1.0.
  */
 float4 shade_fragment(VSOutput p_input, bool p_masked) {
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
     // The submesh material id crosses the rasterizer in world_position.w. Round before using it as a table index.
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];
@@ -99,17 +124,16 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
     uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
 
-    float4 albedo_sample =
-        material_textures.textures[albedo_descriptor_index].Sample(material_textures.material_sampler, p_input.uv);
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
+    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_descriptor_index];
+    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_descriptor_index];
+    float4 albedo_sample = albedo_texture.Sample(material_sampler, p_input.uv);
     if (p_masked && albedo_sample.a < 0.5) {
         discard;
     }
     float3 base_color = albedo_sample.rgb;
-    float2 sampled_normal =
-        material_textures.textures[normal_descriptor_index].Sample(material_textures.material_sampler, p_input.uv).rg;
-    float3 rma = material_textures.textures[rma_descriptor_index]
-                     .Sample(material_textures.material_sampler, p_input.uv)
-                     .rgb;
+    float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
+    float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
     float roughness = clamp(rma.r, 0.04, 1.0);
     float metallic = clamp(rma.g, 0.0, 1.0);
     float ambient_occlusion = clamp(rma.b, 0.0, 1.0);
@@ -120,9 +144,11 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     float3 f0 = lerp(float3(0.04), base_color, metallic);
 
     float3 color = float3(0.0);
-    uint spot_light_count = min(light.light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+    uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLightInfo spot_light_info = light.lights[spot_light_index].info;
+        ConstantBuffer<SpotLightInfo> light_info =
+            ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
+        SpotLightInfo spot_light_info = light_info;
         float3 to_light = spot_light_info.position - p_input.world_position.xyz;
         float light_distance = length(to_light);
         float3 l = to_light / max(light_distance, 0.0001);

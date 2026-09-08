@@ -18,7 +18,13 @@
 /**
  * @brief Constant buffer providing the current application time.
  */
-ConstantBuffer<Time> time;
+struct DrawTriangleDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 time;
+};
+
+[[vk::push_constant]]
+ConstantBuffer<DrawTriangleDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Vertex attributes provided by the minimal triangle test mesh.
@@ -58,5 +64,6 @@ VSOutput vertex_main(TriangleVertexInput p_input) {
  */
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
+    ConstantBuffer<Time> time = ResourceDescriptorHeap[descriptor_indices.time.x];
     return float4(0.0, (sin(time.duration_sec) + 1) * 0.5, 0.0, 1.0);
 }

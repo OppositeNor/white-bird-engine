@@ -25,12 +25,14 @@ struct ShadowVSOutput {
 /**
  * @brief Constant buffer providing the spot light's view and projection matrices.
  */
-ConstantBuffer<CameraInfo> light_camera_info;
+struct ShadowDescriptorIndices {
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 light_camera_info;
+    StaticSetDescriptorIndices static_set;
+};
 
-/**
- * @brief Static geometry tables shared by both pipeline stages.
- */
-ParameterBlock<StaticSet> static_set;
+[[vk::push_constant]]
+ConstantBuffer<ShadowDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Transform a static-set vertex into spot-light clip space.
@@ -40,8 +42,11 @@ ParameterBlock<StaticSet> static_set;
  */
 [shader("vertex")]
 ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    InstanceData instance = static_set.instances[p_instance_id];
-    float4 world_position = mul(static_set.nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
+    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    InstanceData instance = instances[p_instance_id];
+    float4 world_position = mul(nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
     ShadowVSOutput output;
     output.position = mul(light_camera_info.proj, mul(light_camera_info.view, world_position));
     return output;

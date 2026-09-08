@@ -23,6 +23,9 @@
 #include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
@@ -36,6 +39,7 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -72,12 +76,6 @@ VkCommandPool pool_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_qu
 struct ResourceScopeVK {
     VkAccessFlags2 access = VK_ACCESS_2_NONE;
     VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
-};
-
-struct WriteInfoVK {
-    std::string id;
-    Ref<RGNode> node;
-    VkPipelineStageFlags2 stage;
 };
 
 QueueFamilyVK node_queue_family(Ref<RGNode> p_node) {
@@ -169,81 +167,34 @@ void validate_declared_resource(
     }
 }
 
-WriteInfoVK* find_last_writer(Vector<WriteInfoVK, RenderAllocator>& p_last_writers, std::string_view p_resource_id) {
-    for (auto& last_writer : p_last_writers) {
-        if (last_writer.id == p_resource_id) {
-            return &last_writer;
-        }
-    }
-    return nullptr;
+bool accesses_conflict(bool p_before_is_write, bool p_after_is_write) {
+    return p_before_is_write || p_after_is_write;
 }
 
-void ensure_exec_edge(Vector<Ref<RGExecEdge>, RenderAllocator>& p_exec_edges,
-    RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
-    Ref<RGNode> p_before,
-    Ref<RGNode> p_after,
-    VkPipelineStageFlags2 p_before_stage,
-    VkPipelineStageFlags2 p_after_stage) {
+Ref<RGExecEdge> find_direct_exec_edge(Ref<RGNode> p_before, Ref<RGNode> p_after) {
     for (auto& weak_edge : p_before->exec_after) {
         auto edge = weak_edge.lock();
         if (edge != MEM_NULL && edge->after == p_after) {
-            edge->before_finish_pipeline_stage |= p_before_stage;
-            edge->after_start_pipeline_stage |= p_after_stage;
-            return;
+            return edge;
         }
     }
-
-    auto edge = make_ref<RGExecEdge>(p_allocator);
-    edge->before = p_before;
-    edge->after = p_after;
-    edge->before_finish_pipeline_stage = p_before_stage;
-    edge->after_start_pipeline_stage = p_after_stage;
-    edge->semaphore = make_ref<SemaphoreVK>(p_allocator, p_render_data, false);
-    p_before->exec_after.emplace_back(edge);
-    p_after->exec_before.emplace_back(edge);
-    p_exec_edges.emplace_back(edge);
+    return MEM_NULL;
 }
 
-void update_last_writer(
-    Vector<WriteInfoVK, RenderAllocator>& p_last_writers, std::string_view p_resource_id, Ref<RGNode> p_node, VkPipelineStageFlags2 p_stage) {
-    WriteInfoVK* last_writer = find_last_writer(p_last_writers, p_resource_id);
-    if (last_writer != nullptr) {
-        last_writer->node = p_node;
-        last_writer->stage = p_stage;
+void update_edge_resource_scopes(Ref<RGExecEdge> p_edge,
+    QueueFamilyVK p_before_queue,
+    const ResAccessVK& p_before_access,
+    bool p_before_is_write,
+    QueueFamilyVK p_after_queue,
+    const ResAccessVK& p_after_access,
+    bool p_after_is_write) {
+    if (p_edge == MEM_NULL || !accesses_conflict(p_before_is_write, p_after_is_write)) {
         return;
     }
-
-    p_last_writers.emplace_back(WriteInfoVK{.id = std::string(p_resource_id), .node = p_node, .stage = p_stage});
-}
-
-void process_read_dependencies(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources,
-    Vector<Ref<RGExecEdge>, RenderAllocator>& p_exec_edges,
-    RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
-    Vector<WriteInfoVK, RenderAllocator>& p_last_writers,
-    Ref<RGNode> p_node,
-    QueueFamilyVK p_queue_family) {
-    for (const auto& read_access : p_node->reads) {
-        validate_declared_resource(p_resources, *p_node, read_access, false);
-        ResourceScopeVK read_scope = resource_scope(read_access.usage, false, p_queue_family);
-        WriteInfoVK* last_writer = find_last_writer(p_last_writers, read_access.res_id);
-        if (last_writer != nullptr) {
-            ensure_exec_edge(
-                p_exec_edges, p_allocator, p_render_data, last_writer->node, p_node, last_writer->stage, read_scope.stage);
-        }
-    }
-}
-
-void process_write_dependencies(const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources,
-    Vector<WriteInfoVK, RenderAllocator>& p_last_writers,
-    Ref<RGNode> p_node,
-    QueueFamilyVK p_queue_family) {
-    for (const auto& write_access : p_node->writes) {
-        validate_declared_resource(p_resources, *p_node, write_access, true);
-        ResourceScopeVK write_scope = resource_scope(write_access.usage, true, p_queue_family);
-        update_last_writer(p_last_writers, write_access.res_id, p_node, write_scope.stage);
-    }
+    ResourceScopeVK before_scope = resource_scope(p_before_access.usage, p_before_is_write, p_before_queue);
+    ResourceScopeVK after_scope = resource_scope(p_after_access.usage, p_after_is_write, p_after_queue);
+    p_edge->before_finish_pipeline_stage |= before_scope.stage;
+    p_edge->after_start_pipeline_stage |= after_scope.stage;
 }
 
 } // namespace
@@ -407,9 +358,8 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     auto task_ids = instantiate_tasks(p_desc);
     add_exec_edges_from_prev(p_desc, task_ids);
 
-    // Topo-sort once; resource-edge inference walks nodes in execution order.
     topological_sort();
-    infer_resource_dependencies();
+    validate_explicit_resource_dependencies();
 
     allocate_command_buffers();
 
@@ -576,20 +526,93 @@ void RenderGraphVK::add_exec_edges_from_prev(const RendGraphDescVK& p_desc, cons
         for (const auto& prev_id : p_desc.tasks[i].prev) {
             auto producer = node_by_task_id(prev_id);
             if (producer == MEM_NULL) {
-                throw std::runtime_error("RenderGraphVK: unknown prev task id.");
+                throw std::runtime_error(std::format("RenderGraphVK: unknown prev task id: {} for task: {}", prev_id, consumer->task_id));
             }
             add_exec_edge(producer, consumer, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
         }
     }
 }
 
-void RenderGraphVK::infer_resource_dependencies() {
-    Vector<WriteInfoVK, RenderAllocator> last_writers(render_data->allocator);
+bool RenderGraphVK::has_exec_path(Ref<RGNode> p_from, Ref<RGNode> p_to) const {
+    if (p_from == p_to) {
+        return true;
+    }
+
+    Vector<uint8_t, RenderAllocator> visited(nodes.size(), 0, render_data->allocator);
+    Vector<Ref<RGNode>, RenderAllocator> stack(render_data->allocator);
+    stack.push_back(p_from);
+    visited[p_from->topo_order] = 1;
+    while (!stack.empty()) {
+        Ref<RGNode> node = stack.back();
+        stack.pop_back();
+        for (auto& weak_edge : node->exec_after) {
+            auto edge = weak_edge.lock();
+            if (edge == MEM_NULL || edge->after == MEM_NULL) {
+                continue;
+            }
+            if (edge->after == p_to) {
+                return true;
+            }
+            if (visited[edge->after->topo_order] != 0) {
+                continue;
+            }
+            visited[edge->after->topo_order] = 1;
+            stack.push_back(edge->after);
+        }
+    }
+    return false;
+}
+
+void RenderGraphVK::validate_explicit_resource_dependencies() {
+    auto validate_access_list = [&](Ref<RGNode> p_node, const Vector<ResAccessVK, RenderAllocator>& p_accesses, bool p_is_write) {
+        for (const auto& access : p_accesses) {
+            validate_declared_resource(all_resources, *p_node, access, p_is_write);
+        }
+    };
 
     for (auto& node : nodes) {
-        QueueFamilyVK consumer_queue_family = node_queue_family(node);
-        process_read_dependencies(all_resources, exec_edges, render_data->allocator, render_data, last_writers, node, consumer_queue_family);
-        process_write_dependencies(all_resources, last_writers, node, consumer_queue_family);
+        validate_access_list(node, node->reads, false);
+        validate_access_list(node, node->writes, true);
+    }
+
+    auto check_conflicts = [&](Ref<RGNode> p_before,
+                               const Vector<ResAccessVK, RenderAllocator>& p_before_accesses,
+                               bool p_before_is_write,
+                               Ref<RGNode> p_after,
+                               const Vector<ResAccessVK, RenderAllocator>& p_after_accesses,
+                               bool p_after_is_write) {
+        Ref<RGExecEdge> direct_edge = find_direct_exec_edge(p_before, p_after);
+        for (const auto& before_access : p_before_accesses) {
+            for (const auto& after_access : p_after_accesses) {
+                if (before_access.res_id != after_access.res_id || !accesses_conflict(p_before_is_write, p_after_is_write)) {
+                    continue;
+                }
+                if (!has_exec_path(p_before, p_after)) {
+                    throw std::runtime_error(std::format(
+                        "RenderGraphVK: tasks '{}' and '{}' both access resource '{}' without an explicit execution path.",
+                        p_before->task_id,
+                        p_after->task_id,
+                        before_access.res_id));
+                }
+                update_edge_resource_scopes(direct_edge,
+                    p_before->in_queue,
+                    before_access,
+                    p_before_is_write,
+                    p_after->in_queue,
+                    after_access,
+                    p_after_is_write);
+            }
+        }
+    };
+
+    for (size_t before_index = 0; before_index < nodes.size(); ++before_index) {
+        Ref<RGNode> before = nodes[before_index];
+        for (size_t after_index = before_index + 1; after_index < nodes.size(); ++after_index) {
+            Ref<RGNode> after = nodes[after_index];
+            check_conflicts(before, before->reads, false, after, after->writes, true);
+            check_conflicts(before, before->writes, true, after, after->reads, false);
+            check_conflicts(before, before->writes, true, after, after->writes, true);
+        }
     }
 }
 
@@ -669,6 +692,10 @@ void RenderGraphVK::record_node(
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
         throw std::runtime_error("RenderGraphVK: failed to begin command buffer.");
     }
+    if (render_data->descriptor_heap_allocator == nullptr) {
+        throw std::runtime_error("RenderGraphVK: descriptor heap allocator is unavailable.");
+    }
+    render_data->descriptor_heap_allocator->bind_heaps(p_command_buffer);
 
     record_general_transition(p_command_buffer, p_node, p_resources);
 
@@ -711,25 +738,33 @@ void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, 
 
 void RenderGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) {
     // WSI presentation still requires PRESENT_SRC_KHR even when unified image layouts are enabled.
-    for (const auto& [resource_id, resource] : all_resources) {
-        auto image_view = resolve_render_object(*resource).dynamic_cast_ref<ROImageViewVK>();
-        if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
-            continue;
-        }
-        Ref<ROImageVK> image = image_view->fields().image;
-        if (!image->fields().is_swap_chain_image) {
-            continue;
-        }
-        // For the swapchain image, apply a barrier that transfers it into VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
-        ROImageVK::MemoryBarrierBuilder()
-            .set_src_access(VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
-            .set_dst_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
-            .set_subresource_range(image_view->fields().subresource_range)
-            .set_new_layout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-            .set_image(image)
-            .apply_barrier(p_command_buffer);
-        return;
+    RendererVK* renderer = RendererVK::get_singleton();
+    if (renderer == nullptr) {
+        throw std::runtime_error("RenderGraphVK: renderer singleton is unavailable.");
     }
+    Ref<ROCPerFrameVK> swap_chain_images = renderer->get_swap_chain_image_container();
+    if (swap_chain_images == MEM_NULL) {
+        throw std::runtime_error("RenderGraphVK: swap-chain image container is unavailable.");
+    }
+
+    auto image_view = swap_chain_images->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
+    if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
+        throw std::runtime_error("RenderGraphVK: swap-chain image container did not resolve to an image view.");
+    }
+
+    Ref<ROImageVK> image = image_view->fields().image;
+    if (!image->fields().is_swap_chain_image) {
+        throw std::runtime_error("RenderGraphVK: swap-chain image resource does not reference a swap-chain image.");
+    }
+
+    // For the swapchain image, apply a barrier that transfers it into VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
+    ROImageVK::MemoryBarrierBuilder()
+        .set_src_access(VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT)
+        .set_dst_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
+        .set_subresource_range(image_view->fields().subresource_range)
+        .set_new_layout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+        .set_image(image)
+        .apply_barrier(p_command_buffer);
 }
 
 void RenderGraphVK::collect_edge_semaphores(Ref<RGNode> p_node,
@@ -770,8 +805,10 @@ void RenderGraphVK::submit_node(VkCommandBuffer p_command_buffer,
     submit_info.signalSemaphoreInfoCount = static_cast<uint32_t>(p_signals.size());
     submit_info.pSignalSemaphoreInfos = p_signals.data();
 
-    if (vkQueueSubmit2(queue_for(render_data, p_queue_family), 1, &submit_info, p_fence) != VK_SUCCESS) {
-        throw std::runtime_error("RenderGraphVK: vkQueueSubmit2 failed.");
+    VkQueue queue = queue_for(render_data, p_queue_family);
+    auto result = vkQueueSubmit2(queue, 1, &submit_info, p_fence);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("RenderGraphVK: vkQueueSubmit2 failed: {}", string_VkResult(result)));
     }
 }
 

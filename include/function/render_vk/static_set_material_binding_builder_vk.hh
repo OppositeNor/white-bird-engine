@@ -20,6 +20,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -32,6 +33,8 @@ namespace WhiteBirdEngine {
  */
 class StaticSetMaterialBindingBuilderVK final {
 public:
+    using TextureDescriptorIndexResolver = std::function<uint32_t(RefRes<RUTexture>)>;
+
     /**
      * @brief Construct a stateless builder.
      */
@@ -69,6 +72,7 @@ public:
      * @param p_material_params_variable_name Reflected global parameter name for packed material parameters.
      * @param p_max_texture_descriptor_count Maximum sampled-image descriptors supported for the runtime array.
      * @param p_material_sampler Optional sampler render object bound at material_textures.material_sampler.
+     * @param p_texture_descriptor_index_resolver Optional resolver that replaces table-local texture indices with resource-heap indices.
      * @throws std::runtime_error When reflected limits are exceeded or material role data is malformed.
      */
     RenderBindpointDeclarations build(const std::optional<MaterialTextureContract>& p_material_contract,
@@ -77,7 +81,8 @@ public:
         std::string_view p_material_textures_variable_name,
         std::string_view p_material_params_variable_name,
         uint32_t p_max_texture_descriptor_count,
-        Ref<IRenderObject> p_material_sampler = MEM_NULL) const;
+        Ref<IRenderObject> p_material_sampler = MEM_NULL,
+        const TextureDescriptorIndexResolver& p_texture_descriptor_index_resolver = {}) const;
 };
 
 } // namespace WhiteBirdEngine

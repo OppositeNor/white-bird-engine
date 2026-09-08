@@ -39,6 +39,22 @@ For non-trivial implementation tasks:
 - Do not modify dependencies.
 - Before editing multiple files, verify that each file is required.
 
+## Rendering Threading
+
+- Render objects and renderer-backend helpers are confined to the rendering thread. Their methods are not required to provide
+  internal synchronization.
+- Code running on any other thread must not access or operate on render objects directly. Submit that work through the
+  renderer's job buffer with `IRenderer::add_job()` so it executes on the rendering thread.
+- Do not add locks to render objects or renderer-backend helpers solely to support cross-thread access; preserve the
+  render-thread confinement contract instead.
+
+## Vulkan Render Graph
+
+- Declared render-graph reads and writes do not create execution edges. Add explicit `RendTaskDescVK::after()` paths for every
+  read-write, write-read, and write-write conflict; unordered conflicts make graph construction fail.
+- The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
+  descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
+
 ## Layered Architecture
 
 Layers, from upper to lower. Upper layers may depend on lower layers; the reverse is **forbidden**.
@@ -143,11 +159,15 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `utils/utils.slang`.
   - `[WBE_TEXTURE("albedo")] int albedo_index;` selects the explicit `albedo` role.
   - `[WBE_TEXTURE] int detail_index;` uses `detail_index` as the role.
-- `MaterialTextures.material_sampler`, `MaterialTextures.textures`, and `MaterialParamsBuffer.materials` are fixed global-contract
-  members. Applications may configure only the `material_textures` and `material_params` base variable names and the
-  `default_material` resource key.
-- Bindless descriptor arrays and material indices are assembled per graphics pipeline from reflected roles. Keep engine
-  propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or `rma`.
+- `MaterialTextureContractMetadata.material_sampler` and `MaterialTextureContractMetadata.textures` are fixed metadata-only
+  members; `MaterialParamsBuffer.materials` is the fixed runtime material-table member. Applications may configure only the
+  `material_textures` and `material_params` base variable names and the `default_material` resource key.
+- Static-set compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
+  material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
+  `rma`.
+- Vulkan shader resources are declared as aligned `uint2` fields in push data with `WBE_DESCRIPTOR("TYPE")`, where `TYPE` is
+  `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. Runtime shaders access the renderer-owned
+  global heaps through those indices; metadata-only resource declarations belong under `WBE_REFLECTION_METADATA`.
 - `rma` is the canonical project abbreviation and texture role for the roughness, metallic, and ambient-occlusion channel pack.
   Use `rma` in project-owned identifiers instead of a spelled-out equivalent.
 

@@ -32,6 +32,8 @@
 
 namespace WhiteBirdEngine {
 
+class DescriptorHeapAllocatorVK;
+
 /** One-shot Vulkan command-buffer recording job. */
 using GPUJobVK = std::function<void(VkCommandBuffer)>;
 
@@ -94,14 +96,25 @@ struct BaseRenderDataVK {
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
     /** Non-owning libktx Vulkan upload context owned by RendererVK. */
     KTXVulkanDeviceInfoVK* ktx_vulkan_device_info = nullptr;
-    /** Descriptor pool. */
-    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-    /**
-     * @brief Maximum sampled-image descriptors allowed for a variable-count binding.
-     *
-     * This is capped by both the renderer descriptor pool and the physical-device descriptor limits.
-     */
-    uint32_t max_variable_sampled_image_descriptor_count = 1;
+    /** Descriptor-heap properties reported by the physical device. */
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptor_heap_properties{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT};
+    /** Shared stride used by buffer and image resource descriptors. */
+    VkDeviceSize resource_descriptor_stride = 0;
+    /** Stride used by sampler descriptors. */
+    VkDeviceSize sampler_descriptor_stride = 0;
+    /** Non-owning renderer descriptor-heap allocator. */
+    DescriptorHeapAllocatorVK* descriptor_heap_allocator = nullptr;
+    /** Host command for encoding resource descriptors. */
+    PFN_vkWriteResourceDescriptorsEXT write_resource_descriptors = nullptr;
+    /** Host command for encoding sampler descriptors. */
+    PFN_vkWriteSamplerDescriptorsEXT write_sampler_descriptors = nullptr;
+    /** Command for binding the resource descriptor heap. */
+    PFN_vkCmdBindResourceHeapEXT command_bind_resource_heap = nullptr;
+    /** Command for binding the sampler descriptor heap. */
+    PFN_vkCmdBindSamplerHeapEXT command_bind_sampler_heap = nullptr;
+    /** Command for uploading descriptor indices and other pipeline push data. */
+    PFN_vkCmdPushDataEXT command_push_data = nullptr;
     /** Maximum indexed-indirect draws accepted by one Vulkan draw call. */
     uint32_t max_draw_indirect_count = 1;
     /** Required device-address alignment for acceleration-structure scratch storage. */
@@ -230,11 +243,6 @@ struct TimeVKUBO {
      */
     float duration_sec = 0.0F;
 };
-
-/**
- * @brief The maximum number of descriptors per descriptor set.
- */
-constexpr uint32_t MAX_DESCRIPTORS_PER_SET = 16;
 
 } // namespace WhiteBirdEngine
 

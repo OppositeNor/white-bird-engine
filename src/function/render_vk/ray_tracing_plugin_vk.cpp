@@ -42,61 +42,6 @@
 
 namespace WhiteBirdEngine {
 
-// Query one Vulkan feature flag through the features2 pNext chain.
-template <VkStructureType StructureType, typename FeatureType>
-static bool check_device_feature_support(VkPhysicalDevice p_device, VkBool32 FeatureType::* p_feature) {
-    FeatureType feature{};
-    feature.sType = StructureType;
-
-    VkPhysicalDeviceFeatures2 device_features{};
-    device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    device_features.pNext = &feature;
-    vkGetPhysicalDeviceFeatures2(p_device, &device_features);
-
-    return feature.*p_feature == VK_TRUE;
-}
-
-// Verify that every requested extension is exposed either globally or by an enabled layer.
-template <typename EnumerateFunction>
-static bool check_extension_support(std::span<const char* const> p_extensions,
-    std::span<const char* const> p_enabled_layers,
-    const EnumerateFunction& p_enumerate_extensions) {
-    std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
-
-    auto remove_supported_extensions = [&](const char* p_layer_name) {
-        VkResult result = VK_SUCCESS;
-        do {
-            uint32_t extension_count = 0;
-            result = p_enumerate_extensions(p_layer_name, &extension_count, nullptr);
-            if (result != VK_SUCCESS) {
-                return false;
-            }
-
-            std::vector<VkExtensionProperties> extension_properties(extension_count);
-            result = p_enumerate_extensions(p_layer_name, &extension_count, extension_properties.data());
-            if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
-                return false;
-            }
-            if (result == VK_SUCCESS) {
-                for (const auto& extension : extension_properties) {
-                    unsupported_extensions.erase(extension.extensionName);
-                }
-            }
-        } while (result == VK_INCOMPLETE);
-        return true;
-    };
-
-    if (!remove_supported_extensions(nullptr)) {
-        return false;
-    }
-    for (const char* layer_name : p_enabled_layers) {
-        if (!remove_supported_extensions(layer_name)) {
-            return false;
-        }
-    }
-    return unsupported_extensions.empty();
-}
-
 struct RayTracingPluginVK::StaticOpaqueBottomLevelBuild {
     VkAccelerationStructureGeometryKHR geometry{};
     VkAccelerationStructureBuildRangeInfoKHR build_range{};
@@ -217,9 +162,23 @@ std::span<const char* const> RayTracingPluginVK::get_required_device_extensions(
     return REQUIRED_EXTENSIONS;
 }
 
-VkBaseOutStructure* RayTracingPluginVK::get_device_feature_chain() {
+void RayTracingPluginVK::on_before_instance_creation(VkInstanceCreateInfo* /*p_create_info*/) {
+}
+
+void RayTracingPluginVK::on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) {
     WBE_DEBUG_ASSERT(enabled);
-    return reinterpret_cast<VkBaseOutStructure*>(&buffer_device_address_features);
+    enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(p_physical_device,
+        p_create_info,
+        &buffer_device_address_features,
+        &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress);
+    enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR>(p_physical_device,
+        p_create_info,
+        &acceleration_structure_features,
+        &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure);
+    enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(p_physical_device,
+        p_create_info,
+        &ray_tracing_pipeline_features,
+        &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
 }
 
 void RayTracingPluginVK::on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {

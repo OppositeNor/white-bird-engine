@@ -182,6 +182,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
     exposed_fileds.image_memory = VK_NULL_HANDLE;
     allocation = VK_NULL_HANDLE;
     exposed_fileds.image_layout = p_initial_image_layout;
+    exposed_fileds.usage = 0;
     exposed_fileds.is_swap_chain_image = true;
     ownership = Ownership::SWAP_CHAIN;
 }
@@ -200,6 +201,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_t
     exposed_fileds.view_type = p_texture.viewType;
     exposed_fileds.mipmap_levels = p_texture.levelCount;
     exposed_fileds.layers_count = p_texture.layerCount;
+    exposed_fileds.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     ownership = Ownership::KTX;
 }
 
@@ -266,6 +268,7 @@ void ROImageVK::init(const Builder& p_builder) {
     exposed_fileds.view_type = WBE_REQUIRED(p_builder.image_type) == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
     exposed_fileds.mipmap_levels = p_builder.mipmap_level;
     exposed_fileds.layers_count = p_builder.layers_count;
+    exposed_fileds.usage = WBE_REQUIRED(p_builder.usage);
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {

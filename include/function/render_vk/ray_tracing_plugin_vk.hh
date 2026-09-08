@@ -76,7 +76,8 @@ public:
 
     virtual std::span<const char* const> get_required_device_extensions() const override;
 
-    virtual VkBaseOutStructure* get_device_feature_chain() override;
+    virtual void on_before_instance_creation(VkInstanceCreateInfo* p_create_info) override;
+    virtual void on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) override;
 
     virtual void on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
 

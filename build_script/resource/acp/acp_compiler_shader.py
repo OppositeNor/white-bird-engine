@@ -199,7 +199,12 @@ class WBEACPCompilerShader(WBEACPCompiler):
                               output_file: Path, shader_metadata_file: Path,
                               shader_stage: str | None, entry_name: str | None,
                               macro_definitions: list[str], resource: ManifestResource) -> None:
-        cmd = [slangc_path, "-target", "spirv"]
+        cmd = [
+            slangc_path,
+            "-target", "spirv",
+            "-profile", "spirv_1_6+spvDescriptorHeapEXT",
+            "-spirv-unified-descriptor-heap-stride",
+        ]
         if entry_name is not None:
             cmd.extend(["-entry", entry_name])
         if shader_stage is not None:
@@ -220,6 +225,16 @@ class WBEACPCompilerShader(WBEACPCompiler):
             print("Failed to compile", shader_file)
             print(result.stderr)
             raise RuntimeError("Failed to compile shader.")
+        reflection_output_file = output_file.with_name(f"{output_file.name}.reflection")
+        reflection_cmd = list(cmd)
+        reflection_cmd[reflection_cmd.index("-o") + 1] = str(reflection_output_file)
+        reflection_cmd.insert(len(reflection_cmd) - 1, "-DWBE_REFLECTION_METADATA=1")
+        reflection_result = subprocess.run(reflection_cmd, capture_output=True, text=True)
+        reflection_output_file.unlink(missing_ok=True)
+        if reflection_result.returncode != 0:
+            print("Failed to reflect", shader_file)
+            print(reflection_result.stderr)
+            raise RuntimeError("Failed to reflect shader.")
         with open(shader_metadata_file, "r", encoding="utf-8") as metadata_file:
             raw_metadata = json.load(metadata_file)
         self._apply_discovered_stage_entries(resource, raw_metadata)
@@ -266,7 +281,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
         return {
             "parameters": [self._transform_shader_parameter(parameter) for parameter in raw_metadata.get("parameters", [])],
             "entry_points": [self._transform_shader_entry_point(entry_point) for entry_point in raw_metadata.get("entryPoints", [])],
-            "bindless_space_index": int(raw_metadata.get("bindlessSpaceIndex", 0)),
         }
 
     def _transform_shader_user_attribute_argument(self, raw_argument: Any) -> dict[str, Any]:

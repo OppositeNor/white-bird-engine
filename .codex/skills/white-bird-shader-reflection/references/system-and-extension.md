@@ -3,11 +3,11 @@
 ## Pipeline map
 
 1. A shader entry in an ACP manifest supplies `src`, `dst`, and `metadata`.
-2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` with `-target spirv` and `-reflection-json`.
-3. The same compiler normalizes Slang's JSON into the snake-case schema represented by `include/function/render/shader_metadata.hh`.
+2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` for SPIR-V 1.6 with descriptor-heap support and unified descriptor-heap stride.
+3. It performs a second temporary compile with `WBE_REFLECTION_METADATA=1` so reflection-only declarations contribute metadata without entering the runtime shader, then normalizes Slang's JSON into the snake-case schema represented by `include/function/render/shader_metadata.hh`.
 4. The resource loader stores the compiled words, metadata path, and discovered stage-entry names in `RUShader` (`include/function/render/render_resource_unit.hh` and `src/function/render_vk/render_vk_resource_unit_loader.cpp`).
 5. `ShaderMetadataLoader::load` resolves `RUShader::metadata_path`, parses the JSON, and deserializes `ShaderMetadata`.
-6. Backend-neutral resolvers consume metadata for entry points, annotations, material textures, and vertex inputs. Vulkan utilities translate supported resources into descriptor bindings, and the graphics pipeline compiler packs caller-provided bindpoints at reflected offsets.
+6. Backend-neutral resolvers consume metadata for entry points, annotations, material textures, and vertex inputs. Vulkan utilities translate `WBE_DESCRIPTOR` fields into a push-data layout, and pipeline compilers resolve caller-provided bindpoints to resource-owned descriptor-heap indices.
 
 Metadata is a sidecar resource, not embedded in `RUShader`. A missing shader handle or metadata path is an error.
 
@@ -22,12 +22,11 @@ The runtime model preserves:
 - nested fields;
 - semantics and semantic indices;
 - binding kind, index, count, space, offset, size, and element stride;
-- bindless space index;
 - user attributes on global parameters, entry points, entry-point parameters, types, nested element types, and fields.
 
 User-attribute arguments support only integer, floating-point, and string values. Boolean and other argument shapes fail during ACP normalization.
 
-Constant buffers and parameter blocks expose fields from Slang's element layout. The normalizer also has one specialized transformation: parameter-block arrays of structs whose fields are descriptor-table slots are flattened into names such as `material_textures.textures`, with binding indices and counts adjusted for the array.
+Constant buffers and parameter blocks expose fields from Slang's element layout. `bindless_space_index` is not part of the normalized runtime schema.
 
 ## Runtime queries and paths
 
@@ -40,20 +39,37 @@ Constant buffers and parameter blocks expose fields from Slang's element layout.
 
 It does not implement a general dotted-path walker. For nested inspection, query each field vector deliberately or use the contract resolver responsible for that structure.
 
-Pipeline bindpoint declarations accept reflected names such as `camera_info`, `camera_info.view`, or an indexed path. Current indexed parsing supports one numeric `[index]`; if text follows the bracket, it must start with `.`. Uniform data may bind the entire reflected descriptor or direct fields. Field-by-field packing copies bytes at reflected offsets into zero-initialized storage; it is not a general typed serializer for arbitrary scalar/vector values.
+Descriptor-heap bindpoint declarations use field paths relative to the push-data block, such as `camera_info` or `lights[0].shadowmap`. The reflection walker recursively flattens nested structs and fixed-size struct arrays. Buffer bindings must name a complete `ROBufferVK`; subranges are not accepted. Missing bindings remain zero until supplied, while a supplied object of the wrong type throws.
 
-## Vulkan descriptor support
+## Vulkan descriptor-heap support
 
-`src/function/render_vk/shader_metadata_vk_utils.cpp` currently maps:
+`src/function/render_vk/shader_metadata_vk_utils.cpp` recognizes these `WBE_DESCRIPTOR` strings:
 
-- `constantBuffer` to a uniform-buffer descriptor;
-- `resource` whose reflected scalar type starts with `texture` to a sampled-image descriptor;
-- `samplerState` to a sampler descriptor;
-- equivalent direct or array-element field forms inside parameter blocks.
+- `uniform_buffer`;
+- `storage_buffer`;
+- `sampled_image`;
+- `storage_image`;
+- `sampler`.
 
-Unsupported descriptor kinds or shapes throw `std::runtime_error`. When merging shader stages, identical set/binding pairs must have compatible descriptor types and counts; compatible stage flags are combined.
+Each annotation requires one non-empty string argument and must mark an aligned eight-byte `uint2` in the entry point's sole reflected `pushConstantBuffer`. Duplicate annotations, duplicate paths, overlapping ranges, malformed arrays, unsupported categories, and invalid layout values throw `std::runtime_error`. A descriptor-free entry point yields an empty layout. When graphics stages are merged, equal field paths must agree on category and byte offset, and distinct fields must not overlap.
+
+`DescriptorHeapAllocatorVK` owns renderer-wide logical arenas for buffers, sampled images, storage images, and samplers. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` lazily allocate descriptor indices unless builders transfer preallocated ones, own those indices, and defer their release for frames-in-flight safety. `RenderGraphVK` binds the resource and sampler heaps on each task command buffer; `ROPipelineVK` retains bound resources and pushes the reflected index block with `vkCmdPushDataEXT`.
 
 ## Built-in annotation contracts
+
+### `WBE_DESCRIPTOR`
+
+`collect_shader_descriptor_heap_layout()` finds the push-data parameter used by the selected entry point and recursively collects annotated `uint2` fields. Paths are relative to the push-data block; arrays expand to explicit paths such as `lights[0].shadowmap`. `collect_graphics_pipeline_descriptor_heap_layout()` merges vertex, optional geometry, and fragment contracts and combines compatible stage flags.
+
+Production shader code accesses the global resource and sampler heaps through these indices. Declarations needed only to preserve higher-level contracts in metadata belong under `#if WBE_REFLECTION_METADATA`; ACP's second compile sees them, while the runtime SPIR-V does not.
+
+Relevant files:
+
+- `res/assets/shaders/utils/utils.slang`
+- `include/function/render_vk/shader_metadata_vk_utils.hh`
+- `src/function/render_vk/shader_metadata_vk_utils.cpp`
+- `test_env_res/assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.slang`
+- `tests/unit/function/shader_metadata_vk_utils_test.cpp`
 
 ### `WBE_VERTEX_INPUT`
 
@@ -70,13 +86,13 @@ Relevant files:
 
 `MaterialTextureContractResolver` reads direct children of each `MaterialParams` element. Each annotated index must be a four-byte uniform `int32` scalar. Roles must be unique by both name and hash. The role string is open-ended and comes from the shader; an omitted string defaults to the field name.
 
-The fixed global contract is:
+The fixed material contract is split between reflection-only metadata and a runtime table:
 
-- `MaterialTextures.material_sampler` is a sampler;
-- `MaterialTextures.textures` is an array of texture resources;
-- `MaterialParamsBuffer.materials` is a sized array with a valid element stride.
+- `MaterialTextureContractMetadata.material_sampler` is a sampler;
+- `MaterialTextureContractMetadata.textures` is an array of texture resources;
+- `MaterialParamsBuffer.materials` is a runtime sized array with a valid element stride.
 
-Across the merged pipeline metadata, stages must agree on the reflected layout, and the aggregate contract must expose material textures and material parameters together. Applications may configure only the two base variable names and the default-material resource key.
+Across the merged pipeline metadata, stages must agree on the reflected layout, and the aggregate contract must expose material textures and material parameters together. Applications may configure only the two base variable names and the default-material resource key. Static-set compilation resolves each material texture to its global sampled-image heap index and stores that value in `MaterialParamsBuffer`; it does not allocate a per-pipeline descriptor array.
 
 Relevant files:
 
@@ -94,8 +110,8 @@ Trace the exact raw Slang JSON first; do not infer its layout from the Slang sou
 2. If runtime consumers need new data, add a serializable field to the matching structure in `include/function/render/shader_metadata.hh`. Let the normal build regenerate serialization artifacts; never edit `*.gen.*`.
 3. Add or extend deserialization coverage in `tests/unit/function/shader_metadata_vk_test.cpp`. Use both a small normalized JSON test and, when Slang behavior matters, a compiled fixture under `test_env_res/assets/shaders` reached through `test_env_res/res_chunks`.
 4. Put semantic validation in a backend-neutral contract resolver when possible. Use `ShaderMetadataQuery` for uniqueness and `ShaderRoleFieldResolver` for annotation parsing, default roles, duplicate roles, and hash collisions.
-5. If the construct represents a Vulkan descriptor, extend the parameter/field descriptor mapping in `src/function/render_vk/shader_metadata_vk_utils.cpp`. Preserve set, binding, count, stage, and array-layout validation, then add focused utility tests.
-6. If the change affects caller bindpoints, define nested and indexed path behavior explicitly before modifying `src/function/render_vk/graphics_pipeline_compiler_vk.cpp`. Preserve existing whole-descriptor and field-packing behavior unless the feature requires an API change.
+5. If the construct represents a Vulkan descriptor, extend `WBE_DESCRIPTOR` category or push-data field handling in `src/function/render_vk/shader_metadata_vk_utils.cpp`. Preserve alignment, overlap, path, stage-merge, and array-layout validation, then add focused utility tests.
+6. If the change affects caller bindpoints, define nested and indexed path behavior explicitly before modifying `src/function/render_vk/pipeline_compiler_vk.cpp`. Preserve complete-resource binding and resource ownership unless the feature requires an API change.
 7. Add contract-resolver tests for invalid type, layout, duplicate, missing-pair, and cross-stage mismatch cases relevant to the new feature.
 
 Do not make generic engine propagation branch on concrete texture roles. Do not move backend-specific descriptor concepts into `function/render`. Do not catch engine exceptions; invalid reflection contracts throw `std::runtime_error` and terminate outside tests.
@@ -106,8 +122,8 @@ Do not make generic engine propagation branch on concrete texture roles. Do not 
 - Metadata is reloaded and deserialized from the sidecar when requested; `RUShader` does not own a parsed metadata object.
 - Descriptor translation is currently Vulkan-specific.
 - General direct-field lookup is one level at a time.
-- General uniform bindpoint packing is byte-oriented and limited to reflected direct fields.
-- Bindpoint paths accept at most one array index.
+- Descriptor-heap buffer bindings cover complete render objects, not arbitrary subranges.
+- Only fixed-size arrays of descriptor-bearing structs are expanded into indexed paths.
 - The parameter-block array flattening rule is intentionally narrow.
 
 ## Useful fixtures and tests
@@ -115,7 +131,8 @@ Do not make generic engine propagation branch on concrete texture roles. Do not 
 - `test_env_res/assets/shaders/reflection_attributes`: attribute locations and int/float/string arguments.
 - `test_env_res/assets/shaders/forward_cook_torrance_pbr`: nested material parameter layout and texture roles.
 - `test_env_res/assets/shaders/draw_triangle`: vertex roles and automatically assigned locations.
+- `test_env_res/assets/shaders/descriptor_heap_reflection`: explicit descriptor fields, nested structs, and fixed arrays.
 - `tests/unit/function/shader_metadata_vk_test.cpp`: normalized schema and compiled fixtures.
 - `tests/unit/function/shader_role_field_resolver_test.cpp`: role parsing, duplicates, and hash collisions.
 - `tests/unit/function/material_texture_contract_resolver_test.cpp`: material contract validity and stage agreement.
-- `tests/unit/function/shader_metadata_vk_utils_test.cpp`: Vulkan descriptor and vertex-input translation.
+- `tests/unit/function/shader_metadata_vk_utils_test.cpp`: Vulkan descriptor-heap layout and vertex-input translation.
