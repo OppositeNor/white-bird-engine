@@ -24,7 +24,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -61,7 +60,7 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
         Ref<IRenderObject> resource = MEM_NULL;
         uint32_t descriptor_index = 0;
         bool binding_found = false;
-        if (field.type == ShaderDescriptorHeapTypeVK::UniformBuffer || field.type == ShaderDescriptorHeapTypeVK::StorageBuffer) {
+        if (field.type == ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER || field.type == ShaderDescriptorHeapTypeVK::STORAGE_BUFFER) {
             for (const RenderBindpointBufferDeclaration& declaration : p_bindpoint_declarations.buffer_declerations) {
                 if (declaration.field_path == field.field_path) {
                     binding_found = true;
@@ -82,9 +81,9 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
                 throw std::runtime_error(
                     std::format("Failed to bind descriptor heap buffer '{}': resource type is invalid.", field.field_path));
             }
-            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::UniformBuffer ? buffer->get_uniform_view_index()
+            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER ? buffer->get_uniform_view_index()
                                                                                        : buffer->get_storage_view_index();
-        } else if (field.type == ShaderDescriptorHeapTypeVK::SampledImage || field.type == ShaderDescriptorHeapTypeVK::StorageImage) {
+        } else if (field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE || field.type == ShaderDescriptorHeapTypeVK::STORAGE_IMAGE) {
             for (const RenderBindpointImageDeclaration& declaration : p_bindpoint_declarations.image_declerations) {
                 if (declaration.field_path == field.field_path) {
                     binding_found = true;
@@ -100,7 +99,7 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
                 throw std::runtime_error(
                     std::format("Failed to bind descriptor heap image '{}': resource type is invalid.", field.field_path));
             }
-            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::SampledImage ? image_view->get_sampled_view_index()
+            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE ? image_view->get_sampled_view_index()
                                                                                        : image_view->get_storage_view_index();
         } else {
             for (const RenderBindpointSamplerDeclaration& declaration : p_bindpoint_declarations.sampler_declerations) {

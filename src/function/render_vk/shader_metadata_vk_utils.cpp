@@ -21,7 +21,6 @@
 #include "function/render/vertex_input_contract_resolver.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <limits>
@@ -45,19 +44,19 @@ bool entry_point_uses_push_data(const ShaderMetadataEntryPoint& p_entry_point, c
 
 ShaderDescriptorHeapTypeVK descriptor_heap_type_from_name(std::string_view p_name) {
     if (p_name == "uniform_buffer") {
-        return ShaderDescriptorHeapTypeVK::UniformBuffer;
+        return ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER;
     }
     if (p_name == "storage_buffer") {
-        return ShaderDescriptorHeapTypeVK::StorageBuffer;
+        return ShaderDescriptorHeapTypeVK::STORAGE_BUFFER;
     }
     if (p_name == "sampled_image") {
-        return ShaderDescriptorHeapTypeVK::SampledImage;
+        return ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE;
     }
     if (p_name == "storage_image") {
-        return ShaderDescriptorHeapTypeVK::StorageImage;
+        return ShaderDescriptorHeapTypeVK::STORAGE_IMAGE;
     }
     if (p_name == "sampler") {
-        return ShaderDescriptorHeapTypeVK::Sampler;
+        return ShaderDescriptorHeapTypeVK::SAMPLER;
     }
     throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
 }
@@ -77,8 +76,8 @@ const ShaderMetadataUserAttribute* find_descriptor_attribute(const ShaderMetadat
 }
 
 bool fields_overlap(const ShaderDescriptorHeapFieldVK& p_first, const ShaderDescriptorHeapFieldVK& p_second) {
-    constexpr uint32_t descriptor_index_size = sizeof(uint32_t) * 2;
-    return p_first.offset < p_second.offset + descriptor_index_size && p_second.offset < p_first.offset + descriptor_index_size;
+    constexpr uint32_t DESCRIPTOR_INDEX_SIZE = sizeof(uint32_t) * 2;
+    return p_first.offset < p_second.offset + DESCRIPTOR_INDEX_SIZE && p_second.offset < p_first.offset + DESCRIPTOR_INDEX_SIZE;
 }
 
 void append_descriptor_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDescriptorHeapFieldVK p_field) {

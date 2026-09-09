@@ -138,7 +138,7 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(st
         }
     }
     for (const ShaderDescriptorHeapFieldVK& field : descriptor_layout.fields) {
-        if (field.type != ShaderDescriptorHeapTypeVK::SampledImage || context.default_texture_resource == nullptr) {
+        if (field.type != ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE || context.default_texture_resource == nullptr) {
             continue;
         }
         bool found = false;

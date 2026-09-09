@@ -18,7 +18,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <string>
@@ -32,11 +31,11 @@ namespace WhiteBirdEngine {
  * @brief Resource category selected by a reflected WBE_DESCRIPTOR annotation.
  */
 enum class ShaderDescriptorHeapTypeVK : uint8_t {
-    UniformBuffer,
-    StorageBuffer,
-    SampledImage,
-    StorageImage,
-    Sampler,
+    UNIFORM_BUFFER,
+    STORAGE_BUFFER,
+    SAMPLED_IMAGE,
+    STORAGE_IMAGE,
+    SAMPLER,
 };
 
 /**
@@ -47,7 +46,7 @@ struct ShaderDescriptorHeapFieldVK {
     /** Path relative to the push-data parameter. */
     std::string field_path;
     /** Descriptor heap category required by this field. */
-    ShaderDescriptorHeapTypeVK type = ShaderDescriptorHeapTypeVK::UniformBuffer;
+    ShaderDescriptorHeapTypeVK type = ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER;
     /** Byte offset of the explicit uint2 inside push data. */
     uint32_t offset = 0;
 };

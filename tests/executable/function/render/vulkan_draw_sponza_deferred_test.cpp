@@ -275,7 +275,7 @@ private:
 
 void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     control(p_delta);
-    update_descriptors();
+    // update_descriptors();
 }
 
 void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
@@ -877,8 +877,11 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
         .field_path = "camera_info",
     });
 
-    gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
-    composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
+    // TEST
+    if (false) {
+        gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
+        composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
+    }
     log_uniform_buffer_descriptors(base_render_data, gbuffer_camera_info_ubos, "G-buffer camera buffer");
     log_uniform_buffer_descriptors(base_render_data, composition_camera_info_ubos, "Composition camera buffer");
 

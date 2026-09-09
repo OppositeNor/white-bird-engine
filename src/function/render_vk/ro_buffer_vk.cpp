@@ -138,7 +138,7 @@ ROBufferVK::~ROBufferVK() {
             buffer = buffer,
             allocation = allocation,
             uniform_view_index = uniform_view_index,
-            storage_view_index = storage_view_index]() {
+            storage_view_index = storage_view_index]() mutable {
             if (uniform_view_index.has_value()) {
                 render_data->descriptor_heap_allocator->deallocate_buffer(*uniform_view_index);
             }

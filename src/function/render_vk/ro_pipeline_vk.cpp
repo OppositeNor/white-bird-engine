@@ -61,15 +61,15 @@ void ROPipelineVK::retain_descriptor_resource(Ref<IRenderObject> p_resource) {
 }
 
 void ROPipelineVK::set_descriptor_index(uint32_t p_offset, uint32_t p_index, Ref<IRenderObject> p_resource) {
-    constexpr size_t descriptor_index_size = sizeof(uint32_t) * 2;
-    if (p_offset > descriptor_index_data.size() || descriptor_index_size > descriptor_index_data.size() - p_offset) {
+    constexpr size_t DESCRIPTOR_INDEX_SIZE = sizeof(uint32_t) * 2;
+    if (p_offset > descriptor_index_data.size() || DESCRIPTOR_INDEX_SIZE > descriptor_index_data.size() - p_offset) {
         throw std::runtime_error("Failed to set pipeline descriptor index: reflected push-data offset is out of bounds.");
     }
     if (p_resource == MEM_NULL) {
         throw std::runtime_error("Failed to set pipeline descriptor index: resource is missing.");
     }
     const uint32_t descriptor_index[2] = {p_index, 0};
-    std::memcpy(descriptor_index_data.data() + p_offset, descriptor_index, descriptor_index_size);
+    std::memcpy(descriptor_index_data.data() + p_offset, descriptor_index, DESCRIPTOR_INDEX_SIZE);
     auto field = std::ranges::find_if(
         descriptor_fields, [p_offset](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.offset == p_offset; });
     if (field == descriptor_fields.end()) {
@@ -86,7 +86,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
     }
     uint32_t index = 0;
     switch (field->type) {
-    case ShaderDescriptorHeapTypeVK::UniformBuffer: {
+    case ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER: {
         Ref<ROBufferVK> buffer = p_resource.dynamic_cast_ref<ROBufferVK>();
         if (buffer == MEM_NULL) {
             throw std::runtime_error("Failed to set uniform-buffer descriptor binding: resource type is invalid.");
@@ -94,7 +94,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
         index = buffer->get_uniform_view_index();
         break;
     }
-    case ShaderDescriptorHeapTypeVK::StorageBuffer: {
+    case ShaderDescriptorHeapTypeVK::STORAGE_BUFFER: {
         Ref<ROBufferVK> buffer = p_resource.dynamic_cast_ref<ROBufferVK>();
         if (buffer == MEM_NULL) {
             throw std::runtime_error("Failed to set storage-buffer descriptor binding: resource type is invalid.");
@@ -102,7 +102,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
         index = buffer->get_storage_view_index();
         break;
     }
-    case ShaderDescriptorHeapTypeVK::SampledImage: {
+    case ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE: {
         Ref<ROImageViewVK> image_view = p_resource.dynamic_cast_ref<ROImageViewVK>();
         if (image_view == MEM_NULL) {
             throw std::runtime_error("Failed to set sampled-image descriptor binding: resource type is invalid.");
@@ -110,7 +110,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
         index = image_view->get_sampled_view_index();
         break;
     }
-    case ShaderDescriptorHeapTypeVK::StorageImage: {
+    case ShaderDescriptorHeapTypeVK::STORAGE_IMAGE: {
         Ref<ROImageViewVK> image_view = p_resource.dynamic_cast_ref<ROImageViewVK>();
         if (image_view == MEM_NULL) {
             throw std::runtime_error("Failed to set storage-image descriptor binding: resource type is invalid.");
@@ -118,7 +118,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
         index = image_view->get_storage_view_index();
         break;
     }
-    case ShaderDescriptorHeapTypeVK::Sampler: {
+    case ShaderDescriptorHeapTypeVK::SAMPLER: {
         Ref<ROSamplerVK> sampler = p_resource.dynamic_cast_ref<ROSamplerVK>();
         if (sampler == MEM_NULL) {
             throw std::runtime_error("Failed to set sampler descriptor binding: resource type is invalid.");

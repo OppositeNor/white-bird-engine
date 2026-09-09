@@ -397,6 +397,7 @@ private:
     void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
+    void create_swap_chain_images();
 
     bool is_device_suitable(VkPhysicalDevice p_device);
 

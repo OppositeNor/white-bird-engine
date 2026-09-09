@@ -457,6 +457,24 @@ void RendererVK::create_swap_chain() {
         throw std::runtime_error(std::format("Failed to create swap chain: {}.", string_VkResult(result)));
     }
 
+    create_swap_chain_images();
+    swap_chain_image_format = surface_format.format;
+    swap_chain_extent = extent;
+
+    // Setup viewport and scissor information.
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0F;
+    viewport.maxDepth = 1.0F;
+
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent = extent;
+}
+
+void RendererVK::create_swap_chain_images() {
     // Create swap chain images.
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
     Vector<VkImage> swap_chain_images(allocator);
@@ -478,20 +496,6 @@ void RendererVK::create_swap_chain() {
                 swap_chain_images_count));
         frames_in_flight = swap_chain_images_count;
     }
-    swap_chain_image_format = surface_format.format;
-    swap_chain_extent = extent;
-
-    // Setup viewport and scissor information.
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = static_cast<float>(extent.width);
-    viewport.height = static_cast<float>(extent.height);
-    viewport.minDepth = 0.0F;
-    viewport.maxDepth = 1.0F;
-
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent = extent;
 }
 
 void RendererVK::clean_up_swap_chain() {
@@ -752,12 +756,10 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
         uint32_t pick_device_index = game_config.render_device_index.value();
         // The refered device index is provided, use the index to pick device.
         // If failed to pick, fall back to automatic picking.
-        if (std::cmp_greater_equal(pick_device_index, p_physical_devices.size())) {
+        if (pick_device_index >= p_physical_devices.size()) {
             // Index out of range.
             stdout_log(WBE_CHANNEL_DEBUG)
-                ->warning(std::format("Failed to use the device provided by the configuration: "
-                                      "Index {} out of range (total devices: {}). Picking"
-                                      " an alternative device.",
+                ->warning(std::format("Failed to use the device provided by the configuration: Index {} out of range (total devices: {}). Picking an alternative device.",
                     pick_device_index,
                     p_physical_devices.size()));
         } else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
@@ -766,9 +768,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
             String device_name(device_properties.deviceName, allocator);
             stdout_log(WBE_CHANNEL_DEBUG)
-                ->warning(std::format("Failed to use the device provided by the "
-                                      "configuration: device \"{}\" is not suitable."
-                                      " Picking an alternative device.",
+                ->warning(std::format("Failed to use the device provided by the configuration: device \"{}\" is not suitable. Picking an alternative device.",
                     device_name));
         } else {
             // Successfully pick the device.

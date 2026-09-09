@@ -16,7 +16,6 @@
 #include "core/allocator/stack_allocator.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -170,16 +169,16 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     EXPECT_EQ(layout.stage_flags, VK_SHADER_STAGE_COMPUTE_BIT);
     ASSERT_EQ(layout.fields.size(), 5U);
     EXPECT_EQ(layout.fields[0].field_path, "uniform");
-    EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UniformBuffer);
+    EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER);
     EXPECT_EQ(layout.fields[0].offset, 0U);
     EXPECT_EQ(layout.fields[1].field_path, "images.sampled");
-    EXPECT_EQ(layout.fields[1].type, ShaderDescriptorHeapTypeVK::SampledImage);
+    EXPECT_EQ(layout.fields[1].type, ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE);
     EXPECT_EQ(layout.fields[1].offset, 8U);
     EXPECT_EQ(layout.fields[2].field_path, "images.storage");
-    EXPECT_EQ(layout.fields[2].type, ShaderDescriptorHeapTypeVK::StorageImage);
+    EXPECT_EQ(layout.fields[2].type, ShaderDescriptorHeapTypeVK::STORAGE_IMAGE);
     EXPECT_EQ(layout.fields[2].offset, 16U);
-    EXPECT_EQ(layout.fields[3].type, ShaderDescriptorHeapTypeVK::StorageBuffer);
-    EXPECT_EQ(layout.fields[4].type, ShaderDescriptorHeapTypeVK::Sampler);
+    EXPECT_EQ(layout.fields[3].type, ShaderDescriptorHeapTypeVK::STORAGE_BUFFER);
+    EXPECT_EQ(layout.fields[4].type, ShaderDescriptorHeapTypeVK::SAMPLER);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPaths) {
