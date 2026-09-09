@@ -90,7 +90,7 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
     RSMVSOutput output;
     output.position = mul(light_camera_info.proj, mul(light_camera_info.view, world_position));
     output.world_position = world_position.xyz;
-    output.normal = transform_static_normal(node.transform, p_input.normal);
+    output.normal = transform_static_normal(node.normal_transform, p_input.normal);
     output.tangent = normalize(mul(direction_transform, p_input.tangent));
     output.bitangent = normalize(mul(direction_transform, p_input.bitangent));
     output.uv = p_input.uv;

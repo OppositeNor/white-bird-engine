@@ -90,8 +90,7 @@ Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
         });
 }
 
-void log_uniform_buffer_descriptors(
-    const BaseRenderDataVK* p_render_data, Ref<ROCPerFrameVK> p_buffers, std::string_view p_label) {
+void log_uniform_buffer_descriptors(const BaseRenderDataVK* p_render_data, Ref<ROCPerFrameVK> p_buffers, std::string_view p_label) {
     for (uint32_t frame_slot = 0; frame_slot < p_buffers->get_context_count(); ++frame_slot) {
         Ref<ROBufferVK> buffer = p_buffers->get(frame_slot).dynamic_cast_ref<ROBufferVK>();
         if (buffer == MEM_NULL) {
@@ -104,11 +103,8 @@ void log_uniform_buffer_descriptors(
         uint32_t descriptor_index = buffer->get_uniform_view_index();
         VkDeviceAddress device_address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info);
         stdout_log(WBE_CHANNEL_DEBUG)
-            ->message(std::format("{} frame slot {}: resource descriptor index {}, device address 0x{:x}.",
-                p_label,
-                frame_slot,
-                descriptor_index,
-                device_address));
+            ->message(std::format(
+                "{} frame slot {}: resource descriptor index {}, device address 0x{:x}.", p_label, frame_slot, descriptor_index, device_address));
     }
 }
 
@@ -175,10 +171,8 @@ private:
 
     void control(double p_delta);
     void update_descriptors();
-    void write_task_uniform_bindings(
-        std::span<const TaskUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
-    void write_compute_uniform_bindings(
-        std::span<const ComputeUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
+    void write_task_uniform_bindings(std::span<const TaskUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
+    void write_compute_uniform_bindings(std::span<const ComputeUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
 
     void setup_render_context();
     void load_resources();
@@ -187,8 +181,10 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
-    Unique<RTRunStaticSetVK> compile_shadow_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
-    Unique<RTRunStaticSetVK> compile_gbuffer_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
+    Unique<RTRunStaticSetVK> compile_shadow_task(
+        RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
+    Unique<RTRunStaticSetVK> compile_gbuffer_task(
+        RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors(std::span<RTRunStaticSetVK* const> p_gbuffer_tasks);
@@ -446,25 +442,19 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     auto summed_area_table_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
     auto mipmap_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
     auto summed_area_table_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
-    std::array<RTRunStaticSetVK*, 2> gbuffer_tasks {
+    std::array<RTRunStaticSetVK*, 2> gbuffer_tasks{
         mipmap_gbuffer_opaque_task.get(),
         summed_area_table_gbuffer_opaque_task.get(),
     };
-    std::array<RTRunStaticSetVK*, 2> shadow_tasks {
+    std::array<RTRunStaticSetVK*, 2> shadow_tasks{
         mipmap_shadow_opaque_task.get(),
         summed_area_table_shadow_opaque_task.get(),
     };
     write_dynamic_camera_descriptors(gbuffer_tasks);
     write_dynamic_light_descriptors(shadow_tasks);
-    register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH,
-        false,
-        mipmap_shadow_opaque_task,
-        mipmap_gbuffer_opaque_task);
+    register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, mipmap_shadow_opaque_task, mipmap_gbuffer_opaque_task);
     register_deferred_render_graph(
-        DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH,
-        true,
-        summed_area_table_shadow_opaque_task,
-        summed_area_table_gbuffer_opaque_task);
+        DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true, summed_area_table_shadow_opaque_task, summed_area_table_gbuffer_opaque_task);
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
@@ -877,11 +867,8 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
         .field_path = "camera_info",
     });
 
-    // TEST
-    if (false) {
-        gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
-        composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
-    }
+    gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
+    composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
     log_uniform_buffer_descriptors(base_render_data, gbuffer_camera_info_ubos, "G-buffer camera buffer");
     log_uniform_buffer_descriptors(base_render_data, composition_camera_info_ubos, "Composition camera buffer");
 
@@ -940,8 +927,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
     RendTaskDescVK gbuffer_opaque_task_desc(render_allocator, RT_RUN_DEFERRED_GBUFFER, std::move(p_gbuffer_opaque_task));
     gbuffer_opaque_task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     pipeline_desc.add_task(std::move(gbuffer_opaque_task_desc));
-    pipeline_desc
-        .add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
+    pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_present_post_processing_task_desc());
     renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
@@ -1080,8 +1066,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
         .write(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     if (!p_use_summed_area_table) {
         task_desc.after(RT_GENERATE_SHADOW_MIPMAPS);
-    }
-    else {
+    } else {
         task_desc.after(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL);
         task_desc.after(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL);
     }
