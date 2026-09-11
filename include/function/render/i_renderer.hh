@@ -63,6 +63,15 @@ public:
     virtual void tick(double p_delta) = 0;
 
     /**
+     * @brief Request a PNG capture of the next rendered frame before presentation.
+     * @details Call on the rendering thread; other threads must submit the request through add_job().
+     * The renderer copies the path and completes the capture during a subsequent tick that renders a frame.
+     * Readback may stall rendering. Unsupported backends, invalid paths, pending requests, and capture failures throw.
+     * @param p_path Destination PNG file path; its parent directory must already exist.
+     */
+    virtual void request_frame_capture(std::string_view p_path);
+
+    /**
      * @brief Get number of workers working on rendering.
      *
      * @return The number of workers working on rendering.

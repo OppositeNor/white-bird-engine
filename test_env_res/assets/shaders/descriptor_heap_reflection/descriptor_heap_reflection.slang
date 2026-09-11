@@ -33,6 +33,8 @@ struct DescriptorHeapProbeIndices {
     uint2 storage_buffer;
     [WBE_DESCRIPTOR("sampler")]
     uint2 sampler;
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 scalar_uniform;
 };
 
 [[vk::push_constant]]
@@ -43,10 +45,11 @@ ConstantBuffer<DescriptorHeapProbeIndices> descriptor_indices;
 void compute_main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<DescriptorHeapProbeUniform> uniform_buffer =
         ResourceDescriptorHeap[descriptor_indices.uniform_buffer.x];
+    ConstantBuffer<uint> scalar_uniform = ResourceDescriptorHeap[descriptor_indices.scalar_uniform.x];
     StructuredBuffer<float4> storage_buffer = ResourceDescriptorHeap[descriptor_indices.storage_buffer.x];
     Texture2D<float4> sampled_image = ResourceDescriptorHeap[descriptor_indices.images.sampled_image.x];
     RWTexture2D<float4> storage_image = ResourceDescriptorHeap[descriptor_indices.images.storage_image.x];
     SamplerState sampler = SamplerDescriptorHeap[descriptor_indices.sampler.x];
     storage_image[p_dispatch_thread_id.xy] =
-        uniform_buffer.value + storage_buffer[0] + sampled_image.SampleLevel(sampler, float2(0.0), 0.0);
+        uniform_buffer.value + float(scalar_uniform) + storage_buffer[0] + sampled_image.SampleLevel(sampler, float2(0.0), 0.0);
 }

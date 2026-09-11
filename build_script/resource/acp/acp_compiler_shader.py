@@ -225,20 +225,49 @@ class WBEACPCompilerShader(WBEACPCompiler):
             print("Failed to compile", shader_file)
             print(result.stderr)
             raise RuntimeError("Failed to compile shader.")
+        self._validate_spirv_shader(shader_file, output_file)
         reflection_output_file = output_file.with_name(f"{output_file.name}.reflection")
         reflection_cmd = list(cmd)
         reflection_cmd[reflection_cmd.index("-o") + 1] = str(reflection_output_file)
         reflection_cmd.insert(len(reflection_cmd) - 1, "-DWBE_REFLECTION_METADATA=1")
         reflection_result = subprocess.run(reflection_cmd, capture_output=True, text=True)
-        reflection_output_file.unlink(missing_ok=True)
         if reflection_result.returncode != 0:
+            reflection_output_file.unlink(missing_ok=True)
             print("Failed to reflect", shader_file)
             print(reflection_result.stderr)
             raise RuntimeError("Failed to reflect shader.")
+        self._validate_spirv_shader(shader_file, reflection_output_file)
+        reflection_output_file.unlink(missing_ok=True)
         with open(shader_metadata_file, "r", encoding="utf-8") as metadata_file:
             raw_metadata = json.load(metadata_file)
         self._apply_discovered_stage_entries(resource, raw_metadata)
         self._write_normalized_shader_metadata(shader_metadata_file, raw_metadata)
+
+    def _validate_spirv_shader(self, shader_file: Path, output_file: Path) -> None:
+        spirv_val_path = shutil.which("spirv-val")
+        if spirv_val_path is None:
+            raise RuntimeError("Failed to find spirv-val required for shader validation.")
+
+        result = subprocess.run(
+            [
+                spirv_val_path,
+                str(output_file),
+                "--relax-block-layout",
+                "--target-env",
+                "vulkan1.3",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return
+
+        print("Failed to validate", shader_file)
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr)
+        raise RuntimeError("Failed to validate compiled shader SPIR-V.")
 
     def _apply_discovered_stage_entries(self, resource: ManifestResource, raw_metadata: dict[str, Any]) -> None:
 

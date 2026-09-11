@@ -56,6 +56,7 @@
 #include <array>
 #include <atomic>
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -66,6 +67,7 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
+#include <print>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -175,6 +177,7 @@ private:
     void write_compute_uniform_bindings(std::span<const ComputeUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
 
     void setup_render_context();
+    void configure_frame_capture();
     void load_resources();
     void setup_static_scene_resources();
     void setup_spot_light();
@@ -203,6 +206,9 @@ private:
     CompositionCameraInfo make_composition_camera_info() const;
 
     RendererVK* renderer_vk = nullptr;
+    std::string capture_png_path;
+    uint64_t capture_frame = 5;
+    bool capture_requested = false;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUStaticOpaqueSet> sponza_opaque_set;
@@ -419,6 +425,12 @@ void ApplicationVulkanDeferredPBRTest::write_compute_uniform_bindings(
 }
 
 void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
+    if (!capture_png_path.empty() && !capture_requested && base_render_data->current_frame >= capture_frame) {
+        renderer->request_frame_capture(capture_png_path);
+        capture_requested = true;
+    }
+    static uint64_t frame_index = 0;
+    std::println("Drawing frame: {}", ++frame_index);
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
     if (requested == summed_area_table_active) {
         return;
@@ -480,6 +492,26 @@ void ApplicationVulkanDeferredPBRTest::setup_render_context() {
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = get_renderer_allocator().get();
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
+    configure_frame_capture();
+}
+
+void ApplicationVulkanDeferredPBRTest::configure_frame_capture() {
+    const char* capture_path = std::getenv("WBE_CAPTURE_PNG");
+    if (capture_path == nullptr || *capture_path == '\0') {
+        return;
+    }
+    if (*capture_path != '/') {
+        throw std::runtime_error("WBE_CAPTURE_PNG must be an absolute output path.");
+    }
+    capture_png_path = capture_path;
+    if (const char* frame = std::getenv("WBE_CAPTURE_FRAME"); frame != nullptr) {
+        std::string frame_text(frame);
+        const char* frame_end = frame_text.data() + frame_text.size();
+        auto result = std::from_chars(frame_text.c_str(), frame_end, capture_frame);
+        if (result.ec != std::errc{} || result.ptr != frame_end) {
+            throw std::runtime_error("WBE_CAPTURE_FRAME must be a nonnegative frame number.");
+        }
+    }
 }
 
 void ApplicationVulkanDeferredPBRTest::load_resources() {

@@ -210,7 +210,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(push_data.name, "descriptor_indices");
     EXPECT_EQ(push_data.binding.kind, "pushConstantBuffer");
     EXPECT_EQ(push_data.type.kind, "constantBuffer");
-    ASSERT_EQ(push_data.type.fields.size(), 4U);
+    ASSERT_EQ(push_data.type.fields.size(), 5U);
 
     const ShaderMetadataTypeField& uniform_buffer = push_data.type.fields[0];
     EXPECT_EQ(uniform_buffer.name, "uniform_buffer");
@@ -240,6 +240,9 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(push_data.type.fields[2].user_attributes[0].arguments[0].string_value, "storage_buffer");
     EXPECT_EQ(push_data.type.fields[3].binding.offset, 32);
     EXPECT_EQ(push_data.type.fields[3].user_attributes[0].arguments[0].string_value, "sampler");
+    EXPECT_EQ(push_data.type.fields[4].name, "scalar_uniform");
+    EXPECT_EQ(push_data.type.fields[4].binding.offset, 40);
+    EXPECT_EQ(push_data.type.fields[4].user_attributes[0].arguments[0].string_value, "uniform_buffer");
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {

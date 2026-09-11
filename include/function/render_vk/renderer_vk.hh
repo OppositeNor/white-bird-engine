@@ -103,6 +103,8 @@ public:
 
     virtual void tick(double p_delta) override;
 
+    virtual void request_frame_capture(std::string_view p_path) override;
+
     virtual void register_render_graph(std::string_view p_resource_key) override;
 
     virtual void unregister_render_graph(std::string_view p_resource_key) override;
@@ -239,6 +241,9 @@ private:
     VkSwapchainKHR swap_chain = VK_NULL_HANDLE;
     uint32_t swap_chain_images_count = 0;
     uint32_t frames_in_flight = 0;
+    // Pending readback request; accessed only by the rendering thread.
+    String capture_png_path;
+    bool frame_capture_supported = false;
 
     VkQueue graphics_queue = VK_NULL_HANDLE;
     VkQueue compute_queue = VK_NULL_HANDLE;
@@ -421,6 +426,7 @@ private:
     void flush_delayed_calls();
     void submit_gpu_job_command_buffer();
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
+    void capture_swap_chain_image(uint32_t p_image_index);
 };
 
 } // namespace WhiteBirdEngine

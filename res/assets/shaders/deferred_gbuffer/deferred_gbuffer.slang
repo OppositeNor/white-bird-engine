@@ -72,15 +72,15 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
  */
 struct GBufferOutput {
     /**
- * @brief Albedo (rgb) + material id (a). RGBA8 UNORM.
+     * @brief Albedo (rgb) + material id (a). RGBA8 UNORM.
      */
     float4 albedo_matid : SV_Target0;
     /**
- * @brief Octahedron-encoded surface normal stored into R16G16_SNORM ([-1, 1]).
+     * @brief Octahedron-encoded surface normal stored into R16G16_SNORM ([-1, 1]).
      */
     float2 octahedron_normal : SV_Target1;
     /**
- * @brief Roughness (r), metallic (g), ambient occlusion (b), flags (a). RGBA8 UNORM.
+     * @brief Roughness (r), metallic (g), ambient occlusion (b), flags (a). RGBA8 UNORM.
      */
     float4 rma_flags : SV_Target2;
 };

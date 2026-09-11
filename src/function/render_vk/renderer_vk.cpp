@@ -65,12 +65,14 @@
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
-      window(p_window), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
+      window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
       base_render_data(p_allocator), registered_plugins(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
@@ -142,6 +144,10 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     p_graph->execute(
         base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
+    if (!capture_png_path.empty()) {
+        capture_swap_chain_image(image_index);
+        capture_png_path.clear();
+    }
     present(image_index, p_graph);
     if (base_render_data.in_flight_fence != VK_NULL_HANDLE) {
         vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
@@ -426,6 +432,10 @@ void RendererVK::create_swap_chain() {
     create_info.imageExtent = extent;
     create_info.imageArrayLayers = 1;
     create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    frame_capture_supported = (details.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+    if (frame_capture_supported) {
+        create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
     auto unique_indices = queue_family_indices.get_unique_indices();
     Vector<uint32_t> swap_chain_queue_family_indices_array(allocator);
 
@@ -485,6 +495,10 @@ void RendererVK::create_swap_chain_images() {
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
             make_ref<ROImageVK>(allocator, &base_render_data, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
+        if (frame_capture_supported) {
+            render_objects->swap_chain_images.back()->exposed_fileds.usage =
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
     }
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     frames_in_flight = game_config.frames_in_flight;
@@ -1164,6 +1178,139 @@ void RendererVK::flush_delayed_calls() {
             ran_any = true;
         }
     }
+}
+
+void RendererVK::request_frame_capture(std::string_view p_path) {
+    if (p_path.empty() || p_path.find('\0') != std::string_view::npos) {
+        throw std::runtime_error("Frame capture requires a nonempty file path without embedded null characters.");
+    }
+    if (!frame_capture_supported) {
+        throw std::runtime_error("Frame capture requires swap-chain transfer-source support.");
+    }
+    if (!capture_png_path.empty()) {
+        throw std::runtime_error("A frame capture request is already pending.");
+    }
+    capture_png_path.assign(p_path.data(), p_path.size());
+}
+
+void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
+    const bool blue_first = swap_chain_image_format == VK_FORMAT_B8G8R8A8_SRGB ||
+                            swap_chain_image_format == VK_FORMAT_B8G8R8A8_UNORM;
+    if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB &&
+        swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
+        throw std::runtime_error("PNG capture supports only RGBA8 and BGRA8 swap-chain formats.");
+    }
+    if (swap_chain_extent.width > static_cast<uint32_t>(std::numeric_limits<int>::max() / 4) ||
+        swap_chain_extent.height > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
+        throw std::runtime_error("PNG capture extent exceeds the PNG writer's limits.");
+    }
+    // Deliberately stall this diagnostic frame. The graph's terminal semaphore is
+    // left signaled for present(), and the image is restored before presentation.
+    if (vkDeviceWaitIdle(logical_device) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to wait for rendering before PNG capture.");
+    }
+    const VkDeviceSize byte_count = static_cast<VkDeviceSize>(swap_chain_extent.width) * swap_chain_extent.height * 4;
+    Vector<uint8_t> pixels(static_cast<size_t>(byte_count), allocator);
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
+    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+    auto clean_up = [&]() {
+        if (command_buffer != VK_NULL_HANDLE) {
+            vkFreeCommandBuffers(logical_device, graphics_command_pool, 1, &command_buffer);
+        }
+        if (buffer != VK_NULL_HANDLE) {
+            vmaDestroyBuffer(vma_allocator, buffer, allocation);
+        }
+    };
+    auto require_success = [&](VkResult p_result) {
+        if (p_result != VK_SUCCESS) {
+            clean_up();
+            throw std::runtime_error("Vulkan PNG capture readback failed.");
+        }
+    };
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = byte_count;
+    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VmaAllocationCreateInfo allocation_info{};
+    allocation_info.usage = VMA_MEMORY_USAGE_AUTO;
+    allocation_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    VmaAllocationInfo mapped_info{};
+    require_success(vmaCreateBuffer(vma_allocator, &buffer_info, &allocation_info, &buffer, &allocation, &mapped_info));
+    VkCommandBufferAllocateInfo command_info{};
+    command_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    command_info.commandPool = graphics_command_pool;
+    command_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    command_info.commandBufferCount = 1;
+    require_success(vkAllocateCommandBuffers(logical_device, &command_info, &command_buffer));
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    require_success(vkBeginCommandBuffer(command_buffer, &begin_info));
+    VkImageMemoryBarrier2 image_barrier{};
+    image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    image_barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    image_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    image_barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    image_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.image = render_objects->swap_chain_images[p_image_index]->get_image();
+    image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    VkDependencyInfo dependency_info{};
+    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency_info.imageMemoryBarrierCount = 1;
+    dependency_info.pImageMemoryBarriers = &image_barrier;
+    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {swap_chain_extent.width, swap_chain_extent.height, 1};
+    vkCmdCopyImageToBuffer(command_buffer, image_barrier.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copy_region);
+    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    image_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+    image_barrier.dstAccessMask = VK_ACCESS_2_NONE;
+    image_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    image_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    VkBufferMemoryBarrier2 host_barrier{};
+    host_barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    host_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    host_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    host_barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    host_barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+    host_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    host_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    host_barrier.buffer = buffer;
+    host_barrier.size = VK_WHOLE_SIZE;
+    dependency_info.bufferMemoryBarrierCount = 1;
+    dependency_info.pBufferMemoryBarriers = &host_barrier;
+    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+    require_success(vkEndCommandBuffer(command_buffer));
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+    require_success(vkQueueSubmit(graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
+    require_success(vkQueueWaitIdle(graphics_queue));
+    require_success(vmaInvalidateAllocation(vma_allocator, allocation, 0, VK_WHOLE_SIZE));
+    std::memcpy(pixels.data(), mapped_info.pMappedData, static_cast<size_t>(byte_count));
+    clean_up();
+    for (size_t offset = 0; offset < pixels.size(); offset += 4) {
+        if (blue_first) {
+            std::swap(pixels[offset], pixels[offset + 2]);
+        }
+        // The swap-chain alpha channel is not necessarily meaningful.
+        pixels[offset + 3] = 255;
+    }
+    if (stbi_write_png(capture_png_path.c_str(), static_cast<int>(swap_chain_extent.width),
+            static_cast<int>(swap_chain_extent.height), 4, pixels.data(), static_cast<int>(swap_chain_extent.width * 4)) == 0) {
+        throw std::runtime_error("Failed to write the requested frame capture PNG.");
+    }
+    stdout_log()->message(std::format("Captured frame {} to {}", base_render_data.current_frame,
+        std::string_view(capture_png_path.data(), capture_png_path.size())));
 }
 
 void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {

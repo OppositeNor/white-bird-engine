@@ -150,6 +150,8 @@ struct SubmeshData {
 struct NodeData {
     /** Engine-space column-major global transform. */
     float4x4 transform;
+    /** Precomputed inverse-transpose used for static normal transforms. */
+    float4x4 normal_transform;
 };
 
 /** Per-drawn-instance metadata linking one submesh to one node transform. */
@@ -191,28 +193,13 @@ float3 decode_normal_map(float2 p_encoded_normal) {
 }
 
 /**
- * @brief Transform an object-space normal into world space for static geometry.
- * @param p_transform Object-to-world transform.
+ * @brief Transform an object-space normal using the CPU-precomputed inverse-transpose.
+ * @param p_normal_transform Inverse-transpose of the object-to-world transform.
  * @param p_normal Object-space normal.
  * @return Unit-length world-space normal.
  */
-float3x3 inverse_3x3(float3x3 p_matrix) {
-    float3 row0 = p_matrix[0];
-    float3 row1 = p_matrix[1];
-    float3 row2 = p_matrix[2];
-    float3 cofactor0 = cross(row1, row2);
-    float3 cofactor1 = cross(row2, row0);
-    float3 cofactor2 = cross(row0, row1);
-    float determinant = dot(row0, cofactor0);
-    if (abs(determinant) < 0.000001) {
-        return float3x3(1.0);
-    }
-    return transpose(float3x3(cofactor0, cofactor1, cofactor2)) / determinant;
-}
-
-float3 transform_static_normal(float4x4 p_transform, float3 p_normal) {
-    float3x3 normal_transform = transpose(inverse_3x3((float3x3)p_transform));
-    return normalize(mul(normal_transform, p_normal));
+float3 transform_static_normal(float4x4 p_normal_transform, float3 p_normal) {
+    return normalize(mul((float3x3)p_normal_transform, p_normal));
 }
 
 /**
