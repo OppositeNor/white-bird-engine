@@ -109,6 +109,11 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, R
     return add_resource(p_resource_id, make_ref<ROCSingleVK>(allocator, std::move(p_resource)));
 }
 
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id) {
+    return add_resource(RendResVK{
+            .res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
+}
+
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container) {
     if (p_resource_container == MEM_NULL) {
         throw std::runtime_error("Failed to add render graph resource: resource container is null.");

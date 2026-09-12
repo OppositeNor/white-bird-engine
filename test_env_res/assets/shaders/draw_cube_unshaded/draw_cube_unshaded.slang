@@ -15,6 +15,10 @@
 #include "draw_cube_unshaded/draw_cube_unshaded_utils.slang"
 #include "utils.slang"
 
+#ifdef WBE_REFLECTION_METADATA
+ParameterBlock<StaticSetContractMetadata> static_set;
+#endif
+
 /**
  * @brief The input data from the vertex buffer
  */

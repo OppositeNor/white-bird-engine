@@ -123,12 +123,19 @@ struct RendGraphDescVK {
     RendGraphDescVK& add_resource(RendResVK p_resource);
 
     /**
-     * @brief Append a resource binding by id and concrete render object.
-     * @param p_resource_id Graph resource identifier.
-     * @param p_resource The concrete render object bound to the id.
+     * @brief Append a resource binding to the graph.
+     * @param p_resource The resource binding to transfer into the graph.
      * @return This graph descriptor.
      */
     RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectVK> p_resource);
+
+    /**
+     * @brief Append a resource binding by id and concrete render object.
+     * @param p_resource_id Graph resource identifier.
+     * @param p_resource_type_id The type of the resource to be bound.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id);
 
     /**
      * @brief Append a resource binding by id and container.

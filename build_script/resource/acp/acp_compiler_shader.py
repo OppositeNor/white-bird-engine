@@ -387,17 +387,31 @@ class WBEACPCompilerShader(WBEACPCompiler):
         result_type = raw_type.get("resultType", {})
         if not isinstance(result_type, dict):
             result_type = {}
+        reflected_decl_type = raw_type
+        kind = str(raw_type.get("kind", ""))
+        if kind in {"constantBuffer", "parameterBlock"} and element_type:
+            reflected_decl_type = element_type
+        elif kind == "resource" and result_type:
+            reflected_decl_type = result_type
         scalar_type = self._shader_type_shape(raw_type)
         element_scalar_type = self._shader_type_shape(element_type) if element_type else self._shader_type_shape(result_type)
+        raw_name = raw_type.get("name", "")
+        if isinstance(raw_name, str) and raw_name:
+            normalized_name = raw_name
+        else:
+            normalized_name = str(reflected_decl_type.get("name", ""))
+        user_attributes = self._transform_shader_user_attributes(raw_type)
+        if not user_attributes and reflected_decl_type is not raw_type:
+            user_attributes = self._transform_shader_user_attributes(reflected_decl_type)
         return {
-            "kind": str(raw_type.get("kind", "")),
+            "kind": kind,
             "scalar_type": str(scalar_type),
             "access": str(raw_type.get("access", "")),
-            "name": str(raw_type.get("name", "")),
+            "name": normalized_name,
             "element_count": int(raw_type.get("elementCount", 0)),
             "element_scalar_type": str(element_scalar_type),
             "element_access": str(element_type.get("access", result_type.get("access", ""))),
-            "user_attributes": self._transform_shader_user_attributes(raw_type),
+            "user_attributes": user_attributes,
         }
 
     def _transform_shader_type_field(self, raw_field: dict[str, Any]) -> dict[str, Any]:
@@ -411,6 +425,10 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 nested_type = {}
                 break
             nested_type = element_type
+        if nested_type.get("kind") == "resource":
+            result_type = nested_type.get("resultType", {})
+            if isinstance(result_type, dict):
+                nested_type = result_type
         nested_fields = nested_type.get("fields", [])
         if not isinstance(nested_fields, list):
             nested_fields = []

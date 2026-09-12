@@ -41,6 +41,8 @@
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "function/render_vk/static_set_material_binding_builder_vk.hh"
+#include "function/render/static_set_node_contract.hh"
+#include "function/render/static_set_node_contract_resolver.hh"
 #include "glm/common.hpp"
 #include "glm/matrix.hpp"
 #include "resource/resource_manager/resource_manager.hh"
@@ -397,6 +399,25 @@ std::optional<MaterialTextureContract> load_material_contract(RefRes<RUGraphicsP
         p_material_params_variable_name);
 }
 
+void validate_static_set_node_layout(const ShaderMetadata& p_vertex_metadata) {
+    StaticSetNodeContract reflected_contract = StaticSetNodeContractResolver().resolve(p_vertex_metadata, "static_set");
+    StaticSetNodeContract cpu_contract;
+    cpu_contract.element_stride = sizeof(StaticSetNodeGPU);
+    cpu_contract.transform_offset = offsetof(StaticSetNodeGPU, transform);
+    cpu_contract.normal_transform_offset = offsetof(StaticSetNodeGPU, normal_transform);
+    if (cpu_contract.matches(reflected_contract)) {
+        return;
+    }
+    throw std::runtime_error(std::format(
+        "Static-set node layout mismatch: shader expects stride={}, transform offset={}, normal_transform offset={}, but CPU uploads stride={}, transform offset={}, normal_transform offset={}.",
+        reflected_contract.element_stride,
+        reflected_contract.transform_offset,
+        reflected_contract.normal_transform_offset,
+        cpu_contract.element_stride,
+        cpu_contract.transform_offset,
+        cpu_contract.normal_transform_offset));
+}
+
 Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data, bool p_has_material_contract) {
     if (!p_has_material_contract) {
         return MEM_NULL;
@@ -537,6 +558,7 @@ IndirectDrawPlanData build_indirect_draw_plan_data(const BaseRenderDataVK* p_ren
     const StaticInstanceBufferData& p_instance_data) {
     IndirectDrawPlanData result(p_render_data->allocator);
     ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
+    validate_static_set_node_layout(vertex_metadata);
     const std::string_view vertex_entry_name = get_vertex_stage_entry_name(p_graphics_pipeline);
     result.draw_plan = StaticSetDrawBatchPlannerVK().build(p_render_data->allocator,
         std::span<const RUStaticGeometrySubmesh>(p_set->submeshes.get(), p_set->submesh_count),

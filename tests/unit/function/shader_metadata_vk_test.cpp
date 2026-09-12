@@ -14,7 +14,8 @@
 */
 #include "core/parser/parser_json.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render_vk/shader_metadata_vk.hh"
+#include "function/render/static_set_node_contract.hh"
+#include "function/render/static_set_node_contract_resolver.hh"
 #include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
 #include <algorithm>
@@ -25,6 +26,7 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -123,6 +125,66 @@ TEST(WBEShaderMetadataVKTest, MissingUserAttributesRemainEmpty) {
     EXPECT_TRUE(metadata.parameters[0].type.fields[0].type.user_attributes.empty());
     ASSERT_EQ(metadata.entry_points.size(), 1U);
     EXPECT_TRUE(metadata.entry_points[0].user_attributes.empty());
+}
+
+TEST(WBEShaderMetadataVKTest, PreservesWrappedTypeAttributesAndNames) {
+    std::string json_buffer = R"(
+    {
+        "parameters": [
+            {
+                "name": "static_set",
+                "type": {
+                    "kind": "parameterBlock",
+                    "name": "StaticSetContractMetadata",
+                    "user_attributes": [{"name": "WBE_DATA_TYPE", "arguments": []}],
+                    "fields": [
+                        {
+                            "name": "nodes",
+                            "type": {
+                                "kind": "resource",
+                                "name": "NodeData",
+                                "scalar_type": "structuredBuffer",
+                                "element_scalar_type": "struct",
+                                "user_attributes": [
+                                    {"name": "WBE_DATA_TYPE", "arguments": [{"kind": "string", "string_value": "custom_node"}]}
+                                ]
+                            },
+                            "fields": [
+                                {
+                                    "name": "transform",
+                                    "type": {"kind": "matrix", "scalar_type": "matrix"}
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ],
+        "entry_points": []
+    }
+    )";
+    ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    ASSERT_EQ(metadata.parameters.size(), 1U);
+    const ShaderMetadataParameter& parameter = metadata.parameters[0];
+    EXPECT_EQ(parameter.type.kind, "parameterBlock");
+    EXPECT_EQ(parameter.type.name, "StaticSetContractMetadata");
+    ASSERT_EQ(parameter.type.user_attributes.size(), 1U);
+    EXPECT_EQ(parameter.type.user_attributes[0].name, "WBE_DATA_TYPE");
+    EXPECT_TRUE(parameter.type.user_attributes[0].arguments.empty());
+
+    ASSERT_EQ(parameter.type.fields.size(), 1U);
+    const ShaderMetadataTypeField& nodes_field = parameter.type.fields[0];
+    EXPECT_EQ(nodes_field.type.kind, "resource");
+    EXPECT_EQ(nodes_field.type.name, "NodeData");
+    ASSERT_EQ(nodes_field.type.user_attributes.size(), 1U);
+    EXPECT_EQ(nodes_field.type.user_attributes[0].name, "WBE_DATA_TYPE");
+    ASSERT_EQ(nodes_field.type.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(nodes_field.type.user_attributes[0].arguments[0].kind, "string");
+    EXPECT_EQ(nodes_field.type.user_attributes[0].arguments[0].string_value, "custom_node");
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
@@ -313,6 +375,19 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
     }
+}
+
+TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadata) {
+    ParserJSON parser;
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}),
+        "forward_cook_torrance_pbr.json"));
+    ShaderMetadata metadata;
+    metadata.deserialize(parser.get_data());
+
+    const StaticSetNodeContract contract = StaticSetNodeContractResolver().resolve(metadata, "static_set");
+    EXPECT_EQ(contract.element_stride, 128U);
+    EXPECT_EQ(contract.transform_offset, 0U);
+    EXPECT_EQ(contract.normal_transform_offset, 64U);
 }
 
 static void expect_deferred_masked_static_pipeline_resource(const Directory& p_directory) {

@@ -15,10 +15,6 @@
 #ifndef WBE_FILE_UTILS_SLANG
 #define WBE_FILE_UTILS_SLANG
 
-#ifndef WBE_REFLECTION_METADATA
-#define WBE_REFLECTION_METADATA 0
-#endif
-
 /** Marks a vertex entry-point field and selects a resource attribute by role. */
 [__AttributeUsage(_AttributeTargets.Var)]
 struct WBE_VERTEX_INPUTAttribute {
@@ -31,6 +27,13 @@ struct WBE_VERTEX_INPUTAttribute {
 struct WBE_DESCRIPTORAttribute {
     /** Descriptor category interpreted by the Vulkan pipeline compiler. */
     string descriptor_type;
+};
+
+/** Marks a struct as an engine-discoverable data type in reflection metadata. */
+[__AttributeUsage(_AttributeTargets.Struct)]
+struct WBE_DATA_TYPEAttribute {
+    /** Optional logical type name; an empty value means to use the struct name. */
+    string type_name = "";
 };
 
 /**
@@ -110,8 +113,9 @@ struct MaterialDescriptorIndices {
     uint2 material_sampler;
 };
 
-#if WBE_REFLECTION_METADATA
+#ifdef WBE_REFLECTION_METADATA
 /** Reflection-only view of the material texture contract. */
+[WBE_DATA_TYPE]
 struct MaterialTextureContractMetadata {
     SamplerState material_sampler;
     Texture2D<float4> textures[];
@@ -119,6 +123,7 @@ struct MaterialTextureContractMetadata {
 #endif
 
 /** Fixed descriptor indices for one material's textures. */
+[WBE_DATA_TYPE]
 struct MaterialParams {
     /** Albedo texture descriptor index. */
     [WBE_TEXTURE("albedo")]
@@ -132,12 +137,14 @@ struct MaterialParams {
 };
 
 /** Fixed descriptor-index table for every material addressed by an indirect draw. */
+[WBE_DATA_TYPE]
 struct MaterialParamsBuffer {
     /** Material entries indexed by the indirect draw's material index. */
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
 /** Per-submesh metadata for one static-set draw entry. */
+[WBE_DATA_TYPE]
 struct SubmeshData {
     /** Material table entry used by this submesh. */
     uint material_id;
@@ -147,6 +154,7 @@ struct SubmeshData {
 };
 
 /** Per-node transform payload referenced by static-set instances. */
+[WBE_DATA_TYPE]
 struct NodeData {
     /** Engine-space column-major global transform. */
     float4x4 transform;
@@ -155,6 +163,7 @@ struct NodeData {
 };
 
 /** Per-drawn-instance metadata linking one submesh to one node transform. */
+[WBE_DATA_TYPE]
 struct InstanceData {
     /** Index into the static_set.submeshes storage buffer. */
     uint submesh_index;
@@ -163,6 +172,16 @@ struct InstanceData {
     uint padding_0;
     uint padding_1;
 };
+
+#ifdef WBE_REFLECTION_METADATA
+/** Reflection-only view of the static-set storage-buffer contract. */
+[WBE_DATA_TYPE]
+struct StaticSetContractMetadata {
+    StructuredBuffer<SubmeshData> submeshes;
+    StructuredBuffer<NodeData> nodes;
+    StructuredBuffer<InstanceData> instances;
+};
+#endif
 
 /**
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.

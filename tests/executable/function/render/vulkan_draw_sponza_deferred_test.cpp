@@ -67,7 +67,6 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
-#include <print>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -429,8 +428,6 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
         renderer->request_frame_capture(capture_png_path);
         capture_requested = true;
     }
-    static uint64_t frame_index = 0;
-    std::println("Drawing frame: {}", ++frame_index);
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
     if (requested == summed_area_table_active) {
         return;
@@ -522,44 +519,17 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("intel_sponza.static_opaque_set");
-    if (sponza_opaque_set == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: static opaque set resource was not found.");
-    }
     shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_static");
-    if (shadow_opaque_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'rsm_spot_static' graphics pipeline resource not found.");
-    }
     gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
-    if (gbuffer_opaque_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'deferred_gbuffer_static' graphics pipeline resource not found.");
-    }
     shadow_moments_summed_area_table_horizontal_shader_resource =
         resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_horizontal_shader");
-    if (shadow_moments_summed_area_table_horizontal_shader_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'shadow_moments_summed_area_table_horizontal_shader' resource not found.");
-    }
     shadow_moments_summed_area_table_vertical_shader_resource =
         resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_vertical_shader");
-    if (shadow_moments_summed_area_table_vertical_shader_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'shadow_moments_summed_area_table_vertical_shader' resource not found.");
-    }
     direct_lighting_shader_resource = resource_manager->get_resource<RUShader>("direct_lighting_shader");
-    if (direct_lighting_shader_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'direct_lighting_shader' resource not found.");
-    }
     direct_lighting_summed_area_table_shader_resource =
         resource_manager->get_resource<RUShader>("direct_lighting_summed_area_table_shader");
-    if (direct_lighting_summed_area_table_shader_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'direct_lighting_summed_area_table_shader' resource not found.");
-    }
     indirect_lighting_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_shader");
-    if (indirect_lighting_shader_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'indirect_lighting_shader' resource not found.");
-    }
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
-    if (present_post_processing_pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred test: 'present_post_processing' graphics pipeline resource not found.");
-    }
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
@@ -967,8 +937,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
     p_pipeline_desc
-        .add_resource(RendResVK{
-            .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL})
+        .add_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID)
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_COMPUTE_PIPELINE,
             shadow_moments_summed_area_table_horizontal_compute_pipeline)
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL_COMPUTE_PIPELINE,

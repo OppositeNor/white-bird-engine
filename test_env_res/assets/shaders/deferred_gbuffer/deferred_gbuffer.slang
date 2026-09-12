@@ -14,9 +14,10 @@
 */
 #include "deferred_gbuffer/deferred_gbuffer_utils.slang"
 
-#if WBE_REFLECTION_METADATA
+#ifdef WBE_REFLECTION_METADATA
 ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<MaterialTextureContractMetadata> material_textures;
+ParameterBlock<StaticSetContractMetadata> static_set;
 #endif
 
 /**

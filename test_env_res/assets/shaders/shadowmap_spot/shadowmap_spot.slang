@@ -14,6 +14,10 @@
 */
 #include "utils.slang"
 
+#ifdef WBE_REFLECTION_METADATA
+ParameterBlock<StaticSetContractMetadata> static_set;
+#endif
+
 /**
  * @brief Vertex shader output / fragment shader input for the spot-light shadow map pass.
  */
