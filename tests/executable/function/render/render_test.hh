@@ -22,7 +22,7 @@
 #include "platform/os/os.hh"
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
+#include <cstdint>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -31,7 +31,6 @@
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
-#include <limits>
 #include <print>
 #include <string_view>
 
@@ -50,21 +49,42 @@ inline constexpr float TEST_CAMERA_MOVE_SPEED = 3.0F;
 inline constexpr float TEST_CAMERA_TURN_SPEED = glm::radians(90.0F);
 inline constexpr float TEST_CAMERA_PITCH_LIMIT = glm::radians(89.0F);
 
+
 namespace WhiteBirdEngine {
 
-/**
- * @brief Waits for the Enter key when process injection is requested through the environment.
- */
-inline void wait_for_process_inject() {
-    const char* wait_process_inject = std::getenv("WBE_WAIT_PROCESS_INJECT");
-    if (wait_process_inject == nullptr || std::string_view(wait_process_inject) != "1") {
-        return;
+inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
+    static std::string capture_png_path;
+    static uint64_t capture_frame = 5;
+    static bool capture_requested = false;
+    const char* capture_path = std::getenv("WBE_CAPTURE_PNG");
+    if (capture_path != nullptr && *capture_path != '\0') {
+        if (*capture_path != '/') {
+            throw std::runtime_error("WBE_CAPTURE_PNG must be an absolute output path.");
+        }
+        capture_png_path = capture_path;
     }
-
-    std::println("WBE_WAIT_PROCESS_INJECT is set. Running on PID: {}, Press Enter to continue...", OS::get_pid());
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    if (const char* frame = std::getenv("WBE_CAPTURE_FRAME"); frame != nullptr) {
+        std::string frame_text(frame);
+        const char* frame_end = frame_text.data() + frame_text.size();
+        auto result = std::from_chars(frame_text.c_str(), frame_end, capture_frame);
+        if (result.ec != std::errc{} || result.ptr != frame_end) {
+            throw std::runtime_error("WBE_CAPTURE_FRAME must be a nonnegative frame number.");
+        }
+    }
+    if (!capture_png_path.empty() && !capture_requested && p_frame >= capture_frame) {
+        p_renderer.request_frame_capture(capture_png_path);
+        capture_requested = true;
+    }
 }
 
+inline void on_exec_test_start() {
+
+    const char* wait_process_inject = std::getenv("WBE_WAIT_PROCESS_INJECT");
+    if (wait_process_inject != nullptr && std::string_view(wait_process_inject) == "1") {
+        std::println("WBE_WAIT_PROCESS_INJECT is set. Running on PID: {}, Press Enter to continue...", OS::get_pid());
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+}
 } // namespace WhiteBirdEngine
 
 inline glm::vec3 default_test_camera_direction() {

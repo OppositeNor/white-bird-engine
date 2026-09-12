@@ -102,6 +102,7 @@ private:
 };
 
 int main(int p_argc, char* p_argv[]) {
+    WBE::on_exec_test_start();
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         ApplicationVulkanDrawCubeTest game_application;
@@ -183,6 +184,7 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
 }
 
 void ApplicationVulkanDrawCubeTest::render_update(double /* p_delta */) {
+    WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
 }
 
 void ApplicationVulkanDrawCubeTest::setup_draw_task() {

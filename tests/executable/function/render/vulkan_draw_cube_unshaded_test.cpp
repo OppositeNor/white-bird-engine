@@ -25,6 +25,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "render_test.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
@@ -55,6 +56,8 @@ public:
     }
 
     virtual void render_update(double p_delta) override {
+        auto* renderer = WBE::RendererVK::get_singleton();
+        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
         camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
         camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
     }
@@ -113,6 +116,7 @@ private:
 };
 
 int main(int p_argc, char* p_argv[]) {
+    WBE::on_exec_test_start();
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         ApplicationVulkanDrawCubeUnshadedTest game_application;

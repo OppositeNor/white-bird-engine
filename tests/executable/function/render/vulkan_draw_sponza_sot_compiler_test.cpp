@@ -133,6 +133,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::logic_update(double p_delta) {
 }
 
 void ApplicationVulkanDrawSponzaIndirectTest::render_update(double /*p_delta*/) {
+    WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
 }
 
 void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
@@ -199,6 +200,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStati
 } // namespace WhiteBirdEngine
 
 int main(int p_argc, char* p_argv[]) {
+    WBE::on_exec_test_start();
     std::unique_ptr<WhiteBirdEngine::Global> global =
         std::make_unique<WhiteBirdEngine::Global>(p_argc, p_argv, WhiteBirdEngine::Directory({"test_env"}));
     WhiteBirdEngine::ApplicationVulkanDrawSponzaIndirectTest application;

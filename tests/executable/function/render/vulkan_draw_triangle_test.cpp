@@ -58,6 +58,8 @@ public:
     }
 
     virtual void render_update(double p_delta) override {
+        auto* renderer = WBE::RendererVK::get_singleton();
+        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
         time_accumulator += p_delta;
         WBE::TimeVKUBO time_ubo_data{.duration_sec = static_cast<float>(time_accumulator)};
         time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
@@ -156,6 +158,7 @@ private:
 };
 
 int main(int p_argc, char* p_argv[]) {
+    WBE::on_exec_test_start();
     std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
     {
         ApplicationVulkanDrawPipelineTest game_application;
