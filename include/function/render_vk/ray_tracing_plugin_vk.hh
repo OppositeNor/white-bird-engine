@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 #define WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 
-#include "core/memory/unique.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_plugin_vk.hh"
@@ -86,15 +86,13 @@ public:
 
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) override;
     virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const override;
-    virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
-        RefRes<RUStaticOpaqueSet> p_set,
-        Ref<ROBufferVK> p_vertex_buffer,
-        Ref<ROBufferVK> p_index_buffer) override;
+    virtual GPUJobVK on_static_opaque_set_updated(
+        BaseRenderDataVK* p_render_data, RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) override;
 
     /**
      * @brief Update the static-opaque bottom-level acceleration structure for the current static mesh buffers.
      *
-        * @param p_set Static-opaque geometry set published by the scene.
+     * @param p_set Static-opaque geometry set published by the scene.
      * @param p_vertex_buffer Shared static-opaque vertex buffer.
      * @param p_index_buffer Shared static-opaque index buffer.
      * @return A GPU job that records the build, or an empty job when there is no geometry.
@@ -102,6 +100,7 @@ public:
 private:
     struct StaticOpaqueBottomLevelBuild;
     struct StaticOpaqueBuildData;
+    struct StaticOpaqueTopLevelBuild;
 
     const BaseRenderDataVK* render_data = nullptr;
     Unique<BaseRayTracingDataVK> base_ray_tracing_data;
@@ -115,9 +114,28 @@ private:
 
     VkDeviceAddress get_buffer_device_address(Ref<ROBufferVK> p_buffer) const;
     VkDeviceAddress query_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const;
-    StaticOpaqueBuildData build_static_opaque_data(RefRes<RUStaticOpaqueSet> p_set,
+    void reset_static_opaque_acceleration_structures();
+    void validate_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) const;
+    void validate_static_opaque_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instance_count) const;
+    const RUVertexView::Attribute& get_static_opaque_position_attribute(const RUStaticGeometrySubmesh& p_submesh) const;
+    StaticOpaqueBottomLevelBuild create_static_opaque_bottom_level_build(const RUStaticGeometrySubmesh& p_submesh,
+        RefRes<RUStaticOpaqueSet> p_set,
         VkDeviceAddress p_vertex_buffer_address,
         VkDeviceAddress p_index_buffer_address) const;
+    Ref<ROBufferVK> create_aligned_scratch_buffer(
+        VkDeviceSize p_required_size, VkDeviceSize p_alignment, VkDeviceAddress& p_aligned_buffer_address) const;
+    void initialize_bottom_level_builds(StaticOpaqueBuildData& p_build_data,
+        std::vector<Ref<ROAccelerationStructureVK>>& p_bottom_level_acceleration_structures,
+        VkDeviceSize& p_max_bottom_level_scratch_size,
+        size_t& p_total_instance_count) const;
+    StaticOpaqueTopLevelBuild create_top_level_build(StaticOpaqueBuildData& p_build_data, VkDeviceSize p_scratch_alignment) const;
+    StaticOpaqueBuildData build_static_opaque_data(
+        RefRes<RUStaticOpaqueSet> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const;
+    GPUJobVK create_static_opaque_record_job(std::vector<Ref<ROAccelerationStructureVK>>&& p_bottom_level_acceleration_structures,
+        Ref<ROBufferVK> p_bottom_level_scratch_buffer,
+        StaticOpaqueBuildData&& p_build_data,
+        VkDeviceAddress p_aligned_bottom_level_scratch_buffer_address,
+        StaticOpaqueTopLevelBuild&& p_top_level_build) const;
     GPUJobVK create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data);
     GPUJobVK update_static_opaque_acceleration_structure(
         RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer);
