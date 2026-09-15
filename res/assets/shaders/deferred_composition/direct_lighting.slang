@@ -65,15 +65,14 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 normal = octahedron_decode(octa);
     float roughness = clamp(rma_flags.r, 0.04, 1.0);
     float metallic = clamp(rma_flags.g, 0.0, 1.0);
-    float3 world_pos = world_position_from_depth(uv, depth, camera_info.inv_view_proj);
+    float3 world_pos = world_position_from_depth(uv, depth, WBE_SOFTWARE_MATRIX_ROWS(camera_info.inv_view_proj));
     float3 view_direction = normalize(camera_info.camera_world_pos.xyz - world_pos);
     float3 f0 = lerp(float3(0.04), base_color, metallic);
     float3 direct_lighting = float3(0.0);
     uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        ConstantBuffer<SpotLightInfo> spot_light_info_buffer =
+        ConstantBuffer<SpotLightInfo> spot_light_info =
             ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
-        SpotLightInfo spot_light_info = spot_light_info_buffer;
         float3 to_light = spot_light_info.position - world_pos;
         float light_distance = length(to_light);
         float3 light_direction = to_light / max(light_distance, 0.0001);

@@ -58,7 +58,9 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     float3x3 direction_transform = (float3x3)node.transform;
 
     VSOutput output;
-    output.position = mul(camera_info.proj, mul(camera_info.view, world_position));
+    float4 view_position =
+        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), world_position);
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
     output.world_position = float4(world_position.xyz, float(submesh.material_id));
     output.normal = transform_static_normal(node.normal_transform, p_input.normal);
     output.tangent = normalize(mul(direction_transform, p_input.tangent));
@@ -66,7 +68,10 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     output.uv = p_input.uv;
     if (light_count > 0) {
         ConstantBuffer<SpotLightInfo> light_info = ResourceDescriptorHeap[descriptor_indices.light.lights[0].info.x];
-        output.light_space_pos = mul(light_info.proj, mul(light_info.view, world_position));
+        float4 light_view_position =
+            software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(light_info.view), world_position);
+        output.light_space_pos =
+            software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(light_info.proj), light_view_position);
     } else {
         output.light_space_pos = world_position;
     }
@@ -147,9 +152,8 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     float3 color = float3(0.0);
     uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        ConstantBuffer<SpotLightInfo> light_info =
+        ConstantBuffer<SpotLightInfo> spot_light_info =
             ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
-        SpotLightInfo spot_light_info = light_info;
         float3 to_light = spot_light_info.position - p_input.world_position.xyz;
         float light_distance = length(to_light);
         float3 l = to_light / max(light_distance, 0.0001);

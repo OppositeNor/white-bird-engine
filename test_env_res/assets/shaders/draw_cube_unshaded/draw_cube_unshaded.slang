@@ -67,7 +67,9 @@ VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_Vulk
     NodeData node = nodes[instance.node_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     VSOutput output;
-    output.position = mul(camera_info.proj, mul(camera_info.view, world_position));
+    float4 view_position =
+        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), world_position);
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
     output.normal = transform_static_normal(node.normal_transform, p_input.normal);
     output.uv = p_input.uv;
     return output;

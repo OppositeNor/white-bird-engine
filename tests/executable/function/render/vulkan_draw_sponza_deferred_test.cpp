@@ -271,7 +271,7 @@ private:
 
 void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     control(p_delta);
-    // update_descriptors();
+    update_descriptors();
 }
 
 void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
