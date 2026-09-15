@@ -53,7 +53,9 @@ Make the smallest layer-correct change. Add tests at every boundary that changes
 
 Render objects and Vulkan backend helpers are rendering-thread-confined. Route cross-thread resource updates or binding changes through `IRenderer::add_job()`.
 
-When changing Slang compilation or reflection fixtures, preserve the descriptor-heap compile profile used by ACP: `spirv_1_6+spvDescriptorHeapEXT` with `-spirv-unified-descriptor-heap-stride`.
+When changing Slang compilation or reflection fixtures, preserve the descriptor-heap compile profile used by ACP:
+`spirv_1_6+spvDescriptorHeapEXT`. Do not enable unified descriptor-heap stride: the resource heap has separate buffer and image
+regions whose indices use their descriptor type's device-reported stride.
 
 ## Validate
 

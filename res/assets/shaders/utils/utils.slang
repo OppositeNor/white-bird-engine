@@ -87,6 +87,7 @@ struct CameraInfo {
 
 /**
  * @brief Multiply a vector by matrix rows loaded individually from descriptor-heap memory.
+ * This is a temporary work around for a bug of the NVIDIA driver when loading matrix rows.
  * @param p_row_0 First matrix row.
  * @param p_row_1 Second matrix row.
  * @param p_row_2 Third matrix row.

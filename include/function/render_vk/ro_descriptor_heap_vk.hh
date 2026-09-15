@@ -42,8 +42,8 @@ enum class DescriptorHeapTypeVK : uint8_t {
  * @class RODescriptorHeapVK
  * @brief Logical descriptor arena backed by a Vulkan descriptor heap buffer.
  *
- * Resource arenas may share one physical backing buffer. Indices exposed by an
- * arena are global indices in that physical Vulkan heap.
+ * Resource arenas may share one physical backing buffer. An arena's indices are
+ * offsets in the descriptor-type-specific SPIR-V view of that backing buffer.
  *
  * This object is neither copyable nor movable.
  */
@@ -108,7 +108,7 @@ public:
     }
 
     /**
-     * @brief Get the first global descriptor index owned by this arena.
+     * @brief Get the first descriptor index owned by this arena's typed heap view.
      */
     uint32_t get_first_index() const {
         return first_index;
@@ -129,7 +129,7 @@ public:
     }
 
     /**
-     * @brief Check whether a global descriptor-index range belongs to this arena.
+     * @brief Check whether a descriptor-index range belongs to this arena's typed heap view.
      */
     bool owns_range(uint32_t p_first_index, uint32_t p_count = 1) const;
 

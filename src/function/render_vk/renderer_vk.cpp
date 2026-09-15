@@ -296,9 +296,6 @@ void RendererVK::setup_base_render_data() {
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     physical_device_properties.pNext = &base_render_data.descriptor_heap_properties;
     vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
-    base_render_data.resource_descriptor_stride =
-        std::max(base_render_data.descriptor_heap_properties.bufferDescriptorSize,
-            base_render_data.descriptor_heap_properties.imageDescriptorSize);
     base_render_data.sampler_descriptor_stride = base_render_data.descriptor_heap_properties.samplerDescriptorSize;
     base_render_data.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
     for (auto& plugin : registered_plugins) {

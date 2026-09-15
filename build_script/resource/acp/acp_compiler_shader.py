@@ -203,7 +203,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
             slangc_path,
             "-target", "spirv",
             "-profile", "spirv_1_6+spvDescriptorHeapEXT",
-            "-spirv-unified-descriptor-heap-stride",
         ]
         if entry_name is not None:
             cmd.extend(["-entry", entry_name])

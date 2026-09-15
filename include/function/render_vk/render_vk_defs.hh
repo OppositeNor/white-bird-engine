@@ -99,8 +99,6 @@ struct BaseRenderDataVK {
     /** Descriptor-heap properties reported by the physical device. */
     VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptor_heap_properties{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT};
-    /** Shared stride used by buffer and image resource descriptors. */
-    VkDeviceSize resource_descriptor_stride = 0;
     /** Stride used by sampler descriptors. */
     VkDeviceSize sampler_descriptor_stride = 0;
     /** Non-owning renderer descriptor-heap allocator. */

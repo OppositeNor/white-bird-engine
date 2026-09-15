@@ -40,16 +40,37 @@ static VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
     return p_left + p_right;
 }
 
+static VkDeviceSize checked_align_up(VkDeviceSize p_value, VkDeviceSize p_alignment) {
+    VkDeviceSize remainder = p_value % p_alignment;
+    if (remainder == 0) {
+        return p_value;
+    }
+    return checked_add(p_value, p_alignment - remainder);
+}
+
+static uint32_t checked_descriptor_index(VkDeviceSize p_offset, VkDeviceSize p_stride) {
+    VkDeviceSize index = p_offset / p_stride;
+    if (index > std::numeric_limits<uint32_t>::max()) {
+        throw std::runtime_error("Failed to create descriptor heap allocator: descriptor index exceeds uint32.");
+    }
+    return static_cast<uint32_t>(index);
+}
+
 DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), buffer_free_ranges(p_allocator), sampled_image_free_ranges(p_allocator),
       storage_image_free_ranges(p_allocator), sampler_free_ranges(p_allocator) {
-    if (p_allocator == nullptr || p_render_data == nullptr || p_render_data->resource_descriptor_stride == 0 ||
-        p_render_data->sampler_descriptor_stride == 0) {
+    if (p_allocator == nullptr || p_render_data == nullptr || p_render_data->descriptor_heap_properties.bufferDescriptorSize == 0 ||
+        p_render_data->descriptor_heap_properties.imageDescriptorSize == 0 || p_render_data->sampler_descriptor_stride == 0) {
         throw std::runtime_error("Failed to create descriptor heap allocator: invalid allocator, render data, or stride.");
     }
 
-    constexpr uint32_t RESOURCE_CAPACITY = BUFFER_CAPACITY + SAMPLED_IMAGE_CAPACITY + STORAGE_IMAGE_CAPACITY;
-    VkDeviceSize resource_size = checked_multiply(RESOURCE_CAPACITY, render_data->resource_descriptor_stride);
+    const VkDeviceSize buffer_stride = render_data->descriptor_heap_properties.bufferDescriptorSize;
+    const VkDeviceSize image_stride = render_data->descriptor_heap_properties.imageDescriptorSize;
+    const VkDeviceSize buffer_region_size = checked_multiply(BUFFER_CAPACITY, buffer_stride);
+    const VkDeviceSize image_region_offset = checked_align_up(buffer_region_size, image_stride);
+    constexpr uint32_t IMAGE_CAPACITY = SAMPLED_IMAGE_CAPACITY + STORAGE_IMAGE_CAPACITY;
+    const VkDeviceSize image_region_size = checked_multiply(IMAGE_CAPACITY, image_stride);
+    const VkDeviceSize resource_size = checked_add(image_region_offset, image_region_size);
     VkDeviceSize sampler_size = checked_multiply(SAMPLER_CAPACITY, render_data->sampler_descriptor_stride);
     if (checked_add(resource_size, render_data->descriptor_heap_properties.minResourceHeapReservedRange) >
             render_data->descriptor_heap_properties.maxResourceHeapSize ||
@@ -69,29 +90,32 @@ DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocato
         render_data->descriptor_heap_properties.minSamplerHeapReservedRange,
         render_data->descriptor_heap_properties.samplerHeapAlignment);
 
-    constexpr uint32_t SAMPLED_IMAGE_FIRST = BUFFER_CAPACITY;
-    constexpr uint32_t STORAGE_IMAGE_FIRST = BUFFER_CAPACITY + SAMPLED_IMAGE_CAPACITY;
+    const uint32_t sampled_image_first = checked_descriptor_index(image_region_offset, image_stride);
+    if (sampled_image_first > std::numeric_limits<uint32_t>::max() - SAMPLED_IMAGE_CAPACITY) {
+        throw std::runtime_error("Failed to create descriptor heap allocator: image descriptor index exceeds uint32.");
+    }
+    const uint32_t storage_image_first = sampled_image_first + SAMPLED_IMAGE_CAPACITY;
     buffer_heap = make_ref<RODescriptorHeapVK>(p_allocator,
         render_data,
         resource_backing,
         DescriptorHeapTypeVK::BUFFER,
         0,
         BUFFER_CAPACITY,
-        render_data->resource_descriptor_stride);
+        buffer_stride);
     sampled_image_heap = make_ref<RODescriptorHeapVK>(p_allocator,
         render_data,
         resource_backing,
         DescriptorHeapTypeVK::SAMPLED_IMAGE,
-        SAMPLED_IMAGE_FIRST,
+        sampled_image_first,
         SAMPLED_IMAGE_CAPACITY,
-        render_data->resource_descriptor_stride);
+        image_stride);
     storage_image_heap = make_ref<RODescriptorHeapVK>(p_allocator,
         render_data,
         resource_backing,
         DescriptorHeapTypeVK::STORAGE_IMAGE,
-        STORAGE_IMAGE_FIRST,
+        storage_image_first,
         STORAGE_IMAGE_CAPACITY,
-        render_data->resource_descriptor_stride);
+        image_stride);
     sampler_heap = make_ref<RODescriptorHeapVK>(p_allocator,
         render_data,
         sampler_backing,
@@ -101,8 +125,8 @@ DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocato
         render_data->sampler_descriptor_stride);
 
     buffer_free_ranges.push_back({.first_index = 0, .count = BUFFER_CAPACITY});
-    sampled_image_free_ranges.push_back({.first_index = SAMPLED_IMAGE_FIRST, .count = SAMPLED_IMAGE_CAPACITY});
-    storage_image_free_ranges.push_back({.first_index = STORAGE_IMAGE_FIRST, .count = STORAGE_IMAGE_CAPACITY});
+    sampled_image_free_ranges.push_back({.first_index = sampled_image_first, .count = SAMPLED_IMAGE_CAPACITY});
+    storage_image_free_ranges.push_back({.first_index = storage_image_first, .count = STORAGE_IMAGE_CAPACITY});
     sampler_free_ranges.push_back({.first_index = 0, .count = SAMPLER_CAPACITY});
 }
 

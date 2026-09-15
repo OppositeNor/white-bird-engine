@@ -3,7 +3,7 @@
 ## Pipeline map
 
 1. A shader entry in an ACP manifest supplies `src`, `dst`, and `metadata`.
-2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` for SPIR-V 1.6 with descriptor-heap support and unified descriptor-heap stride.
+2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` for SPIR-V 1.6 with descriptor-heap support. Buffer and image descriptor indices use separate regions and their descriptor type's device-reported stride.
 3. It performs a second temporary compile with `WBE_REFLECTION_METADATA=1` so reflection-only declarations contribute metadata without entering the runtime shader, then normalizes Slang's JSON into the snake-case schema represented by `include/function/render/shader_metadata.hh`.
 4. The resource loader stores the compiled words, metadata path, and discovered stage-entry names in `RUShader` (`include/function/render/render_resource_unit.hh` and `src/function/render_vk/render_vk_resource_unit_loader.cpp`).
 5. `ShaderMetadataLoader::load` resolves `RUShader::metadata_path`, parses the JSON, and deserializes `ShaderMetadata`.
@@ -53,7 +53,7 @@ Descriptor-heap bindpoint declarations use field paths relative to the push-data
 
 Each annotation requires one non-empty string argument and must mark an aligned eight-byte `uint2` in the entry point's sole reflected `pushConstantBuffer`. Duplicate annotations, duplicate paths, overlapping ranges, malformed arrays, unsupported categories, and invalid layout values throw `std::runtime_error`. A descriptor-free entry point yields an empty layout. When graphics stages are merged, equal field paths must agree on category and byte offset, and distinct fields must not overlap.
 
-`DescriptorHeapAllocatorVK` owns renderer-wide logical arenas for buffers, sampled images, storage images, and samplers. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` lazily allocate descriptor indices unless builders transfer preallocated ones, own those indices, and defer their release for frames-in-flight safety. `RenderGraphVK` binds the resource and sampler heaps on each task command buffer; `ROPipelineVK` retains bound resources and pushes the reflected index block with `vkCmdPushDataEXT`.
+`DescriptorHeapAllocatorVK` owns renderer-wide logical arenas for buffers, sampled images, storage images, and samplers. Buffers and images occupy separate regions of the one Vulkan resource heap. Buffer indices address the buffer region using `bufferDescriptorSize`; sampled and storage image indices address the image region using `imageDescriptorSize`. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` lazily allocate descriptor indices unless builders transfer preallocated ones, own those indices, and defer their release for frames-in-flight safety. `RenderGraphVK` binds the resource and sampler heaps on each task command buffer; `ROPipelineVK` retains bound resources and pushes the reflected index block with `vkCmdPushDataEXT`.
 
 ## Built-in annotation contracts
 
