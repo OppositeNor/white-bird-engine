@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 #define WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 
+#include "core/memory/unique.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
@@ -77,11 +78,13 @@ public:
     virtual std::span<const char* const> get_required_device_extensions() const override;
 
     virtual void on_before_instance_creation(VkInstanceCreateInfo* p_create_info) override;
+    virtual void on_after_instance_created(VkInstance p_instance) override;
     virtual void on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) override;
 
-    virtual void on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
+    virtual void on_after_device_created(
+        BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
 
-    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const override;
+    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) override;
     virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const override;
     virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
         RefRes<RUStaticOpaqueSet> p_set,
@@ -101,6 +104,7 @@ private:
     struct StaticOpaqueBuildData;
 
     const BaseRenderDataVK* render_data = nullptr;
+    Unique<BaseRayTracingDataVK> base_ray_tracing_data;
     std::vector<Ref<ROAccelerationStructureVK>> static_opaque_bottom_level_acceleration_structures;
     Ref<ROAccelerationStructureVK> static_opaque_top_level_acceleration_structure;
     Ref<ROBufferVK> static_opaque_top_level_instance_buffer;
@@ -110,7 +114,7 @@ private:
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{};
 
     VkDeviceAddress get_buffer_device_address(Ref<ROBufferVK> p_buffer) const;
-    VkDeviceAddress get_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const;
+    VkDeviceAddress query_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const;
     StaticOpaqueBuildData build_static_opaque_data(RefRes<RUStaticOpaqueSet> p_set,
         VkDeviceAddress p_vertex_buffer_address,
         VkDeviceAddress p_index_buffer_address) const;

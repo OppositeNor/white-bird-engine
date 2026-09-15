@@ -31,19 +31,27 @@ TypeID ROAccelerationStructureVK::get_type_uuid() const {
 }
 
 ROAccelerationStructureVK::ROAccelerationStructureVK(
-    const BaseRenderDataVK* p_render_data, VkDeviceSize p_size, VkAccelerationStructureTypeKHR p_type)
+    const BaseRenderDataVK* p_render_data,
+    const BaseRayTracingDataVK* p_base_ray_tracing_data,
+    VkDeviceSize p_size,
+    VkAccelerationStructureTypeKHR p_type)
     : RenderObjectVK(p_render_data),
       storage_buffer(ROBufferVK::Builder()
               .set_domain(DeviceDomain::DEVICE)
               .set_size(p_size)
               .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-              .create_ref(p_render_data)) {
+              .create_ref(p_render_data)),
+      base_ray_tracing_data(p_base_ray_tracing_data) {
+    WBE_DEBUG_ASSERT(base_ray_tracing_data != nullptr);
+    WBE_DEBUG_ASSERT(base_ray_tracing_data->create_acceleration_structure != nullptr);
+    WBE_DEBUG_ASSERT(base_ray_tracing_data->destroy_acceleration_structure != nullptr);
+    destroy_acceleration_structure = base_ray_tracing_data->destroy_acceleration_structure;
     VkAccelerationStructureCreateInfoKHR create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     create_info.buffer = storage_buffer->get_buffer();
     create_info.size = p_size;
     create_info.type = p_type;
-    VkResult result = render_data->create_acceleration_structure(
+    VkResult result = base_ray_tracing_data->create_acceleration_structure(
         render_data->logic_device, &create_info, render_data->allocation_callbacks, &acceleration_structure);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan acceleration structure: {}.", string_VkResult(result)));
@@ -52,8 +60,10 @@ ROAccelerationStructureVK::ROAccelerationStructureVK(
 
 ROAccelerationStructureVK::~ROAccelerationStructureVK() {
     render_data->register_delayed_call(
-        [render_data = render_data, acceleration_structure = acceleration_structure]() {
-            render_data->destroy_acceleration_structure(render_data->logic_device, acceleration_structure, render_data->allocation_callbacks);
+        [render_data = render_data,
+            acceleration_structure = acceleration_structure,
+            destroy_acceleration_structure = destroy_acceleration_structure]() {
+            destroy_acceleration_structure(render_data->logic_device, acceleration_structure, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);
 }

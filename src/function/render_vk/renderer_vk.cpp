@@ -218,7 +218,6 @@ void RendererVK::terminate() {
         swap_chain_image_container->clear();
     }
     render_objects.reset();
-    base_render_data.static_opaque_acceleration_structure = VK_NULL_HANDLE;
 
     // Release the active render graph and any registered render graph descriptors.
     // These hold Refs to render-object resources (buffers, images, etc.) whose
@@ -369,6 +368,9 @@ void RendererVK::create_instance() {
     auto result = vkCreateInstance(&create_info, get_allocation_callbacks(), &vk_instance);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create vulkan instance: {}.", string_VkResult(result)));
+    }
+    for (auto& plugin : registered_plugins) {
+        plugin->on_after_instance_created(vk_instance);
     }
     window->init_vulkan(vk_instance);
     surface = window->get_vulkan_surface();
@@ -730,7 +732,7 @@ void RendererVK::create_logical_device() {
         throw std::runtime_error("Failed to load VK_EXT_descriptor_heap device commands.");
     }
     for (auto& plugin : registered_plugins) {
-        plugin->on_device_created(&base_render_data, physical_device, logical_device);
+        plugin->on_after_device_created(&base_render_data, physical_device, logical_device);
     }
 
     // Get the device queues.

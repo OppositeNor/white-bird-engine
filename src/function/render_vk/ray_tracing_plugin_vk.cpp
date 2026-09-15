@@ -78,16 +78,18 @@ static VkAccelerationStructureBuildGeometryInfoKHR make_top_level_build_info(con
 }
 
 static VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRenderDataVK* p_render_data,
+    const BaseRayTracingDataVK* p_base_ray_tracing_data,
     const VkAccelerationStructureBuildGeometryInfoKHR& p_build_info,
     std::span<const uint32_t> p_primitive_counts) {
     VkAccelerationStructureBuildSizesInfoKHR result{};
     result.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    p_render_data->get_acceleration_structure_build_sizes(
+    p_base_ray_tracing_data->get_acceleration_structure_build_sizes(
         p_render_data->logic_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &p_build_info, p_primitive_counts.data(), &result);
     return result;
 }
 
-RayTracingPluginVK::RayTracingPluginVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
+RayTracingPluginVK::RayTracingPluginVK(const BaseRenderDataVK* p_render_data)
+    : render_data(p_render_data), base_ray_tracing_data(make_unique<BaseRayTracingDataVK>(p_render_data->allocator)) {
     singleton = this;
 }
 
@@ -165,6 +167,9 @@ std::span<const char* const> RayTracingPluginVK::get_required_device_extensions(
 void RayTracingPluginVK::on_before_instance_creation(VkInstanceCreateInfo* /*p_create_info*/) {
 }
 
+void RayTracingPluginVK::on_after_instance_created(VkInstance /*p_instance*/) {
+}
+
 void RayTracingPluginVK::on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) {
     WBE_DEBUG_ASSERT(enabled);
     enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(p_physical_device,
@@ -181,28 +186,31 @@ void RayTracingPluginVK::on_before_device_creation(VkPhysicalDevice p_physical_d
         &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
 }
 
-void RayTracingPluginVK::on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
+void RayTracingPluginVK::on_after_device_created(
+    BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
     // Resolve the Vulkan acceleration-structure entry points after logical-device creation.
-    p_render_data->create_acceleration_structure = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
+    base_ray_tracing_data->create_acceleration_structure = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkCreateAccelerationStructureKHR"));
-    p_render_data->destroy_acceleration_structure = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
+    base_ray_tracing_data->destroy_acceleration_structure = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkDestroyAccelerationStructureKHR"));
-    p_render_data->get_acceleration_structure_build_sizes = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(
+    base_ray_tracing_data->get_acceleration_structure_build_sizes = reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkGetAccelerationStructureBuildSizesKHR"));
-    p_render_data->command_build_acceleration_structures = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
+    base_ray_tracing_data->command_build_acceleration_structures = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkCmdBuildAccelerationStructuresKHR"));
-    p_render_data->get_acceleration_structure_device_address = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(
+    base_ray_tracing_data->get_acceleration_structure_device_address = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(
         vkGetDeviceProcAddr(p_logical_device, "vkGetAccelerationStructureDeviceAddressKHR"));
-    if (p_render_data->create_acceleration_structure == nullptr || p_render_data->destroy_acceleration_structure == nullptr ||
-        p_render_data->get_acceleration_structure_build_sizes == nullptr || p_render_data->command_build_acceleration_structures == nullptr ||
-        p_render_data->get_acceleration_structure_device_address == nullptr) {
+    if (base_ray_tracing_data->create_acceleration_structure == nullptr ||
+        base_ray_tracing_data->destroy_acceleration_structure == nullptr ||
+        base_ray_tracing_data->get_acceleration_structure_build_sizes == nullptr ||
+        base_ray_tracing_data->command_build_acceleration_structures == nullptr ||
+        base_ray_tracing_data->get_acceleration_structure_device_address == nullptr) {
         throw std::runtime_error("Failed to load Vulkan acceleration-structure commands.");
     }
 }
 
-void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const {
+void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice p_physical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
     VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties{};
@@ -211,10 +219,10 @@ void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     physical_device_properties.pNext = &acceleration_structure_properties;
     vkGetPhysicalDeviceProperties2(p_physical_device, &physical_device_properties);
-    p_render_data->min_acceleration_structure_scratch_offset_alignment =
+    base_ray_tracing_data->min_acceleration_structure_scratch_offset_alignment =
         acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
-    p_render_data->max_acceleration_structure_geometry_count = acceleration_structure_properties.maxGeometryCount;
-    p_render_data->max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
+    base_ray_tracing_data->max_acceleration_structure_geometry_count = acceleration_structure_properties.maxGeometryCount;
+    base_ray_tracing_data->max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
 }
 
 StaticGeometryBufferUsageVK RayTracingPluginVK::get_static_geometry_buffer_usage() const {
@@ -232,11 +240,11 @@ VkDeviceAddress RayTracingPluginVK::get_buffer_device_address(Ref<ROBufferVK> p_
     return vkGetBufferDeviceAddress(render_data->logic_device, &address_info);
 }
 
-VkDeviceAddress RayTracingPluginVK::get_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const {
+VkDeviceAddress RayTracingPluginVK::query_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const {
     VkAccelerationStructureDeviceAddressInfoKHR address_info{};
     address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
     address_info.accelerationStructure = p_acceleration_structure->get_acceleration_structure();
-    return render_data->get_acceleration_structure_device_address(render_data->logic_device, &address_info);
+    return base_ray_tracing_data->get_acceleration_structure_device_address(render_data->logic_device, &address_info);
 }
 
 static VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform) {
@@ -337,7 +345,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         static_opaque_top_level_instance_buffer = MEM_NULL;
         return nullptr;
     }
-    const VkDeviceSize scratch_alignment = render_data->min_acceleration_structure_scratch_offset_alignment;
+    const VkDeviceSize scratch_alignment = base_ray_tracing_data->min_acceleration_structure_scratch_offset_alignment;
     if (scratch_alignment == 0) {
         throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid scratch-buffer size or alignment.");
     }
@@ -350,9 +358,10 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         std::array<uint32_t, 1> primitive_counts{build.primitive_count};
         VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info =
             make_bottom_level_build_info(std::span<const VkAccelerationStructureGeometryKHR>(&build.geometry, 1));
-        VkAccelerationStructureBuildSizesInfoKHR bottom_level_build_sizes = get_build_sizes(render_data, bottom_level_build_info, primitive_counts);
-        if (bottom_level_build_info.geometryCount > render_data->max_acceleration_structure_geometry_count ||
-            build.primitive_count > render_data->max_acceleration_structure_primitive_count) {
+        VkAccelerationStructureBuildSizesInfoKHR bottom_level_build_sizes =
+            get_build_sizes(render_data, base_ray_tracing_data.get(), bottom_level_build_info, primitive_counts);
+        if (bottom_level_build_info.geometryCount > base_ray_tracing_data->max_acceleration_structure_geometry_count ||
+            build.primitive_count > base_ray_tracing_data->max_acceleration_structure_primitive_count) {
             throw std::runtime_error("Failed to build static-opaque acceleration structure: device geometry limits exceeded.");
         }
         if (bottom_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
@@ -360,6 +369,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         }
         build.acceleration_structure = make_ref<ROAccelerationStructureVK>(render_data->allocator,
             render_data,
+            base_ray_tracing_data.get(),
             bottom_level_build_sizes.accelerationStructureSize,
             VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
         bottom_level_acceleration_structures.push_back(build.acceleration_structure);
@@ -368,7 +378,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         total_instance_count += build.instance_transforms.size();
     }
 
-    if (total_instance_count == 0 || total_instance_count > render_data->max_acceleration_structure_primitive_count) {
+    if (total_instance_count == 0 || total_instance_count > base_ray_tracing_data->max_acceleration_structure_primitive_count) {
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: device geometry limits exceeded.");
     }
 
@@ -385,7 +395,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     std::vector<VkAccelerationStructureInstanceKHR> top_level_instances;
     top_level_instances.reserve(total_instance_count);
     for (const StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
-        const uint64_t acceleration_structure_address = get_acceleration_structure_device_address(build.acceleration_structure);
+        const uint64_t acceleration_structure_address = query_acceleration_structure_device_address(build.acceleration_structure);
         for (const VkTransformMatrixKHR& transform : build.instance_transforms) {
             VkAccelerationStructureInstanceKHR instance{};
             instance.transform = transform;
@@ -416,16 +426,20 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     std::array<uint32_t, 1> top_level_primitive_counts{static_cast<uint32_t>(top_level_instances.size())};
     VkAccelerationStructureBuildGeometryInfoKHR top_level_sizing_info = make_top_level_build_info(&top_level_geometry);
     VkAccelerationStructureBuildSizesInfoKHR top_level_build_sizes =
-        get_build_sizes(render_data, top_level_sizing_info, top_level_primitive_counts);
-    if (top_level_sizing_info.geometryCount > render_data->max_acceleration_structure_geometry_count ||
-        top_level_instances.size() > render_data->max_acceleration_structure_primitive_count) {
+        get_build_sizes(render_data, base_ray_tracing_data.get(), top_level_sizing_info, top_level_primitive_counts);
+    if (top_level_sizing_info.geometryCount > base_ray_tracing_data->max_acceleration_structure_geometry_count ||
+        top_level_instances.size() > base_ray_tracing_data->max_acceleration_structure_primitive_count) {
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: device geometry limits exceeded.");
     }
     if (top_level_build_sizes.buildScratchSize > std::numeric_limits<VkDeviceSize>::max() - scratch_alignment + 1) {
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: invalid scratch-buffer size or alignment.");
     }
     Ref<ROAccelerationStructureVK> top_level_acceleration_structure = make_ref<ROAccelerationStructureVK>(
-        render_data->allocator, render_data, top_level_build_sizes.accelerationStructureSize, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+        render_data->allocator,
+        render_data,
+        base_ray_tracing_data.get(),
+        top_level_build_sizes.accelerationStructureSize,
+        VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     Ref<ROBufferVK> top_level_scratch_buffer =
         ROBufferVK::Builder()
             .set_domain(DeviceDomain::DEVICE)
@@ -439,7 +453,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     const std::array<VkAccelerationStructureBuildRangeInfoKHR, 1> top_level_build_ranges{
         VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = top_level_primitive_counts[0]}};
 
-    const auto command_build_acceleration_structures = render_data->command_build_acceleration_structures;
+    const auto command_build_acceleration_structures = base_ray_tracing_data->command_build_acceleration_structures;
     GPUJobVK build_job = [bottom_level_acceleration_structures,
                              bottom_level_scratch_buffer,
                              bottom_level_builds = std::move(p_build_data.bottom_level_builds),
@@ -544,7 +558,7 @@ GPUJobVK RayTracingPluginVK::on_static_opaque_set_updated(BaseRenderDataVK* p_re
 
     render_data = p_render_data;
     GPUJobVK build_job = update_static_opaque_acceleration_structure(p_set, p_vertex_buffer, p_index_buffer);
-    p_render_data->static_opaque_acceleration_structure =
+    base_ray_tracing_data->static_opaque_acceleration_structure =
         static_opaque_top_level_acceleration_structure == MEM_NULL
             ? VK_NULL_HANDLE
             : static_opaque_top_level_acceleration_structure->get_acceleration_structure();

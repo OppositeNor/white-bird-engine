@@ -38,6 +38,49 @@ class DescriptorHeapAllocatorVK;
 using GPUJobVK = std::function<void(VkCommandBuffer)>;
 
 /**
+ * @class BaseRayTracingDataVK
+ * @brief Vulkan procedures, limits, and shared handles used by ray-tracing render objects.
+ */
+struct BaseRayTracingDataVK {
+    /**
+     * @brief Device command for creating an acceleration structure.
+     */
+    PFN_vkCreateAccelerationStructureKHR create_acceleration_structure = nullptr;
+    /**
+     * @brief Device command for destroying an acceleration structure.
+     */
+    PFN_vkDestroyAccelerationStructureKHR destroy_acceleration_structure = nullptr;
+    /**
+     * @brief Device command for querying acceleration-structure build sizes.
+     */
+    PFN_vkGetAccelerationStructureBuildSizesKHR get_acceleration_structure_build_sizes = nullptr;
+    /**
+     * @brief Device command for recording acceleration-structure builds.
+     */
+    PFN_vkCmdBuildAccelerationStructuresKHR command_build_acceleration_structures = nullptr;
+    /**
+     * @brief Device command for querying an acceleration-structure device address.
+     */
+    PFN_vkGetAccelerationStructureDeviceAddressKHR get_acceleration_structure_device_address = nullptr;
+    /**
+     * @brief Non-owning handle for the current static-opaque top-level acceleration structure.
+     */
+    VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
+    /**
+     * @brief Required device-address alignment for acceleration-structure scratch storage.
+     */
+    VkDeviceSize min_acceleration_structure_scratch_offset_alignment = 1;
+    /**
+     * @brief Maximum geometries accepted by one acceleration structure.
+     */
+    uint64_t max_acceleration_structure_geometry_count = 0;
+    /**
+     * @brief Maximum primitives accepted by one acceleration structure.
+     */
+    uint64_t max_acceleration_structure_primitive_count = 0;
+};
+
+/**
  * @class BaseRenderDataVK
  * @brief The base render data that is commonly used throughout
  * the render objects.
@@ -59,18 +102,6 @@ struct BaseRenderDataVK {
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     /** Command for setting dynamic vertex input state. */
     PFN_vkCmdSetVertexInputEXT command_set_vertex_input = nullptr;
-    /** Command for creating an acceleration structure. */
-    PFN_vkCreateAccelerationStructureKHR create_acceleration_structure = nullptr;
-    /** Command for destroying an acceleration structure. */
-    PFN_vkDestroyAccelerationStructureKHR destroy_acceleration_structure = nullptr;
-    /** Command for querying acceleration-structure build sizes. */
-    PFN_vkGetAccelerationStructureBuildSizesKHR get_acceleration_structure_build_sizes = nullptr;
-    /** Command for recording acceleration-structure builds. */
-    PFN_vkCmdBuildAccelerationStructuresKHR command_build_acceleration_structures = nullptr;
-    /** Command for querying an acceleration-structure device address. */
-    PFN_vkGetAccelerationStructureDeviceAddressKHR get_acceleration_structure_device_address = nullptr;
-    /** Non-owning handle for the current static-opaque bottom-level acceleration structure. */
-    VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
     /** The VMA allocator used for owned Vulkan buffers and images. */
     VmaAllocator vma_allocator = VK_NULL_HANDLE;
     /** The image format of the swap chain. */
@@ -115,13 +146,6 @@ struct BaseRenderDataVK {
     PFN_vkCmdPushDataEXT command_push_data = nullptr;
     /** Maximum indexed-indirect draws accepted by one Vulkan draw call. */
     uint32_t max_draw_indirect_count = 1;
-    /** Required device-address alignment for acceleration-structure scratch storage. */
-    VkDeviceSize min_acceleration_structure_scratch_offset_alignment = 1;
-    /** Maximum geometries accepted by one acceleration structure. */
-    uint64_t max_acceleration_structure_geometry_count = 0;
-    /** Maximum primitives accepted by one acceleration structure. */
-    uint64_t max_acceleration_structure_primitive_count = 0;
-
     /** The fence that blocks every render tick. */
     VkFence in_flight_fence = VK_NULL_HANDLE;
     /** The current swap chain index. This is useful to trach which frame in

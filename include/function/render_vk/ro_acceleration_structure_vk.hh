@@ -38,10 +38,14 @@ public:
      * @brief Create an acceleration structure with device-local storage.
      *
      * @param p_render_data Renderer data used to create and destroy Vulkan resources.
+     * @param p_base_ray_tracing_data Ray-tracing procedure table owned by the active plugin.
      * @param p_size Required acceleration-structure storage size.
      * @param p_type Acceleration-structure type.
      */
-    ROAccelerationStructureVK(const BaseRenderDataVK* p_render_data, VkDeviceSize p_size, VkAccelerationStructureTypeKHR p_type);
+    ROAccelerationStructureVK(const BaseRenderDataVK* p_render_data,
+        const BaseRayTracingDataVK* p_base_ray_tracing_data,
+        VkDeviceSize p_size,
+        VkAccelerationStructureTypeKHR p_type);
     virtual ~ROAccelerationStructureVK() override;
     ROAccelerationStructureVK(const ROAccelerationStructureVK&) = delete;
     ROAccelerationStructureVK(ROAccelerationStructureVK&&) noexcept = delete;
@@ -59,7 +63,9 @@ public:
 
 private:
     Ref<ROBufferVK> storage_buffer;
+    const BaseRayTracingDataVK* base_ray_tracing_data = nullptr;
     VkAccelerationStructureKHR acceleration_structure = VK_NULL_HANDLE;
+    PFN_vkDestroyAccelerationStructureKHR destroy_acceleration_structure = nullptr;
 };
 
 } // namespace WhiteBirdEngine

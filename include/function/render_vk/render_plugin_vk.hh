@@ -105,6 +105,13 @@ public:
     virtual void on_before_instance_creation(VkInstanceCreateInfo* p_create_info) = 0;
 
     /**
+     * @brief Finish plugin setup after the Vulkan instance has been created.
+     *
+     * @param p_instance Created Vulkan instance.
+     */
+    virtual void on_after_instance_created(VkInstance p_instance) = 0;
+
+    /**
      * @brief Update device creation immediately before vkCreateDevice.
      *
      * Implementations use enable_device_feature() to merge feature requirements without duplicating structure types.
@@ -117,11 +124,12 @@ public:
     /**
      * @brief Finish plugin setup after the logical device has been created.
      *
-     * @param p_render_data Renderer data to populate with plugin-owned Vulkan commands or limits.
+     * @param p_render_data Renderer data available to the plugin.
      * @param p_physical_device Selected physical device.
      * @param p_logical_device Created logical device.
      */
-    virtual void on_device_created(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) = 0;
+    virtual void on_after_device_created(
+        BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) = 0;
 
     /**
      * @brief Refresh plugin-owned physical-device properties stored in the base render data.
@@ -129,7 +137,7 @@ public:
      * @param p_render_data Renderer data to update.
      * @param p_physical_device Selected physical device.
      */
-    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) const = 0;
+    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) = 0;
 
     /**
      * @brief Add extra usage bits required by this plugin for shared static-geometry buffers.
