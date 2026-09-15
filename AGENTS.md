@@ -39,6 +39,19 @@ For non-trivial implementation tasks:
 - Do not modify dependencies.
 - Before editing multiple files, verify that each file is required.
 
+## Default-Safe Convention
+
+- Procedures must default to crashing on failure. The ordinary API must not silently return a sentinel, invalid object, or
+  partial result when it cannot fulfill its contract.
+- Provide an explicitly named `try_` alternative only when failure is an expected, recoverable outcome. For example,
+  `allocate()` crashes if allocation fails, while `try_allocate()` may return `MEM_NULL` to report an allowed allocation
+  failure.
+- Private helpers and other implementation details may omit runtime checks for assumptions guaranteed by their callers, such as
+  pointer parameters being non-null, when avoiding the check is useful for performance. Express each such precondition with
+  `WBE_DEBUG_ASSERT` at the point of use.
+- `WBE_DEBUG_ASSERT` is a valid guard under this convention for implementation assumptions. Do not substitute a silent release
+  fallback unless failure is explicitly part of the API contract.
+
 ## Rendering Threading
 
 - Render objects and renderer-backend helpers are confined to the rendering thread. Their methods are not required to provide
