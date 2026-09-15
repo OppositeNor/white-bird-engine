@@ -20,7 +20,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "ro_buffer_vk.hh"
 #include "utils/utils.hh"
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  * @brief A buffer view.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROBufferViewVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROBufferViewVK final : public IRenderObjectVK {
 public:
     /**
      * @class Builder

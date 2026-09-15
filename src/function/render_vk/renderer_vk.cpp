@@ -25,28 +25,28 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -72,8 +72,8 @@ namespace WhiteBirdEngine {
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
-      window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator), image_available_semaphores(p_allocator), render_graphs(p_allocator),
-      base_render_data(p_allocator), registered_plugins(p_allocator) {
+      window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator), image_available_semaphores(p_allocator),
+      render_graphs(p_allocator), base_render_data(p_allocator), registered_plugins(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -853,10 +853,8 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
         device_features.features.drawIndirectFirstInstance != VK_TRUE ||
         device_features.features.shaderSampledImageArrayDynamicIndexing != VK_TRUE ||
         device_features.features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE ||
-        buffer_device_address_features.bufferDeviceAddress != VK_TRUE ||
-        shader_demote_features.shaderDemoteToHelperInvocation != VK_TRUE ||
-        shader_untyped_pointers_features.shaderUntypedPointers != VK_TRUE ||
-        descriptor_heap_features.descriptorHeap != VK_TRUE ||
+        buffer_device_address_features.bufferDeviceAddress != VK_TRUE || shader_demote_features.shaderDemoteToHelperInvocation != VK_TRUE ||
+        shader_untyped_pointers_features.shaderUntypedPointers != VK_TRUE || descriptor_heap_features.descriptorHeap != VK_TRUE ||
         vertex_input_dynamic_state_features.vertexInputDynamicState != VK_TRUE) {
         return false;
     }
@@ -865,8 +863,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     vkGetPhysicalDeviceMemoryProperties(p_device, &memory_properties);
     bool has_host_device_memory = false;
     for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
-        constexpr VkMemoryPropertyFlags REQUIRED_FLAGS =
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        constexpr VkMemoryPropertyFlags REQUIRED_FLAGS = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
         if ((memory_properties.memoryTypes[i].propertyFlags & REQUIRED_FLAGS) == REQUIRED_FLAGS) {
             has_host_device_memory = true;
             break;
@@ -1155,7 +1152,8 @@ void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
     for (VkFence fence : in_flight_fences) {
         auto result = vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX);
         if (result != VK_SUCCESS) {
-            throw std::runtime_error(std::format("Failed to synchronize GPU work before flushing delayed calls: {}.", string_VkResult(result)));
+            throw std::runtime_error(
+                std::format("Failed to synchronize GPU work before flushing delayed calls: {}.", string_VkResult(result)));
         }
     }
     run_gpu_jobs();
@@ -1193,10 +1191,8 @@ void RendererVK::request_frame_capture(std::string_view p_path) {
 }
 
 void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
-    const bool blue_first = swap_chain_image_format == VK_FORMAT_B8G8R8A8_SRGB ||
-                            swap_chain_image_format == VK_FORMAT_B8G8R8A8_UNORM;
-    if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB &&
-        swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
+    const bool blue_first = swap_chain_image_format == VK_FORMAT_B8G8R8A8_SRGB || swap_chain_image_format == VK_FORMAT_B8G8R8A8_UNORM;
+    if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB && swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("PNG capture supports only RGBA8 and BGRA8 swap-chain formats.");
     }
     if (swap_chain_extent.width > static_cast<uint32_t>(std::numeric_limits<int>::max() / 4) ||
@@ -1304,12 +1300,16 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
         // The swap-chain alpha channel is not necessarily meaningful.
         pixels[offset + 3] = 255;
     }
-    if (stbi_write_png(capture_png_path.c_str(), static_cast<int>(swap_chain_extent.width),
-            static_cast<int>(swap_chain_extent.height), 4, pixels.data(), static_cast<int>(swap_chain_extent.width * 4)) == 0) {
+    if (stbi_write_png(capture_png_path.c_str(),
+            static_cast<int>(swap_chain_extent.width),
+            static_cast<int>(swap_chain_extent.height),
+            4,
+            pixels.data(),
+            static_cast<int>(swap_chain_extent.width * 4)) == 0) {
         throw std::runtime_error("Failed to write the requested frame capture PNG.");
     }
-    stdout_log()->message(std::format("Captured frame {} to {}", base_render_data.current_frame,
-        std::string_view(capture_png_path.data(), capture_png_path.size())));
+    stdout_log()->message(std::format(
+        "Captured frame {} to {}", base_render_data.current_frame, std::string_view(capture_png_path.data(), capture_png_path.size())));
 }
 
 void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
@@ -1415,7 +1415,7 @@ void RendererVK::update_render_graph_resources(
     }
 
     for (size_t i = 0; i < p_binding_count; ++i) {
-        Ref<RenderObjectVK> resource = p_bindings[i].resource.dynamic_cast_ref<RenderObjectVK>();
+        Ref<IRenderObjectVK> resource = p_bindings[i].resource.dynamic_cast_ref<IRenderObjectVK>();
         if (resource == MEM_NULL) {
             throw std::runtime_error(std::format("Render graph resource is not compatible with Vulkan: {}.", p_bindings[i].resource_id));
         }
@@ -1442,8 +1442,8 @@ void RendererVK::update_static_geometry_sets() {
         render_objects->static_opaque_vertices = geometry_buffers.vertex_buffer;
         render_objects->static_opaque_indices = geometry_buffers.index_buffer;
         for (auto& plugin : registered_plugins) {
-            auto plugin_job =
-                plugin->on_static_opaque_set_updated(&base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer);
+            auto plugin_job = plugin->on_static_opaque_set_updated(
+                &base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer);
             if (plugin_job) {
                 register_gpu_job(std::move(plugin_job));
             }

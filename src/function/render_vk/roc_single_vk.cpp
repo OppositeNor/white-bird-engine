@@ -15,33 +15,33 @@
 #include "function/render_vk/roc_single_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <utility>
 
 namespace WhiteBirdEngine {
 
-ROCSingleVK::ROCSingleVK(Ref<RenderObjectVK> p_resource) : resource(std::move(p_resource)) {
+ROCSingleVK::ROCSingleVK(Ref<IRenderObjectVK> p_resource) : resource(std::move(p_resource)) {
     if (resource == MEM_NULL) {
         throw std::runtime_error("ROCSingleVK: resource is null.");
     }
     retain_resource_type(resource);
 }
 
-Ref<RenderObjectVK> ROCSingleVK::get() {
+Ref<IRenderObjectVK> ROCSingleVK::get() {
     return resource;
 }
 
-Ref<RenderObjectVK> ROCSingleVK::get() const {
+Ref<IRenderObjectVK> ROCSingleVK::get() const {
     return resource;
 }
 
-Ref<RenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) {
+Ref<IRenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) {
     return resource;
 }
 
-Ref<RenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
+Ref<IRenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
     return resource;
 }
 

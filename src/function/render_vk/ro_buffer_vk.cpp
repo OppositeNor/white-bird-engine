@@ -16,9 +16,9 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -58,13 +58,12 @@ static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_doma
     return result;
 }
 
-static VkDeviceAddressRangeEXT get_buffer_address_range(
-    const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
+static VkDeviceAddressRangeEXT get_buffer_address_range(const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
     VkBufferDeviceAddressInfo address_info{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = p_buffer};
     return VkDeviceAddressRangeEXT{.address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info), .size = p_size};
 }
 
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
+ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     if (p_builder.uniform_view_index.has_value() && p_builder.storage_view_index.has_value() &&
         p_builder.uniform_view_index == p_builder.storage_view_index) {
         throw std::runtime_error("Failed to create buffer: uniform and storage descriptors cannot adopt the same heap index.");
@@ -121,24 +120,22 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     mapped_memory = allocation_info.pMappedData;
     if (p_builder.uniform_view_index.has_value()) {
         uniform_view_index = p_builder.uniform_view_index;
-        render_data->descriptor_heap_allocator->write_buffer_descriptor(
-            *uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+        render_data->descriptor_heap_allocator->write_buffer_descriptor(*uniform_view_index,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
     }
     if (p_builder.storage_view_index.has_value()) {
         storage_view_index = p_builder.storage_view_index;
-        render_data->descriptor_heap_allocator->write_buffer_descriptor(
-            *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
+        render_data->descriptor_heap_allocator->write_buffer_descriptor(*storage_view_index,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
     }
 }
 
 ROBufferVK::~ROBufferVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data,
-            buffer = buffer,
-            allocation = allocation,
-            uniform_view_index = uniform_view_index,
-            storage_view_index = storage_view_index]() mutable {
+        [render_data = render_data, buffer = buffer, allocation = allocation, uniform_view_index = uniform_view_index, storage_view_index = storage_view_index]() mutable {
             if (uniform_view_index.has_value()) {
                 render_data->descriptor_heap_allocator->deallocate_buffer(*uniform_view_index);
             }

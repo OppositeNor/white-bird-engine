@@ -20,9 +20,9 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include <functional>
 #include <string_view>
@@ -127,7 +127,7 @@ struct RendGraphDescVK {
      * @param p_resource The resource binding to transfer into the graph.
      * @return This graph descriptor.
      */
-    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectVK> p_resource);
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource);
 
     /**
      * @brief Append a resource binding by id and concrete render object.

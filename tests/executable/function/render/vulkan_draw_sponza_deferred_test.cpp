@@ -27,9 +27,9 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -81,7 +81,7 @@ namespace {
 Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
     RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
     return make_ref<ROCPerFrameVK>(
-        p_allocator, p_render_data, [p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<RenderObjectVK> {
+        p_allocator, p_render_data, [p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
             return ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                 .set_domain(DeviceDomain::HOST_DEVICE)
@@ -908,8 +908,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc
-        .add_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID)
+    p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID)
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_COMPUTE_PIPELINE,
             shadow_moments_summed_area_table_horizontal_compute_pipeline)
         .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_VERTICAL_COMPUTE_PIPELINE,

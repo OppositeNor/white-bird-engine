@@ -18,8 +18,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  */
 class ROCPerFrameVK final : public RenderObjectContainerVK {
 public:
-    using Factory = std::function<Ref<RenderObjectVK>(uint32_t)>;
+    using Factory = std::function<Ref<IRenderObjectVK>(uint32_t)>;
 
     ROCPerFrameVK() = delete;
     ~ROCPerFrameVK() override = default;
@@ -45,11 +45,11 @@ public:
     explicit ROCPerFrameVK(const BaseRenderDataVK* p_render_data);
     ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory);
 
-    Ref<RenderObjectVK> get() override;
-    Ref<RenderObjectVK> get() const override;
-    Ref<RenderObjectVK> get(uint32_t p_frame_slot) override;
-    Ref<RenderObjectVK> get(uint32_t p_frame_slot) const override;
-    void set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource);
+    Ref<IRenderObjectVK> get() override;
+    Ref<IRenderObjectVK> get() const override;
+    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) override;
+    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const override;
+    void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource);
 
     /**
      * @brief Release the resources retained for all frame slots.
@@ -74,7 +74,7 @@ private:
     void synchronize(uint32_t p_frame_slot) const;
 
     const BaseRenderDataVK* render_data = nullptr;
-    Vector<Ref<RenderObjectVK>, RenderAllocator> resources;
+    Vector<Ref<IRenderObjectVK>, RenderAllocator> resources;
     mutable Vector<uint64_t, RenderAllocator> applied_generations;
     Vector<uint8_t, RenderAllocator> pending_buffer_data;
     uint64_t update_generation = 0;

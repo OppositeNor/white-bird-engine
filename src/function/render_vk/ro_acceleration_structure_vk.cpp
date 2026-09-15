@@ -14,7 +14,7 @@
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -31,11 +31,8 @@ TypeID ROAccelerationStructureVK::get_type_uuid() const {
 }
 
 ROAccelerationStructureVK::ROAccelerationStructureVK(
-    const BaseRenderDataVK* p_render_data,
-    const BaseRayTracingDataVK* p_base_ray_tracing_data,
-    VkDeviceSize p_size,
-    VkAccelerationStructureTypeKHR p_type)
-    : RenderObjectVK(p_render_data),
+    const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_base_ray_tracing_data, VkDeviceSize p_size, VkAccelerationStructureTypeKHR p_type)
+    : IRenderObjectVK(p_render_data),
       storage_buffer(ROBufferVK::Builder()
               .set_domain(DeviceDomain::DEVICE)
               .set_size(p_size)
@@ -60,9 +57,7 @@ ROAccelerationStructureVK::ROAccelerationStructureVK(
 
 ROAccelerationStructureVK::~ROAccelerationStructureVK() {
     render_data->register_delayed_call(
-        [render_data = render_data,
-            acceleration_structure = acceleration_structure,
-            destroy_acceleration_structure = destroy_acceleration_structure]() {
+        [render_data = render_data, acceleration_structure = acceleration_structure, destroy_acceleration_structure = destroy_acceleration_structure]() {
             destroy_acceleration_structure(render_data->logic_device, acceleration_structure, render_data->allocation_callbacks);
         },
         render_data->frames_in_flight);

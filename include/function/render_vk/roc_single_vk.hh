@@ -16,8 +16,8 @@
 #define WBE_FILE_ROC_SINGLE_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
@@ -35,15 +35,15 @@ public:
     ROCSingleVK& operator=(const ROCSingleVK&) = delete;
     ROCSingleVK& operator=(ROCSingleVK&&) noexcept = delete;
 
-    explicit ROCSingleVK(Ref<RenderObjectVK> p_resource);
+    explicit ROCSingleVK(Ref<IRenderObjectVK> p_resource);
 
-    Ref<RenderObjectVK> get() override;
-    Ref<RenderObjectVK> get() const override;
-    Ref<RenderObjectVK> get(uint32_t p_frame_slot) override;
-    Ref<RenderObjectVK> get(uint32_t p_frame_slot) const override;
+    Ref<IRenderObjectVK> get() override;
+    Ref<IRenderObjectVK> get() const override;
+    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) override;
+    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const override;
 
 private:
-    Ref<RenderObjectVK> resource;
+    Ref<IRenderObjectVK> resource;
 };
 
 } // namespace WhiteBirdEngine

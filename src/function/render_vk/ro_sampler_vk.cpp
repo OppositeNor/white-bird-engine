@@ -13,9 +13,9 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
@@ -169,7 +169,7 @@ VkSampler ROSamplerVK::Builder::create_vk_object(const BaseRenderDataVK* p_rende
     return result;
 }
 
-ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
+ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     create_info = VkSamplerCreateInfo{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .magFilter = p_builder.mag_filter,
         .minFilter = p_builder.min_filter,

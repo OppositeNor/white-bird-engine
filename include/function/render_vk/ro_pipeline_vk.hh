@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -35,7 +35,7 @@ class ComputePipelineCompilerVK;
  * @class ROPipelineVK
  * @brief Shared Vulkan pipeline runtime ownership.
  */
-class ROPipelineVK : public RenderObjectVK {
+class ROPipelineVK : public IRenderObjectVK {
 public:
     ROPipelineVK() = delete;
     virtual ~ROPipelineVK() override;

@@ -15,10 +15,9 @@
 
 #include "function/render_vk/ro_buffer_view_vk.hh"
 #include "core/core_utils.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "generated/type_uuid.gen.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -44,7 +43,7 @@ VkBufferView ROBufferViewVK::Builder::create_vk_object(const BaseRenderDataVK* p
 }
 
 ROBufferViewVK::ROBufferViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : IRenderObjectVK(p_render_data) {
     buffer_view = p_builder.create_vk_object(p_render_data);
     exposed_fields.buffer = p_builder.buffer;
 }

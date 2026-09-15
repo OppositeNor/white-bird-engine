@@ -17,7 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
@@ -34,29 +34,29 @@ public:
     RenderObjectContainerVK& operator=(const RenderObjectContainerVK&) = delete;
     RenderObjectContainerVK& operator=(RenderObjectContainerVK&&) noexcept = delete;
 
-    virtual Ref<RenderObjectVK> get() = 0;
-    virtual Ref<RenderObjectVK> get() const = 0;
+    virtual Ref<IRenderObjectVK> get() = 0;
+    virtual Ref<IRenderObjectVK> get() const = 0;
 
     /**
      * @brief Resolve the resource for an explicit frame slot.
      * @param p_frame_slot Frame slot to resolve.
      * @return Resolved render object.
      */
-    virtual Ref<RenderObjectVK> get(uint32_t p_frame_slot) = 0;
+    virtual Ref<IRenderObjectVK> get(uint32_t p_frame_slot) = 0;
 
     /**
      * @brief Resolve the resource for an explicit frame slot.
      * @param p_frame_slot Frame slot to resolve.
      * @return Resolved render object.
      */
-    virtual Ref<RenderObjectVK> get(uint32_t p_frame_slot) const = 0;
+    virtual Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const = 0;
 
     RendResTID get_resource_type_id() const;
 
 protected:
     RenderObjectContainerVK() = default;
 
-    void retain_resource_type(Ref<RenderObjectVK> p_resource);
+    void retain_resource_type(Ref<IRenderObjectVK> p_resource);
 
     RendResTID resource_type_id = 0;
 };

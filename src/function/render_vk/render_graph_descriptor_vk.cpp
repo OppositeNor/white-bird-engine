@@ -18,8 +18,8 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include <stdexcept>
@@ -102,7 +102,7 @@ RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectVK> p_resource) {
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource) {
     if (p_resource == MEM_NULL) {
         throw std::runtime_error("Failed to add render graph resource: render object is null.");
     }
@@ -110,8 +110,7 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, R
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id) {
-    return add_resource(RendResVK{
-            .res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
+    return add_resource(RendResVK{.res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container) {

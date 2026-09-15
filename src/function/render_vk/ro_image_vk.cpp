@@ -18,8 +18,8 @@
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -171,12 +171,12 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     image->exposed_fileds.image_layout = new_layout;
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : RenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     init(p_builder);
 }
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
-    : RenderObjectVK(p_render_data) {
+    : IRenderObjectVK(p_render_data) {
     exposed_fileds.image = p_image;
     p_image = VK_NULL_HANDLE;
     exposed_fileds.image_memory = VK_NULL_HANDLE;
@@ -187,7 +187,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
     ownership = Ownership::SWAP_CHAIN;
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture) : RenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture) : IRenderObjectVK(p_render_data) {
     if (p_texture.image == VK_NULL_HANDLE || p_texture.deviceMemory == VK_NULL_HANDLE) {
         ktxVulkanTexture_Destruct(&p_texture, p_render_data->logic_device, p_render_data->allocation_callbacks);
         throw std::runtime_error("Failed to adopt libktx Vulkan texture: image or device memory is null.");

@@ -15,7 +15,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -36,7 +36,7 @@ TypeID ROStagingBufferVK::get_type_uuid() const {
 }
 
 ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : IRenderObjectVK(p_render_data) {
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = p_builder.size;

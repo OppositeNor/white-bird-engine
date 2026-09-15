@@ -15,9 +15,9 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -116,7 +116,7 @@ VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_r
 }
 
 ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_render_data) {
+    : IRenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
@@ -126,10 +126,7 @@ ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builde
 ROImageViewVK::~ROImageViewVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data,
-            image_view = image_view,
-            sampled_view_index = sampled_view_index,
-            storage_view_index = storage_view_index]() {
+        [render_data = render_data, image_view = image_view, sampled_view_index = sampled_view_index, storage_view_index = storage_view_index]() {
             if (sampled_view_index.has_value()) {
                 render_data->descriptor_heap_allocator->deallocate_sampled_image(*sampled_view_index);
             }
@@ -171,13 +168,11 @@ void ROImageViewVK::init(const Builder& p_builder) {
     image_view = p_builder.create_vk_object(render_data);
     if (p_builder.sampled_view_index.has_value()) {
         sampled_view_index = p_builder.sampled_view_index;
-        render_data->descriptor_heap_allocator->write_sampled_image_descriptor(
-            *sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        render_data->descriptor_heap_allocator->write_sampled_image_descriptor(*sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
     }
     if (p_builder.storage_view_index.has_value()) {
         storage_view_index = p_builder.storage_view_index;
-        render_data->descriptor_heap_allocator->write_storage_image_descriptor(
-            *storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        render_data->descriptor_heap_allocator->write_storage_image_descriptor(*storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
     }
 }
 

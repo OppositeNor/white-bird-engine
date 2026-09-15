@@ -17,7 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 
 #include <cstdint>
@@ -47,7 +47,7 @@ enum class DescriptorHeapTypeVK : uint8_t {
  *
  * This object is neither copyable nor movable.
  */
-class WBE_META(WBE_RENDER_OBJECT) RODescriptorHeapVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) RODescriptorHeapVK final : public IRenderObjectVK {
 public:
     /**
      * @class Backing
@@ -65,10 +65,7 @@ public:
         /**
          * @brief Create aligned host-visible and device-local heap storage.
          */
-        Backing(const BaseRenderDataVK* p_render_data,
-            VkDeviceSize p_usable_size,
-            VkDeviceSize p_reserved_size,
-            VkDeviceSize p_alignment);
+        Backing(const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment);
 
     private:
         friend class RODescriptorHeapVK;

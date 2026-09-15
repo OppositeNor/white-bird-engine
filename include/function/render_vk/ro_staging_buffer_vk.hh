@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/defs.hh"
@@ -31,7 +31,7 @@
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
-class WBE_META(WBE_RENDER_OBJECT) ROStagingBufferVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROStagingBufferVK final : public IRenderObjectVK {
     friend class ROBufferVK;
 
 public:

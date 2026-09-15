@@ -16,11 +16,10 @@
 #include "function/render_vk/ro_shader_vk.hh"
 #include "core/core_utils.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <span>
@@ -68,19 +67,19 @@ VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_r
 }
 
 ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
-    : RenderObjectVK(p_base_render_data) {
+    : IRenderObjectVK(p_base_render_data) {
     init(p_builder);
 }
 
 ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, std::string_view p_resource_id)
-    : RenderObjectVK(p_base_render_data) {
+    : IRenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource_id);
     init(builder);
 }
 
 ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource)
-    : RenderObjectVK(p_base_render_data) {
+    : IRenderObjectVK(p_base_render_data) {
     Builder builder;
     builder.set_code(p_resource);
     init(builder);

@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_OBJECT_VK_HH
-#define WBE_FILE_RENDER_OBJECT_VK_HH
+#ifndef WBE_FILE_I_RENDER_OBJECT_VK_HH
+#define WBE_FILE_I_RENDER_OBJECT_VK_HH
 
 #include "function/render/i_render_object.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -22,28 +22,28 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RenderObjectVK
+ * @class IRenderObjectVK
  * @brief Vulkan render object.
  *
  * All methods are confined to the rendering thread and do not provide internal synchronization. Callers on other threads
  * must submit operations through the renderer job buffer.
  *
  */
-class RenderObjectVK : public IRenderObject {
+class IRenderObjectVK : public IRenderObject {
 public:
-    RenderObjectVK() = delete;
-    virtual ~RenderObjectVK() override = default;
-    RenderObjectVK(const RenderObjectVK&) = delete;
-    RenderObjectVK(RenderObjectVK&&) noexcept = delete;
-    RenderObjectVK& operator=(const RenderObjectVK&) = delete;
-    RenderObjectVK& operator=(RenderObjectVK&&) noexcept = delete;
+    IRenderObjectVK() = delete;
+    virtual ~IRenderObjectVK() override = default;
+    IRenderObjectVK(const IRenderObjectVK&) = delete;
+    IRenderObjectVK(IRenderObjectVK&&) noexcept = delete;
+    IRenderObjectVK& operator=(const IRenderObjectVK&) = delete;
+    IRenderObjectVK& operator=(IRenderObjectVK&&) noexcept = delete;
 
     /**
      * @brief Constructor.
      *
      * @param p_render_data The base render data.
      */
-    RenderObjectVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
+    IRenderObjectVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
         if (p_render_data == nullptr) {
             throw std::runtime_error("Render data is nullptr.");
         }

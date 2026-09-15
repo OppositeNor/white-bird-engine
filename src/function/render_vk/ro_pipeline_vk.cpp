@@ -20,16 +20,17 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <string_view>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 ROPipelineVK::ROPipelineVK(const BaseRenderDataVK* p_render_data)
-    : RenderObjectVK(p_render_data), descriptor_index_data(p_render_data->allocator), descriptor_resources(p_render_data->allocator),
-      descriptor_resource_containers(p_render_data->allocator), descriptor_fields(p_render_data->allocator) {
+    : IRenderObjectVK(p_render_data), descriptor_index_data(p_render_data->allocator),
+      descriptor_resources(p_render_data->allocator), descriptor_resource_containers(p_render_data->allocator),
+      descriptor_fields(p_render_data->allocator) {
 }
 
 ROPipelineVK::~ROPipelineVK() {
@@ -70,8 +71,9 @@ void ROPipelineVK::set_descriptor_index(uint32_t p_offset, uint32_t p_index, Ref
     }
     const uint32_t descriptor_index[2] = {p_index, 0};
     std::memcpy(descriptor_index_data.data() + p_offset, descriptor_index, DESCRIPTOR_INDEX_SIZE);
-    auto field = std::ranges::find_if(
-        descriptor_fields, [p_offset](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.offset == p_offset; });
+    auto field = std::ranges::find_if(descriptor_fields, [p_offset](const ShaderDescriptorHeapFieldVK& p_field) {
+        return p_field.offset == p_offset;
+    });
     if (field == descriptor_fields.end()) {
         throw std::runtime_error("Failed to set pipeline descriptor index: reflected field is missing.");
     }
@@ -79,8 +81,9 @@ void ROPipelineVK::set_descriptor_index(uint32_t p_offset, uint32_t p_index, Ref
 }
 
 void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource) {
-    auto field = std::ranges::find_if(descriptor_fields,
-        [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.field_path == p_field_path; });
+    auto field = std::ranges::find_if(descriptor_fields, [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) {
+        return p_field.field_path == p_field_path;
+    });
     if (field == descriptor_fields.end()) {
         throw std::runtime_error("Failed to set pipeline descriptor binding: reflected field path was not found.");
     }
@@ -131,17 +134,17 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
     descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = MEM_NULL;
 }
 
-void ROPipelineVK::set_descriptor_binding(
-    std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container) {
+void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container) {
     if (p_resource_container == MEM_NULL) {
         throw std::runtime_error("Failed to set pipeline descriptor binding: resource container is missing.");
     }
-    auto field = std::ranges::find_if(descriptor_fields,
-        [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) { return p_field.field_path == p_field_path; });
+    auto field = std::ranges::find_if(descriptor_fields, [p_field_path](const ShaderDescriptorHeapFieldVK& p_field) {
+        return p_field.field_path == p_field_path;
+    });
     if (field == descriptor_fields.end()) {
         throw std::runtime_error("Failed to set pipeline descriptor binding: reflected field path was not found.");
     }
-    Ref<RenderObjectVK> resource = p_resource_container->get(render_data->current_frame_slot);
+    Ref<IRenderObjectVK> resource = p_resource_container->get(render_data->current_frame_slot);
     set_descriptor_binding(p_field_path, resource);
     descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = std::move(p_resource_container);
 }
@@ -154,7 +157,7 @@ void ROPipelineVK::push_descriptor_indices(VkCommandBuffer p_command_buffer) {
         if (descriptor_resource_containers[i] == MEM_NULL) {
             continue;
         }
-        Ref<RenderObjectVK> resource = descriptor_resource_containers[i]->get(render_data->current_frame_slot);
+        Ref<IRenderObjectVK> resource = descriptor_resource_containers[i]->get(render_data->current_frame_slot);
         Ref<RenderObjectContainerVK> container = descriptor_resource_containers[i];
         set_descriptor_binding(descriptor_fields[i].field_path, resource);
         descriptor_resource_containers[i] = std::move(container);

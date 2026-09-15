@@ -20,8 +20,8 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/ecs/components.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -38,7 +38,7 @@ namespace WhiteBirdEngine {
  * @brief Image.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public IRenderObjectVK {
     friend struct MemoryBarrierBuilder;
     friend class RendererVK;
 

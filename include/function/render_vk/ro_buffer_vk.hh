@@ -20,7 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -38,7 +38,7 @@ namespace WhiteBirdEngine {
  * @class ROBufferVK
  * @brief Buffer render object.
  */
-class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public IRenderObjectVK {
 public:
     /**
      * @class ExposedFields

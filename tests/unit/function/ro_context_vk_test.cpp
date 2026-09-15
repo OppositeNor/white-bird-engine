@@ -15,7 +15,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
@@ -28,10 +28,10 @@
 
 namespace WhiteBirdEngine {
 
-class TestContextResourceVK final : public RenderObjectVK {
+class TestContextResourceVK final : public IRenderObjectVK {
 public:
     TestContextResourceVK(const BaseRenderDataVK* p_render_data, uint32_t p_context_id)
-        : RenderObjectVK(p_render_data), context_id(p_context_id) {
+        : IRenderObjectVK(p_render_data), context_id(p_context_id) {
     }
     virtual ~TestContextResourceVK() override = default;
     TestContextResourceVK(const TestContextResourceVK&) = delete;
@@ -61,7 +61,7 @@ TEST(WBEROCPerFrameVKTest, CreatesOneResourcePerFrameAndUsesCurrentFrameSlot) {
     render_data.current_frame_slot = 1;
 
     ROCPerFrameVK context(&render_data, [&render_data, &allocator](uint32_t p_context_id) {
-        return make_ref<TestContextResourceVK>(&allocator, &render_data, p_context_id).template dynamic_cast_ref<RenderObjectVK>();
+        return make_ref<TestContextResourceVK>(&allocator, &render_data, p_context_id).template dynamic_cast_ref<IRenderObjectVK>();
     });
 
     EXPECT_EQ(context.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
@@ -85,7 +85,7 @@ TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     EXPECT_THROW(ROCPerFrameVK(&render_data, {}), std::runtime_error);
     EXPECT_THROW(ROCPerFrameVK(&render_data,
                      [](uint32_t /*p_context_id*/) {
-                         return Ref<RenderObjectVK>(MEM_NULL);
+                         return Ref<IRenderObjectVK>(MEM_NULL);
                      }),
         std::runtime_error);
 }
@@ -98,9 +98,9 @@ TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
 
     ROCPerFrameVK context(&render_data);
     auto frame_zero_resource =
-        make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<RenderObjectVK>();
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<IRenderObjectVK>();
     auto frame_two_resource =
-        make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<RenderObjectVK>();
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<IRenderObjectVK>();
 
     context.set(0, frame_zero_resource);
     context.set(2, frame_two_resource);
@@ -131,7 +131,7 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
 
-    auto resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 7).template dynamic_cast_ref<RenderObjectVK>();
+    auto resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 7).template dynamic_cast_ref<IRenderObjectVK>();
     ROCSingleVK container(resource);
 
     EXPECT_EQ(container.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);

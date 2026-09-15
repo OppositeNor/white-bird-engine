@@ -17,7 +17,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/defs.hh"
@@ -30,14 +30,14 @@
 
 namespace WhiteBirdEngine {
 
-static Vector<Ref<RenderObjectVK>, RenderAllocator> create_frame_resources(const BaseRenderDataVK* p_render_data) {
+static Vector<Ref<IRenderObjectVK>, RenderAllocator> create_frame_resources(const BaseRenderDataVK* p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("ROCPerFrameVK: render data is null.");
     }
     WBE_DEBUG_ASSERT(p_render_data->allocator != nullptr);
     WBE_DEBUG_ASSERT(p_render_data->frames_in_flight != 0);
 
-    Vector<Ref<RenderObjectVK>, RenderAllocator> resources(p_render_data->allocator);
+    Vector<Ref<IRenderObjectVK>, RenderAllocator> resources(p_render_data->allocator);
     resources.reserve(p_render_data->frames_in_flight);
     for (uint32_t frame_slot = 0; frame_slot < p_render_data->frames_in_flight; ++frame_slot) {
         resources.emplace_back(MEM_NULL);
@@ -64,7 +64,7 @@ ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_fa
     }
 
     for (uint32_t frame_slot = 0; frame_slot < render_data->frames_in_flight; ++frame_slot) {
-        Ref<RenderObjectVK> resource_ref = p_factory(frame_slot);
+        Ref<IRenderObjectVK> resource_ref = p_factory(frame_slot);
         if (resource_ref == MEM_NULL) {
             throw std::runtime_error(std::format("ROCPerFrameVK: resource factory returned null for frame slot {}.", frame_slot));
         }
@@ -73,15 +73,15 @@ ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_fa
     }
 }
 
-Ref<RenderObjectVK> ROCPerFrameVK::get() {
+Ref<IRenderObjectVK> ROCPerFrameVK::get() {
     return get(render_data->current_frame_slot);
 }
 
-Ref<RenderObjectVK> ROCPerFrameVK::get() const {
+Ref<IRenderObjectVK> ROCPerFrameVK::get() const {
     return get(render_data->current_frame_slot);
 }
 
-Ref<RenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) {
+Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));
@@ -90,7 +90,7 @@ Ref<RenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) {
     return resources[p_frame_slot];
 }
 
-Ref<RenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
+Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));
@@ -99,7 +99,7 @@ Ref<RenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
     return resources[p_frame_slot];
 }
 
-void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource) {
+void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));
@@ -110,7 +110,7 @@ void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<RenderObjectVK> p_resource) {
 }
 
 void ROCPerFrameVK::clear() {
-    for (Ref<RenderObjectVK>& resource : resources) {
+    for (Ref<IRenderObjectVK>& resource : resources) {
         resource = MEM_NULL;
     }
 }
@@ -137,7 +137,7 @@ void ROCPerFrameVK::synchronize(uint32_t p_frame_slot) const {
     if (pending_buffer_data.empty() || applied_generations[p_frame_slot] == update_generation) {
         return;
     }
-    Ref<RenderObjectVK> resource = resources[p_frame_slot];
+    Ref<IRenderObjectVK> resource = resources[p_frame_slot];
     if (resource == MEM_NULL) {
         throw std::runtime_error(std::format("ROCPerFrameVK: cannot apply update to empty frame slot {}.", p_frame_slot));
     }

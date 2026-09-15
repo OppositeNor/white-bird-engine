@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -37,10 +38,8 @@ static VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
     return p_left + p_right;
 }
 
-RODescriptorHeapVK::Backing::Backing(const BaseRenderDataVK* p_render_data,
-    VkDeviceSize p_usable_size,
-    VkDeviceSize p_reserved_size,
-    VkDeviceSize p_alignment)
+RODescriptorHeapVK::Backing::Backing(
+    const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment)
     : render_data(p_render_data), usable_size(p_usable_size), reserved_size(p_reserved_size) {
     if (p_render_data == nullptr || p_alignment == 0) {
         throw std::runtime_error("Failed to create descriptor heap: invalid render data or heap alignment.");
@@ -66,13 +65,8 @@ RODescriptorHeapVK::Backing::Backing(const BaseRenderDataVK* p_render_data,
     allocation_create_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
     VmaAllocationInfo allocation_info{};
-    VkResult result = vmaCreateBufferWithAlignment(render_data->vma_allocator,
-        &buffer_create_info,
-        &allocation_create_info,
-        p_alignment,
-        &buffer,
-        &allocation,
-        &allocation_info);
+    VkResult result = vmaCreateBufferWithAlignment(
+        render_data->vma_allocator, &buffer_create_info, &allocation_create_info, p_alignment, &buffer, &allocation, &allocation_info);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan descriptor heap: {}.", string_VkResult(result)));
     }
@@ -104,14 +98,10 @@ RODescriptorHeapVK::Backing::~Backing() {
     }
 }
 
-RODescriptorHeapVK::RODescriptorHeapVK(const BaseRenderDataVK* p_render_data,
-    Ref<Backing> p_backing,
-    DescriptorHeapTypeVK p_type,
-    uint32_t p_first_index,
-    uint32_t p_capacity,
-    VkDeviceSize p_stride)
-    : RenderObjectVK(p_render_data), backing(std::move(p_backing)), type(p_type), first_index(p_first_index), capacity(p_capacity),
-      stride(p_stride) {
+RODescriptorHeapVK::RODescriptorHeapVK(
+    const BaseRenderDataVK* p_render_data, Ref<Backing> p_backing, DescriptorHeapTypeVK p_type, uint32_t p_first_index, uint32_t p_capacity, VkDeviceSize p_stride)
+    : IRenderObjectVK(p_render_data), backing(std::move(p_backing)), type(p_type), first_index(p_first_index),
+      capacity(p_capacity), stride(p_stride) {
     if (backing == MEM_NULL || capacity == 0 || stride == 0) {
         throw std::runtime_error("Failed to create descriptor heap arena: invalid backing, capacity, or stride.");
     }
@@ -136,8 +126,7 @@ bool RODescriptorHeapVK::owns_range(uint32_t p_first_index, uint32_t p_count) co
     return range_end <= arena_end;
 }
 
-void RODescriptorHeapVK::write_resource_descriptor(
-    uint32_t p_index, const VkResourceDescriptorInfoEXT& p_descriptor) const {
+void RODescriptorHeapVK::write_resource_descriptor(uint32_t p_index, const VkResourceDescriptorInfoEXT& p_descriptor) const {
     if (type == DescriptorHeapTypeVK::SAMPLER || !owns_range(p_index)) {
         throw std::runtime_error("Failed to write resource descriptor: descriptor index does not belong to the arena.");
     }

@@ -20,7 +20,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/utils.hh"
@@ -34,7 +34,7 @@ namespace WhiteBirdEngine {
  * @brief Vulkan image view object.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public IRenderObjectVK {
 public:
     // Builder for ROImageViewVK
     struct Builder {
@@ -51,8 +51,8 @@ public:
             .b = VK_COMPONENT_SWIZZLE_IDENTITY,
             .a = VK_COMPONENT_SWIZZLE_IDENTITY};
         // Subresource range.
-        VkImageSubresourceRange subresource_range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+        VkImageSubresourceRange subresource_range{
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         std::optional<uint32_t> sampled_view_index;
         std::optional<uint32_t> storage_view_index;
 

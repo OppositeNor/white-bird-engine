@@ -17,7 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/render_object_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/utils.hh"
@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  *
  * The owned Vulkan resources are neither copyable nor movable.
  */
-class WBE_META(WBE_RENDER_OBJECT) ROAccelerationStructureVK final : public RenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROAccelerationStructureVK final : public IRenderObjectVK {
 public:
     ROAccelerationStructureVK() = delete;
     /**

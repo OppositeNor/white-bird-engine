@@ -19,15 +19,15 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_object_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <algorithm>
 #include <cstddef>
@@ -44,7 +44,7 @@
 
 namespace WhiteBirdEngine {
 
-static Ref<RenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
+static Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
     if (p_resource.container == MEM_NULL) {
         return MEM_NULL;
     }
@@ -526,7 +526,8 @@ void RenderGraphVK::add_exec_edges_from_prev(const RendGraphDescVK& p_desc, cons
         for (const auto& prev_id : p_desc.tasks[i].prev) {
             auto producer = node_by_task_id(prev_id);
             if (producer == MEM_NULL) {
-                throw std::runtime_error(std::format("RenderGraphVK: unknown prev task id: {} for task: {}", prev_id, consumer->task_id));
+                throw std::runtime_error(
+                    std::format("RenderGraphVK: unknown prev task id: {} for task: {}", prev_id, consumer->task_id));
             }
             add_exec_edge(producer, consumer, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
         }
@@ -588,19 +589,13 @@ void RenderGraphVK::validate_explicit_resource_dependencies() {
                     continue;
                 }
                 if (!has_exec_path(p_before, p_after)) {
-                    throw std::runtime_error(std::format(
-                        "RenderGraphVK: tasks '{}' and '{}' both access resource '{}' without an explicit execution path.",
+                    throw std::runtime_error(std::format("RenderGraphVK: tasks '{}' and '{}' both access resource '{}' without an explicit execution path.",
                         p_before->task_id,
                         p_after->task_id,
                         before_access.res_id));
                 }
-                update_edge_resource_scopes(direct_edge,
-                    p_before->in_queue,
-                    before_access,
-                    p_before_is_write,
-                    p_after->in_queue,
-                    after_access,
-                    p_after_is_write);
+                update_edge_resource_scopes(
+                    direct_edge, p_before->in_queue, before_access, p_before_is_write, p_after->in_queue, after_access, p_after_is_write);
             }
         }
     };
