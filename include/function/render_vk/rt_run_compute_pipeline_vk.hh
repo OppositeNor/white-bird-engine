@@ -18,11 +18,9 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include <string>
-#include <string_view>
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -44,12 +42,12 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
      * @brief Constructor.
      *
      * @param p_render_data Base render data.
-     * @param p_pipeline_id Resource id of the compute pipeline.
+     * @param p_pipeline Compute pipeline retained by the task.
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
      * @param p_queue_family Queue family used to submit the compute dispatch.
      */
     RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
-        std::string_view p_pipeline_id,
+        Ref<ROComputePipelineVK> p_pipeline,
         VkExtent3D p_dispatch_group_count,
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
@@ -57,18 +55,16 @@ struct RTRunComputePipelineVK final : public RenderTaskVK {
         return queue_family_id;
     }
 
-    virtual void validate_resources(const RendResViewVK& p_resources) const override;
-
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
-    std::string pipeline_id;
+    Ref<ROComputePipelineVK> pipeline;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
 };
 

@@ -27,9 +27,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -41,7 +39,6 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -126,15 +123,13 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
 
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
-    // Inject the current swap-chain image view into the active graph so tasks
-    // referencing REND_RES_SWAP_CHAIN_IMAGE resolve to the correct
-    // per-frame target.
+    // Update the current frame slot so the pre-bound swap-chain container
+    // resolves to the correct image view during task recording.
     base_render_data.current_swap_chain_index = image_index;
     if (swap_chain_image_container == MEM_NULL) {
         throw std::runtime_error("RendererVK: swap-chain image container is unavailable.");
     }
     swap_chain_image_container->set(base_render_data.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
-    p_graph->set_resource(REND_RES_SWAP_CHAIN_IMAGE, swap_chain_image_container);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
@@ -152,7 +147,6 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     if (base_render_data.in_flight_fence != VK_NULL_HANDLE) {
         vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
     }
-    p_graph->reset_transient_resources();
 
     ++(base_render_data.current_frame);
 }
@@ -195,7 +189,6 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     init_vulkan(p_capabilities);
     base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
-    swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data);
     create_descriptor_heap_allocator();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
@@ -204,6 +197,7 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
     base_render_data.current_frame = 1;
     init_swap_chain_image_views();
+    refresh_swap_chain_image_container();
     image_available_semaphores.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
@@ -266,9 +260,9 @@ void RendererVK::recreate_swap_chain() {
     vkDeviceWaitIdle(logical_device);
     clean_up_swap_chain();
     create_swap_chain();
-    init_swap_chain_image_views();
     setup_base_render_data();
-    swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data);
+    init_swap_chain_image_views();
+    refresh_swap_chain_image_container();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -541,6 +535,25 @@ void RendererVK::init_swap_chain_image_views() {
             .set_subresource_range(subresource_range);
 
         render_objects->swap_chain_image_views.emplace_back(builder.create_ref(&base_render_data));
+    }
+}
+
+void RendererVK::refresh_swap_chain_image_container() {
+    if (render_objects->swap_chain_image_views.empty()) {
+        throw std::runtime_error("RendererVK: swap-chain image views are unavailable.");
+    }
+
+    if (swap_chain_image_container == MEM_NULL || swap_chain_image_container->get_context_count() != frames_in_flight) {
+        swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data, false);
+    } else {
+        swap_chain_image_container->clear();
+    }
+
+    const uint32_t image_view_count = static_cast<uint32_t>(render_objects->swap_chain_image_views.size());
+    const uint32_t context_count = swap_chain_image_container->get_context_count();
+    for (uint32_t frame_slot = 0; frame_slot < context_count; ++frame_slot) {
+        uint32_t image_index = frame_slot % image_view_count;
+        swap_chain_image_container->set(frame_slot, render_objects->swap_chain_image_views[image_index]);
     }
 }
 
@@ -1339,16 +1352,22 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
     }
 
-    auto declare_runtime_resource = [&p_desc](std::string_view p_resource_id, RendResTID p_resource_type_id) {
-        for (const auto& resource : p_desc.resources) {
-            if (resource.res_id == p_resource_id) {
-                return;
-            }
+    bool has_swap_chain_resource = false;
+    for (auto& resource : p_desc.resources) {
+        if (resource.res_id != REND_RES_SWAP_CHAIN_IMAGE) {
+            continue;
         }
-        p_desc.resources.push_back(
-            RendResVK{.res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
-    };
-    declare_runtime_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID);
+        has_swap_chain_resource = true;
+        resource.res_type_id = TypeUUID<ROImageViewVK>::UUID;
+        resource.container = swap_chain_image_container;
+    }
+    if (!has_swap_chain_resource) {
+        p_desc.resources.push_back(RendResVK{
+            .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
+            .res_type_id = TypeUUID<ROImageViewVK>::UUID,
+            .container = swap_chain_image_container,
+        });
+    }
 
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
@@ -1406,22 +1425,11 @@ void RendererVK::activate_render_graph(std::string_view p_resource_key) {
 
 void RendererVK::update_render_graph_resources(
     std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) {
-    auto graph_entry = render_graphs.find(p_resource_key);
-    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
-        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
-    }
-    if (p_bindings == nullptr && p_binding_count != 0) {
-        throw std::runtime_error("Render graph resource bindings are null.");
-    }
-
-    for (size_t i = 0; i < p_binding_count; ++i) {
-        Ref<IRenderObjectVK> resource = p_bindings[i].resource.dynamic_cast_ref<IRenderObjectVK>();
-        if (resource == MEM_NULL) {
-            throw std::runtime_error(std::format("Render graph resource is not compatible with Vulkan: {}.", p_bindings[i].resource_id));
-        }
-        graph_entry->second.graph->set_transient_resource(
-            p_bindings[i].resource_id, make_ref<ROCSingleVK>(allocator, std::move(resource)));
-    }
+    static_cast<void>(p_bindings);
+    static_cast<void>(p_binding_count);
+    throw std::runtime_error(
+        std::format("RendererVK: late render-graph resource updates are not supported for '{}'. Bind resources before graph build.",
+            p_resource_key));
 }
 
 void RendererVK::update_static_geometry_sets() {

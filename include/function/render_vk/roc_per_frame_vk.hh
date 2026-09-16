@@ -42,8 +42,8 @@ public:
     ROCPerFrameVK& operator=(const ROCPerFrameVK&) = delete;
     ROCPerFrameVK& operator=(ROCPerFrameVK&&) noexcept = delete;
 
-    explicit ROCPerFrameVK(const BaseRenderDataVK* p_render_data);
-    ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory);
+    explicit ROCPerFrameVK(const BaseRenderDataVK* p_render_data, bool p_flush = true);
+    ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory, bool p_flush = true);
 
     Ref<IRenderObjectVK> get() override;
     Ref<IRenderObjectVK> get() const override;
@@ -74,6 +74,7 @@ private:
     void synchronize(uint32_t p_frame_slot) const;
 
     const BaseRenderDataVK* render_data = nullptr;
+    bool flush = true;
     Vector<Ref<IRenderObjectVK>, RenderAllocator> resources;
     mutable Vector<uint64_t, RenderAllocator> applied_generations;
     Vector<uint8_t, RenderAllocator> pending_buffer_data;

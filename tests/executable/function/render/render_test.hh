@@ -38,8 +38,6 @@ namespace WBE = WhiteBirdEngine;
 
 inline constexpr std::string_view RT_RUN_PIPELINE = "run_pipeline";
 inline constexpr std::string_view RT_RUN_PIPELINE_SHADOWMAP = "run_shadowmap";
-inline constexpr std::string_view REND_RES_TEST_DRAW_CUBE_GRAPHICS_PIPELINE = "draw_cube_pipeline";
-inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_GRAPHICS_PIPELINE = "shadowmap_pipeline";
 inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW = "shadowmap_color";
 inline constexpr std::string_view REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW = "shadowmap_depth";
 inline constexpr std::string_view REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW = "rsm_normal";
@@ -48,7 +46,6 @@ inline constexpr glm::vec3 TEST_DEFAULT_CAMERA_TARGET = glm::vec3(0.0F, 0.0F, 0.
 inline constexpr float TEST_CAMERA_MOVE_SPEED = 3.0F;
 inline constexpr float TEST_CAMERA_TURN_SPEED = glm::radians(90.0F);
 inline constexpr float TEST_CAMERA_PITCH_LIMIT = glm::radians(89.0F);
-
 
 namespace WhiteBirdEngine {
 
@@ -178,13 +175,9 @@ inline void log_uniform_buffer_descriptors(
         uint32_t descriptor_index = buffer->get_uniform_view_index();
         VkDeviceAddress device_address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info);
         WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
-            ->message(std::format("{} frame slot {}: resource descriptor index {}, device address 0x{:x}.",
-                p_label,
-                frame_slot,
-                descriptor_index,
-                device_address));
+            ->message(std::format(
+                "{} frame slot {}: resource descriptor index {}, device address 0x{:x}.", p_label, frame_slot, descriptor_index, device_address));
     }
 }
-
 
 #endif

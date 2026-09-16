@@ -48,7 +48,6 @@
 
 namespace WBE = WhiteBirdEngine;
 
-inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE = "draw_triangle_pipeline";
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER = "draw_triangle_vertex_buffer";
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "draw_triangle_index_buffer";
 
@@ -74,7 +73,8 @@ public:
             throw std::runtime_error("Failed to setup draw triangle test: expected exactly one triangle submesh.");
         }
         WBE::RefRes<WBE::RUSubmesh3D> triangle_submesh = triangle_mesh->submeshes.get()[0];
-        if (triangle_submesh == nullptr || triangle_submesh->vertices.binary.binary == nullptr || triangle_submesh->indices.binary.binary == nullptr) {
+        if (triangle_submesh == nullptr || triangle_submesh->vertices.binary.binary == nullptr ||
+            triangle_submesh->indices.binary.binary == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: triangle geometry storage is missing.");
         }
 
@@ -111,14 +111,16 @@ public:
                                      .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
                                      .create_ref(base_render_data);
         triangle_vertex_buffer->update_buffer(
-            triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start, triangle_submesh->vertices.binary.size);
+            triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start,
+            triangle_submesh->vertices.binary.size);
         triangle_index_buffer = WBE::ROBufferVK::Builder()
                                     .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                                     .set_size(triangle_submesh->indices.binary.size)
                                     .set_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
                                     .create_ref(base_render_data);
         triangle_index_buffer->update_buffer(
-            triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start, triangle_submesh->indices.binary.size);
+            triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start,
+            triangle_submesh->indices.binary.size);
 
         const WBE::IndexedDrawRegionVK indexed_draw_region{
             .first_index = 0,
@@ -126,18 +128,18 @@ public:
             .vertex_offset = 0,
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE, graphics_pipeline)
-            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
+        pipeline_desc.add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
-        task_desc.create = [render_allocator, base_render_data, vertex_input, indexed_draw_region]() -> WBE::Unique<WBE::RenderTaskVK> {
+        task_desc.create =
+            [render_allocator, base_render_data, graphics_pipeline, vertex_input, indexed_draw_region]() -> WBE::Unique<WBE::RenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 base_render_data->swap_chain_extent,
                 WBE::REND_RES_SWAP_CHAIN_IMAGE,
-                REND_RES_TEST_DRAW_TRIANGLE_GRAPHICS_PIPELINE,
+                graphics_pipeline,
                 REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
                 REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
                 indexed_draw_region,

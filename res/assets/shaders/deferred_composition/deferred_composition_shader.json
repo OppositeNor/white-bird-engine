@@ -40,6 +40,13 @@
             "metadata": "assets/shaders/deferred_composition/indirect_lighting.json"
         },
         {
+            "id": "combine_lighting_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/combine_lighting.slang",
+            "dst": "assets/shaders/deferred_composition/combine_lighting.spv",
+            "metadata": "assets/shaders/deferred_composition/combine_lighting.json"
+        },
+        {
             "id": "post_processing_shader",
             "source_type": "shader",
             "src": "assets/shaders/deferred_composition/post_processing.slang",

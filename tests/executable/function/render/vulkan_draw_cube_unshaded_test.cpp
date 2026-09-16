@@ -25,7 +25,6 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "render_test.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
@@ -34,6 +33,7 @@
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
+#include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <cstdlib>
@@ -47,8 +47,6 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
-
-inline constexpr char REND_RES_TEST_DRAW_CUBE_UNSHADED_GRAPHICS_PIPELINE[] = "draw_cube_unshaded_pipeline";
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
@@ -71,7 +69,8 @@ public:
         auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
             WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
         resource_manager->register_chunk(resource_chunk);
-        WBE::RefRes<WBE::RUStaticOpaqueSet> cube_set = resource_manager->get_resource<WBE::RUStaticOpaqueSet>("model_cube_static.static_opaque_set");
+        WBE::RefRes<WBE::RUStaticOpaqueSet> cube_set =
+            resource_manager->get_resource<WBE::RUStaticOpaqueSet>("model_cube_static.static_opaque_set");
         if (cube_set == nullptr) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: static opaque set resource was not found.");
         }

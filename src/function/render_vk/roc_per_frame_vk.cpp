@@ -51,13 +51,25 @@ static Vector<uint64_t, RenderAllocator> create_applied_generations(const BaseRe
     return result;
 }
 
-ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data)
-    : render_data(p_render_data), resources(create_frame_resources(p_render_data)),
+static Ref<ROBufferVK> require_buffer_resource(Ref<IRenderObjectVK> p_resource, uint32_t p_frame_slot) {
+    if (p_resource == MEM_NULL) {
+        throw std::runtime_error(std::format("ROCPerFrameVK: cannot apply update to empty frame slot {}.", p_frame_slot));
+    }
+    Ref<ROBufferVK> buffer = p_resource.dynamic_cast_ref<ROBufferVK>();
+    if (buffer == MEM_NULL) {
+        throw std::runtime_error(
+            std::format("ROCPerFrameVK: frame slot {} does not contain a buffer for its pending update.", p_frame_slot));
+    }
+    return buffer;
+}
+
+ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, bool p_flush)
+    : render_data(p_render_data), flush(p_flush), resources(create_frame_resources(p_render_data)),
       applied_generations(create_applied_generations(p_render_data)), pending_buffer_data(p_render_data->allocator) {
 }
 
-ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory)
-    : render_data(p_render_data), resources(create_frame_resources(p_render_data)),
+ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory, bool p_flush)
+    : render_data(p_render_data), flush(p_flush), resources(create_frame_resources(p_render_data)),
       applied_generations(create_applied_generations(p_render_data)), pending_buffer_data(p_render_data->allocator) {
     if (!p_factory) {
         throw std::runtime_error("ROCPerFrameVK: resource factory is empty.");
@@ -106,7 +118,9 @@ void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) 
     }
     retain_resource_type(p_resource);
     resources[p_frame_slot] = std::move(p_resource);
-    applied_generations[p_frame_slot] = 0;
+    if (flush) {
+        applied_generations[p_frame_slot] = 0;
+    }
 }
 
 void ROCPerFrameVK::clear() {
@@ -124,6 +138,16 @@ void ROCPerFrameVK::publish_buffer_update(const void* p_data, size_t p_dst_offse
         throw std::runtime_error("ROCPerFrameVK: published buffer data is empty.");
     }
     const auto* data = static_cast<const uint8_t*>(p_data);
+    if (!flush) {
+        for (uint32_t frame_slot = 0; frame_slot < resources.size(); ++frame_slot) {
+            if (resources[frame_slot] == MEM_NULL) {
+                continue;
+            }
+            Ref<ROBufferVK> buffer = require_buffer_resource(resources[frame_slot], frame_slot);
+            buffer->update_buffer(data, p_dst_offset, p_size);
+        }
+        return;
+    }
     pending_buffer_data.assign(data, data + p_size);
     pending_buffer_dst_offset = p_dst_offset;
     ++update_generation;
@@ -134,18 +158,13 @@ void ROCPerFrameVK::publish_buffer_update(const void* p_data, size_t p_dst_offse
 }
 
 void ROCPerFrameVK::synchronize(uint32_t p_frame_slot) const {
+    if (!flush) {
+        return;
+    }
     if (pending_buffer_data.empty() || applied_generations[p_frame_slot] == update_generation) {
         return;
     }
-    Ref<IRenderObjectVK> resource = resources[p_frame_slot];
-    if (resource == MEM_NULL) {
-        throw std::runtime_error(std::format("ROCPerFrameVK: cannot apply update to empty frame slot {}.", p_frame_slot));
-    }
-    Ref<ROBufferVK> buffer = resource.dynamic_cast_ref<ROBufferVK>();
-    if (buffer == MEM_NULL) {
-        throw std::runtime_error(
-            std::format("ROCPerFrameVK: frame slot {} does not contain a buffer for its pending update.", p_frame_slot));
-    }
+    Ref<ROBufferVK> buffer = require_buffer_resource(resources[p_frame_slot], p_frame_slot);
     buffer->update_buffer(pending_buffer_data.data(), pending_buffer_dst_offset, pending_buffer_data.size());
     applied_generations[p_frame_slot] = update_generation;
 }

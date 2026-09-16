@@ -60,9 +60,9 @@ TEST(WBEROCPerFrameVKTest, CreatesOneResourcePerFrameAndUsesCurrentFrameSlot) {
     render_data.frames_in_flight = 3;
     render_data.current_frame_slot = 1;
 
-    ROCPerFrameVK context(&render_data, [&render_data, &allocator](uint32_t p_context_id) {
+    ROCPerFrameVK context(&render_data, ROCPerFrameVK::Factory{[&render_data, &allocator](uint32_t p_context_id) {
         return make_ref<TestContextResourceVK>(&allocator, &render_data, p_context_id).template dynamic_cast_ref<IRenderObjectVK>();
-    });
+    }});
 
     EXPECT_EQ(context.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
     EXPECT_EQ(context.get_context_count(), 3U);
@@ -82,11 +82,11 @@ TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
 
-    EXPECT_THROW(ROCPerFrameVK(&render_data, {}), std::runtime_error);
+    EXPECT_THROW(ROCPerFrameVK(&render_data, ROCPerFrameVK::Factory{}), std::runtime_error);
     EXPECT_THROW(ROCPerFrameVK(&render_data,
-                     [](uint32_t /*p_context_id*/) {
+                     ROCPerFrameVK::Factory{[](uint32_t /*p_context_id*/) {
                          return Ref<IRenderObjectVK>(MEM_NULL);
-                     }),
+                     }}),
         std::runtime_error);
 }
 
@@ -114,6 +114,33 @@ TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
     EXPECT_EQ(explicit_resource->context_id, 0U);
 
     EXPECT_EQ(context.get(1), MEM_NULL);
+}
+
+TEST(WBEROCPerFrameVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    render_data.frames_in_flight = 2;
+    render_data.current_frame_slot = 1;
+
+    ROCPerFrameVK context(&render_data, false);
+    auto frame_zero_resource =
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 10).template dynamic_cast_ref<IRenderObjectVK>();
+    auto frame_one_resource =
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 11).template dynamic_cast_ref<IRenderObjectVK>();
+    auto replacement_resource =
+        make_ref<TestContextResourceVK>(&allocator, &render_data, 42).template dynamic_cast_ref<IRenderObjectVK>();
+
+    context.set(0, frame_zero_resource);
+    context.set(1, frame_one_resource);
+    context.set(1, replacement_resource);
+
+    auto current_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
+    ASSERT_NE(current_resource, MEM_NULL);
+    EXPECT_EQ(current_resource->context_id, 42U);
+
+    auto other_resource = context.get(0).dynamic_cast_ref<TestContextResourceVK>();
+    ASSERT_NE(other_resource, MEM_NULL);
+    EXPECT_EQ(other_resource->context_id, 10U);
 }
 
 TEST(WBEROCPerFrameVKTest, RejectsEmptyPublishedBufferUpdate) {

@@ -18,8 +18,10 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <glm/ext/vector_float4.hpp>
@@ -41,7 +43,7 @@ struct IndexedDrawRegionVK {
  * @class RTRunGraphicsPipelineVK
  * @brief Render task that runs a graphics pipeline and produces an image.
  *
- * Resources are retrieved by their declared ids from the active graph.
+ * Graph resources are bound to stable containers when the graph is built.
  */
 struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
@@ -58,16 +60,15 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_clear_color        Clear color used in the render pass begin.
      * @param p_render_extent      Render area extent.
      * @param p_color_attachment_id Resource id of the color attachment image view (read/write when loaded).
-     * @param p_pipeline_id        Resource id of the graphics pipeline (read).
+     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
      * @param p_color_attachment_load_op Load operation for the color attachment.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
         const glm::vec4& p_clear_color,
         VkExtent2D p_render_extent,
         std::string_view p_color_attachment_id,
-        std::string_view p_pipeline_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
-
 
     /**
      * @brief Constructor (single-color attachment convenience).
@@ -76,7 +77,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_clear_color        Clear color used in the render pass begin.
      * @param p_render_extent      Render area extent.
      * @param p_color_attachment_id Resource id of the color attachment image view (read/write when loaded).
-     * @param p_pipeline_id        Resource id of the graphics pipeline (read).
+     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
      * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
      * @param p_index_buffer_id    Optional resource id of the index buffer (read).
      * @param p_indexed_draw_region Optional indexed subregion to draw.
@@ -88,7 +89,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         const glm::vec4& p_clear_color,
         VkExtent2D p_render_extent,
         std::string_view p_color_attachment_id,
-        std::string_view p_pipeline_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
         std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt,
@@ -108,7 +109,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
      * @param p_render_extent      Render area extent.
      * @param p_color_attachment_ids Resource ids of color attachment image views (read/write when loaded).
      * @param p_depth_attachment_id Optional resource id of the depth attachment image view (read/write when loaded).
-     * @param p_pipeline_id        Resource id of the graphics pipeline (read).
+     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
      * @param p_vertex_buffer_id   Optional resource id of the vertex buffer (read).
      * @param p_index_buffer_id    Optional resource id of the index buffer (read).
      * @param p_indexed_draw_region Optional indexed subregion to draw.
@@ -122,7 +123,7 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         VkExtent2D p_render_extent,
         std::span<const std::string_view> p_color_attachment_ids,
         std::optional<std::string_view> p_depth_attachment_id,
-        std::string_view p_pipeline_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
         std::optional<std::string_view> p_vertex_buffer_id,
         std::optional<std::string_view> p_index_buffer_id,
         std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt,
@@ -135,13 +136,13 @@ struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    virtual void validate_resources(const RendResViewVK& p_resources) const override;
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
 
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
@@ -150,10 +151,14 @@ private:
     VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     VkExtent2D render_extent{};
     Vector<std::string, RenderAllocator> color_attachment_ids;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
     std::optional<std::string> depth_attachment_id;
-    std::string pipeline_id;
+    Ref<RenderObjectContainerVK> depth_attachment_container;
+    Ref<ROGraphicsPipelineVK> graphics_pipeline;
     std::optional<std::string> vertex_buffer_id;
     std::optional<std::string> index_buffer_id;
+    Ref<RenderObjectContainerVK> vertex_buffer_container;
+    Ref<RenderObjectContainerVK> index_buffer_container;
     std::optional<IndexedDrawRegionVK> indexed_draw_region;
     VertexInputDescriptionVK vertex_input;
     VkDeviceSize vertex_buffer_offset = 0;

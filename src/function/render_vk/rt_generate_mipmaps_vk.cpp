@@ -18,10 +18,12 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include <algorithm>
 #include <bit>
 #include <cstdint>
@@ -75,11 +77,16 @@ Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::write_resources() cons
     return resources;
 }
 
-void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
+void RTGenerateMipmapsVK::bind_resources(const RendResViewVK& p_resources) {
+    image_view_container = p_resources.get(image_view_id).container;
+    if (image_view_container == MEM_NULL || image_view_container->get_resource_type_id() != TypeUUID<ROImageViewVK>::UUID) {
+        throw std::runtime_error("RTGenerateMipmapsVK: image-view resource has the wrong type.");
+    }
+}
+
+void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
     // Resolve the graph image view and its underlying image for this frame.
-    auto image_resource = p_resources.get(image_view_id).container;
-    auto image_view =
-        image_resource == MEM_NULL ? Ref<ROImageViewVK>(MEM_NULL) : image_resource->get().dynamic_cast_ref<ROImageViewVK>();
+    auto image_view = image_view_container->get().dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
         // Commands cannot be recorded without a bound image view and image.
         throw std::runtime_error("RTGenerateMipmapsVK: image-view resource is missing.");

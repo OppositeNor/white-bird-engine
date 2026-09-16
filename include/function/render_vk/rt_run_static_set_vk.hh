@@ -130,10 +130,10 @@ public:
         RendererVK* p_renderer, RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline, const Config& p_config);
 
     virtual QueueFamilyVK queue_family() const override;
-    virtual void validate_resources(const RendResViewVK& p_resources) const override;
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
     /**
      * @brief Replace one reflected descriptor-heap binding on the compiled pipeline.
@@ -151,6 +151,8 @@ private:
     Config config;
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task = MEM_NULL;
     Ref<ROGraphicsPipelineVK> compiled_graphics_pipeline = MEM_NULL;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
+    Ref<RenderObjectContainerVK> depth_attachment_container;
 };
 
 } // namespace WhiteBirdEngine

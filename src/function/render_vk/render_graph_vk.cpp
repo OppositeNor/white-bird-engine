@@ -201,9 +201,8 @@ void update_edge_resource_scopes(Ref<RGExecEdge> p_edge,
 
 RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), nodes(p_render_data->allocator), exec_edges(p_render_data->allocator),
-      all_resources(p_render_data->allocator), transient_resource_defaults(p_render_data->allocator),
-      command_buffers(p_render_data->allocator), command_buffer_pools(p_render_data->allocator),
-      terminal_semaphores(p_render_data->allocator) {
+    all_resources(p_render_data->allocator), command_buffers(p_render_data->allocator),
+    command_buffer_pools(p_render_data->allocator), terminal_semaphores(p_render_data->allocator) {
 }
 
 RenderGraphVK::~RenderGraphVK() {
@@ -212,13 +211,13 @@ RenderGraphVK::~RenderGraphVK() {
 
 bool RendResViewVK::contains(std::string_view p_resource_id) const {
     auto resource = resources->find(p_resource_id);
-    return resource != resources->end() && resource->second != MEM_NULL && resolve_render_object(*resource->second) != MEM_NULL;
+    return resource != resources->end() && resource->second != MEM_NULL && resource->second->container != MEM_NULL;
 }
 
 const RendResVK& RendResViewVK::get(std::string_view p_resource_id) const {
     auto resource = resources->find(p_resource_id);
-    if (resource == resources->end() || resource->second == MEM_NULL || resolve_render_object(*resource->second) == MEM_NULL) {
-        throw std::runtime_error(std::format("Render graph resource was not bound: {}.", p_resource_id));
+    if (resource == resources->end() || resource->second == MEM_NULL || resource->second->container == MEM_NULL) {
+        throw std::runtime_error(std::format("Render graph resource was not declared: {}.", p_resource_id));
     }
     return *resource->second;
 }
@@ -352,7 +351,6 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     nodes.clear();
     exec_edges.clear();
     all_resources.clear();
-    transient_resource_defaults.clear();
 
     all_resources = index_resources(p_desc);
     auto task_ids = instantiate_tasks(p_desc);
@@ -373,93 +371,6 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     }
 }
 
-void RenderGraphVK::set_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container) {
-    std::string resource_id(p_res_id);
-    RendResTID resource_type_id = p_resource_container == MEM_NULL ? 0 : p_resource_container->get_resource_type_id();
-    auto it = all_resources.find(resource_id);
-    for (auto& resource_default : transient_resource_defaults) {
-        if (resource_default.resource_id == resource_id) {
-            if (resource_default.existed && resource_default.resource_type_id != 0 && resource_default.resource_type_id != resource_type_id) {
-                throw std::runtime_error(std::format("Render graph resource type mismatch for: {}.", p_res_id));
-            }
-            resource_default.existed = true;
-            resource_default.resource_type_id = resource_type_id;
-            resource_default.container = std::move(p_resource_container);
-            return;
-        }
-    }
-
-    if (it != all_resources.end()) {
-        if (it->second->res_type_id != 0 && it->second->res_type_id != resource_type_id) {
-            throw std::runtime_error(std::format("Render graph resource type mismatch for: {}.", p_res_id));
-        }
-        it->second->container = std::move(p_resource_container);
-        it->second->res_type_id = resource_type_id;
-        return;
-    }
-    auto resource_ref = make_ref<RendResVK>(render_data->allocator);
-    resource_ref->res_id = resource_id;
-    resource_ref->res_type_id = resource_type_id;
-    resource_ref->container = std::move(p_resource_container);
-    all_resources.emplace(std::move(resource_id), std::move(resource_ref));
-}
-
-void RenderGraphVK::set_transient_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container) {
-    std::string resource_id(p_res_id);
-    RendResTID resource_type_id = p_resource_container == MEM_NULL ? 0 : p_resource_container->get_resource_type_id();
-    auto resource = all_resources.find(resource_id);
-    for (const auto& resource_default : transient_resource_defaults) {
-        if (resource_default.resource_id == resource_id) {
-            if (resource != all_resources.end() && resource->second->res_type_id != 0 && resource->second->res_type_id != resource_type_id) {
-                throw std::runtime_error(std::format("Render graph resource type mismatch for: {}.", p_res_id));
-            }
-            resource->second->container = std::move(p_resource_container);
-            resource->second->res_type_id = resource_type_id;
-            return;
-        }
-    }
-
-    if (resource != all_resources.end()) {
-        if (resource->second->res_type_id != 0 && resource->second->res_type_id != resource_type_id) {
-            throw std::runtime_error(std::format("Render graph resource type mismatch for: {}.", p_res_id));
-        }
-        transient_resource_defaults.push_back({
-            .resource_id = resource_id,
-            .existed = true,
-            .resource_type_id = resource->second->res_type_id,
-            .container = resource->second->container,
-        });
-        resource->second->container = std::move(p_resource_container);
-        resource->second->res_type_id = resource_type_id;
-        return;
-    }
-
-    transient_resource_defaults.push_back({.resource_id = resource_id});
-    auto resource_ref = make_ref<RendResVK>(render_data->allocator);
-    resource_ref->res_id = resource_id;
-    resource_ref->res_type_id = resource_type_id;
-    resource_ref->container = std::move(p_resource_container);
-    all_resources.emplace(std::move(resource_id), std::move(resource_ref));
-}
-
-void RenderGraphVK::reset_transient_resources() {
-    for (const auto& resource_default : transient_resource_defaults) {
-        auto resource = all_resources.find(resource_default.resource_id);
-        if (!resource_default.existed) {
-            if (resource != all_resources.end()) {
-                all_resources.erase(resource);
-            }
-            continue;
-        }
-        if (resource == all_resources.end()) {
-            throw std::runtime_error(std::format("Render graph resource disappeared before reset: {}.", resource_default.resource_id));
-        }
-        resource->second->res_type_id = resource_default.resource_type_id;
-        resource->second->container = resource_default.container;
-    }
-    transient_resource_defaults.clear();
-}
-
 Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
     resources_by_id.reserve(p_desc.resources.size());
@@ -467,7 +378,10 @@ Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources
         if (resource_desc.res_id.empty()) {
             throw std::runtime_error("RenderGraphVK: resource id is empty.");
         }
-        if (resource_desc.container != MEM_NULL && resource_desc.container->get_resource_type_id() != resource_desc.res_type_id) {
+        if (resource_desc.container == MEM_NULL) {
+            throw std::runtime_error(std::format("RenderGraphVK: resource '{}' must be bound before graph build.", resource_desc.res_id));
+        }
+        if (resource_desc.container->get_resource_type_id() != resource_desc.res_type_id) {
             throw std::runtime_error(
                 std::format("RenderGraphVK: resource container type does not match declaration for '{}'.", resource_desc.res_id));
         }
@@ -502,7 +416,7 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendG
         }
         Ref<RGNode> node = add_node(std::move(task));
         node->task_id = task_desc.task_id;
-        node->render_task->validate_resources(RendResViewVK(&all_resources));
+        node->render_task->bind_resources(RendResViewVK(&all_resources));
         node->reads = node->render_task->read_resources();
         node->writes = node->render_task->write_resources();
         node->reads.insert(node->reads.end(), task_desc.reads.begin(), task_desc.reads.end());
@@ -694,7 +608,7 @@ void RenderGraphVK::record_node(
 
     record_general_transition(p_command_buffer, p_node, p_resources);
 
-    p_node->render_task->record(p_command_buffer, p_resources, p_delta);
+    p_node->render_task->record(p_command_buffer, p_delta);
 
     if (p_record_present_transition) {
         // Present waits on this node's terminal semaphore, so the present layout transition must be recorded before it is signaled.

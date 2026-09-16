@@ -1,0 +1,23 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "bloom_shader_vertical",
+            "source_type": "shader",
+            "src": "assets/shaders/bloom/bloom.slang",
+            "dst": "assets/shaders/bloom/bloom_vertical.spv",
+            "metadata": "assets/shaders/bloom/bloom_vertical.json"
+        },
+        {
+            "id": "bloom_shader_horizontal",
+            "source_type": "shader",
+            "src": "assets/shaders/bloom/bloom.slang",
+            "dst": "assets/shaders/bloom/bloom_horizontal.spv",
+            "metadata": "assets/shaders/bloom/bloom_horizontal.json",
+            "macros": [
+                {"name": "BLOOM_HORIZONTAL"}
+            ]
+        }
+    ]
+}
+

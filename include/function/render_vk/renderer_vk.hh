@@ -395,6 +395,7 @@ private:
     void create_command_pools();
     void create_ktx_vulkan_device_info();
     void create_gpu_job_command_buffer();
+    void refresh_swap_chain_image_container();
     void create_descriptor_heap_allocator();
     void create_async_objects();
 

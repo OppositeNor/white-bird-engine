@@ -108,14 +108,14 @@ struct RenderTaskVK : public RenderTask {
     virtual QueueFamilyVK queue_family() const = 0;
 
     /**
-     * @brief Validate non-synchronizing graph-resource references used by this task.
+     * @brief Bind stable graph resource containers before the task is first recorded.
      *
-     * Pipeline objects and similar immutable references do not belong in read/write synchronization declarations, but must
-     * still be present and type-correct when the graph is built.
+     * Tasks retain the containers they use and resolve the current render object from each container during record().
+     * Resource ids remain graph-side synchronization identities and are not looked up while recording.
      *
-     * @param p_resources Resources indexed by the graph descriptor.
+     * @param p_resources Resources indexed by the graph descriptor during graph construction.
      */
-    virtual void validate_resources(const RendResViewVK& p_resources) const {
+    virtual void bind_resources(const RendResViewVK& p_resources) {
         static_cast<void>(p_resources);
     }
 
@@ -141,11 +141,9 @@ struct RenderTaskVK : public RenderTask {
      * required image layout transitions are emitted first.
      *
      * @param p_command_buffer The command buffer to record into.
-     * @param p_resources All resources for the active graph, indexed by
-     *                    resource id.
      * @param p_delta     The frame delta in seconds.
      */
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) = 0;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) = 0;
 
     /**
      * @brief Default no-op for the cross-API perform() entry point. The

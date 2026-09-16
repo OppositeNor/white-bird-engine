@@ -9,7 +9,7 @@ Treat a render graph as a statically built DAG of `RenderTaskVK` nodes operating
 
 ## Build a graph descriptor
 
-1. Add one `RendResVK` declaration for every resource ID that tasks read. Set its type to `TypeUUID<ConcreteRenderObject>::UUID`.
+1. Add one `RendResVK` declaration for every resource ID that tasks read. Bind each declaration to a concrete `RenderObjectContainerVK` before graph build, and set its type to `TypeUUID<ConcreteRenderObject>::UUID`.
 2. Add task descriptors with unique lower-snake-case string `task_id` values and factories that return `Unique<RenderTaskVK>`.
 3. Use `after()` to establish every required execution path. Declared resource accesses do not create execution edges.
 4. Use descriptor `read()` / `write()` calls for shader resources not declared intrinsically by the task.
@@ -35,7 +35,11 @@ Presentation remains graphics-specific: swap-chain acquire waits attach to the f
 
 ## Bind runtime resources through the renderer
 
-Register static graph resources in the descriptor when possible. Let the renderer inject frame-dependent resources such as the current swap-chain image. Use its render-graph resource update path for application-provided transient bindings; transient resources are reset after execution.
+Render-graph resources are now bind-once for the graph lifetime. `RenderGraphVK::build_from_descriptor()` rejects any `RendResVK` whose container is null. When a resource varies by frame, bind one stable container up front and mutate the render objects inside it instead of rebinding the graph resource.
+
+The swap-chain path uses this pattern: `RendererVK::register_render_graph()` prebinds `REND_RES_SWAP_CHAIN_IMAGE` to the renderer-owned `ROCPerFrameVK`, and each frame the renderer replaces only the current slot's image view before execution. Construct swap-chain `ROCPerFrameVK` containers with `p_flush = false` so slot replacement does not trigger buffer-update generation tracking.
+
+Do not rely on post-build `set_resource()` or transient graph-resource overrides; those late-binding paths are no longer supported. `ROCBindingVK` was removed from the codebase; if a resource must vary, represent that variation inside the bound container itself.
 
 Graph rebuild frees existing command buffers and waits for the device to become idle. Unregistration defers destruction for the configured frames in flight. Preserve recreatable task factories when a descriptor may be rebuilt.
 
@@ -53,4 +57,4 @@ The wrapper runs the complete unit suite after the focused tests pass. Do not in
 
 ## Advanced work
 
-Read [references/system-and-usage.md](references/system-and-usage.md) before changing dependency validation, synchronization, queue behavior, descriptor-heap binding, resource binding, graph rebuilding, or presentation integration. It also identifies canonical graphics and deferred-compute examples.
+Read [references/system-and-usage.md](references/system-and-usage.md) before changing dependency validation, synchronization, queue behavior, descriptor-heap binding, bind-once resource setup, graph rebuilding, or presentation integration. It also identifies canonical graphics and deferred-compute examples.

@@ -20,6 +20,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -39,7 +40,7 @@ namespace WhiteBirdEngine {
  * @class RTRunGraphicsPipelineIndirectVK
  * @brief Render task that submits indexed draw commands from a GPU buffer in one Vulkan call.
  *
- * Pipeline-owned descriptors are bound while graph resources are resolved by their declared ids.
+ * Pipelines are retained directly while graph resources are bound to stable containers during graph construction.
  */
 struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
     /**
@@ -56,9 +57,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         PipelineBatch& operator=(const PipelineBatch&) = default;
         PipelineBatch& operator=(PipelineBatch&&) noexcept = default;
 
-        /** Graphics-pipeline render-graph resource id. */
-        std::string pipeline_id;
-        /** Optional task-owned graphics pipeline used instead of pipeline_id. */
+        /** Graphics pipeline retained directly by the task. */
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
         /** First tightly packed indirect command in the shared command buffer. */
         uint32_t first_draw = 0;
@@ -84,7 +83,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_clear_color Clear value for the color attachment.
      * @param p_render_extent Render area extent.
      * @param p_color_attachment_id Color attachment graph resource id.
-     * @param p_pipeline_id Graphics pipeline graph resource id.
+     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
      * @param p_vertex_buffer_id Vertex buffer graph resource id.
      * @param p_index_buffer_id Index buffer graph resource id.
      * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
@@ -97,7 +96,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         const glm::vec4& p_clear_color,
         VkExtent2D p_render_extent,
         std::string_view p_color_attachment_id,
-        std::string_view p_pipeline_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
         std::string_view p_vertex_buffer_id,
         std::string_view p_index_buffer_id,
         std::string_view p_indirect_buffer_id,
@@ -114,7 +113,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
      * @param p_render_extent Render area extent.
      * @param p_color_attachment_ids Color attachment graph resource ids in pipeline order.
      * @param p_depth_attachment_id Optional depth attachment graph resource id.
-     * @param p_pipeline_id Graphics pipeline graph resource id.
+     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
      * @param p_vertex_buffer_id Vertex buffer graph resource id.
      * @param p_index_buffer_id Index buffer graph resource id.
      * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
@@ -129,7 +128,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         VkExtent2D p_render_extent,
         std::span<const std::string_view> p_color_attachment_ids,
         std::optional<std::string_view> p_depth_attachment_id,
-        std::string_view p_pipeline_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
         std::string_view p_vertex_buffer_id,
         std::string_view p_index_buffer_id,
         std::string_view p_indirect_buffer_id,
@@ -215,11 +214,11 @@ struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    virtual void validate_resources(const RendResViewVK& p_resources) const override;
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
 
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
@@ -228,10 +227,15 @@ private:
     VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     VkExtent2D render_extent{};
     Vector<std::string, RenderAllocator> color_attachment_ids;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
     std::optional<std::string> depth_attachment_id;
+    Ref<RenderObjectContainerVK> depth_attachment_container;
     std::string vertex_buffer_id;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
+    Ref<RenderObjectContainerVK> vertex_buffer_container;
+    Ref<RenderObjectContainerVK> index_buffer_container;
+    Ref<RenderObjectContainerVK> indirect_buffer_container;
     Ref<ROBufferVK> vertex_buffer = MEM_NULL;
     Ref<ROBufferVK> index_buffer = MEM_NULL;
     Ref<ROBufferVK> indirect_buffer = MEM_NULL;

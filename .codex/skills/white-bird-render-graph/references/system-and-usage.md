@@ -5,7 +5,7 @@
 1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` factories.
 2. `RendererVK::register_render_graph` stores the descriptor and immediately builds a `RenderGraphVK`.
 3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds explicit predecessor edges, topologically sorts nodes, validates that those edges order every resource conflict, allocates per-node command buffers, and creates terminal semaphores.
-4. Each frame, the renderer acquires a swap-chain image, binds current runtime resources, executes the graph, presents, and resets transient bindings.
+4. Each frame, the renderer acquires a swap-chain image, updates the prebound swap-chain per-frame container for the current frame slot, executes the graph, and presents.
 5. `RenderGraphVK::execute` records and submits nodes individually in topological order to their selected graphics or compute queue.
 
 ## Core APIs
@@ -16,7 +16,7 @@
 - `include/function/render_vk/render_task_vk.hh`
   - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `RenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
-  - Descriptor building, explicit-path validation, execution, runtime resource binding, and terminal semaphore access.
+  - Descriptor building, explicit-path validation, execution, bind-once resource contracts, and terminal semaphore access.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
   - General compute dispatch task with compute-queue default and additional resource accesses.
 - `include/function/render_vk/rt_generate_mipmaps_vk.hh`
@@ -24,7 +24,7 @@
 
 ## Descriptor pattern
 
-Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type. Type matching is checked when runtime resources are bound.
+Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null `RenderObjectContainerVK`. `RenderGraphVK::build_from_descriptor()` now rejects null containers, so descriptor construction must be complete before registration.
 
 A pipeline-run task descriptor captures only construction data. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:
 
@@ -78,16 +78,18 @@ Ensure every compute node whose completion matters to presentation reaches the f
 
 ## Runtime lifecycle
 
-Registration builds the graph immediately. During a frame the renderer binds its current swap-chain resource and applies application-provided resource updates before execution. Transient bindings are cleared after execution.
+Registration builds the graph immediately. During a frame the renderer updates the contents of already-bound containers before execution; it does not rebind graph resources after build.
 
-The swap-chain image view is held in an `ROCPerFrameVK` container. `ROPipelineVK` likewise resolves descriptor bindings backed by a `RenderObjectContainerVK` from `current_frame_slot` before pushing indices. All render objects and backend helpers remain rendering-thread-confined; cross-thread work goes through `IRenderer::add_job()`.
+The swap-chain image view is held in an `ROCPerFrameVK` container that is prebound during `RendererVK::register_render_graph()`. Swap-chain recreation keeps that container stable when possible and replaces its per-slot image views in place. Use `ROCPerFrameVK(..., false)` for swap-chain-style replacement so `set()` skips buffer-update generation flushing. `ROPipelineVK` likewise resolves descriptor bindings backed by a `RenderObjectContainerVK` from `current_frame_slot` before pushing indices. All render objects and backend helpers remain rendering-thread-confined; cross-thread work goes through `IRenderer::add_job()`.
+
+`ROCBindingVK` has been removed from the codebase. Late persistent rebinding and transient graph-resource override APIs were removed from the graph path; if a resource must vary, represent that variation inside its bound container instead.
 
 Rebuilding a graph with allocated command buffers waits for device idle, frees the old buffers, and reconstructs graph state. Unregistration retains the graph and descriptor until the configured frames-in-flight delay expires.
 
 ## Failure checklist
 
 - Confirm every read ID appears in the graph resource declarations.
-- Confirm runtime-bound object UUIDs match their `RendResVK` declarations.
+- Confirm every `RendResVK` is bound to a non-null container before registration and that container UUIDs match their declarations.
 - Confirm task IDs and `prev` references are valid and acyclic.
 - Confirm each compact usage describes the actual command and that reads and writes are declared on the correct side.
 - Add explicit ordering for every read-write, write-read, and write-write hazard.
@@ -101,4 +103,4 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - `tests/executable/function/render/vulkan_draw_sponza_deferred_test.cpp`: graphics-to-compute deferred pipeline, declared shader accesses, and final presentation dependency.
 - `tests/unit/function/render_graph_descriptor_vk_test.cpp`: direct-task ownership and descriptor-copy behavior.
 - `src/function/render_vk/render_graph_vk.cpp`: authoritative build, dependency validation, heap binding, barrier, and submission behavior.
-- `src/function/render_vk/renderer_vk.cpp`: graph registration, per-frame resource binding, execution, presentation, and delayed destruction.
+- `src/function/render_vk/renderer_vk.cpp`: graph registration, swap-chain prebinding, per-frame container updates, execution, presentation, and delayed destruction.

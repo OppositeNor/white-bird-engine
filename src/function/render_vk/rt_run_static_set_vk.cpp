@@ -27,6 +27,8 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
+#include "function/render/static_set_node_contract.hh"
+#include "function/render/static_set_node_contract_resolver.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -41,8 +43,6 @@
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "function/render_vk/static_set_material_binding_builder_vk.hh"
-#include "function/render/static_set_node_contract.hh"
-#include "function/render/static_set_node_contract_resolver.hh"
 #include "glm/common.hpp"
 #include "glm/matrix.hpp"
 #include "resource/resource_manager/resource_manager.hh"
@@ -293,13 +293,6 @@ void validate_constructor_inputs(RendererVK* p_renderer, RefRes<RUStaticGeometry
     }
 }
 
-void validate_attachment_resource(std::string_view p_resource_id, const RendResViewVK& p_resources) {
-    Ref<ROImageViewVK> image_view = p_resources.get(p_resource_id).container->get().dynamic_cast_ref<ROImageViewVK>();
-    if (image_view == MEM_NULL) {
-        throw std::runtime_error("RTRunStaticSetVK: attachment resource has the wrong type.");
-    }
-}
-
 bool is_empty_set(const RUStaticGeometrySet& p_set) {
     return p_set.submesh_count == 0 || p_set.instance_count == 0;
 }
@@ -408,8 +401,7 @@ void validate_static_set_node_layout(const ShaderMetadata& p_vertex_metadata) {
     if (cpu_contract.matches(reflected_contract)) {
         return;
     }
-    throw std::runtime_error(std::format(
-        "Static-set node layout mismatch: shader expects stride={}, transform offset={}, normal_transform offset={}, but CPU uploads stride={}, transform offset={}, normal_transform offset={}.",
+    throw std::runtime_error(std::format("Static-set node layout mismatch: shader expects stride={}, transform offset={}, normal_transform offset={}, but CPU uploads stride={}, transform offset={}, normal_transform offset={}.",
         reflected_contract.element_stride,
         reflected_contract.transform_offset,
         reflected_contract.normal_transform_offset,
@@ -760,7 +752,8 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
 RTRunStaticSetVK::RTRunStaticSetVK(
     RendererVK* p_renderer, RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline, const Config& p_config)
     : render_data(p_renderer != nullptr ? p_renderer->get_base_render_data() : nullptr), geometry_set(p_set),
-      graphics_pipeline(p_graphics_pipeline), config(p_config) {
+      graphics_pipeline(p_graphics_pipeline), config(p_config),
+      color_attachment_containers(p_renderer != nullptr ? p_renderer->get_base_render_data()->allocator : nullptr) {
     validate_constructor_inputs(p_renderer, p_set, p_graphics_pipeline);
     const StaticSetAttachmentDataVK attachment_data = build_attachment_data(config, render_data);
     if (!is_empty_set(*geometry_set)) {
@@ -775,17 +768,19 @@ QueueFamilyVK RTRunStaticSetVK::queue_family() const {
     return QueueFamilyVK::GRAPHICS;
 }
 
-void RTRunStaticSetVK::validate_resources(const RendResViewVK& p_resources) const {
+void RTRunStaticSetVK::bind_resources(const RendResViewVK& p_resources) {
     if (!indirect_task.is_null()) {
-        indirect_task->validate_resources(p_resources);
+        indirect_task->bind_resources(p_resources);
         return;
     }
     const StaticSetAttachmentDataVK attachment_data = build_attachment_data(config, render_data);
+    color_attachment_containers.clear();
+    color_attachment_containers.reserve(attachment_data.color_attachment_ids.size());
     for (const std::string& color_attachment_id : attachment_data.color_attachment_ids) {
-        validate_attachment_resource(color_attachment_id, p_resources);
+        color_attachment_containers.push_back(p_resources.get(color_attachment_id).container);
     }
     if (attachment_data.depth_attachment_id.has_value()) {
-        validate_attachment_resource(*attachment_data.depth_attachment_id, p_resources);
+        depth_attachment_container = p_resources.get(*attachment_data.depth_attachment_id).container;
     }
 }
 
@@ -822,9 +817,9 @@ Vector<ResAccessVK, RenderAllocator> RTRunStaticSetVK::write_resources() const {
     return write_accesses;
 }
 
-void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double /*p_delta*/) {
+void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
     if (!indirect_task.is_null()) {
-        indirect_task->record(p_command_buffer, p_resources, 0.0);
+        indirect_task->record(p_command_buffer, 0.0);
         return;
     }
 
@@ -832,8 +827,8 @@ void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, const RendResVie
     Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
     color_attachments.reserve(attachment_data.color_attachment_ids.size());
     for (size_t i = 0; i < attachment_data.color_attachment_ids.size(); ++i) {
-        Ref<ROImageViewVK> color_attachment = WBE_REQUIRES_VALID(
-            p_resources.get(attachment_data.color_attachment_ids[i]).container->get().dynamic_cast_ref<ROImageViewVK>());
+        Ref<ROImageViewVK> color_attachment =
+            WBE_REQUIRES_VALID(color_attachment_containers[i]->get().dynamic_cast_ref<ROImageViewVK>());
         color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
                 .set_load_op(config.get_color_attachment_load_op())
                 .set_clear_value(attachment_data.clear_values[i])
@@ -849,8 +844,8 @@ void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, const RendResVie
 
     VkRenderingAttachmentInfo depth_attachment_info{};
     if (attachment_data.depth_attachment_id.has_value()) {
-        Ref<ROImageViewVK> depth_attachment = WBE_REQUIRES_VALID(
-            p_resources.get(*attachment_data.depth_attachment_id).container->get().dynamic_cast_ref<ROImageViewVK>());
+        Ref<ROImageViewVK> depth_attachment =
+            WBE_REQUIRES_VALID(depth_attachment_container->get().dynamic_cast_ref<ROImageViewVK>());
         depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
                                     .set_load_op(config.get_depth_attachment_load_op())
                                     .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)

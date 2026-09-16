@@ -50,7 +50,7 @@ public:
         return Vector<ResAccessVK, RenderAllocator>(allocator);
     }
 
-    virtual void record(VkCommandBuffer /*p_command_buffer*/, const RendResViewVK& /*p_resources*/, double /*p_delta*/) override {
+    virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
     }
 
 private:

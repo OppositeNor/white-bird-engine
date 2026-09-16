@@ -16,7 +16,9 @@
 #define WBE_FILE_RT_GENERATE_MIPMAPS_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>
@@ -69,12 +71,16 @@ struct RTGenerateMipmapsVK final : public RenderTaskVK {
     /** @copydoc RenderTaskVK::write_resources */
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
+    /** @copydoc RenderTaskVK::bind_resources */
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
+
     /** @copydoc RenderTaskVK::record */
-    virtual void record(VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string image_view_id;
+    Ref<RenderObjectContainerVK> image_view_container;
     VkExtent2D base_extent{};
     uint32_t mipmap_level_count = 1;
 };

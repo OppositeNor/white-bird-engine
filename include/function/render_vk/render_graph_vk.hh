@@ -45,13 +45,13 @@ struct RendResVK {
     std::string res_id;
     // The runtime type id of the underlying resource (TypeUUID<T>::UUID).
     RendResTID res_type_id = 0;
-    // The resource container.
+    // The resource container bound during graph construction.
     Ref<RenderObjectContainerVK> container;
 };
 
 /**
  * @class RendResViewVK
- * @brief Read-only resource lookup for a Vulkan render graph.
+ * @brief Read-only lookup of stable resource bindings for a Vulkan render graph.
  */
 class RendResViewVK {
 public:
@@ -68,17 +68,19 @@ public:
     }
 
     /**
-     * @brief Check whether a resource is bound under an id.
+     * @brief Check whether a stable resource binding is declared under an id.
      *
      * @param p_resource_id The resource id to query.
-     * @return True when the resource is bound, otherwise false.
+     * @return True when the resource binding is declared, otherwise false.
      */
     bool contains(std::string_view p_resource_id) const;
 
     /**
-     * @brief Get a resource binding by id.
+     * @brief Get a stable resource binding by id.
      *
      * @param p_resource_id The resource id to query.
+     * The binding may not have a current render object until runtime resources are populated.
+     *
      * @return The resource binding stored under the id.
      */
     const RendResVK& get(std::string_view p_resource_id) const;
@@ -201,32 +203,6 @@ public:
         std::span<const VkSemaphoreSubmitInfo> p_extra_signals_last_submit);
 
     /**
-     * @brief Insert or override a persistent runtime-bound resource by id.
-     *
-     * If a transient override exists, this updates the value restored after
-     * execution without replacing the current override.
-     *
-     * @param p_res_id      The resource id (label).
-     * @param p_resource    The resource instance.
-     * @param p_res_type_id The runtime type id of the resource.
-     */
-    void set_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container);
-
-    /**
-     * @brief Insert or override a resource until the graph next executes.
-     *
-     * @param p_res_id The resource id to override.
-     * @param p_resource The transient resource instance.
-     * @param p_res_type_id The runtime type id of the resource.
-     */
-    void set_transient_resource(std::string_view p_res_id, Ref<RenderObjectContainerVK> p_resource_container);
-
-    /**
-     * @brief Restore descriptor defaults after transient resource overrides.
-     */
-    void reset_transient_resources();
-
-    /**
      * @brief The terminal binary semaphore: signaled by the last graphics-
      * queue submit of the most recent execute(). Caller waits on it at
      * present time. One semaphore is allocated per swap-chain image because
@@ -244,14 +220,6 @@ private:
     Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
     // All resources known to the graph, keyed by res_id.
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
-
-    struct TransientResourceDefault {
-        std::string resource_id;
-        bool existed = false;
-        RendResTID resource_type_id = 0;
-        Ref<RenderObjectContainerVK> container;
-    };
-    Vector<TransientResourceDefault, RenderAllocator> transient_resource_defaults;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
