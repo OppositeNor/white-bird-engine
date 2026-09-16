@@ -41,6 +41,7 @@ public:
     Ref<IRenderObjectVK> get() const override;
     Ref<IRenderObjectVK> get(uint32_t p_frame_slot) override;
     Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const override;
+    DebugDataRows descriptor_debug_data() const override;
 
 private:
     Ref<IRenderObjectVK> resource;

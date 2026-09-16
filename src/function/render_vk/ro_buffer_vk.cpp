@@ -33,6 +33,21 @@
 
 namespace WhiteBirdEngine {
 
+namespace {
+
+DebugData make_descriptor_row(
+    std::string_view p_resource_type, std::string_view p_descriptor_type, uint32_t p_heap_index, VkDeviceAddress p_device_address) {
+    DebugData row;
+    row.set_value("resource_type", std::string(p_resource_type));
+    row.set_value("descriptor_type", std::string(p_descriptor_type));
+    row.set_value("heap", "resource");
+    row.set_value("heap_index", p_heap_index);
+    row.set_value("device_address", std::format("0x{:x}", p_device_address));
+    return row;
+}
+
+} // namespace
+
 TypeID ROBufferVK::get_type_uuid() const {
     return TypeUUID<ROBufferVK>::UUID;
 }
@@ -179,6 +194,21 @@ uint32_t ROBufferVK::get_storage_view_index() const {
             get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size));
     }
     return *storage_view_index;
+}
+
+DebugDataRows ROBufferVK::descriptor_debug_data() const {
+    DebugDataRows rows(render_data->allocator);
+    if (!uniform_view_index.has_value() && !storage_view_index.has_value()) {
+        return rows;
+    }
+    VkDeviceAddress device_address = get_buffer_address_range(render_data, buffer, exposed_fields.buffer_size).address;
+    if (uniform_view_index.has_value()) {
+        rows.emplace_back(make_descriptor_row("ROBufferVK", "uniform_buffer", *uniform_view_index, device_address));
+    }
+    if (storage_view_index.has_value()) {
+        rows.emplace_back(make_descriptor_row("ROBufferVK", "storage_buffer", *storage_view_index, device_address));
+    }
+    return rows;
 }
 
 void ROBufferVK::update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) {

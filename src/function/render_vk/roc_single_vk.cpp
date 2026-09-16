@@ -45,4 +45,9 @@ Ref<IRenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
     return resource;
 }
 
+DebugDataRows ROCSingleVK::descriptor_debug_data() const {
+    WBE_DEBUG_ASSERT(resource != MEM_NULL);
+    return resource->descriptor_debug_data();
+}
+
 } // namespace WhiteBirdEngine

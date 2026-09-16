@@ -17,8 +17,10 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include <cstdint>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -50,6 +52,22 @@ public:
      * @return Resolved render object.
      */
     virtual Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const = 0;
+
+    /**
+     * @brief Return structured descriptor-debug rows owned by this container.
+     *
+     * Implementations must inspect only already-bound resources and must not allocate descriptors or synchronize per-frame state.
+     *
+     * @return Flattened descriptor-debug rows.
+     */
+    virtual DebugDataRows descriptor_debug_data() const = 0;
+
+    /**
+     * @brief Serialize the descriptor-debug rows into one compact JSON array.
+     *
+     * @return Compact JSON array string.
+     */
+    std::string to_string() const;
 
     RendResTID get_resource_type_id() const;
 

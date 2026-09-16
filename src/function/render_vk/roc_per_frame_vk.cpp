@@ -111,6 +111,21 @@ Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
     return resources[p_frame_slot];
 }
 
+DebugDataRows ROCPerFrameVK::descriptor_debug_data() const {
+    DebugDataRows rows(render_data->allocator);
+    for (uint32_t frame_slot = 0; frame_slot < resources.size(); ++frame_slot) {
+        if (resources[frame_slot] == MEM_NULL) {
+            continue;
+        }
+        DebugDataRows resource_rows = resources[frame_slot]->descriptor_debug_data();
+        for (DebugData& row : resource_rows) {
+            row.set_value("frame_index", frame_slot);
+            rows.emplace_back(std::move(row));
+        }
+    }
+    return rows;
+}
+
 void ROCPerFrameVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(

@@ -14,15 +14,18 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
-#include "core/logging/log.hh"
 #include "function/ecs/components.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "platform/os/os.hh"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <format>
+#include <fstream>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -31,7 +34,11 @@
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <print>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace WBE = WhiteBirdEngine;
@@ -48,6 +55,42 @@ inline constexpr float TEST_CAMERA_TURN_SPEED = glm::radians(90.0F);
 inline constexpr float TEST_CAMERA_PITCH_LIMIT = glm::radians(89.0F);
 
 namespace WhiteBirdEngine {
+
+inline std::string make_descriptor_debug_file_stem(std::string_view p_name) {
+    std::string result;
+    result.reserve(p_name.size());
+    for (char character : p_name) {
+        if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9')) {
+            result.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(character))));
+        } else {
+            result.push_back('_');
+        }
+    }
+    if (result.empty()) {
+        throw std::runtime_error("Descriptor debug output name is empty.");
+    }
+    return result;
+}
+
+inline void write_descriptor_debug_output(std::string_view p_name, std::string_view p_json) {
+    std::filesystem::path output_dir = std::filesystem::path("test_env") / "descriptor_debug";
+    std::filesystem::create_directories(output_dir);
+    std::filesystem::path output_path = output_dir / std::format("{}.json", make_descriptor_debug_file_stem(p_name));
+    std::ofstream output(output_path, std::ios::out | std::ios::trunc);
+    if (!output.is_open()) {
+        throw std::runtime_error(std::format("Failed to open descriptor debug output file: {}.", output_path.generic_string()));
+    }
+    output << nlohmann::json::parse(p_json).dump(2) << '\n';
+    if (!output.good()) {
+        throw std::runtime_error(std::format("Failed to write descriptor debug output file: {}.", output_path.generic_string()));
+    }
+}
+
+inline void write_descriptor_debug_output(std::string_view p_name, const DebugData& p_data) {
+    std::ostringstream stream;
+    stream << p_data;
+    write_descriptor_debug_output(p_name, stream.str());
+}
 
 inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
     static std::string capture_png_path;
@@ -161,23 +204,8 @@ inline WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::ComponentSpot
         .emitter_width = p_spot_light_component.emitter_width};
 }
 
-inline void log_uniform_buffer_descriptors(
-    const WBE::BaseRenderDataVK* p_render_data, WBE::Ref<WBE::ROCPerFrameVK> p_buffers, std::string_view p_label) {
-    for (uint32_t frame_slot = 0; frame_slot < p_buffers->get_context_count(); ++frame_slot) {
-        WBE::Ref<WBE::ROBufferVK> buffer = p_buffers->get(frame_slot).dynamic_cast_ref<WBE::ROBufferVK>();
-        if (buffer == WBE::MEM_NULL) {
-            throw std::runtime_error("Failed to log deferred camera buffer descriptor: frame resource is not a buffer.");
-        }
-        VkBufferDeviceAddressInfo address_info{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = buffer->get_buffer(),
-        };
-        uint32_t descriptor_index = buffer->get_uniform_view_index();
-        VkDeviceAddress device_address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info);
-        WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
-            ->message(std::format(
-                "{} frame slot {}: resource descriptor index {}, device address 0x{:x}.", p_label, frame_slot, descriptor_index, device_address));
-    }
+inline void log_uniform_buffer_descriptors(WBE::Ref<WBE::ROCPerFrameVK> p_buffers, std::string_view p_label) {
+    WBE::write_descriptor_debug_output(std::format("{}_descriptors", p_label), p_buffers->to_string());
 }
 
 #endif

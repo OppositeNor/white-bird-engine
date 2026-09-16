@@ -26,6 +26,20 @@
 
 namespace WhiteBirdEngine {
 
+namespace {
+
+DebugData make_descriptor_row(std::string_view p_descriptor_type, uint32_t p_heap_index) {
+    DebugData row;
+    row.set_value("resource_type", "ROImageViewVK");
+    row.set_value("descriptor_type", std::string(p_descriptor_type));
+    row.set_value("heap", "resource");
+    row.set_value("heap_index", p_heap_index);
+    row.set_value("device_address", nullptr);
+    return row;
+}
+
+} // namespace
+
 TypeID ROImageViewVK::get_type_uuid() const {
     return TypeUUID<ROImageViewVK>::UUID;
 }
@@ -204,6 +218,17 @@ uint32_t ROImageViewVK::get_storage_view_index() const {
         allocator->write_storage_image_descriptor(*storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
     }
     return *storage_view_index;
+}
+
+DebugDataRows ROImageViewVK::descriptor_debug_data() const {
+    DebugDataRows rows(render_data->allocator);
+    if (sampled_view_index.has_value()) {
+        rows.emplace_back(make_descriptor_row("sampled_image", *sampled_view_index));
+    }
+    if (storage_view_index.has_value()) {
+        rows.emplace_back(make_descriptor_row("storage_image", *storage_view_index));
+    }
+    return rows;
 }
 
 } // namespace WhiteBirdEngine

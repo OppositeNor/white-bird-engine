@@ -104,7 +104,9 @@ public:
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .container = WBE::MEM_NULL});
         pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_STATIC_SET, std::move(task));
-        WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        WBE::Ref<WBE::RenderGraphVK> graph =
+            WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }
 

@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -84,6 +85,15 @@ public:
      * @return The resource binding stored under the id.
      */
     const RendResVK& get(std::string_view p_resource_id) const;
+
+    /**
+     * @brief Return structured descriptor-debug rows for all declared graph resources.
+     *
+     * Each row is annotated with its graph resource id and deterministically sorted.
+     *
+     * @return Descriptor-debug rows for this resource view.
+     */
+    DebugDataRows descriptor_debug_data() const;
 
 private:
     const Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
@@ -212,6 +222,15 @@ public:
      * @return The terminal semaphore for the current swap-chain image.
      */
     Ref<SemaphoreVK> get_terminal_semaphore() const;
+
+    /**
+     * @brief Return descriptors owned by declared graph resources as structured debug data.
+     *
+     * The returned object is a JSON-array-shaped debug value containing one row per descriptor.
+     *
+     * @return Structured descriptor debug data.
+     */
+    DebugData list_descriptors() const;
 
 private:
     const BaseRenderDataVK* render_data;

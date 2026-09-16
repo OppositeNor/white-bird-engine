@@ -148,8 +148,9 @@ public:
      *
      * @param p_resource_key The resource key to register under.
      * @param p_desc The render graph descriptor.
+    * @return The newly built render graph.
      */
-    void register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
+    Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
 
     /**
      * @brief Execute a render graph through this renderer's swap-chain path.

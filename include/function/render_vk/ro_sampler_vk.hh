@@ -230,6 +230,8 @@ public:
         return sampler;
     }
 
+    DebugDataRows descriptor_debug_data() const override;
+
     /**
      * @brief Get or lazily create the sampler descriptor index.
      */

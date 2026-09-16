@@ -93,24 +93,6 @@ Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
         }});
 }
 
-void log_uniform_buffer_descriptors(const BaseRenderDataVK* p_render_data, Ref<ROCPerFrameVK> p_buffers, std::string_view p_label) {
-    for (uint32_t frame_slot = 0; frame_slot < p_buffers->get_context_count(); ++frame_slot) {
-        Ref<ROBufferVK> buffer = p_buffers->get(frame_slot).dynamic_cast_ref<ROBufferVK>();
-        if (buffer == MEM_NULL) {
-            throw std::runtime_error("Failed to log deferred camera buffer descriptor: frame resource is not a buffer.");
-        }
-        VkBufferDeviceAddressInfo address_info{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = buffer->get_buffer(),
-        };
-        uint32_t descriptor_index = buffer->get_uniform_view_index();
-        VkDeviceAddress device_address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info);
-        stdout_log(WBE_CHANNEL_DEBUG)
-            ->message(std::format(
-                "{} frame slot {}: resource descriptor index {}, device address 0x{:x}.", p_label, frame_slot, descriptor_index, device_address));
-    }
-}
-
 } // namespace
 
 constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
@@ -915,8 +897,8 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
 
     gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
     composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
-    log_uniform_buffer_descriptors(base_render_data, gbuffer_camera_info_ubos, "G-buffer camera buffer");
-    log_uniform_buffer_descriptors(base_render_data, composition_camera_info_ubos, "Composition camera buffer");
+    log_uniform_buffer_descriptors(gbuffer_camera_info_ubos, "G-buffer camera buffer");
+    log_uniform_buffer_descriptors(composition_camera_info_ubos, "Composition camera buffer");
 
     write_task_uniform_bindings(gbuffer_camera_bindings, gbuffer_camera_info_ubos);
     write_compute_uniform_bindings(composition_camera_bindings, composition_camera_info_ubos);
@@ -952,6 +934,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span
     });
 
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+    log_uniform_buffer_descriptors(spot_light_info_ubos, "Spot light buffer");
 
     write_task_uniform_bindings(shadow_light_bindings, spot_light_info_ubos);
     write_compute_uniform_bindings(spot_light_bindings, spot_light_info_ubos);
@@ -977,7 +960,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_task_desc())
         .add_task(create_present_result_image_task_desc());
-    renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
+    Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
+    write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {

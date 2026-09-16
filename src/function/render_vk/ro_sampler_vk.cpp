@@ -23,6 +23,20 @@
 
 namespace WhiteBirdEngine {
 
+namespace {
+
+DebugData make_descriptor_row(uint32_t p_heap_index) {
+    DebugData row;
+    row.set_value("resource_type", "ROSamplerVK");
+    row.set_value("descriptor_type", "sampler");
+    row.set_value("heap", "sampler");
+    row.set_value("heap_index", p_heap_index);
+    row.set_value("device_address", nullptr);
+    return row;
+}
+
+} // namespace
+
 TypeID ROSamplerVK::get_type_uuid() const {
     return TypeUUID<ROSamplerVK>::UUID;
 }
@@ -220,6 +234,14 @@ uint32_t ROSamplerVK::get_sampler_index() const {
         allocator->write_sampler_descriptor(*sampler_index, create_info);
     }
     return *sampler_index;
+}
+
+DebugDataRows ROSamplerVK::descriptor_debug_data() const {
+    DebugDataRows rows(render_data->allocator);
+    if (sampler_index.has_value()) {
+        rows.emplace_back(make_descriptor_row(*sampler_index));
+    }
+    return rows;
 }
 
 } // namespace WhiteBirdEngine

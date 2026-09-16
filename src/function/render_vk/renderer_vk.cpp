@@ -1347,7 +1347,7 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     }
 }
 
-void RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc) {
+Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc) {
     if (render_graphs.contains(p_resource_key)) {
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
     }
@@ -1372,6 +1372,7 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     graph->build_from_descriptor(*desc_ref);
+    Ref<RenderGraphVK> graph_ref = graph;
 
     render_graphs.emplace(std::string(p_resource_key),
         RegisteredRenderGraph{
@@ -1379,6 +1380,7 @@ void RendererVK::register_render_graph(std::string_view p_resource_key, RendGrap
             .graph = std::move(graph),
             .reference_count = 1,
         });
+    return graph_ref;
 }
 
 void RendererVK::register_render_graph(std::string_view p_resource_key) {

@@ -306,6 +306,8 @@ public:
         return image_view;
     }
 
+    DebugDataRows descriptor_debug_data() const override;
+
     /**
      * @brief Get or lazily create the sampled-image descriptor index.
      */

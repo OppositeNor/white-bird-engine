@@ -28,7 +28,6 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -148,7 +147,9 @@ public:
                 0);
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
-        WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        WBE::Ref<WBE::RenderGraphVK> graph =
+            WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }
 

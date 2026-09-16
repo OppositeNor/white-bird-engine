@@ -15,11 +15,34 @@
 #include "function/render_vk/render_object_container_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/parser/parser_json.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include <sstream>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
+
+namespace {
+
+std::string descriptor_rows_to_string(const DebugDataRows& p_rows) {
+    DebugDataArray rows;
+    rows.reserve(p_rows.size());
+    for (const DebugData& row : p_rows) {
+        rows.push_back(row);
+    }
+    DebugData root;
+    root.set(std::move(rows));
+    std::ostringstream stream;
+    stream << root;
+    return stream.str();
+}
+
+} // namespace
+
+std::string RenderObjectContainerVK::to_string() const {
+    return descriptor_rows_to_string(descriptor_debug_data());
+}
 
 RendResTID RenderObjectContainerVK::get_resource_type_id() const {
     return resource_type_id;

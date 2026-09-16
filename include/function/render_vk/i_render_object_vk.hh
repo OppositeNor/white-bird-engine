@@ -16,6 +16,7 @@
 #define WBE_FILE_I_RENDER_OBJECT_VK_HH
 
 #include "function/render/i_render_object.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -47,6 +48,17 @@ public:
         if (p_render_data == nullptr) {
             throw std::runtime_error("Render data is nullptr.");
         }
+    }
+
+    /**
+     * @brief Return structured descriptor-debug rows owned by this render object.
+     *
+     * Implementations must report only descriptors that already exist and must not allocate new descriptors while inspecting.
+     *
+     * @return Descriptor-debug rows for this object.
+     */
+    virtual DebugDataRows descriptor_debug_data() const {
+        return DebugDataRows(render_data->allocator);
     }
 
 protected:

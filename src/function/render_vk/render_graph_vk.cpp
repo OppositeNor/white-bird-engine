@@ -39,6 +39,7 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
@@ -52,6 +53,40 @@ static Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
 }
 
 namespace {
+
+DebugData make_descriptor_data(const DebugDataRows& p_rows) {
+    DebugDataArray rows;
+    rows.reserve(p_rows.size());
+    for (const DebugData& row : p_rows) {
+        rows.push_back(row);
+    }
+    DebugData root;
+    root.set(std::move(rows));
+    return root;
+}
+
+uint32_t descriptor_heap_index(const DebugData& p_row) {
+    return p_row.get_value<uint32_t>("heap_index");
+}
+
+std::string descriptor_heap(const DebugData& p_row) {
+    return p_row.get_value<std::string>("heap");
+}
+
+std::string descriptor_resource_id(const DebugData& p_row) {
+    return p_row.get_value<std::string>("resource_id");
+}
+
+int64_t descriptor_frame_index(const DebugData& p_row) {
+    if (!p_row.contains("frame_index")) {
+        return -1;
+    }
+    return static_cast<int64_t>(p_row.get_value<uint32_t>("frame_index"));
+}
+
+std::string descriptor_type_name(const DebugData& p_row) {
+    return p_row.get_value<std::string>("descriptor_type");
+}
 
 VkQueue queue_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_queue_family) {
     switch (p_queue_family) {
@@ -222,6 +257,34 @@ const RendResVK& RendResViewVK::get(std::string_view p_resource_id) const {
     return *resource->second;
 }
 
+DebugDataRows RendResViewVK::descriptor_debug_data() const {
+    RenderAllocator* allocator = resources->get_allocator().allocator;
+    DebugDataRows rows(allocator);
+    for (const auto& [resource_id, resource] : *resources) {
+        if (resource == MEM_NULL || resource->container == MEM_NULL) {
+            continue;
+        }
+        DebugDataRows resource_rows = resource->container->descriptor_debug_data();
+        for (DebugData& row : resource_rows) {
+            row.set_value("resource_id", resource_id);
+            rows.emplace_back(std::move(row));
+        }
+    }
+    std::sort(rows.begin(), rows.end(), [](const DebugData& p_left, const DebugData& p_right) {
+        return std::make_tuple(descriptor_heap_index(p_left),
+                   descriptor_heap(p_left),
+                   descriptor_resource_id(p_left),
+                   descriptor_frame_index(p_left),
+                   descriptor_type_name(p_left)) <
+               std::make_tuple(descriptor_heap_index(p_right),
+                   descriptor_heap(p_right),
+                   descriptor_resource_id(p_right),
+                   descriptor_frame_index(p_right),
+                   descriptor_type_name(p_right));
+    });
+    return rows;
+}
+
 Ref<RGNode> RenderGraphVK::add_node(Unique<RenderTaskVK> p_task) {
     auto node = make_ref<RGNode>(render_data->allocator, render_data->allocator);
     node->render_task = std::move(p_task);
@@ -344,6 +407,10 @@ uint32_t RenderGraphVK::terminal_semaphore_index() const {
 
 Ref<SemaphoreVK> RenderGraphVK::get_terminal_semaphore() const {
     return terminal_semaphores[terminal_semaphore_index()];
+}
+
+DebugData RenderGraphVK::list_descriptors() const {
+    return make_descriptor_data(RendResViewVK(&all_resources).descriptor_debug_data());
 }
 
 void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {

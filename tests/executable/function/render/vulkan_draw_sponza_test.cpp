@@ -485,6 +485,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
     main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE);
     pipeline_desc.tasks.emplace_back(std::move(main_masked_task_desc));
 
-    renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
+    WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
+    WBE::write_descriptor_debug_output("draw_sponza_pipeline_graph_descriptors", graph->list_descriptors());
     renderer_vk->activate_render_graph("draw_sponza_pipeline");
 }

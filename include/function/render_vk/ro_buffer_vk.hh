@@ -351,6 +351,8 @@ public:
         return buffer;
     }
 
+    DebugDataRows descriptor_debug_data() const override;
+
     /**
      * @brief Get or lazily create the whole-buffer uniform descriptor index.
      */

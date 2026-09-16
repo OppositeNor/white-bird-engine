@@ -337,6 +337,7 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
     main_task_desc.after(RT_RUN_PIPELINE_SHADOWMAP);
     pipeline_desc.tasks.emplace_back(std::move(main_task_desc));
 
-    renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
+    WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
+    WBE::write_descriptor_debug_output("draw_cube_pipeline_graph_descriptors", graph->list_descriptors());
     renderer_vk->activate_render_graph("draw_cube_pipeline");
 }
