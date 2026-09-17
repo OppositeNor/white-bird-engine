@@ -41,7 +41,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
-#include "function/render_vk/rt_run_compute_pipeline_2d_vk.hh"
+#include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
@@ -95,30 +95,6 @@ Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
 
 } // namespace
 
-constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
-constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
-constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
-constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW = "gbuffer_normal";
-constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW = "gbuffer_rma";
-constexpr std::string_view REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
-constexpr std::string_view REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW = "shadow_moments";
-constexpr std::string_view REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW = "shadow_sat_horizontal";
-constexpr std::string_view REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW = "shadow_sat";
-constexpr std::string_view REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
-constexpr std::string_view REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
-constexpr std::string_view REND_RES_TEST_RESULT_IMAGE_VIEW = "result_image";
-constexpr std::string_view REND_RES_TEST_BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
-constexpr std::string_view REND_RES_TEST_BLOOM_IMAGE_VIEW = "bloom";
-inline constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
-inline constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
-inline constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
-inline constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE = "build_shadow_sat";
-inline constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
-inline constexpr std::string_view RT_RUN_INDIRECT_LIGHTING = "run_indirect_lighting";
-inline constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
-inline constexpr std::string_view RT_BLOOM = "bloom";
-inline constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
-
 constexpr VkFormat GBUFFER_ALBEDO_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat GBUFFER_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat GBUFFER_RMA_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
@@ -137,6 +113,33 @@ public:
     void setup_draw_task();
 
 private:
+    static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
+    static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
+    static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
+    static constexpr std::string_view GBUFFER_NORMAL_IMAGE_VIEW = "gbuffer_normal";
+    static constexpr std::string_view GBUFFER_RMA_IMAGE_VIEW = "gbuffer_rma";
+    static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
+    static constexpr std::string_view SHADOWMAP_COLOR_IMAGE_VIEW = "shadowmap_color";
+    static constexpr std::string_view RSM_NORMAL_IMAGE_VIEW = "rsm_normal";
+    static constexpr std::string_view SHADOWMAP_DEPTH_IMAGE_VIEW = "shadowmap_depth";
+    static constexpr std::string_view SHADOW_MOMENTS_IMAGE_VIEW = "shadow_moments";
+    static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW = "shadow_sat_horizontal";
+    static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW = "shadow_sat";
+    static constexpr std::string_view DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
+    static constexpr std::string_view INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
+    static constexpr std::string_view RESULT_IMAGE_VIEW = "result_image";
+    static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
+    static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
+    static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
+    static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
+    static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
+    static constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE = "build_shadow_sat";
+    static constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
+    static constexpr std::string_view RT_RUN_INDIRECT_LIGHTING = "run_indirect_lighting";
+    static constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
+    static constexpr std::string_view RT_BLOOM = "bloom";
+    static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
+
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
         glm::vec4 camera_world_position;
@@ -164,6 +167,20 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
+    Ref<ROBufferVK> create_initialized_uniform_buffer(const void* p_data, size_t p_size) const;
+    ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
+    GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
+    RenderBindpointDeclarations build_direct_lighting_bindpoints(Ref<ROBufferVK> p_camera_buffer,
+        Ref<ROBufferVK> p_light_info_buffer,
+        Ref<ROBufferVK> p_light_count_buffer,
+        Ref<ROImageViewVK> p_shadow_moments_view,
+        bool p_use_summed_area_table) const;
+    RenderBindpointDeclarations build_indirect_lighting_bindpoints(
+        Ref<ROBufferVK> p_camera_buffer, Ref<ROBufferVK> p_light_info_buffer, Ref<ROBufferVK> p_light_count_buffer) const;
+    RenderBindpointDeclarations build_combine_lighting_bindpoints() const;
+    RenderBindpointDeclarations build_bloom_horizontal_bindpoints() const;
+    RenderBindpointDeclarations build_bloom_vertical_bindpoints() const;
+    RenderBindpointDeclarations build_present_post_processing_bindpoints() const;
     Unique<RTRunStaticSetVK> compile_shadow_task(
         RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     Unique<RTRunStaticSetVK> compile_gbuffer_task(
@@ -460,10 +477,10 @@ Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_gbuffer_task(
     RTRunStaticSetVK::Config task_config;
     VkClearValue color_clear{};
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    task_config.add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_FORMAT)
-        .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_FORMAT)
-        .add_color_attachment(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_FORMAT)
-        .set_depth_attachment(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_FORMAT);
+    task_config.add_color_attachment(GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_FORMAT)
+        .add_color_attachment(GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_FORMAT)
+        .add_color_attachment(GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_FORMAT)
+        .set_depth_attachment(GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_FORMAT);
     if (p_load_existing) {
         task_config.set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD).set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     } else {
@@ -704,10 +721,10 @@ Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task(
     shadow_moments_clear.color.float32[1] = 1.0F;
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
-        .add_color_attachment(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)
-        .add_color_attachment(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_FORMAT)
-        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT);
+        .add_color_attachment(SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
+        .add_color_attachment(RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)
+        .add_color_attachment(SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_FORMAT)
+        .set_depth_attachment(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT);
     if (p_load_existing) {
         task_config.set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD).set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     } else {
@@ -747,120 +764,153 @@ void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_
     shadow_moments_summed_area_table_vertical_compute_pipeline = vertical_compiled.compute_pipeline;
 }
 
-void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
-    CompositionCameraInfo camera_info = make_composition_camera_info();
-    SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    uint32_t spot_light_count = 1;
-    auto make_uniform_buffer = [this](const void* p_data, size_t p_size) {
-        Ref<ROBufferVK> buffer = ROBufferVK::Builder()
-                                     .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                     .set_domain(DeviceDomain::HOST_DEVICE)
-                                     .set_size(p_size)
-                                     .create_ref(base_render_data);
-        buffer->update_buffer(p_data, p_size);
-        return buffer;
-    };
-    Ref<ROBufferVK> camera_buffer = make_uniform_buffer(&camera_info, sizeof(camera_info));
-    Ref<ROBufferVK> light_info_buffer = make_uniform_buffer(&spot_light_info, sizeof(spot_light_info));
-    Ref<ROBufferVK> light_count_buffer = make_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
+Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_uniform_buffer(const void* p_data, size_t p_size) const {
+    Ref<ROBufferVK> buffer = ROBufferVK::Builder()
+                                 .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                 .set_domain(DeviceDomain::HOST_DEVICE)
+                                 .set_size(p_size)
+                                 .create_ref(base_render_data);
+    buffer->update_buffer(p_data, p_size);
+    return buffer;
+}
 
-    auto make_direct_bindpoints = [&](Ref<ROImageViewVK> p_shadow_moments_view, bool p_use_summed_area_table) {
-        RenderBindpointDeclarationsBuilder bindpoints;
-        bindpoints.add_storage_buffer_decleration("camera_info", camera_buffer)
-            .add_storage_buffer_decleration("light.lights[0].info", light_info_buffer)
-            .add_image_decleration("light.lights[0].shadowmap", p_shadow_moments_view);
-        if (p_use_summed_area_table) {
-            bindpoints.add_image_decleration("light.lights[0].shadow_moments_summed_area_table", shadow_moments_summed_area_table_view);
-        }
-        bindpoints.add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
-            .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
-            .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
-            .add_storage_buffer_decleration("light.light_count", light_count_buffer)
-            .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
-            .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
-            .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-            .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
-            .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
-            .add_image_decleration("direct_lighting_output", direct_lighting_view);
-        return bindpoints;
-    };
-    RenderBindpointDeclarationsBuilder direct_bindpoints = make_direct_bindpoints(shadow_moments_sampled_view, false);
-
-    ComputePipelineCompilerVKContext compute_context{
+ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_pipeline_context() const {
+    return ComputePipelineCompilerVKContext{
         .allocator = render_allocator,
         .render_data = base_render_data,
         .render_database = renderer_vk->get_render_database(),
     };
-    auto direct_compiled = ComputePipelineCompilerVK(compute_context)
-                               .compile("direct_lighting_shader", direct_lighting_shader_resource, direct_bindpoints.build());
-    direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
-    RenderBindpointDeclarationsBuilder direct_summed_area_table_bindpoints =
-        make_direct_bindpoints(shadow_moments_attachment_view, true);
-    auto direct_summed_area_table_compiled = ComputePipelineCompilerVK(compute_context)
-                                                 .compile("direct_lighting_summed_area_table_shader",
-                                                     direct_lighting_summed_area_table_shader_resource,
-                                                     direct_summed_area_table_bindpoints.build());
-    direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
+}
 
-    RenderBindpointDeclarationsBuilder indirect_bindpoints;
-    indirect_bindpoints.add_storage_buffer_decleration("camera_info", camera_buffer)
-        .add_storage_buffer_decleration("light.lights[0].info", light_info_buffer)
-        .add_image_decleration("light.lights[0].shadowmap", shadow_moments_attachment_view)
-        .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
-        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
-        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
-        .add_storage_buffer_decleration("light.light_count", light_count_buffer)
-        .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
-        .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
-        .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-        .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
-        .add_image_decleration("indirect_lighting_output", indirect_lighting_view);
-    auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
-                                 .compile("indirect_lighting_shader", indirect_lighting_shader_resource, indirect_bindpoints.build());
-    indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
-
-    RenderBindpointDeclarationsBuilder combine_bindpoints;
-    combine_bindpoints.add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-        .add_image_decleration("direct_lighting", direct_lighting_view)
-        .add_image_decleration("indirect_lighting", indirect_lighting_view)
-        .add_image_decleration("result_image", result_image_view);
-    auto combine_compiled = ComputePipelineCompilerVK(compute_context)
-                                .compile("combine_lighting_shader", combine_lighting_shader_resource, combine_bindpoints.build());
-    combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
-
-    RenderBindpointDeclarationsBuilder bloom_horizontal_bindpoints;
-    bloom_horizontal_bindpoints.add_image_decleration("bloom_input", result_image_view)
-        .add_image_decleration("bloom_output", bloom_horizontal_image_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
-    auto bloom_horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context)
-            .compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, bloom_horizontal_bindpoints.build());
-    bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
-
-    RenderBindpointDeclarationsBuilder bloom_vertical_bindpoints;
-    bloom_vertical_bindpoints.add_image_decleration("bloom_input", bloom_horizontal_image_view)
-        .add_image_decleration("bloom_output", bloom_image_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
-    auto bloom_vertical_compiled =
-        ComputePipelineCompilerVK(compute_context)
-            .compile("bloom_shader_vertical", bloom_vertical_shader_resource, bloom_vertical_bindpoints.build());
-    bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
-
-    RenderBindpointDeclarationsBuilder present_bindpoints;
-    present_bindpoints.add_image_decleration("result_image", result_image_view)
-        .add_image_decleration("bloom_image", bloom_image_view)
-        .add_sampler_decleration("result_sampler", gbuffer_sampler);
-    GraphicsPipelineCompilerVKContext present_context{
+GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present_graphics_pipeline_context() const {
+    return GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
         .render_data = base_render_data,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
         .color_attachment_formats = {base_render_data->swap_chain_format},
     };
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_direct_lighting_bindpoints(Ref<ROBufferVK> p_camera_buffer,
+    Ref<ROBufferVK> p_light_info_buffer,
+    Ref<ROBufferVK> p_light_count_buffer,
+    Ref<ROImageViewVK> p_shadow_moments_view,
+    bool p_use_summed_area_table) const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer)
+        .add_storage_buffer_decleration("light.lights[0].info", p_light_info_buffer)
+        .add_image_decleration("light.lights[0].shadowmap", p_shadow_moments_view);
+    if (p_use_summed_area_table) {
+        bindpoints.add_image_decleration("light.lights[0].shadow_moments_summed_area_table", shadow_moments_summed_area_table_view);
+    }
+    bindpoints.add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
+        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
+        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
+        .add_storage_buffer_decleration("light.light_count", p_light_count_buffer)
+        .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
+        .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
+        .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
+        .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
+        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
+        .add_image_decleration("direct_lighting_output", direct_lighting_view);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_indirect_lighting_bindpoints(
+    Ref<ROBufferVK> p_camera_buffer, Ref<ROBufferVK> p_light_info_buffer, Ref<ROBufferVK> p_light_count_buffer) const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer)
+        .add_storage_buffer_decleration("light.lights[0].info", p_light_info_buffer)
+        .add_image_decleration("light.lights[0].shadowmap", shadow_moments_attachment_view)
+        .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
+        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
+        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
+        .add_storage_buffer_decleration("light.light_count", p_light_count_buffer)
+        .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
+        .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
+        .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
+        .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
+        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
+        .add_image_decleration("indirect_lighting_output", indirect_lighting_view);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_combine_lighting_bindpoints() const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_image_decleration("gbuffer_rma", gbuffer_rma_view)
+        .add_image_decleration("direct_lighting", direct_lighting_view)
+        .add_image_decleration("indirect_lighting", indirect_lighting_view)
+        .add_image_decleration("result_image", result_image_view);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_horizontal_bindpoints() const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_image_decleration("bloom_input", result_image_view)
+        .add_image_decleration("bloom_output", bloom_horizontal_image_view)
+        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_vertical_bindpoints() const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_image_decleration("bloom_input", bloom_horizontal_image_view)
+        .add_image_decleration("bloom_output", bloom_image_view)
+        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_present_post_processing_bindpoints() const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_image_decleration("result_image", result_image_view)
+        .add_image_decleration("bloom_image", bloom_image_view)
+        .add_sampler_decleration("result_sampler", gbuffer_sampler);
+    return bindpoints.build();
+}
+
+void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
+    CompositionCameraInfo camera_info = make_composition_camera_info();
+    SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    uint32_t spot_light_count = 1;
+    Ref<ROBufferVK> camera_buffer = create_initialized_uniform_buffer(&camera_info, sizeof(camera_info));
+    Ref<ROBufferVK> light_info_buffer = create_initialized_uniform_buffer(&spot_light_info, sizeof(spot_light_info));
+    Ref<ROBufferVK> light_count_buffer = create_initialized_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
+    ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
+    auto direct_compiled = ComputePipelineCompilerVK(compute_context)
+                               .compile("direct_lighting_shader",
+                                   direct_lighting_shader_resource,
+                                   build_direct_lighting_bindpoints(
+                                       camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_sampled_view, false));
+    direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
+    auto direct_summed_area_table_compiled = ComputePipelineCompilerVK(compute_context)
+                                                 .compile("direct_lighting_summed_area_table_shader",
+                                                     direct_lighting_summed_area_table_shader_resource,
+                                                     build_direct_lighting_bindpoints(camera_buffer,
+                                                         light_info_buffer,
+                                                         light_count_buffer,
+                                                         shadow_moments_attachment_view,
+                                                         true));
+    direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
+    auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
+                                 .compile("indirect_lighting_shader",
+                                     indirect_lighting_shader_resource,
+                                     build_indirect_lighting_bindpoints(camera_buffer, light_info_buffer, light_count_buffer));
+    indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
+    auto combine_compiled = ComputePipelineCompilerVK(compute_context)
+                                .compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
+    combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
+    auto bloom_horizontal_compiled =
+        ComputePipelineCompilerVK(compute_context)
+            .compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_horizontal_bindpoints());
+    bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
+    auto bloom_vertical_compiled =
+        ComputePipelineCompilerVK(compute_context)
+            .compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_vertical_bindpoints());
+    bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
     auto present_compiled =
-        GraphicsPipelineCompilerVK(present_context)
-            .compile("present_post_processing", present_post_processing_pipeline_resource, present_bindpoints.build());
+        GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context())
+            .compile("present_post_processing", present_post_processing_pipeline_resource, build_present_post_processing_bindpoints());
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;
 }
 
@@ -966,31 +1016,31 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID)
-        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, shadow_moments_summed_area_table_horizontal_view)
-        .add_resource(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, shadow_moments_summed_area_table_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, gbuffer_albedo_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, gbuffer_normal_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, gbuffer_rma_view)
-        .add_resource(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, gbuffer_depth_view)
-        .add_resource(REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
-        .add_resource(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
-        .add_resource(REND_RES_TEST_RESULT_IMAGE_VIEW, result_image_view)
-        .add_resource(REND_RES_TEST_BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
-        .add_resource(REND_RES_TEST_BLOOM_IMAGE_VIEW, bloom_image_view);
+        .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
+        .add_resource(SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
+        .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, shadow_moments_summed_area_table_horizontal_view)
+        .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, shadow_moments_summed_area_table_view)
+        .add_resource(SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(GBUFFER_ALBEDO_IMAGE_VIEW, gbuffer_albedo_view)
+        .add_resource(GBUFFER_NORMAL_IMAGE_VIEW, gbuffer_normal_view)
+        .add_resource(GBUFFER_RMA_IMAGE_VIEW, gbuffer_rma_view)
+        .add_resource(GBUFFER_DEPTH_IMAGE_VIEW, gbuffer_depth_view)
+        .add_resource(DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
+        .add_resource(INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
+        .add_resource(RESULT_IMAGE_VIEW, result_image_view)
+        .add_resource(BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
+        .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE;
     task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE)
-        .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
-        .write(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+        .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
+        .write(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
@@ -1006,8 +1056,11 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
             .height = 1,
             .depth = 1,
         };
-        return make_unique<RTRunComputePipeline2DVK>(
-            task_render_allocator, task_base_render_data, horizontal_pipeline, vertical_pipeline, horizontal_dispatch_group_count, vertical_dispatch_group_count);
+        std::array<RTRunComputePipelinesSequentialVK::Dispatch, 2> dispatches{{
+            {.pipeline = horizontal_pipeline, .group_count = horizontal_dispatch_group_count},
+            {.pipeline = vertical_pipeline, .group_count = vertical_dispatch_group_count},
+        }};
+        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatches);
     };
     return task_desc;
 }
@@ -1022,7 +1075,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
                            task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<RenderTaskVK> {
         return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
             task_base_render_data,
-            REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW,
+            SHADOW_MOMENTS_IMAGE_VIEW,
             task_shadow_extent,
             task_shadow_mipmap_level_count,
             SHADOW_MOMENTS_FORMAT);
@@ -1035,16 +1088,16 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
     task_desc.after(RT_RUN_DEFERRED_GBUFFER)
         .after(p_use_summed_area_table ? RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE : RT_GENERATE_SHADOW_MIPMAPS)
-        .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+        .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_ALBEDO_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_DEPTH_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(DIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     if (p_use_summed_area_table) {
-        task_desc.read(REND_RES_TEST_SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+        task_desc.read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     }
     Ref<ROComputePipelineVK> pipeline =
         p_use_summed_area_table ? direct_lighting_summed_area_table_compute_pipeline : direct_lighting_compute_pipeline;
@@ -1065,14 +1118,14 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
     task_desc.after(RT_RUN_DEFERRED_GBUFFER)
-        .read(REND_RES_TEST_SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_ALBEDO_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_DEPTH_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+        .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_ALBEDO_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(GBUFFER_DEPTH_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(INDIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     if (!p_use_summed_area_table) {
         task_desc.after(RT_GENERATE_SHADOW_MIPMAPS);
     } else {
@@ -1096,10 +1149,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
     task_desc.task_id = RT_COMBINE_LIGHTING;
     task_desc.after(RT_RUN_DIRECT_LIGHTING)
         .after(RT_RUN_INDIRECT_LIGHTING)
-        .read(REND_RES_TEST_DEFERRED_GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_DIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_INDIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(REND_RES_TEST_RESULT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+        .read(GBUFFER_RMA_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(DIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(INDIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(RESULT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = combine_lighting_compute_pipeline]() -> Unique<RenderTaskVK> {
@@ -1117,10 +1170,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_task_desc() const 
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BLOOM;
     task_desc.after(RT_COMBINE_LIGHTING)
-        .read(REND_RES_TEST_RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(REND_RES_TEST_BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(REND_RES_TEST_BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
-        .write(REND_RES_TEST_BLOOM_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
+        .write(BLOOM_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            horizontal_pipeline = bloom_horizontal_compute_pipeline,
@@ -1130,8 +1183,11 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_task_desc() const 
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
             .depth = 1,
         };
-        return make_unique<RTRunComputePipeline2DVK>(
-            task_render_allocator, task_base_render_data, horizontal_pipeline, vertical_pipeline, dispatch_group_count, dispatch_group_count);
+        std::array<RTRunComputePipelinesSequentialVK::Dispatch, 2> dispatches{{
+            {.pipeline = horizontal_pipeline, .group_count = dispatch_group_count},
+            {.pipeline = vertical_pipeline, .group_count = dispatch_group_count},
+        }};
+        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatches);
     };
     return task_desc;
 }
@@ -1139,7 +1195,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_task_desc() const 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
-    task_desc.after(RT_BLOOM).read(REND_RES_TEST_RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(REND_RES_TEST_BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    task_desc.after(RT_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<RenderTaskVK> {

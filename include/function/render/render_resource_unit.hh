@@ -66,6 +66,21 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaShader : public RUSchema {
     // Default compute entry discovered for this shader module.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> compute_entry;
+    // Default ray-generation entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> raygen_entry;
+    // Default miss entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> miss_entry;
+    // Default closest-hit entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> closest_hit_entry;
+    // Default any-hit entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> any_hit_entry;
+    // Default intersection-shader entry discovered for this shader module.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> intersection_shader_entry;
 };
 
 /**
@@ -119,6 +134,59 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // Should cull back-facing triangles.
     WBE_META(WBE_REFLECT)
     bool cull_backfaces = true;
+};
+
+/**
+ * @class RUSchemaRayTracingPipeline
+ * @brief The scheme of RURayTracingPipeline.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaRayTracingPipeline : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaRayTracingPipeline)
+    // The resource ID of the ray-generation shader.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> raygen_stage_id;
+    // Entry function for the ray-generation stage.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> raygen_stage_entry;
+    // The ray-generation shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaShader> raygen_stage;
+    // The resource ID of the miss shader.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> miss_stage_id;
+    // Entry function for the miss stage.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> miss_stage_entry;
+    // The miss shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaShader> miss_stage;
+    // The resource ID of the closest-hit shader.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> closest_hit_stage_id;
+    // Entry function for the closest-hit stage.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> closest_hit_stage_entry;
+    // The closest-hit shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaShader> closest_hit_stage;
+    // The resource ID of the any-hit shader.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> any_hit_stage_id;
+    // Entry function for the any-hit stage.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> any_hit_stage_entry;
+    // The any-hit shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaShader> any_hit_stage;
+    // The resource ID of the intersection shader.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> intersection_shader_stage_id;
+    // Entry function for the intersection-shader stage.
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> intersection_shader_stage_entry;
+    // The intersection shader of the pipeline.
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaShader> intersection_shader_stage;
 };
 
 /**
@@ -337,6 +405,16 @@ struct RUShader : public ResourceUnit {
     RefRes<char> fragment_entry;
     // Default compute entry for this shader module.
     RefRes<char> compute_entry;
+    // Default ray-generation entry for this shader module.
+    RefRes<char> raygen_entry;
+    // Default miss entry for this shader module.
+    RefRes<char> miss_entry;
+    // Default closest-hit entry for this shader module.
+    RefRes<char> closest_hit_entry;
+    // Default any-hit entry for this shader module.
+    RefRes<char> any_hit_entry;
+    // Default intersection-shader entry for this shader module.
+    RefRes<char> intersection_shader_entry;
 };
 
 /**
@@ -367,6 +445,33 @@ struct RUGraphicsPipeline : public ResourceUnit {
     bool depth_write = true;
     // Should cull back-facing triangles.
     bool cull_backfaces = true;
+};
+
+/**
+ * @class RURayTracingPipeline
+ * @brief Ray-tracing pipeline resource with one fixed slot for each supported stage.
+ */
+struct RURayTracingPipeline : public ResourceUnit {
+    // The ray-generation shader.
+    RefRes<RUShader> raygen_stage;
+    // Entry function for the ray-generation stage.
+    RefRes<char> raygen_stage_entry;
+    // The miss shader.
+    RefRes<RUShader> miss_stage;
+    // Entry function for the miss stage.
+    RefRes<char> miss_stage_entry;
+    // The closest-hit shader.
+    RefRes<RUShader> closest_hit_stage;
+    // Entry function for the closest-hit stage.
+    RefRes<char> closest_hit_stage_entry;
+    // The any-hit shader.
+    RefRes<RUShader> any_hit_stage;
+    // Entry function for the any-hit stage.
+    RefRes<char> any_hit_stage_entry;
+    // The intersection shader.
+    RefRes<RUShader> intersection_shader_stage;
+    // Entry function for the intersection-shader stage.
+    RefRes<char> intersection_shader_stage_entry;
 };
 
 /**

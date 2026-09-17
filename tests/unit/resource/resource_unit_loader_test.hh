@@ -342,6 +342,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderVideo video_loader;
     WBE::ResourceUnitLoaderShader shader_loader;
     WBE::ResourceUnitLoaderGraphicsPipeline graphics_pipeline_loader;
+    WBE::ResourceUnitLoaderRayTracingPipeline ray_tracing_pipeline_loader;
     WBE::ResourceUnitLoaderMaterial material_loader;
     WBE::ResourceUnitLoaderMesh mesh_loader;
     WBE::ResourceUnitLoaderSubmesh submesh_loader;
@@ -351,7 +352,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 18> loaders = {&audio_loader,
+    const std::array<const WBE::IResourceUnitLoader*, 19> loaders = {&audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
@@ -360,6 +361,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &video_loader,
         &shader_loader,
         &graphics_pipeline_loader,
+        &ray_tracing_pipeline_loader,
         &material_loader,
         &mesh_loader,
         &submesh_loader,
@@ -369,7 +371,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &prefab_loader,
         &world_loader,
         &scene_loader};
-    const std::array<std::string_view, 18> expected_resource_types = {"audio",
+    const std::array<std::string_view, 19> expected_resource_types = {"audio",
         "binary",
         "font",
         "image",
@@ -378,6 +380,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         "video",
         "shader",
         "graphics_pipeline",
+        "ray_tracing_pipeline",
         "material",
         "mesh",
         "submesh",
@@ -397,6 +400,83 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         EXPECT_EQ(first_resource_types.front(), expected_resource_types[i]);
         EXPECT_EQ(first_resource_types.data(), second_resource_types.data());
     }
+}
+
+TEST_F(ResourcePopulatorTest, RayTracingPipelinePopulatesFixedStagesAndOptionalEntries) {
+    WBE::ResourceUnitLoaderRayTracingPipeline loader;
+    WBE::StackAllocator stack_allocator(64 * 1024);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RURayTracingPipeline> captured_pipeline;
+    std::vector<std::string> created_ref_keys;
+
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+    WBE::RUShader raygen_shader;
+    WBE::RUShader miss_shader;
+    WBE::RUShader closest_hit_shader;
+    WBE::RUShader any_hit_shader;
+    WBE::RUShader intersection_shader;
+    std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
+        {"raygen_shader", push_to_stack(sizeof(raygen_shader), &raygen_shader)},
+        {"miss_shader", push_to_stack(sizeof(miss_shader), &miss_shader)},
+        {"closest_hit_shader", push_to_stack(sizeof(closest_hit_shader), &closest_hit_shader)},
+        {"any_hit_shader", push_to_stack(sizeof(any_hit_shader), &any_hit_shader)},
+        {"intersection_shader", push_to_stack(sizeof(intersection_shader), &intersection_shader)},
+    };
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
+                             [&captured_pipeline, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                 WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                                 captured_pipeline = saved_resource.force_cast<WBE::RURayTracingPipeline>();
+                                 return saved_resource;
+                             }))
+                         .set_create_ref_to_callback([&created_ref_keys, &reference_resources](
+                                                         std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                             created_ref_keys.emplace_back(p_key);
+                             auto found_resource = reference_resources.find(created_ref_keys.back());
+                             ASSERT_NE(found_resource, reference_resources.end());
+                             p_assign_ref(found_resource->second);
+                         })
+                         .build(stream);
+
+    constexpr std::string_view JSON_BUFFER = R"(
+    {
+        "id": "test_ray_tracing_pipeline",
+        "type": "ray_tracing_pipeline",
+        "raygen_stage_id": "raygen_shader",
+        "raygen_stage_entry": "raygen_main",
+        "miss_stage_id": "miss_shader",
+        "miss_stage_entry": "miss_main",
+        "closest_hit_stage_id": "closest_hit_shader",
+        "closest_hit_stage_entry": "closest_hit_main",
+        "any_hit_stage_id": "any_hit_shader",
+        "any_hit_stage_entry": "any_hit_main",
+        "intersection_shader_stage_id": "intersection_shader"
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(JSON_BUFFER);
+
+    loader.populate_scheme_from_data(*res_chunk, parser.get_data());
+
+    ASSERT_NE(captured_pipeline, nullptr);
+    EXPECT_EQ(captured_pipeline->raygen_stage.force_cast<char>(), reference_resources.at("raygen_shader"));
+    EXPECT_EQ(captured_pipeline->miss_stage.force_cast<char>(), reference_resources.at("miss_shader"));
+    EXPECT_EQ(captured_pipeline->closest_hit_stage.force_cast<char>(), reference_resources.at("closest_hit_shader"));
+    EXPECT_EQ(captured_pipeline->any_hit_stage.force_cast<char>(), reference_resources.at("any_hit_shader"));
+    EXPECT_EQ(captured_pipeline->intersection_shader_stage.force_cast<char>(), reference_resources.at("intersection_shader"));
+    EXPECT_STREQ(captured_pipeline->raygen_stage_entry.get(), "raygen_main");
+    EXPECT_STREQ(captured_pipeline->miss_stage_entry.get(), "miss_main");
+    EXPECT_STREQ(captured_pipeline->closest_hit_stage_entry.get(), "closest_hit_main");
+    EXPECT_STREQ(captured_pipeline->any_hit_stage_entry.get(), "any_hit_main");
+    EXPECT_STREQ(captured_pipeline->intersection_shader_stage_entry.get(), "");
+    EXPECT_EQ(created_ref_keys,
+        (std::vector<std::string>{"raygen_shader", "miss_shader", "closest_hit_shader", "any_hit_shader", "intersection_shader"}));
 }
 
 TEST_F(ResourcePopulatorTest, TextureResourceOwnershipContract) {

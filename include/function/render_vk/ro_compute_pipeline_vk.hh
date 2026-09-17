@@ -93,8 +93,6 @@ public:
     ROComputePipelineVK& operator=(const ROComputePipelineVK&) = delete;
     ROComputePipelineVK& operator=(ROComputePipelineVK&&) = delete;
 
-    TypeID get_type_uuid() const override;
-
     /**
      * @brief Construct a compute pipeline render object.
      *
@@ -102,6 +100,8 @@ public:
      * @param p_builder Builder containing the compute pipeline configuration.
      */
     ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @class ExposedFields

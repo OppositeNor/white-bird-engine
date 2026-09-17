@@ -793,6 +793,13 @@ private:
     };
 
     void init(const Config& p_config);
+    void cache_exposed_shader_fields(const Config& p_config);
+    PipelineStateCreateInfo make_pipeline_state_create_info(const Config& p_config);
+    VkGraphicsPipelineCreateInfo make_graphics_pipeline_create_info(const Config& p_config,
+        const std::vector<VkPipelineShaderStageCreateInfo>& p_shader_stages,
+        PipelineStateCreateInfo& p_state_create_info,
+        VkPipelineCreateFlags2CreateInfo& p_create_flags) const;
+    VkPipeline create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& p_create_info) const;
 
     void setup_vertex_input_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_input_assembly_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
@@ -805,6 +812,7 @@ private:
     void setup_dynamic_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
     void setup_pipeline_rendering_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos);
 
+    static std::vector<VkPipelineShaderStageCreateInfo> gather_shader_stages(const Config& p_config);
     static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(
         VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);
 };

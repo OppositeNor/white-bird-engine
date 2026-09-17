@@ -45,6 +45,25 @@ protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
+/**
+ * @class ResourceUnitLoaderRayTracingPipeline
+ * @brief Populates fixed-stage Vulkan ray-tracing pipeline resource units.
+ */
+class ResourceUnitLoaderRayTracingPipeline final : public IResourceUnitLoader {
+public:
+    /**
+     * @brief Return the ray-tracing pipeline resource type handled by this loader.
+     */
+    virtual std::span<const std::string> get_supported_resource_types() const override;
+    /**
+     * @brief Deserialize and populate a ray-tracing pipeline resource.
+     */
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+
+protected:
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
+};
+
 // TODO: Test
 class ResourceUnitLoaderMaterial final : public IResourceUnitLoader {
 public:

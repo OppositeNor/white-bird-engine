@@ -54,12 +54,11 @@ VkPipelineShaderStageCreateInfo ROGraphicsPipelineVK::get_shader_stage_create_in
     return shader_stage_create_info;
 }
 
-void ROGraphicsPipelineVK::init(const Config& p_config) {
+std::vector<VkPipelineShaderStageCreateInfo> ROGraphicsPipelineVK::gather_shader_stages(const Config& p_config) {
     const auto& vertex_stage = WBE_REQUIRED(p_config.shader.vertex_shader);
     const bool has_geometry_stage = p_config.shader.geometry_shader.has_value();
     const auto& fragment_stage = WBE_REQUIRED(p_config.shader.fragment_shader);
 
-    // Gather shader stages.
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(5); // We can have a maximum of 5 shader stages
                               // (vertex, TSC, TSE, geometry, fragment)
@@ -70,11 +69,20 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     }
     shader_stages.push_back(get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_stage));
     // TODO: TSC and TSE shaders
+    return shader_stages;
+}
+
+void ROGraphicsPipelineVK::cache_exposed_shader_fields(const Config& p_config) {
+    const auto& vertex_stage = WBE_REQUIRED(p_config.shader.vertex_shader);
+    const bool has_geometry_stage = p_config.shader.geometry_shader.has_value();
+    const auto& fragment_stage = WBE_REQUIRED(p_config.shader.fragment_shader);
+
     exposed_fields.vertex_shader = vertex_stage.shader;
     exposed_fields.geometry_shader = has_geometry_stage ? WBE_REQUIRED(p_config.shader.geometry_shader).shader : MEM_NULL;
     exposed_fields.fragment_shader = fragment_stage.shader;
+}
 
-    // Setup create information for states.
+ROGraphicsPipelineVK::PipelineStateCreateInfo ROGraphicsPipelineVK::make_pipeline_state_create_info(const Config& p_config) {
     PipelineStateCreateInfo state_create_info;
     setup_vertex_input_state_create_info(p_config, state_create_info);
     setup_input_assembly_state_create_info(p_config, state_create_info);
@@ -86,39 +94,57 @@ void ROGraphicsPipelineVK::init(const Config& p_config) {
     setup_color_blend_state_create_info(p_config, state_create_info);
     setup_dynamic_state_create_info(p_config, state_create_info);
     setup_pipeline_rendering_create_info(p_config, state_create_info);
+    return state_create_info;
+}
 
+VkGraphicsPipelineCreateInfo ROGraphicsPipelineVK::make_graphics_pipeline_create_info(const Config& p_config,
+    const std::vector<VkPipelineShaderStageCreateInfo>& p_shader_stages,
+    PipelineStateCreateInfo& p_state_create_info,
+    VkPipelineCreateFlags2CreateInfo& p_create_flags) const {
     VkGraphicsPipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    VkPipelineCreateFlags2CreateInfo create_flags{};
-    create_flags.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO;
-    create_flags.pNext = &(state_create_info.pipeline_rendering);
-    create_flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-    create_info.pNext = &create_flags;
-    create_info.stageCount = shader_stages.size();
-    create_info.pStages = shader_stages.data();
-    create_info.pVertexInputState = &(state_create_info.vertex_input_state);
-    create_info.pInputAssemblyState = &(state_create_info.input_assembly_state);
-    if (state_create_info.tessellation_state.has_value()) {
-        create_info.pTessellationState = &(state_create_info.tessellation_state.value());
+    p_create_flags.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO;
+    p_create_flags.pNext = &(p_state_create_info.pipeline_rendering);
+    p_create_flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.pNext = &p_create_flags;
+    create_info.stageCount = p_shader_stages.size();
+    create_info.pStages = p_shader_stages.data();
+    create_info.pVertexInputState = &(p_state_create_info.vertex_input_state);
+    create_info.pInputAssemblyState = &(p_state_create_info.input_assembly_state);
+    if (p_state_create_info.tessellation_state.has_value()) {
+        create_info.pTessellationState = &(p_state_create_info.tessellation_state.value());
     }
-    create_info.pViewportState = &(state_create_info.viewport_state);
-    create_info.pRasterizationState = &(state_create_info.rasterization_state);
-    create_info.pMultisampleState = &(state_create_info.multisample_state);
-    create_info.pDepthStencilState = &(state_create_info.depth_stencil_state);
-    create_info.pColorBlendState = &(state_create_info.color_blend_state);
-    create_info.pDynamicState = &(state_create_info.dynamic_state);
+    create_info.pViewportState = &(p_state_create_info.viewport_state);
+    create_info.pRasterizationState = &(p_state_create_info.rasterization_state);
+    create_info.pMultisampleState = &(p_state_create_info.multisample_state);
+    create_info.pDepthStencilState = &(p_state_create_info.depth_stencil_state);
+    create_info.pColorBlendState = &(p_state_create_info.color_blend_state);
+    create_info.pDynamicState = &(p_state_create_info.dynamic_state);
     create_info.layout = VK_NULL_HANDLE;
     // Using dynamic rendering.
     create_info.renderPass = VK_NULL_HANDLE;
     create_info.subpass = p_config.subpass_index;
+    return create_info;
+}
 
+VkPipeline ROGraphicsPipelineVK::create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& p_create_info) const {
     VkPipeline graphics_pipeline = VK_NULL_HANDLE;
     auto create_result = vkCreateGraphicsPipelines(
-        render_data->logic_device, VK_NULL_HANDLE, 1, &create_info, render_data->allocation_callbacks, &graphics_pipeline);
+        render_data->logic_device, VK_NULL_HANDLE, 1, &p_create_info, render_data->allocation_callbacks, &graphics_pipeline);
     if (create_result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create graphics pipeline: {}.", string_VkResult(create_result)));
     }
-    set_pipeline(graphics_pipeline);
+    return graphics_pipeline;
+}
+
+void ROGraphicsPipelineVK::init(const Config& p_config) {
+    std::vector<VkPipelineShaderStageCreateInfo> shader_stages = gather_shader_stages(p_config);
+    cache_exposed_shader_fields(p_config);
+    PipelineStateCreateInfo state_create_info = make_pipeline_state_create_info(p_config);
+    VkPipelineCreateFlags2CreateInfo create_flags{};
+    VkGraphicsPipelineCreateInfo create_info =
+        make_graphics_pipeline_create_info(p_config, shader_stages, state_create_info, create_flags);
+    set_pipeline(create_graphics_pipeline(create_info));
     config = p_config;
 }
 

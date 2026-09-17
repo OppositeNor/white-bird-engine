@@ -217,6 +217,11 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     resource_unit.geometry_entry = populate_text(p_res_chunk, p_scheme.geometry_entry.value_or(""));
     resource_unit.fragment_entry = populate_text(p_res_chunk, p_scheme.fragment_entry.value_or(""));
     resource_unit.compute_entry = populate_text(p_res_chunk, p_scheme.compute_entry.value_or(""));
+    resource_unit.raygen_entry = populate_text(p_res_chunk, p_scheme.raygen_entry.value_or(""));
+    resource_unit.miss_entry = populate_text(p_res_chunk, p_scheme.miss_entry.value_or(""));
+    resource_unit.closest_hit_entry = populate_text(p_res_chunk, p_scheme.closest_hit_entry.value_or(""));
+    resource_unit.any_hit_entry = populate_text(p_res_chunk, p_scheme.any_hit_entry.value_or(""));
+    resource_unit.intersection_shader_entry = populate_text(p_res_chunk, p_scheme.intersection_shader_entry.value_or(""));
     resource_unit.data = data.force_cast<uint32_t>();
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
@@ -297,6 +302,42 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     create_pipeline_stage_ref(p_res_chunk, saved_resource->tessellation_stage, p_scheme.tessellation_stage_id);
     create_pipeline_stage_ref(p_res_chunk, saved_resource->geometry_stage, p_scheme.geometry_stage_id);
     create_pipeline_stage_ref(p_res_chunk, saved_resource->fragment_stage, p_scheme.fragment_stage_id);
+    return saved_resource;
+}
+
+RefRes<RURayTracingPipeline> populate_ray_tracing_pipeline_resource(IResourceChunk& p_res_chunk, const RUSchemaRayTracingPipeline& p_scheme) {
+    RURayTracingPipeline resource_unit;
+    populate_pipeline_stage(p_res_chunk, resource_unit.raygen_stage, p_scheme.raygen_stage_id, p_scheme.raygen_stage, "raygen", false);
+    populate_pipeline_stage(p_res_chunk, resource_unit.miss_stage, p_scheme.miss_stage_id, p_scheme.miss_stage, "miss", false);
+    populate_pipeline_stage(
+        p_res_chunk, resource_unit.closest_hit_stage, p_scheme.closest_hit_stage_id, p_scheme.closest_hit_stage, "closest_hit", false);
+    populate_pipeline_stage(p_res_chunk, resource_unit.any_hit_stage, p_scheme.any_hit_stage_id, p_scheme.any_hit_stage, "any_hit", false);
+    populate_pipeline_stage(p_res_chunk,
+        resource_unit.intersection_shader_stage,
+        p_scheme.intersection_shader_stage_id,
+        p_scheme.intersection_shader_stage,
+        "intersection_shader",
+        false);
+    resource_unit.raygen_stage_entry = push_stage_entry(p_res_chunk,
+        resolve_pipeline_stage_entry(
+            p_scheme.raygen_stage_entry, scheme_has_pipeline_stage(p_scheme.raygen_stage_id, p_scheme.raygen_stage)));
+    resource_unit.miss_stage_entry = push_stage_entry(p_res_chunk,
+        resolve_pipeline_stage_entry(p_scheme.miss_stage_entry, scheme_has_pipeline_stage(p_scheme.miss_stage_id, p_scheme.miss_stage)));
+    resource_unit.closest_hit_stage_entry = push_stage_entry(p_res_chunk,
+        resolve_pipeline_stage_entry(p_scheme.closest_hit_stage_entry,
+            scheme_has_pipeline_stage(p_scheme.closest_hit_stage_id, p_scheme.closest_hit_stage)));
+    resource_unit.any_hit_stage_entry = push_stage_entry(p_res_chunk,
+        resolve_pipeline_stage_entry(
+            p_scheme.any_hit_stage_entry, scheme_has_pipeline_stage(p_scheme.any_hit_stage_id, p_scheme.any_hit_stage)));
+    resource_unit.intersection_shader_stage_entry = push_stage_entry(p_res_chunk,
+        resolve_pipeline_stage_entry(p_scheme.intersection_shader_stage_entry,
+            scheme_has_pipeline_stage(p_scheme.intersection_shader_stage_id, p_scheme.intersection_shader_stage)));
+    auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RURayTracingPipeline>();
+    create_pipeline_stage_ref(p_res_chunk, saved_resource->raygen_stage, p_scheme.raygen_stage_id);
+    create_pipeline_stage_ref(p_res_chunk, saved_resource->miss_stage, p_scheme.miss_stage_id);
+    create_pipeline_stage_ref(p_res_chunk, saved_resource->closest_hit_stage, p_scheme.closest_hit_stage_id);
+    create_pipeline_stage_ref(p_res_chunk, saved_resource->any_hit_stage, p_scheme.any_hit_stage_id);
+    create_pipeline_stage_ref(p_res_chunk, saved_resource->intersection_shader_stage, p_scheme.intersection_shader_stage_id);
     return saved_resource;
 }
 
@@ -492,6 +533,23 @@ void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
+std::span<const std::string> ResourceUnitLoaderRayTracingPipeline::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"ray_tracing_pipeline"};
+    return supported_resource_types;
+}
+
+std::any ResourceUnitLoaderRayTracingPipeline::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaRayTracingPipeline>(p_scheme, "ray_tracing_pipeline");
+    return populate_ray_tracing_pipeline_resource(p_res_chunk, typed_scheme);
+}
+
+void ResourceUnitLoaderRayTracingPipeline::populate_scheme_from_data(
+    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemaRayTracingPipeline scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
+}
+
 std::span<const std::string> ResourceUnitLoaderMaterial::get_supported_resource_types() const {
     static const std::array<std::string, 1> supported_resource_types = {"material"};
     return supported_resource_types;
@@ -598,6 +656,7 @@ void register_renderer_vk_resource_unit_loaders() {
     auto* resource_manager = ResourceManager::get_singleton();
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderGraphicsPipeline>(global_allocator()));
+    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderRayTracingPipeline>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
