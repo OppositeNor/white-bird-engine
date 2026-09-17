@@ -25,8 +25,8 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_task.hh"
-#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
@@ -35,8 +35,8 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -148,7 +148,7 @@ public:
      *
      * @param p_resource_key The resource key to register under.
      * @param p_desc The render graph descriptor.
-    * @return The newly built render graph.
+     * @return The newly built render graph.
      */
     Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
 

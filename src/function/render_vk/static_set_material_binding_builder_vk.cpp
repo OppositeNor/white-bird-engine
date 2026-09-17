@@ -13,9 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/static_set_material_binding_builder_vk.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/material_texture_contract.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_role.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -80,8 +84,7 @@ uint32_t get_or_append_texture_descriptor_index(std::vector<RefRes<RUTexture>>& 
         }
     }
     if (p_textures.size() >= p_max_texture_descriptor_count) {
-        throw std::runtime_error(std::format(
-            "Failed to build static-set material bindings: runtime texture table exceeds descriptor limit {} while adding role '{}' from '{}'.",
+        throw std::runtime_error(std::format("Failed to build static-set material bindings: runtime texture table exceeds descriptor limit {} while adding role '{}' from '{}'.",
             p_max_texture_descriptor_count,
             p_role_name,
             p_material_name));
@@ -114,8 +117,7 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
 
     const MaterialTextureContract& material_contract = *p_material_contract;
     if (p_materials.size() > material_contract.material_count) {
-        throw std::runtime_error(std::format(
-            "Failed to build static-set material bindings: material row count {} exceeds shader capacity {}.",
+        throw std::runtime_error(std::format("Failed to build static-set material bindings: material row count {} exceeds shader capacity {}.",
             p_materials.size(),
             material_contract.material_count));
     }
@@ -129,8 +131,8 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
     for (const MaterialTextureContract::TextureField& texture_field : material_contract.texture_fields) {
         const RUMaterial::TextureSlot* default_slot = find_texture_slot(default_texture_slots, texture_field.role, "default material");
         if (default_slot == nullptr) {
-            throw std::runtime_error(std::format(
-                "Failed to build static-set material bindings: default material is missing required role '{}'.", texture_field.role.get_name()));
+            throw std::runtime_error(std::format("Failed to build static-set material bindings: default material is missing required role '{}'.",
+                texture_field.role.get_name()));
         }
         default_texture_indices.push_back(get_or_append_texture_descriptor_index(
             unique_textures, default_slot->texture, p_max_texture_descriptor_count, texture_field.role.get_name(), "default material"));
@@ -141,7 +143,9 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
     for (size_t material_index = 0; material_index < material_contract.material_count; ++material_index) {
         const size_t row_offset = material_contract.table_offset + material_index * material_contract.table_stride;
         for (size_t field_index = 0; field_index < material_contract.texture_fields.size(); ++field_index) {
-            write_texture_index(material_params_data, row_offset + material_contract.texture_fields[field_index].offset, default_texture_indices[field_index]);
+            write_texture_index(material_params_data,
+                row_offset + material_contract.texture_fields[field_index].offset,
+                default_texture_indices[field_index]);
         }
     }
 

@@ -62,10 +62,42 @@
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
 namespace WhiteBirdEngine {
+
+namespace {
+template <typename T>
+void update_buffer(const BaseRenderDataVK* p_render_data,
+    DeviceDomain p_domain,
+    Ref<ROBufferVK>& p_buffer,
+    const Vector<T, RenderAllocator>& p_from_buffer,
+    VkBufferUsageFlags p_buffer_usage,
+    Ref<ROStagingBufferVK> p_staging_buffer) {
+    size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
+    if (p_buffer == MEM_NULL || size_in_bytes > p_buffer->fields().buffer_size) {
+        // If res not initialized, or size exceeds buffer capacity, create a new
+        // buffer.
+        ROBufferVK::Builder builder;
+        builder.set_domain(p_domain).set_usage(p_buffer_usage).set_size(size_in_bytes);
+        p_buffer = builder.create_ref(p_render_data);
+    }
+    switch (p_domain) {
+    case DeviceDomain::HOST_DEVICE:
+    case DeviceDomain::HOST:
+        p_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
+        break;
+    case DeviceDomain::DEVICE: {
+        // Setup a temporary host buffer for copying the data.
+        ROBufferVK::Builder temp_buffer_builder;
+        temp_buffer_builder.set_domain(DeviceDomain::HOST).add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT).set_size(size_in_bytes);
+        void* data = p_staging_buffer->allocate(size_in_bytes);
+        memcpy(data, p_from_buffer.data(), size_in_bytes);
+        p_buffer->update_buffer(p_staging_buffer, data, size_in_bytes);
+    } break;
+    }
+}
+} // namespace
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
@@ -149,37 +181,6 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     }
 
     ++(base_render_data.current_frame);
-}
-
-template <typename T>
-static void update_buffer(const BaseRenderDataVK* p_render_data,
-    DeviceDomain p_domain,
-    Ref<ROBufferVK>& p_buffer,
-    const Vector<T, RenderAllocator>& p_from_buffer,
-    VkBufferUsageFlags p_buffer_usage,
-    Ref<ROStagingBufferVK> p_staging_buffer) {
-    size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
-    if (p_buffer == MEM_NULL || size_in_bytes > p_buffer->fields().buffer_size) {
-        // If res not initialized, or size exceeds buffer capacity, create a new
-        // buffer.
-        ROBufferVK::Builder builder;
-        builder.set_domain(p_domain).set_usage(p_buffer_usage).set_size(size_in_bytes);
-        p_buffer = builder.create_ref(p_render_data);
-    }
-    switch (p_domain) {
-    case DeviceDomain::HOST_DEVICE:
-    case DeviceDomain::HOST:
-        p_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
-        break;
-    case DeviceDomain::DEVICE: {
-        // Setup a temporary host buffer for copying the data.
-        ROBufferVK::Builder temp_buffer_builder;
-        temp_buffer_builder.set_domain(DeviceDomain::HOST).add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT).set_size(size_in_bytes);
-        void* data = p_staging_buffer->allocate(size_in_bytes);
-        memcpy(data, p_from_buffer.data(), size_in_bytes);
-        p_buffer->update_buffer(p_staging_buffer, data, size_in_bytes);
-    } break;
-    }
 }
 
 void RendererVK::init(RendererCapabilities& p_capabilities) {
@@ -402,7 +403,7 @@ void RendererVK::create_vma_allocator() {
     }
 }
 
-void RendererVK::create_swap_chain() {
+void RendererVK::create_swap_chain() { // NOLINT
     // Get informations to create swap chain.
     SwapChainSupportDetails details = get_swap_chain_support_details(physical_device);
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(details.formats);
@@ -634,7 +635,7 @@ void RendererVK::create_physical_device() {
     queue_family_indices = get_queue_family_indices(physical_device);
 }
 
-void RendererVK::create_logical_device() {
+void RendererVK::create_logical_device() { // NOLINT
     // Setup queues create info.
     float queue_priority = 1.0;
     Set<uint32_t> indices = queue_family_indices.get_unique_indices();
@@ -823,7 +824,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
     }
 }
 
-bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
+bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) { // NOLINT
     VkPhysicalDeviceProperties device_properties{};
     vkGetPhysicalDeviceProperties(p_device, &device_properties);
     if (device_properties.apiVersion < VULKAN_API_VERSION) {
@@ -890,7 +891,7 @@ bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) {
     return true;
 }
 
-RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) {
+RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) { // NOLINT
     QueueFamilyIndices indices{};
     indices.allocator = allocator;
 
@@ -1191,7 +1192,7 @@ void RendererVK::flush_delayed_calls() {
 }
 
 void RendererVK::request_frame_capture(std::string_view p_path) {
-    if (p_path.empty() || p_path.find('\0') != std::string_view::npos) {
+    if (p_path.empty() || p_path.contains('\0')) {
         throw std::runtime_error("Frame capture requires a nonempty file path without embedded null characters.");
     }
     if (!frame_capture_supported) {
@@ -1203,7 +1204,7 @@ void RendererVK::request_frame_capture(std::string_view p_path) {
     capture_png_path.assign(p_path.data(), p_path.size());
 }
 
-void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
+void RendererVK::capture_swap_chain_image(uint32_t p_image_index) { // NOLINT
     const bool blue_first = swap_chain_image_format == VK_FORMAT_B8G8R8A8_SRGB || swap_chain_image_format == VK_FORMAT_B8G8R8A8_UNORM;
     if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB && swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("PNG capture supports only RGBA8 and BGRA8 swap-chain formats.");
@@ -1267,15 +1268,16 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
     image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.image = render_objects->swap_chain_images[p_image_index]->get_image();
-    image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    image_barrier.subresourceRange = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
     VkDependencyInfo dependency_info{};
     dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
     dependency_info.imageMemoryBarrierCount = 1;
     dependency_info.pImageMemoryBarriers = &image_barrier;
     vkCmdPipelineBarrier2(command_buffer, &dependency_info);
     VkBufferImageCopy copy_region{};
-    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    copy_region.imageExtent = {swap_chain_extent.width, swap_chain_extent.height, 1};
+    copy_region.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
+    copy_region.imageExtent = {.width = swap_chain_extent.width, .height = swap_chain_extent.height, .depth = 1};
     vkCmdCopyImageToBuffer(command_buffer, image_barrier.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copy_region);
     image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     image_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
@@ -1429,9 +1431,8 @@ void RendererVK::update_render_graph_resources(
     std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) {
     static_cast<void>(p_bindings);
     static_cast<void>(p_binding_count);
-    throw std::runtime_error(
-        std::format("RendererVK: late render-graph resource updates are not supported for '{}'. Bind resources before graph build.",
-            p_resource_key));
+    throw std::runtime_error(std::format(
+        "RendererVK: late render-graph resource updates are not supported for '{}'. Bind resources before graph build.", p_resource_key));
 }
 
 void RendererVK::update_static_geometry_sets() {

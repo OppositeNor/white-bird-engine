@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
@@ -350,6 +351,13 @@ public:
     VkBuffer get_buffer() const {
         return buffer;
     }
+
+    /**
+     * @brief Get the Vulkan device address of the buffer.
+     *
+     * @return The buffer device address.
+     */
+    VkDeviceAddress get_device_address() const;
 
     DebugDataRows descriptor_debug_data() const override;
 

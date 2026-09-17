@@ -15,10 +15,13 @@
 #ifndef WBE_FILE_STATIC_SET_MATERIAL_BINDING_BUILDER_VK_HH
 #define WBE_FILE_STATIC_SET_MATERIAL_BINDING_BUILDER_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/material_texture_contract.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <functional>
 #include <optional>

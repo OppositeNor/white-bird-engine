@@ -73,7 +73,8 @@ RefRes<RUTexture> make_test_texture_ref(StackAllocator& p_allocator) {
     return RefRes<RUTexture>(memory, &p_allocator);
 }
 
-RefRes<RUMaterial> make_test_material(StackAllocator& p_allocator, std::string_view p_resource_key, std::span<const RUMaterial::TextureSlot> p_texture_slots) {
+RefRes<RUMaterial> make_test_material(
+    StackAllocator& p_allocator, std::string_view p_resource_key, std::span<const RUMaterial::TextureSlot> p_texture_slots) {
     RUMaterial material;
     material.resource_key = nullptr;
     if (!p_resource_key.empty()) {

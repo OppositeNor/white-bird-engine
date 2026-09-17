@@ -13,10 +13,17 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_pipeline_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -127,6 +134,14 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
             throw std::runtime_error("Failed to set sampler descriptor binding: resource type is invalid.");
         }
         index = sampler->get_sampler_index();
+        break;
+    }
+    case ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE: {
+        Ref<ROAccelerationStructureVK> acceleration_structure = p_resource.dynamic_cast_ref<ROAccelerationStructureVK>();
+        if (acceleration_structure == MEM_NULL) {
+            throw std::runtime_error("Failed to set acceleration-structure descriptor binding: resource type is invalid.");
+        }
+        index = acceleration_structure->get_descriptor_index();
         break;
     }
     }

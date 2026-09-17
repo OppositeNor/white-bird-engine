@@ -12,17 +12,22 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
@@ -59,12 +64,13 @@ static RUStaticGeometrySubmesh make_batch_submesh(
         auto* name_data = static_cast<char*>(p_storage.get(name_memory));
         std::memcpy(name_data, name.data(), name.size());
         name_data[name.size()] = '\0';
-        std::construct_at(attributes + i, RUVertexView::Attribute{
-            .role = RUShaderRole(RefRes<char>(name_memory, &p_storage), dynam_hash(name)),
-            .format = RUVertexAttributeFormat::FLOAT3,
-            .offset = i * 12,
-            .size = 12,
-        });
+        std::construct_at(attributes + i,
+            RUVertexView::Attribute{
+                .role = RUShaderRole(RefRes<char>(name_memory, &p_storage), dynam_hash(name)),
+                .format = RUVertexAttributeFormat::FLOAT3,
+                .offset = i * 12,
+                .size = 12,
+            });
     }
     RUStaticGeometrySubmesh submesh;
     submesh.vertices.attributes = RefRes<RUVertexView::Attribute>(attributes_memory, &p_storage);
@@ -82,12 +88,12 @@ static RUStaticGeometrySubmesh make_batch_submesh(
 TEST(WBEStaticSetDrawBatchPlannerVKTest, GroupsNonAdjacentLayoutsAndPreservesInstanceAndIndexRanges) {
     StackAllocator storage(WBE_KI_B(16));
     RenderAllocator allocator(WBE_KI_B(128));
-    std::array submeshes{make_batch_submesh(storage, 120, 0),
-        make_batch_submesh(storage, 240, 12, true),
-        make_batch_submesh(storage, 12, 24)};
+    std::array submeshes{
+        make_batch_submesh(storage, 120, 0), make_batch_submesh(storage, 240, 12, true), make_batch_submesh(storage, 12, 24)};
     submeshes[2].instance_count = 4;
     const std::array<uint32_t, 3> first_instances{7, 20, 31};
-    auto result = StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+    auto result =
+        StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
     ASSERT_EQ(result.commands.size(), 3U);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[0].first_draw, 0U);
@@ -111,7 +117,8 @@ TEST(WBEStaticSetDrawBatchPlannerVKTest, SplitsAtDeviceDrawLimit) {
     RenderAllocator allocator(WBE_KI_B(128));
     std::array submeshes{make_batch_submesh(storage, 0, 0), make_batch_submesh(storage, 36, 12), make_batch_submesh(storage, 72, 24)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
-    auto result = StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 2);
+    auto result =
+        StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 2);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[0].draw_count, 2U);
     EXPECT_EQ(result.batches[1].first_draw, 2U);
@@ -127,7 +134,8 @@ TEST(WBEStaticSetDrawBatchPlannerVKTest, SeparatesDifferentAttributeOffsetsAndUn
         make_batch_submesh(storage, 72, 12, true, true),
         make_batch_submesh(storage, 148, 24, true)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
-    auto result = StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+    auto result =
+        StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
     ASSERT_EQ(result.batches.size(), 3U);
     EXPECT_EQ(result.batches[0].vertex_input.attributes[0].offset, 0U);
     EXPECT_EQ(result.batches[1].vertex_input.attributes[0].offset, 12U);
@@ -138,11 +146,11 @@ TEST(WBEStaticSetDrawBatchPlannerVKTest, SplitsBeforeSignedVertexOffsetOverflow)
     StackAllocator storage(WBE_KI_B(16));
     RenderAllocator allocator(WBE_KI_B(128));
     const size_t boundary = static_cast<size_t>(std::numeric_limits<int32_t>::max()) * 12;
-    std::array submeshes{make_batch_submesh(storage, 0, 0),
-        make_batch_submesh(storage, boundary, 12),
-        make_batch_submesh(storage, boundary + 12, 24)};
+    std::array submeshes{
+        make_batch_submesh(storage, 0, 0), make_batch_submesh(storage, boundary, 12), make_batch_submesh(storage, boundary + 12, 24)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
-    auto result = StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+    auto result =
+        StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.commands[1].vertexOffset, std::numeric_limits<int32_t>::max());
     EXPECT_EQ(result.commands[2].vertexOffset, 0);
@@ -155,7 +163,8 @@ TEST(WBEStaticSetDrawBatchPlannerVKTest, SkipsEmptyDrawsAndRejectsInvalidArgumen
     submeshes[0].indices.index_count = 0;
     submeshes[1].instance_count = 0;
     const std::array<uint32_t, 2> first_instances{0, 0};
-    auto result = StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+    auto result =
+        StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
     EXPECT_TRUE(result.commands.empty());
     EXPECT_TRUE(result.batches.empty());
     EXPECT_THROW(StaticSetDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 0),

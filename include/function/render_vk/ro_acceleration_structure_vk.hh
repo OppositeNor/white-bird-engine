@@ -15,12 +15,17 @@
 #ifndef WBE_FILE_RO_ACCELERATION_STRUCTURE_VK_HH
 #define WBE_FILE_RO_ACCELERATION_STRUCTURE_VK_HH
 
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_ro_ray_tracing_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/utils.hh"
+#include <cstdint>
+#include <optional>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -31,21 +36,81 @@ namespace WhiteBirdEngine {
  *
  * The owned Vulkan resources are neither copyable nor movable.
  */
-class WBE_META(WBE_RENDER_OBJECT) ROAccelerationStructureVK final : public IRenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROAccelerationStructureVK final : public IRORayTracingVK {
 public:
+    /**
+     * @class Builder
+     * @brief Builder for Vulkan acceleration-structure render objects.
+     */
+    struct Builder {
+        friend ROAccelerationStructureVK;
+
+        /**
+         * @brief Required acceleration-structure storage size.
+         */
+        Required<VkDeviceSize> size;
+        /**
+         * @brief Vulkan acceleration-structure type.
+         */
+        Required<VkAccelerationStructureTypeKHR> type;
+
+        /**
+         * @brief Set the required acceleration-structure storage size.
+         *
+         * @param p_size Storage size in bytes.
+         * @return *this.
+         */
+        Builder& set_size(VkDeviceSize p_size) {
+            size = p_size;
+            return *this;
+        }
+
+        /**
+         * @brief Set the Vulkan acceleration-structure type.
+         *
+         * @param p_type Acceleration-structure type.
+         * @return *this.
+         */
+        Builder& set_type(VkAccelerationStructureTypeKHR p_type) {
+            type = p_type;
+            return *this;
+        }
+
+        /**
+         * @brief Create a reference-counted acceleration-structure object.
+         *
+         * @param p_render_data Base render data.
+         * @param p_ray_tracing_data Ray-tracing procedure table owned by the active plugin.
+         * @return Reference-counted acceleration-structure object.
+         */
+        Ref<ROAccelerationStructureVK> create_ref(
+            const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
+            return make_ref<ROAccelerationStructureVK>(p_render_data->allocator, p_render_data, p_ray_tracing_data, *this);
+        }
+
+        /**
+         * @brief Create a unique-ownership acceleration-structure object.
+         *
+         * @param p_render_data Base render data.
+         * @param p_ray_tracing_data Ray-tracing procedure table owned by the active plugin.
+         * @return Unique-ownership acceleration-structure object.
+         */
+        Unique<ROAccelerationStructureVK> create_unique(
+            const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
+            return make_unique<ROAccelerationStructureVK>(p_render_data->allocator, p_render_data, p_ray_tracing_data, *this);
+        }
+    };
+
     ROAccelerationStructureVK() = delete;
     /**
      * @brief Create an acceleration structure with device-local storage.
      *
      * @param p_render_data Renderer data used to create and destroy Vulkan resources.
-     * @param p_base_ray_tracing_data Ray-tracing procedure table owned by the active plugin.
-     * @param p_size Required acceleration-structure storage size.
-     * @param p_type Acceleration-structure type.
+     * @param p_ray_tracing_data Ray-tracing procedure table owned by the active plugin.
+     * @param p_builder Builder containing the acceleration-structure configuration.
      */
-    ROAccelerationStructureVK(const BaseRenderDataVK* p_render_data,
-        const BaseRayTracingDataVK* p_base_ray_tracing_data,
-        VkDeviceSize p_size,
-        VkAccelerationStructureTypeKHR p_type);
+    ROAccelerationStructureVK(
+        const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
     virtual ~ROAccelerationStructureVK() override;
     ROAccelerationStructureVK(const ROAccelerationStructureVK&) = delete;
     ROAccelerationStructureVK(ROAccelerationStructureVK&&) noexcept = delete;
@@ -61,9 +126,25 @@ public:
         return acceleration_structure;
     }
 
+    /**
+     * @brief Get the Vulkan device address of the acceleration structure.
+     *
+     * @return The acceleration-structure device address.
+     */
+    VkDeviceAddress get_device_address() const;
+
+    /**
+     * @brief Get or lazily create the acceleration-structure descriptor index.
+     *
+     * @return The resource-heap descriptor index.
+     */
+    uint32_t get_descriptor_index() const;
+
+    DebugDataRows descriptor_debug_data() const override;
+
 private:
     Ref<ROBufferVK> storage_buffer;
-    const BaseRayTracingDataVK* base_ray_tracing_data = nullptr;
+    mutable std::optional<uint32_t> descriptor_index;
     VkAccelerationStructureKHR acceleration_structure = VK_NULL_HANDLE;
     PFN_vkDestroyAccelerationStructureKHR destroy_acceleration_structure = nullptr;
 };

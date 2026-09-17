@@ -17,9 +17,12 @@
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

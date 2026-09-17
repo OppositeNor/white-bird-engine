@@ -26,6 +26,7 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -81,15 +82,13 @@ TEST(WBERenderGraphVKTest, RendResViewDescriptorDebugDataAddsResourceIdsAndSorts
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
 
     auto single_container = make_ref<ROCSingleVK>(&allocator,
-        make_ref<TestDescriptorResourceVK>(&allocator,
-            &render_data,
-            DebugDataArray{make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 7)})
+        make_ref<TestDescriptorResourceVK>(
+            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 7)})
             .template dynamic_cast_ref<IRenderObjectVK>());
     auto per_frame_container = make_ref<ROCPerFrameVK>(&allocator, &render_data, false);
     per_frame_container->set(0,
-        make_ref<TestDescriptorResourceVK>(&allocator,
-            &render_data,
-            DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 7)})
+        make_ref<TestDescriptorResourceVK>(
+            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 7)})
             .template dynamic_cast_ref<IRenderObjectVK>());
     per_frame_container->set(1,
         make_ref<TestDescriptorResourceVK>(&allocator,

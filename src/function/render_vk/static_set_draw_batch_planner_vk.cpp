@@ -13,18 +13,26 @@
    limitations under the License.
 */
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <span>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 struct StaticSetDrawGroupVK {
     StaticSetDrawGroupVK() = delete;
-    explicit StaticSetDrawGroupVK(RenderAllocator* p_allocator)
-        : submesh_indices(p_allocator) {
+    explicit StaticSetDrawGroupVK(RenderAllocator* p_allocator) : submesh_indices(p_allocator) {
     }
     ~StaticSetDrawGroupVK() = default;
     StaticSetDrawGroupVK(const StaticSetDrawGroupVK&) = delete;
@@ -62,12 +70,9 @@ static bool static_set_vertex_inputs_equal(const VertexInputDescriptionVK& p_lef
     return true;
 }
 
-static bool static_set_group_accepts(const StaticSetDrawGroupVK& p_group,
-    const VertexInputDescriptionVK& p_vertex_input,
-    size_t p_vertex_stride,
-    VkDeviceSize p_vertex_offset) {
-    if (p_group.vertex_stride != p_vertex_stride ||
-        p_group.minimum_offset % p_vertex_stride != p_vertex_offset % p_vertex_stride ||
+static bool static_set_group_accepts(
+    const StaticSetDrawGroupVK& p_group, const VertexInputDescriptionVK& p_vertex_input, size_t p_vertex_stride, VkDeviceSize p_vertex_offset) {
+    if (p_group.vertex_stride != p_vertex_stride || p_group.minimum_offset % p_vertex_stride != p_vertex_offset % p_vertex_stride ||
         !static_set_vertex_inputs_equal(p_group.vertex_input, p_vertex_input)) {
         return false;
     }
@@ -123,8 +128,8 @@ StaticSetDrawBatchPlannerVK::BuildResult StaticSetDrawBatchPlannerVK::build(Rend
         VertexInputDescriptionVK vertex_input =
             build_vertex_input_description_vk(p_vertex_metadata, p_vertex_entry_name, submesh.vertices);
         if (vertex_input.bindings.size() > 1 ||
-            (!vertex_input.bindings.empty() &&
-                (vertex_input.bindings.front().binding != 0 || vertex_input.bindings.front().stride != submesh.vertices.vertex_stride))) {
+            (!vertex_input.bindings.empty() && (vertex_input.bindings.front().binding != 0 ||
+                                                   vertex_input.bindings.front().stride != submesh.vertices.vertex_stride))) {
             throw std::runtime_error("Failed to plan static set draws: vertex input must use the shared interleaved binding zero.");
         }
         auto group = std::find_if(groups.begin(), groups.end(), [&](const StaticSetDrawGroupVK& p_group) {

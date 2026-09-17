@@ -24,6 +24,7 @@
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <string_view>
 
 namespace WhiteBirdEngine {

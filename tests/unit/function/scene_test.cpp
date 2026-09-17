@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"

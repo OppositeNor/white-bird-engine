@@ -24,6 +24,7 @@
 #include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -36,12 +37,15 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "glm/geometric.hpp"
 #include "global/global.hh"
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -51,7 +55,9 @@
 #include <glm/vec3.hpp>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -201,12 +207,13 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
         .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .add_clear_value(shadow_color_clear)
         .add_clear_value(shadow_depth_clear);
-    auto shadow_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, cube_set, shadow_pipeline_resource, shadow_task_config);
+    auto shadow_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
+        render_allocator, renderer_vk, cube_set, shadow_pipeline_resource, shadow_task_config);
     write_shadow_dynamic_descriptors(*shadow_task);
 
     WBE::RTRunStaticSetVK::Config main_task_config;
-    auto main_task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, cube_set, main_pipeline_resource, main_task_config);
+    auto main_task =
+        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, cube_set, main_pipeline_resource, main_task_config);
     write_main_dynamic_descriptors(*main_task);
 
     register_draw_cube_render_graph(shadow_task, main_task);
@@ -328,8 +335,7 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .container = WBE::MEM_NULL});
-    pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
+    pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view).add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
 
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
 

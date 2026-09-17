@@ -20,8 +20,10 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include <cstdint>
 #include <span>
 #include <string_view>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

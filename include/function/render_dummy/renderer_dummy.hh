@@ -14,6 +14,7 @@
 */
 #ifndef WBE_FILE_RENDERER_DUMMY_H
 #define WBE_FILE_RENDERER_DUMMY_H
+#include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"

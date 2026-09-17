@@ -281,8 +281,8 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
         .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .add_clear_value(shadow_color_clear)
         .add_clear_value(shadow_depth_clear);
-    auto shadow_opaque_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_opaque_set, shadow_opaque_pipeline, shadow_opaque_task_config);
+    auto shadow_opaque_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
+        render_allocator, renderer_vk, sponza_opaque_set, shadow_opaque_pipeline, shadow_opaque_task_config);
     write_shadow_dynamic_descriptors(*shadow_opaque_task);
 
     WBE::RTRunStaticSetVK::Config shadow_masked_task_config;
@@ -291,22 +291,22 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
         .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
         .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    auto shadow_masked_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_masked_set, shadow_masked_pipeline, shadow_masked_task_config);
+    auto shadow_masked_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
+        render_allocator, renderer_vk, sponza_masked_set, shadow_masked_pipeline, shadow_masked_task_config);
     write_shadow_dynamic_descriptors(*shadow_masked_task);
 
     WBE::RTRunStaticSetVK::Config main_opaque_task_config;
     main_opaque_task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
-    auto main_opaque_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_opaque_set, main_opaque_pipeline, main_opaque_task_config);
+    auto main_opaque_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
+        render_allocator, renderer_vk, sponza_opaque_set, main_opaque_pipeline, main_opaque_task_config);
     write_main_dynamic_descriptors(*main_opaque_task);
 
     WBE::RTRunStaticSetVK::Config main_masked_task_config;
     main_masked_task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT)
         .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    auto main_masked_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_masked_set, main_masked_pipeline, main_masked_task_config);
+    auto main_masked_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
+        render_allocator, renderer_vk, sponza_masked_set, main_masked_pipeline, main_masked_task_config);
     write_main_dynamic_descriptors(*main_masked_task);
 
     register_draw_sponza_render_graph(shadow_opaque_task, shadow_masked_task, main_opaque_task, main_masked_task);
@@ -458,8 +458,7 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
     p_task.set_descriptor_binding("light.lights.shadowmap_sampler", shadow_sampler);
 }
 
-void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(
-    WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
+void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
     WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_masked_task,
     WBE::Unique<WBE::RTRunStaticSetVK>& p_main_opaque_task,
     WBE::Unique<WBE::RTRunStaticSetVK>& p_main_masked_task) {

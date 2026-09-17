@@ -20,14 +20,15 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(const BaseRenderDataVK* p_render_data,
-    std::span<const Dispatch> p_dispatches,
-    QueueFamilyVK p_queue_family)
+RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
+    const BaseRenderDataVK* p_render_data, std::span<const Dispatch> p_dispatches, QueueFamilyVK p_queue_family)
     : render_data(p_render_data), queue_family_id(p_queue_family), dispatches(p_render_data->allocator) {
     if (p_dispatches.empty()) {
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one compute pipeline is required.");
@@ -64,8 +65,7 @@ void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer,
             .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
             .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            .dstAccessMask =
-                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
         };
         VkDependencyInfo dependency_info{
             .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

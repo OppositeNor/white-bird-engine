@@ -161,7 +161,11 @@ public:
             return *this;
         }
 
-        // TODO
+        // Next builder fields to add when this moves beyond the minimal prototype:
+        // 1. Pipeline recursion depth.
+        // 2. Optional library pipelines or library create infos.
+        // 3. Pipeline create flags and interface data for payload / hit-attribute sizes.
+        // 4. Optional per-region metadata if you want explicit SBT record ordering.
 
         /**
          * @brief Baseline Vulkan shader-group configuration used when creating a new group.
@@ -198,21 +202,20 @@ public:
      * @param p_render_data Base render data.
      * @param p_builder Builder containing the ray tracing pipeline configuration.
      */
-    RORayTracingPipelineVK(const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data,
-            const Builder& p_builder);
+    RORayTracingPipelineVK(const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
 
     virtual TypeID get_type_uuid() const override;
 
 private:
     size_t calculate_sbt_buffer_size(VkPipeline p_ray_pipeline,
-            VkRayTracingPipelineCreateInfoKHR p_ray_pipeline_info,
-            std::span<const VkRayTracingPipelineCreateInfoKHR> p_libraries_info);
+        VkRayTracingPipelineCreateInfoKHR p_ray_pipeline_info,
+        std::span<const VkRayTracingPipelineCreateInfoKHR> p_libraries_info);
 
     VkPipeline pipeline = VK_NULL_HANDLE;
-    Vector<Ref<ROShaderVK>, RenderAllocator> shaders;
+    Vector<Ref<const ROShaderVK>, RenderAllocator> shaders;
     Ref<ROBufferVK> shader_binding_table_buffer = MEM_NULL;
 
-    void create_shader_binding_table();
+    void create_sbt();
 };
 
 } // namespace WhiteBirdEngine

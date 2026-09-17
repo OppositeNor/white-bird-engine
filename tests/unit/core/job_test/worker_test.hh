@@ -15,11 +15,12 @@
 #ifndef WBE_FILE_WORKER_TEST_HH
 #define WBE_FILE_WORKER_TEST_HH
 
-#include "job_test_utils.hh"
 #include "core/async/worker.hh"
 #include "global/global.hh"
+#include "job_test_utils.hh"
 #include "platform/file_system/directory.hh"
 #include <atomic>
+#include <future>
 #include <gtest/gtest.h>
 #include <latch>
 #include <memory>

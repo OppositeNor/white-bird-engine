@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_SCENE_HH
 #define WBE_FILE_SCENE_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"

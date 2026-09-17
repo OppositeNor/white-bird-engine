@@ -18,7 +18,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
+#include "utils/utils.hh"
 
 #include <cstdint>
 #include <vulkan/vulkan_core.h>

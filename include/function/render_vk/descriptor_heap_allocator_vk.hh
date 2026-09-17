@@ -17,6 +17,8 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
 #include <cstdint>
@@ -121,18 +123,20 @@ public:
      * @brief Write a uniform or storage-buffer descriptor.
      * @throws std::runtime_error If the type or index is invalid.
      */
-    void write_buffer_descriptor(
-        uint32_t p_index, VkDescriptorType p_type, const VkDeviceAddressRangeEXT& p_address_range) const;
+    void write_buffer_descriptor(uint32_t p_index, VkDescriptorType p_type, const VkDeviceAddressRangeEXT& p_address_range) const;
+    /**
+     * @brief Write an acceleration-structure descriptor using its device address.
+     * @throws std::runtime_error If the index is not allocated in the buffer arena.
+     */
+    void write_acceleration_structure_descriptor(uint32_t p_index, VkDeviceAddress p_device_address) const;
     /**
      * @brief Write a sampled-image descriptor.
      */
-    void write_sampled_image_descriptor(
-        uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
+    void write_sampled_image_descriptor(uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
     /**
      * @brief Write a storage-image descriptor.
      */
-    void write_storage_image_descriptor(
-        uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
+    void write_storage_image_descriptor(uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
     /**
      * @brief Write a sampler descriptor.
      */
@@ -177,11 +181,7 @@ private:
     using RangeVector = Vector<FreeRange, RenderAllocator>;
 
     uint32_t allocate(RangeVector& p_free_ranges, uint32_t p_count, const char* p_arena_name);
-    void deallocate(Ref<RODescriptorHeapVK> p_heap,
-        RangeVector& p_free_ranges,
-        uint32_t p_first_index,
-        uint32_t p_count,
-        const char* p_arena_name);
+    void deallocate(Ref<RODescriptorHeapVK> p_heap, RangeVector& p_free_ranges, uint32_t p_first_index, uint32_t p_count, const char* p_arena_name);
     static bool is_allocated(
         const Ref<RODescriptorHeapVK>& p_heap, const RangeVector& p_free_ranges, uint32_t p_first_index, uint32_t p_count);
 

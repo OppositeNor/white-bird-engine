@@ -14,7 +14,7 @@
 */
 
 // NOLINTBEGIN
-#include "job_buffer_ring_spsc_test.hh"
 #include "job_buffer_ring_mpsc_test.hh"
+#include "job_buffer_ring_spsc_test.hh"
 #include "worker_test.hh"
 // NOLINTEND

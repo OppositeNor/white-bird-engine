@@ -15,6 +15,7 @@
 #include "function/render/static_set_node_contract_resolver.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
+#include "function/render/static_set_node_contract.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -26,9 +27,8 @@
 namespace WhiteBirdEngine {
 namespace {
 
-const ShaderMetadataTypeField& require_field(const std::vector<ShaderMetadataTypeField>& p_fields,
-    std::string_view p_name,
-    std::string_view p_context) {
+const ShaderMetadataTypeField& require_field(
+    const std::vector<ShaderMetadataTypeField>& p_fields, std::string_view p_name, std::string_view p_context) {
     const ShaderMetadataTypeField* field = ShaderMetadataQuery().find_field(p_fields, p_name);
     if (field == nullptr) {
         throw std::runtime_error(std::format("Failed to resolve static-set node contract: {} field '{}' is missing.", p_context, p_name));
@@ -38,8 +38,8 @@ const ShaderMetadataTypeField& require_field(const std::vector<ShaderMetadataTyp
 
 size_t resolve_field_extent(const ShaderMetadataTypeField& p_field) {
     if (p_field.binding.offset < 0 || p_field.binding.size <= 0) {
-        throw std::runtime_error(std::format(
-            "Failed to resolve static-set node contract: field '{}' has an invalid reflected layout.", p_field.name));
+        throw std::runtime_error(
+            std::format("Failed to resolve static-set node contract: field '{}' has an invalid reflected layout.", p_field.name));
     }
     return static_cast<size_t>(p_field.binding.offset) + static_cast<size_t>(p_field.binding.size);
 }
@@ -55,8 +55,8 @@ StaticSetNodeContract StaticSetNodeContractResolver::resolve(
     ShaderMetadataQuery metadata_query;
     const ShaderMetadataParameter* static_set_parameter = metadata_query.find_parameter(p_metadata, p_static_set_parameter_name);
     if (static_set_parameter == nullptr) {
-        throw std::runtime_error(std::format(
-            "Failed to resolve static-set node contract: parameter '{}' is missing.", p_static_set_parameter_name));
+        throw std::runtime_error(
+            std::format("Failed to resolve static-set node contract: parameter '{}' is missing.", p_static_set_parameter_name));
     }
     if (static_set_parameter->type.kind != "parameterBlock") {
         throw std::runtime_error(std::format(
@@ -68,13 +68,11 @@ StaticSetNodeContract StaticSetNodeContractResolver::resolve(
         throw std::runtime_error("Failed to resolve static-set node contract: static_set.nodes must be a StructuredBuffer resource.");
     }
     if (nodes_field.fields.empty()) {
-        throw std::runtime_error(
-            "Failed to resolve static-set node contract: static_set.nodes is missing reflected NodeData fields.");
+        throw std::runtime_error("Failed to resolve static-set node contract: static_set.nodes is missing reflected NodeData fields.");
     }
 
     const ShaderMetadataTypeField& transform_field = require_field(nodes_field.fields, "transform", "NodeData");
-    const ShaderMetadataTypeField& normal_transform_field =
-        require_field(nodes_field.fields, "normal_transform", "NodeData");
+    const ShaderMetadataTypeField& normal_transform_field = require_field(nodes_field.fields, "normal_transform", "NodeData");
 
     size_t element_stride = 0;
     for (const ShaderMetadataTypeField& field : nodes_field.fields) {

@@ -112,8 +112,6 @@ private:
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{};
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{};
 
-    VkDeviceAddress get_buffer_device_address(Ref<ROBufferVK> p_buffer) const;
-    VkDeviceAddress query_acceleration_structure_device_address(Ref<ROAccelerationStructureVK> p_acceleration_structure) const;
     void reset_static_opaque_acceleration_structures();
     void validate_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) const;
     void validate_static_opaque_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instance_count) const;

@@ -14,10 +14,15 @@
 */
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "utils/utils.hh"
 
 #include <cstddef>
 #include <cstdint>

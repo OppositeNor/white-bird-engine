@@ -75,6 +75,17 @@ struct RenderBindpointSamplerDeclaration {
 };
 
 /**
+ * @class RenderBindpointAccelerationStructureDeclaration
+ * @brief Caller-provided acceleration-structure bindpoint resolved from an already-built render object.
+ */
+struct RenderBindpointAccelerationStructureDeclaration {
+    /** Reflected shader field path. */
+    std::string field_path;
+    /** Render-object-backed acceleration structure. */
+    Ref<IRenderObject> acceleration_structure_render_object = MEM_NULL;
+};
+
+/**
  * @class RenderBindpointDeclarations
  * @brief Aggregated caller-provided bindpoint data.
  */
@@ -83,6 +94,7 @@ struct RenderBindpointDeclarations {
     std::vector<RenderBindpointBufferDeclaration> buffer_declerations;
     std::vector<RenderBindpointImageDeclaration> image_declerations;
     std::vector<RenderBindpointSamplerDeclaration> sampler_declerations;
+    std::vector<RenderBindpointAccelerationStructureDeclaration> acceleration_structure_declerations;
 
     std::span<const uint8_t> get_buffer_data(const RenderBindpointBufferDeclaration& p_decleration) const {
         return std::span<const uint8_t>(buffer_data.data() + p_decleration.offset, p_decleration.size);
@@ -159,6 +171,16 @@ struct RenderBindpointDeclarationsBuilder {
     RenderBindpointDeclarationsBuilder& add_sampler_decleration(std::string_view p_field_path, Ref<IRenderObject> p_sampler_render_object) {
         declerations.sampler_declerations.push_back(
             {.field_path = std::string(p_field_path), .sampler_render_object = p_sampler_render_object});
+        return *this;
+    }
+
+    /**
+     * @brief Add an acceleration-structure declaration.
+     */
+    RenderBindpointDeclarationsBuilder& add_acceleration_structure_decleration(
+        std::string_view p_field_path, Ref<IRenderObject> p_acceleration_structure_render_object) {
+        declerations.acceleration_structure_declerations.push_back({.field_path = std::string(p_field_path),
+            .acceleration_structure_render_object = p_acceleration_structure_render_object});
         return *this;
     }
 

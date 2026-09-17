@@ -13,13 +13,21 @@
    limitations under the License.
 */
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
+#include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
+#include "ktxvulkan.h"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdint>
 #include <format>
@@ -115,20 +123,10 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(st
     }
     std::string fragment_entry = resolve_pipeline_stage_entry(
         p_pipeline_resource->fragment_stage, fragment_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
-    ShaderDescriptorHeapLayoutVK descriptor_layout = collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata,
-        vertex_entry,
-        geometry_metadata.has_value() ? &*geometry_metadata : nullptr,
-        geometry_entry,
-        fragment_metadata,
-        fragment_entry);
-    Ref<ROGraphicsPipelineVK> graphics_pipeline = compile_graphics_pipeline(p_resource_key,
-        *p_pipeline_resource,
-        vertex_shader,
-        geometry_shader,
-        fragment_shader,
-        vertex_entry,
-        geometry_entry,
-        fragment_entry);
+    ShaderDescriptorHeapLayoutVK descriptor_layout = collect_graphics_pipeline_descriptor_heap_layout(
+        vertex_metadata, vertex_entry, geometry_metadata.has_value() ? &*geometry_metadata : nullptr, geometry_entry, fragment_metadata, fragment_entry);
+    Ref<ROGraphicsPipelineVK> graphics_pipeline = compile_graphics_pipeline(
+        p_resource_key, *p_pipeline_resource, vertex_shader, geometry_shader, fragment_shader, vertex_entry, geometry_entry, fragment_entry);
 
     RenderBindpointDeclarations resolved_bindpoints = p_bindpoint_declarations;
     for (RenderBindpointImageDeclaration& declaration : resolved_bindpoints.image_declerations) {
@@ -190,8 +188,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     return graphics_pipeline;
 }
 
-Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(
-    std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
+Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
     std::string formatted_resource_key = std::format("{}#image_view", p_resource_key);
     auto image_view = get_registered_render_object<ROImageViewVK>(
         context.render_database, formatted_resource_key, TypeUUID<ROImageViewVK>::UUID);
@@ -214,8 +211,7 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(
     return image_view;
 }
 
-Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_texture(
-    std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
+Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_texture(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
     auto image = get_registered_render_object<ROImageVK>(context.render_database, p_resource_key, TypeUUID<ROImageVK>::UUID);
     if (image != MEM_NULL) {
         return image;

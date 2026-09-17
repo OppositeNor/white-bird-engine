@@ -35,10 +35,16 @@ struct DescriptorHeapProbeIndices {
     uint2 sampler;
     [WBE_DESCRIPTOR("uniform_buffer")]
     uint2 scalar_uniform;
+    [WBE_DESCRIPTOR("acceleration_structure")]
+    uint2 acceleration_structure;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<DescriptorHeapProbeIndices> descriptor_indices;
+
+#ifdef WBE_REFLECTION_METADATA
+RaytracingAccelerationStructure acceleration_structure;
+#endif
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -16,6 +16,7 @@
 #define WBE_FILE_ROC_SINGLE_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include <cstdint>

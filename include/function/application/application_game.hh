@@ -16,7 +16,6 @@
 #define WBE_FILE_APPLICATION_GAME_HH
 
 #include "core/async/worker.hh"
-#include <future>
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/application/i_application.hh"
@@ -29,6 +28,7 @@
 #include "utils/defs.hh"
 #include <atomic>
 #include <functional>
+#include <future>
 #include <utility>
 namespace WhiteBirdEngine {
 

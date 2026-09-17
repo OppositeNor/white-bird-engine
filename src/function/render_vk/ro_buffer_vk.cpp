@@ -16,6 +16,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -27,6 +28,8 @@
 #include <cstring>
 #include <format>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -160,6 +163,13 @@ ROBufferVK::~ROBufferVK() {
             vmaDestroyBuffer(render_data->vma_allocator, buffer, allocation);
         },
         render_data->frames_in_flight);
+}
+
+VkDeviceAddress ROBufferVK::get_device_address() const {
+    VkBufferDeviceAddressInfo address_info{};
+    address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    address_info.buffer = buffer;
+    return vkGetBufferDeviceAddress(render_data->logic_device, &address_info);
 }
 
 uint32_t ROBufferVK::get_uniform_view_index() const {

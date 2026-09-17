@@ -1,6 +1,6 @@
 ---
 name: white-bird-shader-reflection
-description: Use and extend White Bird Engine's Slang shader-reflection pipeline. Apply when loading reflected shader parameters from RUShader resources, querying metadata, consuming user attributes or layout data, diagnosing reflection contracts, or adding reflected types and Vulkan descriptor support.
+description: Use and extend White Bird Engine's Slang shader-reflection pipeline. Apply when loading reflected shader parameters from RUShader resources, querying metadata, consuming user attributes or layout data, diagnosing reflection contracts, or adding reflected buffer, image, sampler, and ray-tracing acceleration-structure descriptor support.
 ---
 
 # White Bird Shader Reflection
@@ -43,7 +43,9 @@ Treat pointers and references returned by `ShaderMetadataQuery` as views into `S
 
 Do not introduce a closed texture-role enum or branch on roles such as `albedo`, `normal`, or `rma`. Roles are shader-defined strings. An attribute with no explicit string argument uses the annotated field name as its role.
 
-Do not add new descriptor-set, binding-number, or bindless-space fields to `ShaderMetadata`. The Vulkan path now binds through renderer-owned descriptor heaps. Reflected descriptor fields must be aligned eight-byte `uint2` values in the entry point's single push-data block, with exactly one `WBE_DESCRIPTOR` argument: `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. Nested structs and fixed-size struct arrays are supported.
+Do not add new descriptor-set, binding-number, or bindless-space fields to `ShaderMetadata`. The Vulkan path now binds through renderer-owned descriptor heaps. Reflected descriptor fields must be aligned eight-byte `uint2` values in the entry point's single push-data block, with exactly one `WBE_DESCRIPTOR` argument: `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`. Nested structs and fixed-size struct arrays are supported.
+
+Slang reflects `RaytracingAccelerationStructure` metadata as `kind == "resource"` and `scalar_type == "accelerationStructure"`; query it through `ShaderMetadataQuery` like other global parameters. At runtime, annotate its heap-index field with `WBE_DESCRIPTOR("acceleration_structure")` and bind an `ROAccelerationStructureVK`. The render object lazily owns the buffer-region descriptor returned by `get_descriptor_index()`.
 
 ## Before changing support
 
@@ -55,7 +57,8 @@ Render objects and Vulkan backend helpers are rendering-thread-confined. Route c
 
 When changing Slang compilation or reflection fixtures, preserve the descriptor-heap compile profile used by ACP:
 `spirv_1_6+spvDescriptorHeapEXT`. Do not enable unified descriptor-heap stride: the resource heap has separate buffer and image
-regions whose indices use their descriptor type's device-reported stride.
+regions whose indices use their descriptor type's device-reported stride. Acceleration structures use the buffer region and
+`bufferDescriptorSize`, not the image region or a separate heap.
 
 ## Validate
 

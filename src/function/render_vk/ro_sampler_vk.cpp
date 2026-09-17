@@ -13,11 +13,13 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 

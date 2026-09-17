@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 #define WBE_FILE_JOB_BUFFER_RING_MPSC_TEST_HH
 
-#include "job_test_utils.hh"
 #include "core/core_utils.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "global/global.hh"
+#include "job_test_utils.hh"
 #include "platform/file_system/directory.hh"
 #include <algorithm>
 #include <atomic>

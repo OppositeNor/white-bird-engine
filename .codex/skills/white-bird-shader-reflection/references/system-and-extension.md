@@ -3,7 +3,7 @@
 ## Pipeline map
 
 1. A shader entry in an ACP manifest supplies `src`, `dst`, and `metadata`.
-2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` for SPIR-V 1.6 with descriptor-heap support. Buffer and image descriptor indices use separate regions and their descriptor type's device-reported stride.
+2. `build_script/resource/acp/acp_compiler_shader.py` invokes `slangc` for SPIR-V 1.6 with descriptor-heap support. Buffer and image descriptor indices use separate regions and their descriptor type's device-reported stride; acceleration structures share the buffer region and stride.
 3. It performs a second temporary compile with `WBE_REFLECTION_METADATA=1` so reflection-only declarations contribute metadata without entering the runtime shader, then normalizes Slang's JSON into the snake-case schema represented by `include/function/render/shader_metadata.hh`.
 4. The resource loader stores the compiled words, metadata path, and discovered stage-entry names in `RUShader` (`include/function/render/render_resource_unit.hh` and `src/function/render_vk/render_vk_resource_unit_loader.cpp`).
 5. `ShaderMetadataLoader::load` resolves `RUShader::metadata_path`, parses the JSON, and deserializes `ShaderMetadata`.
@@ -28,6 +28,8 @@ User-attribute arguments support only integer, floating-point, and string values
 
 Constant buffers and parameter blocks expose fields from Slang's element layout. `bindless_space_index` is not part of the normalized runtime schema.
 
+Slang acceleration-structure declarations need no schema extension. `RaytracingAccelerationStructure` normalizes to a type atom with `kind == "resource"` and `scalar_type == "accelerationStructure"`. A metadata-only declaration must still be instantiated as a reflected global parameter to be queryable.
+
 ## Runtime queries and paths
 
 `ShaderMetadataQuery` supports:
@@ -39,7 +41,7 @@ Constant buffers and parameter blocks expose fields from Slang's element layout.
 
 It does not implement a general dotted-path walker. For nested inspection, query each field vector deliberately or use the contract resolver responsible for that structure.
 
-Descriptor-heap bindpoint declarations use field paths relative to the push-data block, such as `camera_info` or `lights[0].shadowmap`. The reflection walker recursively flattens nested structs and fixed-size struct arrays. Buffer bindings must name a complete `ROBufferVK`; subranges are not accepted. Missing bindings remain zero until supplied, while a supplied object of the wrong type throws.
+Descriptor-heap bindpoint declarations use field paths relative to the push-data block, such as `camera_info` or `lights[0].shadowmap`. The reflection walker recursively flattens nested structs and fixed-size struct arrays. Buffer bindings must name a complete `ROBufferVK`; subranges are not accepted. Acceleration-structure bindings must name an `ROAccelerationStructureVK`. Missing bindings remain zero until supplied, while a supplied object of the wrong type throws.
 
 ## Vulkan descriptor-heap support
 
@@ -49,11 +51,12 @@ Descriptor-heap bindpoint declarations use field paths relative to the push-data
 - `storage_buffer`;
 - `sampled_image`;
 - `storage_image`;
-- `sampler`.
+- `sampler`;
+- `acceleration_structure`.
 
 Each annotation requires one non-empty string argument and must mark an aligned eight-byte `uint2` in the entry point's sole reflected `pushConstantBuffer`. Duplicate annotations, duplicate paths, overlapping ranges, malformed arrays, unsupported categories, and invalid layout values throw `std::runtime_error`. A descriptor-free entry point yields an empty layout. When graphics stages are merged, equal field paths must agree on category and byte offset, and distinct fields must not overlap.
 
-`DescriptorHeapAllocatorVK` owns renderer-wide logical arenas for buffers, sampled images, storage images, and samplers. Buffers and images occupy separate regions of the one Vulkan resource heap. Buffer indices address the buffer region using `bufferDescriptorSize`; sampled and storage image indices address the image region using `imageDescriptorSize`. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` lazily allocate descriptor indices unless builders transfer preallocated ones, own those indices, and defer their release for frames-in-flight safety. `RenderGraphVK` binds the resource and sampler heaps on each task command buffer; `ROPipelineVK` retains bound resources and pushes the reflected index block with `vkCmdPushDataEXT`.
+`DescriptorHeapAllocatorVK` owns renderer-wide logical arenas for buffers, sampled images, storage images, and samplers. Buffers and images occupy separate regions of the one Vulkan resource heap. Buffer and acceleration-structure indices address the buffer region using `bufferDescriptorSize`; sampled and storage image indices address the image region using `imageDescriptorSize`. Acceleration-structure descriptors are written as `VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR` through `VkResourceDescriptorInfoEXT::data.pAddressRange`, using the address from `ROAccelerationStructureVK::get_device_address()` and a zero-sized range. `ROBufferVK`, `ROImageViewVK`, `ROSamplerVK`, and `ROAccelerationStructureVK` lazily allocate and own their descriptor indices, then defer release for frames-in-flight safety. `RenderGraphVK` binds the resource and sampler heaps on each task command buffer; `ROPipelineVK` retains bound resources and pushes the reflected index block with `vkCmdPushDataEXT`.
 
 ## Built-in annotation contracts
 
@@ -63,12 +66,31 @@ Each annotation requires one non-empty string argument and must mark an aligned 
 
 Production shader code accesses the global resource and sampler heaps through these indices. Declarations needed only to preserve higher-level contracts in metadata belong under `#if WBE_REFLECTION_METADATA`; ACP's second compile sees them, while the runtime SPIR-V does not.
 
+For ray tracing, keep the metadata resource and runtime heap index distinct:
+
+```slang
+struct DescriptorIndices {
+    [WBE_DESCRIPTOR("acceleration_structure")]
+    uint2 scene;
+};
+
+#if WBE_REFLECTION_METADATA
+RaytracingAccelerationStructure scene_acceleration_structure;
+#endif
+```
+
+Query the metadata declaration as a `resource` / `accelerationStructure` type. Bind the runtime `scene` path to an `ROAccelerationStructureVK`; both pipeline compilation and `ROPipelineVK::set_descriptor_binding()` resolve it through `get_descriptor_index()`.
+
 Relevant files:
 
 - `res/assets/shaders/utils/utils.slang`
 - `include/function/render_vk/shader_metadata_vk_utils.hh`
 - `src/function/render_vk/shader_metadata_vk_utils.cpp`
+- `include/function/render_vk/ro_acceleration_structure_vk.hh`
+- `src/function/render_vk/descriptor_heap_allocator_vk.cpp`
+- `src/function/render_vk/pipeline_compiler_vk.cpp`
 - `test_env_res/assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.slang`
+- `tests/unit/function/shader_metadata_vk_test.cpp`
 - `tests/unit/function/shader_metadata_vk_utils_test.cpp`
 
 ### `WBE_VERTEX_INPUT`
@@ -123,6 +145,7 @@ Do not make generic engine propagation branch on concrete texture roles. Do not 
 - Descriptor translation is currently Vulkan-specific.
 - General direct-field lookup is one level at a time.
 - Descriptor-heap buffer bindings cover complete render objects, not arbitrary subranges.
+- Acceleration-structure descriptor binding requires the ray-tracing plugin and an `ROAccelerationStructureVK`; the generic reflection schema does not enable device ray-tracing features.
 - Only fixed-size arrays of descriptor-bearing structs are expanded into indexed paths.
 - The parameter-block array flattening rule is intentionally narrow.
 

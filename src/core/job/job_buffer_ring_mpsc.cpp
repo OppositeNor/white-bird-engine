@@ -15,6 +15,7 @@
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <atomic>
 #include <cstddef>

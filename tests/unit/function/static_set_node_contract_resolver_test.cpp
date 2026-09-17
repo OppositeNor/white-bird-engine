@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace WhiteBirdEngine {
 namespace {

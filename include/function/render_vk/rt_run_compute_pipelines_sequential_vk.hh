@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RT_RUN_COMPUTE_PIPELINES_SEQUENTIAL_VK_HH
 #define WBE_FILE_RT_RUN_COMPUTE_PIPELINES_SEQUENTIAL_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"

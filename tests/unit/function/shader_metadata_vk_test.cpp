@@ -14,6 +14,7 @@
 */
 #include "core/parser/parser_json.hh"
 #include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_query.hh"
 #include "function/render/static_set_node_contract.hh"
 #include "function/render/static_set_node_contract_resolver.hh"
 #include "platform/file_system/directory.hh"
@@ -262,17 +263,23 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
 
 TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(
-        Directory({"test_env", "res", "assets", "shaders", "descriptor_heap_reflection"}), "descriptor_heap_reflection.json"));
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "descriptor_heap_reflection"}), "descriptor_heap_reflection.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
-    ASSERT_EQ(metadata.parameters.size(), 1U);
-    const ShaderMetadataParameter& push_data = metadata.parameters[0];
+    const ShaderMetadataQuery query;
+    const ShaderMetadataParameter* acceleration_structure = query.find_parameter(metadata, "acceleration_structure");
+    ASSERT_NE(acceleration_structure, nullptr);
+    EXPECT_EQ(acceleration_structure->type.kind, "resource");
+    EXPECT_EQ(acceleration_structure->type.scalar_type, "accelerationStructure");
+
+    const ShaderMetadataParameter* push_data_pointer = query.find_parameter(metadata, "descriptor_indices");
+    ASSERT_NE(push_data_pointer, nullptr);
+    const ShaderMetadataParameter& push_data = *push_data_pointer;
     EXPECT_EQ(push_data.name, "descriptor_indices");
     EXPECT_EQ(push_data.binding.kind, "pushConstantBuffer");
     EXPECT_EQ(push_data.type.kind, "constantBuffer");
-    ASSERT_EQ(push_data.type.fields.size(), 5U);
+    ASSERT_EQ(push_data.type.fields.size(), 6U);
 
     const ShaderMetadataTypeField& uniform_buffer = push_data.type.fields[0];
     EXPECT_EQ(uniform_buffer.name, "uniform_buffer");
@@ -305,6 +312,18 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(push_data.type.fields[4].name, "scalar_uniform");
     EXPECT_EQ(push_data.type.fields[4].binding.offset, 40);
     EXPECT_EQ(push_data.type.fields[4].user_attributes[0].arguments[0].string_value, "uniform_buffer");
+
+    const ShaderMetadataTypeField& acceleration_structure_index = push_data.type.fields[5];
+    EXPECT_EQ(acceleration_structure_index.name, "acceleration_structure");
+    EXPECT_EQ(acceleration_structure_index.type.kind, "vector");
+    EXPECT_EQ(acceleration_structure_index.type.element_scalar_type, "uint32");
+    EXPECT_EQ(acceleration_structure_index.type.element_count, 2);
+    EXPECT_EQ(acceleration_structure_index.binding.offset, 48);
+    EXPECT_EQ(acceleration_structure_index.binding.size, 8);
+    ASSERT_EQ(acceleration_structure_index.user_attributes.size(), 1U);
+    EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "WBE_DESCRIPTOR");
+    ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
@@ -342,8 +361,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}),
-        "forward_cook_torrance_pbr.json"));
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -379,8 +397,7 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
 
 TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}),
-        "forward_cook_torrance_pbr.json"));
+    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -390,7 +407,9 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadat
     EXPECT_EQ(contract.normal_transform_offset, 64U);
 }
 
-static void expect_deferred_masked_static_pipeline_resource(const Directory& p_directory) {
+namespace {
+
+void expect_deferred_masked_static_pipeline_resource(const Directory& p_directory) {
     ParserJSON parser;
     parser.parse(Path(p_directory, "deferred_gbuffer_shader.json"));
 
@@ -408,6 +427,8 @@ static void expect_deferred_masked_static_pipeline_resource(const Directory& p_d
     EXPECT_TRUE(resource->get_value<bool>("depth_write"));
     EXPECT_TRUE(resource->get_value<bool>("cull_backfaces") == false);
 }
+
+} // namespace
 
 TEST(WBEShaderMetadataVKTest, DeferredMaskedStaticPipelineResourceUsesMaskedFragmentEntry) {
     expect_deferred_masked_static_pipeline_resource(Directory({"test_env_res", "assets", "shaders", "deferred_gbuffer"}));

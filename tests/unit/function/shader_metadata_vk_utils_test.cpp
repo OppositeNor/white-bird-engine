@@ -33,6 +33,8 @@
 
 namespace WhiteBirdEngine {
 
+namespace {
+
 struct VertexAttributeTestSpec {
     std::string_view role;
     RUVertexAttributeFormat format;
@@ -40,7 +42,7 @@ struct VertexAttributeTestSpec {
     size_t size;
 };
 
-static RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_size, const void* p_data) {
+RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_size, const void* p_data) {
     MemID memory = p_allocator.allocate(p_size);
     if (p_size > 0) {
         std::memcpy(p_allocator.get(memory), p_data, p_size);
@@ -48,7 +50,7 @@ static RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_
     return RefRes<char>(memory, &p_allocator);
 }
 
-static RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
+RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
     std::vector<RUVertexView::Attribute> attributes;
     attributes.reserve(p_specs.size());
     for (const VertexAttributeTestSpec& spec : p_specs) {
@@ -69,7 +71,7 @@ static RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span
     return result;
 }
 
-static ShaderMetadataTypeField make_vertex_shader_field(
+ShaderMetadataTypeField make_vertex_shader_field(
     std::string_view p_name, std::string_view p_role, int32_t p_location, std::string_view p_kind, std::string_view p_scalar_type, int32_t p_component_count) {
     ShaderMetadataTypeField field;
     field.name = p_name;
@@ -94,7 +96,7 @@ static ShaderMetadataTypeField make_vertex_shader_field(
     return field;
 }
 
-static ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField> p_fields) {
+ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField> p_fields) {
     ShaderMetadata metadata;
     ShaderMetadataEntryPoint entry_point;
     entry_point.name = "vertex_main";
@@ -108,8 +110,7 @@ static ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadata
     return metadata;
 }
 
-static ShaderMetadataTypeField make_descriptor_heap_field(
-    std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset) {
+ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset) {
     ShaderMetadataTypeField field;
     field.name = p_name;
     field.type.kind = "vector";
@@ -129,7 +130,7 @@ static ShaderMetadataTypeField make_descriptor_heap_field(
     return field;
 }
 
-static ShaderMetadata make_descriptor_heap_metadata(
+ShaderMetadata make_descriptor_heap_metadata(
     std::string_view p_stage, std::string_view p_entry_name, std::span<const ShaderMetadataTypeField> p_fields) {
     ShaderMetadata metadata;
     ShaderMetadataParameter push_data;
@@ -146,6 +147,8 @@ static ShaderMetadata make_descriptor_heap_metadata(
     return metadata;
 }
 
+} // namespace
+
 TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     ShaderMetadataTypeField images;
     images.name = "images";
@@ -155,19 +158,20 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     images.binding.size = 16;
     images.fields.push_back(make_descriptor_heap_field("sampled", "sampled_image", 0));
     images.fields.push_back(make_descriptor_heap_field("storage", "storage_image", 8));
-    const std::array<ShaderMetadataTypeField, 4> fields{{
+    const std::array<ShaderMetadataTypeField, 5> fields{{
         make_descriptor_heap_field("uniform", "uniform_buffer", 0),
         images,
         make_descriptor_heap_field("storage", "storage_buffer", 24),
         make_descriptor_heap_field("sampler", "sampler", 32),
+        make_descriptor_heap_field("acceleration_structure", "acceleration_structure", 40),
     }};
     ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
 
     ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
 
-    EXPECT_EQ(layout.size, 40U);
+    EXPECT_EQ(layout.size, 48U);
     EXPECT_EQ(layout.stage_flags, VK_SHADER_STAGE_COMPUTE_BIT);
-    ASSERT_EQ(layout.fields.size(), 5U);
+    ASSERT_EQ(layout.fields.size(), 6U);
     EXPECT_EQ(layout.fields[0].field_path, "uniform");
     EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER);
     EXPECT_EQ(layout.fields[0].offset, 0U);
@@ -179,6 +183,9 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     EXPECT_EQ(layout.fields[2].offset, 16U);
     EXPECT_EQ(layout.fields[3].type, ShaderDescriptorHeapTypeVK::STORAGE_BUFFER);
     EXPECT_EQ(layout.fields[4].type, ShaderDescriptorHeapTypeVK::SAMPLER);
+    EXPECT_EQ(layout.fields[5].field_path, "acceleration_structure");
+    EXPECT_EQ(layout.fields[5].type, ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE);
+    EXPECT_EQ(layout.fields[5].offset, 40U);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPaths) {
@@ -272,8 +279,7 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
     EXPECT_EQ(layout.fields[1].field_path, "sampler");
 
     fragment_metadata.parameters[0].type.fields[0].type.element_count = 1;
-    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(
-                     vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 }
 

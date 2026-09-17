@@ -16,6 +16,7 @@
 #define WBE_FILE_RT_RUN_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"

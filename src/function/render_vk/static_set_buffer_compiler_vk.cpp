@@ -13,17 +13,23 @@
    limitations under the License.
 */
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/function_utils.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {
@@ -111,23 +117,22 @@ Ref<ROBufferVK> build_static_binary_buffer(
     }
 
     const std::string cache_key = build_buffer_cache_key(p_binary, p_usage);
-    Ref<IRenderObject> registered_buffer = p_render_data->render_database->get_compiled_render_resource(cache_key, TypeUUID<ROBufferVK>::UUID);
+    Ref<IRenderObject> registered_buffer =
+        p_render_data->render_database->get_compiled_render_resource(cache_key, TypeUUID<ROBufferVK>::UUID);
     if (registered_buffer != MEM_NULL) {
         Ref<ROBufferVK> result = registered_buffer.dynamic_cast_ref<ROBufferVK>();
         if (result == MEM_NULL) {
             throw std::runtime_error("Failed to compile static set buffer: registered geometry buffer has the wrong type.");
         }
         if (result->fields().buffer_size != p_binary->size) {
-            throw std::runtime_error("Failed to compile static set buffer: registered geometry buffer size does not match its binary resource.");
+            throw std::runtime_error(
+                "Failed to compile static set buffer: registered geometry buffer size does not match its binary resource.");
         }
         return result;
     }
 
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
-                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                 .set_size(p_binary->size)
-                                 .set_usage(p_usage)
-                                 .create_ref(p_render_data);
+    Ref<ROBufferVK> result =
+        ROBufferVK::Builder().set_domain(DeviceDomain::HOST_DEVICE).set_size(p_binary->size).set_usage(p_usage).create_ref(p_render_data);
     result->update_buffer(p_binary->data.get(), p_binary->size);
     p_render_data->render_database->register_compiled_render_resource(cache_key, result);
     return result;

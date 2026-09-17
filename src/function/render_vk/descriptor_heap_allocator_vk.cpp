@@ -15,7 +15,9 @@
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_descriptor_heap_vk.hh"
 
 #include <algorithm>
 #include <cstdint>
@@ -26,21 +28,23 @@
 
 namespace WhiteBirdEngine {
 
-static VkDeviceSize checked_multiply(VkDeviceSize p_left, VkDeviceSize p_right) {
+namespace {
+
+VkDeviceSize checked_multiply(VkDeviceSize p_left, VkDeviceSize p_right) {
     if (p_left != 0 && p_right > std::numeric_limits<VkDeviceSize>::max() / p_left) {
         throw std::runtime_error("Failed to create descriptor heap: heap size overflow.");
     }
     return p_left * p_right;
 }
 
-static VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
+VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
     if (p_right > std::numeric_limits<VkDeviceSize>::max() - p_left) {
         throw std::runtime_error("Failed to create descriptor heap: heap size overflow.");
     }
     return p_left + p_right;
 }
 
-static VkDeviceSize checked_align_up(VkDeviceSize p_value, VkDeviceSize p_alignment) {
+VkDeviceSize checked_align_up(VkDeviceSize p_value, VkDeviceSize p_alignment) {
     VkDeviceSize remainder = p_value % p_alignment;
     if (remainder == 0) {
         return p_value;
@@ -48,13 +52,15 @@ static VkDeviceSize checked_align_up(VkDeviceSize p_value, VkDeviceSize p_alignm
     return checked_add(p_value, p_alignment - remainder);
 }
 
-static uint32_t checked_descriptor_index(VkDeviceSize p_offset, VkDeviceSize p_stride) {
+uint32_t checked_descriptor_index(VkDeviceSize p_offset, VkDeviceSize p_stride) {
     VkDeviceSize index = p_offset / p_stride;
     if (index > std::numeric_limits<uint32_t>::max()) {
         throw std::runtime_error("Failed to create descriptor heap allocator: descriptor index exceeds uint32.");
     }
     return static_cast<uint32_t>(index);
 }
+
+} // namespace
 
 DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), buffer_free_ranges(p_allocator), sampled_image_free_ranges(p_allocator),
@@ -95,34 +101,14 @@ DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocato
         throw std::runtime_error("Failed to create descriptor heap allocator: image descriptor index exceeds uint32.");
     }
     const uint32_t storage_image_first = sampled_image_first + SAMPLED_IMAGE_CAPACITY;
-    buffer_heap = make_ref<RODescriptorHeapVK>(p_allocator,
-        render_data,
-        resource_backing,
-        DescriptorHeapTypeVK::BUFFER,
-        0,
-        BUFFER_CAPACITY,
-        buffer_stride);
-    sampled_image_heap = make_ref<RODescriptorHeapVK>(p_allocator,
-        render_data,
-        resource_backing,
-        DescriptorHeapTypeVK::SAMPLED_IMAGE,
-        sampled_image_first,
-        SAMPLED_IMAGE_CAPACITY,
-        image_stride);
-    storage_image_heap = make_ref<RODescriptorHeapVK>(p_allocator,
-        render_data,
-        resource_backing,
-        DescriptorHeapTypeVK::STORAGE_IMAGE,
-        storage_image_first,
-        STORAGE_IMAGE_CAPACITY,
-        image_stride);
-    sampler_heap = make_ref<RODescriptorHeapVK>(p_allocator,
-        render_data,
-        sampler_backing,
-        DescriptorHeapTypeVK::SAMPLER,
-        0,
-        SAMPLER_CAPACITY,
-        render_data->sampler_descriptor_stride);
+    buffer_heap = make_ref<RODescriptorHeapVK>(
+        p_allocator, render_data, resource_backing, DescriptorHeapTypeVK::BUFFER, 0, BUFFER_CAPACITY, buffer_stride);
+    sampled_image_heap = make_ref<RODescriptorHeapVK>(
+        p_allocator, render_data, resource_backing, DescriptorHeapTypeVK::SAMPLED_IMAGE, sampled_image_first, SAMPLED_IMAGE_CAPACITY, image_stride);
+    storage_image_heap = make_ref<RODescriptorHeapVK>(
+        p_allocator, render_data, resource_backing, DescriptorHeapTypeVK::STORAGE_IMAGE, storage_image_first, STORAGE_IMAGE_CAPACITY, image_stride);
+    sampler_heap = make_ref<RODescriptorHeapVK>(
+        p_allocator, render_data, sampler_backing, DescriptorHeapTypeVK::SAMPLER, 0, SAMPLER_CAPACITY, render_data->sampler_descriptor_stride);
 
     buffer_free_ranges.push_back({.first_index = 0, .count = BUFFER_CAPACITY});
     sampled_image_free_ranges.push_back({.first_index = sampled_image_first, .count = SAMPLED_IMAGE_CAPACITY});
@@ -149,11 +135,8 @@ uint32_t DescriptorHeapAllocatorVK::allocate(RangeVector& p_free_ranges, uint32_
     throw std::runtime_error(std::format("Failed to allocate {} descriptor range: capacity is exhausted.", p_arena_name));
 }
 
-void DescriptorHeapAllocatorVK::deallocate(Ref<RODescriptorHeapVK> p_heap,
-    RangeVector& p_free_ranges,
-    uint32_t p_first_index,
-    uint32_t p_count,
-    const char* p_arena_name) {
+void DescriptorHeapAllocatorVK::deallocate(
+    Ref<RODescriptorHeapVK> p_heap, RangeVector& p_free_ranges, uint32_t p_first_index, uint32_t p_count, const char* p_arena_name) {
     if (!p_heap->owns_range(p_first_index, p_count)) {
         throw std::runtime_error(std::format("Failed to release {} descriptor range: range is outside the arena.", p_arena_name));
     }
@@ -167,10 +150,10 @@ void DescriptorHeapAllocatorVK::deallocate(Ref<RODescriptorHeapVK> p_heap,
     for (uint32_t i = 0; i < p_count; ++i) {
         p_heap->clear_descriptor(p_first_index + i);
     }
-    auto insert_position = std::lower_bound(p_free_ranges.begin(),
-        p_free_ranges.end(),
-        p_first_index,
-        [](const FreeRange& p_range, uint32_t p_index) { return p_range.first_index < p_index; });
+    auto insert_position =
+        std::lower_bound(p_free_ranges.begin(), p_free_ranges.end(), p_first_index, [](const FreeRange& p_range, uint32_t p_index) {
+            return p_range.first_index < p_index;
+        });
     insert_position = p_free_ranges.insert(insert_position, {.first_index = p_first_index, .count = p_count});
     if (insert_position != p_free_ranges.begin()) {
         auto previous = insert_position - 1;
@@ -264,8 +247,24 @@ void DescriptorHeapAllocatorVK::write_buffer_descriptor(
     buffer_heap->write_resource_descriptor(p_index, descriptor);
 }
 
-static VkResourceDescriptorInfoEXT make_image_descriptor(
-    VkDescriptorType p_type, const VkImageDescriptorInfoEXT* p_image_info) {
+void DescriptorHeapAllocatorVK::write_acceleration_structure_descriptor(uint32_t p_index, VkDeviceAddress p_device_address) const {
+    if (!is_allocated(buffer_heap, buffer_free_ranges, p_index, 1)) {
+        throw std::runtime_error("Failed to write acceleration-structure descriptor: descriptor index is not allocated.");
+    }
+    VkDeviceAddressRangeEXT address_range{
+        .address = p_device_address,
+        .size = 0,
+    };
+    VkResourceDescriptorInfoEXT descriptor{};
+    descriptor.sType = VK_STRUCTURE_TYPE_RESOURCE_DESCRIPTOR_INFO_EXT;
+    descriptor.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    descriptor.data.pAddressRange = &address_range;
+    buffer_heap->write_resource_descriptor(p_index, descriptor);
+}
+
+namespace {
+
+VkResourceDescriptorInfoEXT make_image_descriptor(VkDescriptorType p_type, const VkImageDescriptorInfoEXT* p_image_info) {
     VkResourceDescriptorInfoEXT descriptor{};
     descriptor.sType = VK_STRUCTURE_TYPE_RESOURCE_DESCRIPTOR_INFO_EXT;
     descriptor.type = p_type;
@@ -273,13 +272,15 @@ static VkResourceDescriptorInfoEXT make_image_descriptor(
     return descriptor;
 }
 
-static VkImageDescriptorInfoEXT make_image_info(const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) {
+VkImageDescriptorInfoEXT make_image_info(const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) {
     VkImageDescriptorInfoEXT image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_DESCRIPTOR_INFO_EXT;
     image_info.pView = &p_view;
     image_info.layout = p_layout;
     return image_info;
 }
+
+} // namespace
 
 void DescriptorHeapAllocatorVK::write_sampled_image_descriptor(
     uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const {

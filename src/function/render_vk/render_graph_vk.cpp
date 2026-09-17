@@ -19,6 +19,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -236,8 +237,8 @@ void update_edge_resource_scopes(Ref<RGExecEdge> p_edge,
 
 RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), nodes(p_render_data->allocator), exec_edges(p_render_data->allocator),
-    all_resources(p_render_data->allocator), command_buffers(p_render_data->allocator),
-    command_buffer_pools(p_render_data->allocator), terminal_semaphores(p_render_data->allocator) {
+      all_resources(p_render_data->allocator), command_buffers(p_render_data->allocator),
+      command_buffer_pools(p_render_data->allocator), terminal_semaphores(p_render_data->allocator) {
 }
 
 RenderGraphVK::~RenderGraphVK() {
@@ -275,12 +276,11 @@ DebugDataRows RendResViewVK::descriptor_debug_data() const {
                    descriptor_heap(p_left),
                    descriptor_resource_id(p_left),
                    descriptor_frame_index(p_left),
-                   descriptor_type_name(p_left)) <
-               std::make_tuple(descriptor_heap_index(p_right),
-                   descriptor_heap(p_right),
-                   descriptor_resource_id(p_right),
-                   descriptor_frame_index(p_right),
-                   descriptor_type_name(p_right));
+                   descriptor_type_name(p_left)) < std::make_tuple(descriptor_heap_index(p_right),
+                                                       descriptor_heap(p_right),
+                                                       descriptor_resource_id(p_right),
+                                                       descriptor_frame_index(p_right),
+                                                       descriptor_type_name(p_right));
     });
     return rows;
 }
@@ -446,7 +446,8 @@ Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources
             throw std::runtime_error("RenderGraphVK: resource id is empty.");
         }
         if (resource_desc.container == MEM_NULL) {
-            throw std::runtime_error(std::format("RenderGraphVK: resource '{}' must be bound before graph build.", resource_desc.res_id));
+            throw std::runtime_error(
+                std::format("RenderGraphVK: resource '{}' must be bound before graph build.", resource_desc.res_id));
         }
         if (resource_desc.container->get_resource_type_id() != resource_desc.res_type_id) {
             throw std::runtime_error(

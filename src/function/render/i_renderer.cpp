@@ -14,6 +14,7 @@
 */
 #include "function/render/i_renderer.hh"
 #include <stdexcept>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 

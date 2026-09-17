@@ -236,21 +236,6 @@ StaticGeometryBufferUsageVK RayTracingPluginVK::get_static_geometry_buffer_usage
     };
 }
 
-VkDeviceAddress RayTracingPluginVK::get_buffer_device_address(Ref<ROBufferVK> p_buffer) const {
-    VkBufferDeviceAddressInfo address_info{};
-    address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    address_info.buffer = p_buffer->get_buffer();
-    return vkGetBufferDeviceAddress(render_data->logic_device, &address_info);
-}
-
-VkDeviceAddress RayTracingPluginVK::query_acceleration_structure_device_address(
-    Ref<ROAccelerationStructureVK> p_acceleration_structure) const {
-    VkAccelerationStructureDeviceAddressInfoKHR address_info{};
-    address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-    address_info.accelerationStructure = p_acceleration_structure->get_acceleration_structure();
-    return base_ray_tracing_data->get_acceleration_structure_device_address(render_data->logic_device, &address_info);
-}
-
 void RayTracingPluginVK::reset_static_opaque_acceleration_structures() {
     static_opaque_bottom_level_acceleration_structures.clear();
     static_opaque_top_level_acceleration_structure = MEM_NULL;
@@ -343,7 +328,7 @@ Ref<ROBufferVK> RayTracingPluginVK::create_aligned_scratch_buffer(
                                          .set_size(p_required_size + p_alignment - 1)
                                          .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
                                          .create_ref(render_data);
-    const VkDeviceAddress scratch_buffer_address = get_buffer_device_address(scratch_buffer);
+    const VkDeviceAddress scratch_buffer_address = scratch_buffer->get_device_address();
     p_aligned_buffer_address = ((scratch_buffer_address + p_alignment - 1) / p_alignment) * p_alignment;
     return scratch_buffer;
 }
@@ -370,11 +355,10 @@ void RayTracingPluginVK::initialize_bottom_level_builds(StaticOpaqueBuildData& p
             std::numeric_limits<VkDeviceSize>::max() - base_ray_tracing_data->min_acceleration_structure_scratch_offset_alignment + 1) {
             throw std::runtime_error("Failed to build static-opaque acceleration structure: invalid scratch-buffer size or alignment.");
         }
-        build.acceleration_structure = make_ref<ROAccelerationStructureVK>(render_data->allocator,
-            render_data,
-            base_ray_tracing_data.get(),
-            bottom_level_build_sizes.accelerationStructureSize,
-            VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
+        build.acceleration_structure = ROAccelerationStructureVK::Builder()
+                                           .set_size(bottom_level_build_sizes.accelerationStructureSize)
+                                           .set_type(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR)
+                                           .create_ref(render_data, base_ray_tracing_data.get());
         p_bottom_level_acceleration_structures.push_back(build.acceleration_structure);
         const VkDeviceSize required_scratch_size = std::max(bottom_level_build_sizes.buildScratchSize, static_cast<VkDeviceSize>(1));
         p_max_bottom_level_scratch_size = std::max(p_max_bottom_level_scratch_size, required_scratch_size);
@@ -391,7 +375,7 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_lev
     }
     top_level_instances.reserve(total_instance_count);
     for (const StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
-        const uint64_t acceleration_structure_address = query_acceleration_structure_device_address(build.acceleration_structure);
+        const uint64_t acceleration_structure_address = build.acceleration_structure->get_device_address();
         for (const VkTransformMatrixKHR& transform : build.instance_transforms) {
             VkAccelerationStructureInstanceKHR instance{};
             instance.transform = transform;
@@ -418,7 +402,7 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_lev
     result.geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
     result.geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
     result.geometry.geometry.instances.arrayOfPointers = VK_FALSE;
-    result.geometry.geometry.instances.data.deviceAddress = get_buffer_device_address(result.instance_buffer);
+    result.geometry.geometry.instances.data.deviceAddress = result.instance_buffer->get_device_address();
 
     std::array<uint32_t, 1> top_level_primitive_counts{static_cast<uint32_t>(top_level_instances.size())};
     VkAccelerationStructureBuildGeometryInfoKHR top_level_sizing_info = make_top_level_build_info(&result.geometry);
@@ -432,11 +416,10 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_lev
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: invalid scratch-buffer size or alignment.");
     }
 
-    result.acceleration_structure = make_ref<ROAccelerationStructureVK>(render_data->allocator,
-        render_data,
-        base_ray_tracing_data.get(),
-        top_level_build_sizes.accelerationStructureSize,
-        VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+    result.acceleration_structure = ROAccelerationStructureVK::Builder()
+                                        .set_size(top_level_build_sizes.accelerationStructureSize)
+                                        .set_type(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR)
+                                        .create_ref(render_data, base_ray_tracing_data.get());
     result.scratch_buffer = create_aligned_scratch_buffer(
         std::max<VkDeviceSize>(top_level_build_sizes.buildScratchSize, 1), p_scratch_alignment, result.aligned_scratch_buffer_address);
     result.build_ranges = {VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = top_level_primitive_counts[0]}};
@@ -600,7 +583,7 @@ GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
     }
 
     StaticOpaqueBuildData build_data =
-        build_static_opaque_data(p_set, get_buffer_device_address(p_vertex_buffer), get_buffer_device_address(p_index_buffer));
+        build_static_opaque_data(p_set, p_vertex_buffer->get_device_address(), p_index_buffer->get_device_address());
     if (build_data.bottom_level_builds.empty()) {
         reset_static_opaque_acceleration_structures();
         return nullptr;

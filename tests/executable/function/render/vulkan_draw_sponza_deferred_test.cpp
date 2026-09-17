@@ -41,8 +41,8 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
-#include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -81,8 +81,7 @@ namespace {
 
 Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
     RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
-    return make_ref<ROCPerFrameVK>(
-        p_allocator,
+    return make_ref<ROCPerFrameVK>(p_allocator,
         p_render_data,
         ROCPerFrameVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
             return ROBufferVK::Builder()
@@ -883,30 +882,26 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
                                    build_direct_lighting_bindpoints(
                                        camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_sampled_view, false));
     direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
-    auto direct_summed_area_table_compiled = ComputePipelineCompilerVK(compute_context)
-                                                 .compile("direct_lighting_summed_area_table_shader",
-                                                     direct_lighting_summed_area_table_shader_resource,
-                                                     build_direct_lighting_bindpoints(camera_buffer,
-                                                         light_info_buffer,
-                                                         light_count_buffer,
-                                                         shadow_moments_attachment_view,
-                                                         true));
+    auto direct_summed_area_table_compiled =
+        ComputePipelineCompilerVK(compute_context)
+            .compile("direct_lighting_summed_area_table_shader",
+                direct_lighting_summed_area_table_shader_resource,
+                build_direct_lighting_bindpoints(
+                    camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_attachment_view, true));
     direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
     auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
                                  .compile("indirect_lighting_shader",
                                      indirect_lighting_shader_resource,
                                      build_indirect_lighting_bindpoints(camera_buffer, light_info_buffer, light_count_buffer));
     indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
-    auto combine_compiled = ComputePipelineCompilerVK(compute_context)
-                                .compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
+    auto combine_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
     combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
     auto bloom_horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context)
-            .compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_horizontal_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_horizontal_bindpoints());
     bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
     auto bloom_vertical_compiled =
-        ComputePipelineCompilerVK(compute_context)
-            .compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_vertical_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_vertical_bindpoints());
     bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context())
@@ -1073,12 +1068,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
                            task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<RenderTaskVK> {
-        return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
-            task_base_render_data,
-            SHADOW_MOMENTS_IMAGE_VIEW,
-            task_shadow_extent,
-            task_shadow_mipmap_level_count,
-            SHADOW_MOMENTS_FORMAT);
+        return make_unique<RTGenerateMipmapsVK>(
+            task_render_allocator, task_base_render_data, SHADOW_MOMENTS_IMAGE_VIEW, task_shadow_extent, task_shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
     };
     return task_desc;
 }

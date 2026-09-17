@@ -35,6 +35,8 @@
 #include "platform/file_system/directory.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/vector_float4.hpp>

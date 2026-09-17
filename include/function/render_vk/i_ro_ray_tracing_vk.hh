@@ -3,6 +3,7 @@
 
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include <stdexcept>
 namespace WhiteBirdEngine {
 class IRORayTracingVK : public IRenderObjectVK {
 public:

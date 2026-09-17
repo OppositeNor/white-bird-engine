@@ -13,12 +13,22 @@
    limitations under the License.
 */
 #include "function/render_vk/pipeline_compiler_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <limits>
 #include <stdexcept>
@@ -66,8 +76,7 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
                     binding_found = true;
                     resource = declaration.buffer_render_object;
                     if (declaration.offset != 0 || declaration.size != std::numeric_limits<size_t>::max()) {
-                        throw std::runtime_error(std::format(
-                            "Failed to bind descriptor heap buffer '{}': descriptor heap buffers must bind the complete resource.",
+                        throw std::runtime_error(std::format("Failed to bind descriptor heap buffer '{}': descriptor heap buffers must bind the complete resource.",
                             field.field_path));
                     }
                     break;
@@ -82,7 +91,7 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
                     std::format("Failed to bind descriptor heap buffer '{}': resource type is invalid.", field.field_path));
             }
             descriptor_index = field.type == ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER ? buffer->get_uniform_view_index()
-                                                                                       : buffer->get_storage_view_index();
+                                                                                        : buffer->get_storage_view_index();
         } else if (field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE || field.type == ShaderDescriptorHeapTypeVK::STORAGE_IMAGE) {
             for (const RenderBindpointImageDeclaration& declaration : p_bindpoint_declarations.image_declerations) {
                 if (declaration.field_path == field.field_path) {
@@ -101,6 +110,24 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
             }
             descriptor_index = field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE ? image_view->get_sampled_view_index()
                                                                                        : image_view->get_storage_view_index();
+        } else if (field.type == ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE) {
+            for (const RenderBindpointAccelerationStructureDeclaration& declaration :
+                p_bindpoint_declarations.acceleration_structure_declerations) {
+                if (declaration.field_path == field.field_path) {
+                    binding_found = true;
+                    resource = declaration.acceleration_structure_render_object;
+                    break;
+                }
+            }
+            auto acceleration_structure = resource.dynamic_cast_ref<ROAccelerationStructureVK>();
+            if (acceleration_structure == MEM_NULL) {
+                if (!binding_found) {
+                    continue;
+                }
+                throw std::runtime_error(std::format(
+                    "Failed to bind descriptor heap acceleration structure '{}': resource type is invalid.", field.field_path));
+            }
+            descriptor_index = acceleration_structure->get_descriptor_index();
         } else {
             for (const RenderBindpointSamplerDeclaration& declaration : p_bindpoint_declarations.sampler_declerations) {
                 if (declaration.field_path == field.field_path) {

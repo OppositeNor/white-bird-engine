@@ -15,13 +15,17 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
+#include <cstdint>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

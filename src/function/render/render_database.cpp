@@ -288,7 +288,8 @@ bool append_draw_group(RenderDatabase::OpaqueTrianglesInfo& p_triangles_info,
 
 } // namespace
 
-RenderDatabase::RenderDatabase(AllocType* p_allocator) : compiled_render_resources(p_allocator), dynamic_opaque(p_allocator) {
+RenderDatabase::RenderDatabase(AllocType* p_allocator)
+    : compiled_render_resources(p_allocator), dynamic_opaque(p_allocator) {
     singleton = this;
     if (p_allocator == nullptr) {
         throw std::runtime_error("Failed to create renderer database: allocator is null.");

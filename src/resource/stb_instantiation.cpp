@@ -14,3 +14,5 @@
 */
 #define STB_IMAGE_IMPLEMENTATION // NOLINT
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION // NOLINT
+#include <stb_image_write.h>

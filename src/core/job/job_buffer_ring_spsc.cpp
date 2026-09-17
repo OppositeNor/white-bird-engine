@@ -18,6 +18,7 @@
 #include "utils/utils.hh"
 #include <atomic>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <future>
 #include <stdexcept>

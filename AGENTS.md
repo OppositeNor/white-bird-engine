@@ -15,7 +15,7 @@ Follow repository conventions and existing patterns.
 - Do not modify generated files.
 - Do not modify dependencies.
 - Preserve existing APIs unless explicitly required.
-- Use only one namespace: `WhiteBirdEngine`. Do not introduce other namespaces in engine or test-support code unless the user explicitly asks for it.
+- Use only one named namespace: `WhiteBirdEngine`. Do not introduce other named namespaces in engine or test-support code unless the user explicitly asks for it. Use anonymous namespaces for internal linkage in `.cpp` files instead of `static` free functions, in accordance with clang-tidy.
 
 ---
 

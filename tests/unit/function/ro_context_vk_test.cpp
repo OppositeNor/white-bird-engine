@@ -24,12 +24,14 @@
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
 #include <cstdint>
-#include <string>
-#include <utility>
-#include <vector>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -148,10 +150,9 @@ TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     render_data.frames_in_flight = 2;
 
     EXPECT_THROW(ROCPerFrameVK(&render_data, ROCPerFrameVK::Factory{}), std::runtime_error);
-    EXPECT_THROW(ROCPerFrameVK(&render_data,
-                     ROCPerFrameVK::Factory{[](uint32_t /*p_context_id*/) {
-                         return Ref<IRenderObjectVK>(MEM_NULL);
-                     }}),
+    EXPECT_THROW(ROCPerFrameVK(&render_data, ROCPerFrameVK::Factory{[](uint32_t /*p_context_id*/) {
+        return Ref<IRenderObjectVK>(MEM_NULL);
+    }}),
         std::runtime_error);
 }
 
@@ -263,14 +264,12 @@ TEST(WBEROCPerFrameVKTest, ToStringAddsFrameIndexAndSkipsEmptyResources) {
 
     ROCPerFrameVK container(&render_data);
     container.set(0,
-        make_ref<TestDescriptorResourceVK>(&allocator,
-            &render_data,
-            DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 4, true)})
+        make_ref<TestDescriptorResourceVK>(
+            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 4, true)})
             .template dynamic_cast_ref<IRenderObjectVK>());
     container.set(2,
-        make_ref<TestDescriptorResourceVK>(&allocator,
-            &render_data,
-            DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 1, false)})
+        make_ref<TestDescriptorResourceVK>(
+            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 1, false)})
             .template dynamic_cast_ref<IRenderObjectVK>());
 
     DebugDataArray rows = parse_json_array(container.to_string());
@@ -290,9 +289,8 @@ TEST(WBEROCPerFrameVKTest, ToStringDoesNotTriggerFlushSynchronization) {
 
     ROCPerFrameVK container(&render_data);
     container.set(0,
-        make_ref<TestDescriptorResourceVK>(&allocator,
-            &render_data,
-            DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 9, true)})
+        make_ref<TestDescriptorResourceVK>(
+            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 9, true)})
             .template dynamic_cast_ref<IRenderObjectVK>());
 
     uint8_t value = 7;
@@ -308,8 +306,8 @@ TEST(WBEROCPerFrameVKTest, ToStringDoesNotTriggerFlushSynchronization) {
 TEST(WBEROCSingleVKTest, EmptyDescriptorResourcesProduceEmptyJsonArray) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    auto resource = make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{})
-                        .template dynamic_cast_ref<IRenderObjectVK>();
+    auto resource =
+        make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
 
     ROCSingleVK container(resource);
     DebugDataArray rows = parse_json_array(container.to_string());

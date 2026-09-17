@@ -14,15 +14,19 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
+#include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_per_frame_vk.hh"
 #include "platform/os/os.hh"
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -34,12 +38,14 @@
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <print>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace WBE = WhiteBirdEngine;
 

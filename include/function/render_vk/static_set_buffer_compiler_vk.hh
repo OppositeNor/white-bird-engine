@@ -15,10 +15,12 @@
 #ifndef WBE_FILE_STATIC_SET_BUFFER_COMPILER_VK_HH
 #define WBE_FILE_STATIC_SET_BUFFER_COMPILER_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

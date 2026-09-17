@@ -13,10 +13,17 @@
    limitations under the License.
 */
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
+#include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -57,8 +64,7 @@ ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
     Ref<ROShaderVK> compute_shader = compile_shader(p_shader_resource);
     ShaderMetadata shader_metadata = ShaderMetadataLoader().load(p_shader_resource);
     std::string compute_entry = resolve_compute_stage_entry(p_shader_resource, shader_metadata);
-    ShaderDescriptorHeapLayoutVK descriptor_layout =
-        collect_shader_descriptor_heap_layout(shader_metadata, "compute", compute_entry);
+    ShaderDescriptorHeapLayoutVK descriptor_layout = collect_shader_descriptor_heap_layout(shader_metadata, "compute", compute_entry);
     Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry);
     compile_descriptor_indices(compute_pipeline, descriptor_layout, p_bindpoint_declarations);
     return CompileResult{.compute_pipeline = compute_pipeline};

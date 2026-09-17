@@ -15,7 +15,9 @@
 #include "function/render_vk/roc_single_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <utility>

@@ -58,9 +58,8 @@ public:
 private:
     ComputePipelineCompilerVKContext context;
 
-    Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_key,
-        Ref<ROShaderVK> p_compute_shader,
-        std::string_view p_compute_entry);
+    Ref<ROComputePipelineVK> compile_compute_pipeline(
+        std::string_view p_resource_key, Ref<ROShaderVK> p_compute_shader, std::string_view p_compute_entry);
 };
 
 } // namespace WhiteBirdEngine

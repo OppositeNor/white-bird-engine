@@ -36,6 +36,7 @@ enum class ShaderDescriptorHeapTypeVK : uint8_t {
     SAMPLED_IMAGE,
     STORAGE_IMAGE,
     SAMPLER,
+    ACCELERATION_STRUCTURE,
 };
 
 /**
