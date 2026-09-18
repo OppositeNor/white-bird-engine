@@ -62,11 +62,13 @@
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -78,6 +80,23 @@
 namespace WhiteBirdEngine {
 
 namespace {
+
+constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
+
+struct BillboardInfoVKUBO {
+    glm::vec4 position = glm::vec4(0.0F);
+    glm::vec2 size = glm::vec2(0.0F);
+    glm::vec2 size_padding = glm::vec2(0.0F);
+    glm::vec4 rotation_axis = glm::vec4(0.0F);
+};
+
+BillboardInfoVKUBO make_light_billboard_info(const ComponentSpotLight& p_spot_light_component) {
+    return BillboardInfoVKUBO{
+        .position = glm::vec4(p_spot_light_component.position, 1.0F),
+        .size = LIGHT_BILLBOARD_SIZE,
+        .rotation_axis = glm::vec4(0.0F, 1.0F, 0.0F, 0.0F),
+    };
+}
 
 Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
     RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
@@ -138,6 +157,7 @@ private:
     static constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
     static constexpr std::string_view RT_BLOOM = "bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
+    static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
@@ -166,6 +186,7 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
+    void setup_light_billboard_overlay_resources();
     Ref<ROBufferVK> create_initialized_uniform_buffer(const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
@@ -200,6 +221,7 @@ private:
     RendTaskDescVK create_combine_lighting_task_desc() const;
     RendTaskDescVK create_bloom_task_desc() const;
     RendTaskDescVK create_present_result_image_task_desc() const;
+    RendTaskDescVK create_light_billboard_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
 
     RendererVK* renderer_vk = nullptr;
@@ -227,6 +249,7 @@ private:
     Ref<ROComputePipelineVK> bloom_horizontal_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_vertical_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
     Ref<ROImageVK> gbuffer_albedo_image;
     Ref<ROImageVK> gbuffer_normal_image;
     Ref<ROImageVK> gbuffer_rma_image;
@@ -263,6 +286,8 @@ private:
     Ref<ROCPerFrameVK> gbuffer_camera_info_ubos;
     Ref<ROCPerFrameVK> composition_camera_info_ubos;
     Ref<ROCPerFrameVK> spot_light_info_ubos;
+    Ref<ROBufferVK> light_billboard_ubo;
+    Ref<ROSamplerVK> light_billboard_sampler;
     std::vector<TaskUniformBinding> gbuffer_camera_bindings;
     std::vector<TaskUniformBinding> shadow_light_bindings;
     std::vector<ComputeUniformBinding> composition_camera_bindings;
@@ -394,13 +419,16 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info]() {
-        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL || spot_light_info_ubos == MEM_NULL) {
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info, light_billboard_info]() {
+        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL || spot_light_info_ubos == MEM_NULL ||
+            light_billboard_ubo == MEM_NULL) {
             throw std::runtime_error("Failed to update deferred descriptors: per-frame uniform buffers are not initialized.");
         }
         gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
         composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
         spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+        light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     });
 }
 
@@ -465,6 +493,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     };
     write_dynamic_camera_descriptors(gbuffer_tasks);
     write_dynamic_light_descriptors(shadow_tasks);
+    setup_light_billboard_overlay_resources();
     register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, mipmap_shadow_opaque_task, mipmap_gbuffer_opaque_task);
     register_deferred_render_graph(
         DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true, summed_area_table_shadow_opaque_task, summed_area_table_gbuffer_opaque_task);
@@ -531,6 +560,48 @@ void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
         .height = spot_light_component.shadow_map_resolution,
     };
     shadow_mipmap_level_count = std::bit_width(std::max(shadow_extent.width, shadow_extent.height));
+}
+
+void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources() {
+    auto* resource_manager = ResourceManager::get_singleton();
+    RefRes<RUGraphicsPipeline> pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("billboard_face_camera_depth_tested_pipeline");
+    if (pipeline_resource == nullptr) {
+        throw std::runtime_error("Failed to setup deferred light billboard overlay: graphics pipeline resource was not found.");
+    }
+    RefRes<RUTexture> texture_resource = resource_manager->get_resource<RUTexture>("spot_light_billboard");
+    if (texture_resource == nullptr) {
+        throw std::runtime_error("Failed to setup deferred light billboard overlay: texture resource was not found.");
+    }
+
+    light_billboard_ubo = ROBufferVK::Builder()
+                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                              .set_domain(DeviceDomain::HOST_DEVICE)
+                              .set_size(sizeof(BillboardInfoVKUBO))
+                              .create_ref(base_render_data);
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
+    light_billboard_sampler = ROSamplerVK::Builder()
+                                  .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                                  .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
+                                  .create_ref(base_render_data);
+
+    RenderBindpointDeclarationsBuilder bindpoint_builder;
+    bindpoint_builder.add_storage_buffer_decleration("camera_info", gbuffer_camera_info_ubos)
+        .add_storage_buffer_decleration("billboard_info", light_billboard_ubo)
+        .add_image_decleration("texture_image", texture_resource)
+        .add_sampler_decleration("texture_sampler", light_billboard_sampler);
+    GraphicsPipelineCompilerVKContext compiler_context{
+        .allocator = render_allocator,
+        .render_data = base_render_data,
+        .render_database = renderer_vk->get_render_database(),
+        .renderer = renderer_vk,
+        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
+    };
+    auto compiled = GraphicsPipelineCompilerVK(compiler_context)
+                        .compile("deferred_light_billboard_pipeline", pipeline_resource, bindpoint_builder.build());
+    light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
@@ -1004,7 +1075,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_task_desc())
-        .add_task(create_present_result_image_task_desc());
+        .add_task(create_present_result_image_task_desc())
+        .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
 }
@@ -1197,6 +1269,34 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
             REND_RES_SWAP_CHAIN_IMAGE,
             task_pipeline,
             VK_ATTACHMENT_LOAD_OP_CLEAR);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
+    task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = light_billboard_pipeline]() -> Unique<RenderTaskVK> {
+        std::array<VkClearValue, 2> clear_values{};
+        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN_IMAGE};
+        return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
+            task_base_render_data,
+            clear_values,
+            task_base_render_data->swap_chain_extent,
+            color_attachment_ids,
+            GBUFFER_DEPTH_IMAGE_VIEW,
+            task_pipeline,
+            std::nullopt,
+            std::nullopt,
+            std::nullopt,
+            VK_ATTACHMENT_LOAD_OP_LOAD,
+            VK_ATTACHMENT_LOAD_OP_LOAD,
+            VertexInputDescriptionVK{},
+            0,
+            6);
     };
     return task_desc;
 }

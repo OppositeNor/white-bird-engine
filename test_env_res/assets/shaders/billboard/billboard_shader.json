@@ -31,6 +31,18 @@
             "depth_write": false,
             "color_blend": false,
             "cull_backfaces": false
+        },
+        {
+            "id": "billboard_face_camera_depth_tested_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "billboard_shader",
+            "vertex_stage_entry": "vertex_face_camera",
+            "fragment_stage_id": "billboard_shader",
+            "fragment_stage_entry": "fragment_main",
+            "depth_test": true,
+            "depth_write": false,
+            "color_blend": false,
+            "cull_backfaces": false
         }
     ]
 }
