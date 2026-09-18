@@ -46,14 +46,15 @@
 
 namespace WhiteBirdEngine {
 
-static Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
+
+namespace {
+
+Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
     if (p_resource.container == MEM_NULL) {
         return MEM_NULL;
     }
-    return p_resource.container->get();
+    return p_resource.container->get().dynamic_cast_ref<IRenderObjectVK>();
 }
-
-namespace {
 
 DebugData make_descriptor_data(const DebugDataRows& p_rows) {
     DebugDataArray rows;

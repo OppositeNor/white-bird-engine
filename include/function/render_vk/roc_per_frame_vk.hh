@@ -17,6 +17,7 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -46,10 +47,10 @@ public:
     explicit ROCPerFrameVK(const BaseRenderDataVK* p_render_data, bool p_flush = true);
     ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_factory, bool p_flush = true);
 
-    Ref<IRenderObjectVK> get() override;
-    Ref<IRenderObjectVK> get() const override;
-    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) override;
-    Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const override;
+    Ref<IRenderObject> get() override;
+    Ref<IRenderObject> get() const override;
+    Ref<IRenderObject> get(uint32_t p_frame_slot) override;
+    Ref<IRenderObject> get(uint32_t p_frame_slot) const override;
     DebugDataRows descriptor_debug_data() const override;
     void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource);
 

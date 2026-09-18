@@ -34,6 +34,7 @@
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
+#include "function/render_vk/render_vk_utils_private.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
@@ -56,17 +57,95 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <stb_image_write.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
-#include <stb_image_write.h>
 
 namespace WhiteBirdEngine {
 
 namespace {
+struct ExtensionSupportQueryResult {
+    bool success = true;
+    std::vector<std::string> unsupported_extensions;
+    std::string error_message;
+};
+
+std::string join_string_list(const std::vector<std::string>& p_values) {
+    std::string result;
+    for (size_t i = 0; i < p_values.size(); ++i) {
+        if (i != 0) {
+            result += ", ";
+        }
+        result += p_values[i];
+    }
+    return result;
+}
+
+std::string format_vulkan_api_version(uint32_t p_version) {
+    return std::format("{}.{}.{}", VK_API_VERSION_MAJOR(p_version), VK_API_VERSION_MINOR(p_version), VK_API_VERSION_PATCH(p_version));
+}
+
+std::string get_physical_device_name(VkPhysicalDevice p_device) {
+    VkPhysicalDeviceProperties device_properties{};
+    vkGetPhysicalDeviceProperties(p_device, &device_properties);
+    return device_properties.deviceName;
+}
+
+template <typename EnumerateFunction>
+ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char* const> p_extensions,
+    std::span<const char* const> p_enabled_layers,
+    const EnumerateFunction& p_enumerate_extensions) {
+    ExtensionSupportQueryResult result;
+    std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
+    auto remove_supported_extensions = [&](const char* p_layer_name) {
+        VkResult enumerate_result = VK_SUCCESS;
+        do {
+            uint32_t extension_count = 0;
+            enumerate_result = p_enumerate_extensions(p_layer_name, &extension_count, nullptr);
+            if (enumerate_result != VK_SUCCESS) {
+                result.success = false;
+                result.error_message =
+                    p_layer_name == nullptr
+                        ? std::format("vkEnumerateDeviceExtensionProperties failed: {}", string_VkResult(enumerate_result))
+                        : std::format("vkEnumerateDeviceExtensionProperties failed for layer '{}': {}",
+                              p_layer_name,
+                              string_VkResult(enumerate_result));
+                return false;
+            }
+            std::vector<VkExtensionProperties> extension_properties(extension_count);
+            enumerate_result = p_enumerate_extensions(p_layer_name, &extension_count, extension_properties.data());
+            if (enumerate_result != VK_SUCCESS && enumerate_result != VK_INCOMPLETE) {
+                result.success = false;
+                result.error_message =
+                    p_layer_name == nullptr
+                        ? std::format("vkEnumerateDeviceExtensionProperties failed: {}", string_VkResult(enumerate_result))
+                        : std::format("vkEnumerateDeviceExtensionProperties failed for layer '{}': {}",
+                              p_layer_name,
+                              string_VkResult(enumerate_result));
+                return false;
+            }
+            for (const auto& extension : extension_properties) {
+                unsupported_extensions.erase(extension.extensionName);
+            }
+        } while (enumerate_result == VK_INCOMPLETE);
+        return true;
+    };
+    if (!remove_supported_extensions(nullptr)) {
+        return result;
+    }
+    for (const char* layer_name : p_enabled_layers) {
+        if (!remove_supported_extensions(layer_name)) {
+            return result;
+        }
+    }
+    result.unsupported_extensions.assign(unsupported_extensions.begin(), unsupported_extensions.end());
+    return result;
+}
+
 template <typename T>
 void update_buffer(const BaseRenderDataVK* p_render_data,
     DeviceDomain p_domain,
@@ -776,6 +855,119 @@ bool RendererVK::check_layer_support() {
     return true;
 }
 
+std::vector<std::string> RendererVK::collect_device_unsuitability_reasons(VkPhysicalDevice p_device) { // NOLINT
+    std::vector<std::string> reasons;
+
+    VkPhysicalDeviceProperties device_properties{};
+    vkGetPhysicalDeviceProperties(p_device, &device_properties);
+    if (device_properties.apiVersion < VULKAN_API_VERSION) {
+        reasons.emplace_back(std::format("API version {} is below required {}.",
+            format_vulkan_api_version(device_properties.apiVersion),
+            format_vulkan_api_version(VULKAN_API_VERSION)));
+    }
+
+    QueueFamilyIndices device_indices = get_queue_family_indices(p_device);
+    if (!device_indices.graphics.has_value()) {
+        reasons.emplace_back("No graphics queue family found.");
+    }
+    if (!device_indices.compute.has_value()) {
+        reasons.emplace_back("No compute queue family found.");
+    }
+    if (!device_indices.present.has_value()) {
+        reasons.emplace_back("No present-capable queue family found for the active surface.");
+    }
+
+    ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(enabled_device_extensions,
+        enabled_layers,
+        [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+            return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
+        });
+    if (!extension_support.success) {
+        reasons.emplace_back(std::format("Unable to query device extensions: {}.", extension_support.error_message));
+    } else if (!extension_support.unsupported_extensions.empty()) {
+        reasons.emplace_back(
+            std::format("Missing required device extensions: {}.", join_string_list(extension_support.unsupported_extensions)));
+    }
+
+    SwapChainSupportDetails swap_chain_support_details = get_swap_chain_support_details(p_device);
+    if (swap_chain_support_details.formats.empty()) {
+        reasons.emplace_back("No swap-chain surface formats are available.");
+    }
+    if (swap_chain_support_details.present_modes.empty()) {
+        reasons.emplace_back("No swap-chain present modes are available.");
+    }
+
+    VkPhysicalDeviceFeatures supported_device_features{};
+    vkGetPhysicalDeviceFeatures(p_device, &supported_device_features);
+    std::vector<std::string> missing_features;
+    if (supported_device_features.depthClamp != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.depthClamp");
+    }
+    if (supported_device_features.multiDrawIndirect != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.multiDrawIndirect");
+    }
+    if (supported_device_features.drawIndirectFirstInstance != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.drawIndirectFirstInstance");
+    }
+    if (supported_device_features.shaderSampledImageArrayDynamicIndexing != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.shaderSampledImageArrayDynamicIndexing");
+    }
+    if (supported_device_features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.shaderUniformBufferArrayDynamicIndexing");
+    }
+    if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(
+            p_device, &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress)) {
+        missing_features.emplace_back("VkPhysicalDeviceBufferDeviceAddressFeatures.bufferDeviceAddress");
+    }
+    if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES>(
+            p_device, &VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures::shaderDemoteToHelperInvocation)) {
+        missing_features.emplace_back("VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures.shaderDemoteToHelperInvocation");
+    }
+    if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR>(
+            p_device, &VkPhysicalDeviceShaderUntypedPointersFeaturesKHR::shaderUntypedPointers)) {
+        missing_features.emplace_back("VkPhysicalDeviceShaderUntypedPointersFeaturesKHR.shaderUntypedPointers");
+    }
+    if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT>(
+            p_device, &VkPhysicalDeviceDescriptorHeapFeaturesEXT::descriptorHeap)) {
+        missing_features.emplace_back("VkPhysicalDeviceDescriptorHeapFeaturesEXT.descriptorHeap");
+    }
+    if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT>(
+            p_device, &VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT::vertexInputDynamicState)) {
+        missing_features.emplace_back("VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT.vertexInputDynamicState");
+    }
+    if (!missing_features.empty()) {
+        reasons.emplace_back(std::format("Missing required device features: {}.", join_string_list(missing_features)));
+    }
+
+    VkPhysicalDeviceMemoryProperties memory_properties{};
+    vkGetPhysicalDeviceMemoryProperties(p_device, &memory_properties);
+    bool has_host_device_memory = false;
+    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
+        constexpr VkMemoryPropertyFlags REQUIRED_FLAGS = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        if ((memory_properties.memoryTypes[i].propertyFlags & REQUIRED_FLAGS) == REQUIRED_FLAGS) {
+            has_host_device_memory = true;
+            break;
+        }
+    }
+    if (!has_host_device_memory) {
+        reasons.emplace_back("No memory type supports both VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT and VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.");
+    }
+
+    return reasons;
+}
+
+void RendererVK::log_device_unsuitability(VkPhysicalDevice p_device, std::string_view p_context) {
+    std::vector<std::string> reasons = collect_device_unsuitability_reasons(p_device);
+    stdout_log(WBE_CHANNEL_DEBUG)->warning(std::format("{} \"{}\".", p_context, get_physical_device_name(p_device)));
+    if (reasons.empty()) {
+        stdout_log(WBE_CHANNEL_DEBUG)->warning("  - Rejected, but no diagnostic reason was recorded.");
+        return;
+    }
+    for (const std::string& reason : reasons) {
+        stdout_log(WBE_CHANNEL_DEBUG)->warning(std::format("  - {}", reason));
+    }
+}
+
 void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
@@ -791,12 +983,9 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
                     p_physical_devices.size()));
         } else if (!is_device_suitable(p_physical_devices[pick_device_index])) {
             // Device is not suitable.
-            VkPhysicalDeviceProperties device_properties;
-            vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            String device_name(device_properties.deviceName, allocator);
-            stdout_log(WBE_CHANNEL_DEBUG)
-                ->warning(std::format("Failed to use the device provided by the configuration: device \"{}\" is not suitable. Picking an alternative device.",
-                    device_name));
+            log_device_unsuitability(p_physical_devices[pick_device_index],
+                "Failed to use the device provided by the configuration: unsuitable device");
+            stdout_log(WBE_CHANNEL_DEBUG)->warning("Picking an alternative device.");
         } else {
             // Successfully pick the device.
             VkPhysicalDeviceProperties device_properties;
@@ -820,75 +1009,15 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
         }
     }
     if (physical_device == VK_NULL_HANDLE) {
+        for (const VkPhysicalDevice& device : p_physical_devices) {
+            log_device_unsuitability(device, "Rejected Vulkan physical device");
+        }
         throw std::runtime_error("No valid physical device found.");
     }
 }
 
 bool RendererVK::is_device_suitable(VkPhysicalDevice p_device) { // NOLINT
-    VkPhysicalDeviceProperties device_properties{};
-    vkGetPhysicalDeviceProperties(p_device, &device_properties);
-    if (device_properties.apiVersion < VULKAN_API_VERSION) {
-        return false;
-    }
-    QueueFamilyIndices device_indices = get_queue_family_indices(p_device);
-    if (!device_indices.is_complete()) {
-        return false;
-    }
-    if (!RenderPluginVK::check_extension_support(enabled_device_extensions,
-            enabled_layers,
-            [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
-                return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
-            })) {
-        return false;
-    }
-    SwapChainSupportDetails swap_chain_support_details = get_swap_chain_support_details(p_device);
-    if (swap_chain_support_details.formats.empty() || swap_chain_support_details.present_modes.empty()) {
-        return false;
-    }
-    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state_features{};
-    vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
-    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptor_heap_features{};
-    descriptor_heap_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT;
-    descriptor_heap_features.pNext = &vertex_input_dynamic_state_features;
-    VkPhysicalDeviceShaderUntypedPointersFeaturesKHR shader_untyped_pointers_features{};
-    shader_untyped_pointers_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR;
-    shader_untyped_pointers_features.pNext = &descriptor_heap_features;
-    VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures shader_demote_features{};
-    shader_demote_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
-    shader_demote_features.pNext = &shader_untyped_pointers_features;
-    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
-    buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-    buffer_device_address_features.pNext = &shader_demote_features;
-    VkPhysicalDeviceFeatures2 device_features{};
-    device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    device_features.pNext = &buffer_device_address_features;
-    vkGetPhysicalDeviceFeatures2(p_device, &device_features);
-    if (device_features.features.depthClamp != VK_TRUE || device_features.features.multiDrawIndirect != VK_TRUE ||
-        device_features.features.drawIndirectFirstInstance != VK_TRUE ||
-        device_features.features.shaderSampledImageArrayDynamicIndexing != VK_TRUE ||
-        device_features.features.shaderUniformBufferArrayDynamicIndexing != VK_TRUE ||
-        buffer_device_address_features.bufferDeviceAddress != VK_TRUE || shader_demote_features.shaderDemoteToHelperInvocation != VK_TRUE ||
-        shader_untyped_pointers_features.shaderUntypedPointers != VK_TRUE || descriptor_heap_features.descriptorHeap != VK_TRUE ||
-        vertex_input_dynamic_state_features.vertexInputDynamicState != VK_TRUE) {
-        return false;
-    }
-
-    VkPhysicalDeviceMemoryProperties memory_properties{};
-    vkGetPhysicalDeviceMemoryProperties(p_device, &memory_properties);
-    bool has_host_device_memory = false;
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
-        constexpr VkMemoryPropertyFlags REQUIRED_FLAGS = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        if ((memory_properties.memoryTypes[i].propertyFlags & REQUIRED_FLAGS) == REQUIRED_FLAGS) {
-            has_host_device_memory = true;
-            break;
-        }
-    }
-    if (!has_host_device_memory) {
-        return false;
-    }
-
-    // End of checks, the device is suitable.
-    return true;
+    return collect_device_unsuitability_reasons(p_device).empty();
 }
 
 RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDevice p_device) { // NOLINT

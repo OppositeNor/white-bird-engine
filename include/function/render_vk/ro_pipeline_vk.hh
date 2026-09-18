@@ -18,9 +18,9 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/i_render_object_container.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <cstdint>
@@ -75,7 +75,7 @@ public:
     /**
      * @brief Bind a context-resolved resource container to a reflected field.
      */
-    void set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container);
+    void set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObjectContainer> p_resource_container);
 
     /**
      * @brief Push the current descriptor-index block into a command buffer.
@@ -108,7 +108,7 @@ private:
     VkPipeline pipeline = VK_NULL_HANDLE;
     Vector<uint8_t, RenderAllocator> descriptor_index_data;
     Vector<Ref<IRenderObject>, RenderAllocator> descriptor_resources;
-    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> descriptor_resource_containers;
+    Vector<Ref<IRenderObjectContainer>, RenderAllocator> descriptor_resource_containers;
     Vector<ShaderDescriptorHeapFieldVK, RenderAllocator> descriptor_fields;
 };
 

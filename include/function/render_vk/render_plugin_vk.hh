@@ -21,6 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_vk_utils_private.hh"
 #include "resource/resource_unit/resource_unit.hh"
 
 #include <cstddef>
@@ -161,26 +162,6 @@ protected:
     friend class RendererVK;
 
     /**
-     * @brief Check one Boolean Vulkan device feature through a features2 query.
-     *
-     * @tparam StructureType Structure type identifying FeatureType.
-     * @tparam FeatureType Vulkan feature structure containing the requested member.
-     * @param p_physical_device Physical device to query.
-     * @param p_feature Boolean feature member to inspect.
-     * @return True when the feature is supported.
-     */
-    template <VkStructureType StructureType, typename FeatureType>
-    static bool check_device_feature_support(VkPhysicalDevice p_physical_device, VkBool32 FeatureType::* p_feature) {
-        FeatureType feature{};
-        feature.sType = StructureType;
-        VkPhysicalDeviceFeatures2 device_features{};
-        device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        device_features.pNext = &feature;
-        vkGetPhysicalDeviceFeatures2(p_physical_device, &device_features);
-        return feature.*p_feature == VK_TRUE;
-    }
-
-    /**
      * @brief Enable one supported Boolean device feature without duplicating its structure type.
      *
      * The method searches p_create_info by StructureType. It sets the requested member on an existing structure or appends
@@ -205,7 +186,7 @@ protected:
         if (!check_device_feature_support<StructureType>(p_physical_device, p_feature)) {
             throw std::runtime_error("Failed to enable Vulkan device feature: requested feature is not supported.");
         }
-        auto* feature = reinterpret_cast<VkBaseOutStructure*>(const_cast<void*>(p_create_info->pNext));
+        auto* feature = reinterpret_cast<VkBaseOutStructure*>(const_cast<void*>(p_create_info->pNext)); // NOLINT
         VkBaseOutStructure* tail = nullptr;
         while (feature != nullptr) {
             if (feature->sType == StructureType) {

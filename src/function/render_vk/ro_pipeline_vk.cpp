@@ -16,8 +16,8 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/i_render_object_container.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -149,7 +149,7 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRe
     descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = MEM_NULL;
 }
 
-void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container) {
+void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObjectContainer> p_resource_container) {
     if (p_resource_container == MEM_NULL) {
         throw std::runtime_error("Failed to set pipeline descriptor binding: resource container is missing.");
     }
@@ -159,7 +159,10 @@ void ROPipelineVK::set_descriptor_binding(std::string_view p_field_path, Ref<Ren
     if (field == descriptor_fields.end()) {
         throw std::runtime_error("Failed to set pipeline descriptor binding: reflected field path was not found.");
     }
-    Ref<IRenderObjectVK> resource = p_resource_container->get(render_data->current_frame_slot);
+    Ref<IRenderObjectVK> resource = p_resource_container->get(render_data->current_frame_slot).dynamic_cast_ref<IRenderObjectVK>();
+    if (resource == MEM_NULL) {
+        throw std::runtime_error("Failed to set pipeline descriptor binding: resource container did not resolve a Vulkan render object.");
+    }
     set_descriptor_binding(p_field_path, resource);
     descriptor_resource_containers[static_cast<size_t>(field - descriptor_fields.begin())] = std::move(p_resource_container);
 }
@@ -172,8 +175,12 @@ void ROPipelineVK::push_descriptor_indices(VkCommandBuffer p_command_buffer) {
         if (descriptor_resource_containers[i] == MEM_NULL) {
             continue;
         }
-        Ref<IRenderObjectVK> resource = descriptor_resource_containers[i]->get(render_data->current_frame_slot);
-        Ref<RenderObjectContainerVK> container = descriptor_resource_containers[i];
+        Ref<IRenderObjectVK> resource =
+            descriptor_resource_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<IRenderObjectVK>();
+        if (resource == MEM_NULL) {
+            throw std::runtime_error("Failed to push pipeline descriptor indices: resource container did not resolve a Vulkan render object.");
+        }
+        Ref<IRenderObjectContainer> container = descriptor_resource_containers[i];
         set_descriptor_binding(descriptor_fields[i].field_path, resource);
         descriptor_resource_containers[i] = std::move(container);
     }

@@ -407,6 +407,8 @@ private:
     void create_swap_chain_images();
 
     bool is_device_suitable(VkPhysicalDevice p_device);
+    std::vector<std::string> collect_device_unsuitability_reasons(VkPhysicalDevice p_device);
+    void log_device_unsuitability(VkPhysicalDevice p_device, std::string_view p_context);
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
     SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);

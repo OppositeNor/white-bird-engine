@@ -156,10 +156,10 @@ inline glm::mat4 test_camera_view(const glm::vec3& p_position, float p_yaw, floa
     return glm::lookAt(p_position, p_position + forward, up);
 }
 
-inline WBE::ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_far_plane = 10.0F) {
+inline WBE::ComponentCamera make_default_test_camera_component(float p_aspect_ratio, float p_near_plane = 10.0F) {
     WBE::ComponentCamera camera_component{
         .view = test_camera_view(TEST_DEFAULT_CAMERA_POSITION, default_test_camera_yaw(), default_test_camera_pitch()),
-        .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), p_aspect_ratio, p_far_plane, 0.1F),
+        .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), p_aspect_ratio, p_near_plane, 0.1F),
         .is_dirty = false,
     };
     camera_component.proj[1][1] *= -1;

@@ -15,6 +15,7 @@
 #include "function/render_vk/roc_single_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "utils/defs.hh"
@@ -31,19 +32,19 @@ ROCSingleVK::ROCSingleVK(Ref<IRenderObjectVK> p_resource) : resource(std::move(p
     retain_resource_type(resource);
 }
 
-Ref<IRenderObjectVK> ROCSingleVK::get() {
+Ref<IRenderObject> ROCSingleVK::get() {
     return resource;
 }
 
-Ref<IRenderObjectVK> ROCSingleVK::get() const {
+Ref<IRenderObject> ROCSingleVK::get() const {
     return resource;
 }
 
-Ref<IRenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) {
+Ref<IRenderObject> ROCSingleVK::get(uint32_t /*p_frame_slot*/) {
     return resource;
 }
 
-Ref<IRenderObjectVK> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
+Ref<IRenderObject> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
     return resource;
 }
 

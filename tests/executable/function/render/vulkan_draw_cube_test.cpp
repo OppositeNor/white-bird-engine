@@ -323,10 +323,10 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunSta
         p_task.set_descriptor_binding(p_name, p_buffer);
     };
     write_uniform_buffer("camera_info", camera_info_ubo);
-    write_uniform_buffer("light.lights.info", spot_light_info_ubo);
+    write_uniform_buffer("light.lights[0].info", spot_light_info_ubo);
     write_uniform_buffer("light.light_count", spot_light_count_ubo);
-    p_task.set_descriptor_binding("light.lights.shadowmap", shadow_depth_view);
-    p_task.set_descriptor_binding("light.lights.shadowmap_sampler", shadow_sampler);
+    p_task.set_descriptor_binding("light.lights[0].shadowmap", shadow_depth_view);
+    p_task.set_descriptor_binding("light.lights[0].shadowmap_sampler", shadow_sampler);
 }
 
 void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(

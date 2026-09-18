@@ -16,6 +16,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -86,15 +87,15 @@ ROCPerFrameVK::ROCPerFrameVK(const BaseRenderDataVK* p_render_data, Factory p_fa
     }
 }
 
-Ref<IRenderObjectVK> ROCPerFrameVK::get() {
+Ref<IRenderObject> ROCPerFrameVK::get() {
     return get(render_data->current_frame_slot);
 }
 
-Ref<IRenderObjectVK> ROCPerFrameVK::get() const {
+Ref<IRenderObject> ROCPerFrameVK::get() const {
     return get(render_data->current_frame_slot);
 }
 
-Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) {
+Ref<IRenderObject> ROCPerFrameVK::get(uint32_t p_frame_slot) {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));
@@ -103,7 +104,7 @@ Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) {
     return resources[p_frame_slot];
 }
 
-Ref<IRenderObjectVK> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
+Ref<IRenderObject> ROCPerFrameVK::get(uint32_t p_frame_slot) const {
     if (p_frame_slot >= resources.size()) {
         throw std::runtime_error(
             std::format("ROCPerFrameVK: frame slot {} is out of range for {} contexts.", p_frame_slot, resources.size()));

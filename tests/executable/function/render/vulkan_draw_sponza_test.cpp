@@ -26,15 +26,19 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
@@ -52,17 +56,22 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
 #include <glm/geometric.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <glm/vec2.hpp>
 #include <vulkan/vulkan_core.h>
 
 constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW = "sponza_depth";
@@ -78,6 +87,56 @@ constexpr std::string_view RT_RUN_SHADOWMAP_OPAQUE = "run_shadowmap_opaque";
 constexpr std::string_view RT_RUN_SHADOWMAP_MASKED = "run_shadowmap_masked";
 constexpr std::string_view RT_RUN_MAIN_OPAQUE = "run_main_opaque";
 constexpr std::string_view RT_RUN_MAIN_MASKED = "run_main_masked";
+constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
+constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
+
+struct ForwardSceneViewConfig {
+    glm::vec3 camera_position = glm::vec3(0.0F);
+    float camera_yaw = 0.0F;
+    float camera_pitch = 0.0F;
+    glm::vec3 light_position = glm::vec3(0.0F);
+    float light_yaw = 0.0F;
+    float light_pitch = 0.0F;
+};
+
+ForwardSceneViewConfig make_forward_sponza_view_config() {
+    return ForwardSceneViewConfig{
+        .camera_position = glm::vec3(1.894651F, 1.6352656F, 4.6991568F),
+        .camera_yaw = glm::radians(-77.84428F),
+        .camera_pitch = glm::radians(-8.191941F),
+        .light_position = glm::vec3(2.9011555F, 1.7444739F, 2.8511076F),
+        .light_yaw = glm::radians(-130.4772F),
+        .light_pitch = glm::radians(-44.71062F),
+    };
+}
+
+struct BillboardInfoVKUBO {
+    glm::vec4 position = glm::vec4(0.0F);
+    glm::vec2 size = glm::vec2(0.0F);
+    glm::vec2 size_padding = glm::vec2(0.0F);
+    glm::vec4 rotation_axis = glm::vec4(0.0F);
+};
+
+BillboardInfoVKUBO make_light_billboard_info(const WBE::ComponentSpotLight& p_spot_light_component) {
+    return BillboardInfoVKUBO{
+        .position = glm::vec4(p_spot_light_component.position, 1.0F),
+        .size = LIGHT_BILLBOARD_SIZE,
+        .rotation_axis = glm::vec4(0.0F, 1.0F, 0.0F, 0.0F),
+    };
+}
+
+WBE::Ref<WBE::ROCPerFrameVK> create_per_frame_uniform_buffers(
+    WBE::RenderAllocator* p_allocator, const WBE::BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
+    return WBE::make_ref<WBE::ROCPerFrameVK>(p_allocator,
+        p_render_data,
+        WBE::ROCPerFrameVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
+            return WBE::ROBufferVK::Builder()
+                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(p_buffer_size)
+                .create_ref(p_render_data);
+        }});
+}
 
 } // namespace
 
@@ -86,7 +145,8 @@ public:
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;
 
-    void setup_draw_task();
+    void setup_draw_task(const ForwardSceneViewConfig& p_view_config);
+    void log_view_state() const;
 
 private:
     void setup_render_context();
@@ -95,6 +155,7 @@ private:
     void setup_spot_light();
     void create_shadow_map_resources();
     void create_main_depth_resources();
+    void setup_light_billboard_overlay_resources();
     void write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
     void write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
     void register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
@@ -118,17 +179,20 @@ private:
     WBE::Ref<WBE::ROImageVK> main_depth_image;
     WBE::Ref<WBE::ROImageViewVK> main_depth_view;
     WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
-    WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    WBE::Ref<WBE::ROBufferVK> spot_light_info_ubo;
-    WBE::Ref<WBE::ROBufferVK> spot_light_count_ubo;
+    WBE::Ref<WBE::ROCPerFrameVK> camera_info_ubos;
+    WBE::Ref<WBE::ROCPerFrameVK> spot_light_info_ubos;
+    WBE::Ref<WBE::ROCPerFrameVK> spot_light_count_ubos;
     WBE::ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
+    WBE::Ref<WBE::ROBufferVK> light_billboard_ubo;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> light_billboard_pipeline;
+    WBE::Ref<WBE::ROSamplerVK> light_billboard_sampler;
     WBE::ComponentCamera camera_component{};
-    glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
-    float camera_yaw = default_test_camera_yaw();
-    float camera_pitch = default_test_camera_pitch();
+    glm::vec3 camera_position = glm::vec3(0.0F);
+    float camera_yaw = 0.0F;
+    float camera_pitch = 0.0F;
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -138,8 +202,9 @@ int main(int p_argc, char* p_argv[]) {
         ApplicationVulkanDrawSponzaTest game_application;
         {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
-            game_application.setup_draw_task();
+            game_application.setup_draw_task(make_forward_sponza_view_config());
             game_application.run();
+            game_application.log_view_state();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
@@ -253,11 +318,17 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
 
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
 
+    if (camera_info_ubos == WBE::MEM_NULL || spot_light_info_ubos == WBE::MEM_NULL || light_billboard_ubo == WBE::MEM_NULL) {
+        return;
+    }
+
     WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    add_render_job([this, camera_info, spot_light_info]() {
-        camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
-        spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    add_render_job([this, camera_info, spot_light_info, light_billboard_info]() {
+        camera_info_ubos->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
+        spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+        light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     });
 }
 
@@ -265,11 +336,48 @@ void ApplicationVulkanDrawSponzaTest::render_update(double /* p_delta */) {
     WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
 }
 
-void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
+void ApplicationVulkanDrawSponzaTest::log_view_state() const {
+    glm::vec3 camera_forward = test_camera_forward(camera_yaw, camera_pitch);
+    WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)
+        ->message(std::format("Forward Sponza camera: position=({}, {}, {}), yaw_deg={}, pitch_deg={}, forward=({}, {}, {})",
+            camera_position.x,
+            camera_position.y,
+            camera_position.z,
+            glm::degrees(camera_yaw),
+            glm::degrees(camera_pitch),
+            camera_forward.x,
+            camera_forward.y,
+            camera_forward.z));
+    WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)
+        ->message(std::format("Forward Sponza light: position=({}, {}, {}), yaw_deg={}, pitch_deg={}, direction=({}, {}, {})",
+            spot_light_component.position.x,
+            spot_light_component.position.y,
+            spot_light_component.position.z,
+            glm::degrees(spot_light_yaw),
+            glm::degrees(spot_light_pitch),
+            spot_light_component.direction.x,
+            spot_light_component.direction.y,
+            spot_light_component.direction.z));
+}
+
+void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConfig& p_view_config) {
+    camera_position = p_view_config.camera_position;
+    camera_yaw = p_view_config.camera_yaw;
+    camera_pitch = p_view_config.camera_pitch;
     setup_render_context();
     load_resources();
     setup_static_scene_resources();
     setup_spot_light();
+    spot_light_component.position = p_view_config.light_position;
+    spot_light_yaw = p_view_config.light_yaw;
+    spot_light_pitch = p_view_config.light_pitch;
+    spot_light_component.direction = test_camera_forward(spot_light_yaw, spot_light_pitch);
+    {
+        glm::vec3 light_up =
+            std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
+        spot_light_component.view =
+            glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
+    }
     create_shadow_map_resources();
     create_main_depth_resources();
 
@@ -309,6 +417,8 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task() {
         render_allocator, renderer_vk, sponza_masked_set, main_masked_pipeline, main_masked_task_config);
     write_main_dynamic_descriptors(*main_masked_task);
 
+    setup_light_billboard_overlay_resources();
+
     register_draw_sponza_render_graph(shadow_opaque_task, shadow_masked_task, main_opaque_task, main_masked_task);
 }
 
@@ -317,6 +427,7 @@ void ApplicationVulkanDrawSponzaTest::setup_render_context() {
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = get_renderer_allocator().get();
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
+    camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
 }
 
 void ApplicationVulkanDrawSponzaTest::load_resources() {
@@ -421,41 +532,88 @@ void ApplicationVulkanDrawSponzaTest::create_main_depth_resources() {
                           .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    spot_light_info_ubo = WBE::ROBufferVK::Builder()
+void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() {
+    auto* resource_manager = WBE::ResourceManager::get_singleton();
+    auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("billboard_face_camera_pipeline");
+    if (pipeline_resource == nullptr) {
+        throw std::runtime_error("Failed to setup light billboard overlay: graphics pipeline resource was not found.");
+    }
+    auto texture_resource = resource_manager->get_resource<WBE::RUTexture>("spot_light_billboard");
+    if (texture_resource == nullptr) {
+        throw std::runtime_error("Failed to setup light billboard overlay: texture resource was not found.");
+    }
+
+    if (camera_info_ubos == WBE::MEM_NULL) {
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
+    }
+    light_billboard_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(WBE::SpotLightInfoVKUBO))
+                              .set_size(sizeof(BillboardInfoVKUBO))
                               .create_ref(base_render_data);
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
+    light_billboard_sampler = WBE::ROSamplerVK::Builder()
+                                  .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                                  .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
+                                  .create_ref(base_render_data);
+
+    WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
+    bindpoint_builder.add_storage_buffer_decleration("camera_info", camera_info_ubos)
+        .add_storage_buffer_decleration("billboard_info", light_billboard_ubo)
+        .add_image_decleration("texture_image", texture_resource)
+        .add_sampler_decleration("texture_sampler", light_billboard_sampler);
+    WBE::GraphicsPipelineCompilerVKContext compiler_context{
+        .allocator = render_allocator,
+        .render_data = base_render_data,
+        .render_database = renderer_vk->get_render_database(),
+        .renderer = renderer_vk,
+        .color_attachment_formats = {base_render_data->swap_chain_format},
+    };
+    auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
+                        .compile("light_billboard_pipeline", pipeline_resource, bindpoint_builder.build());
+    light_billboard_pipeline = compiled.graphics_pipeline;
+}
+
+void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    if (spot_light_info_ubos == WBE::MEM_NULL) {
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
+    }
     WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
-    p_task.set_descriptor_binding("light_camera_info", spot_light_info_ubo);
+    spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+    log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza shadow light buffer");
+    p_task.set_descriptor_binding("light_camera_info", spot_light_info_ubos);
 }
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    camera_info_ubo = WBE::ROBufferVK::Builder()
-                          .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                          .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                          .set_size(sizeof(WBE::CameraInfoVKUBO))
-                          .create_ref(base_render_data);
-    spot_light_count_ubo = WBE::ROBufferVK::Builder()
-                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                               .set_size(sizeof(uint32_t))
-                               .create_ref(base_render_data);
+    if (camera_info_ubos == WBE::MEM_NULL) {
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
+    }
+    if (spot_light_count_ubos == WBE::MEM_NULL) {
+        spot_light_count_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(uint32_t));
+    }
+    if (spot_light_info_ubos == WBE::MEM_NULL) {
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
+    }
     WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     uint32_t spot_light_count = 1;
-    camera_info_ubo->update_buffer(&camera_info, sizeof(camera_info));
-    spot_light_count_ubo->update_buffer(&spot_light_count, sizeof(spot_light_count));
+    camera_info_ubos->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
+    spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+    spot_light_count_ubos->publish_buffer_update(&spot_light_count, 0, sizeof(spot_light_count));
 
-    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROBufferVK> p_buffer) {
+    log_uniform_buffer_descriptors(camera_info_ubos, "forward sponza camera buffer");
+    log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza main light buffer");
+    log_uniform_buffer_descriptors(spot_light_count_ubos, "forward sponza light count buffer");
+
+    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROCPerFrameVK> p_buffer) {
         p_task.set_descriptor_binding(p_name, p_buffer);
     };
-    write_uniform_buffer("camera_info", camera_info_ubo);
-    write_uniform_buffer("light.lights.info", spot_light_info_ubo);
-    write_uniform_buffer("light.light_count", spot_light_count_ubo);
-    p_task.set_descriptor_binding("light.lights.shadowmap", shadow_depth_view);
-    p_task.set_descriptor_binding("light.lights.shadowmap_sampler", shadow_sampler);
+    write_uniform_buffer("camera_info", camera_info_ubos);
+    write_uniform_buffer("light.lights[0].info", spot_light_info_ubos);
+    write_uniform_buffer("light.light_count", spot_light_count_ubos);
+    p_task.set_descriptor_binding("light.lights[0].shadowmap", shadow_depth_view);
+    p_task.set_descriptor_binding("light.lights[0].shadowmap_sampler", shadow_sampler);
 }
 
 void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
@@ -477,12 +635,36 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
     pipeline_desc.tasks.emplace_back(std::move(shadow_masked_task_desc));
 
     WBE::RendTaskDescVK main_opaque_task_desc(render_allocator, RT_RUN_MAIN_OPAQUE, std::move(p_main_opaque_task));
-    main_opaque_task_desc.after(RT_RUN_SHADOWMAP_MASKED);
+    main_opaque_task_desc.after(RT_RUN_SHADOWMAP_MASKED)
+        .read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
     pipeline_desc.tasks.emplace_back(std::move(main_opaque_task_desc));
 
     WBE::RendTaskDescVK main_masked_task_desc(render_allocator, RT_RUN_MAIN_MASKED, std::move(p_main_masked_task));
-    main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE);
+    main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE)
+        .read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
     pipeline_desc.tasks.emplace_back(std::move(main_masked_task_desc));
+
+    WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
+    light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
+    light_billboard_task_desc.after(RT_RUN_MAIN_MASKED);
+    light_billboard_task_desc.create = [render_allocator = render_allocator,
+                                           base_render_data = base_render_data,
+                                           light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::RenderTaskVK> {
+        return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
+            base_render_data,
+            glm::vec4(0.0F),
+            base_render_data->swap_chain_extent,
+            WBE::REND_RES_SWAP_CHAIN_IMAGE,
+            light_billboard_pipeline,
+            std::optional<std::string_view>{},
+            std::optional<std::string_view>{},
+            std::optional<WBE::IndexedDrawRegionVK>{},
+            VK_ATTACHMENT_LOAD_OP_LOAD,
+            WBE::VertexInputDescriptionVK{},
+            0,
+            6);
+    };
+    pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
 
     WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
     WBE::write_descriptor_debug_output("draw_sponza_pipeline_graph_descriptors", graph->list_descriptors());

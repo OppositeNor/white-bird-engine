@@ -15,7 +15,6 @@
 #include "function/render_vk/pipeline_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
@@ -28,7 +27,6 @@
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include <cstdint>
 #include <format>
 #include <limits>
 #include <stdexcept>
@@ -36,6 +34,145 @@
 #include <string_view>
 
 namespace WhiteBirdEngine {
+
+namespace {
+
+const RenderBindpointBufferDeclaration* find_buffer_declaration(
+    std::string_view p_field_path, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    for (const RenderBindpointBufferDeclaration& declaration : p_bindpoint_declarations.buffer_declerations) {
+        if (declaration.field_path == p_field_path) {
+            return &declaration;
+        }
+    }
+    return nullptr;
+}
+
+const RenderBindpointImageDeclaration* find_image_declaration(
+    std::string_view p_field_path, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    for (const RenderBindpointImageDeclaration& declaration : p_bindpoint_declarations.image_declerations) {
+        if (declaration.field_path == p_field_path) {
+            return &declaration;
+        }
+    }
+    return nullptr;
+}
+
+const RenderBindpointAccelerationStructureDeclaration* find_acceleration_structure_declaration(
+    std::string_view p_field_path, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    for (const RenderBindpointAccelerationStructureDeclaration& declaration :
+        p_bindpoint_declarations.acceleration_structure_declerations) {
+        if (declaration.field_path == p_field_path) {
+            return &declaration;
+        }
+    }
+    return nullptr;
+}
+
+const RenderBindpointSamplerDeclaration* find_sampler_declaration(
+    std::string_view p_field_path, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    for (const RenderBindpointSamplerDeclaration& declaration : p_bindpoint_declarations.sampler_declerations) {
+        if (declaration.field_path == p_field_path) {
+            return &declaration;
+        }
+    }
+    return nullptr;
+}
+
+bool bind_buffer_descriptor_field(Ref<ROPipelineVK> p_pipeline,
+    const ShaderDescriptorHeapFieldVK& p_field,
+    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    const RenderBindpointBufferDeclaration* declaration = find_buffer_declaration(p_field.field_path, p_bindpoint_declarations);
+    if (declaration == nullptr) {
+        return false;
+    }
+    if (declaration->offset != 0 || declaration->size != std::numeric_limits<size_t>::max()) {
+        throw std::runtime_error(std::format(
+            "Failed to bind descriptor heap buffer '{}': descriptor heap buffers must bind the complete resource.", p_field.field_path));
+    }
+    if (declaration->buffer_render_object_container != MEM_NULL) {
+        // Keep container-backed bindings on the per-frame resolution path.
+        p_pipeline->set_descriptor_binding(p_field.field_path, declaration->buffer_render_object_container);
+        return true;
+    }
+    Ref<ROBufferVK> buffer = declaration->buffer_render_object.dynamic_cast_ref<ROBufferVK>();
+    if (buffer == MEM_NULL) {
+        throw std::runtime_error(std::format(
+            "Failed to bind descriptor heap buffer '{}': resource type is invalid.", p_field.field_path));
+    }
+    // Bind direct resources once so push-time rebinding can skip them.
+    p_pipeline->set_descriptor_binding(p_field.field_path, declaration->buffer_render_object);
+    return true;
+}
+
+bool bind_image_descriptor_field(Ref<ROPipelineVK> p_pipeline,
+    const ShaderDescriptorHeapFieldVK& p_field,
+    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    const RenderBindpointImageDeclaration* declaration = find_image_declaration(p_field.field_path, p_bindpoint_declarations);
+    if (declaration == nullptr) {
+        return false;
+    }
+    if (declaration->image_render_object_container != MEM_NULL) {
+        // Keep container-backed bindings on the per-frame resolution path.
+        p_pipeline->set_descriptor_binding(p_field.field_path, declaration->image_render_object_container);
+        return true;
+    }
+    Ref<ROImageViewVK> image_view = declaration->image_render_object.dynamic_cast_ref<ROImageViewVK>();
+    if (image_view == MEM_NULL) {
+        throw std::runtime_error(
+            std::format("Failed to bind descriptor heap image '{}': resource type is invalid.", p_field.field_path));
+    }
+    // Bind direct resources once so push-time rebinding can skip them.
+    p_pipeline->set_descriptor_binding(p_field.field_path, declaration->image_render_object);
+    return true;
+}
+
+bool bind_acceleration_structure_descriptor_field(Ref<ROPipelineVK> p_pipeline,
+    const ShaderDescriptorHeapFieldVK& p_field,
+    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    const RenderBindpointAccelerationStructureDeclaration* declaration =
+        find_acceleration_structure_declaration(p_field.field_path, p_bindpoint_declarations);
+    if (declaration == nullptr) {
+        return false;
+    }
+    if (declaration->acceleration_structure_render_object_container != MEM_NULL) {
+        // Keep container-backed bindings on the per-frame resolution path.
+        p_pipeline->set_descriptor_binding(p_field.field_path, declaration->acceleration_structure_render_object_container);
+        return true;
+    }
+    Ref<ROAccelerationStructureVK> acceleration_structure =
+        declaration->acceleration_structure_render_object.dynamic_cast_ref<ROAccelerationStructureVK>();
+    if (acceleration_structure == MEM_NULL) {
+        throw std::runtime_error(std::format(
+            "Failed to bind descriptor heap acceleration structure '{}': resource type is invalid.", p_field.field_path));
+    }
+    // Bind direct resources once so push-time rebinding can skip them.
+    p_pipeline->set_descriptor_binding(p_field.field_path, declaration->acceleration_structure_render_object);
+    return true;
+}
+
+bool bind_sampler_descriptor_field(Ref<ROPipelineVK> p_pipeline,
+    const ShaderDescriptorHeapFieldVK& p_field,
+    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    const RenderBindpointSamplerDeclaration* declaration = find_sampler_declaration(p_field.field_path, p_bindpoint_declarations);
+    if (declaration == nullptr) {
+        return false;
+    }
+    if (declaration->sampler_render_object_container != MEM_NULL) {
+        // Keep container-backed bindings on the per-frame resolution path.
+        p_pipeline->set_descriptor_binding(p_field.field_path, declaration->sampler_render_object_container);
+        return true;
+    }
+    Ref<ROSamplerVK> sampler = declaration->sampler_render_object.dynamic_cast_ref<ROSamplerVK>();
+    if (sampler == MEM_NULL) {
+        throw std::runtime_error(
+            std::format("Failed to bind descriptor heap sampler '{}': resource type is invalid.", p_field.field_path));
+    }
+    // Bind direct resources once so push-time rebinding can skip them.
+    p_pipeline->set_descriptor_binding(p_field.field_path, declaration->sampler_render_object);
+    return true;
+}
+
+} // namespace
 
 PipelineCompilerVK::PipelineCompilerVK(const PipelineCompilerVKContext& p_context, std::string_view p_compiler_name)
     : base_context(p_context) {
@@ -65,88 +202,24 @@ void PipelineCompilerVK::compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline
     if (p_pipeline == MEM_NULL) {
         throw std::runtime_error("Failed to compile pipeline descriptor indices: pipeline is missing.");
     }
+
+    // Initialize the reflected descriptor slots before applying any bindings.
     p_pipeline->set_descriptor_layout(p_layout);
+
     for (const ShaderDescriptorHeapFieldVK& field : p_layout.fields) {
-        Ref<IRenderObject> resource = MEM_NULL;
-        uint32_t descriptor_index = 0;
-        bool binding_found = false;
         if (field.type == ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER || field.type == ShaderDescriptorHeapTypeVK::STORAGE_BUFFER) {
-            for (const RenderBindpointBufferDeclaration& declaration : p_bindpoint_declarations.buffer_declerations) {
-                if (declaration.field_path == field.field_path) {
-                    binding_found = true;
-                    resource = declaration.buffer_render_object;
-                    if (declaration.offset != 0 || declaration.size != std::numeric_limits<size_t>::max()) {
-                        throw std::runtime_error(std::format("Failed to bind descriptor heap buffer '{}': descriptor heap buffers must bind the complete resource.",
-                            field.field_path));
-                    }
-                    break;
-                }
-            }
-            auto buffer = resource.dynamic_cast_ref<ROBufferVK>();
-            if (buffer == MEM_NULL) {
-                if (!binding_found) {
-                    continue;
-                }
-                throw std::runtime_error(
-                    std::format("Failed to bind descriptor heap buffer '{}': resource type is invalid.", field.field_path));
-            }
-            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER ? buffer->get_uniform_view_index()
-                                                                                        : buffer->get_storage_view_index();
+            // Buffer descriptors must resolve to either a per-frame container or one concrete buffer.
+            bind_buffer_descriptor_field(p_pipeline, field, p_bindpoint_declarations);
         } else if (field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE || field.type == ShaderDescriptorHeapTypeVK::STORAGE_IMAGE) {
-            for (const RenderBindpointImageDeclaration& declaration : p_bindpoint_declarations.image_declerations) {
-                if (declaration.field_path == field.field_path) {
-                    binding_found = true;
-                    resource = declaration.image_render_object;
-                    break;
-                }
-            }
-            auto image_view = resource.dynamic_cast_ref<ROImageViewVK>();
-            if (image_view == MEM_NULL) {
-                if (!binding_found) {
-                    continue;
-                }
-                throw std::runtime_error(
-                    std::format("Failed to bind descriptor heap image '{}': resource type is invalid.", field.field_path));
-            }
-            descriptor_index = field.type == ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE ? image_view->get_sampled_view_index()
-                                                                                       : image_view->get_storage_view_index();
+            // Image descriptors follow the same direct-vs-container split as buffers.
+            bind_image_descriptor_field(p_pipeline, field, p_bindpoint_declarations);
         } else if (field.type == ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE) {
-            for (const RenderBindpointAccelerationStructureDeclaration& declaration :
-                p_bindpoint_declarations.acceleration_structure_declerations) {
-                if (declaration.field_path == field.field_path) {
-                    binding_found = true;
-                    resource = declaration.acceleration_structure_render_object;
-                    break;
-                }
-            }
-            auto acceleration_structure = resource.dynamic_cast_ref<ROAccelerationStructureVK>();
-            if (acceleration_structure == MEM_NULL) {
-                if (!binding_found) {
-                    continue;
-                }
-                throw std::runtime_error(std::format(
-                    "Failed to bind descriptor heap acceleration structure '{}': resource type is invalid.", field.field_path));
-            }
-            descriptor_index = acceleration_structure->get_descriptor_index();
+            // Acceleration structures can be static or frame-varying, so keep both paths explicit.
+            bind_acceleration_structure_descriptor_field(p_pipeline, field, p_bindpoint_declarations);
         } else {
-            for (const RenderBindpointSamplerDeclaration& declaration : p_bindpoint_declarations.sampler_declerations) {
-                if (declaration.field_path == field.field_path) {
-                    binding_found = true;
-                    resource = declaration.sampler_render_object;
-                    break;
-                }
-            }
-            auto sampler = resource.dynamic_cast_ref<ROSamplerVK>();
-            if (sampler == MEM_NULL) {
-                if (!binding_found) {
-                    continue;
-                }
-                throw std::runtime_error(
-                    std::format("Failed to bind descriptor heap sampler '{}': resource type is invalid.", field.field_path));
-            }
-            descriptor_index = sampler->get_sampler_index();
+            // Samplers use the same split, but resolve against sampler declarations.
+            bind_sampler_descriptor_field(p_pipeline, field, p_bindpoint_declarations);
         }
-        p_pipeline->set_descriptor_index(field.offset, descriptor_index, resource);
     }
 }
 

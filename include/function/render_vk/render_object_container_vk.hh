@@ -16,6 +16,8 @@
 #define WBE_FILE_RENDER_OBJECT_CONTAINER_VK_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_object.hh"
+#include "function/render/i_render_object_container.hh"
 #include "function/render/render_task.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -28,7 +30,7 @@ namespace WhiteBirdEngine {
  * @class RenderObjectContainerVK
  * @brief Abstract container that resolves the render object bound to one graph resource.
  */
-class RenderObjectContainerVK {
+class RenderObjectContainerVK : public IRenderObjectContainer {
 public:
     virtual ~RenderObjectContainerVK() = default;
     RenderObjectContainerVK(const RenderObjectContainerVK&) = delete;
@@ -36,22 +38,22 @@ public:
     RenderObjectContainerVK& operator=(const RenderObjectContainerVK&) = delete;
     RenderObjectContainerVK& operator=(RenderObjectContainerVK&&) noexcept = delete;
 
-    virtual Ref<IRenderObjectVK> get() = 0;
-    virtual Ref<IRenderObjectVK> get() const = 0;
+    virtual Ref<IRenderObject> get() override = 0;
+    virtual Ref<IRenderObject> get() const override = 0;
 
     /**
      * @brief Resolve the resource for an explicit frame slot.
      * @param p_frame_slot Frame slot to resolve.
      * @return Resolved render object.
      */
-    virtual Ref<IRenderObjectVK> get(uint32_t p_frame_slot) = 0;
+    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) override = 0;
 
     /**
      * @brief Resolve the resource for an explicit frame slot.
      * @param p_frame_slot Frame slot to resolve.
      * @return Resolved render object.
      */
-    virtual Ref<IRenderObjectVK> get(uint32_t p_frame_slot) const = 0;
+    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) const override = 0;
 
     /**
      * @brief Return structured descriptor-debug rows owned by this container.
@@ -69,14 +71,8 @@ public:
      */
     std::string to_string() const;
 
-    RendResTID get_resource_type_id() const;
-
 protected:
     RenderObjectContainerVK() = default;
-
-    void retain_resource_type(Ref<IRenderObjectVK> p_resource);
-
-    RendResTID resource_type_id = 0;
 };
 
 } // namespace WhiteBirdEngine

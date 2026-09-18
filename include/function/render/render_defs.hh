@@ -19,6 +19,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
+#include "function/render/i_render_object_container.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
@@ -53,6 +54,10 @@ struct RenderBindpointBufferDeclaration {
      * @brief Render-object-backed buffer for storage-buffer descriptors.
      */
     Ref<IRenderObject> buffer_render_object = MEM_NULL;
+    /**
+     * @brief Optional container-backed buffer binding resolved at render time.
+     */
+    Ref<IRenderObjectContainer> buffer_render_object_container = MEM_NULL;
 };
 
 /**
@@ -63,6 +68,7 @@ struct RenderBindpointImageDeclaration {
     std::string field_path;
     RefRes<RUTexture> image_resource = MEM_NULL;
     Ref<IRenderObject> image_render_object = MEM_NULL;
+    Ref<IRenderObjectContainer> image_render_object_container = MEM_NULL;
 };
 
 /**
@@ -72,6 +78,7 @@ struct RenderBindpointImageDeclaration {
 struct RenderBindpointSamplerDeclaration {
     std::string field_path;
     Ref<IRenderObject> sampler_render_object = MEM_NULL;
+    Ref<IRenderObjectContainer> sampler_render_object_container = MEM_NULL;
 };
 
 /**
@@ -83,6 +90,8 @@ struct RenderBindpointAccelerationStructureDeclaration {
     std::string field_path;
     /** Render-object-backed acceleration structure. */
     Ref<IRenderObject> acceleration_structure_render_object = MEM_NULL;
+    /** Optional container-backed acceleration structure binding resolved at render time. */
+    Ref<IRenderObjectContainer> acceleration_structure_render_object_container = MEM_NULL;
 };
 
 /**
@@ -119,6 +128,7 @@ struct RenderBindpointDeclarationsBuilder {
             .offset = declerations.buffer_data.size(),
             .size = p_data.size(),
             .buffer_render_object = MEM_NULL,
+            .buffer_render_object_container = MEM_NULL,
         };
         declerations.buffer_data.resize(declerations.buffer_data.size() + p_data.size());
         if (!p_data.empty()) {
@@ -142,8 +152,26 @@ struct RenderBindpointDeclarationsBuilder {
         Ref<IRenderObject> p_buffer_render_object,
         size_t p_offset = 0,
         size_t p_size = std::numeric_limits<size_t>::max()) {
-        declerations.buffer_declerations.push_back(RenderBindpointBufferDeclaration{
-            .field_path = std::string(p_field_path), .offset = p_offset, .size = p_size, .buffer_render_object = p_buffer_render_object});
+        declerations.buffer_declerations.push_back(RenderBindpointBufferDeclaration{.field_path = std::string(p_field_path),
+            .offset = p_offset,
+            .size = p_size,
+            .buffer_render_object = p_buffer_render_object,
+            .buffer_render_object_container = MEM_NULL});
+        return *this;
+    }
+
+    /**
+     * @brief Add a container-backed storage buffer declaration.
+     */
+    RenderBindpointDeclarationsBuilder& add_storage_buffer_decleration(std::string_view p_field_path,
+        Ref<IRenderObjectContainer> p_buffer_render_object_container,
+        size_t p_offset = 0,
+        size_t p_size = std::numeric_limits<size_t>::max()) {
+        declerations.buffer_declerations.push_back(RenderBindpointBufferDeclaration{.field_path = std::string(p_field_path),
+            .offset = p_offset,
+            .size = p_size,
+            .buffer_render_object = MEM_NULL,
+            .buffer_render_object_container = p_buffer_render_object_container});
         return *this;
     }
 
@@ -151,8 +179,10 @@ struct RenderBindpointDeclarationsBuilder {
      * @brief Add an image decleration backed by a resource unit.
      */
     RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, RefRes<RUTexture> p_image_resource) {
-        declerations.image_declerations.push_back(
-            {.field_path = std::string(p_field_path), .image_resource = p_image_resource, .image_render_object = MEM_NULL});
+        declerations.image_declerations.push_back({.field_path = std::string(p_field_path),
+            .image_resource = p_image_resource,
+            .image_render_object = MEM_NULL,
+            .image_render_object_container = MEM_NULL});
         return *this;
     }
 
@@ -160,8 +190,22 @@ struct RenderBindpointDeclarationsBuilder {
      * @brief Add an image decleration backed by a render object.
      */
     RenderBindpointDeclarationsBuilder& add_image_decleration(std::string_view p_field_path, Ref<IRenderObject> p_image_render_object) {
-        declerations.image_declerations.push_back(
-            {.field_path = std::string(p_field_path), .image_resource = MEM_NULL, .image_render_object = p_image_render_object});
+        declerations.image_declerations.push_back({.field_path = std::string(p_field_path),
+            .image_resource = MEM_NULL,
+            .image_render_object = p_image_render_object,
+            .image_render_object_container = MEM_NULL});
+        return *this;
+    }
+
+    /**
+     * @brief Add an image decleration backed by a render-object container.
+     */
+    RenderBindpointDeclarationsBuilder& add_image_decleration(
+        std::string_view p_field_path, Ref<IRenderObjectContainer> p_image_render_object_container) {
+        declerations.image_declerations.push_back({.field_path = std::string(p_field_path),
+            .image_resource = MEM_NULL,
+            .image_render_object = MEM_NULL,
+            .image_render_object_container = p_image_render_object_container});
         return *this;
     }
 
@@ -169,8 +213,20 @@ struct RenderBindpointDeclarationsBuilder {
      * @brief Add a sampler decleration.
      */
     RenderBindpointDeclarationsBuilder& add_sampler_decleration(std::string_view p_field_path, Ref<IRenderObject> p_sampler_render_object) {
-        declerations.sampler_declerations.push_back(
-            {.field_path = std::string(p_field_path), .sampler_render_object = p_sampler_render_object});
+        declerations.sampler_declerations.push_back({.field_path = std::string(p_field_path),
+            .sampler_render_object = p_sampler_render_object,
+            .sampler_render_object_container = MEM_NULL});
+        return *this;
+    }
+
+    /**
+     * @brief Add a sampler decleration backed by a render-object container.
+     */
+    RenderBindpointDeclarationsBuilder& add_sampler_decleration(
+        std::string_view p_field_path, Ref<IRenderObjectContainer> p_sampler_render_object_container) {
+        declerations.sampler_declerations.push_back({.field_path = std::string(p_field_path),
+            .sampler_render_object = MEM_NULL,
+            .sampler_render_object_container = p_sampler_render_object_container});
         return *this;
     }
 
@@ -180,7 +236,19 @@ struct RenderBindpointDeclarationsBuilder {
     RenderBindpointDeclarationsBuilder& add_acceleration_structure_decleration(
         std::string_view p_field_path, Ref<IRenderObject> p_acceleration_structure_render_object) {
         declerations.acceleration_structure_declerations.push_back({.field_path = std::string(p_field_path),
-            .acceleration_structure_render_object = p_acceleration_structure_render_object});
+            .acceleration_structure_render_object = p_acceleration_structure_render_object,
+            .acceleration_structure_render_object_container = MEM_NULL});
+        return *this;
+    }
+
+    /**
+     * @brief Add an acceleration-structure declaration backed by a render-object container.
+     */
+    RenderBindpointDeclarationsBuilder& add_acceleration_structure_decleration(
+        std::string_view p_field_path, Ref<IRenderObjectContainer> p_acceleration_structure_render_object_container) {
+        declerations.acceleration_structure_declerations.push_back({.field_path = std::string(p_field_path),
+            .acceleration_structure_render_object = MEM_NULL,
+            .acceleration_structure_render_object_container = p_acceleration_structure_render_object_container});
         return *this;
     }
 
