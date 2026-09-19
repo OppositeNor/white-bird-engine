@@ -23,6 +23,17 @@
             "metadata": "assets/shaders/deferred_composition/direct_lighting.json"
         },
         {
+            "id": "direct_lighting_pcf_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/direct_lighting.slang",
+            "dst": "assets/shaders/deferred_composition/direct_lighting_pcf.spv",
+            "metadata": "assets/shaders/deferred_composition/direct_lighting_pcf.json",
+            "macros": [
+                {"name": "WBE_SPOT_SHADOW_IMPLEMENTATION", "value": "2"},
+                {"name": "WBE_USE_RSM_INDIRECT_LIGHTING", "value": "0"}
+            ]
+        },
+        {
             "id": "direct_lighting_summed_area_table_shader",
             "source_type": "shader",
             "src": "assets/shaders/deferred_composition/direct_lighting.slang",
@@ -33,11 +44,32 @@
             ]
         },
         {
-            "id": "indirect_lighting_shader",
+            "id": "indirect_lighting_rsm_shader",
             "source_type": "shader",
-            "src": "assets/shaders/deferred_composition/indirect_lighting.slang",
-            "dst": "assets/shaders/deferred_composition/indirect_lighting.spv",
-            "metadata": "assets/shaders/deferred_composition/indirect_lighting.json"
+            "src": "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
+            "dst": "assets/shaders/deferred_composition/indirect_lighting_rsm.spv",
+            "metadata": "assets/shaders/deferred_composition/indirect_lighting_rsm.json"
+        },
+        {
+            "id": "indirect_lighting_ddgi_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/indirect_lighting_ddgi.slang",
+            "dst": "assets/shaders/deferred_composition/indirect_lighting_ddgi.spv",
+            "metadata": "assets/shaders/deferred_composition/indirect_lighting_ddgi.json"
+        },
+        {
+            "id": "ddgi_trace_probes_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/ddgi/ddgi_trace_probes.slang",
+            "dst": "assets/shaders/ddgi/ddgi_trace_probes.spv",
+            "metadata": "assets/shaders/ddgi/ddgi_trace_probes.json"
+        },
+        {
+            "id": "ddgi_update_probes_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/ddgi/ddgi_update_probes.slang",
+            "dst": "assets/shaders/ddgi/ddgi_update_probes.spv",
+            "metadata": "assets/shaders/ddgi/ddgi_update_probes.json"
         },
         {
             "id": "combine_lighting_shader",

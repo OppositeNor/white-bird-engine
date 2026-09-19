@@ -674,8 +674,83 @@ void RendererVK::create_gpu_job_command_buffer() {
 }
 
 void RendererVK::create_descriptor_heap_allocator() {
+    constexpr uint32_t BUFFER_DESCRIPTOR_CAPACITY = 272;
+    constexpr uint32_t SAMPLED_IMAGE_DESCRIPTOR_CAPACITY = 256;
+    constexpr uint32_t STORAGE_IMAGE_DESCRIPTOR_CAPACITY = 64;
+    constexpr uint32_t SAMPLER_DESCRIPTOR_CAPACITY = 256;
+    const auto& properties = base_render_data.descriptor_heap_properties;
+    if (properties.bufferDescriptorSize == 0 || properties.imageDescriptorSize == 0 || properties.samplerDescriptorSize == 0 ||
+        properties.bufferDescriptorAlignment == 0 || properties.imageDescriptorAlignment == 0 ||
+        properties.samplerDescriptorAlignment == 0) {
+        throw std::runtime_error("Failed to create descriptor heaps: device descriptor sizes or alignments are invalid.");
+    }
+
+    std::array<DescriptorHeapConfigurationVK, 2> configurations{
+        DescriptorHeapConfigurationVK{
+            .type = DescriptorHeapTypeVK::RESOURCE,
+            .reserved_size = properties.minResourceHeapReservedRange,
+            .alignment = properties.resourceHeapAlignment,
+        },
+        DescriptorHeapConfigurationVK{
+            .type = DescriptorHeapTypeVK::SAMPLER,
+            .reserved_size = properties.minSamplerHeapReservedRange,
+            .alignment = properties.samplerHeapAlignment,
+        },
+    };
+    const VkDeviceSize buffer_offset = configurations[0].reserve_arena_bytes(
+        BUFFER_DESCRIPTOR_CAPACITY, properties.bufferDescriptorSize, properties.bufferDescriptorAlignment);
+    const VkDeviceSize sampled_image_offset = configurations[0].reserve_arena_bytes(
+        SAMPLED_IMAGE_DESCRIPTOR_CAPACITY, properties.imageDescriptorSize, properties.imageDescriptorAlignment);
+    const VkDeviceSize storage_image_offset = configurations[0].reserve_arena_bytes(
+        STORAGE_IMAGE_DESCRIPTOR_CAPACITY, properties.imageDescriptorSize, properties.imageDescriptorAlignment);
+    const VkDeviceSize sampler_offset = configurations[1].reserve_arena_bytes(
+        SAMPLER_DESCRIPTOR_CAPACITY, properties.samplerDescriptorSize, properties.samplerDescriptorAlignment);
+    for (auto& plugin : registered_plugins) {
+        plugin->configure_descriptor_heaps(&base_render_data, configurations);
+    }
+
     descriptor_heap_allocator = make_unique<DescriptorHeapAllocatorVK>(allocator, allocator, &base_render_data);
     base_render_data.descriptor_heap_allocator = descriptor_heap_allocator.get();
+    base_render_data.resource_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[0]);
+    base_render_data.sampler_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[1]);
+    const DescriptorHeapIDVK resource_heap_id = base_render_data.resource_descriptor_heap_id;
+    const DescriptorHeapIDVK sampler_heap_id = base_render_data.sampler_descriptor_heap_id;
+    base_render_data.buffer_descriptor_arena = {
+        .heap_id = resource_heap_id,
+        .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
+            {.byte_offset = buffer_offset,
+                .descriptor_stride = properties.bufferDescriptorSize,
+                .descriptor_count = BUFFER_DESCRIPTOR_CAPACITY,
+                .descriptor_alignment = properties.bufferDescriptorAlignment}),
+    };
+    base_render_data.sampled_image_descriptor_arena = {
+        .heap_id = resource_heap_id,
+        .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
+            {.byte_offset = sampled_image_offset,
+                .descriptor_stride = properties.imageDescriptorSize,
+                .descriptor_count = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY,
+                .descriptor_alignment = properties.imageDescriptorAlignment}),
+    };
+    base_render_data.sampled_image_descriptor_capacity = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY;
+    base_render_data.storage_image_descriptor_arena = {
+        .heap_id = resource_heap_id,
+        .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
+            {.byte_offset = storage_image_offset,
+                .descriptor_stride = properties.imageDescriptorSize,
+                .descriptor_count = STORAGE_IMAGE_DESCRIPTOR_CAPACITY,
+                .descriptor_alignment = properties.imageDescriptorAlignment}),
+    };
+    base_render_data.sampler_descriptor_arena = {
+        .heap_id = sampler_heap_id,
+        .arena_id = descriptor_heap_allocator->allocate_arena(sampler_heap_id,
+            {.byte_offset = sampler_offset,
+                .descriptor_stride = properties.samplerDescriptorSize,
+                .descriptor_count = SAMPLER_DESCRIPTOR_CAPACITY,
+                .descriptor_alignment = properties.samplerDescriptorAlignment}),
+    };
+    for (auto& plugin : registered_plugins) {
+        plugin->create_descriptor_arenas(&base_render_data);
+    }
 }
 
 void RendererVK::create_async_objects() {
@@ -796,7 +871,7 @@ void RendererVK::create_logical_device() { // NOLINT
     vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
     descriptor_heap_features.pNext = &vertex_input_dynamic_state_features;
     for (auto& plugin : registered_plugins) {
-        plugin->on_before_device_creation(physical_device, &create_info);
+        plugin->on_before_device_creation(physical_device, &create_info, &device_features);
     }
 
     // Create logical device.

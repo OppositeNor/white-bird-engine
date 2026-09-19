@@ -234,7 +234,7 @@ private:
     RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
     RefRes<RUShader> direct_lighting_shader_resource;
     RefRes<RUShader> direct_lighting_summed_area_table_shader_resource;
-    RefRes<RUShader> indirect_lighting_shader_resource;
+    RefRes<RUShader> indirect_lighting_rsm_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
     RefRes<RUShader> bloom_horizontal_shader_resource;
     RefRes<RUShader> bloom_vertical_shader_resource;
@@ -541,7 +541,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     direct_lighting_shader_resource = resource_manager->get_resource<RUShader>("direct_lighting_shader");
     direct_lighting_summed_area_table_shader_resource =
         resource_manager->get_resource<RUShader>("direct_lighting_summed_area_table_shader");
-    indirect_lighting_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_shader");
+    indirect_lighting_rsm_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_rsm_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
     bloom_horizontal_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_horizontal");
     bloom_vertical_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_vertical");
@@ -961,8 +961,8 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
                     camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_attachment_view, true));
     direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
     auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
-                                 .compile("indirect_lighting_shader",
-                                     indirect_lighting_shader_resource,
+                                 .compile("indirect_lighting_rsm_shader",
+                                     indirect_lighting_rsm_shader_resource,
                                      build_indirect_lighting_bindpoints(camera_buffer, light_info_buffer, light_count_buffer));
     indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
     auto combine_compiled =

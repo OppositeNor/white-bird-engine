@@ -18,7 +18,6 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/i_render_object_container.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include <cstdint>
@@ -54,6 +53,26 @@ public:
      * @return Resolved render object.
      */
     virtual Ref<IRenderObject> get(uint32_t p_frame_slot) const override = 0;
+
+    /**
+     * @brief Replace the resource bound to one explicit slot.
+     *
+     * @param p_frame_slot Slot index to update.
+     * @param p_resource Replacement resource.
+     */
+    virtual void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) = 0;
+
+    /**
+     * @brief Clear the resource bound to one explicit slot.
+     *
+     * @param p_frame_slot Slot index to clear.
+     */
+    virtual void clear(uint32_t p_frame_slot) = 0;
+
+    /**
+     * @brief Clear all slot bindings retained by this container.
+     */
+    virtual void clear() = 0;
 
     /**
      * @brief Return structured descriptor-debug rows owned by this container.

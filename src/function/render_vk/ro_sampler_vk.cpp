@@ -204,14 +204,17 @@ ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p
         .unnormalizedCoordinates = p_builder.unnormalized_coordinates};
     if (p_builder.sampler_index.has_value()) {
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_sampler_range(*p_builder.sampler_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->sampler_descriptor_arena.heap_id,
+                render_data->sampler_descriptor_arena.arena_id,
+                *p_builder.sampler_index)) {
             throw std::runtime_error("Failed to adopt sampler descriptor index: the index is not allocated by the sampler arena.");
         }
     }
     sampler = p_builder.create_vk_object(p_render_data);
     if (p_builder.sampler_index.has_value()) {
         sampler_index = p_builder.sampler_index;
-        render_data->descriptor_heap_allocator->write_sampler_descriptor(*sampler_index, create_info);
+        const DescriptorArenaLocationVK arena = render_data->sampler_descriptor_arena;
+        render_data->descriptor_heap_allocator->write_sampler_descriptor(arena.heap_id, arena.arena_id, *sampler_index, create_info);
     }
 }
 
@@ -219,7 +222,8 @@ ROSamplerVK::~ROSamplerVK() {
     render_data->register_delayed_call(
         [render_data = render_data, sampler = sampler, sampler_index = sampler_index]() {
             if (sampler_index.has_value()) {
-                render_data->descriptor_heap_allocator->deallocate_sampler(*sampler_index);
+                const DescriptorArenaLocationVK arena = render_data->sampler_descriptor_arena;
+                render_data->descriptor_heap_allocator->deallocate_descriptor(arena.heap_id, arena.arena_id, *sampler_index);
             }
             vkDestroySampler(render_data->logic_device, sampler, render_data->allocation_callbacks);
         },
@@ -232,8 +236,9 @@ uint32_t ROSamplerVK::get_sampler_index() const {
         if (allocator == nullptr) {
             throw std::runtime_error("Failed to create sampler descriptor: descriptor heap allocator is unavailable.");
         }
-        sampler_index = allocator->allocate_sampler();
-        allocator->write_sampler_descriptor(*sampler_index, create_info);
+        const DescriptorArenaLocationVK arena = render_data->sampler_descriptor_arena;
+        sampler_index = allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
+        allocator->write_sampler_descriptor(arena.heap_id, arena.arena_id, *sampler_index, create_info);
     }
     return *sampler_index;
 }

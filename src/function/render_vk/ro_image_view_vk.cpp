@@ -42,6 +42,22 @@ DebugData make_descriptor_row(std::string_view p_descriptor_type, uint32_t p_hea
     return row;
 }
 
+void write_image_descriptor(const BaseRenderDataVK* p_render_data,
+    DescriptorArenaLocationVK p_arena,
+    uint32_t p_index,
+    VkDescriptorType p_type,
+    const VkImageViewCreateInfo& p_view) {
+    VkImageDescriptorInfoEXT image_info{};
+    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_DESCRIPTOR_INFO_EXT;
+    image_info.pView = &p_view;
+    image_info.layout = VK_IMAGE_LAYOUT_GENERAL;
+    VkResourceDescriptorInfoEXT descriptor{};
+    descriptor.sType = VK_STRUCTURE_TYPE_RESOURCE_DESCRIPTOR_INFO_EXT;
+    descriptor.type = p_type;
+    descriptor.data.pImage = &image_info;
+    p_render_data->descriptor_heap_allocator->write_resource_descriptor(p_arena.heap_id, p_arena.arena_id, p_index, descriptor);
+}
+
 } // namespace
 
 TypeID ROImageViewVK::get_type_uuid() const {
@@ -146,10 +162,12 @@ ROImageViewVK::~ROImageViewVK() {
     render_data->register_delayed_call(
         [render_data = render_data, image_view = image_view, sampled_view_index = sampled_view_index, storage_view_index = storage_view_index]() {
             if (sampled_view_index.has_value()) {
-                render_data->descriptor_heap_allocator->deallocate_sampled_image(*sampled_view_index);
+                const DescriptorArenaLocationVK arena = render_data->sampled_image_descriptor_arena;
+                render_data->descriptor_heap_allocator->deallocate_descriptor(arena.heap_id, arena.arena_id, *sampled_view_index);
             }
             if (storage_view_index.has_value()) {
-                render_data->descriptor_heap_allocator->deallocate_storage_image(*storage_view_index);
+                const DescriptorArenaLocationVK arena = render_data->storage_image_descriptor_arena;
+                render_data->descriptor_heap_allocator->deallocate_descriptor(arena.heap_id, arena.arena_id, *storage_view_index);
             }
             vkDestroyImageView(render_data->logic_device, image_view, render_data->allocation_callbacks);
         },
@@ -170,7 +188,9 @@ void ROImageViewVK::init(const Builder& p_builder) {
             throw std::runtime_error("Failed to adopt sampled-image descriptor index: image does not have sampled usage.");
         }
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_sampled_image_range(*p_builder.sampled_view_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->sampled_image_descriptor_arena.heap_id,
+                render_data->sampled_image_descriptor_arena.arena_id,
+                *p_builder.sampled_view_index)) {
             throw std::runtime_error("Failed to adopt sampled-image descriptor index: the index is not allocated by the sampled-image arena.");
         }
     }
@@ -179,18 +199,22 @@ void ROImageViewVK::init(const Builder& p_builder) {
             throw std::runtime_error("Failed to adopt storage-image descriptor index: image does not have storage usage.");
         }
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_storage_image_range(*p_builder.storage_view_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->storage_image_descriptor_arena.heap_id,
+                render_data->storage_image_descriptor_arena.arena_id,
+                *p_builder.storage_view_index)) {
             throw std::runtime_error("Failed to adopt storage-image descriptor index: the index is not allocated by the storage-image arena.");
         }
     }
     image_view = p_builder.create_vk_object(render_data);
     if (p_builder.sampled_view_index.has_value()) {
         sampled_view_index = p_builder.sampled_view_index;
-        render_data->descriptor_heap_allocator->write_sampled_image_descriptor(*sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        write_image_descriptor(
+            render_data, render_data->sampled_image_descriptor_arena, *sampled_view_index, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, create_info);
     }
     if (p_builder.storage_view_index.has_value()) {
         storage_view_index = p_builder.storage_view_index;
-        render_data->descriptor_heap_allocator->write_storage_image_descriptor(*storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        write_image_descriptor(
+            render_data, render_data->storage_image_descriptor_arena, *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, create_info);
     }
 }
 
@@ -203,8 +227,9 @@ uint32_t ROImageViewVK::get_sampled_view_index() const {
         if (allocator == nullptr) {
             throw std::runtime_error("Failed to create sampled-image descriptor: descriptor heap allocator is unavailable.");
         }
-        sampled_view_index = allocator->allocate_sampled_image();
-        allocator->write_sampled_image_descriptor(*sampled_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        const DescriptorArenaLocationVK arena = render_data->sampled_image_descriptor_arena;
+        sampled_view_index = allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
+        write_image_descriptor(render_data, arena, *sampled_view_index, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, create_info);
     }
     return *sampled_view_index;
 }
@@ -218,8 +243,9 @@ uint32_t ROImageViewVK::get_storage_view_index() const {
         if (allocator == nullptr) {
             throw std::runtime_error("Failed to create storage-image descriptor: descriptor heap allocator is unavailable.");
         }
-        storage_view_index = allocator->allocate_storage_image();
-        allocator->write_storage_image_descriptor(*storage_view_index, create_info, VK_IMAGE_LAYOUT_GENERAL);
+        const DescriptorArenaLocationVK arena = render_data->storage_image_descriptor_arena;
+        storage_view_index = allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
+        write_image_descriptor(render_data, arena, *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, create_info);
     }
     return *storage_view_index;
 }

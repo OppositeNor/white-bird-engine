@@ -60,6 +60,8 @@ enum class RendResUsageVK : uint32_t {
     UNIFORM_BUFFER,
     /** Shader storage buffer read or write. */
     STORAGE_BUFFER,
+    /** Acceleration-structure build write or shader read. */
+    ACCELERATION_STRUCTURE,
     /** Transfer source read. */
     TRANSFER_SRC,
     /** Transfer destination write. */

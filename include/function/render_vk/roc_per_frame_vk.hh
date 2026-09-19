@@ -52,12 +52,19 @@ public:
     Ref<IRenderObject> get(uint32_t p_frame_slot) override;
     Ref<IRenderObject> get(uint32_t p_frame_slot) const override;
     DebugDataRows descriptor_debug_data() const override;
-    void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource);
+    void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) override;
+
+    /**
+     * @brief Release the resource retained for one frame slot.
+     *
+     * @param p_frame_slot Slot index to clear.
+     */
+    void clear(uint32_t p_frame_slot) override;
 
     /**
      * @brief Release the resources retained for all frame slots.
      */
-    void clear();
+    void clear() override;
 
     uint32_t get_context_count() const;
 

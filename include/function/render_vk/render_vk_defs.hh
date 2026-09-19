@@ -34,6 +34,22 @@ namespace WhiteBirdEngine {
 
 class DescriptorHeapAllocatorVK;
 
+/** @brief Identifies a physical Vulkan descriptor heap owned by the renderer. */
+using DescriptorHeapIDVK = uint32_t;
+/** @brief Identifies an arena within a physical Vulkan descriptor heap. */
+using DescriptorArenaIDVK = uint32_t;
+
+/**
+ * @struct DescriptorArenaLocationVK
+ * @brief Identifies an arena in a physical descriptor heap.
+ */
+struct DescriptorArenaLocationVK {
+    /** Physical descriptor heap identifier. */
+    DescriptorHeapIDVK heap_id = UINT32_MAX;
+    /** Arena identifier local to that heap. */
+    DescriptorArenaIDVK arena_id = UINT32_MAX;
+};
+
 /** One-shot Vulkan command-buffer recording job. */
 using GPUJobVK = std::function<void(VkCommandBuffer)>;
 
@@ -42,6 +58,14 @@ using GPUJobVK = std::function<void(VkCommandBuffer)>;
  * @brief Vulkan procedures, limits, and shared handles used by ray-tracing render objects.
  */
 struct BaseRayTracingDataVK {
+    /**
+     * @brief Device-reported size of an acceleration-structure descriptor in the resource heap.
+     */
+    VkDeviceSize acceleration_structure_descriptor_size = 0;
+    /**
+     * @brief Arena containing acceleration-structure descriptors.
+     */
+    DescriptorArenaLocationVK acceleration_structure_descriptor_arena{};
     /**
      * @brief Device command for creating an acceleration structure.
      */
@@ -130,6 +154,20 @@ struct BaseRenderDataVK {
     /** Descriptor-heap properties reported by the physical device. */
     VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptor_heap_properties{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT};
+    /** Renderer-owned resource descriptor heap. */
+    DescriptorHeapIDVK resource_descriptor_heap_id = UINT32_MAX;
+    /** Renderer-owned sampler descriptor heap. */
+    DescriptorHeapIDVK sampler_descriptor_heap_id = UINT32_MAX;
+    /** Renderer-owned buffer descriptor arena. */
+    DescriptorArenaLocationVK buffer_descriptor_arena{};
+    /** Renderer-owned sampled-image descriptor arena. */
+    DescriptorArenaLocationVK sampled_image_descriptor_arena{};
+    /** Number of slots in the sampled-image descriptor arena. */
+    uint32_t sampled_image_descriptor_capacity = 0;
+    /** Renderer-owned storage-image descriptor arena. */
+    DescriptorArenaLocationVK storage_image_descriptor_arena{};
+    /** Renderer-owned sampler descriptor arena. */
+    DescriptorArenaLocationVK sampler_descriptor_arena{};
     /** Stride used by sampler descriptors. */
     VkDeviceSize sampler_descriptor_stride = 0;
     /** Non-owning renderer descriptor-heap allocator. */

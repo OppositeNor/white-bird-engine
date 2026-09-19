@@ -54,7 +54,7 @@ size_t get_worker_thread_count(size_t p_configured_thread_count, size_t p_render
 
 } // namespace
 
-ApplicationGame::ApplicationGame() {
+ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities) : renderer_capabilities(p_renderer_capabilities) {
     init();
 }
 

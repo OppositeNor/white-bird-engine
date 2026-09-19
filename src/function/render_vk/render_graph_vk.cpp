@@ -46,7 +46,6 @@
 
 namespace WhiteBirdEngine {
 
-
 namespace {
 
 Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
@@ -162,6 +161,9 @@ ResourceScopeVK resource_scope(RendResUsageVK p_usage, bool p_write, QueueFamily
     case RendResUsageVK::STORAGE_BUFFER:
         return {.access = p_write ? VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT : VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
             .stage = shader_stage_scope(p_queue_family)};
+    case RendResUsageVK::ACCELERATION_STRUCTURE:
+        return {.access = p_write ? VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR : VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .stage = p_write ? VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR : shader_stage_scope(p_queue_family)};
     case RendResUsageVK::TRANSFER_SRC:
         if (p_write) {
             break;
@@ -673,7 +675,8 @@ void RenderGraphVK::record_node(
     if (render_data->descriptor_heap_allocator == nullptr) {
         throw std::runtime_error("RenderGraphVK: descriptor heap allocator is unavailable.");
     }
-    render_data->descriptor_heap_allocator->bind_heaps(p_command_buffer);
+    render_data->descriptor_heap_allocator->bind_heaps(
+        p_command_buffer, render_data->resource_descriptor_heap_id, render_data->sampler_descriptor_heap_id);
 
     record_general_transition(p_command_buffer, p_node, p_resources);
 

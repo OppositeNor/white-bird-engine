@@ -39,7 +39,12 @@ namespace WhiteBirdEngine {
  */
 class ApplicationGame : public IApplication {
 public:
-    ApplicationGame();
+    /**
+     * @brief Initialize the game renderer with requested optional capabilities.
+     *
+     * @param p_renderer_capabilities Features to request before renderer creation.
+     */
+    explicit ApplicationGame(RendererCapabilities p_renderer_capabilities = {.ray_tracing = true});
     virtual ~ApplicationGame() = default;
     ApplicationGame(const ApplicationGame&) = delete;
     ApplicationGame(ApplicationGame&&) noexcept = delete;
@@ -92,7 +97,7 @@ public:
 
 private:
     Ref<RenderAllocator> renderer_allocator;
-    RendererCapabilities renderer_capabilities{.ray_tracing = true};
+    RendererCapabilities renderer_capabilities;
     Ref<InputManager> input_manager;
     Ref<IWindow> window;
 

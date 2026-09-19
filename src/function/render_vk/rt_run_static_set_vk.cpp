@@ -414,7 +414,8 @@ Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data, 
     if (!p_has_material_contract) {
         return MEM_NULL;
     }
-    uint32_t sampler_index = p_render_data->descriptor_heap_allocator->allocate_sampler();
+    const DescriptorArenaLocationVK arena = p_render_data->sampler_descriptor_arena;
+    uint32_t sampler_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
     return ROSamplerVK::Builder().set_sampler_index(sampler_index).create_ref(p_render_data);
 }
 
@@ -464,7 +465,8 @@ void assign_material_buffer_render_objects(const BaseRenderDataVK* p_render_data
             continue;
         }
         std::span<const uint8_t> buffer_data = p_material_bindpoints.get_buffer_data(declaration);
-        uint32_t uniform_view_index = p_render_data->descriptor_heap_allocator->allocate_buffer();
+        const DescriptorArenaLocationVK arena = p_render_data->buffer_descriptor_arena;
+        uint32_t uniform_view_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
         Ref<ROBufferVK> material_params_buffer = ROBufferVK::Builder()
                                                      .set_domain(DeviceDomain::HOST_DEVICE)
                                                      .set_size(buffer_data.size())
@@ -522,7 +524,8 @@ std::optional<uint32_t> allocate_storage_descriptor_range(
     if (storage_descriptor_count == 0) {
         return std::nullopt;
     }
-    return p_render_data->descriptor_heap_allocator->allocate_buffer(storage_descriptor_count);
+    const DescriptorArenaLocationVK arena = p_render_data->buffer_descriptor_arena;
+    return p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id, storage_descriptor_count);
 }
 
 StaticSetStorageBuffers build_static_set_storage_buffers(const BaseRenderDataVK* p_render_data, RefRes<RUStaticGeometrySet> p_set) {
@@ -682,7 +685,7 @@ GraphicsPipelineCompilerVK::CompileResult compile_static_set_pipeline(RendererVK
         get_default_material(p_config.get_default_material_resource_key()),
         p_config.get_material_textures_variable_name(),
         p_config.get_material_params_variable_name(),
-        DescriptorHeapAllocatorVK::SAMPLED_IMAGE_CAPACITY,
+        render_data->sampled_image_descriptor_capacity,
         material_sampler,
         [&pipeline_compiler, &material_texture_views](RefRes<RUTexture> p_texture) {
             return get_material_texture_view_index(pipeline_compiler, material_texture_views, p_texture);

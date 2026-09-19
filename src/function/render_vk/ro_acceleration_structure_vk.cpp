@@ -78,9 +78,11 @@ ROAccelerationStructureVK::~ROAccelerationStructureVK() {
         [render_data = render_data,
             acceleration_structure = acceleration_structure,
             destroy_acceleration_structure = destroy_acceleration_structure,
-            descriptor_index = descriptor_index]() {
+            descriptor_index = descriptor_index,
+            descriptor_arena = ray_tracing_data->acceleration_structure_descriptor_arena]() {
             if (descriptor_index.has_value()) {
-                render_data->descriptor_heap_allocator->deallocate_buffer(*descriptor_index);
+                render_data->descriptor_heap_allocator->deallocate_descriptor(
+                    descriptor_arena.heap_id, descriptor_arena.arena_id, *descriptor_index);
             }
             destroy_acceleration_structure(render_data->logic_device, acceleration_structure, render_data->allocation_callbacks);
         },
@@ -100,8 +102,14 @@ uint32_t ROAccelerationStructureVK::get_descriptor_index() const {
         if (allocator == nullptr) {
             throw std::runtime_error("Failed to create acceleration-structure descriptor: descriptor heap allocator is unavailable.");
         }
-        descriptor_index = allocator->allocate_buffer();
-        allocator->write_acceleration_structure_descriptor(*descriptor_index, get_device_address());
+        const DescriptorArenaLocationVK arena = ray_tracing_data->acceleration_structure_descriptor_arena;
+        descriptor_index = allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
+        VkDeviceAddressRangeEXT address_range{.address = get_device_address(), .size = 0};
+        VkResourceDescriptorInfoEXT descriptor{};
+        descriptor.sType = VK_STRUCTURE_TYPE_RESOURCE_DESCRIPTOR_INFO_EXT;
+        descriptor.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        descriptor.data.pAddressRange = &address_range;
+        allocator->write_resource_descriptor(arena.heap_id, arena.arena_id, *descriptor_index, descriptor);
     }
     return *descriptor_index;
 }

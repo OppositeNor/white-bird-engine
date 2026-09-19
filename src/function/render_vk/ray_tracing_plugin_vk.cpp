@@ -21,8 +21,10 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_vk_utils_private.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 
@@ -62,8 +64,13 @@ struct RayTracingPluginVK::StaticOpaqueTopLevelBuild {
     std::array<VkAccelerationStructureBuildRangeInfoKHR, 1> build_ranges{};
 };
 
-static VkAccelerationStructureBuildGeometryInfoKHR make_bottom_level_build_info(
-    std::span<const VkAccelerationStructureGeometryKHR> p_geometries) {
+VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform);
+
+namespace {
+
+constexpr uint32_t ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY = 16;
+
+VkAccelerationStructureBuildGeometryInfoKHR make_bottom_level_build_info(std::span<const VkAccelerationStructureGeometryKHR> p_geometries) {
     VkAccelerationStructureBuildGeometryInfoKHR result{};
     result.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     result.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -74,7 +81,7 @@ static VkAccelerationStructureBuildGeometryInfoKHR make_bottom_level_build_info(
     return result;
 }
 
-static VkAccelerationStructureBuildGeometryInfoKHR make_top_level_build_info(const VkAccelerationStructureGeometryKHR* p_geometry) {
+VkAccelerationStructureBuildGeometryInfoKHR make_top_level_build_info(const VkAccelerationStructureGeometryKHR* p_geometry) {
     VkAccelerationStructureBuildGeometryInfoKHR result{};
     result.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     result.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
@@ -85,7 +92,7 @@ static VkAccelerationStructureBuildGeometryInfoKHR make_top_level_build_info(con
     return result;
 }
 
-static VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRenderDataVK* p_render_data,
+VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRenderDataVK* p_render_data,
     const BaseRayTracingDataVK* p_base_ray_tracing_data,
     const VkAccelerationStructureBuildGeometryInfoKHR& p_build_info,
     std::span<const uint32_t> p_primitive_counts) {
@@ -96,7 +103,7 @@ static VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRender
     return result;
 }
 
-static VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform);
+} // namespace
 
 RayTracingPluginVK::RayTracingPluginVK(const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), base_ray_tracing_data(make_unique<BaseRayTracingDataVK>(p_render_data->allocator)) {
@@ -107,55 +114,116 @@ RayTracingPluginVK::~RayTracingPluginVK() {
     singleton = nullptr;
 }
 
-bool RayTracingPluginVK::try_enable(
-    RendererCapabilities& p_capabilities, VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) {
-    static constexpr std::array<const char*, 3> REQUIRED_EXTENSIONS{
+bool RayTracingPluginVK::supports_base_features(
+    VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const {
+    static constexpr std::array<const char*, 2> REQUIRED_BASE_EXTENSIONS{
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     };
-    enabled = false;
-    if (!p_capabilities.ray_tracing) {
-        return false;
-    }
-    // Reject ray tracing early unless the device supports the required extensions, buffer format, and feature set.
-    if (!check_extension_support(REQUIRED_EXTENSIONS,
+    // Both paths need acceleration structures and deferred host operations.
+    if (!check_extension_support(REQUIRED_BASE_EXTENSIONS,
             std::span<const char* const>(p_enabled_layers, p_enabled_layer_count),
             [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                 return vkEnumerateDeviceExtensionProperties(p_physical_device, p_layer_name, p_extension_count, p_extension_properties);
             })) {
-        p_capabilities.ray_tracing = false;
         return false;
     }
 
+    // Static mesh BLAS builds read three-component float positions from vertex buffers.
     VkFormatProperties position_format_properties{};
     vkGetPhysicalDeviceFormatProperties(p_physical_device, VK_FORMAT_R32G32B32_SFLOAT, &position_format_properties);
     if ((position_format_properties.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR) == 0) {
-        p_capabilities.ray_tracing = false;
         return false;
     }
 
+    // Acceleration-structure builds require device addresses and the base AS feature.
     if (!check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(
             p_physical_device, &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress) ||
         !check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR>(
-            p_physical_device, &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure) ||
-        !check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
-            p_physical_device, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline)) {
-        p_capabilities.ray_tracing = false;
+            p_physical_device, &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure)) {
         return false;
     }
 
+    // Descriptor-heap acceleration-structure loads generated by Slang use 64-bit integers.
+    VkPhysicalDeviceFeatures supported_device_features{};
+    vkGetPhysicalDeviceFeatures(p_physical_device, &supported_device_features);
+    return supported_device_features.shaderInt64 == VK_TRUE;
+}
+
+bool RayTracingPluginVK::supports_ray_query(
+    VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const {
+    static constexpr std::array<const char*, 1> REQUIRED_RAY_QUERY_EXTENSION{VK_KHR_RAY_QUERY_EXTENSION_NAME};
+    return check_extension_support(REQUIRED_RAY_QUERY_EXTENSION,
+               std::span<const char* const>(p_enabled_layers, p_enabled_layer_count),
+               [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                   return vkEnumerateDeviceExtensionProperties(p_physical_device, p_layer_name, p_extension_count, p_extension_properties);
+               }) &&
+        check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR>(
+               p_physical_device, &VkPhysicalDeviceRayQueryFeaturesKHR::rayQuery);
+}
+
+bool RayTracingPluginVK::supports_ray_tracing_pipeline(
+    VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const {
+    static constexpr std::array<const char*, 1> REQUIRED_RAY_TRACING_PIPELINE_EXTENSION{VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME};
+    return check_extension_support(REQUIRED_RAY_TRACING_PIPELINE_EXTENSION,
+               std::span<const char* const>(p_enabled_layers, p_enabled_layer_count),
+               [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                   return vkEnumerateDeviceExtensionProperties(p_physical_device, p_layer_name, p_extension_count, p_extension_properties);
+               }) &&
+        check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
+               p_physical_device, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
+}
+
+void RayTracingPluginVK::prepare_device_features(const RendererCapabilities& p_capabilities) {
+    // Link only supported ray features into the device-creation feature chain.
     buffer_device_address_features = {};
     buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
     acceleration_structure_features = {};
     acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     acceleration_structure_features.accelerationStructure = VK_TRUE;
+    ray_query_features = {};
+    ray_query_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    ray_query_features.rayQuery = p_capabilities.ray_query ? VK_TRUE : VK_FALSE;
     ray_tracing_pipeline_features = {};
     ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-    ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
+    ray_tracing_pipeline_features.rayTracingPipeline = p_capabilities.ray_tracing ? VK_TRUE : VK_FALSE;
     buffer_device_address_features.pNext = &acceleration_structure_features;
-    acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+    acceleration_structure_features.pNext = &ray_query_features;
+    ray_query_features.pNext = &ray_tracing_pipeline_features;
+}
+
+bool RayTracingPluginVK::try_enable(
+    RendererCapabilities& p_capabilities, VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) {
+    enabled = false;
+    ray_query_enabled = false;
+    ray_tracing_pipeline_enabled = false;
+    // Skip the plugin when neither ray execution path was requested.
+    if (!p_capabilities.ray_tracing && !p_capabilities.ray_query) {
+        return false;
+    }
+    if (!supports_base_features(p_physical_device, p_enabled_layers, p_enabled_layer_count)) {
+        // Shared acceleration-structure requirements disable both ray execution paths.
+        p_capabilities.ray_tracing = false;
+        p_capabilities.ray_query = false;
+        return false;
+    }
+
+    if (p_capabilities.ray_query) {
+        // Enable inline ray traversal only when its extension and feature are available.
+        ray_query_enabled = supports_ray_query(p_physical_device, p_enabled_layers, p_enabled_layer_count);
+        p_capabilities.ray_query = ray_query_enabled;
+    }
+    if (p_capabilities.ray_tracing) {
+        // Check ray-tracing pipelines independently from inline ray queries.
+        ray_tracing_pipeline_enabled = supports_ray_tracing_pipeline(p_physical_device, p_enabled_layers, p_enabled_layer_count);
+        p_capabilities.ray_tracing = ray_tracing_pipeline_enabled;
+    }
+    if (!p_capabilities.ray_tracing && !p_capabilities.ray_query) {
+        return false;
+    }
+
+    prepare_device_features(p_capabilities);
     enabled = true;
     return true;
 }
@@ -165,29 +233,51 @@ std::span<const char* const> RayTracingPluginVK::get_required_instance_extension
 }
 
 std::span<const char* const> RayTracingPluginVK::get_required_device_extensions() const {
-    static constexpr std::array<const char*, 3> REQUIRED_EXTENSIONS{
+    WBE_DEBUG_ASSERT(enabled);
+    static thread_local std::vector<const char*> required_extensions;
+    required_extensions = {
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     };
-    WBE_DEBUG_ASSERT(enabled);
-    return REQUIRED_EXTENSIONS;
+    if (ray_query_enabled) {
+        // Request the ray-query device extension only for inline ray traversal.
+        required_extensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    }
+    if (ray_tracing_pipeline_enabled) {
+        // Request the pipeline extension only when that separate path is enabled.
+        required_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    }
+    return required_extensions;
 }
 
 void RayTracingPluginVK::on_before_instance_creation(VkInstanceCreateInfo* /*p_create_info*/) {
 }
 
-void RayTracingPluginVK::on_after_instance_created(VkInstance /*p_instance*/) {
+void RayTracingPluginVK::on_after_instance_created(VkInstance p_instance) {
+    vk_instance = p_instance;
 }
 
-void RayTracingPluginVK::on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) {
+void RayTracingPluginVK::on_before_device_creation(
+    VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info, VkPhysicalDeviceFeatures* p_device_features) {
     WBE_DEBUG_ASSERT(enabled);
+    WBE_DEBUG_ASSERT(p_device_features != nullptr);
+    // Slang's acceleration-structure heap access requires 64-bit integer operations.
+    p_device_features->shaderInt64 = VK_TRUE;
+    // Add the shared acceleration-structure dependencies to the device feature chain.
     enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES>(
         p_physical_device, p_create_info, &buffer_device_address_features, &VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddress);
     enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR>(
         p_physical_device, p_create_info, &acceleration_structure_features, &VkPhysicalDeviceAccelerationStructureFeaturesKHR::accelerationStructure);
-    enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
-        p_physical_device, p_create_info, &ray_tracing_pipeline_features, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
+    if (ray_query_enabled) {
+        // Request inline ray traversal for compute and graphics shaders.
+        enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR>(
+            p_physical_device, p_create_info, &ray_query_features, &VkPhysicalDeviceRayQueryFeaturesKHR::rayQuery);
+    }
+    if (ray_tracing_pipeline_enabled) {
+        // Request ray-generation and hit shader stages for ray-tracing pipelines.
+        enable_device_feature<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
+            p_physical_device, p_create_info, &ray_tracing_pipeline_features, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
+    }
 }
 
 void RayTracingPluginVK::on_after_device_created(
@@ -213,9 +303,23 @@ void RayTracingPluginVK::on_after_device_created(
     }
 }
 
-void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice p_physical_device) {
+void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
+    // Use the descriptor-heap type-specific size for the acceleration-structure arena.
+    auto get_descriptor_size = reinterpret_cast<PFN_vkGetPhysicalDeviceDescriptorSizeEXT>(
+        vkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceDescriptorSizeEXT"));
+    if (get_descriptor_size == nullptr) {
+        throw std::runtime_error("Failed to load vkGetPhysicalDeviceDescriptorSizeEXT.");
+    }
+    base_ray_tracing_data->acceleration_structure_descriptor_size =
+        get_descriptor_size(p_physical_device, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
+    if (base_ray_tracing_data->acceleration_structure_descriptor_size == 0 ||
+        base_ray_tracing_data->acceleration_structure_descriptor_size > p_render_data->descriptor_heap_properties.bufferDescriptorSize) {
+        throw std::runtime_error("Invalid acceleration-structure descriptor size reported by the device.");
+    }
+
+    // Cache limits needed to size and align BLAS and TLAS builds.
     VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties{};
     acceleration_structure_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
     VkPhysicalDeviceProperties2 physical_device_properties{};
@@ -228,6 +332,39 @@ void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* /*p_render_da
     base_ray_tracing_data->max_acceleration_structure_primitive_count = acceleration_structure_properties.maxPrimitiveCount;
 }
 
+void RayTracingPluginVK::configure_descriptor_heaps(
+    const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) {
+    WBE_DEBUG_ASSERT(enabled);
+    auto resource_configuration = std::ranges::find_if(p_configurations, [](const DescriptorHeapConfigurationVK& p_configuration) {
+        return p_configuration.type == DescriptorHeapTypeVK::RESOURCE;
+    });
+    if (resource_configuration == p_configurations.end()) {
+        throw std::runtime_error("Failed to reserve acceleration-structure descriptors: resource heap is missing.");
+    }
+    // Extend the shared resource heap with a tightly packed acceleration-structure arena.
+    acceleration_structure_descriptor_byte_offset = resource_configuration->reserve_arena_bytes(
+        ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY,
+        base_ray_tracing_data->acceleration_structure_descriptor_size,
+        p_render_data->descriptor_heap_properties.bufferDescriptorAlignment);
+}
+
+void RayTracingPluginVK::create_descriptor_arenas(BaseRenderDataVK* p_render_data) {
+    WBE_DEBUG_ASSERT(enabled);
+    if (p_render_data->descriptor_heap_allocator == nullptr) {
+        throw std::runtime_error("Failed to create acceleration-structure arena: descriptor heap allocator is missing.");
+    }
+    // Keep the plugin-owned arena handle with the rest of the ray-tracing state.
+    const DescriptorHeapIDVK heap_id = p_render_data->resource_descriptor_heap_id;
+    const DescriptorArenaIDVK arena_id = p_render_data->descriptor_heap_allocator->allocate_arena(heap_id,
+        DescriptorArenaConfigurationVK{
+            .byte_offset = acceleration_structure_descriptor_byte_offset,
+            .descriptor_stride = base_ray_tracing_data->acceleration_structure_descriptor_size,
+            .descriptor_count = ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY,
+            .descriptor_alignment = p_render_data->descriptor_heap_properties.bufferDescriptorAlignment,
+        });
+    base_ray_tracing_data->acceleration_structure_descriptor_arena = {.heap_id = heap_id, .arena_id = arena_id};
+}
+
 StaticGeometryBufferUsageVK RayTracingPluginVK::get_static_geometry_buffer_usage() const {
     WBE_DEBUG_ASSERT(enabled);
     return StaticGeometryBufferUsageVK{
@@ -237,9 +374,13 @@ StaticGeometryBufferUsageVK RayTracingPluginVK::get_static_geometry_buffer_usage
 }
 
 void RayTracingPluginVK::reset_static_opaque_acceleration_structures() {
+    // Drop the previous static scene while retaining its container for existing graph bindings.
     static_opaque_bottom_level_acceleration_structures.clear();
     static_opaque_top_level_acceleration_structure = MEM_NULL;
     static_opaque_top_level_instance_buffer = MEM_NULL;
+    if (static_opaque_top_level_acceleration_structure_container != MEM_NULL) {
+        static_opaque_top_level_acceleration_structure_container->clear();
+    }
 }
 
 void RayTracingPluginVK::validate_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) const {
@@ -313,6 +454,7 @@ RayTracingPluginVK::StaticOpaqueBottomLevelBuild RayTracingPluginVK::create_stat
     build.geometry.geometry.triangles.indexData.deviceAddress = p_index_buffer_address + p_submesh.indices.binary.start;
     build.primitive_count = static_cast<uint32_t>(p_submesh.indices.index_count / 3);
     build.build_range = VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = build.primitive_count};
+    // Keep each instance transform for the TLAS after this submesh's BLAS is built.
     build.instance_transforms.reserve(p_submesh.instance_count);
     for (size_t instance_index = 0; instance_index < p_submesh.instance_count; ++instance_index) {
         build.instance_transforms.push_back(
@@ -341,6 +483,7 @@ void RayTracingPluginVK::initialize_bottom_level_builds(StaticOpaqueBuildData& p
     p_max_bottom_level_scratch_size = 1;
     p_total_instance_count = 0;
 
+    // Size one BLAS per populated submesh and track the largest reusable scratch allocation.
     for (StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
         std::array<uint32_t, 1> primitive_counts{build.primitive_count};
         VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info =
@@ -368,6 +511,7 @@ void RayTracingPluginVK::initialize_bottom_level_builds(StaticOpaqueBuildData& p
 
 RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_level_build(
     StaticOpaqueBuildData& p_build_data, VkDeviceSize p_scratch_alignment) const {
+    // Expand each BLAS reference into one TLAS instance per static-set transform.
     std::vector<VkAccelerationStructureInstanceKHR> top_level_instances;
     size_t total_instance_count = 0;
     for (const StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
@@ -388,6 +532,7 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_lev
         }
     }
 
+    // Upload the instance records before querying the TLAS build size.
     StaticOpaqueTopLevelBuild result;
     result.instance_buffer =
         ROBufferVK::Builder()
@@ -426,7 +571,7 @@ RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_lev
     return result;
 }
 
-static VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform) {
+VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform) {
     VkTransformMatrixKHR result{};
     result.matrix[0][0] = p_transform[0][0];
     result.matrix[0][1] = p_transform[1][0];
@@ -452,6 +597,7 @@ RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaqu
     for (size_t submesh_index = 0; submesh_index < p_set->submesh_count; ++submesh_index) {
         const RUStaticGeometrySubmesh& submesh = p_set->submeshes.get()[submesh_index];
         if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
+            // Empty geometry contributes no BLAS or TLAS instances.
             continue;
         }
         result.bottom_level_builds.push_back(
@@ -462,6 +608,7 @@ RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaqu
 
 GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data) {
     if (p_build_data.bottom_level_builds.empty()) {
+        // An empty static set clears the scene AS without submitting a build.
         reset_static_opaque_acceleration_structures();
         return nullptr;
     }
@@ -479,17 +626,27 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
         throw std::runtime_error("Failed to build static-opaque top-level acceleration structure: device geometry limits exceeded.");
     }
 
+    // Allocate shared BLAS scratch storage and the separate TLAS build inputs.
     VkDeviceAddress aligned_bottom_level_scratch_buffer_address = 0;
     Ref<ROBufferVK> bottom_level_scratch_buffer = create_aligned_scratch_buffer(
         max_bottom_level_scratch_size, scratch_alignment, aligned_bottom_level_scratch_buffer_address);
     StaticOpaqueTopLevelBuild top_level_build = create_top_level_build(p_build_data, scratch_alignment);
 
+    // Publish the new TLAS through the stable container already held by the render graph.
     std::vector<Ref<ROAccelerationStructureVK>> stored_bottom_level_acceleration_structures = bottom_level_acceleration_structures;
     Ref<ROAccelerationStructureVK> stored_top_level_acceleration_structure = top_level_build.acceleration_structure;
     Ref<ROBufferVK> stored_top_level_instance_buffer = top_level_build.instance_buffer;
     static_opaque_bottom_level_acceleration_structures = std::move(stored_bottom_level_acceleration_structures);
     static_opaque_top_level_acceleration_structure = stored_top_level_acceleration_structure;
     static_opaque_top_level_instance_buffer = stored_top_level_instance_buffer;
+    if (static_opaque_top_level_acceleration_structure_container == MEM_NULL) {
+        // Create the container on the first nonempty static set.
+        static_opaque_top_level_acceleration_structure_container =
+            make_ref<ROCSingleVK>(render_data->allocator, static_opaque_top_level_acceleration_structure);
+    } else {
+        // Replace its resource while keeping existing graph bindings valid.
+        static_opaque_top_level_acceleration_structure_container->set(static_opaque_top_level_acceleration_structure);
+    }
     return create_static_opaque_record_job(std::move(bottom_level_acceleration_structures),
         bottom_level_scratch_buffer,
         std::move(p_build_data),
@@ -520,6 +677,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
         (void)top_level_acceleration_structure;
         (void)top_level_instance_buffer;
         (void)top_level_scratch_buffer;
+        // Build BLAS objects serially because they reuse the same scratch buffer.
         for (size_t build_index = 0; build_index < bottom_level_builds.size(); ++build_index) {
             VkAccelerationStructureBuildGeometryInfoKHR bottom_level_build_info = make_bottom_level_build_info(
                 std::span<const VkAccelerationStructureGeometryKHR>(&bottom_level_builds[build_index].geometry, 1));
@@ -530,6 +688,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
                 &bottom_level_builds[build_index].build_range;
             command_build_acceleration_structures(p_command_buffer, 1, &bottom_level_build_info, &bottom_level_build_range_pointer);
             if (build_index + 1 < bottom_level_builds.size()) {
+                // Make the scratch writes visible before the next BLAS reuses them.
                 VkMemoryBarrier2 between_blas_barrier{
                     .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
                     .srcStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
@@ -543,6 +702,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
             }
         }
 
+        // Ensure every BLAS is readable before the TLAS references it.
         VkMemoryBarrier2 build_barrier{};
         build_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
         build_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
@@ -555,17 +715,19 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
         build_dependency_info.pMemoryBarriers = &build_barrier;
         vkCmdPipelineBarrier2(p_command_buffer, &build_dependency_info);
 
+        // Build the TLAS after all referenced BLAS objects are complete.
         VkAccelerationStructureBuildGeometryInfoKHR top_level_build_info = make_top_level_build_info(&top_level_geometry);
         top_level_build_info.dstAccelerationStructure = top_level_acceleration_structure->get_acceleration_structure();
         top_level_build_info.scratchData.deviceAddress = aligned_top_level_scratch_buffer_address;
         const VkAccelerationStructureBuildRangeInfoKHR* top_level_build_range_pointer = top_level_build_ranges.data();
         command_build_acceleration_structures(p_command_buffer, 1, &top_level_build_info, &top_level_build_range_pointer);
 
+        // Expose the completed TLAS to later ray-query or ray-tracing shaders.
         VkMemoryBarrier2 shader_read_barrier{};
         shader_read_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
         shader_read_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
         shader_read_barrier.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-        shader_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        shader_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         shader_read_barrier.dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
         VkDependencyInfo shader_read_dependency_info{};
         shader_read_dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -578,6 +740,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
 GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
     RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) {
     if (p_set == nullptr || p_vertex_buffer == MEM_NULL || p_index_buffer == MEM_NULL) {
+        // Missing static geometry removes the old AS and requires no GPU work.
         reset_static_opaque_acceleration_structures();
         return nullptr;
     }
@@ -585,6 +748,7 @@ GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(
     StaticOpaqueBuildData build_data =
         build_static_opaque_data(p_set, p_vertex_buffer->get_device_address(), p_index_buffer->get_device_address());
     if (build_data.bottom_level_builds.empty()) {
+        // All submeshes were empty, so the previous TLAS is no longer valid.
         reset_static_opaque_acceleration_structures();
         return nullptr;
     }

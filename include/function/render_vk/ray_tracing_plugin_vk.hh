@@ -23,6 +23,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/i_singleton.hh"
 
@@ -79,15 +80,37 @@ public:
 
     virtual void on_before_instance_creation(VkInstanceCreateInfo* p_create_info) override;
     virtual void on_after_instance_created(VkInstance p_instance) override;
-    virtual void on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) override;
+    virtual void on_before_device_creation(
+        VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info, VkPhysicalDeviceFeatures* p_device_features) override;
 
     virtual void on_after_device_created(
         BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
 
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) override;
+    virtual void configure_descriptor_heaps(
+        const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
+    virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
     virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const override;
     virtual GPUJobVK on_static_opaque_set_updated(
         BaseRenderDataVK* p_render_data, RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) override;
+
+    /**
+     * @brief Get the prepared static-opaque top-level acceleration structure.
+     *
+     * @return The stable top-level acceleration structure render object, or null when no static-opaque geometry is available.
+     */
+    Ref<ROAccelerationStructureVK> get_static_opaque_top_level_acceleration_structure() const {
+        return static_opaque_top_level_acceleration_structure;
+    }
+
+    /**
+     * @brief Get the stable container bound to the current static-opaque TLAS.
+     *
+     * @return The stable container used by graph consumers, or null when no static-opaque TLAS has been prepared.
+     */
+    Ref<ROCSingleVK> get_static_opaque_top_level_acceleration_structure_container() const {
+        return static_opaque_top_level_acceleration_structure_container;
+    }
 
     /**
      * @brief Update the static-opaque bottom-level acceleration structure for the current static mesh buffers.
@@ -103,15 +126,26 @@ private:
     struct StaticOpaqueTopLevelBuild;
 
     const BaseRenderDataVK* render_data = nullptr;
+    VkInstance vk_instance = VK_NULL_HANDLE;
+    VkDeviceSize acceleration_structure_descriptor_byte_offset = 0;
     Unique<BaseRayTracingDataVK> base_ray_tracing_data;
     std::vector<Ref<ROAccelerationStructureVK>> static_opaque_bottom_level_acceleration_structures;
     Ref<ROAccelerationStructureVK> static_opaque_top_level_acceleration_structure;
+    Ref<ROCSingleVK> static_opaque_top_level_acceleration_structure_container;
     Ref<ROBufferVK> static_opaque_top_level_instance_buffer;
     bool enabled = false;
+    bool ray_query_enabled = false;
+    bool ray_tracing_pipeline_enabled = false;
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{};
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{};
+    VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features{};
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{};
 
+    bool supports_base_features(VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const;
+    bool supports_ray_query(VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const;
+    bool supports_ray_tracing_pipeline(
+        VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const;
+    void prepare_device_features(const RendererCapabilities& p_capabilities);
     void reset_static_opaque_acceleration_structures();
     void validate_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) const;
     void validate_static_opaque_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instance_count) const;

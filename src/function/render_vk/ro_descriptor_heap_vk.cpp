@@ -36,11 +36,13 @@
 
 namespace WhiteBirdEngine {
 
-static VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
+namespace {
+VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
     if (p_right > std::numeric_limits<VkDeviceSize>::max() - p_left) {
         throw std::runtime_error("Failed to create descriptor heap: heap size overflow.");
     }
     return p_left + p_right;
+}
 }
 
 RODescriptorHeapVK::Backing::Backing(
@@ -101,6 +103,16 @@ RODescriptorHeapVK::Backing::~Backing() {
     if (buffer != VK_NULL_HANDLE) {
         vmaDestroyBuffer(render_data->vma_allocator, buffer, allocation);
     }
+}
+
+VkBindHeapInfoEXT RODescriptorHeapVK::Backing::get_bind_info() const {
+    VkBindHeapInfoEXT result{};
+    result.sType = VK_STRUCTURE_TYPE_BIND_HEAP_INFO_EXT;
+    result.heapRange.address = device_address;
+    result.heapRange.size = usable_size + reserved_size;
+    result.reservedRangeOffset = usable_size;
+    result.reservedRangeSize = reserved_size;
+    return result;
 }
 
 RODescriptorHeapVK::RODescriptorHeapVK(
@@ -180,13 +192,7 @@ void RODescriptorHeapVK::clear_descriptor(uint32_t p_index) const {
 }
 
 VkBindHeapInfoEXT RODescriptorHeapVK::get_bind_info() const {
-    VkBindHeapInfoEXT result{};
-    result.sType = VK_STRUCTURE_TYPE_BIND_HEAP_INFO_EXT;
-    result.heapRange.address = backing->device_address;
-    result.heapRange.size = backing->usable_size + backing->reserved_size;
-    result.reservedRangeOffset = backing->usable_size;
-    result.reservedRangeSize = backing->reserved_size;
-    return result;
+    return backing->get_bind_info();
 }
 
 } // namespace WhiteBirdEngine

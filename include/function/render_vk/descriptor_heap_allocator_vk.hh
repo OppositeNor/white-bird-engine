@@ -27,34 +27,53 @@
 namespace WhiteBirdEngine {
 
 /**
+ * @struct DescriptorHeapConfigurationVK
+ * @brief Size and Vulkan bind domain of one physical descriptor heap.
+ */
+struct DescriptorHeapConfigurationVK {
+    /** Vulkan bind domain. */
+    DescriptorHeapTypeVK type = DescriptorHeapTypeVK::RESOURCE;
+    /** Bytes available for descriptor arenas. */
+    VkDeviceSize usable_size = 0;
+    /** Bytes reserved for the implementation after the usable range. */
+    VkDeviceSize reserved_size = 0;
+    /** Required physical heap address alignment. */
+    VkDeviceSize alignment = 0;
+
+    /**
+     * @brief Append an aligned arena range and return its byte offset.
+     * @throws std::runtime_error If the range cannot be represented.
+     */
+    VkDeviceSize reserve_arena_bytes(uint32_t p_descriptor_count, VkDeviceSize p_stride, VkDeviceSize p_alignment);
+};
+
+/**
+ * @struct DescriptorArenaConfigurationVK
+ * @brief Location and indexing rules for an arena in one descriptor heap.
+ */
+struct DescriptorArenaConfigurationVK {
+    /** Byte offset from the beginning of the physical heap. */
+    VkDeviceSize byte_offset = 0;
+    /** Bytes between consecutive descriptors in this arena. */
+    VkDeviceSize descriptor_stride = 0;
+    /** Number of descriptors in the arena. */
+    uint32_t descriptor_count = 0;
+    /** Required alignment of each descriptor in this arena. */
+    VkDeviceSize descriptor_alignment = 0;
+};
+
+/**
  * @class DescriptorHeapAllocatorVK
- * @brief Owns Vulkan descriptor heaps and allocates their logical index ranges.
+ * @brief Owns physical Vulkan descriptor heaps and their logical arenas.
  *
- * Resource descriptors use one physical heap split into buffer, sampled-image,
- * and storage-image arenas. Samplers use a separate physical heap. Like render
- * objects, this allocator is confined to the rendering thread.
+ * Heap IDs identify physical backing buffers; arena IDs identify typed index
+ * ranges inside one heap. Callers define layout and descriptor types. The
+ * allocator is confined to the rendering thread.
  *
  * This object is neither copyable nor movable.
  */
 class DescriptorHeapAllocatorVK final {
 public:
-    /**
-     * @brief Number of buffer descriptors available to the renderer.
-     */
-    static constexpr uint32_t BUFFER_CAPACITY = 272;
-    /**
-     * @brief Number of sampled-image descriptors available to the renderer.
-     */
-    static constexpr uint32_t SAMPLED_IMAGE_CAPACITY = 256;
-    /**
-     * @brief Number of storage-image descriptors available to the renderer.
-     */
-    static constexpr uint32_t STORAGE_IMAGE_CAPACITY = 64;
-    /**
-     * @brief Number of sampler descriptors available to the renderer.
-     */
-    static constexpr uint32_t SAMPLER_CAPACITY = 256;
-
     DescriptorHeapAllocatorVK() = delete;
     ~DescriptorHeapAllocatorVK() = default;
     DescriptorHeapAllocatorVK(const DescriptorHeapAllocatorVK&) = delete;
@@ -63,114 +82,50 @@ public:
     DescriptorHeapAllocatorVK& operator=(DescriptorHeapAllocatorVK&&) noexcept = delete;
 
     /**
-     * @brief Construct the renderer-owned descriptor heaps.
-     * @throws std::runtime_error If heap storage cannot be created.
+     * @brief Construct an empty descriptor-heap allocator.
      */
     DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data);
 
     /**
-     * @brief Allocate a contiguous buffer-descriptor range.
+     * @brief Create a physical descriptor heap and return its identifier.
+     * @throws std::runtime_error If the configuration is invalid or the backing cannot be created.
      */
-    uint32_t allocate_buffer(uint32_t p_count = 1);
+    DescriptorHeapIDVK create_heap(const DescriptorHeapConfigurationVK& p_configuration);
     /**
-     * @brief Allocate a contiguous sampled-image-descriptor range.
+     * @brief Reserve an arena inside an existing physical heap.
+     * @throws std::runtime_error If the arena overlaps another arena or exceeds the heap.
      */
-    uint32_t allocate_sampled_image(uint32_t p_count = 1);
+    DescriptorArenaIDVK allocate_arena(DescriptorHeapIDVK p_heap_id, const DescriptorArenaConfigurationVK& p_configuration);
     /**
-     * @brief Allocate a contiguous storage-image-descriptor range.
+     * @brief Allocate a contiguous descriptor range and return its shader-visible index.
      */
-    uint32_t allocate_storage_image(uint32_t p_count = 1);
+    uint32_t allocate_descriptor(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_count = 1);
     /**
-     * @brief Allocate a contiguous sampler-descriptor range.
+     * @brief Release a previously allocated descriptor range.
      */
-    uint32_t allocate_sampler(uint32_t p_count = 1);
+    void deallocate_descriptor(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_first_index, uint32_t p_count = 1);
+    /**
+     * @brief Check whether a range belongs to an arena and is currently allocated.
+     */
+    bool owns_descriptor(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_first_index, uint32_t p_count = 1) const;
 
     /**
-     * @brief Release a buffer-descriptor range.
+     * @brief Encode a resource descriptor into an allocated arena slot.
      */
-    void deallocate_buffer(uint32_t p_first_index, uint32_t p_count = 1);
+    void write_resource_descriptor(DescriptorHeapIDVK p_heap_id,
+        DescriptorArenaIDVK p_arena_id,
+        uint32_t p_index,
+        const VkResourceDescriptorInfoEXT& p_descriptor) const;
     /**
-     * @brief Release a sampled-image-descriptor range.
+     * @brief Encode a sampler descriptor into an allocated arena slot.
      */
-    void deallocate_sampled_image(uint32_t p_first_index, uint32_t p_count = 1);
-    /**
-     * @brief Release a storage-image-descriptor range.
-     */
-    void deallocate_storage_image(uint32_t p_first_index, uint32_t p_count = 1);
-    /**
-     * @brief Release a sampler-descriptor range.
-     */
-    void deallocate_sampler(uint32_t p_first_index, uint32_t p_count = 1);
+    void write_sampler_descriptor(
+        DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_index, const VkSamplerCreateInfo& p_sampler) const;
 
     /**
-     * @brief Check whether a range is currently allocated in the buffer arena.
+     * @brief Bind one resource heap and one sampler heap to a command buffer.
      */
-    bool owns_buffer_range(uint32_t p_first_index, uint32_t p_count = 1) const;
-    /**
-     * @brief Check whether a range is currently allocated in the sampled-image arena.
-     */
-    bool owns_sampled_image_range(uint32_t p_first_index, uint32_t p_count = 1) const;
-    /**
-     * @brief Check whether a range is currently allocated in the storage-image arena.
-     */
-    bool owns_storage_image_range(uint32_t p_first_index, uint32_t p_count = 1) const;
-    /**
-     * @brief Check whether a range is currently allocated in the sampler arena.
-     */
-    bool owns_sampler_range(uint32_t p_first_index, uint32_t p_count = 1) const;
-
-    /**
-     * @brief Write a uniform or storage-buffer descriptor.
-     * @throws std::runtime_error If the type or index is invalid.
-     */
-    void write_buffer_descriptor(uint32_t p_index, VkDescriptorType p_type, const VkDeviceAddressRangeEXT& p_address_range) const;
-    /**
-     * @brief Write an acceleration-structure descriptor using its device address.
-     * @throws std::runtime_error If the index is not allocated in the buffer arena.
-     */
-    void write_acceleration_structure_descriptor(uint32_t p_index, VkDeviceAddress p_device_address) const;
-    /**
-     * @brief Write a sampled-image descriptor.
-     */
-    void write_sampled_image_descriptor(uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
-    /**
-     * @brief Write a storage-image descriptor.
-     */
-    void write_storage_image_descriptor(uint32_t p_index, const VkImageViewCreateInfo& p_view, VkImageLayout p_layout) const;
-    /**
-     * @brief Write a sampler descriptor.
-     */
-    void write_sampler_descriptor(uint32_t p_index, const VkSamplerCreateInfo& p_sampler) const;
-
-    /**
-     * @brief Bind the renderer's resource and sampler heaps to a command buffer.
-     */
-    void bind_heaps(VkCommandBuffer p_command_buffer) const;
-
-    /**
-     * @brief Get the buffer descriptor arena.
-     */
-    const Ref<RODescriptorHeapVK>& get_buffer_heap() const {
-        return buffer_heap;
-    }
-    /**
-     * @brief Get the sampled-image descriptor arena.
-     */
-    const Ref<RODescriptorHeapVK>& get_sampled_image_heap() const {
-        return sampled_image_heap;
-    }
-    /**
-     * @brief Get the storage-image descriptor arena.
-     */
-    const Ref<RODescriptorHeapVK>& get_storage_image_heap() const {
-        return storage_image_heap;
-    }
-    /**
-     * @brief Get the sampler descriptor arena.
-     */
-    const Ref<RODescriptorHeapVK>& get_sampler_heap() const {
-        return sampler_heap;
-    }
+    void bind_heaps(VkCommandBuffer p_command_buffer, DescriptorHeapIDVK p_resource_heap_id, DescriptorHeapIDVK p_sampler_heap_id) const;
 
 private:
     struct FreeRange {
@@ -180,20 +135,45 @@ private:
 
     using RangeVector = Vector<FreeRange, RenderAllocator>;
 
-    uint32_t allocate(RangeVector& p_free_ranges, uint32_t p_count, const char* p_arena_name);
-    void deallocate(Ref<RODescriptorHeapVK> p_heap, RangeVector& p_free_ranges, uint32_t p_first_index, uint32_t p_count, const char* p_arena_name);
-    static bool is_allocated(
-        const Ref<RODescriptorHeapVK>& p_heap, const RangeVector& p_free_ranges, uint32_t p_first_index, uint32_t p_count);
+    struct Arena {
+        Arena() = delete;
+        ~Arena() = default;
+        Arena(const Arena&) = delete;
+        Arena& operator=(const Arena&) = delete;
+        Arena(Arena&&) noexcept = default;
+        Arena& operator=(Arena&&) noexcept = default;
+        Arena(RenderAllocator* p_allocator, Ref<RODescriptorHeapVK> p_view, VkDeviceSize p_byte_offset, VkDeviceSize p_byte_size);
+
+        Ref<RODescriptorHeapVK> view;
+        VkDeviceSize byte_offset = 0;
+        VkDeviceSize byte_size = 0;
+        RangeVector free_ranges;
+    };
+
+    struct Heap {
+        Heap() = delete;
+        ~Heap() = default;
+        Heap(const Heap&) = delete;
+        Heap& operator=(const Heap&) = delete;
+        Heap(Heap&&) noexcept = default;
+        Heap& operator=(Heap&&) noexcept = default;
+        Heap(RenderAllocator* p_allocator, DescriptorHeapTypeVK p_type, Ref<RODescriptorHeapVK::Backing> p_backing, VkDeviceSize p_usable_size);
+
+        DescriptorHeapTypeVK type = DescriptorHeapTypeVK::RESOURCE;
+        Ref<RODescriptorHeapVK::Backing> backing;
+        VkDeviceSize usable_size = 0;
+        Vector<Arena, RenderAllocator> arenas;
+    };
+
+    Heap& get_heap(DescriptorHeapIDVK p_heap_id);
+    const Heap& get_heap(DescriptorHeapIDVK p_heap_id) const;
+    Arena& get_arena(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id);
+    const Arena& get_arena(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id) const;
+    static bool is_allocated(const Arena& p_arena, uint32_t p_first_index, uint32_t p_count);
 
     const BaseRenderDataVK* render_data = nullptr;
-    Ref<RODescriptorHeapVK> buffer_heap;
-    Ref<RODescriptorHeapVK> sampled_image_heap;
-    Ref<RODescriptorHeapVK> storage_image_heap;
-    Ref<RODescriptorHeapVK> sampler_heap;
-    RangeVector buffer_free_ranges;
-    RangeVector sampled_image_free_ranges;
-    RangeVector storage_image_free_ranges;
-    RangeVector sampler_free_ranges;
+    RenderAllocator* allocator = nullptr;
+    Vector<Heap, RenderAllocator> heaps;
 };
 
 } // namespace WhiteBirdEngine

@@ -28,7 +28,7 @@ void register_builtin_render_plugins_vk(Vector<Ref<RenderPluginVK>, RenderAlloca
     const BaseRenderDataVK* p_render_data,
     const RendererCapabilities& p_capabilities) {
     p_registered_plugins.clear();
-    if (p_capabilities.ray_tracing) {
+    if (p_capabilities.ray_tracing || p_capabilities.ray_query) {
         p_registered_plugins.emplace_back(make_ref<RayTracingPluginVK>(p_allocator, p_render_data));
     }
 }

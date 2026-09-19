@@ -39,6 +39,7 @@ public:
     RendererDummy(RenderAllocator* p_allocator, RendererCapabilities& p_capabilities)
         : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
         p_capabilities.ray_tracing = false;
+        p_capabilities.ray_query = false;
     }
 
     virtual ~RendererDummy() override = default;

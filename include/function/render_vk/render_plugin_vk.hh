@@ -20,6 +20,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -120,8 +121,10 @@ public:
      *
      * @param p_physical_device Physical device whose feature support is queried.
      * @param p_create_info Mutable device create info whose referenced storage remains valid through creation.
+     * @param p_device_features Mutable Vulkan core features enabled for this device.
      */
-    virtual void on_before_device_creation(VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info) = 0;
+    virtual void on_before_device_creation(
+        VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info, VkPhysicalDeviceFeatures* p_device_features) = 0;
 
     /**
      * @brief Finish plugin setup after the logical device has been created.
@@ -140,6 +143,17 @@ public:
      * @param p_physical_device Selected physical device.
      */
     virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) = 0;
+
+    /**
+     * @brief Reserve plugin-owned regions in renderer-provided descriptor heap configurations.
+     */
+    virtual void configure_descriptor_heaps(
+        const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) = 0;
+
+    /**
+     * @brief Register plugin-owned arenas after the renderer has created the physical heaps.
+     */
+    virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) = 0;
 
     /**
      * @brief Add extra usage bits required by this plugin for shared static-geometry buffers.

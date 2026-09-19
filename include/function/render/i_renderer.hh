@@ -37,6 +37,10 @@ struct RendererCapabilities {
      * @brief Whether ray tracing is requested and was enabled.
      */
     bool ray_tracing = false;
+    /**
+     * @brief Whether ray query is requested and was enabled.
+     */
+    bool ray_query = false;
 };
 
 /**

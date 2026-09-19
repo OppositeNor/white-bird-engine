@@ -34,9 +34,7 @@ class DescriptorHeapAllocatorVK;
  * @brief Logical descriptor arena represented by a descriptor heap object.
  */
 enum class DescriptorHeapTypeVK : uint8_t {
-    BUFFER,
-    SAMPLED_IMAGE,
-    STORAGE_IMAGE,
+    RESOURCE,
     SAMPLER,
 };
 
@@ -68,6 +66,11 @@ public:
          * @brief Create aligned host-visible and device-local heap storage.
          */
         Backing(const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment);
+
+        /**
+         * @brief Get the physical range used when binding this heap.
+         */
+        VkBindHeapInfoEXT get_bind_info() const;
 
     private:
         friend class RODescriptorHeapVK;
@@ -141,7 +144,7 @@ private:
     VkBindHeapInfoEXT get_bind_info() const;
 
     Ref<Backing> backing;
-    DescriptorHeapTypeVK type = DescriptorHeapTypeVK::BUFFER;
+    DescriptorHeapTypeVK type = DescriptorHeapTypeVK::RESOURCE;
     uint32_t first_index = 0;
     uint32_t capacity = 0;
     VkDeviceSize stride = 0;

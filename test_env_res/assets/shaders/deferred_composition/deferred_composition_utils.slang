@@ -19,12 +19,30 @@
 #define WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS 0
 #endif
 
+#define WBE_SPOT_SHADOW_IMPLEMENTATION_VSSM_MIPMAP 0
+#define WBE_SPOT_SHADOW_IMPLEMENTATION_VSSM_SAT 1
+#define WBE_SPOT_SHADOW_IMPLEMENTATION_PCF 2
+
+#ifndef WBE_SPOT_SHADOW_IMPLEMENTATION
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+#define WBE_SPOT_SHADOW_IMPLEMENTATION WBE_SPOT_SHADOW_IMPLEMENTATION_VSSM_SAT
+#else
+#define WBE_SPOT_SHADOW_IMPLEMENTATION WBE_SPOT_SHADOW_IMPLEMENTATION_VSSM_MIPMAP
+#endif
+#endif
+
+#ifndef WBE_USE_RSM_INDIRECT_LIGHTING
+#define WBE_USE_RSM_INDIRECT_LIGHTING 1
+#endif
+
 #include "utils.slang"
 
 static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
-static const uint WBE_RSM_SAMPLE_COUNT = 8;
+#if WBE_USE_RSM_INDIRECT_LIGHTING
+static const uint WBE_RSM_SAMPLE_COUNT = 16;
 static const float WBE_RSM_SAMPLE_RADIUS_UV = 0.5;
 static const float WBE_RSM_MIN_DISTANCE_SQUARED = 0.05;
+#endif
 
 struct VSOutput {
     float4 position : SV_Position;
@@ -51,14 +69,22 @@ struct CompositionCamera {
 };
 
 struct LightParamDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")] uint2 info;
-    [WBE_DESCRIPTOR("sampled_image")] uint2 shadowmap;
+    [WBE_DESCRIPTOR("uniform_buffer")]
+    uint2 info;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [WBE_DESCRIPTOR("sampled_image")] uint2 shadow_moments_summed_area_table;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 shadow_moments_summed_area_table;
 #endif
-    [WBE_DESCRIPTOR("sampled_image")] uint2 rsm_flux;
-    [WBE_DESCRIPTOR("sampled_image")] uint2 rsm_octa_normal;
-    [WBE_DESCRIPTOR("sampler")] uint2 shadowmap_sampler;
+#if WBE_USE_RSM_INDIRECT_LIGHTING
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 rsm_flux;
+    [WBE_DESCRIPTOR("sampled_image")]
+    uint2 rsm_octa_normal;
+#endif
+    [WBE_DESCRIPTOR("sampler")]
+    uint2 shadowmap_sampler;
 };
 
 struct LightParamsDescriptorIndices {
@@ -191,6 +217,7 @@ float2 sample_shadow_moments_mipmap(LightParamsDescriptorIndices p_light,
     return shadowmap.SampleLevel(shadowmap_sampler, p_center_uv, mip_level);
 }
 
+#if WBE_USE_RSM_INDIRECT_LIGHTING
 float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uint p_sample_index) {
     float sample_index = float(p_sample_index);
     float light_index = float(p_spot_light_index + 1);
@@ -259,10 +286,46 @@ float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_li
     }
     return indirect_irradiance * (2.0 * maximum_sample_distance_squared / float(WBE_RSM_SAMPLE_COUNT));
 }
+#endif
+
+float compute_spot_shadow_pcf(LightParamsDescriptorIndices p_light,
+    uint p_spot_light_index,
+    float3 p_world_position) {
+    ConstantBuffer<SpotLightInfo> spot_light_info = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    Texture2D<float> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
+    SamplerState shadowmap_sampler = SamplerDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap_sampler.x];
+    float4 light_view_position = software_mul_float4x4_vector(
+        WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view), float4(p_world_position, 1.0));
+    float4 light_space_position =
+        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.proj), light_view_position);
+    float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
+    float2 uv = ndc.xy * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z < 0.0 || ndc.z > 1.0) {
+        return 1.0;
+    }
+    const float bias = 0.0015;
+    float current_depth = clamp(ndc.z + bias, 0.0, 1.0);
+    uint shadow_width;
+    uint shadow_height;
+    shadowmap.GetDimensions(shadow_width, shadow_height);
+    float2 texel_size = float2(1.0 / float(shadow_width), 1.0 / float(shadow_height));
+    float visibility = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            float2 offset = float2(x, y) * texel_size;
+            float sampled_depth = shadowmap.SampleLevel(shadowmap_sampler, uv + offset, 0.0);
+            visibility += current_depth >= sampled_depth ? 1.0 : 0.0;
+        }
+    }
+    return visibility / 9.0;
+}
 
 float compute_spot_shadow(LightParamsDescriptorIndices p_light,
     uint p_spot_light_index,
     float3 p_world_position) {
+#if WBE_SPOT_SHADOW_IMPLEMENTATION == WBE_SPOT_SHADOW_IMPLEMENTATION_PCF
+    return compute_spot_shadow_pcf(p_light, p_spot_light_index, p_world_position);
+#else
     ConstantBuffer<SpotLightInfo> spot_light_info = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
     Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     float4 light_view_position = software_mul_float4x4_vector(
@@ -330,6 +393,7 @@ float compute_spot_shadow(LightParamsDescriptorIndices p_light,
     float visibility = chebyshev_upper_bound(filtered_moments, current_depth, minimum_variance);
     // visibility_reduced = saturate((visibility - reduction) / (1 - reduction)).
     return saturate((visibility - light_bleeding_reduction) / (1.0 - light_bleeding_reduction));
+#endif
 }
 
 #endif

@@ -23,11 +23,12 @@ namespace WhiteBirdEngine {
 
 TEST(WBERendererCapabilitiesTest, DummyRendererDisablesRequestedRayTracing) {
     RenderAllocator allocator(WBE_KI_B(64));
-    RendererCapabilities capabilities{.ray_tracing = true};
+    RendererCapabilities capabilities{.ray_tracing = true, .ray_query = true};
 
     RendererDummy renderer(&allocator, capabilities);
 
     EXPECT_FALSE(capabilities.ray_tracing);
+    EXPECT_FALSE(capabilities.ray_query);
 }
 
 } // namespace WhiteBirdEngine
