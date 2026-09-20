@@ -50,7 +50,7 @@ private:
 
 public:
     // Represents a subregion.
-    struct SubRegion {
+    struct Subregion {
         // The starting index of the subregion.
         size_t starting_index;
         // The number of elements of the subregion.
@@ -136,13 +136,13 @@ public:
             /** Byte offset bound for this group's first vertex. */
             size_t vertex_buffer_byte_offset = 0;
             /** Contiguous local-index range belonging to this group. */
-            SubRegion index_sub_region{};
+            Subregion index_sub_region{};
             /** Index into materials. */
             size_t material_index = 0;
             /** Fixed layout of the group's interleaved vertices. */
             VertexLayout vertex_layout;
             /** Contiguous indirect-command range generated for this group. */
-            SubRegion indirect_command_sub_region{};
+            Subregion indirect_command_sub_region{};
         };
         /** Draw groups in pipeline, material, and layout order. */
         Vector<DrawGroup> draw_groups;
@@ -154,7 +154,7 @@ public:
             /** Graphics pipeline used by every draw group in the range. */
             RefRes<RUGraphicsPipeline> graphics_pipeline;
             /** Subregion of draw_groups rendered with this pipeline. */
-            SubRegion draw_group_sub_region;
+            Subregion draw_group_sub_region;
         };
         /** Graphics-pipeline batches in draw order. */
         Vector<GraphicsPipelineUnit> graphics_pipelines;
