@@ -16,4 +16,4 @@ imgui.ini
 *.log
 
 # TODO: Figure out a way to import this.
-test_env_res/assets/models/IntelSponza
+res/assets/models/IntelSponza

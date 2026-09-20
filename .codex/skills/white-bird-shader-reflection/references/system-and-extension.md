@@ -89,7 +89,7 @@ Relevant files:
 - `include/function/render_vk/ro_acceleration_structure_vk.hh`
 - `src/function/render_vk/descriptor_heap_allocator_vk.cpp`
 - `src/function/render_vk/pipeline_compiler_vk.cpp`
-- `test_env_res/assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.slang`
+- `res/assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.slang`
 - `tests/unit/function/shader_metadata_vk_test.cpp`
 - `tests/unit/function/shader_metadata_vk_utils_test.cpp`
 
@@ -130,7 +130,7 @@ Trace the exact raw Slang JSON first; do not infer its layout from the Slang sou
 
 1. Normalize the new raw property or shape in the narrowest helper in `build_script/resource/acp/acp_compiler_shader.py`: binding, type atom, field, full type, parameter, result, or entry point.
 2. If runtime consumers need new data, add a serializable field to the matching structure in `include/function/render/shader_metadata.hh`. Let the normal build regenerate serialization artifacts; never edit `*.gen.*`.
-3. Add or extend deserialization coverage in `tests/unit/function/shader_metadata_vk_test.cpp`. Use both a small normalized JSON test and, when Slang behavior matters, a compiled fixture under `test_env_res/assets/shaders` reached through `test_env_res/res_chunks`.
+3. Add or extend deserialization coverage in `tests/unit/function/shader_metadata_vk_test.cpp`. Use both a small normalized JSON test and, when Slang behavior matters, a compiled fixture under `res/assets/shaders` reached through `res/res_chunks`.
 4. Put semantic validation in a backend-neutral contract resolver when possible. Use `ShaderMetadataQuery` for uniqueness and `ShaderRoleFieldResolver` for annotation parsing, default roles, duplicate roles, and hash collisions.
 5. If the construct represents a Vulkan descriptor, extend `WBE_DESCRIPTOR` category or push-data field handling in `src/function/render_vk/shader_metadata_vk_utils.cpp`. Preserve alignment, overlap, path, stage-merge, and array-layout validation, then add focused utility tests.
 6. If the change affects caller bindpoints, define nested and indexed path behavior explicitly before modifying `src/function/render_vk/pipeline_compiler_vk.cpp`. Preserve complete-resource binding and resource ownership unless the feature requires an API change.
@@ -151,10 +151,10 @@ Do not make generic engine propagation branch on concrete texture roles. Do not 
 
 ## Useful fixtures and tests
 
-- `test_env_res/assets/shaders/reflection_attributes`: attribute locations and int/float/string arguments.
-- `test_env_res/assets/shaders/forward_cook_torrance_pbr`: nested material parameter layout and texture roles.
-- `test_env_res/assets/shaders/draw_triangle`: vertex roles and automatically assigned locations.
-- `test_env_res/assets/shaders/descriptor_heap_reflection`: explicit descriptor fields, nested structs, and fixed arrays.
+- `res/assets/shaders/reflection_attributes`: attribute locations and int/float/string arguments.
+- `res/assets/shaders/forward_cook_torrance_pbr`: nested material parameter layout and texture roles.
+- `res/assets/shaders/draw_triangle`: vertex roles and automatically assigned locations.
+- `res/assets/shaders/descriptor_heap_reflection`: explicit descriptor fields, nested structs, and fixed arrays.
 - `tests/unit/function/shader_metadata_vk_test.cpp`: normalized schema and compiled fixtures.
 - `tests/unit/function/shader_role_field_resolver_test.cpp`: role parsing, duplicates, and hash collisions.
 - `tests/unit/function/material_texture_contract_resolver_test.cpp`: material contract validity and stage agreement.

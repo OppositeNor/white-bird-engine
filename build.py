@@ -128,8 +128,7 @@ if __name__ == "__main__":
         print("WBEBuilder: Running asset conditioning pipeline...")
         build_setup.acp.process_resources()
         if build_setup.build_target["generate-tests"]:
-            print("WBEBuilder: Running asset conditioning pipeline for test environment...")
-            # Setup test env if generate tests.
+            print("WBEBuilder: Running asset conditioning pipeline with test resources...")
             build_setup.test_env_acp.process_resources()
         print("WBEBuilder: Gathering licenses...")
         _gather_license()

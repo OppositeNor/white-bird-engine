@@ -1,7 +1,7 @@
 {
+    "scope": "test_only",
     "include": [
         "assets/models/models.json"
     ],
     "resources": []
 }
-

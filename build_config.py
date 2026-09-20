@@ -112,7 +112,6 @@ source_extensions = src_extensions.union(header_extensions)
 include_dir = "include"
 source_dir = "src"
 test_dir = "tests"
-test_env_res_dir = "test_env_res"
 test_env_dir = "test_env"
 resource_dir = "res"
 
@@ -159,4 +158,3 @@ project_headers_exclude_tests = [path for path in project_sources_exclude_tests 
 gen_info_files = list_files(root_dir, ignore_dirs=[".cache", ".git",
                                                    ".github", "__pycache__", "build"])
 gen_info_files = [gen_info for gen_info in gen_info_files if os.path.basename(gen_info) == "generate.json"]
-

@@ -47,15 +47,13 @@ dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
-test_env_res_dir = os.path.join(root_dir, build_config.test_env_res_dir)
 resource_output_dir = os.path.join(binary_dir, "res")
 test_env_res_output_dir = os.path.join(test_env_dir, "res")
 config_dir = os.path.join(resource_dir, "config")
 config_output_dir = os.path.join(resource_output_dir, "config")
-test_env_config_dir = os.path.join(test_env_res_dir, "config")
+test_env_config_dir = os.path.join(config_dir, "test")
 test_env_config_output_dir = os.path.join(test_env_res_output_dir, "config")
 shaders_incl_dir = os.path.join(resource_dir, "assets/shaders")
-test_env_shaders_incl_dir = os.path.join(test_env_res_dir, "assets/shaders")
 res_chunks_dir = os.path.join(resource_dir, "res_chunks")
 res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 assets_dir = os.path.join(resource_dir, "assets")
@@ -72,14 +70,16 @@ os.makedirs(metadata_cache_dir, exist_ok=True)
 os.makedirs(model_compiler_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
-shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True)
-shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
+shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns("test"))
+if build_target["generate-tests"]:
+    shutil.copytree(config_dir, test_env_config_output_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns("test"))
+    shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
 acp_dependencies_compiler = WBEACPDependenciesCompiler(
     Path(root_dir), Path(build_root_dir), Path(dependencies_dir), build_target)
-acp = WBEACP(Path(resource_dir), Path(resource_output_dir))
-test_env_acp = WBEACP(Path(test_env_res_dir), Path(test_env_res_output_dir))
+acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
+test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
 acp_compilers_configured = False
 
 
@@ -105,7 +105,7 @@ def setup_acp_compilers() -> None:
     acp.add_compiler(WBEACPCompilerMesh())
     acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
 
-    test_env_acp.add_compiler(WBEACPCompilerShader(Path(test_env_shaders_incl_dir)))
+    test_env_acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
     test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
     test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     test_env_acp.add_compiler(WBEACPCompilerMesh())

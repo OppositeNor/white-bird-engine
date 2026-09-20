@@ -4,7 +4,8 @@
         "assets/shaders/main_pipeline/main_pipeline_shader.json",
         "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_shader.json",
         "assets/shaders/shadowmap_spot/shadowmap_spot_shader.json",
-        "assets/materials/default_material.json"
+        "assets/materials/default_material.json",
+        "res_chunks/test_global_resources.json"
     ],
     "resources": []
 }

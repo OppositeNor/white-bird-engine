@@ -1,4 +1,5 @@
 {
+    "scope": "test_only",
     "include": [],
     "resources": [
         {

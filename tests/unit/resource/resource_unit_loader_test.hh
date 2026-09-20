@@ -489,7 +489,7 @@ TEST_F(ResourcePopulatorTest, TextureResourceOwnershipContract) {
     static_assert(!std::is_copy_constructible_v<WBE::RUTexture>);
     static_assert(std::is_nothrow_move_constructible_v<WBE::RUTexture>);
 
-    EXPECT_THROW(WBE::KTXTexture2("test_env_res/assets/missing_texture.ktx2"), std::runtime_error);
+    EXPECT_THROW(WBE::KTXTexture2("res/assets/missing_texture.ktx2"), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {

@@ -142,7 +142,7 @@ Per-directory CMakeLists.txt use `file(GLOB *.cpp)`; new test files are picked u
 - `include/<layer>/...` — public headers (mirrors `src/`).
 - `src/<layer>/...` — implementation (`.cpp`).
 - `templates/` — Jinja templates consumed by `build_script/reflection/`.
-- `res/`, `test_env_res/` — runtime assets.
+- `res/` — source assets and manifests; ACP writes deployment resources to `build/<target>/bin/res` and test resources to `test_env/res`.
 - `dependencies/` — vendored third-party (do not modify).
 - `todos/` — per-layer todo lists.
 
@@ -156,10 +156,11 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 
 ## Resource Pipeline / ACP
 
-- ACP root manifest discovery starts only from `res/res_chunks/**/*.json` and `test_env_res/res_chunks/**/*.json`.
+- ACP root manifest discovery starts only from `res/res_chunks/**/*.json`.
 - Do not make ACP scan every JSON file under a resource tree; formats such as glTF are JSON and are not ACP manifests.
 - Manifest files outside `res_chunks` are processed only when reachable from a root chunk manifest through `include`.
 - `include` paths are resource-root-relative manifest paths. Included files must contain a `resources` array.
+- `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest to skip its entire include tree, or on an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
 - `wbe-utils-model-compiler` owns final mesh and material resource shaping. Keep `acp_compiler_model.py` limited to ACP path/schema
   adaptation; do not normalize compiled material textures in the ACP adapter.
 

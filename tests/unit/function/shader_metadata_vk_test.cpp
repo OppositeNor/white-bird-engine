@@ -431,7 +431,6 @@ void expect_deferred_masked_static_pipeline_resource(const Directory& p_director
 } // namespace
 
 TEST(WBEShaderMetadataVKTest, DeferredMaskedStaticPipelineResourceUsesMaskedFragmentEntry) {
-    expect_deferred_masked_static_pipeline_resource(Directory({"test_env_res", "assets", "shaders", "deferred_gbuffer"}));
     expect_deferred_masked_static_pipeline_resource(Directory({"res", "assets", "shaders", "deferred_gbuffer"}));
 }
 

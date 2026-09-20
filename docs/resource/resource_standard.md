@@ -14,6 +14,21 @@ then recursively follows their includes.
 JSON files outside `res/res_chunks/` are processed only when they are reachable through `include` from
 a root chunk manifest. Included files must be valid ACP manifests with a `resources` array.
 
+## Resource Scope
+
+The optional `scope` field accepts `global` or `test_only`. The default is `global`.
+Global resources are compiled into both deployment and test outputs. Test-only resources are
+compiled only when tests are enabled. ACP validates scope values, filters entries before
+compilation, and omits `scope` from runtime index files.
+
+Set `scope` on an individual resource entry, or on a whole manifest when all its resources
+and includes are test-only. A test-only manifest is skipped for deployment. A global
+manifest may include a test-only manifest; ACP removes that include from deployment output.
+For a nested resource, keep it in the same scope as its containing resource.
+
+Source manifests live under `res/`. ACP writes deployment resources under
+`build/<target>/bin/res` and, for test builds, test resources under `test_env/res`.
+
 ## Manifest Entry Rules
 
 - Every resource entry must contain a `type` field.
