@@ -14,10 +14,6 @@
                     "sources" : ["vulkan_draw_sponza_deferred_test.cpp"]
                 },
                 {
-                    "name" : "vulkan_draw_sponza_ddgi_test",
-                    "sources" : ["vulkan_draw_sponza_ddgi_test.cpp"]
-                },
-                {
                     "name" : "vulkan_draw_cube_test",
                     "sources" : ["vulkan_draw_cube_test.cpp"]
                 },

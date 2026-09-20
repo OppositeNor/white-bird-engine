@@ -51,27 +51,6 @@
             "metadata": "assets/shaders/deferred_composition/indirect_lighting_rsm.json"
         },
         {
-            "id": "indirect_lighting_ddgi_shader",
-            "source_type": "shader",
-            "src": "assets/shaders/deferred_composition/indirect_lighting_ddgi.slang",
-            "dst": "assets/shaders/deferred_composition/indirect_lighting_ddgi.spv",
-            "metadata": "assets/shaders/deferred_composition/indirect_lighting_ddgi.json"
-        },
-        {
-            "id": "ddgi_trace_probes_shader",
-            "source_type": "shader",
-            "src": "assets/shaders/ddgi/ddgi_trace_probes.slang",
-            "dst": "assets/shaders/ddgi/ddgi_trace_probes.spv",
-            "metadata": "assets/shaders/ddgi/ddgi_trace_probes.json"
-        },
-        {
-            "id": "ddgi_update_probes_shader",
-            "source_type": "shader",
-            "src": "assets/shaders/ddgi/ddgi_update_probes.slang",
-            "dst": "assets/shaders/ddgi/ddgi_update_probes.spv",
-            "metadata": "assets/shaders/ddgi/ddgi_update_probes.json"
-        },
-        {
             "id": "combine_lighting_shader",
             "source_type": "shader",
             "src": "assets/shaders/deferred_composition/combine_lighting.slang",
