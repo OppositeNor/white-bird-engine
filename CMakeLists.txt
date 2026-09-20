@@ -88,7 +88,64 @@ set(YAML_CPP_BUILD_TESTS OFF)
 set(YAML_CPP_BUILD_TOOLS OFF)
 add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
-add_subdirectory(dependencies/boost)
+set(BOOST_SUPERPROJECT_VERSION 1.89.0)
+# Build Boost.Thread, Boost.ProgramOptions, Boost.Container, and their CMake target dependencies.
+foreach(boost_library IN ITEMS
+    algorithm
+    align
+    any
+    array
+    assert
+    atomic
+    bind
+    chrono
+    concept_check
+    config
+    container
+    container_hash
+    conversion
+    core
+    date_time
+    describe
+    detail
+    exception
+    function
+    function_types
+    functional
+    fusion
+    integer
+    intrusive
+    io
+    iterator
+    lexical_cast
+    move
+    mp11
+    mpl
+    numeric/conversion
+    optional
+    predef
+    preprocessor
+    program_options
+    range
+    ratio
+    regex
+    smart_ptr
+    static_assert
+    system
+    thread
+    throw_exception
+    tokenizer
+    tuple
+    type_index
+    type_traits
+    typeof
+    unordered
+    utility
+    variant2
+    winapi
+)
+    add_subdirectory(dependencies/boost/libs/${boost_library})
+endforeach()
 if (WBE_MAKE_TEST)
     # KTX enables the global BUILD_SHARED_LIBS option. GoogleTest must remain static because
     # test discovery runs the executable before the project's deployed-library layout exists.
