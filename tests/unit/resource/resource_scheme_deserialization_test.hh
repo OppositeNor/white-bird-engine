@@ -18,7 +18,7 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <exception>
 #include <gtest/gtest.h>
@@ -30,7 +30,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEResourceSchemaDeserializationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

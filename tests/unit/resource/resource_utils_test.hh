@@ -16,7 +16,7 @@
 #define WBE_FILE_RESOURCE_UTILS_TEST_HH
 
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "resource/resource_utils.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -31,7 +31,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEResourceUtilsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

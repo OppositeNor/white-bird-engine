@@ -18,7 +18,7 @@
 #include "core/engine_core.hh"
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "resource/engine_resource.hh"
 #include "utils/interface/i_singleton.hh"
 
@@ -53,7 +53,7 @@ public:
      * @param p_argv argv.
      * @param p_root_dir The root directory.
      */
-    Global(int p_argc, char* p_argv[], const Directory& p_root_dir);
+    Global(int p_argc, char* p_argv[], const Path& p_root_dir);
 
     /**
      * @brief Get the singleton.

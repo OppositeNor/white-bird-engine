@@ -22,7 +22,7 @@
 #include "generated/serializable_factory.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 
 #include <cstddef>
@@ -36,7 +36,7 @@ namespace WBE = WhiteBirdEngine;
 class WBESerializableFactoryTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

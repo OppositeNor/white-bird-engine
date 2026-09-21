@@ -21,7 +21,7 @@
 #include "core/engine_config/engine_config.hh"
 #include "core/logging/log_stream.hh"
 #include "core/logging/logging_manager.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "platform/file_system/file_system.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
@@ -61,7 +61,7 @@ public:
      * @param p_argv argv.
      * @param p_root_dir The root directory.
      */
-    EngineCore(uint32_t p_argc, char* p_argv[], const Directory& p_root_dir);
+    EngineCore(uint32_t p_argc, char* p_argv[], const Path& p_root_dir);
 
     /**
      * @brief Get the singleton.

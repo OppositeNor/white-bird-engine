@@ -30,7 +30,7 @@
 #include "glm/ext/vector_uint3.hpp"
 #include "glm/ext/vector_uint4.hpp"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "resource/ktx_texture.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -118,7 +118,7 @@ struct OrderedDestroyTestResourceUnit : public WBE::ResourceUnit {
 class ResourcePopulatorTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
         text_scheme.path = "test_text_files/test_file_utf8.txt";
     }
 
@@ -954,7 +954,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
 
     loader.populate_scheme(*res_chunk, binary_scheme);
 
-    auto expected_binary = WBE::load_binary_file(static_cast<std::string>(WBE::get_resource_path(binary_scheme.path)).c_str());
+    auto expected_binary = WBE::load_binary_file(WBE::get_resource_path(binary_scheme.path).string().c_str());
     ASSERT_NE(captured_ru_binary, nullptr);
     EXPECT_EQ(captured_ru_binary->size, expected_binary.size());
     EXPECT_EQ(binary_data_storage.size(), expected_binary.size());

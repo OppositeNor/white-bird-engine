@@ -31,7 +31,7 @@
 #include "function/scene/scene_node.hh"
 #include "function/scene/world.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -170,7 +170,7 @@ private:
 class WBEWorldTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

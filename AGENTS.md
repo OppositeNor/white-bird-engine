@@ -250,7 +250,7 @@ Rules:
   - `AlwaysBreakTemplateDeclarations: Yes`.
   - `BreakStringLiterals: false` — long error-message string literals stay on one line.
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
-- Prefer the engine's file system wrappers `Directory` / `Path` (in `platform/file_system/`) over raw `std::filesystem`. They are header-only thin wrappers around `std::filesystem` — use them in engine code; drop down to `std::filesystem` only inside their implementation or when an API genuinely requires it. Note: `Directory::get_dir_names()` returns by value, capture with `auto`.
+- Use the engine's `Path` alias from `platform/file_system/path.hh` for filesystem paths in engine APIs. It is `std::filesystem::path`; use standard path operations directly.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.
 
 ## Header / Source Separation

@@ -48,7 +48,7 @@
 #include "generated/type_uuid.gen.hh"
 #include "glm/ext/matrix_transform.hpp"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -1314,7 +1314,7 @@ namespace WBE = WhiteBirdEngine;
 
 int main(int p_argc, char* p_argv[]) {
     WBE::on_exec_test_start();
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Directory({"test_env"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Path("test_env"));
     {
         WBE::ApplicationVulkanDeferredPBRTest game_application;
         {

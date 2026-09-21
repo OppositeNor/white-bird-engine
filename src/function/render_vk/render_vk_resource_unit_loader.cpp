@@ -202,13 +202,12 @@ RefRes<RUTexture> populate_texture_resource(IResourceChunk& p_res_chunk, const R
         throw std::runtime_error("Failed to populate texture resource: inline texture requires path.");
     }
     ResourceUnitLoaderTexture texture_loader;
-    return std::any_cast<RefRes<RUTexture>>(
-        static_cast<const IResourceUnitLoader&>(texture_loader).populate_scheme_ptr(p_res_chunk, p_scheme));
+    return std::any_cast<RefRes<RUTexture>>(texture_loader.populate_scheme_ptr(p_res_chunk, p_scheme));
 }
 
 RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemaShader& p_scheme) {
     auto file_path = get_resource_path(p_scheme.path);
-    auto file_content = load_binary_file<uint32_t>(static_cast<std::string>(file_path).c_str());
+    auto file_content = load_binary_file<uint32_t>(file_path.string().c_str());
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);

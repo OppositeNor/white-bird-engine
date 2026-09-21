@@ -18,7 +18,7 @@
 #include "core/parser/parser_yaml.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -35,7 +35,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEDeserializerYAMLTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

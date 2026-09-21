@@ -18,7 +18,7 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -29,7 +29,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEAllocFSPTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

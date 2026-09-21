@@ -337,7 +337,7 @@ public:
     }
 
     void parse(const Path& p_path) {
-        data.node = YAML::LoadFile(static_cast<std::string>(p_path));
+        data.node = YAML::LoadFile(p_path.string());
     }
 
     void parse_from_buffer(std::string_view p_buffer) {

@@ -62,7 +62,7 @@ static void write_ppm_pixel(uint8_t* p_data, size_t p_pixel_offset, uint32_t p_o
 static std::optional<std::vector<uint8_t>> load_ppm_data(
     const Path& p_path, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels, uint32_t p_desired_channels = 0) {
     // Load manually if PPM3
-    if (p_path.get_extension() == "ppm") {
+    if (p_path.extension() == ".ppm") {
         std::ifstream file(FileSystem::path_to_string(p_path), std::ios::in);
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open PPM file: " + FileSystem::path_to_string(p_path));
@@ -89,7 +89,7 @@ static std::optional<std::vector<uint8_t>> load_ppm_data(
         }
         uint32_t width, height;
         p_file_channels = 3;
-        std::string str_content = load_text_file(static_cast<std::string>(p_path).c_str());
+        std::string str_content = load_text_file(p_path.string().c_str());
         std::stringstream content(remove_ppm_comments(str_content));
         // discard header line
         content >> line;

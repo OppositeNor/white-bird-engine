@@ -18,6 +18,7 @@
 #include "core/job/job_handler.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/i_singleton.hh"
+#include "utils/utils.hh"
 #include <BS_thread_pool.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -99,7 +100,7 @@ public:
     template <typename T = uint8_t>
     std::future<std::vector<T>> read_binary_file(const Path& p_path) {
         return thread_pool.submit_task([path = p_path]() {
-            return load_binary_file<T>(static_cast<std::string>(path).c_str());
+            return load_binary_file<T>(path.string().c_str());
         });
     }
 

@@ -17,7 +17,6 @@
 #include "function/render/shader_metadata_query.hh"
 #include "function/render/static_set_node_contract.hh"
 #include "function/render/static_set_node_contract_resolver.hh"
-#include "platform/file_system/directory.hh"
 #include "platform/file_system/path.hh"
 #include <algorithm>
 #include <array>
@@ -190,7 +189,7 @@ TEST(WBEShaderMetadataVKTest, PreservesWrappedTypeAttributesAndNames) {
 
 TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "reflection_attributes"}), "reflection_attributes.json"));
+    parser.parse((Path("test_env/res/assets/shaders/reflection_attributes") / "reflection_attributes.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -263,7 +262,7 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
 
 TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "descriptor_heap_reflection"}), "descriptor_heap_reflection.json"));
+    parser.parse((Path("test_env/res/assets/shaders/descriptor_heap_reflection") / "descriptor_heap_reflection.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -328,7 +327,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -361,7 +360,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -397,7 +396,7 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
 
 TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "forward_cook_torrance_pbr"}), "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -409,9 +408,9 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadat
 
 namespace {
 
-void expect_deferred_masked_static_pipeline_resource(const Directory& p_directory) {
+void expect_deferred_masked_static_pipeline_resource(const Path& p_directory) {
     ParserJSON parser;
-    parser.parse(Path(p_directory, "deferred_gbuffer_shader.json"));
+    parser.parse((p_directory / "deferred_gbuffer_shader.json"));
 
     std::vector<JSONData> resources = parser.get_value<std::vector<JSONData>>("resources");
     auto resource = std::ranges::find_if(resources, [](const JSONData& p_resource) {
@@ -431,12 +430,12 @@ void expect_deferred_masked_static_pipeline_resource(const Directory& p_director
 } // namespace
 
 TEST(WBEShaderMetadataVKTest, DeferredMaskedStaticPipelineResourceUsesMaskedFragmentEntry) {
-    expect_deferred_masked_static_pipeline_resource(Directory({"res", "assets", "shaders", "deferred_gbuffer"}));
+    expect_deferred_masked_static_pipeline_resource(Path("res/assets/shaders/deferred_gbuffer"));
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
     ParserJSON parser;
-    parser.parse(Path(Directory({"test_env", "res", "assets", "shaders", "vertex_input_attributes"}), "vertex_input_attributes.json"));
+    parser.parse((Path("test_env/res/assets/shaders/vertex_input_attributes") / "vertex_input_attributes.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 

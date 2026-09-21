@@ -33,7 +33,7 @@
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -203,7 +203,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStati
 int main(int p_argc, char* p_argv[]) {
     WBE::on_exec_test_start();
     std::unique_ptr<WhiteBirdEngine::Global> global =
-        std::make_unique<WhiteBirdEngine::Global>(p_argc, p_argv, WhiteBirdEngine::Directory({"test_env"}));
+        std::make_unique<WhiteBirdEngine::Global>(p_argc, p_argv, WhiteBirdEngine::Path("test_env"));
     WhiteBirdEngine::ApplicationVulkanDrawSponzaIndirectTest application;
     application.setup_draw_task();
     application.run();

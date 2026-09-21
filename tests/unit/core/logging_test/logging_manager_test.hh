@@ -20,7 +20,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "generated/label_manager.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
 #include <memory>
@@ -75,7 +75,7 @@ public:
 };
 
 TEST(WBELoggingManagerTest, GetLogConstructDestruct) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     std::stringstream ss;
     {
         WBE::LoggingManager<LogTestMock, std::ostream> logging_manager(ss);

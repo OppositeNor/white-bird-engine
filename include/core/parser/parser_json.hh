@@ -346,13 +346,13 @@ public:
     void parse(const Path& p_path) {
         try {
             std::ifstream f;
-            f.open(static_cast<std::string>(p_path));
+            f.open(p_path.string());
             if (!f.is_open()) {
-                throw std::runtime_error("Failed to open file at path: " + static_cast<std::string>(p_path));
+                throw std::runtime_error("Failed to open file at path: " + p_path.string());
             }
             data.data = Json::parse(f);
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to parse JSON file at path: " + static_cast<std::string>(p_path) + ". Error: " + e.what());
+            throw std::runtime_error("Failed to parse JSON file at path: " + p_path.string() + ". Error: " + e.what());
         }
     }
 

@@ -19,7 +19,7 @@
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "global/global.hh"
 #include "job_test_utils.hh"
-#include "platform/file_system/directory.hh"
+#include "platform/file_system/path.hh"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -38,7 +38,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEJobBufferRingMPSCTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Directory({"test_env"}));
+        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
     }
 
     void TearDown() override {

@@ -16,7 +16,6 @@
 #define WBE_FILE_RESOURCE_UTILS_HH
 
 #include "core/engine_core.hh"
-#include "platform/file_system/directory.hh"
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/path.hh"
 #include "utils/utils.hh"
@@ -36,24 +35,7 @@ namespace WhiteBirdEngine {
  * @return The resource path relative to the resource directory.
  */
 inline Path parse_res_rel_path(std::string_view p_res_path) {
-    auto splitted = split_string(p_res_path, '/');
-    std::string file_name = splitted.back();
-    splitted.pop_back();
-    std::vector<std::string> path_stack;
-    path_stack.reserve(splitted.size());
-    for (auto& dir_name : splitted) {
-        if (dir_name == "..") {
-            if (!path_stack.empty()) {
-                path_stack.pop_back();
-            }
-            continue;
-        }
-        if (dir_name == "." || dir_name.empty()) {
-            continue;
-        }
-        path_stack.push_back(dir_name);
-    }
-    return Path(Directory(path_stack, false), file_name);
+    return Path(std::string(p_res_path)).lexically_normal();
 }
 
 /**
@@ -63,8 +45,8 @@ inline Path parse_res_rel_path(std::string_view p_res_path) {
  * @return The path to the resource in the filesystem.
  */
 inline Path get_resource_path(std::string_view p_res_path) {
-    Directory res_directory = EngineCore::get_singleton()->file_system->get_resource_directory();
-    return combine(res_directory, parse_res_rel_path(p_res_path));
+    const Path& res_directory = EngineCore::get_singleton()->file_system->get_resource_directory();
+    return (res_directory / parse_res_rel_path(p_res_path)).lexically_normal();
 }
 
 /**

@@ -46,7 +46,7 @@ void Worker::wait() {
 
 std::future<std::string> Worker::read_text_file(const Path& p_path) {
     return thread_pool.submit_task([path = p_path]() {
-        return load_text_file(static_cast<std::string>(path).c_str());
+        return load_text_file(path.string().c_str());
     });
 }
 
