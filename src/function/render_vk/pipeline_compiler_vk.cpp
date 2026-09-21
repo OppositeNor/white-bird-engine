@@ -59,8 +59,7 @@ const RenderBindpointImageDeclaration* find_image_declaration(
 
 const RenderBindpointAccelerationStructureDeclaration* find_acceleration_structure_declaration(
     std::string_view p_field_path, const RenderBindpointDeclarations& p_bindpoint_declarations) {
-    for (const RenderBindpointAccelerationStructureDeclaration& declaration :
-        p_bindpoint_declarations.acceleration_structure_declerations) {
+    for (const RenderBindpointAccelerationStructureDeclaration& declaration : p_bindpoint_declarations.acceleration_structure_declerations) {
         if (declaration.field_path == p_field_path) {
             return &declaration;
         }
@@ -78,9 +77,8 @@ const RenderBindpointSamplerDeclaration* find_sampler_declaration(
     return nullptr;
 }
 
-bool bind_buffer_descriptor_field(Ref<ROPipelineVK> p_pipeline,
-    const ShaderDescriptorHeapFieldVK& p_field,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+bool bind_buffer_descriptor_field(
+    Ref<ROPipelineVK> p_pipeline, const ShaderDescriptorHeapFieldVK& p_field, const RenderBindpointDeclarations& p_bindpoint_declarations) {
     const RenderBindpointBufferDeclaration* declaration = find_buffer_declaration(p_field.field_path, p_bindpoint_declarations);
     if (declaration == nullptr) {
         return false;
@@ -90,52 +88,48 @@ bool bind_buffer_descriptor_field(Ref<ROPipelineVK> p_pipeline,
             "Failed to bind descriptor heap buffer '{}': descriptor heap buffers must bind the complete resource.", p_field.field_path));
     }
     if (declaration->buffer_render_object_container != MEM_NULL) {
-        // Keep container-backed bindings on the per-frame resolution path.
+        // Keep container-backed bindings on the renderer-selected slot resolution path.
         p_pipeline->set_descriptor_binding(p_field.field_path, declaration->buffer_render_object_container);
         return true;
     }
     Ref<ROBufferVK> buffer = declaration->buffer_render_object.dynamic_cast_ref<ROBufferVK>();
     if (buffer == MEM_NULL) {
-        throw std::runtime_error(std::format(
-            "Failed to bind descriptor heap buffer '{}': resource type is invalid.", p_field.field_path));
+        throw std::runtime_error(std::format("Failed to bind descriptor heap buffer '{}': resource type is invalid.", p_field.field_path));
     }
     // Bind direct resources once so push-time rebinding can skip them.
     p_pipeline->set_descriptor_binding(p_field.field_path, declaration->buffer_render_object);
     return true;
 }
 
-bool bind_image_descriptor_field(Ref<ROPipelineVK> p_pipeline,
-    const ShaderDescriptorHeapFieldVK& p_field,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+bool bind_image_descriptor_field(
+    Ref<ROPipelineVK> p_pipeline, const ShaderDescriptorHeapFieldVK& p_field, const RenderBindpointDeclarations& p_bindpoint_declarations) {
     const RenderBindpointImageDeclaration* declaration = find_image_declaration(p_field.field_path, p_bindpoint_declarations);
     if (declaration == nullptr) {
         return false;
     }
     if (declaration->image_render_object_container != MEM_NULL) {
-        // Keep container-backed bindings on the per-frame resolution path.
+        // Keep container-backed bindings on the renderer-selected slot resolution path.
         p_pipeline->set_descriptor_binding(p_field.field_path, declaration->image_render_object_container);
         return true;
     }
     Ref<ROImageViewVK> image_view = declaration->image_render_object.dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL) {
-        throw std::runtime_error(
-            std::format("Failed to bind descriptor heap image '{}': resource type is invalid.", p_field.field_path));
+        throw std::runtime_error(std::format("Failed to bind descriptor heap image '{}': resource type is invalid.", p_field.field_path));
     }
     // Bind direct resources once so push-time rebinding can skip them.
     p_pipeline->set_descriptor_binding(p_field.field_path, declaration->image_render_object);
     return true;
 }
 
-bool bind_acceleration_structure_descriptor_field(Ref<ROPipelineVK> p_pipeline,
-    const ShaderDescriptorHeapFieldVK& p_field,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+bool bind_acceleration_structure_descriptor_field(
+    Ref<ROPipelineVK> p_pipeline, const ShaderDescriptorHeapFieldVK& p_field, const RenderBindpointDeclarations& p_bindpoint_declarations) {
     const RenderBindpointAccelerationStructureDeclaration* declaration =
         find_acceleration_structure_declaration(p_field.field_path, p_bindpoint_declarations);
     if (declaration == nullptr) {
         return false;
     }
     if (declaration->acceleration_structure_render_object_container != MEM_NULL) {
-        // Keep container-backed bindings on the per-frame resolution path.
+        // Keep container-backed bindings on the renderer-selected slot resolution path.
         p_pipeline->set_descriptor_binding(p_field.field_path, declaration->acceleration_structure_render_object_container);
         return true;
     }
@@ -150,15 +144,14 @@ bool bind_acceleration_structure_descriptor_field(Ref<ROPipelineVK> p_pipeline,
     return true;
 }
 
-bool bind_sampler_descriptor_field(Ref<ROPipelineVK> p_pipeline,
-    const ShaderDescriptorHeapFieldVK& p_field,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+bool bind_sampler_descriptor_field(
+    Ref<ROPipelineVK> p_pipeline, const ShaderDescriptorHeapFieldVK& p_field, const RenderBindpointDeclarations& p_bindpoint_declarations) {
     const RenderBindpointSamplerDeclaration* declaration = find_sampler_declaration(p_field.field_path, p_bindpoint_declarations);
     if (declaration == nullptr) {
         return false;
     }
     if (declaration->sampler_render_object_container != MEM_NULL) {
-        // Keep container-backed bindings on the per-frame resolution path.
+        // Keep container-backed bindings on the renderer-selected slot resolution path.
         p_pipeline->set_descriptor_binding(p_field.field_path, declaration->sampler_render_object_container);
         return true;
     }

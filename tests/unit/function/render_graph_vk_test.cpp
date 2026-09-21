@@ -20,7 +20,7 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -85,7 +85,7 @@ TEST(WBERenderGraphVKTest, RendResViewDescriptorDebugDataAddsResourceIdsAndSorts
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 7)})
             .template dynamic_cast_ref<IRenderObjectVK>());
-    auto per_frame_container = make_ref<ROCPerFrameVK>(&allocator, &render_data, false);
+    auto per_frame_container = make_ref<ROCMultislotsVK>(&allocator, &allocator, render_data.frames_in_flight, false);
     per_frame_container->set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 7)})
@@ -115,18 +115,18 @@ TEST(WBERenderGraphVKTest, RendResViewDescriptorDebugDataAddsResourceIdsAndSorts
     ASSERT_EQ(rows.size(), 4U);
     EXPECT_EQ(rows[0].get_value<uint32_t>("heap_index"), 3U);
     EXPECT_EQ(rows[0].get_value<std::string>("resource_id"), "beta");
-    EXPECT_EQ(rows[0].get_value<uint32_t>("frame_index"), 1U);
+    EXPECT_EQ(rows[0].get_value<uint32_t>("slot_index"), 1U);
     EXPECT_EQ(rows[1].get_value<uint32_t>("heap_index"), 7U);
     EXPECT_EQ(rows[1].get_value<std::string>("heap"), "resource");
     EXPECT_EQ(rows[1].get_value<std::string>("resource_id"), "alpha");
-    EXPECT_FALSE(rows[1].contains("frame_index"));
+    EXPECT_FALSE(rows[1].contains("slot_index"));
     EXPECT_EQ(rows[2].get_value<uint32_t>("heap_index"), 7U);
     EXPECT_EQ(rows[2].get_value<std::string>("heap"), "resource");
     EXPECT_EQ(rows[2].get_value<std::string>("resource_id"), "beta");
-    EXPECT_EQ(rows[2].get_value<uint32_t>("frame_index"), 1U);
+    EXPECT_EQ(rows[2].get_value<uint32_t>("slot_index"), 1U);
     EXPECT_EQ(rows[3].get_value<std::string>("heap"), "sampler");
     EXPECT_EQ(rows[3].get_value<std::string>("resource_id"), "beta");
-    EXPECT_EQ(rows[3].get_value<uint32_t>("frame_index"), 0U);
+    EXPECT_EQ(rows[3].get_value<uint32_t>("slot_index"), 0U);
 }
 
 TEST(WBERenderGraphVKTest, ListDescriptorsReturnsEmptyJsonForEmptyGraph) {

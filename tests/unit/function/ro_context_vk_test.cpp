@@ -19,7 +19,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
@@ -121,59 +121,57 @@ TypeID TestDescriptorResourceVK::get_type_uuid() const {
     return TypeUUID<TestDescriptorResourceVK>::UUID;
 }
 
-TEST(WBEROCPerFrameVKTest, CreatesOneResourcePerFrameAndUsesCurrentFrameSlot) {
+TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 3;
-    render_data.current_frame_slot = 1;
 
-    ROCPerFrameVK context(&render_data, ROCPerFrameVK::Factory{[&render_data, &allocator](uint32_t p_context_id) {
-        return make_ref<TestContextResourceVK>(&allocator, &render_data, p_context_id).template dynamic_cast_ref<IRenderObjectVK>();
+    ROCMultislotsVK context(&allocator, 3, ROCMultislotsVK::Factory{[&render_data, &allocator](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(&allocator, &render_data, p_slot).template dynamic_cast_ref<IRenderObjectVK>();
     }});
 
     EXPECT_EQ(context.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
-    EXPECT_EQ(context.get_context_count(), 3U);
+    EXPECT_EQ(context.get_slot_count(), 3U);
 
-    auto current_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
-    ASSERT_NE(current_resource, MEM_NULL);
-    EXPECT_EQ(current_resource->get_type_uuid(), TypeUUID<TestContextResourceVK>::UUID);
-    EXPECT_EQ(current_resource->context_id, 1U);
+    auto default_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
+    ASSERT_NE(default_resource, MEM_NULL);
+    EXPECT_EQ(default_resource->get_type_uuid(), TypeUUID<TestContextResourceVK>::UUID);
+    EXPECT_EQ(default_resource->context_id, 0U);
 
     auto explicit_resource = context.get(2).dynamic_cast_ref<TestContextResourceVK>();
     ASSERT_NE(explicit_resource, MEM_NULL);
     EXPECT_EQ(explicit_resource->context_id, 2U);
 }
 
-TEST(WBEROCPerFrameVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
+TEST(WBEROCMultislotsVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 2;
 
-    EXPECT_THROW(ROCPerFrameVK(&render_data, ROCPerFrameVK::Factory{}), std::runtime_error);
-    EXPECT_THROW(ROCPerFrameVK(&render_data, ROCPerFrameVK::Factory{[](uint32_t /*p_context_id*/) {
+    EXPECT_THROW(ROCMultislotsVK(&allocator, 2, ROCMultislotsVK::Factory{}), std::runtime_error);
+    EXPECT_THROW(ROCMultislotsVK(&allocator, 2, ROCMultislotsVK::Factory{[](uint32_t /*p_slot*/) {
         return Ref<IRenderObjectVK>(MEM_NULL);
     }}),
         std::runtime_error);
+    EXPECT_THROW(ROCMultislotsVK(nullptr, 2), std::runtime_error);
+    EXPECT_THROW(ROCMultislotsVK(&allocator, 0), std::runtime_error);
 }
 
-TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
+TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 3;
-    render_data.current_frame_slot = 2;
 
-    ROCPerFrameVK context(&render_data);
-    auto frame_zero_resource =
+    ROCMultislotsVK context(&allocator, 3);
+    auto slot_zero_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<IRenderObjectVK>();
-    auto frame_two_resource =
+    auto slot_two_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 2).template dynamic_cast_ref<IRenderObjectVK>();
 
-    context.set(0, frame_zero_resource);
-    context.set(2, frame_two_resource);
+    context.set(0, slot_zero_resource);
+    context.set(2, slot_two_resource);
 
-    auto current_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
-    ASSERT_NE(current_resource, MEM_NULL);
-    EXPECT_EQ(current_resource->context_id, 2U);
+    auto default_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
+    ASSERT_NE(default_resource, MEM_NULL);
+    EXPECT_EQ(default_resource->context_id, 0U);
 
     auto explicit_resource = context.get(0).dynamic_cast_ref<TestContextResourceVK>();
     ASSERT_NE(explicit_resource, MEM_NULL);
@@ -182,38 +180,35 @@ TEST(WBEROCPerFrameVKTest, UpdatesOneFrameSlotIndependently) {
     EXPECT_EQ(context.get(1), MEM_NULL);
 }
 
-TEST(WBEROCPerFrameVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
+TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 2;
-    render_data.current_frame_slot = 1;
 
-    ROCPerFrameVK context(&render_data, false);
-    auto frame_zero_resource =
+    ROCMultislotsVK context(&allocator, 2, false);
+    auto slot_zero_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 10).template dynamic_cast_ref<IRenderObjectVK>();
-    auto frame_one_resource =
+    auto slot_one_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 11).template dynamic_cast_ref<IRenderObjectVK>();
     auto replacement_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 42).template dynamic_cast_ref<IRenderObjectVK>();
 
-    context.set(0, frame_zero_resource);
-    context.set(1, frame_one_resource);
+    context.set(0, slot_zero_resource);
+    context.set(1, slot_one_resource);
     context.set(1, replacement_resource);
 
-    auto current_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
-    ASSERT_NE(current_resource, MEM_NULL);
-    EXPECT_EQ(current_resource->context_id, 42U);
+    auto default_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
+    ASSERT_NE(default_resource, MEM_NULL);
+    EXPECT_EQ(default_resource->context_id, 10U);
 
     auto other_resource = context.get(0).dynamic_cast_ref<TestContextResourceVK>();
     ASSERT_NE(other_resource, MEM_NULL);
     EXPECT_EQ(other_resource->context_id, 10U);
 }
 
-TEST(WBEROCPerFrameVKTest, RejectsEmptyPublishedBufferUpdate) {
+TEST(WBEROCMultislotsVKTest, RejectsEmptyPublishedBufferUpdate) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 2;
-    ROCPerFrameVK context(&render_data);
+    ROCMultislotsVK context(&allocator, 2);
 
     EXPECT_THROW(context.publish_buffer_update(nullptr, 0, 1), std::runtime_error);
     uint8_t value = 0;
@@ -234,7 +229,7 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     EXPECT_EQ(stored_resource->context_id, 7U);
 }
 
-TEST(WBEROCSingleVKTest, ToStringOmitsFrameIndexAndPreservesMultipleDescriptors) {
+TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescriptors) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     auto resource = make_ref<TestDescriptorResourceVK>(&allocator,
@@ -247,22 +242,21 @@ TEST(WBEROCSingleVKTest, ToStringOmitsFrameIndexAndPreservesMultipleDescriptors)
     DebugDataArray rows = parse_json_array(container.to_string());
 
     ASSERT_EQ(rows.size(), 2U);
-    EXPECT_FALSE(rows[0].contains("frame_index"));
+    EXPECT_FALSE(rows[0].contains("slot_index"));
     EXPECT_EQ(rows[0].get_value<std::string>("resource_type"), "ROBufferVK");
     EXPECT_EQ(rows[0].get_value<std::string>("descriptor_type"), "uniform_buffer");
     EXPECT_EQ(rows[0].get_value<std::string>("device_address"), "0x1234");
     EXPECT_EQ(rows[1].get_value<std::string>("resource_type"), "ROImageViewVK");
     EXPECT_EQ(rows[1].get_value<std::string>("descriptor_type"), "sampled_image");
-    EXPECT_FALSE(rows[1].contains("frame_index"));
+    EXPECT_FALSE(rows[1].contains("slot_index"));
     EXPECT_EQ(rows[1].get_value<std::nullptr_t>("device_address"), nullptr);
 }
 
-TEST(WBEROCPerFrameVKTest, ToStringAddsFrameIndexAndSkipsEmptyResources) {
+TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 3;
 
-    ROCPerFrameVK container(&render_data);
+    ROCMultislotsVK container(&allocator, 3);
     container.set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 4, true)})
@@ -275,19 +269,18 @@ TEST(WBEROCPerFrameVKTest, ToStringAddsFrameIndexAndSkipsEmptyResources) {
     DebugDataArray rows = parse_json_array(container.to_string());
 
     ASSERT_EQ(rows.size(), 2U);
-    EXPECT_EQ(rows[0].get_value<uint32_t>("frame_index"), 0U);
+    EXPECT_EQ(rows[0].get_value<uint32_t>("slot_index"), 0U);
     EXPECT_EQ(rows[0].get_value<uint32_t>("heap_index"), 4U);
-    EXPECT_EQ(rows[1].get_value<uint32_t>("frame_index"), 2U);
+    EXPECT_EQ(rows[1].get_value<uint32_t>("slot_index"), 2U);
     EXPECT_EQ(rows[1].get_value<std::string>("heap"), "sampler");
     EXPECT_EQ(rows[1].get_value<std::nullptr_t>("device_address"), nullptr);
 }
 
-TEST(WBEROCPerFrameVKTest, ToStringDoesNotTriggerFlushSynchronization) {
+TEST(WBEROCMultislotsVKTest, ToStringDoesNotTriggerFlushSynchronization) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    render_data.frames_in_flight = 1;
 
-    ROCPerFrameVK container(&render_data);
+    ROCMultislotsVK container(&allocator, 1);
     container.set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 9, true)})
@@ -299,7 +292,7 @@ TEST(WBEROCPerFrameVKTest, ToStringDoesNotTriggerFlushSynchronization) {
     EXPECT_NO_THROW({
         DebugDataArray rows = parse_json_array(container.to_string());
         ASSERT_EQ(rows.size(), 1U);
-        EXPECT_EQ(rows[0].get_value<uint32_t>("frame_index"), 0U);
+        EXPECT_EQ(rows[0].get_value<uint32_t>("slot_index"), 0U);
     });
 }
 

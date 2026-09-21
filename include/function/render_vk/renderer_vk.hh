@@ -37,7 +37,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -183,7 +183,7 @@ public:
         return &base_render_data;
     }
 
-    Ref<ROCPerFrameVK> get_swap_chain_image_container() const {
+    Ref<ROCMultislotsVK> get_swap_chain_image_container() const {
         return swap_chain_image_container;
     }
 
@@ -262,7 +262,7 @@ private:
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
     Unique<DescriptorHeapAllocatorVK> descriptor_heap_allocator;
-    Ref<ROCPerFrameVK> swap_chain_image_container;
+    Ref<ROCMultislotsVK> swap_chain_image_container;
 
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;

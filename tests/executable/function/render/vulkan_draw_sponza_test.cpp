@@ -37,7 +37,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_static_set_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -62,6 +62,7 @@
 #include <glm/geometric.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/trigonometric.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <memory>
@@ -71,7 +72,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-#include <glm/vec2.hpp>
 #include <vulkan/vulkan_core.h>
 
 constexpr std::string_view REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW = "sponza_depth";
@@ -125,11 +125,12 @@ BillboardInfoVKUBO make_light_billboard_info(const WBE::ComponentSpotLight& p_sp
     };
 }
 
-WBE::Ref<WBE::ROCPerFrameVK> create_per_frame_uniform_buffers(
+WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
     WBE::RenderAllocator* p_allocator, const WBE::BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
-    return WBE::make_ref<WBE::ROCPerFrameVK>(p_allocator,
-        p_render_data,
-        WBE::ROCPerFrameVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
+    return WBE::make_ref<WBE::ROCMultislotsVK>(p_allocator,
+        p_allocator,
+        p_render_data->frames_in_flight,
+        WBE::ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
             return WBE::ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                 .set_domain(WBE::DeviceDomain::HOST_DEVICE)
@@ -179,9 +180,9 @@ private:
     WBE::Ref<WBE::ROImageVK> main_depth_image;
     WBE::Ref<WBE::ROImageViewVK> main_depth_view;
     WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
-    WBE::Ref<WBE::ROCPerFrameVK> camera_info_ubos;
-    WBE::Ref<WBE::ROCPerFrameVK> spot_light_info_ubos;
-    WBE::Ref<WBE::ROCPerFrameVK> spot_light_count_ubos;
+    WBE::Ref<WBE::ROCMultislotsVK> camera_info_ubos;
+    WBE::Ref<WBE::ROCMultislotsVK> spot_light_info_ubos;
+    WBE::Ref<WBE::ROCMultislotsVK> spot_light_count_ubos;
     WBE::ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
@@ -606,7 +607,7 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
     log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza main light buffer");
     log_uniform_buffer_descriptors(spot_light_count_ubos, "forward sponza light count buffer");
 
-    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROCPerFrameVK> p_buffer) {
+    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROCMultislotsVK> p_buffer) {
         p_task.set_descriptor_binding(p_name, p_buffer);
     };
     write_uniform_buffer("camera_info", camera_info_ubos);
@@ -635,13 +636,11 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
     pipeline_desc.tasks.emplace_back(std::move(shadow_masked_task_desc));
 
     WBE::RendTaskDescVK main_opaque_task_desc(render_allocator, RT_RUN_MAIN_OPAQUE, std::move(p_main_opaque_task));
-    main_opaque_task_desc.after(RT_RUN_SHADOWMAP_MASKED)
-        .read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    main_opaque_task_desc.after(RT_RUN_SHADOWMAP_MASKED).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
     pipeline_desc.tasks.emplace_back(std::move(main_opaque_task_desc));
 
     WBE::RendTaskDescVK main_masked_task_desc(render_allocator, RT_RUN_MAIN_MASKED, std::move(p_main_masked_task));
-    main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE)
-        .read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
     pipeline_desc.tasks.emplace_back(std::move(main_masked_task_desc));
 
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);

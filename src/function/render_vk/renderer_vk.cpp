@@ -41,7 +41,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -633,17 +633,17 @@ void RendererVK::refresh_swap_chain_image_container() {
         throw std::runtime_error("RendererVK: swap-chain image views are unavailable.");
     }
 
-    if (swap_chain_image_container == MEM_NULL || swap_chain_image_container->get_context_count() != frames_in_flight) {
-        swap_chain_image_container = make_ref<ROCPerFrameVK>(allocator, &base_render_data, false);
+    if (swap_chain_image_container == MEM_NULL || swap_chain_image_container->get_slot_count() != frames_in_flight) {
+        swap_chain_image_container = make_ref<ROCMultislotsVK>(allocator, allocator, frames_in_flight, false);
     } else {
         swap_chain_image_container->clear();
     }
 
     const uint32_t image_view_count = static_cast<uint32_t>(render_objects->swap_chain_image_views.size());
-    const uint32_t context_count = swap_chain_image_container->get_context_count();
-    for (uint32_t frame_slot = 0; frame_slot < context_count; ++frame_slot) {
-        uint32_t image_index = frame_slot % image_view_count;
-        swap_chain_image_container->set(frame_slot, render_objects->swap_chain_image_views[image_index]);
+    const uint32_t slot_count = swap_chain_image_container->get_slot_count();
+    for (uint32_t slot = 0; slot < slot_count; ++slot) {
+        uint32_t image_index = slot % image_view_count;
+        swap_chain_image_container->set(slot, render_objects->swap_chain_image_views[image_index]);
     }
 }
 

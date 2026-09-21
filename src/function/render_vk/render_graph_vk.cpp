@@ -28,7 +28,7 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <algorithm>
 #include <cstddef>
@@ -48,11 +48,11 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource) {
+Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource, uint32_t p_slot) {
     if (p_resource.container == MEM_NULL) {
         return MEM_NULL;
     }
-    return p_resource.container->get().dynamic_cast_ref<IRenderObjectVK>();
+    return p_resource.container->get(p_slot).dynamic_cast_ref<IRenderObjectVK>();
 }
 
 DebugData make_descriptor_data(const DebugDataRows& p_rows) {
@@ -78,11 +78,11 @@ std::string descriptor_resource_id(const DebugData& p_row) {
     return p_row.get_value<std::string>("resource_id");
 }
 
-int64_t descriptor_frame_index(const DebugData& p_row) {
-    if (!p_row.contains("frame_index")) {
+int64_t descriptor_slot_index(const DebugData& p_row) {
+    if (!p_row.contains("slot_index")) {
         return -1;
     }
-    return static_cast<int64_t>(p_row.get_value<uint32_t>("frame_index"));
+    return static_cast<int64_t>(p_row.get_value<uint32_t>("slot_index"));
 }
 
 std::string descriptor_type_name(const DebugData& p_row) {
@@ -278,11 +278,11 @@ DebugDataRows RendResViewVK::descriptor_debug_data() const {
         return std::make_tuple(descriptor_heap_index(p_left),
                    descriptor_heap(p_left),
                    descriptor_resource_id(p_left),
-                   descriptor_frame_index(p_left),
+                   descriptor_slot_index(p_left),
                    descriptor_type_name(p_left)) < std::make_tuple(descriptor_heap_index(p_right),
                                                        descriptor_heap(p_right),
                                                        descriptor_resource_id(p_right),
-                                                       descriptor_frame_index(p_right),
+                                                       descriptor_slot_index(p_right),
                                                        descriptor_type_name(p_right));
     });
     return rows;
@@ -697,7 +697,7 @@ void RenderGraphVK::record_general_transition(VkCommandBuffer p_command_buffer, 
     QueueFamilyVK queue_family = node_queue_family(p_node);
     for (const auto& write : p_node->writes) {
         const auto& bound_resource = p_resources.get(write.res_id);
-        auto image_view = resolve_render_object(bound_resource).dynamic_cast_ref<ROImageViewVK>();
+        auto image_view = resolve_render_object(bound_resource, render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
         if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
             continue;
         }
@@ -723,7 +723,7 @@ void RenderGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) 
     if (renderer == nullptr) {
         throw std::runtime_error("RenderGraphVK: renderer singleton is unavailable.");
     }
-    Ref<ROCPerFrameVK> swap_chain_images = renderer->get_swap_chain_image_container();
+    Ref<ROCMultislotsVK> swap_chain_images = renderer->get_swap_chain_image_container();
     if (swap_chain_images == MEM_NULL) {
         throw std::runtime_error("RenderGraphVK: swap-chain image container is unavailable.");
     }

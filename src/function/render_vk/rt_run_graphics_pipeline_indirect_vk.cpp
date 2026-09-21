@@ -245,15 +245,18 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     double /*p_delta*/) {
     Ref<ROBufferVK> resolved_vertex_buffer = vertex_buffer;
     if (resolved_vertex_buffer == nullptr) {
-        resolved_vertex_buffer = WBE_REQUIRES_VALID(vertex_buffer_container->get().dynamic_cast_ref<ROBufferVK>());
+        resolved_vertex_buffer =
+            WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
     }
     Ref<ROBufferVK> resolved_index_buffer = index_buffer;
     if (resolved_index_buffer == nullptr) {
-        resolved_index_buffer = WBE_REQUIRES_VALID(index_buffer_container->get().dynamic_cast_ref<ROBufferVK>());
+        resolved_index_buffer =
+            WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
     }
     Ref<ROBufferVK> resolved_indirect_buffer = indirect_buffer;
     if (resolved_indirect_buffer == nullptr) {
-        resolved_indirect_buffer = WBE_REQUIRES_VALID(indirect_buffer_container->get().dynamic_cast_ref<ROBufferVK>());
+        resolved_indirect_buffer =
+            WBE_REQUIRES_VALID(indirect_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
     }
     uint64_t required_draw_count = 0;
     for (const auto& batch : pipeline_batches) {
@@ -284,7 +287,8 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
     color_attachments.reserve(color_attachment_count);
     for (size_t i = 0; i < color_attachment_count; ++i) {
-        auto color_attachment = WBE_REQUIRES_VALID(color_attachment_containers[i]->get().dynamic_cast_ref<ROImageViewVK>());
+        auto color_attachment = WBE_REQUIRES_VALID(
+            color_attachment_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
                 .set_load_op(color_attachment_load_op)
                 .set_clear_value(clear_values[i])
@@ -294,7 +298,8 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     rendering_info.pColorAttachments = color_attachments.data();
     VkRenderingAttachmentInfo depth_attachment_info{};
     if (depth_attachment_id.has_value()) {
-        auto depth_attachment = WBE_REQUIRES_VALID(depth_attachment_container->get().dynamic_cast_ref<ROImageViewVK>());
+        auto depth_attachment = WBE_REQUIRES_VALID(
+            depth_attachment_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
                                     .set_load_op(depth_attachment_load_op)
                                     .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)

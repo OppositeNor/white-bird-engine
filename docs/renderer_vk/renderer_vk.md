@@ -250,7 +250,8 @@ task->set_descriptor_binding("light.lights.shadowmap", shadow_depth_view);
 The resource type must match the field's `WBE_DESCRIPTOR` category. Buffers bind as complete `ROBufferVK` objects; image fields
 take `ROImageViewVK`, and sampler fields take `ROSamplerVK`. The pipeline retains directly bound resources for its lifetime.
 
-For frame-local resources, pass an `ROCPerFrameVK` container instead of resolving one slot manually:
+`ROCMultislotsVK` is a general container for arbitrary slot-indexed resources and is widely used for frame-local resources. Pass
+the container instead of resolving one frame slot manually:
 
 ```cpp
 task->set_descriptor_binding("camera_info", camera_buffers);

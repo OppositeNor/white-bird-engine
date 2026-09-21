@@ -830,8 +830,8 @@ void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, double /*p_delta
     Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
     color_attachments.reserve(attachment_data.color_attachment_ids.size());
     for (size_t i = 0; i < attachment_data.color_attachment_ids.size(); ++i) {
-        Ref<ROImageViewVK> color_attachment =
-            WBE_REQUIRES_VALID(color_attachment_containers[i]->get().dynamic_cast_ref<ROImageViewVK>());
+        Ref<ROImageViewVK> color_attachment = WBE_REQUIRES_VALID(
+            color_attachment_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
                 .set_load_op(config.get_color_attachment_load_op())
                 .set_clear_value(attachment_data.clear_values[i])
@@ -847,8 +847,8 @@ void RTRunStaticSetVK::record(VkCommandBuffer p_command_buffer, double /*p_delta
 
     VkRenderingAttachmentInfo depth_attachment_info{};
     if (attachment_data.depth_attachment_id.has_value()) {
-        Ref<ROImageViewVK> depth_attachment =
-            WBE_REQUIRES_VALID(depth_attachment_container->get().dynamic_cast_ref<ROImageViewVK>());
+        Ref<ROImageViewVK> depth_attachment = WBE_REQUIRES_VALID(
+            depth_attachment_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
                                     .set_load_op(config.get_depth_attachment_load_op())
                                     .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)

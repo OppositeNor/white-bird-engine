@@ -19,7 +19,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "platform/os/os.hh"
 #include <algorithm>
 #include <cctype>
@@ -210,7 +210,7 @@ inline WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::ComponentSpot
         .emitter_width = p_spot_light_component.emitter_width};
 }
 
-inline void log_uniform_buffer_descriptors(WBE::Ref<WBE::ROCPerFrameVK> p_buffers, std::string_view p_label) {
+inline void log_uniform_buffer_descriptors(WBE::Ref<WBE::ROCMultislotsVK> p_buffers, std::string_view p_label) {
     WBE::write_descriptor_debug_output(std::format("{}_descriptors", p_label), p_buffers->to_string());
 }
 

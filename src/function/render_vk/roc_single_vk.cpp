@@ -34,7 +34,7 @@ ROCSingleVK::ROCSingleVK(Ref<IRenderObjectVK> p_resource) : resource(std::move(p
 
 void ROCSingleVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) {
     if (p_frame_slot != 0) {
-        throw std::runtime_error("ROCSingleVK: frame slot is out of range.");
+        throw std::runtime_error("ROCSingleVK: slot is out of range.");
     }
     resource = std::move(p_resource);
     retain_resource_type(resource);
@@ -42,7 +42,7 @@ void ROCSingleVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) {
 
 void ROCSingleVK::clear(uint32_t p_frame_slot) {
     if (p_frame_slot != 0) {
-        throw std::runtime_error("ROCSingleVK: frame slot is out of range.");
+        throw std::runtime_error("ROCSingleVK: slot is out of range.");
     }
     resource = MEM_NULL;
 }

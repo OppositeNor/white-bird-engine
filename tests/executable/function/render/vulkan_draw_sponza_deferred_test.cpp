@@ -39,7 +39,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/roc_per_frame_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
@@ -98,11 +98,12 @@ BillboardInfoVKUBO make_light_billboard_info(const ComponentSpotLight& p_spot_li
     };
 }
 
-Ref<ROCPerFrameVK> create_per_frame_uniform_buffers(
+Ref<ROCMultislotsVK> create_per_frame_uniform_buffers(
     RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
-    return make_ref<ROCPerFrameVK>(p_allocator,
-        p_render_data,
-        ROCPerFrameVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
+    return make_ref<ROCMultislotsVK>(p_allocator,
+        p_allocator,
+        p_render_data->frames_in_flight,
+        ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
             return ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                 .set_domain(DeviceDomain::HOST_DEVICE)
@@ -181,8 +182,8 @@ private:
 
     void control(double p_delta);
     void update_descriptors();
-    void write_task_uniform_bindings(std::span<const TaskUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
-    void write_compute_uniform_bindings(std::span<const ComputeUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container);
+    void write_task_uniform_bindings(std::span<const TaskUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container);
+    void write_compute_uniform_bindings(std::span<const ComputeUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container);
 
     void setup_render_context();
     void load_resources();
@@ -297,9 +298,9 @@ private:
     Ref<ROSamplerVK> shadow_sampler;
     Ref<ROSamplerVK> gbuffer_sampler;
     Ref<ROSamplerVK> bloom_sampler;
-    Ref<ROCPerFrameVK> gbuffer_camera_info_ubos;
-    Ref<ROCPerFrameVK> composition_camera_info_ubos;
-    Ref<ROCPerFrameVK> spot_light_info_ubos;
+    Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
+    Ref<ROCMultislotsVK> composition_camera_info_ubos;
+    Ref<ROCMultislotsVK> spot_light_info_ubos;
     Ref<ROBufferVK> light_billboard_ubo;
     Ref<ROSamplerVK> light_billboard_sampler;
     std::vector<TaskUniformBinding> gbuffer_camera_bindings;
@@ -437,8 +438,8 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
     add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info, light_billboard_info]() {
-        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL || spot_light_info_ubos == MEM_NULL ||
-            light_billboard_ubo == MEM_NULL) {
+        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL ||
+            spot_light_info_ubos == MEM_NULL || light_billboard_ubo == MEM_NULL) {
             throw std::runtime_error("Failed to update deferred descriptors: per-frame uniform buffers are not initialized.");
         }
         gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
@@ -449,7 +450,7 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::write_task_uniform_bindings(
-    std::span<const TaskUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container) {
+    std::span<const TaskUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container) {
     if (p_buffer_container == MEM_NULL) {
         throw std::runtime_error("Failed to write deferred task uniform bindings: buffer container is null.");
     }
@@ -462,7 +463,7 @@ void ApplicationVulkanDeferredPBRTest::write_task_uniform_bindings(
 }
 
 void ApplicationVulkanDeferredPBRTest::write_compute_uniform_bindings(
-    std::span<const ComputeUniformBinding> p_bindings, Ref<ROCPerFrameVK> p_buffer_container) {
+    std::span<const ComputeUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container) {
     if (p_buffer_container == MEM_NULL) {
         throw std::runtime_error("Failed to write deferred compute uniform bindings: buffer container is null.");
     }
@@ -772,8 +773,8 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                               .set_format(LIGHTING_OUTPUT_FORMAT)
                               .image_2d(extent)
                               .set_mipmap_level(bloom_mipmap_level_count)
-                              .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                         VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                              .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                               .create_ref(base_render_data);
     bloom_horizontal_image = ROImageVK::Builder()
                                  .set_format(LIGHTING_OUTPUT_FORMAT)
@@ -805,16 +806,14 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                                    .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                                    .set_format(LIGHTING_OUTPUT_FORMAT)
                                    .create_ref(base_render_data);
-    bloom_downsampled_image_view = ROImageViewVK::Builder()
-                                       .set_image(bloom_extract_image)
-                                       .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                       .set_format(LIGHTING_OUTPUT_FORMAT)
-                                       .set_subresource_range(VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                           .baseMipLevel = bloom_mipmap_level,
-                                           .levelCount = 1,
-                                           .baseArrayLayer = 0,
-                                           .layerCount = 1})
-                                       .create_ref(base_render_data);
+    bloom_downsampled_image_view =
+        ROImageViewVK::Builder()
+            .set_image(bloom_extract_image)
+            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+            .set_format(LIGHTING_OUTPUT_FORMAT)
+            .set_subresource_range(VkImageSubresourceRange{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = bloom_mipmap_level, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
+            .create_ref(base_render_data);
     bloom_horizontal_image_view = ROImageViewVK::Builder()
                                       .set_image(bloom_horizontal_image)
                                       .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
@@ -1297,9 +1296,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_EXTRACT_BLOOM;
-    task_desc.after(RT_COMBINE_LIGHTING)
-        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(BLOOM_EXTRACT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+    task_desc.after(RT_COMBINE_LIGHTING).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).write(BLOOM_EXTRACT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = bloom_extract_compute_pipeline]() -> Unique<RenderTaskVK> {

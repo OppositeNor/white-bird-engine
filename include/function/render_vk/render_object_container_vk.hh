@@ -41,33 +41,33 @@ public:
     virtual Ref<IRenderObject> get() const override = 0;
 
     /**
-     * @brief Resolve the resource for an explicit frame slot.
-     * @param p_frame_slot Frame slot to resolve.
+     * @brief Resolve the resource for an explicit slot.
+     * @param p_slot Slot in the container.
      * @return Resolved render object.
      */
-    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) override = 0;
+    virtual Ref<IRenderObject> get(uint32_t p_slot) override = 0;
 
     /**
-     * @brief Resolve the resource for an explicit frame slot.
-     * @param p_frame_slot Frame slot to resolve.
+     * @brief Resolve the resource for an explicit slot.
+     * @param p_slot Slot in the container.
      * @return Resolved render object.
      */
-    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) const override = 0;
+    virtual Ref<IRenderObject> get(uint32_t p_slot) const override = 0;
 
     /**
      * @brief Replace the resource bound to one explicit slot.
      *
-     * @param p_frame_slot Slot index to update.
+     * @param p_slot Slot index to update.
      * @param p_resource Replacement resource.
      */
-    virtual void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) = 0;
+    virtual void set(uint32_t p_slot, Ref<IRenderObjectVK> p_resource) = 0;
 
     /**
      * @brief Clear the resource bound to one explicit slot.
      *
-     * @param p_frame_slot Slot index to clear.
+     * @param p_slot Slot index to clear.
      */
-    virtual void clear(uint32_t p_frame_slot) = 0;
+    virtual void clear(uint32_t p_slot) = 0;
 
     /**
      * @brief Clear all slot bindings retained by this container.
@@ -77,7 +77,7 @@ public:
     /**
      * @brief Return structured descriptor-debug rows owned by this container.
      *
-     * Implementations must inspect only already-bound resources and must not allocate descriptors or synchronize per-frame state.
+     * Implementations must inspect only already-bound resources and must not allocate descriptors or synchronize per-slot state.
      *
      * @return Flattened descriptor-debug rows.
      */
