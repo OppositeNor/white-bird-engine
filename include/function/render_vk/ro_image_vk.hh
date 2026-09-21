@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <future>
 #include <set>
+#include <span>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -191,7 +192,19 @@ public:
      * @return A future containing the linear image bytes.
      * @throws std::runtime_error if the image cannot be copied or no engine worker is available.
      */
-    std::future<std::vector<uint8_t>> acquire_image_content();
+    std::future<std::vector<uint8_t>> acquire_image_content() const;
+
+    /**
+     * @brief Acquire every mip level and array layer into caller-owned storage.
+     *
+     * The destination receives the same tightly packed byte sequence as acquire_image_content(). The destination storage and
+     * this image must remain alive until the returned future completes.
+     *
+     * @param p_destination CPU storage that receives the image bytes.
+     * @return A future completed after the destination has been populated.
+     * @throws std::runtime_error If the destination is too small, the image cannot be copied, or no engine worker is available.
+     */
+    std::future<void> acquire_image_content(std::span<uint8_t> p_destination) const;
 
     struct ExposedFields {
         /**

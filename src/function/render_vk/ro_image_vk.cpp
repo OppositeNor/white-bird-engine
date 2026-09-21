@@ -68,6 +68,14 @@ struct ImageReadbackPlan {
     VkImageAspectFlags aspect = 0;
 };
 
+struct ImageReadbackOperation {
+    std::future<Ref<ROFenseVK>> submission_future;
+    Ref<ROStagingBufferVK> staging_buffer;
+    const void* mapped_memory = nullptr;
+    size_t output_size = 0;
+    std::vector<ImageReadbackSegment> segments;
+};
+
 VkDeviceSize align_copy_offset(VkDeviceSize p_offset) {
     constexpr VkDeviceSize COPY_OFFSET_ALIGNMENT = 4;
     if (p_offset > std::numeric_limits<VkDeviceSize>::max() - (COPY_OFFSET_ALIGNMENT - 1)) {
@@ -222,29 +230,90 @@ void record_image_readback(VkCommandBuffer p_command_buffer,
     vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
 }
 
-std::vector<uint8_t> finish_image_readback(std::future<Ref<ROFenseVK>> p_submission_future,
-    Ref<ROStagingBufferVK> p_staging_buffer,
-    const void* p_mapped_memory,
-    size_t p_output_size,
-    std::vector<ImageReadbackSegment> p_segments) {
+ImageReadbackOperation begin_image_readback(
+    const ROImageVK::ExposedFields& p_fields, const BaseRenderDataVK* p_render_data, ImageReadbackPlan p_plan) {
+    RendererVK* renderer = RendererVK::get_singleton();
+    if (renderer == nullptr) {
+        throw std::runtime_error("Failed to acquire image content: the Vulkan renderer is unavailable.");
+    }
+
+    // Allocate a dedicated mapped staging buffer that remains alive through the worker copy.
+    const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(static_cast<size_t>(p_plan.buffer_size));
+    Ref<ROStagingBufferVK> staging_buffer =
+        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(p_render_data);
+    const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(static_cast<size_t>(p_plan.buffer_size));
+    for (VkBufferImageCopy& copy_region : p_plan.copy_regions) {
+        // Translate plan-relative offsets into the staging buffer's suballocation.
+        copy_region.bufferOffset += staging_allocation.offset;
+    }
+
+    // Preserve the current layout so the GPU job can restore it after the transfer.
+    const VkImageSubresourceRange subresource_range{.aspectMask = p_plan.aspect,
+        .baseMipLevel = 0,
+        .levelCount = p_fields.mipmap_levels,
+        .baseArrayLayer = 0,
+        .layerCount = p_fields.layers_count};
+
+    // Register the GPU copy and receive its completion fence only after queue submission succeeds.
+    std::future<Ref<ROFenseVK>> submission_future =
+        renderer->register_gpu_job([image = p_fields.image,
+                                       image_layout = p_fields.image_layout,
+                                       subresource_range,
+                                       staging_buffer,
+                                       staging_offset = staging_allocation.offset,
+                                       buffer_size = p_plan.buffer_size,
+                                       copy_regions = std::move(p_plan.copy_regions)](VkCommandBuffer p_command_buffer) {
+            record_image_readback(
+                p_command_buffer, image, image_layout, subresource_range, staging_buffer, staging_offset, buffer_size, copy_regions);
+        });
+
+    return ImageReadbackOperation{.submission_future = std::move(submission_future),
+        .staging_buffer = std::move(staging_buffer),
+        .mapped_memory = staging_allocation.data,
+        .output_size = p_plan.output_size,
+        .segments = std::move(p_plan.segments)};
+}
+
+void finish_image_readback(ImageReadbackOperation p_operation, std::span<uint8_t> p_destination) {
     // Wait until queue submission has finished before accessing its externally synchronized Vulkan fence.
-    Ref<ROFenseVK> completion_fense = p_submission_future.get();
+    Ref<ROFenseVK> completion_fense = p_operation.submission_future.get();
     completion_fense->wait();
 
     // Remove Vulkan's per-mip alignment gaps while assembling the tightly packed CPU result.
-    std::vector<uint8_t> content(p_output_size);
-    for (const ImageReadbackSegment& segment : p_segments) {
-        std::memcpy(content.data() + segment.output_offset,
-            static_cast<const uint8_t*>(p_mapped_memory) + segment.buffer_offset,
+    for (const ImageReadbackSegment& segment : p_operation.segments) {
+        std::memcpy(p_destination.data() + segment.output_offset,
+            static_cast<const uint8_t*>(p_operation.mapped_memory) + segment.buffer_offset,
             segment.size);
     }
 
     // Transfer final render-object ownership back to the rendering thread for delayed destruction.
-    RendererVK::get_singleton()->add_job([completion_fense, p_staging_buffer]() {
+    RendererVK::get_singleton()->add_job([completion_fense, staging_buffer = p_operation.staging_buffer]() {
         static_cast<void>(completion_fense);
-        static_cast<void>(p_staging_buffer);
+        static_cast<void>(staging_buffer);
     });
-    return content;
+}
+
+template <typename TCompletion>
+auto schedule_image_readback(
+    const ROImageVK::ExposedFields& p_fields, const BaseRenderDataVK* p_render_data, size_t p_destination_size, TCompletion p_completion) {
+    Worker* worker = Worker::get_singleton();
+    if (worker == nullptr) {
+        throw std::runtime_error("Failed to acquire image content: the engine worker is unavailable.");
+    }
+
+    // Validate and size the complete readback before registering GPU work.
+    validate_image_readback(p_fields);
+    ImageReadbackPlan plan = build_image_readback_plan(p_fields);
+    if (p_destination_size < plan.output_size) {
+        throw std::runtime_error(std::format(
+            "Failed to acquire image content: destination has {} bytes but {} bytes are required.", p_destination_size, plan.output_size));
+    }
+    ImageReadbackOperation operation = begin_image_readback(p_fields, p_render_data, std::move(plan));
+
+    // Use one worker task for the fence wait, CPU copy, and overload-specific result assembly.
+    return worker->submit_task([operation = std::move(operation), completion = std::move(p_completion)]() mutable {
+        return completion(std::move(operation));
+    });
 }
 
 } // namespace
@@ -517,58 +586,17 @@ void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<R
     apply_upload_barrier(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 }
 
-std::future<std::vector<uint8_t>> ROImageVK::acquire_image_content() {
-    // Resolve the systems that submit GPU work and wait for its completion.
-    Worker* worker = Worker::get_singleton();
-    if (worker == nullptr) {
-        // Acquiring asynchronously requires an active engine worker pool.
-        throw std::runtime_error("Failed to acquire image content: the engine worker is unavailable.");
-    }
-    RendererVK* renderer = RendererVK::get_singleton();
+std::future<std::vector<uint8_t>> ROImageVK::acquire_image_content() const {
+    return schedule_image_readback(exposed_fields, render_data, std::numeric_limits<size_t>::max(), [](ImageReadbackOperation p_operation) {
+        std::vector<uint8_t> content(p_operation.output_size);
+        finish_image_readback(std::move(p_operation), content);
+        return content;
+    });
+}
 
-    // Validate the image and calculate one copy region for each mip level.
-    validate_image_readback(exposed_fields);
-    ImageReadbackPlan plan = build_image_readback_plan(exposed_fields);
-
-    // Allocate a dedicated mapped staging buffer that remains alive through the worker copy.
-    const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(static_cast<size_t>(plan.buffer_size));
-    Ref<ROStagingBufferVK> staging_buffer =
-        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(render_data);
-    const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(static_cast<size_t>(plan.buffer_size));
-    for (VkBufferImageCopy& copy_region : plan.copy_regions) {
-        // Translate plan-relative offsets into the staging buffer's suballocation.
-        copy_region.bufferOffset += staging_allocation.offset;
-    }
-
-    // Preserve the current layout so the GPU job can restore it after the transfer.
-    const VkImage image = exposed_fields.image;
-    const VkImageLayout image_layout = exposed_fields.image_layout;
-    const VkImageSubresourceRange subresource_range{.aspectMask = plan.aspect,
-        .baseMipLevel = 0,
-        .levelCount = exposed_fields.mipmap_levels,
-        .baseArrayLayer = 0,
-        .layerCount = exposed_fields.layers_count};
-
-    // Register the GPU copy and receive its completion fence only after queue submission succeeds.
-    std::future<Ref<ROFenseVK>> submission_future =
-        renderer->register_gpu_job([image,
-                                       image_layout,
-                                       subresource_range,
-                                       staging_buffer,
-                                       staging_offset = staging_allocation.offset,
-                                       buffer_size = plan.buffer_size,
-                                       copy_regions = std::move(plan.copy_regions)](VkCommandBuffer p_command_buffer) {
-            record_image_readback(
-                p_command_buffer, image, image_layout, subresource_range, staging_buffer, staging_offset, buffer_size, copy_regions);
-        });
-
-    // Let a worker wait for GPU completion and assemble the tightly packed CPU byte buffer.
-    return worker->submit_task([submission_future = std::move(submission_future),
-                                   staging_buffer,
-                                   mapped_memory = staging_allocation.data,
-                                   output_size = plan.output_size,
-                                   segments = std::move(plan.segments)]() mutable {
-        return finish_image_readback(std::move(submission_future), staging_buffer, mapped_memory, output_size, std::move(segments));
+std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destination) const {
+    return schedule_image_readback(exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation p_operation) {
+        finish_image_readback(std::move(p_operation), p_destination);
     });
 }
 
