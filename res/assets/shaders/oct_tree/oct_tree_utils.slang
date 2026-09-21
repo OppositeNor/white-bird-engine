@@ -111,9 +111,7 @@ struct OctTreeInfo {
 
 [WBE_DATA_TYPE]
 struct OctTreeBuildDeferredTask {
-    float3 deepest_node_svo_position;
-    uint deepest_node_index;
-    uint remain_depth;
+    OctTreeNodeTraceInfo unfinished_trace_info;
 };
 
 uint get_oct_tree_node_subregion(float3 p_position)

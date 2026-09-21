@@ -45,11 +45,7 @@ void step_deferred_task(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctTreeBuildDeferredList> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
     OctTreeBuildDeferredTask task = deferred_list_read[p_dispatch_thread_id];
 
-    OctTreeNodeTraceInfo trace_info;
-    trace_info.state = OctTreeNode::ChildState::NODE;
-    trace_info.node_index = task.deepest_node_index;
-    trace_info.svo_position = task.deepest_node_svo_position;
-    trace_info.remain_depth = task.remain_depth;
+    OctTreeNodeTraceInfo trace_info = task.unfinished_trace_info;
     // We trace and expect it to hit a leaf.
     traverse_oct_tree(tree_nodes, trace_info);
     switch (trace_info.state) {
