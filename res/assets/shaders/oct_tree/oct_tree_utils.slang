@@ -20,7 +20,7 @@ struct OctTreeNode {
     static const uint STATE_MASK = 0xC0000000u;
     static const uint INDEX_MASK = 0x3FFFFFFFu;
     static const uint32_t STATE_SHIFT = 30;
-    enum class ChildrenState {
+    enum class ChildState {
         NODE = 0b00 << STATE_SHIFT,
         EMPTY = 0b01 << STATE_SHIFT,
         ALLOCATING = 0b10 << STATE_SHIFT,
@@ -84,27 +84,37 @@ struct OctTreeInfo {
      */
     float width;
     /**
-     * @brief The resolution of the oct tree. This should be a power of 2.
+     * @brief The maximum depth of the oct tree.
      */
-    uint resolution;
+    uint max_depth;
     /**
-     * @brief The stride for data blocks.
+     * @brief The stride for data blocks. Must be a multiple of 4.
      */
     uint data_stride;
     /**
      * @brief The number of nodes.
      */
-    uint node_count;
+    Atomic<uint> node_count;
     /**
      * @brief The number of leaves.
      */
-    uint leaves_count;
+    Atomic<uint> leaves_count;
     /**
      * @brief The number of data blocks.
      */
-    uint data_count;
+    Atomic<uint> data_count;
+    /**
+     * @brief The number of deferred tasks.
+     */
+    Atomic<uint> deferred_task_count;
 };
 
+[WBE_DATA_TYPE]
+struct OctTreeBuildDeferredTask {
+    float3 deepest_node_svo_position;
+    uint deepest_node_index;
+    uint remain_depth;
+};
 
 uint get_oct_tree_node_subregion(float3 p_position)
 {
@@ -115,35 +125,40 @@ uint get_oct_tree_node_subregion(float3 p_position)
 
 struct OctTreeNodeTraceInfo {
     // The state of the next deeper node. If remain_depth is 0, this will be set to 0.
-    uint state;
-    // The node if traced, or the deepest node traced, if blocked.
-    OctTreeNode node;
+    OctTreeNode::ChildState state;
+    // The index of the node.
+    uint node_index;
+    // The child index, if the traverse path is blocked.
+    uint child_index;
     // The position in the node's svo space.
     float3 svo_position;
     // The remain depth.
     int remain_depth;
 };
 
-void traverse_oct_tree(OctTreeNode* p_nodes, inout OctTreeNodeTraceInfo p_trace_info) {
-    uint node_index = 0;
+void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNodeTraceInfo p_trace_info) {
+    uint node_index = p_trace_info.node_index;
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
         OctTreeNode node = p_nodes[node_index];
         uint child_index = get_oct_tree_node_subregion(p_trace_info.svo_position);
         uint entry = node.children[child_index];
-        if ((entry & OctTreeNode::STATE_MASK) != 0) {
+        OctTreeNode::ChildState child_state = (OctTreeNode::ChildState)(entry & OctTreeNode::STATE_MASK);
+        if (child_state != OctTreeNode::ChildState::NODE) {
             // Traced to an empty/allocating/leaf node, set p_state and return.
-            p_trace_info.state = entry;
-            p_trace_info.node = node;
-            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : depth;
+            p_trace_info.state = child_state;
+            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
+            p_trace_info.node_index = node_index;
+            p_trace_info.child_index = child_index;
             return;
         }
         node_index = entry & OctTreeNode::INDEX_MASK;
         // Remap from parent-local coordinates into child-local coordinates.
         p_trace_info.svo_position = frac(p_trace_info.svo_position * 2.0);
     }
-    // We've successfully traced the node.
-    p_trace_info.state = 0;
-    p_trace_info.node = p_nodes[node_index];
+    // We've traced a node.
+    p_trace_info.state = OctTreeNode::ChildState::NODE;
+    p_trace_info.child_index = 0;
+    p_trace_info.node_index = node_index;
 }
 
 #endif
