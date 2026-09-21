@@ -15,7 +15,6 @@
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "core/async/worker.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"

@@ -63,6 +63,7 @@ void step_deferred_task(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         if (trace_info.remain_depth != 1) {
             // TODO: Currupted tree: There's a leaf not at the bottom level.
         }
+        // The tree node for this path is complete. No need to further traverse.
         return;
     }
 }
