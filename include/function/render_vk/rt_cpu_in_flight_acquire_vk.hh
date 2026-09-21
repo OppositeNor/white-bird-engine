@@ -67,21 +67,16 @@ public:
         std::atomic_bool* p_acquire_requested,
         std::binary_semaphore* p_completion_semaphore);
 
-    /** @copydoc RenderTaskVK::queue_family */
     QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    /** @copydoc RenderTaskVK::read_resources */
     Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
-    /** @copydoc RenderTaskVK::write_resources */
     Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    /** @copydoc RenderTaskVK::bind_resources */
     void bind_resources(const RendResViewVK& p_resources) override;
 
-    /** @copydoc RenderTaskVK::record */
     void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:

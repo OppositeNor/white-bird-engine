@@ -110,7 +110,7 @@ struct OctTreeInfo {
 };
 
 [WBE_DATA_TYPE]
-struct OctTreeBuildDeferredTask {
+struct OctTreeDeferredListEntry {
     OctTreeNodeTraceInfo unfinished_trace_info;
 };
 
@@ -207,6 +207,7 @@ bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStruct
     else {
         p_nodes[p_node_index].children[p_child_index] = create_oct_tree_child_node(p_nodes, p_tree_info, p_node_index);
     }
+    return true;
 }
 
 bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
@@ -257,6 +258,7 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
     p_trace_info.child_index = 0;
     p_trace_info.node_index = node_index;
     p_trace_info.curr_depth = curr_depth;
+    return true;
 }
 
 #endif

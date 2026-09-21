@@ -82,9 +82,6 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 VertexInputDescriptionVK build_vertex_input_description_vk(
     const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data);
 
-/**
- * @copydoc build_vertex_input_description_vk(const ShaderMetadata&, std::string_view, const RUVertexView&)
- */
 VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
     std::string_view p_entry_name,
     const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout);

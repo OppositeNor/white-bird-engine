@@ -657,9 +657,6 @@ struct RUSubmesh3D : public ResourceUnit {
     /** Binary-backed uint32 indices. */
     RUIndexView indices;
 
-    /**
-     * @copydoc RUVertexView::swap_vertices
-     */
     void swap_vertices(size_t p_first, size_t p_second);
     /** Set an exact float scalar attribute. */
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, float p_value);
@@ -685,9 +682,7 @@ struct RUSubmesh3D : public ResourceUnit {
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec3& p_value);
     /** Set an exact unsigned 32-bit integer4 attribute. */
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec4& p_value);
-    /**
-     * @copydoc RUVertexView::get_vertex_attribute_offset
-     */
+
     size_t get_vertex_attribute_offset(std::string_view p_role) const;
     /**
      * @brief Return the byte stride between vertices.

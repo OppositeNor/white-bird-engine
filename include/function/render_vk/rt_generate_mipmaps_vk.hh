@@ -60,21 +60,16 @@ struct RTGenerateMipmapsVK final : public RenderTaskVK {
         uint32_t p_mipmap_level_count,
         VkFormat p_format);
 
-    /** @copydoc RenderTaskVK::queue_family */
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    /** @copydoc RenderTaskVK::read_resources */
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
 
-    /** @copydoc RenderTaskVK::write_resources */
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
-    /** @copydoc RenderTaskVK::bind_resources */
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 
-    /** @copydoc RenderTaskVK::record */
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:

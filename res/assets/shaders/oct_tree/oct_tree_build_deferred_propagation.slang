@@ -41,29 +41,16 @@ void step_deferred_task(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<OctTreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     RWStructuredBuffer<uint> tree_node_data = ResourceDescriptorHeap[descriptor_indices.node_data.x];
-    StructuredBuffer<OctTreeBuildDeferredTask> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
-    RWStructuredBuffer<OctTreeBuildDeferredList> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
+    StructuredBuffer<OctTreeDeferredListEntry> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
+    RWStructuredBuffer<OctTreeDeferredListEntry> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
     OctTreeBuildDeferredTask task = deferred_list_read[p_dispatch_thread_id];
 
     OctTreeNodeTraceInfo trace_info = task.unfinished_trace_info;
-    // We trace and expect it to hit a leaf.
-    traverse_oct_tree(tree_nodes, trace_info);
-    switch (trace_info.state) {
-    case OctTreeNode::ChildState::NODE:
-        // TODO: Currupted tree: There's a node deeper than the max depth.
-        return;
-    case OctTreeNode::ChildState::ALLOCATING:
-        // TODO: Another thread is allocating the children node. Add this task to deferred.
-        return;
-    case OctTreeNode::ChildState::EMPTY:
-        // TODO: Try allocate the node.
-        break;
-    case OctTreeNode::ChildState::LEAF:
-        // Hits a leaf.
-        if (trace_info.remain_depth != 1) {
-            // TODO: Currupted tree: There's a leaf not at the bottom level.
-        }
-        // The tree node for this path is complete. No need to further traverse.
-        return;
+    // Try to allocate the node.
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info)) {
+        // If allocation failed, push this to the deferred list.
+        uint new_task_index;
+        InterlockedAdd(oct_tree_info[0].deferred_task_count, 1, new_task_index);
+        deferred_list_write[new_task_index].unfinished_trace_info = trace_info;
     }
 }
