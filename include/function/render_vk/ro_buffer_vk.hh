@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RO_BUFFER_VK_HH
 #define WBE_FILE_RO_BUFFER_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -203,6 +204,10 @@ public:
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The buffer to set barrier on.
         Ref<ROBufferVK> buffer;
+        // Raw buffer handle used when the buffer is owned by another render-object type.
+        VkBuffer buffer_handle = VK_NULL_HANDLE;
+        // Total size of the raw buffer.
+        VkDeviceSize buffer_size = 0;
         // The offset of the data to apply barrier on in the buffer.
         VkDeviceSize offset = 0;
         // The size of the data to apply barrier on in the buffer. If set to 0,
@@ -278,6 +283,26 @@ public:
          */
         MemoryBarrierBuilder& set_buffer(Ref<ROBufferVK> p_buffer) {
             buffer = p_buffer;
+            buffer_handle = p_buffer->get_buffer();
+            buffer_size = p_buffer->fields().buffer_size;
+            return *this;
+        }
+
+        /**
+         * @brief Set a raw buffer handle and its total size.
+         *
+         * This overload does not retain a render object. The caller must keep the buffer alive until command execution finishes.
+         *
+         * @param p_buffer The Vulkan buffer handle.
+         * @param p_buffer_size The total buffer size in bytes.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_buffer(VkBuffer p_buffer, VkDeviceSize p_buffer_size) {
+            WBE_DEBUG_ASSERT(p_buffer != VK_NULL_HANDLE);
+            WBE_DEBUG_ASSERT(p_buffer_size > 0);
+            buffer = MEM_NULL;
+            buffer_handle = p_buffer;
+            buffer_size = p_buffer_size;
             return *this;
         }
 

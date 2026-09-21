@@ -4,16 +4,18 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
+   */
 #include "function/render_vk/ro_image_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/async/worker.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
@@ -21,22 +23,231 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_fense_vk.hh"
+#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
+#include "vulkan/vulkan.hpp"
+#include <algorithm>
+#include <array>
 #include <cstdint>
+#include <cstring>
 #include <format>
+#include <future>
 #include <glm/glm.hpp>
+#include <limits>
 #include <set>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_format_traits.hpp>
 
 namespace WhiteBirdEngine {
+
+namespace {
+
+struct ImageReadbackSegment {
+    VkDeviceSize buffer_offset = 0;
+    size_t output_offset = 0;
+    size_t size = 0;
+};
+
+struct ImageReadbackPlan {
+    std::vector<VkBufferImageCopy> copy_regions;
+    std::vector<ImageReadbackSegment> segments;
+    VkDeviceSize buffer_size = 0;
+    size_t output_size = 0;
+    VkImageAspectFlags aspect = 0;
+};
+
+VkDeviceSize align_copy_offset(VkDeviceSize p_offset) {
+    constexpr VkDeviceSize COPY_OFFSET_ALIGNMENT = 4;
+    if (p_offset > std::numeric_limits<VkDeviceSize>::max() - (COPY_OFFSET_ALIGNMENT - 1)) {
+        throw std::runtime_error("Failed to acquire image content: aligned image byte size exceeds the CPU address space.");
+    }
+    return (p_offset + COPY_OFFSET_ALIGNMENT - 1) & ~(COPY_OFFSET_ALIGNMENT - 1);
+}
+
+uint64_t checked_multiply(uint64_t p_left, uint64_t p_right) {
+    if (p_right != 0 && p_left > std::numeric_limits<uint64_t>::max() / p_right) {
+        throw std::runtime_error("Failed to acquire image content: image byte size exceeds the CPU address space.");
+    }
+    return p_left * p_right;
+}
+
+size_t checked_image_level_size(
+    VkExtent3D p_extent, const std::array<uint8_t, 3>& p_block_extent, uint8_t p_block_size, uint32_t p_layers_count) {
+    const uint64_t block_count_x = (static_cast<uint64_t>(p_extent.width) + p_block_extent[0] - 1) / p_block_extent[0];
+    const uint64_t block_count_y = (static_cast<uint64_t>(p_extent.height) + p_block_extent[1] - 1) / p_block_extent[1];
+    const uint64_t block_count_z = (static_cast<uint64_t>(p_extent.depth) + p_block_extent[2] - 1) / p_block_extent[2];
+    uint64_t byte_count = checked_multiply(block_count_x, block_count_y);
+    byte_count = checked_multiply(byte_count, block_count_z);
+    byte_count = checked_multiply(byte_count, p_block_size);
+    byte_count = checked_multiply(byte_count, p_layers_count);
+    if (byte_count > std::numeric_limits<size_t>::max()) {
+        throw std::runtime_error("Failed to acquire image content: image byte size exceeds the CPU address space.");
+    }
+    return static_cast<size_t>(byte_count);
+}
+
+VkImageAspectFlags readback_aspect(VkFormat p_format) {
+    const vk::Format format = static_cast<vk::Format>(p_format);
+    if (vk::planeCount(format) != 1) {
+        // A multiplanar image needs one independently described copy per plane.
+        throw std::runtime_error("Failed to acquire image content: multiplanar formats are not supported.");
+    }
+    const bool has_depth = vk::hasDepthComponent(format);
+    const bool has_stencil = vk::hasStencilComponent(format);
+    if (has_depth && has_stencil) {
+        // Combined depth-stencil packing cannot be represented by this single-aspect linear result.
+        throw std::runtime_error("Failed to acquire image content: combined depth-stencil formats are not supported.");
+    }
+    if (has_depth) {
+        // Copy only the depth aspect of a depth-only image.
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+    if (has_stencil) {
+        // Copy only the stencil aspect of a stencil-only image.
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    if (!vk::isColor(format)) {
+        // Reject formats that Vulkan does not expose as a copyable color, depth, or stencil aspect.
+        throw std::runtime_error("Failed to acquire image content: the image format has no copyable aspect.");
+    }
+    return VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+void validate_image_readback(const ROImageVK::ExposedFields& p_fields) {
+    if ((p_fields.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
+        // Vulkan only permits image-to-buffer copies from transfer-source images.
+        throw std::runtime_error("Failed to acquire image content: image was not created with transfer-source usage.");
+    }
+    if (p_fields.image_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+        // An undefined layout explicitly indicates that the image contents cannot be preserved.
+        throw std::runtime_error("Failed to acquire image content: image contents are undefined.");
+    }
+}
+
+ImageReadbackPlan build_image_readback_plan(const ROImageVK::ExposedFields& p_fields) {
+    ImageReadbackPlan plan;
+    const vk::Format format = static_cast<vk::Format>(p_fields.format);
+    const std::array<uint8_t, 3> block_extent = vk::blockExtent(format);
+    const uint8_t block_size = vk::blockSize(format);
+    if (block_size == 0 || block_extent[0] == 0 || block_extent[1] == 0 || block_extent[2] == 0) {
+        // A zero format trait means the byte footprint cannot be calculated safely.
+        throw std::runtime_error("Failed to acquire image content: image format size is unavailable.");
+    }
+    plan.aspect = readback_aspect(p_fields.format);
+    plan.copy_regions.reserve(p_fields.mipmap_levels);
+    plan.segments.reserve(p_fields.mipmap_levels);
+
+    VkExtent3D level_extent = p_fields.extent;
+    for (uint32_t level = 0; level < p_fields.mipmap_levels; ++level) {
+        // Vulkan buffer-image copies require every mip's buffer offset to be four-byte aligned.
+        plan.buffer_size = align_copy_offset(plan.buffer_size);
+        const size_t level_size = checked_image_level_size(level_extent, block_extent, block_size, p_fields.layers_count);
+        if (level_size > std::numeric_limits<VkDeviceSize>::max() - plan.buffer_size ||
+            level_size > std::numeric_limits<size_t>::max() - plan.output_size) {
+            // Refuse an image whose combined mip footprint cannot be represented by the GPU or CPU size types.
+            throw std::runtime_error("Failed to acquire image content: combined mip data exceeds the CPU address space.");
+        }
+        plan.copy_regions.push_back(VkBufferImageCopy{.bufferOffset = plan.buffer_size,
+            .imageSubresource = {.aspectMask = plan.aspect, .mipLevel = level, .baseArrayLayer = 0, .layerCount = p_fields.layers_count},
+            .imageExtent = level_extent});
+        plan.segments.push_back(
+            ImageReadbackSegment{.buffer_offset = plan.buffer_size, .output_offset = plan.output_size, .size = level_size});
+        plan.buffer_size += level_size;
+        plan.output_size += level_size;
+        level_extent.width = std::max(level_extent.width / 2, 1U);
+        level_extent.height = std::max(level_extent.height / 2, 1U);
+        level_extent.depth = std::max(level_extent.depth / 2, 1U);
+    }
+    return plan;
+}
+
+void record_image_readback(VkCommandBuffer p_command_buffer,
+    VkImage p_image,
+    VkImageLayout p_original_layout,
+    VkImageSubresourceRange p_subresource_range,
+    Ref<ROStagingBufferVK> p_staging_buffer,
+    VkDeviceSize p_staging_offset,
+    VkDeviceSize p_buffer_size,
+    const std::vector<VkBufferImageCopy>& p_copy_regions) {
+    // Move the image from its tracked layout into the engine's unified general layout for transfer.
+    ROImageVK::MemoryBarrierBuilder()
+        .set_image(p_image, p_original_layout)
+        .set_src_access(VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT)
+        .set_dst_access(VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT)
+        .set_new_layout(VK_IMAGE_LAYOUT_GENERAL)
+        .set_subresource_range(p_subresource_range)
+        .apply_barrier(p_command_buffer);
+
+    // Copy every mip and array layer into its planned staging-buffer region.
+    vkCmdCopyImageToBuffer(p_command_buffer,
+        p_image,
+        VK_IMAGE_LAYOUT_GENERAL,
+        p_staging_buffer->get_buffer(),
+        static_cast<uint32_t>(p_copy_regions.size()),
+        p_copy_regions.data());
+
+    // Restore swapchain and other special images to the layout they had before acquisition.
+    ROImageVK::MemoryBarrierBuilder()
+        .set_image(p_image, VK_IMAGE_LAYOUT_GENERAL)
+        .set_src_access(VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT)
+        .set_dst_access(VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT)
+        .set_new_layout(p_original_layout)
+        .set_subresource_range(p_subresource_range)
+        .apply_barrier(p_command_buffer);
+
+    // Make transfer writes visible to the worker's coherent host-memory read.
+    const VkBufferMemoryBarrier2 buffer_barrier =
+        ROBufferVK::MemoryBarrierBuilder()
+            .set_buffer(p_staging_buffer->get_buffer(), p_staging_buffer->fields().buffer_size)
+            .set_src_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT)
+            .set_dst_access(VK_ACCESS_2_HOST_READ_BIT, VK_PIPELINE_STAGE_2_HOST_BIT)
+            .set_data_region(p_staging_offset, p_buffer_size)
+            .build();
+    VkDependencyInfo dependency_info{};
+    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency_info.bufferMemoryBarrierCount = 1;
+    dependency_info.pBufferMemoryBarriers = &buffer_barrier;
+    vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
+}
+
+std::vector<uint8_t> finish_image_readback(std::future<Ref<ROFenseVK>> p_submission_future,
+    Ref<ROStagingBufferVK> p_staging_buffer,
+    const void* p_mapped_memory,
+    size_t p_output_size,
+    std::vector<ImageReadbackSegment> p_segments) {
+    // Wait until queue submission has finished before accessing its externally synchronized Vulkan fence.
+    Ref<ROFenseVK> completion_fense = p_submission_future.get();
+    completion_fense->wait();
+
+    // Remove Vulkan's per-mip alignment gaps while assembling the tightly packed CPU result.
+    std::vector<uint8_t> content(p_output_size);
+    for (const ImageReadbackSegment& segment : p_segments) {
+        std::memcpy(content.data() + segment.output_offset,
+            static_cast<const uint8_t*>(p_mapped_memory) + segment.buffer_offset,
+            segment.size);
+    }
+
+    // Transfer final render-object ownership back to the rendering thread for delayed destruction.
+    RendererVK::get_singleton()->add_job([completion_fense, p_staging_buffer]() {
+        static_cast<void>(completion_fense);
+        static_cast<void>(p_staging_buffer);
+    });
+    return content;
+}
+
+} // namespace
 
 TypeID ROImageVK::get_type_uuid() const {
     return TypeUUID<ROImageVK>::UUID;
@@ -160,7 +371,8 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-    barrier.image = WBE_REQUIRED(image).get_image();
+    WBE_DEBUG_ASSERT(image_handle != VK_NULL_HANDLE);
+    barrier.image = image_handle;
     barrier.subresourceRange = subresource_range;
     VkDependencyInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -168,7 +380,9 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     info.pImageMemoryBarriers = &barrier;
     vkCmdPipelineBarrier2(p_command_buffer, &info);
     // Keep later graph barriers aligned with the layout this command buffer will establish.
-    image->exposed_fileds.image_layout = new_layout;
+    if (image != MEM_NULL) {
+        image->exposed_fields.image_layout = new_layout;
+    }
 }
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
@@ -177,13 +391,13 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_bui
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
     : IRenderObjectVK(p_render_data) {
-    exposed_fileds.image = p_image;
+    exposed_fields.image = p_image;
     p_image = VK_NULL_HANDLE;
-    exposed_fileds.image_memory = VK_NULL_HANDLE;
+    exposed_fields.image_memory = VK_NULL_HANDLE;
     allocation = VK_NULL_HANDLE;
-    exposed_fileds.image_layout = p_initial_image_layout;
-    exposed_fileds.usage = 0;
-    exposed_fileds.is_swap_chain_image = true;
+    exposed_fields.image_layout = p_initial_image_layout;
+    exposed_fields.usage = 0;
+    exposed_fields.is_swap_chain_image = true;
     ownership = Ownership::SWAP_CHAIN;
 }
 
@@ -193,15 +407,15 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_t
         throw std::runtime_error("Failed to adopt libktx Vulkan texture: image or device memory is null.");
     }
     ktx_texture = p_texture;
-    exposed_fileds.image = p_texture.image;
-    exposed_fileds.image_memory = p_texture.deviceMemory;
-    exposed_fileds.image_layout = p_texture.imageLayout;
-    exposed_fileds.format = p_texture.imageFormat;
-    exposed_fileds.extent = VkExtent3D{.width = p_texture.width, .height = p_texture.height, .depth = p_texture.depth};
-    exposed_fileds.view_type = p_texture.viewType;
-    exposed_fileds.mipmap_levels = p_texture.levelCount;
-    exposed_fileds.layers_count = p_texture.layerCount;
-    exposed_fileds.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    exposed_fields.image = p_texture.image;
+    exposed_fields.image_memory = p_texture.deviceMemory;
+    exposed_fields.image_layout = p_texture.imageLayout;
+    exposed_fields.format = p_texture.imageFormat;
+    exposed_fields.extent = VkExtent3D{.width = p_texture.width, .height = p_texture.height, .depth = p_texture.depth};
+    exposed_fields.view_type = p_texture.viewType;
+    exposed_fields.mipmap_levels = p_texture.levelCount;
+    exposed_fields.layers_count = p_texture.layerCount;
+    exposed_fields.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     ownership = Ownership::KTX;
 }
 
@@ -213,9 +427,9 @@ ROImageVK::~ROImageVK() {
                 ktxVulkanTexture_Destruct(&texture, render_data->logic_device, render_data->allocation_callbacks);
             },
             render_data->frames_in_flight);
-    } else if (ownership == Ownership::VMA && (exposed_fileds.image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)) {
+    } else if (ownership == Ownership::VMA && (exposed_fields.image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)) {
         render_data->register_delayed_call(
-            [render_data = render_data, image = exposed_fileds.image, allocation = allocation]() {
+            [render_data = render_data, image = exposed_fields.image, allocation = allocation]() {
                 vmaDestroyImage(render_data->vma_allocator, image, allocation);
             },
             render_data->frames_in_flight);
@@ -223,7 +437,7 @@ ROImageVK::~ROImageVK() {
 }
 
 void ROImageVK::init(const Builder& p_builder) {
-    exposed_fileds.queue_families = p_builder.queue_families;
+    exposed_fields.queue_families = p_builder.queue_families;
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     create_info.imageType = WBE_REQUIRED(p_builder.image_type);
@@ -233,7 +447,7 @@ void ROImageVK::init(const Builder& p_builder) {
     create_info.arrayLayers = p_builder.layers_count;
     create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create_info.usage = WBE_REQUIRED(p_builder.usage);
+    create_info.usage = WBE_REQUIRED(p_builder.usage) | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     Vector<uint32_t, RenderAllocator> queue_families(render_data->allocator);
@@ -258,17 +472,17 @@ void ROImageVK::init(const Builder& p_builder) {
     };
     VmaAllocationInfo allocation_info{};
     VkResult result = vmaCreateImage(
-        render_data->vma_allocator, &create_info, &allocation_create_info, &exposed_fileds.image, &allocation, &allocation_info);
+        render_data->vma_allocator, &create_info, &allocation_create_info, &exposed_fields.image, &allocation, &allocation_info);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
     }
-    exposed_fileds.image_memory = allocation_info.deviceMemory;
-    exposed_fileds.format = WBE_REQUIRED(p_builder.format);
-    exposed_fileds.extent = WBE_REQUIRED(p_builder.extent);
-    exposed_fileds.view_type = WBE_REQUIRED(p_builder.image_type) == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
-    exposed_fileds.mipmap_levels = p_builder.mipmap_level;
-    exposed_fileds.layers_count = p_builder.layers_count;
-    exposed_fileds.usage = WBE_REQUIRED(p_builder.usage);
+    exposed_fields.image_memory = allocation_info.deviceMemory;
+    exposed_fields.format = WBE_REQUIRED(p_builder.format);
+    exposed_fields.extent = WBE_REQUIRED(p_builder.extent);
+    exposed_fields.view_type = WBE_REQUIRED(p_builder.image_type) == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
+    exposed_fields.mipmap_levels = p_builder.mipmap_level;
+    exposed_fields.layers_count = p_builder.layers_count;
+    exposed_fields.usage = create_info.usage;
 }
 
 void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info) {
@@ -284,23 +498,78 @@ void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<R
         barrier.srcAccessMask = p_src_access;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         barrier.dstAccessMask = p_dst_access;
-        barrier.oldLayout = exposed_fileds.image_layout;
+        barrier.oldLayout = exposed_fields.image_layout;
         barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = exposed_fileds.image;
+        barrier.image = exposed_fields.image;
         barrier.subresourceRange = subresource_range;
         VkDependencyInfo info{};
         info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
         info.imageMemoryBarrierCount = 1;
         info.pImageMemoryBarriers = &barrier;
         vkCmdPipelineBarrier2(p_command_buffer, &info);
-        exposed_fileds.image_layout = VK_IMAGE_LAYOUT_GENERAL;
+        exposed_fields.image_layout = VK_IMAGE_LAYOUT_GENERAL;
     };
     apply_upload_barrier(VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT);
-    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fileds.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
+    vkCmdCopyBufferToImage(p_command_buffer, p_data->get_buffer(), exposed_fields.image, VK_IMAGE_LAYOUT_GENERAL, 1, &p_region_info);
     // Make the uploaded texels visible to shader sampling before the image is used by a draw.
     apply_upload_barrier(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+}
+
+std::future<std::vector<uint8_t>> ROImageVK::acquire_image_content() {
+    // Resolve the systems that submit GPU work and wait for its completion.
+    Worker* worker = Worker::get_singleton();
+    if (worker == nullptr) {
+        // Acquiring asynchronously requires an active engine worker pool.
+        throw std::runtime_error("Failed to acquire image content: the engine worker is unavailable.");
+    }
+    RendererVK* renderer = RendererVK::get_singleton();
+
+    // Validate the image and calculate one copy region for each mip level.
+    validate_image_readback(exposed_fields);
+    ImageReadbackPlan plan = build_image_readback_plan(exposed_fields);
+
+    // Allocate a dedicated mapped staging buffer that remains alive through the worker copy.
+    const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(static_cast<size_t>(plan.buffer_size));
+    Ref<ROStagingBufferVK> staging_buffer =
+        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(render_data);
+    const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(static_cast<size_t>(plan.buffer_size));
+    for (VkBufferImageCopy& copy_region : plan.copy_regions) {
+        // Translate plan-relative offsets into the staging buffer's suballocation.
+        copy_region.bufferOffset += staging_allocation.offset;
+    }
+
+    // Preserve the current layout so the GPU job can restore it after the transfer.
+    const VkImage image = exposed_fields.image;
+    const VkImageLayout image_layout = exposed_fields.image_layout;
+    const VkImageSubresourceRange subresource_range{.aspectMask = plan.aspect,
+        .baseMipLevel = 0,
+        .levelCount = exposed_fields.mipmap_levels,
+        .baseArrayLayer = 0,
+        .layerCount = exposed_fields.layers_count};
+
+    // Register the GPU copy and receive its completion fence only after queue submission succeeds.
+    std::future<Ref<ROFenseVK>> submission_future =
+        renderer->register_gpu_job([image,
+                                       image_layout,
+                                       subresource_range,
+                                       staging_buffer,
+                                       staging_offset = staging_allocation.offset,
+                                       buffer_size = plan.buffer_size,
+                                       copy_regions = std::move(plan.copy_regions)](VkCommandBuffer p_command_buffer) {
+            record_image_readback(
+                p_command_buffer, image, image_layout, subresource_range, staging_buffer, staging_offset, buffer_size, copy_regions);
+        });
+
+    // Let a worker wait for GPU completion and assemble the tightly packed CPU byte buffer.
+    return worker->submit_task([submission_future = std::move(submission_future),
+                                   staging_buffer,
+                                   mapped_memory = staging_allocation.data,
+                                   output_size = plan.output_size,
+                                   segments = std::move(plan.segments)]() mutable {
+        return finish_image_readback(std::move(submission_future), staging_buffer, mapped_memory, output_size, std::move(segments));
+    });
 }
 
 } // namespace WhiteBirdEngine

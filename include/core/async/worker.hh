@@ -25,6 +25,8 @@
 #include <functional>
 #include <future>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -58,6 +60,17 @@ public:
     virtual ~Worker() override;
 
     virtual std::future<void> add_job(std::function<void()> p_job) override;
+
+    /**
+     * @brief Submit a value-producing task to the worker pool.
+     * @tparam TFunction Callable type.
+     * @param p_task Task to execute.
+     * @return A future containing the task result.
+     */
+    template <typename TFunction>
+    auto submit_task(TFunction&& p_task) -> std::future<std::invoke_result_t<TFunction>> {
+        return thread_pool.submit_task(std::forward<TFunction>(p_task));
+    }
 
     static Worker* get_singleton() {
         return singleton;

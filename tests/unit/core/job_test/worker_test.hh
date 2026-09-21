@@ -67,4 +67,14 @@ TEST_F(WBEWorkerTest, HandleCompletesWithoutDrainingPool) {
     blocking_handle.wait();
 }
 
+TEST_F(WBEWorkerTest, SubmitTaskReturnsValue) {
+    WBE::Worker worker;
+
+    std::future<int> result = worker.submit_task([]() {
+        return 42;
+    });
+
+    EXPECT_EQ(result.get(), 42);
+}
+
 #endif

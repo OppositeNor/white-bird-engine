@@ -33,6 +33,7 @@
 #include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
@@ -123,12 +124,13 @@ public:
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
      *
-     * Registered jobs are batched into the renderer's reusable graphics command buffer. Captured resources stay alive until
-     * the job is recorded, submitted, and waited by the renderer.
+     * Registered jobs are batched into the renderer's reusable graphics command buffer. The renderer retains captured resources
+     * until completion and synchronizes the batch with later compute-queue work without blocking the rendering thread.
      *
      * @param p_job The GPU job to record.
+     * @return A future that becomes ready after queue submission and contains the RAII fence that signals after GPU completion.
      */
-    void register_gpu_job(GPUJobVK p_job);
+    std::future<Ref<ROFenseVK>> register_gpu_job(GPUJobVK p_job);
 
     /**
      * @brief Submit work from another thread for execution on the rendering thread.
@@ -376,7 +378,15 @@ private:
 
     static constexpr size_t MAX_GPU_JOBS = 1024;
     VkCommandBuffer gpu_job_command_buffer = VK_NULL_HANDLE;
-    std::array<GPUJobVK, MAX_GPU_JOBS> gpu_jobs;
+    struct RegisteredGPUJob {
+        GPUJobVK record;
+        Ref<ROFenseVK> completion_fense;
+        std::promise<Ref<ROFenseVK>> submission_promise;
+    };
+    std::array<RegisteredGPUJob, MAX_GPU_JOBS> gpu_jobs;
+    Vector<GPUJobVK> running_gpu_jobs;
+    Vector<Ref<ROFenseVK>> running_gpu_job_fenses;
+    Ref<SemaphoreVK> running_gpu_job_semaphore;
 
     void init(RendererCapabilities& p_capabilities);
     void terminate();
@@ -428,7 +438,10 @@ private:
     void run_gpu_jobs();
     void synchronize_gpu_and_flush_delayed_calls();
     void flush_delayed_calls();
-    void submit_gpu_job_command_buffer();
+    void wait_for_running_gpu_jobs();
+    void submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>>& p_completion_fenses,
+        std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
+        Ref<SemaphoreVK> p_completion_semaphore);
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
     void capture_swap_chain_image(uint32_t p_image_index);
 };

@@ -36,6 +36,8 @@
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_descriptor_heap_vk.hh"
+#include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
@@ -53,6 +55,7 @@
 #include <cstring>
 #include <format>
 #include <functional>
+#include <future>
 #include <limits>
 #include <optional>
 #include <set>
@@ -180,8 +183,9 @@ void update_buffer(const BaseRenderDataVK* p_render_data,
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
-      window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator), image_available_semaphores(p_allocator),
-      render_graphs(p_allocator), base_render_data(p_allocator), registered_plugins(p_allocator) {
+      window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator),
+      image_available_semaphores(p_allocator), render_graphs(p_allocator), base_render_data(p_allocator),
+      registered_plugins(p_allocator), running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -540,9 +544,9 @@ void RendererVK::create_swap_chain() { // NOLINT
         throw std::runtime_error(std::format("Failed to create swap chain: {}.", string_VkResult(result)));
     }
 
-    create_swap_chain_images();
     swap_chain_image_format = surface_format.format;
     swap_chain_extent = extent;
+    create_swap_chain_images();
 
     // Setup viewport and scissor information.
     viewport.x = 0;
@@ -568,9 +572,15 @@ void RendererVK::create_swap_chain_images() {
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
             make_ref<ROImageVK>(allocator, &base_render_data, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
+        ROImageVK::ExposedFields& fields = render_objects->swap_chain_images.back()->exposed_fields;
+        fields.format = swap_chain_image_format;
+        fields.extent = VkExtent3D{.width = swap_chain_extent.width, .height = swap_chain_extent.height, .depth = 1};
+        fields.view_type = VK_IMAGE_VIEW_TYPE_2D;
+        fields.mipmap_levels = 1;
+        fields.layers_count = 1;
+        fields.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         if (frame_capture_supported) {
-            render_objects->swap_chain_images.back()->exposed_fileds.usage =
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            fields.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
     }
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
@@ -679,9 +689,9 @@ void RendererVK::create_descriptor_heap_allocator() {
     constexpr uint32_t STORAGE_IMAGE_DESCRIPTOR_CAPACITY = 64;
     constexpr uint32_t SAMPLER_DESCRIPTOR_CAPACITY = 256;
     const auto& properties = base_render_data.descriptor_heap_properties;
-    if (properties.bufferDescriptorSize == 0 || properties.imageDescriptorSize == 0 || properties.samplerDescriptorSize == 0 ||
-        properties.bufferDescriptorAlignment == 0 || properties.imageDescriptorAlignment == 0 ||
-        properties.samplerDescriptorAlignment == 0) {
+    if (properties.bufferDescriptorSize == 0 || properties.imageDescriptorSize == 0 ||
+        properties.samplerDescriptorSize == 0 || properties.bufferDescriptorAlignment == 0 ||
+        properties.imageDescriptorAlignment == 0 || properties.samplerDescriptorAlignment == 0) {
         throw std::runtime_error("Failed to create descriptor heaps: device descriptor sizes or alignments are invalid.");
     }
 
@@ -1273,16 +1283,18 @@ void RendererVK::run_delayed_calls() {
     }
 }
 
-void RendererVK::register_gpu_job(GPUJobVK p_job) {
+std::future<Ref<ROFenseVK>> RendererVK::register_gpu_job(GPUJobVK p_job) {
     if (!p_job) {
         throw std::runtime_error("Failed to register GPU job: job is empty.");
     }
     for (auto& gpu_job : gpu_jobs) {
-        if (gpu_job) {
+        if (gpu_job.record) {
             continue;
         }
-        gpu_job = std::move(p_job);
-        return;
+        Ref<ROFenseVK> completion_fense = make_ref<ROFenseVK>(global_allocator(), &base_render_data);
+        gpu_job.record = std::move(p_job);
+        gpu_job.completion_fense = completion_fense;
+        return gpu_job.submission_promise.get_future();
     }
     throw std::runtime_error("Failed to register GPU job: GPU-job capacity is exhausted.");
 }
@@ -1290,7 +1302,7 @@ void RendererVK::register_gpu_job(GPUJobVK p_job) {
 void RendererVK::run_gpu_jobs() {
     bool has_job = false;
     for (const auto& gpu_job : gpu_jobs) {
-        if (gpu_job) {
+        if (gpu_job.record) {
             has_job = true;
             break;
         }
@@ -1298,6 +1310,8 @@ void RendererVK::run_gpu_jobs() {
     if (!has_job) {
         return;
     }
+
+    wait_for_running_gpu_jobs();
 
     auto result = vkResetCommandBuffer(gpu_job_command_buffer, 0);
     if (result != VK_SUCCESS) {
@@ -1310,19 +1324,40 @@ void RendererVK::run_gpu_jobs() {
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to begin GPU-job command buffer: {}.", string_VkResult(result)));
     }
-    Vector<GPUJobVK> running_jobs(allocator);
+    Vector<GPUJobVK> submitted_jobs(allocator);
+    Vector<Ref<ROFenseVK>> completion_fenses(allocator);
+    std::vector<std::promise<Ref<ROFenseVK>>> submission_promises;
     for (auto& gpu_job : gpu_jobs) {
-        if (!gpu_job) {
+        if (!gpu_job.record) {
             continue;
         }
-        running_jobs.push_back(std::move(gpu_job));
-        gpu_job = nullptr;
-        running_jobs.back()(gpu_job_command_buffer);
+        submitted_jobs.push_back(std::move(gpu_job.record));
+        completion_fenses.push_back(std::move(gpu_job.completion_fense));
+        submission_promises.push_back(std::move(gpu_job.submission_promise));
+        gpu_job.record = nullptr;
+        gpu_job.submission_promise = std::promise<Ref<ROFenseVK>>();
+        submitted_jobs.back()(gpu_job_command_buffer);
     }
-    submit_gpu_job_command_buffer();
+    Ref<SemaphoreVK> completion_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
+    submit_gpu_job_command_buffer(completion_fenses, submission_promises, completion_semaphore);
+    running_gpu_jobs = std::move(submitted_jobs);
+    running_gpu_job_fenses = std::move(completion_fenses);
+    running_gpu_job_semaphore = std::move(completion_semaphore);
 }
 
-void RendererVK::submit_gpu_job_command_buffer() {
+void RendererVK::wait_for_running_gpu_jobs() {
+    if (running_gpu_job_fenses.empty()) {
+        return;
+    }
+    running_gpu_job_fenses.back()->wait();
+    running_gpu_jobs.clear();
+    running_gpu_job_fenses.clear();
+    running_gpu_job_semaphore = MEM_NULL;
+}
+
+void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>>& p_completion_fenses, // NOLINT
+    std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
+    Ref<SemaphoreVK> p_completion_semaphore) {
     VkMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
     barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -1346,24 +1381,34 @@ void RendererVK::submit_gpu_job_command_buffer() {
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &command_buffer_info;
-    VkFence fence = VK_NULL_HANDLE;
-    VkFenceCreateInfo fence_info{};
-    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    result = vkCreateFence(logical_device, &fence_info, get_allocation_callbacks(), &fence);
+    VkSemaphoreSubmitInfo signal_info = p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    submit_info.signalSemaphoreInfoCount = 1;
+    submit_info.pSignalSemaphoreInfos = &signal_info;
+    WBE_DEBUG_ASSERT(!p_completion_fenses.empty());
+    WBE_DEBUG_ASSERT(p_completion_fenses.size() == p_submission_promises.size());
+    result = vkQueueSubmit2(graphics_queue, 1, &submit_info, p_completion_fenses.front()->get_fense());
     if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to create GPU-job fence: {}.", string_VkResult(result)));
-    }
-    result = vkQueueSubmit2(graphics_queue, 1, &submit_info, fence);
-    if (result != VK_SUCCESS) {
-        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
         throw std::runtime_error(std::format("Failed to submit GPU jobs: {}", string_VkResult(result)));
     }
-    result = vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX);
-    if (result != VK_SUCCESS) {
-        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
-        throw std::runtime_error(std::format("Failed to submit GPU jobs: {}.", string_VkResult(result)));
+    p_submission_promises.front().set_value(p_completion_fenses.front());
+    VkSubmitInfo2 empty_submit_info{};
+    empty_submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    for (size_t i = 1; i < p_completion_fenses.size(); ++i) {
+        result = vkQueueSubmit2(graphics_queue, 1, &empty_submit_info, p_completion_fenses[i]->get_fense());
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to submit GPU-job completion fense: {}.", string_VkResult(result)));
+        }
+        p_submission_promises[i].set_value(p_completion_fenses[i]);
     }
-    vkDestroyFence(logical_device, fence, get_allocation_callbacks());
+    VkSemaphoreSubmitInfo wait_info = p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    VkSubmitInfo2 compute_wait_submit{};
+    compute_wait_submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    compute_wait_submit.waitSemaphoreInfoCount = 1;
+    compute_wait_submit.pWaitSemaphoreInfos = &wait_info;
+    result = vkQueueSubmit2(compute_queue, 1, &compute_wait_submit, VK_NULL_HANDLE);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to synchronize GPU jobs with the compute queue: {}.", string_VkResult(result)));
+    }
 }
 
 void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
@@ -1375,6 +1420,7 @@ void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
         }
     }
     run_gpu_jobs();
+    wait_for_running_gpu_jobs();
     flush_delayed_calls();
 }
 
@@ -1408,7 +1454,7 @@ void RendererVK::request_frame_capture(std::string_view p_path) {
     capture_png_path.assign(p_path.data(), p_path.size());
 }
 
-void RendererVK::capture_swap_chain_image(uint32_t p_image_index) { // NOLINT
+void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
     const bool blue_first = swap_chain_image_format == VK_FORMAT_B8G8R8A8_SRGB || swap_chain_image_format == VK_FORMAT_B8G8R8A8_UNORM;
     if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB && swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("PNG capture supports only RGBA8 and BGRA8 swap-chain formats.");
@@ -1417,101 +1463,13 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) { // NOLINT
         swap_chain_extent.height > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
         throw std::runtime_error("PNG capture extent exceeds the PNG writer's limits.");
     }
-    // Deliberately stall this diagnostic frame. The graph's terminal semaphore is
-    // left signaled for present(), and the image is restored before presentation.
-    if (vkDeviceWaitIdle(logical_device) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to wait for rendering before PNG capture.");
+    std::future<std::vector<uint8_t>> acquire_future = render_objects->swap_chain_images[p_image_index]->acquire_image_content();
+    run_gpu_jobs();
+    std::vector<uint8_t> pixels = acquire_future.get();
+    const size_t expected_byte_count = static_cast<size_t>(swap_chain_extent.width) * swap_chain_extent.height * 4;
+    if (pixels.size() != expected_byte_count) {
+        throw std::runtime_error(std::format("PNG capture readback returned {} bytes; expected {}.", pixels.size(), expected_byte_count));
     }
-    const VkDeviceSize byte_count = static_cast<VkDeviceSize>(swap_chain_extent.width) * swap_chain_extent.height * 4;
-    Vector<uint8_t> pixels(static_cast<size_t>(byte_count), allocator);
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VmaAllocation allocation = VK_NULL_HANDLE;
-    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    auto clean_up = [&]() {
-        if (command_buffer != VK_NULL_HANDLE) {
-            vkFreeCommandBuffers(logical_device, graphics_command_pool, 1, &command_buffer);
-        }
-        if (buffer != VK_NULL_HANDLE) {
-            vmaDestroyBuffer(vma_allocator, buffer, allocation);
-        }
-    };
-    auto require_success = [&](VkResult p_result) {
-        if (p_result != VK_SUCCESS) {
-            clean_up();
-            throw std::runtime_error("Vulkan PNG capture readback failed.");
-        }
-    };
-    VkBufferCreateInfo buffer_info{};
-    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.size = byte_count;
-    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VmaAllocationCreateInfo allocation_info{};
-    allocation_info.usage = VMA_MEMORY_USAGE_AUTO;
-    allocation_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    VmaAllocationInfo mapped_info{};
-    require_success(vmaCreateBuffer(vma_allocator, &buffer_info, &allocation_info, &buffer, &allocation, &mapped_info));
-    VkCommandBufferAllocateInfo command_info{};
-    command_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    command_info.commandPool = graphics_command_pool;
-    command_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_info.commandBufferCount = 1;
-    require_success(vkAllocateCommandBuffers(logical_device, &command_info, &command_buffer));
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    require_success(vkBeginCommandBuffer(command_buffer, &begin_info));
-    VkImageMemoryBarrier2 image_barrier{};
-    image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    image_barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-    image_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-    image_barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    image_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_barrier.image = render_objects->swap_chain_images[p_image_index]->get_image();
-    image_barrier.subresourceRange = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-    VkDependencyInfo dependency_info{};
-    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    dependency_info.imageMemoryBarrierCount = 1;
-    dependency_info.pImageMemoryBarriers = &image_barrier;
-    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
-    VkBufferImageCopy copy_region{};
-    copy_region.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1};
-    copy_region.imageExtent = {.width = swap_chain_extent.width, .height = swap_chain_extent.height, .depth = 1};
-    vkCmdCopyImageToBuffer(command_buffer, image_barrier.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copy_region);
-    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-    image_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
-    image_barrier.dstAccessMask = VK_ACCESS_2_NONE;
-    image_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    image_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    VkBufferMemoryBarrier2 host_barrier{};
-    host_barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-    host_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-    host_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-    host_barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
-    host_barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
-    host_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    host_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    host_barrier.buffer = buffer;
-    host_barrier.size = VK_WHOLE_SIZE;
-    dependency_info.bufferMemoryBarrierCount = 1;
-    dependency_info.pBufferMemoryBarriers = &host_barrier;
-    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
-    require_success(vkEndCommandBuffer(command_buffer));
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer;
-    require_success(vkQueueSubmit(graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
-    require_success(vkQueueWaitIdle(graphics_queue));
-    require_success(vmaInvalidateAllocation(vma_allocator, allocation, 0, VK_WHOLE_SIZE));
-    std::memcpy(pixels.data(), mapped_info.pMappedData, static_cast<size_t>(byte_count));
-    clean_up();
     for (size_t offset = 0; offset < pixels.size(); offset += 4) {
         if (blue_first) {
             std::swap(pixels[offset], pixels[offset + 2]);

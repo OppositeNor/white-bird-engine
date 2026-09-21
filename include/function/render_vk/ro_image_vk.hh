@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RO_IMAGE_VK_HH
 #define WBE_FILE_RO_IMAGE_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -27,9 +28,12 @@
 #include "function/render_vk/vma_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <future>
 #include <set>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -164,7 +168,7 @@ public:
      * @return The image instance.
      */
     VkImage get_image() const {
-        return exposed_fileds.image;
+        return exposed_fields.image;
     }
 
     /**
@@ -176,6 +180,18 @@ public:
      * @param p_region_info The region info of the src buffer and the dst image.
      */
     void set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<ROBufferVK> p_data, VkBufferImageCopy p_region_info);
+
+    /**
+     * @brief Acquire every mip level and array layer as tightly packed CPU bytes.
+     *
+     * The copy is registered with the renderer and a worker waits on its completion fense. Mip levels are concatenated from
+     * largest to smallest, with every layer of a mip stored contiguously. The returned future and this image must finish
+     * before renderer shutdown. Multiplanar and combined depth-stencil formats are not supported.
+     *
+     * @return A future containing the linear image bytes.
+     * @throws std::runtime_error if the image cannot be copied or no engine worker is available.
+     */
+    std::future<std::vector<uint8_t>> acquire_image_content();
 
     struct ExposedFields {
         /**
@@ -220,7 +236,7 @@ public:
      * @return The exposed fields.
      */
     const ExposedFields& fields() const {
-        return exposed_fileds;
+        return exposed_fields;
     }
 
     /**
@@ -248,6 +264,8 @@ public:
         uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED;
         // The image to set barrier on.
         Ref<ROImageVK> image;
+        // Raw image handle used when the render object cannot safely be retained by deferred work.
+        VkImage image_handle = VK_NULL_HANDLE;
         VkImageSubresourceRange subresource_range{
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 
@@ -362,6 +380,7 @@ public:
          */
         MemoryBarrierBuilder& set_image(Ref<ROImageVK> p_image, bool p_drop_old = false) {
             image = p_image;
+            image_handle = p_image->get_image();
             if (p_drop_old) {
                 // If the old data will be dropped, set the old layout to
                 // VK_IMAGE_LAYOUT_UNDEFINED
@@ -369,6 +388,24 @@ public:
             } else {
                 old_layout = p_image->fields().image_layout;
             }
+            return *this;
+        }
+
+        /**
+         * @brief Set a raw image handle and its current layout.
+         *
+         * This overload does not retain a render object or update its tracked layout. It is intended for deferred commands
+         * that separately guarantee the Vulkan image lifetime.
+         *
+         * @param p_image The Vulkan image handle.
+         * @param p_old_layout The image layout before this barrier.
+         * @return *this.
+         */
+        MemoryBarrierBuilder& set_image(VkImage p_image, VkImageLayout p_old_layout) {
+            WBE_DEBUG_ASSERT(p_image != VK_NULL_HANDLE);
+            image = MEM_NULL;
+            image_handle = p_image;
+            old_layout = p_old_layout;
             return *this;
         }
 
@@ -387,7 +424,7 @@ private:
         SWAP_CHAIN,
     };
 
-    ExposedFields exposed_fileds{};
+    ExposedFields exposed_fields{};
     VmaAllocation allocation = VK_NULL_HANDLE;
     ktxVulkanTexture ktx_texture{};
     Ownership ownership = Ownership::VMA;

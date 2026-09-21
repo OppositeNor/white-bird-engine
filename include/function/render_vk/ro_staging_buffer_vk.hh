@@ -26,7 +26,9 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <set>
+#include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -35,6 +37,19 @@ class WBE_META(WBE_RENDER_OBJECT) ROStagingBufferVK final : public IRenderObject
     friend class ROBufferVK;
 
 public:
+    /**
+     * @struct Allocation
+     * @brief A mapped staging-buffer suballocation and its Vulkan buffer offset.
+     */
+    struct Allocation {
+        /** Mapped CPU address of the allocation. */
+        void* data = nullptr;
+        /** Byte offset of the allocation in the Vulkan buffer. */
+        VkDeviceSize offset = 0;
+        /** Aligned allocation size in bytes. */
+        size_t size = 0;
+    };
+
     /**
      * @class ExposedFields
      * @brief The exposed fields of ROStagingBufferVK..
@@ -157,6 +172,29 @@ public:
      * frames.
      */
     void* allocate(size_t p_size);
+
+    /**
+     * @brief Allocate a mapped region and return both its CPU address and Vulkan buffer offset.
+     * @param p_size Requested byte count.
+     * @return The mapped staging-buffer region.
+     */
+    Allocation allocate_region(size_t p_size);
+
+    /**
+     * @brief Return the backing-buffer size required for one allocation of the requested size.
+     * @param p_size Requested allocation size.
+     * @return Required staging-buffer size.
+     */
+    static size_t required_buffer_size(size_t p_size) {
+        if (p_size > std::numeric_limits<uint32_t>::max() - DATA_CHUNK_HEADER_SIZE) {
+            throw std::runtime_error("Staging-buffer allocation exceeds the supported size.");
+        }
+        const size_t aligned_size = get_align_size(p_size, DATA_CHUNK_HEADER_SIZE);
+        if (aligned_size > std::numeric_limits<uint32_t>::max() - DATA_CHUNK_HEADER_SIZE) {
+            throw std::runtime_error("Staging-buffer allocation exceeds the supported size.");
+        }
+        return aligned_size + DATA_CHUNK_HEADER_SIZE;
+    }
 
     /**
      * @brief Get the vulkan buffer instance.

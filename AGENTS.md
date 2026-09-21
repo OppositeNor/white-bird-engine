@@ -21,6 +21,9 @@ Follow repository conventions and existing patterns.
 
 ## Agent Workflow
 
+Before implementing a feature or utility, check whether it already exists, whether an equivalent is embedded in another
+implementation, or whether existing implementation-specific logic should be abstracted and reused.
+
 For non-trivial implementation tasks:
 
 1. Use repo-explorer when repository context is unclear.

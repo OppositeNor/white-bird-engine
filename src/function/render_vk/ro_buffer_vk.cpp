@@ -130,9 +130,8 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
             throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: buffer does not have uniform-buffer usage.");
         }
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->buffer_descriptor_arena.heap_id,
-                render_data->buffer_descriptor_arena.arena_id,
-                *p_builder.uniform_view_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(
+                render_data->buffer_descriptor_arena.heap_id, render_data->buffer_descriptor_arena.arena_id, *p_builder.uniform_view_index)) {
             throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: the index is not allocated by the buffer arena.");
         }
     }
@@ -141,9 +140,8 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
             throw std::runtime_error("Failed to adopt storage-buffer descriptor index: buffer does not have storage-buffer usage.");
         }
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->buffer_descriptor_arena.heap_id,
-                render_data->buffer_descriptor_arena.arena_id,
-                *p_builder.storage_view_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(
+                render_data->buffer_descriptor_arena.heap_id, render_data->buffer_descriptor_arena.arena_id, *p_builder.storage_view_index)) {
             throw std::runtime_error("Failed to adopt storage-buffer descriptor index: the index is not allocated by the buffer arena.");
         }
     }
@@ -311,6 +309,9 @@ void ROBufferVK::update_buffer(Ref<ROStagingBufferVK> p_buffer, void* p_data, si
 }
 
 VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
+    if (buffer_handle == VK_NULL_HANDLE || buffer_size == 0) {
+        throw std::runtime_error("Failed to build buffer memory barrier: buffer and buffer size are required.");
+    }
     VkBufferMemoryBarrier2 result{};
     result.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
     result.srcAccessMask = src_access_mask;
@@ -319,9 +320,9 @@ VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
     result.dstStageMask = dst_stage_mask;
     result.srcQueueFamilyIndex = src_queue_family_index;
     result.dstQueueFamilyIndex = dst_queue_family_index;
-    result.buffer = WBE_REQUIRED(buffer).get_buffer();
+    result.buffer = buffer_handle;
     result.offset = offset;
-    result.size = size == 0 ? buffer->fields().buffer_size : size;
+    result.size = size == 0 ? buffer_size : size;
     return result;
 }
 

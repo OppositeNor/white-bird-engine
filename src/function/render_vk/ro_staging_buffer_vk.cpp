@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -35,6 +36,9 @@ TypeID ROStagingBufferVK::get_type_uuid() const {
 
 ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
     : IRenderObjectVK(p_render_data) {
+    if (p_builder.size < DATA_CHUNK_HEADER_SIZE || p_builder.size > std::numeric_limits<uint32_t>::max()) {
+        throw std::runtime_error("Failed to create Vulkan staging buffer: buffer size is outside the supported range.");
+    }
     VkBufferCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = p_builder.size;
@@ -60,7 +64,7 @@ ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, cons
         throw std::runtime_error(std::format("Failed to create Vulkan staging buffer: {}.", string_VkResult(result)));
     }
     mapped_memory = allocation_info.pMappedData;
-    static_cast<DataChunkHeader*>(mapped_memory)->size = exposed_fields.buffer_size;
+    static_cast<DataChunkHeader*>(mapped_memory)->size = static_cast<uint32_t>(exposed_fields.buffer_size);
     static_cast<DataChunkHeader*>(mapped_memory)->is_allocated = false;
     static_cast<DataChunkHeader*>(mapped_memory)->frame = 0;
 }
@@ -75,6 +79,10 @@ ROStagingBufferVK::~ROStagingBufferVK() {
 }
 
 void* ROStagingBufferVK::allocate(size_t p_size) {
+    return allocate_region(p_size).data;
+}
+
+ROStagingBufferVK::Allocation ROStagingBufferVK::allocate_region(size_t p_size) {
     p_size = get_align_size(p_size, DATA_CHUNK_HEADER_SIZE);
     DataChunkHeader* header = static_cast<DataChunkHeader*>(mapped_memory);
     uintptr_t end_addr = reinterpret_cast<uintptr_t>(mapped_memory) + exposed_fields.buffer_size;
@@ -103,7 +111,10 @@ void* ROStagingBufferVK::allocate(size_t p_size) {
                     header->is_allocated = false;
                 },
                 render_data->frames_in_flight);
-            return header + 1;
+            void* data = header + 1;
+            return Allocation{.data = data,
+                .offset = static_cast<VkDeviceSize>(reinterpret_cast<uintptr_t>(data) - reinterpret_cast<uintptr_t>(mapped_memory)),
+                .size = p_size};
         }
         header += header->size / DATA_CHUNK_HEADER_SIZE;
     }
