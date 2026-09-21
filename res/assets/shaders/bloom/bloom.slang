@@ -21,6 +21,8 @@ struct BloomDescriptorIndices {
 };
 
 static const int KERNEL_RADIUS = 2;
+static const float BLOOM_THRESHOLD = 1.0;
+static const float BLOOM_THRESHOLD_EPSILON = 0.0001;
 static const float KERNEL[5] = {
     1.0 / 16.0,
     4.0 / 16.0,
@@ -45,6 +47,13 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     if (dispatch_thread_id.x >= width || dispatch_thread_id.y >= height) {
         return;
     }
+#ifdef BLOOM_EXTRACT
+    float2 sample_uv = (float2(dispatch_thread_id.xy) + 0.5) / float2(width, height);
+    float3 sample_color = bloom_input.SampleLevel(gbuffer_sampler, sample_uv, 0).rgb;
+    float brightness = dot(sample_color, float3(0.2126, 0.7152, 0.0722));
+    float contribution = max(brightness - BLOOM_THRESHOLD, 0.0) / max(brightness, BLOOM_THRESHOLD_EPSILON);
+    bloom_output[dispatch_thread_id.xy] = float4(sample_color * contribution, 1.0);
+#else
     float3 accumulated_color = 0.0;
     for (int offset = -KERNEL_RADIUS; offset <= KERNEL_RADIUS; ++offset) {
 #ifdef BLOOM_HORIZONTAL
@@ -53,10 +62,8 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         float2 sample_uv = (float2(int2(dispatch_thread_id) + int2(0, offset)) + 0.5) / float2(width, height);
 #endif
         float3 sample_color = bloom_input.SampleLevel(gbuffer_sampler, sample_uv, 0).rgb;
-#ifdef BLOOM_HORIZONTAL
-        sample_color = max(sample_color - 1.0, 0.0);
-#endif
         accumulated_color += sample_color * KERNEL[offset + KERNEL_RADIUS];
     }
-    bloom_output[dispatch_thread_id] = float4(accumulated_color, 1.0);
+    bloom_output[dispatch_thread_id.xy] = float4(accumulated_color, 1.0);
+#endif
 }

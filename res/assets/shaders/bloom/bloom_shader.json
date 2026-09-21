@@ -2,6 +2,16 @@
     "include": [],
     "resources": [
         {
+            "id": "bloom_shader_extract",
+            "source_type": "shader",
+            "src": "assets/shaders/bloom/bloom.slang",
+            "dst": "assets/shaders/bloom/bloom_extract.spv",
+            "metadata": "assets/shaders/bloom/bloom_extract.json",
+            "macros": [
+                {"name": "BLOOM_EXTRACT"}
+            ]
+        },
+        {
             "id": "bloom_shader_vertical",
             "source_type": "shader",
             "src": "assets/shaders/bloom/bloom.slang",
@@ -20,4 +30,3 @@
         }
     ]
 }
-

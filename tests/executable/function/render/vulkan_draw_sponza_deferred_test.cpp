@@ -122,6 +122,7 @@ constexpr VkFormat SHADOW_MOMENTS_FORMAT = VK_FORMAT_R32G32_SFLOAT;
 constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
+constexpr uint32_t BLOOM_DOWNSAMPLE_LEVEL = 4;
 
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
@@ -146,6 +147,8 @@ private:
     static constexpr std::string_view DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
     static constexpr std::string_view INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
     static constexpr std::string_view RESULT_IMAGE_VIEW = "result_image";
+    static constexpr std::string_view BLOOM_EXTRACT_IMAGE_VIEW = "bloom_extract";
+    static constexpr std::string_view BLOOM_DOWNSAMPLED_IMAGE_VIEW = "bloom_downsampled";
     static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
     static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
@@ -155,7 +158,9 @@ private:
     static constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
     static constexpr std::string_view RT_RUN_INDIRECT_LIGHTING = "run_indirect_lighting";
     static constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
-    static constexpr std::string_view RT_BLOOM = "bloom";
+    static constexpr std::string_view RT_EXTRACT_BLOOM = "extract_bloom";
+    static constexpr std::string_view RT_GENERATE_BLOOM_MIPMAPS = "generate_bloom_mipmaps";
+    static constexpr std::string_view RT_BLUR_BLOOM = "blur_bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
@@ -198,6 +203,7 @@ private:
     RenderBindpointDeclarations build_indirect_lighting_bindpoints(
         Ref<ROBufferVK> p_camera_buffer, Ref<ROBufferVK> p_light_info_buffer, Ref<ROBufferVK> p_light_count_buffer) const;
     RenderBindpointDeclarations build_combine_lighting_bindpoints() const;
+    RenderBindpointDeclarations build_bloom_extract_bindpoints() const;
     RenderBindpointDeclarations build_bloom_horizontal_bindpoints() const;
     RenderBindpointDeclarations build_bloom_vertical_bindpoints() const;
     RenderBindpointDeclarations build_present_post_processing_bindpoints() const;
@@ -219,7 +225,9 @@ private:
     RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;
     RendTaskDescVK create_indirect_lighting_task_desc(bool p_use_summed_area_table) const;
     RendTaskDescVK create_combine_lighting_task_desc() const;
-    RendTaskDescVK create_bloom_task_desc() const;
+    RendTaskDescVK create_bloom_extract_task_desc() const;
+    RendTaskDescVK create_bloom_mipmap_task_desc() const;
+    RendTaskDescVK create_bloom_blur_task_desc() const;
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
@@ -236,6 +244,7 @@ private:
     RefRes<RUShader> direct_lighting_summed_area_table_shader_resource;
     RefRes<RUShader> indirect_lighting_rsm_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
+    RefRes<RUShader> bloom_extract_shader_resource;
     RefRes<RUShader> bloom_horizontal_shader_resource;
     RefRes<RUShader> bloom_vertical_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
@@ -246,6 +255,7 @@ private:
     Ref<ROComputePipelineVK> direct_lighting_summed_area_table_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> indirect_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_horizontal_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_vertical_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
@@ -257,6 +267,7 @@ private:
     Ref<ROImageVK> direct_lighting_image;
     Ref<ROImageVK> indirect_lighting_image;
     Ref<ROImageVK> result_image;
+    Ref<ROImageVK> bloom_extract_image;
     Ref<ROImageVK> bloom_horizontal_image;
     Ref<ROImageVK> bloom_image;
     Ref<ROImageViewVK> gbuffer_albedo_view;
@@ -266,6 +277,8 @@ private:
     Ref<ROImageViewVK> direct_lighting_view;
     Ref<ROImageViewVK> indirect_lighting_view;
     Ref<ROImageViewVK> result_image_view;
+    Ref<ROImageViewVK> bloom_extract_image_view;
+    Ref<ROImageViewVK> bloom_downsampled_image_view;
     Ref<ROImageViewVK> bloom_horizontal_image_view;
     Ref<ROImageViewVK> bloom_image_view;
     Ref<ROImageVK> shadow_depth_image;
@@ -283,6 +296,7 @@ private:
     Ref<ROImageViewVK> shadow_moments_summed_area_table_view;
     Ref<ROSamplerVK> shadow_sampler;
     Ref<ROSamplerVK> gbuffer_sampler;
+    Ref<ROSamplerVK> bloom_sampler;
     Ref<ROCPerFrameVK> gbuffer_camera_info_ubos;
     Ref<ROCPerFrameVK> composition_camera_info_ubos;
     Ref<ROCPerFrameVK> spot_light_info_ubos;
@@ -297,6 +311,8 @@ private:
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
+    VkExtent2D bloom_extent{};
+    uint32_t bloom_mipmap_level_count = 1;
     bool render_graph_switch_key_was_down = false;
     std::atomic<bool> summed_area_table_requested = false;
     bool summed_area_table_active = false;
@@ -543,6 +559,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         resource_manager->get_resource<RUShader>("direct_lighting_summed_area_table_shader");
     indirect_lighting_rsm_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_rsm_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
+    bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
     bloom_horizontal_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_horizontal");
     bloom_vertical_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_vertical");
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
@@ -729,6 +746,13 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
 
 void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     VkExtent2D extent = base_render_data->swap_chain_extent;
+    uint32_t maximum_bloom_mipmap_level = std::bit_width(std::min(extent.width, extent.height)) - 1U;
+    uint32_t bloom_mipmap_level = std::min(BLOOM_DOWNSAMPLE_LEVEL, maximum_bloom_mipmap_level);
+    bloom_mipmap_level_count = bloom_mipmap_level + 1U;
+    bloom_extent = VkExtent2D{
+        .width = std::max(extent.width >> bloom_mipmap_level, 1U),
+        .height = std::max(extent.height >> bloom_mipmap_level, 1U),
+    };
     direct_lighting_image = ROImageVK::Builder()
                                 .set_format(LIGHTING_OUTPUT_FORMAT)
                                 .image_2d(extent)
@@ -744,14 +768,21 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                        .image_2d(extent)
                        .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                        .create_ref(base_render_data);
+    bloom_extract_image = ROImageVK::Builder()
+                              .set_format(LIGHTING_OUTPUT_FORMAT)
+                              .image_2d(extent)
+                              .set_mipmap_level(bloom_mipmap_level_count)
+                              .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                         VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                              .create_ref(base_render_data);
     bloom_horizontal_image = ROImageVK::Builder()
                                  .set_format(LIGHTING_OUTPUT_FORMAT)
-                                 .image_2d(extent)
+                                 .image_2d(bloom_extent)
                                  .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                  .create_ref(base_render_data);
     bloom_image = ROImageVK::Builder()
                       .set_format(LIGHTING_OUTPUT_FORMAT)
-                      .image_2d(extent)
+                      .image_2d(bloom_extent)
                       .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                       .create_ref(base_render_data);
     direct_lighting_view = ROImageViewVK::Builder()
@@ -769,6 +800,21 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                             .set_format(LIGHTING_OUTPUT_FORMAT)
                             .create_ref(base_render_data);
+    bloom_extract_image_view = ROImageViewVK::Builder()
+                                   .set_image(bloom_extract_image)
+                                   .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                   .set_format(LIGHTING_OUTPUT_FORMAT)
+                                   .create_ref(base_render_data);
+    bloom_downsampled_image_view = ROImageViewVK::Builder()
+                                       .set_image(bloom_extract_image)
+                                       .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                       .set_format(LIGHTING_OUTPUT_FORMAT)
+                                       .set_subresource_range(VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                           .baseMipLevel = bloom_mipmap_level,
+                                           .levelCount = 1,
+                                           .baseArrayLayer = 0,
+                                           .layerCount = 1})
+                                       .create_ref(base_render_data);
     bloom_horizontal_image_view = ROImageViewVK::Builder()
                                       .set_image(bloom_horizontal_image)
                                       .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
@@ -779,6 +825,10 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                            .set_format(LIGHTING_OUTPUT_FORMAT)
                            .create_ref(base_render_data);
+    bloom_sampler = ROSamplerVK::Builder()
+                        .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                        .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
+                        .create_ref(base_render_data);
 }
 
 Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task(
@@ -915,11 +965,19 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_combine_ligh
     return bindpoints.build();
 }
 
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_horizontal_bindpoints() const {
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_extract_bindpoints() const {
     RenderBindpointDeclarationsBuilder bindpoints;
     bindpoints.add_image_decleration("bloom_input", result_image_view)
+        .add_image_decleration("bloom_output", bloom_extract_image_view)
+        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
+    return bindpoints.build();
+}
+
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_horizontal_bindpoints() const {
+    RenderBindpointDeclarationsBuilder bindpoints;
+    bindpoints.add_image_decleration("bloom_input", bloom_downsampled_image_view)
         .add_image_decleration("bloom_output", bloom_horizontal_image_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
+        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
     return bindpoints.build();
 }
 
@@ -927,7 +985,7 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_vertic
     RenderBindpointDeclarationsBuilder bindpoints;
     bindpoints.add_image_decleration("bloom_input", bloom_horizontal_image_view)
         .add_image_decleration("bloom_output", bloom_image_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler);
+        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
     return bindpoints.build();
 }
 
@@ -935,7 +993,7 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_present_post
     RenderBindpointDeclarationsBuilder bindpoints;
     bindpoints.add_image_decleration("result_image", result_image_view)
         .add_image_decleration("bloom_image", bloom_image_view)
-        .add_sampler_decleration("result_sampler", gbuffer_sampler);
+        .add_sampler_decleration("result_sampler", bloom_sampler);
     return bindpoints.build();
 }
 
@@ -968,6 +1026,9 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto combine_compiled =
         ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
     combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
+    auto bloom_extract_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource, build_bloom_extract_bindpoints());
+    bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
     auto bloom_horizontal_compiled =
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_horizontal_bindpoints());
     bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
@@ -1074,7 +1135,9 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
-        .add_task(create_bloom_task_desc())
+        .add_task(create_bloom_extract_task_desc())
+        .add_task(create_bloom_mipmap_task_desc())
+        .add_task(create_bloom_blur_task_desc())
         .add_task(create_present_result_image_task_desc())
         .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
@@ -1096,6 +1159,8 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
         .add_resource(INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
         .add_resource(RESULT_IMAGE_VIEW, result_image_view)
+        .add_resource(BLOOM_EXTRACT_IMAGE_VIEW, bloom_extract_image_view)
+        .add_resource(BLOOM_DOWNSAMPLED_IMAGE_VIEW, bloom_downsampled_image_view)
         .add_resource(BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
         .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view);
 }
@@ -1229,21 +1294,58 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_task_desc() const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_BLOOM;
+    task_desc.task_id = RT_EXTRACT_BLOOM;
     task_desc.after(RT_COMBINE_LIGHTING)
         .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(BLOOM_EXTRACT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = bloom_extract_compute_pipeline]() -> Unique<RenderTaskVK> {
+        VkExtent3D dispatch_group_count{
+            .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
+            .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
+            .depth = 1,
+        };
+        return make_unique<RTRunComputePipelineVK>(task_render_allocator, task_base_render_data, task_pipeline, dispatch_group_count);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_mipmap_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_GENERATE_BLOOM_MIPMAPS;
+    task_desc.after(RT_EXTRACT_BLOOM);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_bloom_mipmap_level_count = bloom_mipmap_level_count]() -> Unique<RenderTaskVK> {
+        return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
+            task_base_render_data,
+            BLOOM_EXTRACT_IMAGE_VIEW,
+            task_base_render_data->swap_chain_extent,
+            task_bloom_mipmap_level_count,
+            LIGHTING_OUTPUT_FORMAT);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_BLUR_BLOOM;
+    task_desc.after(RT_GENERATE_BLOOM_MIPMAPS)
+        .read(BLOOM_DOWNSAMPLED_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .write(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
         .write(BLOOM_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
+                           task_bloom_extent = bloom_extent,
                            horizontal_pipeline = bloom_horizontal_compute_pipeline,
                            vertical_pipeline = bloom_vertical_compute_pipeline]() -> Unique<RenderTaskVK> {
         VkExtent3D dispatch_group_count{
-            .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
-            .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
+            .width = (task_bloom_extent.width + 7U) / 8U,
+            .height = (task_bloom_extent.height + 7U) / 8U,
             .depth = 1,
         };
         std::array<RTRunComputePipelinesSequentialVK::Dispatch, 2> dispatches{{
@@ -1258,7 +1360,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_task_desc() const 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
-    task_desc.after(RT_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    task_desc.after(RT_BLUR_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<RenderTaskVK> {
