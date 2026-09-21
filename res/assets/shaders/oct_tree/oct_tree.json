@@ -1,0 +1,43 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "oct_tree_build_static_set_x",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_x.spv",
+            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_x.json",
+            "depth_test": false,
+            "cull_backfaces": false,
+            "macros": [
+                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "0"}
+            ]
+        },
+        {
+            "id": "oct_tree_build_static_set_y",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_y.spv",
+            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_y.json",
+            "depth_test": false,
+            "cull_backfaces": false,
+            "macros": [
+                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "1"}
+            ]
+        },
+        {
+            "id": "oct_tree_build_static_set_z",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_z.spv",
+            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_z.json",
+            "depth_test": false,
+            "cull_backfaces": false,
+            "macros": [
+                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "2"}
+            ]
+        }
+
+
+    ]
+}

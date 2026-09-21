@@ -205,61 +205,6 @@ struct StaticSetContractMetadata {
 };
 #endif
 
-[WBE_DATA_TYPE]
-struct SparseOctTreeNode {
-    static const uint STATE_MASK = 0xC0000000u;
-    static const uint INDEX_MASK = 0x3FFFFFFFu;
-    static const uint32_t STATE_SHIFT = 30;
-    enum class ChildrenState {
-        NODE = 0b00 << STATE_SHIFT,
-        EMPTY = 0b01 << STATE_SHIFT,
-        ALLOCATING = 0b10 << STATE_SHIFT,
-        // Used in utility functions, should never appear as a real child state.
-        INVALID = 0b11 << STATE_SHIFT,
-    };
-    enum Subregion {
-        XYZ_000,
-        XYZ_001,
-        XYZ_010,
-        XYZ_011,
-        XYZ_100,
-        XYZ_101,
-        XYZ_110,
-        XYZ_111,
-        MAX_SUBREGION
-    };
-    /**
-     * @brief Children info. The 2 most significant bits are used as state tracking.
-     * For EMPTY and ALLOCATING states, the remained bits must be 0s. Or else, it represents
-     * the index in the corresponding node.
-     */
-    uint children[Subregion::MAX_SUBREGION];
-    /**
-     * @index of the data in the data buffer.
-     */
-    uint data_index;
-};
-
-[WBE_DATA_TYPE]
-struct SparseOctTreeInfo {
-    /**
-     * @brief three directional matrices for oct tree setup.
-     */
-    float4x4 matrices[3];
-    /**
-     * @brief The origin of the oct tree in world space.
-     */
-    float3 origin;
-    /**
-     * @brief The width of the region this oct tree is covering.
-     */
-    float width;
-    /**
-     * @brief The resolution of the oct tree. This should be a power of 2.
-     */
-    uint resolution;
-};
-
 /**
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
  */
@@ -276,40 +221,6 @@ struct StaticSetDescriptorIndices {
  * @brief Mathematical constant pi.
  */
 static const float WBE_PI = 3.14159265359;
-
-uint get_oct_tree_node_subregion(float3 p_position)
-{
-    return (uint(p_position.x >= 0.5) << 2) |
-        (uint(p_position.y >= 0.5) << 1) |
-        uint(p_position.z >= 0.5);
-}
-
-SparseOctTreeNode traverse_oct_tree(SparseOctTreeNode* p_nodes, float3 p_svo_position, int p_depth) {
-    uint node_index = 0;
-    float3 position = p_svo_position;
-
-    for (int depth = 0; p_depth < 0 || depth < p_depth; ++depth) {
-        SparseOctTreeNode node = p_nodes[node_index];
-
-        uint child_index =
-            get_oct_tree_node_subregion(position);
-
-        uint entry = node.children[child_index];
-
-        // EMPTY / ALLOCATING
-        if ((entry & SparseOctTreeNode::STATE_MASK) != 0) {
-            break;
-        }
-
-        node_index = entry & SparseOctTreeNode::INDEX_MASK;
-
-        // Remap from parent-local coordinates
-        // into child-local coordinates.
-        position = frac(position * 2.0);
-    }
-
-    return p_nodes[node_index];
-}
 
 /**
  * @brief Decode a two-channel tangent-space normal map sample and reconstruct its positive Z component.

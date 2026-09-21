@@ -1,7 +1,8 @@
-#ifndef WBE_SPARSE_OCT_TREE_BUILD_SLANG
-#define WBE_SPARSE_OCT_TREE_BUILD_SLANG
+#ifndef WBE_OCT_TREE_BUILD_SLANG
+#define WBE_OCT_TREE_BUILD_SLANG
 
-#include "utils.slang"
+#include "utils/utils.slang"
+#include "oct_tree/oct_tree_utils.slang"
 
 /**
  * @brief The input data from the vertex buffer
@@ -30,29 +31,33 @@ struct VSOutput {
 };
 
 
-struct SparseOctTreeDescriptorIndices {
+struct OctTreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer")]
-    uint2 sparse_oct_tree_info;
+    uint2 oct_tree_info;
     [WBE_DESCRIPTOR("storage_buffer")]
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer")]
-    uint2 block_data;
+    uint2 tree_leaves;
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 tree_node_data;
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 node_data;
 
     StaticSetDescriptorIndices static_set;
 };
 
 [[vk::push_constant]]
-ConstantBuffer<SparseOctTreeDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctTreeDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-set vertex for the sparse oct tree.
+ * @brief Transform a static-set vertex for the oct tree.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into static_set.instances.
  * @return Vertex output in clip space.
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<SparseOctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.sparse_oct_tree_info.x];
+    ConstantBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     float4x4 proj_matrix = oct_tree_info.matrices[WBE_OCT_TREE_VIEW_INDEX];
     StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
     StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
@@ -72,6 +77,7 @@ VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) 
 
 [shader("fragment")]
 void fragment_main(VSOutput p_input) : SV_Target0 {
+    // Trace to the bottom-most node
 
 }
 

@@ -8,7 +8,7 @@
         "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.json",
         "assets/shaders/deferred_gbuffer/deferred_gbuffer_shader.json",
         "assets/shaders/deferred_composition/deferred_composition_shader.json",
-        "assets/shaders/sparse_oct_tree/sparse_oct_tree.json",
+        "assets/shaders/oct_tree/oct_tree.json",
         "assets/shaders/bloom/bloom_shader.json"
     ],
     "resources": [
