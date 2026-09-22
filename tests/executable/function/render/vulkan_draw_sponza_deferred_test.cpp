@@ -40,6 +40,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
@@ -53,6 +54,7 @@
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -60,15 +62,19 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <format>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 #include <glm/geometric.hpp>
+#include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
 #include <optional>
+#include <semaphore>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -124,6 +130,34 @@ constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
 constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 constexpr uint32_t BLOOM_DOWNSAMPLE_LEVEL = 4;
+constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
+
+namespace {
+
+std::vector<uint8_t> convert_bloom_to_rgba8(std::span<const uint8_t> p_bloom_data) {
+    if (p_bloom_data.size_bytes() % BLOOM_BYTES_PER_PIXEL != 0) {
+        throw std::runtime_error("Failed to convert deferred bloom acquisition: byte count is not pixel aligned.");
+    }
+    const size_t pixel_count = p_bloom_data.size_bytes() / BLOOM_BYTES_PER_PIXEL;
+    std::vector<uint8_t> rgba8(pixel_count * 4);
+    for (size_t pixel = 0; pixel < pixel_count; ++pixel) {
+        for (size_t channel = 0; channel < 3; ++channel) {
+            uint16_t packed_channel = 0;
+            std::memcpy(&packed_channel,
+                p_bloom_data.data() + pixel * BLOOM_BYTES_PER_PIXEL + channel * sizeof(packed_channel),
+                sizeof(packed_channel));
+            float value = glm::unpackHalf1x16(packed_channel);
+            if (!std::isfinite(value)) {
+                value = value > 0.0F ? 1.0F : 0.0F;
+            }
+            rgba8[pixel * 4 + channel] = static_cast<uint8_t>(std::clamp(value, 0.0F, 1.0F) * 255.0F + 0.5F);
+        }
+        rgba8[pixel * 4 + 3] = UINT8_MAX;
+    }
+    return rgba8;
+}
+
+} // namespace
 
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
@@ -162,6 +196,7 @@ private:
     static constexpr std::string_view RT_EXTRACT_BLOOM = "extract_bloom";
     static constexpr std::string_view RT_GENERATE_BLOOM_MIPMAPS = "generate_bloom_mipmaps";
     static constexpr std::string_view RT_BLUR_BLOOM = "blur_bloom";
+    static constexpr std::string_view RT_ACQUIRE_BLOOM = "acquire_bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
@@ -229,9 +264,11 @@ private:
     RendTaskDescVK create_bloom_extract_task_desc() const;
     RendTaskDescVK create_bloom_mipmap_task_desc() const;
     RendTaskDescVK create_bloom_blur_task_desc() const;
+    RendTaskDescVK create_bloom_acquire_task_desc();
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
+    void write_completed_bloom_acquire();
 
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
@@ -314,6 +351,11 @@ private:
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
     uint32_t bloom_mipmap_level_count = 1;
+    std::vector<uint8_t> bloom_acquire_buffer;
+    std::atomic_bool bloom_acquire_requested = false;
+    std::binary_semaphore bloom_acquire_completed{0};
+    bool bloom_acquire_key_was_down = false;
+    bool bloom_acquire_in_flight = false;
     bool render_graph_switch_key_was_down = false;
     std::atomic<bool> summed_area_table_requested = false;
     bool summed_area_table_active = false;
@@ -324,6 +366,7 @@ private:
 };
 
 void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
+    write_completed_bloom_acquire();
     control(p_delta);
     update_descriptors();
 }
@@ -340,6 +383,13 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         summed_area_table_requested.store(requested, std::memory_order_relaxed);
     }
     render_graph_switch_key_was_down = render_graph_switch_key_down;
+
+    bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
+    if (bloom_acquire_key_down && !bloom_acquire_key_was_down && !bloom_acquire_in_flight) {
+        bloom_acquire_requested.store(true, std::memory_order_release);
+        bloom_acquire_in_flight = true;
+    }
+    bloom_acquire_key_was_down = bloom_acquire_key_down;
 
     float delta = static_cast<float>(p_delta);
     if (input_manager->get_input_status(KEYCODE_LEFT).is_down()) {
@@ -754,6 +804,10 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
         .width = std::max(extent.width >> bloom_mipmap_level, 1U),
         .height = std::max(extent.height >> bloom_mipmap_level, 1U),
     };
+    if (bloom_extent.width > std::numeric_limits<size_t>::max() / bloom_extent.height / BLOOM_BYTES_PER_PIXEL) {
+        throw std::runtime_error("Failed to allocate the deferred bloom acquisition buffer: image byte size is too large.");
+    }
+    bloom_acquire_buffer.resize(static_cast<size_t>(bloom_extent.width) * bloom_extent.height * BLOOM_BYTES_PER_PIXEL);
     direct_lighting_image = ROImageVK::Builder()
                                 .set_format(LIGHTING_OUTPUT_FORMAT)
                                 .image_2d(extent)
@@ -784,7 +838,7 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     bloom_image = ROImageVK::Builder()
                       .set_format(LIGHTING_OUTPUT_FORMAT)
                       .image_2d(bloom_extent)
-                      .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                      .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
                       .create_ref(base_render_data);
     direct_lighting_view = ROImageViewVK::Builder()
                                .set_image(direct_lighting_image)
@@ -1137,6 +1191,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
         .add_task(create_bloom_extract_task_desc())
         .add_task(create_bloom_mipmap_task_desc())
         .add_task(create_bloom_blur_task_desc())
+        .add_task(create_bloom_acquire_task_desc())
         .add_task(create_present_result_image_task_desc())
         .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
@@ -1354,10 +1409,25 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
     return task_desc;
 }
 
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc() {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_ACQUIRE_BLOOM;
+    task_desc.after(RT_BLUR_BLOOM);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_destination = std::span<uint8_t>(bloom_acquire_buffer),
+                           task_acquire_requested = &bloom_acquire_requested,
+                           task_acquire_completed = &bloom_acquire_completed]() -> Unique<RenderTaskVK> {
+        return make_unique<RTCPUInFlightAcquireVK>(
+            task_render_allocator, task_base_render_data, BLOOM_IMAGE_VIEW, task_destination, task_acquire_requested, task_acquire_completed);
+    };
+    return task_desc;
+}
+
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
-    task_desc.after(RT_BLUR_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    task_desc.after(RT_ACQUIRE_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<RenderTaskVK> {
@@ -1370,6 +1440,20 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
             VK_ATTACHMENT_LOAD_OP_CLEAR);
     };
     return task_desc;
+}
+
+void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
+    if (!bloom_acquire_completed.try_acquire()) {
+        return;
+    }
+
+    std::filesystem::path output_directory = std::filesystem::path("test_env") / "descriptor_debug";
+    std::filesystem::create_directories(output_directory);
+    std::filesystem::path output_path = output_directory / "deferred_bloom.png";
+    std::vector<uint8_t> rgba8 = convert_bloom_to_rgba8(bloom_acquire_buffer);
+    write_image_data_png(output_path, rgba8, bloom_extent.width, bloom_extent.height, 4);
+    bloom_acquire_in_flight = false;
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Stored deferred bloom acquisition in {}.", output_path.generic_string()));
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {

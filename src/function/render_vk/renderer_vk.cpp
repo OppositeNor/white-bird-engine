@@ -47,6 +47,7 @@
 #include "function/window/i_window.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -60,7 +61,6 @@
 #include <optional>
 #include <set>
 #include <span>
-#include <stb_image_write.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -1459,10 +1459,6 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
     if (!blue_first && swap_chain_image_format != VK_FORMAT_R8G8B8A8_SRGB && swap_chain_image_format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("PNG capture supports only RGBA8 and BGRA8 swap-chain formats.");
     }
-    if (swap_chain_extent.width > static_cast<uint32_t>(std::numeric_limits<int>::max() / 4) ||
-        swap_chain_extent.height > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
-        throw std::runtime_error("PNG capture extent exceeds the PNG writer's limits.");
-    }
     std::future<std::vector<uint8_t>> acquire_future = render_objects->swap_chain_images[p_image_index]->acquire_image_content();
     run_gpu_jobs();
     std::vector<uint8_t> pixels = acquire_future.get();
@@ -1477,14 +1473,7 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
         // The swap-chain alpha channel is not necessarily meaningful.
         pixels[offset + 3] = 255;
     }
-    if (stbi_write_png(capture_png_path.c_str(),
-            static_cast<int>(swap_chain_extent.width),
-            static_cast<int>(swap_chain_extent.height),
-            4,
-            pixels.data(),
-            static_cast<int>(swap_chain_extent.width * 4)) == 0) {
-        throw std::runtime_error("Failed to write the requested frame capture PNG.");
-    }
+    write_image_data_png(Path(capture_png_path.c_str()), pixels, swap_chain_extent.width, swap_chain_extent.height, 4);
     stdout_log()->message(std::format(
         "Captured frame {} to {}", base_render_data.current_frame, std::string_view(capture_png_path.data(), capture_png_path.size())));
 }

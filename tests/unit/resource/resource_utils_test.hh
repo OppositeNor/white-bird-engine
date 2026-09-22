@@ -21,6 +21,7 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
@@ -427,6 +428,47 @@ TEST_F(WBEResourceUtilsTest, SmallImages) {
 
     WBE::img_rotate_180(data.get(), size, size, channels);
     EXPECT_EQ(get_pixel(data.get(), 0, 0, size, channels), original_value);
+}
+
+TEST_F(WBEResourceUtilsTest, WriteImageDataPNG) {
+    const WBE::Path output_path = std::filesystem::temp_directory_path() / "wbe_resource_utils_test.png";
+    const std::vector<uint8_t> pixels{
+        255,
+        0,
+        0,
+        255,
+        0,
+        255,
+        0,
+        255,
+        0,
+        0,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+    };
+
+    ASSERT_NO_THROW(WBE::write_image_data_png(output_path, pixels, 2, 2, 4));
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 0;
+    std::vector<uint8_t> loaded = WBE::load_image_data(output_path, 4, false, false, width, height, channels);
+    EXPECT_EQ(width, 2U);
+    EXPECT_EQ(height, 2U);
+    EXPECT_EQ(channels, 4U);
+    EXPECT_EQ(loaded, pixels);
+    std::filesystem::remove(output_path);
+}
+
+TEST_F(WBEResourceUtilsTest, WriteImageDataPNGRejectsInvalidArguments) {
+    const std::vector<uint8_t> pixels(4, UINT8_MAX);
+    EXPECT_THROW(WBE::write_image_data_png(WBE::Path(), pixels, 1, 1, 4), std::runtime_error);
+    EXPECT_THROW(WBE::write_image_data_png("unused.png", pixels, 0, 1, 4), std::runtime_error);
+    EXPECT_THROW(WBE::write_image_data_png("unused.png", pixels, 1, 1, 5), std::runtime_error);
+    EXPECT_THROW(WBE::write_image_data_png("unused.png", pixels, 2, 1, 4), std::runtime_error);
 }
 
 #endif

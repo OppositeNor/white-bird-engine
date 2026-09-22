@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -116,6 +117,18 @@ void img_rotate_180(uint8_t* p_data, uint32_t p_width, uint32_t p_height, uint32
  */
 std::vector<uint8_t> load_image_data(
     const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
+
+/**
+ * @brief Write tightly packed 8-bit image data to a PNG file.
+ *
+ * @param p_path Destination file path.
+ * @param p_data Tightly packed image channels in row-major order.
+ * @param p_width Image width in pixels.
+ * @param p_height Image height in pixels.
+ * @param p_channels Channel count from one through four.
+ * @throws std::runtime_error If the arguments are invalid or the PNG cannot be written.
+ */
+void write_image_data_png(const Path& p_path, std::span<const uint8_t> p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels);
 
 /**
  * @brief Load HDR image data from a image file.

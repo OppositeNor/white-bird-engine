@@ -21,10 +21,13 @@
 #include <cstring>
 #include <fstream>
 #include <ios>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <stb_image.h>
+#include <stb_image_write.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -157,6 +160,36 @@ std::vector<uint8_t> load_image_data(
     }
     WBE_DEBUG_ASSERT(p_width >= 0 && p_height >= 0 && p_file_channels >= 0);
     return result;
+}
+
+void write_image_data_png(const Path& p_path, std::span<const uint8_t> p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channels) {
+    if (p_path.empty()) {
+        throw std::runtime_error("Failed to write PNG image: destination path is empty.");
+    }
+    if (p_width == 0 || p_height == 0 || p_channels == 0 || p_channels > 4) {
+        throw std::runtime_error("Failed to write PNG image: width, height, and channel count must be valid.");
+    }
+    if (p_width > static_cast<uint32_t>(std::numeric_limits<int>::max()) / p_channels ||
+        p_height > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
+        throw std::runtime_error("Failed to write PNG image: dimensions exceed the PNG writer's limits.");
+    }
+    const size_t row_size = static_cast<size_t>(p_width) * p_channels;
+    if (p_height > std::numeric_limits<size_t>::max() / row_size) {
+        throw std::runtime_error("Failed to write PNG image: image byte size exceeds the CPU address space.");
+    }
+    const size_t expected_size = row_size * p_height;
+    if (p_data.size_bytes() != expected_size) {
+        throw std::runtime_error(std::format(
+            "Failed to write PNG image: received {} bytes but {} bytes are required.", p_data.size_bytes(), expected_size));
+    }
+    if (stbi_write_png(FileSystem::path_to_string(p_path).c_str(),
+            static_cast<int>(p_width),
+            static_cast<int>(p_height),
+            static_cast<int>(p_channels),
+            p_data.data(),
+            static_cast<int>(row_size)) == 0) {
+        throw std::runtime_error(std::format("Failed to write PNG image: {}.", FileSystem::path_to_string(p_path)));
+    }
 }
 
 std::optional<std::vector<float>> load_image_data_hdr(
