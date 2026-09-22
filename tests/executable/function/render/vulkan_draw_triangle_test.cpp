@@ -51,6 +51,7 @@ namespace WBE = WhiteBirdEngine;
 
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER = "draw_triangle_vertex_buffer";
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "draw_triangle_index_buffer";
+static constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER = "time";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
@@ -120,7 +121,7 @@ public:
             .vertex_offset = 0,
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource("time", time_ubo)
+        pipeline_desc.add_resource(REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER, time_ubo)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
         WBE::RendTaskDescVK task_desc(render_allocator);

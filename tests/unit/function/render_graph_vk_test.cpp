@@ -41,6 +41,12 @@ namespace WhiteBirdEngine {
 
 namespace {
 
+static constexpr std::string_view TEST_LOGICAL_RESOURCE = "logical";
+static constexpr std::string_view TEST_MISSING_RESOURCE = "missing";
+static constexpr std::string_view TEST_SHARED_RESOURCE = "shared";
+static constexpr std::string_view TEST_LIGHTING_TASK = "lighting";
+static constexpr std::string_view TEST_LIGHTING_SHARED_RESOURCE = "lighting.shared";
+
 DebugData make_descriptor_row(
     std::string_view p_resource_type, std::string_view p_descriptor_type, std::string_view p_heap, uint32_t p_heap_index) {
     DebugData row;
@@ -103,13 +109,13 @@ public:
 
     void register_resources(RendResRegistrarVK& p_registrar) override {
         for (size_t i = 0; i < registration_count; ++i) {
-            p_registrar.add_resource("logical", container->get_resource_type_id(), container);
+            p_registrar.add_resource(TEST_LOGICAL_RESOURCE, container->get_resource_type_id(), container);
         }
     }
 
     void bind_resources(const RendResViewVK& p_resources) override {
         if (require_missing_resource) {
-            static_cast<void>(p_resources.get("missing"));
+            static_cast<void>(p_resources.get(TEST_MISSING_RESOURCE));
         }
     }
 
@@ -120,7 +126,7 @@ public:
     Vector<ResAccessVK, RenderAllocator> write_resources() const override {
         Vector<ResAccessVK, RenderAllocator> result(allocator);
         if (write_resource) {
-            result.push_back({.res_id = "logical", .usage = RendResUsageVK::STORAGE_BUFFER});
+            result.push_back({.res_id = std::string(TEST_LOGICAL_RESOURCE), .usage = RendResUsageVK::STORAGE_BUFFER});
         }
         return result;
     }
@@ -212,22 +218,22 @@ TEST(WBERenderGraphVKTest, TaskResourceViewPrefersQualifiedResourcesAndFallsBack
     Ref<ROCSingleVK> local_container = make_test_container(&allocator, &render_data);
 
     auto global_resource = make_ref<RendResVK>(&allocator);
-    global_resource->res_id = "shared";
+    global_resource->res_id = TEST_SHARED_RESOURCE;
     global_resource->res_type_id = global_container->get_resource_type_id();
     global_resource->container = global_container;
-    resources.emplace("shared", global_resource);
+    resources.emplace(std::string(TEST_SHARED_RESOURCE), global_resource);
     auto local_resource = make_ref<RendResVK>(&allocator);
-    local_resource->res_id = "lighting.shared";
+    local_resource->res_id = TEST_LIGHTING_SHARED_RESOURCE;
     local_resource->res_type_id = local_container->get_resource_type_id();
     local_resource->container = local_container;
-    resources.emplace("lighting.shared", local_resource);
+    resources.emplace(std::string(TEST_LIGHTING_SHARED_RESOURCE), local_resource);
 
-    RendResViewVK lighting_view(&resources, "lighting");
+    RendResViewVK lighting_view(&resources, TEST_LIGHTING_TASK);
     RendResViewVK other_view(&resources, "other");
-    EXPECT_EQ(lighting_view.get("shared").container, local_container);
-    EXPECT_EQ(other_view.get("shared").container, global_container);
-    EXPECT_TRUE(lighting_view.contains("shared"));
-    EXPECT_THROW(lighting_view.get("missing"), std::runtime_error);
+    EXPECT_EQ(lighting_view.get(TEST_SHARED_RESOURCE).container, local_container);
+    EXPECT_EQ(other_view.get(TEST_SHARED_RESOURCE).container, global_container);
+    EXPECT_TRUE(lighting_view.contains(TEST_SHARED_RESOURCE));
+    EXPECT_THROW(lighting_view.get(TEST_MISSING_RESOURCE), std::runtime_error);
 }
 
 TEST(WBERenderGraphVKTest, RejectsDuplicateTaskPrivateResourceRegistration) {

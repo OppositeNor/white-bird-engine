@@ -65,6 +65,12 @@ namespace {
 
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
 constexpr VkFormat SHADOWMAP_COLOR_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
+static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
+static constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
+static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
+static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
+static constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
+static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
 
 } // namespace
 
@@ -322,12 +328,12 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
         .container = WBE::MEM_NULL});
     pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
-        .add_resource("shadow_light_info", spot_light_info_ubo)
-        .add_resource("camera_info", camera_info_ubo)
-        .add_resource("spot_light_info", spot_light_info_ubo)
-        .add_resource("spot_light_count", spot_light_count_ubo)
-        .add_resource("shadowmap", shadow_depth_view)
-        .add_resource("shadow_sampler", shadow_sampler);
+        .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubo)
+        .add_resource(CAMERA_INFO_BUFFER, camera_info_ubo)
+        .add_resource(SPOT_LIGHT_INFO_BUFFER, spot_light_info_ubo)
+        .add_resource(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_ubo)
+        .add_resource(SHADOWMAP_SAMPLED_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(SHADOW_SAMPLER, shadow_sampler);
 
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
 

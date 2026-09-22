@@ -45,11 +45,14 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
+
+static constexpr std::string_view REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER = "camera_info";
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
@@ -102,7 +105,7 @@ public:
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .container = WBE::MEM_NULL});
-        pipeline_desc.add_resource("camera_info", camera_info_ubo);
+        pipeline_desc.add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
         pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_STATIC_SET, std::move(task));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));

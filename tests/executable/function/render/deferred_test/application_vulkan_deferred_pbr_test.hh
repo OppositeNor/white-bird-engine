@@ -50,8 +50,6 @@
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
 #include <semaphore>
-#include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -111,6 +109,17 @@ private:
     static constexpr std::string_view BLOOM_DOWNSAMPLED_IMAGE_VIEW = "bloom_downsampled";
     static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
     static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
+    static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
+    static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
+    static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
+    static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_infos";
+    static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
+    static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
+    static constexpr std::string_view GBUFFER_SAMPLER = "gbuffer_sampler";
+    static constexpr std::string_view BLOOM_SAMPLER = "bloom_sampler";
+    static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
+    static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
+    static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 
     static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
     static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";

@@ -88,6 +88,16 @@ constexpr std::string_view RT_RUN_SHADOWMAP_MASKED = "run_shadowmap_masked";
 constexpr std::string_view RT_RUN_MAIN_OPAQUE = "run_main_opaque";
 constexpr std::string_view RT_RUN_MAIN_MASKED = "run_main_masked";
 constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
+static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
+static constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
+static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
+static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
+static constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
+static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
+static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
+static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
+static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
+static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
 
 struct ForwardSceneViewConfig {
@@ -609,16 +619,16 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
     pipeline_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
-        .add_resource("shadow_light_info", spot_light_info_ubos)
-        .add_resource("camera_info", camera_info_ubos)
-        .add_resource("spot_light_info", spot_light_info_ubos)
-        .add_resource("spot_light_count", spot_light_count_ubos)
-        .add_resource("shadowmap", shadow_depth_view)
-        .add_resource("shadow_sampler", shadow_sampler)
-        .add_resource("gbuffer_camera_info", camera_info_ubos)
-        .add_resource("light_billboard_info", light_billboard_ubo)
-        .add_resource("light_billboard_texture", light_billboard_texture_view)
-        .add_resource("light_billboard_sampler", light_billboard_sampler);
+        .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubos)
+        .add_resource(CAMERA_INFO_BUFFER, camera_info_ubos)
+        .add_resource(SPOT_LIGHT_INFO_BUFFER, spot_light_info_ubos)
+        .add_resource(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_ubos)
+        .add_resource(SHADOWMAP_SAMPLED_IMAGE_VIEW, shadow_depth_view)
+        .add_resource(SHADOW_SAMPLER, shadow_sampler)
+        .add_resource(GBUFFER_CAMERA_INFO_BUFFER, camera_info_ubos)
+        .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, light_billboard_ubo)
+        .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
+        .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
 
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_SHADOWMAP_OPAQUE, std::move(p_shadow_opaque_task));
 
