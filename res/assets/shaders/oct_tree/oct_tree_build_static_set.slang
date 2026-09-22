@@ -100,10 +100,10 @@ void fragment_main(VSOutput p_input) : SV_Target0 {
     RWStructuredBuffer<OctTreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
     OctTreeNodeTraceInfo trace_info;
-    trace_info.state = OctTreeNode::ChildState::NODE;
     trace_info.node_index = 0;
-    trace_info.svo_position = p_input.svo_position;
+    trace_info.curr_depth = 0;
     trace_info.remain_depth = oct_tree_info[0].max_depth;
+    trace_info.svo_position = p_input.svo_position;
     // Try to allocate the node.
     if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info)) {
         // If allocation failed, push this to the deferred list.

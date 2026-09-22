@@ -17,14 +17,11 @@
 
 [WBE_DATA_TYPE]
 struct OctTreeNode {
-    static const uint STATE_MASK = 0xC0000000u;
-    static const uint INDEX_MASK = 0x3FFFFFFFu;
-    static const uint32_t STATE_SHIFT = 30;
-    enum class ChildState {
-        NODE = 0b00 << STATE_SHIFT,
-        EMPTY = 0b01 << STATE_SHIFT,
-        ALLOCATING = 0b10 << STATE_SHIFT,
-        LEAF = 0b11 << STATE_SHIFT,
+    enum class ChildrenState {
+        NODE,
+        LEAF,
+        EMPTY,
+        ALLOCATING
     };
     enum Subregion {
         XYZ_000,
@@ -38,13 +35,17 @@ struct OctTreeNode {
         MAX_SUBREGION
     };
     /**
-     * @brief Children info. The 2 most significant bits are used as state tracking.
-     * For EMPTY and ALLOCATING states, the remained bits must be 0s. For NODE state,
-     * the rest of the bits represents the index in the corresponding node in the node
-     * array. For LEAF, the rest of the bits represents the index of the corresponding
-     * leaf in the leaf array.
+     * @brief The children's state.
+     * We have to atomically operate on this, but Slang does not support
+     * atomic operation on enums (I sincerrily don't understand why. Aren't
+     * they integers basically?) So we couldn't use ChildrenState type but
+     * have to use uint.
      */
-    uint children[Subregion::MAX_SUBREGION];
+    uint children_state;
+    /**
+     * @brief Children's chunk start index.
+     */
+    uint children;
     /**
      * @index of the data in the data buffer.
      */
@@ -122,90 +123,95 @@ uint get_oct_tree_node_subregion(float3 p_position)
 }
 
 struct OctTreeNodeTraceInfo {
-    // The state of the next deeper node. If remain_depth is 0, this will be set to 0.
-    OctTreeNode::ChildState state;
     // The index of the node.
     uint node_index;
-    // The child index, if the traverse path is blocked.
-    uint child_index;
-    // The position in the node's svo space.
-    float3 svo_position;
     // The current depth.
     uint curr_depth;
     // The remain depth.
     int remain_depth;
+    // The position in the node's svo space.
+    float3 svo_position;
 };
 
 void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNodeTraceInfo p_trace_info) {
     uint node_index = p_trace_info.node_index;
+    uint curr_depth = p_trace_info.curr_depth;
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
         OctTreeNode node = p_nodes[node_index];
-        uint child_index = get_oct_tree_node_subregion(p_trace_info.svo_position);
-        uint entry = node.children[child_index];
-        OctTreeNode::ChildState child_state = (OctTreeNode::ChildState)(entry & OctTreeNode::STATE_MASK);
-        if (child_state != OctTreeNode::ChildState::NODE) {
+        OctTreeNode::ChildrenState children_state = OctTreeNode::ChildrenState(node.children_state);
+        if (children_state != OctTreeNode::ChildrenState::NODE) {
             // Traced to an empty/allocating/leaf node, set p_state and return.
-            p_trace_info.state = child_state;
-            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             p_trace_info.node_index = node_index;
-            p_trace_info.child_index = child_index;
+            p_trace_info.curr_depth = curr_depth;
+            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             return;
         }
-        node_index = entry & OctTreeNode::INDEX_MASK;
+        node_index = node.children + get_oct_tree_node_subregion(p_trace_info.svo_position);
+        ++curr_depth;
         // Remap from parent-local coordinates into child-local coordinates.
         p_trace_info.svo_position = frac(p_trace_info.svo_position * 2.0);
     }
     // We've traced a node.
-    p_trace_info.state = OctTreeNode::ChildState::NODE;
-    p_trace_info.child_index = 0;
+    p_trace_info.curr_depth = curr_depth;
     p_trace_info.node_index = node_index;
+    p_trace_info.remain_depth = 0;
 }
 
-uint create_oct_tree_child_node(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
-    uint new_node_index;
-    InterlockedAdd(p_tree_info[0].node_count, 1, new_node_index);
+uint create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
+    uint children_index;
+    InterlockedAdd(p_tree_info[0].node_count, 8, children_index);
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Initialize all of the children to empty
-        p_nodes[new_node_index].children[i] = uint(OctTreeNode::ChildState::EMPTY);
+        uint child_index = children_index + i;
+        p_nodes[child_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
+        p_nodes[child_index].parent_index = p_parent_node_index;
     }
-    p_nodes[new_node_index].parent_index = p_parent_node_index;
     uint new_data_index;
-    InterlockedAdd(p_tree_info[0].data_count, 1, new_data_index);
-    p_nodes[new_node_index].data_index = new_data_index;
-    return new_node_index | uint(OctTreeNode::ChildState::NODE);
+    InterlockedAdd(p_tree_info[0].data_count, 8, new_data_index);
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        p_nodes[children_index + i].data_index = new_data_index + i;
+    }
+    return children_index;
 }
 
-uint create_oct_tree_child_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
-    uint new_leaf_index;
-    InterlockedAdd(p_tree_info[0].leaves_count, 1, new_leaf_index);
-    p_leaves[new_leaf_index].parent_index = p_parent_node_index;
+uint create_oct_tree_children_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
+    uint children_index;
+    InterlockedAdd(p_tree_info[0].leaves_count, 8, children_index);
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        uint child_index = children_index + i;
+        p_leaves[child_index].parent_index = p_parent_node_index;
+    }
     uint new_data_index;
-    InterlockedAdd(p_tree_info[0].data_count, 1, new_data_index);
-    p_leaves[new_leaf_index].data_index = new_data_index;
-    return new_leaf_index | uint(OctTreeNode::ChildState::LEAF);
+    InterlockedAdd(p_tree_info[0].data_count, 8, new_data_index);
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        p_leaves[children_index + i].data_index = new_data_index + i;
+    }
+    return children_index;
 }
 
 bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
     RWStructuredBuffer<OctTreeInfo> p_tree_info,
-    uint p_node_index, uint p_child_index, bool p_is_leaf) {
+    uint p_node_index, bool p_is_leaf) {
     uint original;
     // Try swaping to ALLOCATE state
-    InterlockedCompareExchange<uint>(
-        p_nodes[p_node_index].children[p_child_index],
-        uint(OctTreeNode::ChildState::EMPTY),
-        uint(OctTreeNode::ChildState::ALLOCATING),
+    InterlockedCompareExchange(
+        p_nodes[p_node_index].children_state,
+        uint(OctTreeNode::ChildrenState::EMPTY),
+        uint(OctTreeNode::ChildrenState::ALLOCATING),
         original
     );
-    if (original != OctTreeNode::ChildState::EMPTY) {
+    if (original != uint(OctTreeNode::ChildrenState::EMPTY)) {
         // CAS Failed. Allocation failed.
         return false;
     }
     // CAS succeeded. Allocate the child node:
     if (p_is_leaf) {
-        p_nodes[p_node_index].children[p_child_index] = create_oct_tree_child_leaf(p_leaves, p_tree_info, p_node_index);
+        p_nodes[p_node_index].children = create_oct_tree_children_leaf(p_leaves, p_tree_info, p_node_index);
+        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::NODE);
     }
     else {
-        p_nodes[p_node_index].children[p_child_index] = create_oct_tree_child_node(p_nodes, p_tree_info, p_node_index);
+        p_nodes[p_node_index].children = create_oct_tree_children_node(p_nodes, p_tree_info, p_node_index);
+        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::LEAF);
     }
     return true;
 }
@@ -214,50 +220,43 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
     RWStructuredBuffer<OctTreeInfo> p_tree_info, inout OctTreeNodeTraceInfo p_trace_info) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
-    // TODO: is leaf
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
         OctTreeNode node = p_nodes[node_index];
-        uint child_index = get_oct_tree_node_subregion(p_trace_info.svo_position);
-        uint entry = node.children[child_index];
-        OctTreeNode::ChildState child_state = (OctTreeNode::ChildState)(entry & OctTreeNode::STATE_MASK);
+        OctTreeNode::ChildrenState child_state = OctTreeNode::ChildrenState(node.children_state);
         switch (child_state) {
-        case OctTreeNode::ChildState::NODE:
+        case OctTreeNode::ChildrenState::NODE:
             // A node, keep on looking deeper.
             break;
-        case OctTreeNode::ChildState::LEAF:
+        case OctTreeNode::ChildrenState::LEAF:
             // Found a leaf, allocation success.
             return true;
-        case OctTreeNode::ChildState::ALLOCATING:
-            // Other thread is occupying this node. Allocation failed. Set trace info and return.
-            p_trace_info.state = child_state;
-            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
+        case OctTreeNode::ChildrenState::ALLOCATING:
+            // Traced to an empty/allocating/leaf node, set p_state and return.
             p_trace_info.node_index = node_index;
-            p_trace_info.child_index = child_index;
             p_trace_info.curr_depth = curr_depth;
+            p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             return false;
-        case OctTreeNode::ChildState::EMPTY:
+        case OctTreeNode::ChildrenState::EMPTY:
             // Try to allocate if found child empty.
-            if (!try_create_oct_tree_entry(p_nodes, p_leaves, p_tree_info, node_index, child_index, curr_depth == p_tree_info[0].max_depth - 1)) {
+            if (!try_create_oct_tree_entry(p_nodes, p_leaves, p_tree_info, node_index, curr_depth == p_tree_info[0].max_depth - 1)) {
                 // If allocation failed, add this task to the deferred list.
-                p_trace_info.state = child_state;
-                p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
                 p_trace_info.node_index = node_index;
-                p_trace_info.child_index = child_index;
                 p_trace_info.curr_depth = curr_depth;
+                p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
                 return false;
             }
             break;
         }
-        node_index = entry & OctTreeNode::INDEX_MASK;
+        uint child_index = node.children + get_oct_tree_node_subregion(p_trace_info.svo_position);
+        node_index = child_index;
         ++curr_depth;
         // Remap from parent-local coordinates into child-local coordinates.
         p_trace_info.svo_position = frac(p_trace_info.svo_position * 2.0);
     }
     // We've traced a node.
-    p_trace_info.state = OctTreeNode::ChildState::NODE;
-    p_trace_info.child_index = 0;
     p_trace_info.node_index = node_index;
     p_trace_info.curr_depth = curr_depth;
+    p_trace_info.remain_depth = 0;
     return true;
 }
 
