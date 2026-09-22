@@ -89,10 +89,6 @@ struct OctTreeInfo {
      */
     uint max_depth;
     /**
-     * @brief The stride for data blocks. Must be a multiple of 4.
-     */
-    uint data_stride;
-    /**
      * @brief The number of nodes.
      */
     uint node_count;
