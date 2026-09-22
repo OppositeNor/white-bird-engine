@@ -263,6 +263,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     create_shadow_map_resources();
     create_gbuffer_resources();
     create_lighting_output_resources();
+    create_oct_tree_resources();
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
@@ -601,6 +602,25 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                         .create_ref(base_render_data);
 }
 
+void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
+    OctTreeInfo initial_oct_tree_info{
+        .matrices = {glm::mat4(1.0), glm::mat4(1.0), glm::mat4(1.0)},
+        .origin = OCT_TREE_ORIGIN,
+        .width = OCT_TREE_WIDTH,
+        .max_depth = OCT_TREE_MAX_DEPTH,
+    };
+    oct_tree_info = create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &initial_oct_tree_info, sizeof(initial_oct_tree_info));
+    oct_tree_nodes = ROBufferVK::Builder()
+        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        .create_ref(base_render_data);
+    oct_tree_leaves = ROBufferVK::Builder()
+        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        .create_ref(base_render_data);
+    oct_tree_deferred_list = ROBufferVK::Builder()
+        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        .create_ref(base_render_data);
+}
+
 Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task(
     RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing) {
     RTRunStaticSetVK::Config task_config;
@@ -654,9 +674,9 @@ void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_
     shadow_moments_summed_area_table_vertical_compute_pipeline = vertical_compiled.compute_pipeline;
 }
 
-Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_uniform_buffer(const void* p_data, size_t p_size) const {
+Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
     return ROBufferVK::Builder()
-        .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+        .set_usage(p_buffer_usage)
         .initial_data(p_data, p_size)
         .create_ref(base_render_data);
 }
@@ -775,7 +795,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         sizeof(SpotLightInfoVKUBO) * MAX_SPOT_LIGHT_INFO_COUNT,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     uint32_t spot_light_count = 1;
-    Ref<ROBufferVK> light_count_buffer = create_initialized_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
+    Ref<ROBufferVK> light_count_buffer = create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &spot_light_count, sizeof(spot_light_count));
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context)
                                .compile("direct_lighting_shader",

@@ -22,6 +22,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include <format>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -104,7 +105,7 @@ RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource) {
     if (p_resource == MEM_NULL) {
-        throw std::runtime_error("Failed to add render graph resource: render object is null.");
+        throw std::runtime_error(std::format("Failed to add render graph resource: render object for slot: {} is null.", p_resource_id));
     }
     return add_resource(p_resource_id, make_ref<ROCSingleVK>(allocator, std::move(p_resource)));
 }

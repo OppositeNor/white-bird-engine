@@ -84,6 +84,12 @@ private:
     static constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
     static constexpr uint32_t BLOOM_DOWNSAMPLE_LEVEL = 4;
     static constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
+    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = 1024;
+    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = 1024;
+    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = 1024;
+    static constexpr size_t OCT_TREE_MAX_DEPTH = 16;
+    static constexpr float OCT_TREE_WIDTH = 100.0F;
+    static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(0.0);
 
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
@@ -107,7 +113,7 @@ private:
 
     static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
     static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";
-    static constexpr std::string_view OCT_TREE_LEAVES_BUFFER = "oct_tree_node_buffer";
+    static constexpr std::string_view OCT_TREE_LEAF_BUFFER = "oct_tree_leaves_buffer";
     static constexpr std::string_view OCT_TREE_DEFERRED_LIST = "oct_tree_deferred_list";
 
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
@@ -187,8 +193,9 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
+    void create_oct_tree_resources();
     void setup_light_billboard_overlay_resources();
-    Ref<ROBufferVK> create_initialized_uniform_buffer(const void* p_data, size_t p_size) const;
+    Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     RenderBindpointDeclarations build_direct_lighting_bindpoints(Ref<IRenderObjectContainer> p_camera_buffer_container,

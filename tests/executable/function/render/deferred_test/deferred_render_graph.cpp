@@ -129,7 +129,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view)
         .add_resource(OCT_TREE_INFO, oct_tree_info)
         .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
-        .add_resource(OCT_TREE_LEAVES_BUFFER, oct_tree_leaves)
+        .add_resource(OCT_TREE_LEAF_BUFFER, oct_tree_leaves)
         .add_resource(OCT_TREE_DEFERRED_LIST, oct_tree_deferred_list);
 }
 
