@@ -114,7 +114,8 @@ private:
     static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
     static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";
     static constexpr std::string_view OCT_TREE_LEAF_BUFFER = "oct_tree_leaves_buffer";
-    static constexpr std::string_view OCT_TREE_DEFERRED_LIST = "oct_tree_deferred_list";
+    static constexpr std::string_view OCT_TREE_DEFERRED_LIST_PING = "oct_tree_deferred_list_ping";
+    static constexpr std::string_view OCT_TREE_DEFERRED_LIST_PONG = "oct_tree_deferred_list_pong";
 
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
@@ -208,8 +209,8 @@ private:
         Ref<ROBufferVK> p_light_count_buffer) const;
     RenderBindpointDeclarations build_combine_lighting_bindpoints() const;
     RenderBindpointDeclarations build_bloom_extract_bindpoints() const;
-    RenderBindpointDeclarations build_bloom_horizontal_bindpoints() const;
-    RenderBindpointDeclarations build_bloom_vertical_bindpoints() const;
+    RenderBindpointDeclarations build_bloom_bindpoints(Ref<ROImageViewVK> p_image_view) const;
+    RenderBindpointDeclarations build_oct_tree_build_bindpoints() const;
     RenderBindpointDeclarations build_present_post_processing_bindpoints() const;
     Unique<RTRunStaticSetVK> compile_shadow_task(
         RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
@@ -235,6 +236,7 @@ private:
     RendTaskDescVK create_bloom_acquire_task_desc();
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
+    RendTaskDescVK create_oct_tree_build_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 
@@ -253,6 +255,9 @@ private:
     RefRes<RUShader> bloom_extract_shader_resource;
     RefRes<RUShader> bloom_horizontal_shader_resource;
     RefRes<RUShader> bloom_vertical_shader_resource;
+    RefRes<RUShader> oct_tree_build_x_shader_resource;
+    RefRes<RUShader> oct_tree_build_y_shader_resource;
+    RefRes<RUShader> oct_tree_build_z_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_horizontal_compute_pipeline = MEM_NULL;
@@ -312,7 +317,8 @@ private:
     Ref<ROBufferVK> oct_tree_info;
     Ref<ROBufferVK> oct_tree_nodes;
     Ref<ROBufferVK> oct_tree_leaves;
-    Ref<ROBufferVK> oct_tree_deferred_list;
+    Ref<ROBufferVK> oct_tree_deferred_list_ping;
+    Ref<ROBufferVK> oct_tree_deferred_list_pong;
     std::vector<TaskUniformBinding> gbuffer_camera_bindings;
     std::vector<TaskUniformBinding> shadow_light_bindings;
     ComponentSpotLight spot_light_component{};

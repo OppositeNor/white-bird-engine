@@ -130,7 +130,8 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(OCT_TREE_INFO, oct_tree_info)
         .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
         .add_resource(OCT_TREE_LEAF_BUFFER, oct_tree_leaves)
-        .add_resource(OCT_TREE_DEFERRED_LIST, oct_tree_deferred_list);
+        .add_resource(OCT_TREE_DEFERRED_LIST_PING, oct_tree_deferred_list_ping)
+        .add_resource(OCT_TREE_DEFERRED_LIST_PONG, oct_tree_deferred_list_pong);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
@@ -389,8 +390,34 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VertexInputDescriptionVK{},
-            0,
-            6);
+            0, 6);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
+    task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
+        std::array<VkClearValue, 2> clear_values{};
+        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN_IMAGE};
+        return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
+            task_base_render_data,
+            clear_values,
+            task_base_render_data->swap_chain_extent,
+            color_attachment_ids,
+            GBUFFER_DEPTH_IMAGE_VIEW,
+            task_pipeline,
+            std::nullopt,
+            std::nullopt,
+            std::nullopt,
+            VK_ATTACHMENT_LOAD_OP_LOAD,
+            VK_ATTACHMENT_LOAD_OP_LOAD,
+            VertexInputDescriptionVK{},
+            0, 6);
     };
     return task_desc;
 }

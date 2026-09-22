@@ -333,6 +333,10 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
     bloom_horizontal_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_horizontal");
     bloom_vertical_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_vertical");
+    oct_tree_build_x_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_x");
+    oct_tree_build_y_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_y");
+    oct_tree_build_z_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_z");
+
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
 
@@ -393,38 +397,34 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
     shadow_depth_image = ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
     shadow_color_image = ROImageVK::Builder()
-                             .set_format(RSM_FLUX_FORMAT)
-                             .image_2d(shadow_extent)
-                             .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                             .create_ref(base_render_data);
+        .set_properties_2d(
+                RSM_FLUX_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+        .create_ref(base_render_data);
     shadow_normal_image = ROImageVK::Builder()
-                              .set_format(RSM_NORMAL_FORMAT)
-                              .image_2d(shadow_extent)
-                              .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                              .create_ref(base_render_data);
+        .set_properties_2d(
+                RSM_NORMAL_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+        .create_ref(base_render_data);
     shadow_moments_image = ROImageVK::Builder()
-                               .set_format(SHADOW_MOMENTS_FORMAT)
-                               .image_2d(shadow_extent)
-                               .set_mipmap_level(shadow_mipmap_level_count)
-                               .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-                               .create_ref(base_render_data);
+        .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent,
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        .set_mipmap_level(shadow_mipmap_level_count)
+        .create_ref(base_render_data);
     shadow_moments_summed_area_table_horizontal_image = ROImageVK::Builder()
-                                                            .set_format(SHADOW_MOMENTS_FORMAT)
-                                                            .image_2d(shadow_extent)
-                                                            .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                                            .create_ref(base_render_data);
+        .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent,
+                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+        .create_ref(base_render_data);
     shadow_moments_summed_area_table_image = ROImageVK::Builder()
-                                                 .set_format(SHADOW_MOMENTS_FORMAT)
-                                                 .image_2d(shadow_extent)
-                                                 .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                                 .create_ref(base_render_data);
+        .set_properties_2d(SHADOW_MOMENTS_FORMAT,
+                shadow_extent,
+                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+        .create_ref(base_render_data);
     shadow_depth_view = ROImageViewVK::Builder()
-                            .set_image(shadow_depth_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
-                            .set_format(SHADOWMAP_DEPTH_FORMAT)
-                            .create_ref(base_render_data);
+        .set_image(shadow_depth_image)
+        .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+        .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
+        .set_format(SHADOWMAP_DEPTH_FORMAT)
+        .create_ref(base_render_data);
     shadow_color_view = ROImageViewVK::Builder()
                             .set_image(shadow_color_image)
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
@@ -467,24 +467,21 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
 void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
     VkExtent2D extent = base_render_data->swap_chain_extent;
     gbuffer_albedo_image = ROImageVK::Builder()
-                               .set_format(GBUFFER_ALBEDO_FORMAT)
-                               .image_2d(extent)
-                               .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                               .set_properties_2d(
+                                   GBUFFER_ALBEDO_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                .create_ref(base_render_data);
     gbuffer_normal_image = ROImageVK::Builder()
-                               .set_format(GBUFFER_NORMAL_FORMAT)
-                               .image_2d(extent)
-                               .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                               .set_properties_2d(
+                                   GBUFFER_NORMAL_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                .create_ref(base_render_data);
     gbuffer_rma_image = ROImageVK::Builder()
-                            .set_format(GBUFFER_RMA_FORMAT)
-                            .image_2d(extent)
-                            .set_usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                            .set_properties_2d(
+                                GBUFFER_RMA_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                             .create_ref(base_render_data);
     gbuffer_depth_image = ROImageVK::Builder()
-                              .set_format(GBUFFER_DEPTH_FORMAT)
-                              .image_2d(extent)
-                              .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                              .set_properties_2d(GBUFFER_DEPTH_FORMAT,
+                                  extent,
+                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                               .create_ref(base_render_data);
     gbuffer_albedo_view = ROImageViewVK::Builder()
                               .set_image(gbuffer_albedo_image)
@@ -527,36 +524,32 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     }
     bloom_acquire_buffer.resize(static_cast<size_t>(bloom_extent.width) * bloom_extent.height * BLOOM_BYTES_PER_PIXEL);
     direct_lighting_image = ROImageVK::Builder()
-                                .set_format(LIGHTING_OUTPUT_FORMAT)
-                                .image_2d(extent)
-                                .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                                .set_properties_2d(
+                                    LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                 .create_ref(base_render_data);
     indirect_lighting_image = ROImageVK::Builder()
-                                  .set_format(LIGHTING_OUTPUT_FORMAT)
-                                  .image_2d(extent)
-                                  .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                                  .set_properties_2d(
+                                      LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                   .create_ref(base_render_data);
     result_image = ROImageVK::Builder()
-                       .set_format(LIGHTING_OUTPUT_FORMAT)
-                       .image_2d(extent)
-                       .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                       .set_properties_2d(
+                           LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                        .create_ref(base_render_data);
     bloom_extract_image = ROImageVK::Builder()
-                              .set_format(LIGHTING_OUTPUT_FORMAT)
-                              .image_2d(extent)
+                              .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
+                                  extent,
+                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                      VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                               .set_mipmap_level(bloom_mipmap_level_count)
-                              .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                               .create_ref(base_render_data);
     bloom_horizontal_image = ROImageVK::Builder()
-                                 .set_format(LIGHTING_OUTPUT_FORMAT)
-                                 .image_2d(bloom_extent)
-                                 .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                                 .set_properties_2d(
+                                     LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                  .create_ref(base_render_data);
     bloom_image = ROImageVK::Builder()
-                      .set_format(LIGHTING_OUTPUT_FORMAT)
-                      .image_2d(bloom_extent)
-                      .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+                      .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
+                          bloom_extent,
+                          VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
                       .create_ref(base_render_data);
     direct_lighting_view = ROImageViewVK::Builder()
                                .set_image(direct_lighting_image)
@@ -616,7 +609,10 @@ void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
     oct_tree_leaves = ROBufferVK::Builder()
         .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
         .create_ref(base_render_data);
-    oct_tree_deferred_list = ROBufferVK::Builder()
+    oct_tree_deferred_list_ping = ROBufferVK::Builder()
+        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        .create_ref(base_render_data);
+    oct_tree_deferred_list_pong = ROBufferVK::Builder()
         .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
         .create_ref(base_render_data);
 }
@@ -763,7 +759,7 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_extrac
     return bindpoints.build();
 }
 
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_horizontal_bindpoints() const {
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_bindpoints() const {
     RenderBindpointDeclarationsBuilder bindpoints;
     bindpoints.add_image_decleration("bloom_input", bloom_downsampled_image_view)
         .add_image_decleration("bloom_output", bloom_horizontal_image_view)
@@ -771,11 +767,12 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_horizo
     return bindpoints.build();
 }
 
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_vertical_bindpoints() const {
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_oct_tree_build_bindpoints() const {
     RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_image_decleration("bloom_input", bloom_horizontal_image_view)
-        .add_image_decleration("bloom_output", bloom_image_view)
-        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
+    bindpoints.add_storage_buffer_decleration("oct_tree_info", oct_tree_info)
+        .add_storage_buffer_decleration("tree_nodes", oct_tree_nodes)
+        .add_storage_buffer_decleration("tree_leaves", oct_tree_leaves)
+        .add_storage_buffer_decleration("deferred_list", oct_tree_deferred_list_ping);
     return bindpoints.build();
 }
 
@@ -831,15 +828,17 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource, build_bloom_extract_bindpoints());
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
     auto bloom_horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_horizontal_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_bindpoints());
     bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
     auto bloom_vertical_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_vertical_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_bindpoints());
     bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context())
             .compile("present_post_processing", present_post_processing_pipeline_resource, build_present_post_processing_bindpoints());
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;
+    auto oct_tree_build_x_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("oct_tree_build_x", oct_tree_build_x_shader_resource, build_oct_tree_build_bindpoints());
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::span<RTRunStaticSetVK* const> p_gbuffer_tasks) {

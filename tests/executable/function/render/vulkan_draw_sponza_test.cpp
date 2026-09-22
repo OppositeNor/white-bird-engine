@@ -512,9 +512,8 @@ void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
 
 void ApplicationVulkanDrawSponzaTest::create_main_depth_resources() {
     main_depth_image = WBE::ROImageVK::Builder()
-                           .set_format(MAIN_DEPTH_FORMAT)
-                           .image_2d(base_render_data->swap_chain_extent)
-                           .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                           .set_properties_2d(
+                               MAIN_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                            .create_ref(base_render_data);
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,

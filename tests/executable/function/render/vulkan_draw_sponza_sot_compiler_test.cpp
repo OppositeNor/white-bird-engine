@@ -173,9 +173,9 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
 
 void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
     depth_image = ROImageVK::Builder()
-                      .set_format(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT)
-                      .image_2d(base_render_data->swap_chain_extent)
-                      .set_usage(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                      .set_properties_2d(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT,
+                          base_render_data->swap_chain_extent,
+                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                       .create_ref(base_render_data);
     depth_view =
         ROImageViewVK::Builder()

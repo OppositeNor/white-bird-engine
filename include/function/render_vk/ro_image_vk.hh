@@ -87,6 +87,15 @@ public:
         Builder& set_usage(VkImageUsageFlags p_usage);
         // Set the queue families.
         Builder& set_queue_families(const std::set<uint32_t>& p_queue_families);
+        /**
+         * @brief Configure the required properties of a two-dimensional image.
+         *
+         * @param p_format Image format.
+         * @param p_extent Image width and height. The depth is set to one.
+         * @param p_usage Image usage flags.
+         * @return *this.
+         */
+        Builder& set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage);
         // Make a 2D image.
         Builder& image_2d(glm::uvec2 p_size);
         // Make a 2D image.

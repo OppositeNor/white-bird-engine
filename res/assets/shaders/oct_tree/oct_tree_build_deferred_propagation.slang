@@ -23,8 +23,6 @@ struct OctTreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer")]
     uint2 tree_leaves;
     [WBE_DESCRIPTOR("storage_buffer")]
-    uint2 tree_node_data;
-    [WBE_DESCRIPTOR("storage_buffer")]
     uint2 deferred_list_read;
     [WBE_DESCRIPTOR("storage_buffer")]
     uint2 deferred_list_write;
@@ -40,7 +38,6 @@ void step_deferred_task(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     }
     RWStructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<OctTreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWStructuredBuffer<uint> tree_node_data = ResourceDescriptorHeap[descriptor_indices.node_data.x];
     StructuredBuffer<OctTreeDeferredListEntry> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
     RWStructuredBuffer<OctTreeDeferredListEntry> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
     OctTreeBuildDeferredTask task = deferred_list_read[p_dispatch_thread_id];
