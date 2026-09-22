@@ -16,8 +16,11 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstddef>
@@ -42,7 +45,8 @@ RTRunComputePipelinesSequentialVK::Dispatch& RTRunComputePipelinesSequentialVK::
 
 RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
     const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family)
-    : render_data(p_render_data), queue_family_id(p_queue_family), entries(p_render_data->allocator) {
+    : render_data(p_render_data), queue_family_id(p_queue_family), entries(p_render_data->allocator),
+      descriptor_bindings(p_render_data->allocator) {
     if (p_dispatch.entries.empty()) {
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one compute pipeline is required.");
     }
@@ -51,6 +55,14 @@ RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
         if (entry.pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: compute pipeline is null.");
         }
+        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(
+            render_data->allocator, render_data, entry.pipeline->get_descriptor_layout()));
+    }
+}
+
+void RTRunComputePipelinesSequentialVK::bind_resources(const RendResViewVK& p_resources) {
+    for (Unique<PipelineDescriptorBindingsVK>& bindings : descriptor_bindings) {
+        bindings->bind_resources(p_resources);
     }
 }
 
@@ -66,7 +78,7 @@ void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer,
     for (size_t i = 0; i < entries.size(); ++i) {
         Entry& entry = entries[i];
         vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, entry.pipeline->get_pipeline());
-        entry.pipeline->push_descriptor_indices(p_command_buffer);
+        descriptor_bindings[i]->push(p_command_buffer);
         vkCmdDispatch(p_command_buffer, entry.group_count.width, entry.group_count.height, entry.group_count.depth);
 
         if (i + 1 >= entries.size()) {

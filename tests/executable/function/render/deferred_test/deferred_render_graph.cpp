@@ -113,6 +113,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
         .add_resource(SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
+        .add_resource(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, shadow_moments_sampled_view)
         .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, shadow_moments_summed_area_table_horizontal_view)
         .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, shadow_moments_summed_area_table_view)
         .add_resource(SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
@@ -127,6 +128,17 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(BLOOM_DOWNSAMPLED_IMAGE_VIEW, bloom_downsampled_image_view)
         .add_resource(BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
         .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view)
+        .add_resource("gbuffer_camera_info", gbuffer_camera_info_ubos)
+        .add_resource("composition_camera_info", composition_camera_info_ubos)
+        .add_resource("shadow_light_info", spot_light_info_buffers)
+        .add_resource("spot_light_infos", spot_light_info_buffers)
+        .add_resource("spot_light_count", spot_light_count_buffer)
+        .add_resource("shadow_sampler", shadow_sampler)
+        .add_resource("gbuffer_sampler", gbuffer_sampler)
+        .add_resource("bloom_sampler", bloom_sampler)
+        .add_resource("light_billboard_info", light_billboard_ubo)
+        .add_resource("light_billboard_texture", light_billboard_texture_view)
+        .add_resource("light_billboard_sampler", light_billboard_sampler)
         .add_resource(OCT_TREE_INFO, oct_tree_info)
         .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
         .add_resource(OCT_TREE_LEAF_BUFFER, oct_tree_leaves)
@@ -158,8 +170,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
             .depth = 1,
         };
         RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
-        dispatch.add_entry(horizontal_pipeline, horizontal_dispatch_group_count)
-            .add_entry(vertical_pipeline, vertical_dispatch_group_count);
+        dispatch.add_entry(horizontal_pipeline, horizontal_dispatch_group_count).add_entry(vertical_pipeline, vertical_dispatch_group_count);
         return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
     };
     return task_desc;
@@ -184,7 +195,6 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
     task_desc.after(RT_RUN_DEFERRED_GBUFFER)
         .after(p_use_summed_area_table ? RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE : RT_GENERATE_SHADOW_MIPMAPS)
-        .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(GBUFFER_ALBEDO_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -193,7 +203,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
         .read(GBUFFER_DEPTH_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .write(DIRECT_LIGHTING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     if (p_use_summed_area_table) {
-        task_desc.read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+        task_desc.read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    } else {
+        task_desc.read(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     }
     Ref<ROComputePipelineVK> pipeline =
         p_use_summed_area_table ? direct_lighting_summed_area_table_compute_pipeline : direct_lighting_compute_pipeline;
@@ -390,7 +402,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VertexInputDescriptionVK{},
-            0, 6);
+            0,
+            6);
     };
     return task_desc;
 }
@@ -417,7 +430,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VK_ATTACHMENT_LOAD_OP_LOAD,
             VertexInputDescriptionVK{},
-            0, 6);
+            0,
+            6);
     };
     return task_desc;
 }

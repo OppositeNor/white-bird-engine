@@ -24,14 +24,14 @@ ParameterBlock<StaticSetContractMetadata> static_set;
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
 struct MaterialSamplerDescriptorIndices {
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
 };
 
 struct DeferredGBufferDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
     MaterialSamplerDescriptorIndices material_textures;
     StaticSetDescriptorIndices static_set;

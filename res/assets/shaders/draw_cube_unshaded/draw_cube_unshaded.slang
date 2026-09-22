@@ -44,7 +44,7 @@ struct Vertex3DUnshadedInput {
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
 struct DrawCubeUnshadedDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
     uint2 camera_info;
     StaticSetDescriptorIndices static_set;
 };

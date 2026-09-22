@@ -16,25 +16,25 @@
 #include "ddgi/ddgi_common.slang"
 
 struct IndirectLightingDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "ddgi_config")]
     uint2 ddgi_config;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "irradiance_atlas")]
     uint2 irradiance_atlas;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "distance_atlas")]
     uint2 distance_atlas;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_albedo")]
     uint2 gbuffer_albedo;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_normal")]
     uint2 gbuffer_octa_normal;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_depth")]
     uint2 gbuffer_depth;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "gbuffer_sampler")]
     uint2 gbuffer_sampler;
-    [WBE_DESCRIPTOR("storage_image")]
+    [WBE_DESCRIPTOR("storage_image", "indirect_lighting")]
     uint2 indirect_lighting_output;
 };
 

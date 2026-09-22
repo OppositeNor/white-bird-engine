@@ -57,7 +57,7 @@ ComputePipelineCompilerVK::ComputePipelineCompilerVK(const ComputePipelineCompil
 }
 
 ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
-    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource, const RenderBindpointDeclarations& p_bindpoint_declarations) {
+    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource) {
     if (p_shader_resource == nullptr || p_shader_resource->resource_key == nullptr) {
         throw std::runtime_error("Failed to compile compute pipeline: shader resource key was not propagated.");
     }
@@ -66,7 +66,7 @@ ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
     std::string compute_entry = resolve_compute_stage_entry(p_shader_resource, shader_metadata);
     ShaderDescriptorHeapLayoutVK descriptor_layout = collect_shader_descriptor_heap_layout(shader_metadata, "compute", compute_entry);
     Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry);
-    compile_descriptor_indices(compute_pipeline, descriptor_layout, p_bindpoint_declarations);
+    compute_pipeline->set_descriptor_layout(descriptor_layout);
     return CompileResult{.compute_pipeline = compute_pipeline};
 }
 

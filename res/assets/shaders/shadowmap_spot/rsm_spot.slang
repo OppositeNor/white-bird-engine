@@ -32,14 +32,14 @@ struct RSMVSOutput {
 };
 
 struct MaterialSamplerDescriptorIndices {
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
 };
 
 struct RSMDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
     MaterialSamplerDescriptorIndices material_textures;
     StaticSetDescriptorIndices static_set;

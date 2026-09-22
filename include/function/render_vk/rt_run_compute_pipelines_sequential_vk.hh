@@ -18,8 +18,10 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <vulkan/vulkan_core.h>
@@ -90,9 +92,8 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
      * @param p_dispatch Ordered compute entries retained by the task.
      * @param p_queue_family Queue family used to submit the compute dispatches.
      */
-    RTRunComputePipelinesSequentialVK(const BaseRenderDataVK* p_render_data,
-        const Dispatch& p_dispatch,
-        QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
+    RTRunComputePipelinesSequentialVK(
+        const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -102,12 +103,15 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
+
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
     Vector<Entry, RenderAllocator> entries;
+    Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
 };
 
 } // namespace WhiteBirdEngine

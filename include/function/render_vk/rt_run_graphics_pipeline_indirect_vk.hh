@@ -18,8 +18,10 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -240,6 +242,9 @@ private:
     Ref<ROBufferVK> index_buffer = MEM_NULL;
     Ref<ROBufferVK> indirect_buffer = MEM_NULL;
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
+    Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
+
+    void initialize_descriptor_bindings();
 };
 
 } // namespace WhiteBirdEngine

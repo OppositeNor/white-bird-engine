@@ -48,6 +48,10 @@ namespace WhiteBirdEngine {
 
 namespace {
 
+std::string qualify_task_resource_id(std::string_view p_task_id, std::string_view p_resource_id) {
+    return std::format("{}.{}", p_task_id, p_resource_id);
+}
+
 Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource, uint32_t p_slot) {
     if (p_resource.container == MEM_NULL) {
         return MEM_NULL;
@@ -249,11 +253,26 @@ RenderGraphVK::~RenderGraphVK() {
 }
 
 bool RendResViewVK::contains(std::string_view p_resource_id) const {
+    if (!task_id.empty()) {
+        auto local_resource = resources->find(qualify_task_resource_id(task_id, p_resource_id));
+        if (local_resource != resources->end()) {
+            return local_resource->second != MEM_NULL && local_resource->second->container != MEM_NULL;
+        }
+    }
     auto resource = resources->find(p_resource_id);
     return resource != resources->end() && resource->second != MEM_NULL && resource->second->container != MEM_NULL;
 }
 
 const RendResVK& RendResViewVK::get(std::string_view p_resource_id) const {
+    if (!task_id.empty()) {
+        auto local_resource = resources->find(qualify_task_resource_id(task_id, p_resource_id));
+        if (local_resource != resources->end()) {
+            if (local_resource->second == MEM_NULL || local_resource->second->container == MEM_NULL) {
+                throw std::runtime_error(std::format("Render graph task-private resource is null: {}.", p_resource_id));
+            }
+            return *local_resource->second;
+        }
+    }
     auto resource = resources->find(p_resource_id);
     if (resource == resources->end() || resource->second == MEM_NULL || resource->second->container == MEM_NULL) {
         throw std::runtime_error(std::format("Render graph resource was not declared: {}.", p_resource_id));
@@ -385,7 +404,10 @@ void RenderGraphVK::allocate_command_buffers() {
 }
 
 void RenderGraphVK::free_command_buffers() {
-    if (!command_buffers.empty()) {
+    const bool has_allocated_command_buffer = std::ranges::any_of(command_buffers, [](VkCommandBuffer p_command_buffer) {
+        return p_command_buffer != VK_NULL_HANDLE;
+    });
+    if (has_allocated_command_buffer) {
         vkDeviceWaitIdle(render_data->logic_device);
     }
     for (size_t i = 0; i < command_buffers.size(); ++i) {
@@ -441,6 +463,36 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     }
 }
 
+RendResRegistrarVK::RendResRegistrarVK(
+    Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, RenderAllocator* p_allocator, std::string_view p_task_id)
+    : resources(p_resources), allocator(p_allocator), task_id(p_task_id) {
+    if (resources == nullptr || allocator == nullptr || task_id.empty()) {
+        throw std::runtime_error("RenderGraphVK: invalid task resource registrar.");
+    }
+}
+
+void RendResRegistrarVK::add_resource(
+    std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectContainerVK> p_container) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("RenderGraphVK: task-private resource id is empty.");
+    }
+    if (p_container == MEM_NULL) {
+        throw std::runtime_error(std::format("RenderGraphVK: task-private resource '{}' has a null container.", p_resource_id));
+    }
+    if (p_container->get_resource_type_id() != p_resource_type_id) {
+        throw std::runtime_error(std::format("RenderGraphVK: task-private resource container type does not match '{}'.", p_resource_id));
+    }
+    const std::string physical_id = qualify_task_resource_id(task_id, p_resource_id);
+    if (resources->contains(physical_id)) {
+        throw std::runtime_error(std::format("RenderGraphVK: duplicate task-private resource id: {}.", physical_id));
+    }
+    Ref<RendResVK> resource = make_ref<RendResVK>(allocator);
+    resource->res_id = physical_id;
+    resource->res_type_id = p_resource_type_id;
+    resource->container = std::move(p_container);
+    resources->emplace(physical_id, std::move(resource));
+}
+
 Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
     resources_by_id.reserve(p_desc.resources.size());
@@ -487,14 +539,30 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendG
         }
         Ref<RGNode> node = add_node(std::move(task));
         node->task_id = task_desc.task_id;
-        node->render_task->bind_resources(RendResViewVK(&all_resources));
+        RendResRegistrarVK registrar(&all_resources, render_data->allocator, node->task_id);
+        node->render_task->register_resources(registrar);
+        node->render_task->bind_resources(RendResViewVK(&all_resources, node->task_id));
         node->reads = node->render_task->read_resources();
         node->writes = node->render_task->write_resources();
         node->reads.insert(node->reads.end(), task_desc.reads.begin(), task_desc.reads.end());
         node->writes.insert(node->writes.end(), task_desc.writes.begin(), task_desc.writes.end());
+        normalize_task_accesses(node);
         task_ids.emplace_back(task_desc.task_id);
     }
     return task_ids;
+}
+
+void RenderGraphVK::normalize_task_accesses(Ref<RGNode> p_node) const {
+    auto normalize = [this, &p_node](Vector<ResAccessVK, RenderAllocator>& p_accesses) {
+        for (ResAccessVK& access : p_accesses) {
+            const std::string physical_id = qualify_task_resource_id(p_node->task_id, access.res_id);
+            if (all_resources.contains(physical_id)) {
+                access.res_id = physical_id;
+            }
+        }
+    };
+    normalize(p_node->reads);
+    normalize(p_node->writes);
 }
 
 void RenderGraphVK::add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids) {

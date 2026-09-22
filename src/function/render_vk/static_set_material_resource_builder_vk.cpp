@@ -12,11 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/static_set_material_binding_builder_vk.hh"
+#include "function/render_vk/static_set_material_resource_builder_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/material_texture_contract.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_role.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -29,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -100,19 +100,14 @@ void write_texture_index(std::vector<uint8_t>& p_buffer, size_t p_offset, uint32
 
 } // namespace
 
-RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::optional<MaterialTextureContract>& p_material_contract,
+StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std::optional<MaterialTextureContract>& p_material_contract,
     std::span<const RefRes<RUMaterial>> p_materials,
     RefRes<RUMaterial> p_default_material,
-    std::string_view p_material_textures_variable_name,
-    std::string_view p_material_params_variable_name,
     uint32_t p_max_texture_descriptor_count,
     Ref<IRenderObject> p_material_sampler,
     const TextureDescriptorIndexResolver& p_texture_descriptor_index_resolver) const {
     if (!p_material_contract.has_value()) {
         return {};
-    }
-    if (p_material_textures_variable_name.empty() || p_material_params_variable_name.empty()) {
-        throw std::runtime_error("Failed to build static-set material bindings: material variable names must be non-empty.");
     }
 
     const MaterialTextureContract& material_contract = *p_material_contract;
@@ -138,7 +133,6 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
             unique_textures, default_slot->texture, p_max_texture_descriptor_count, texture_field.role.get_name(), "default material"));
     }
 
-    RenderBindpointDeclarationsBuilder builder;
     std::vector<uint8_t> material_params_data(material_contract.table_size, uint8_t{0});
     for (size_t material_index = 0; material_index < material_contract.material_count; ++material_index) {
         const size_t row_offset = material_contract.table_offset + material_index * material_contract.table_stride;
@@ -181,13 +175,9 @@ RenderBindpointDeclarations StaticSetMaterialBindingBuilderVK::build(const std::
         }
     }
 
-    builder.add_buffer_decleration(p_material_params_variable_name, material_params_data.data(), material_params_data.size());
-    builder.add_sampler_decleration(std::format("{}.material_sampler", p_material_textures_variable_name), p_material_sampler);
-    for (size_t texture_index = 0; texture_index < unique_textures.size(); ++texture_index) {
-        builder.add_image_decleration(
-            std::format("{}.textures[{}]", p_material_textures_variable_name, texture_index), unique_textures[texture_index]);
-    }
-    return builder.build();
+    return StaticSetMaterialResourcesVK{.material_params_data = std::move(material_params_data),
+        .material_textures = std::move(unique_textures),
+        .material_sampler = std::move(p_material_sampler)};
 }
 
 } // namespace WhiteBirdEngine

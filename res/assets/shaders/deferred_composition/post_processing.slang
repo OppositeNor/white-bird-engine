@@ -15,17 +15,17 @@
 #include "deferred_composition/deferred_composition_utils.slang"
 
 struct PostProcessingDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_depth")]
     uint2 gbuffer_depth;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "direct_lighting_texture")]
     uint2 direct_lighting_texture;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "indirect_lighting_texture")]
     uint2 indirect_lighting_texture;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "gbuffer_sampler")]
     uint2 gbuffer_sampler;
-    [WBE_DESCRIPTOR("storage_image")]
+    [WBE_DESCRIPTOR("storage_image", "post_processed_output")]
     uint2 post_processed_output;
 };
 

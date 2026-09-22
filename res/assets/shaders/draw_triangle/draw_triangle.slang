@@ -19,7 +19,7 @@
  * @brief Constant buffer providing the current application time.
  */
 struct DrawTriangleDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "time")]
     uint2 time;
 };
 

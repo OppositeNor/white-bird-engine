@@ -65,7 +65,8 @@ public:
      *
      * @param p_resources The resource map to view.
      */
-    RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources) : resources(p_resources) {
+    RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, std::string_view p_task_id = {})
+        : resources(p_resources), task_id(p_task_id) {
     }
 
     /**
@@ -97,6 +98,37 @@ public:
 
 private:
     const Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
+    std::string task_id;
+};
+
+/**
+ * @class RendResRegistrarVK
+ * @brief Registers task-private render resources into a graph-owned namespace.
+ */
+class RendResRegistrarVK {
+public:
+    RendResRegistrarVK() = delete;
+    ~RendResRegistrarVK() = default;
+    RendResRegistrarVK(const RendResRegistrarVK&) = delete;
+    RendResRegistrarVK(RendResRegistrarVK&&) noexcept = delete;
+    RendResRegistrarVK& operator=(const RendResRegistrarVK&) = delete;
+    RendResRegistrarVK& operator=(RendResRegistrarVK&&) noexcept = delete;
+
+    /**
+     * @brief Register one task-private logical resource id.
+     * @param p_resource_id Logical id used by shader reflection and task accesses.
+     * @param p_resource_type_id Runtime type id of the contained render object.
+     * @param p_container Stable container retained by the graph.
+     */
+    void add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectContainerVK> p_container);
+
+private:
+    friend class RenderGraphVK;
+    RendResRegistrarVK(Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, RenderAllocator* p_allocator, std::string_view p_task_id);
+
+    Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
+    RenderAllocator* allocator;
+    std::string task_id;
 };
 
 /**
@@ -259,6 +291,7 @@ private:
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
+    void normalize_task_accesses(Ref<RGNode> p_node) const;
     void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
     void validate_explicit_resource_dependencies();
     bool has_exec_path(Ref<RGNode> p_from, Ref<RGNode> p_to) const;

@@ -92,17 +92,17 @@ struct SpotLightInfoBuffer {
 };
 
 struct LightParamDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_info")]
     uint2 info;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "shadowmap")]
     uint2 shadowmap;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
 };
 
 struct LightParamsDescriptorIndices {
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
     uint2 light_count;
 };
 

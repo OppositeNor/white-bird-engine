@@ -131,19 +131,11 @@ public:
         RendererVK* p_renderer, RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline, const Config& p_config);
 
     virtual QueueFamilyVK queue_family() const override;
+    virtual void register_resources(RendResRegistrarVK& p_registrar) override;
     virtual void bind_resources(const RendResViewVK& p_resources) override;
     virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
-
-    /**
-     * @brief Replace one reflected descriptor-heap binding on the compiled pipeline.
-     */
-    void set_descriptor_binding(std::string_view p_field_path, Ref<IRenderObject> p_resource);
-    /**
-     * @brief Replace one reflected binding with a context-resolved resource.
-     */
-    void set_descriptor_binding(std::string_view p_field_path, Ref<RenderObjectContainerVK> p_resource_container);
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
@@ -152,6 +144,12 @@ private:
     Config config;
     Unique<RTRunGraphicsPipelineIndirectVK> indirect_task = MEM_NULL;
     Ref<ROGraphicsPipelineVK> compiled_graphics_pipeline = MEM_NULL;
+    Ref<RenderObjectContainerVK> submesh_container;
+    Ref<RenderObjectContainerVK> node_container;
+    Ref<RenderObjectContainerVK> instance_container;
+    Ref<RenderObjectContainerVK> material_params_container;
+    Ref<RenderObjectContainerVK> material_sampler_container;
+    Vector<Ref<IRenderObject>, RenderAllocator> retained_material_textures;
     Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
     Ref<RenderObjectContainerVK> depth_attachment_container;
 };

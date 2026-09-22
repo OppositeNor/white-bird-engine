@@ -88,8 +88,6 @@ public:
         if (pipeline_resource == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
         }
-        WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-        bindpoint_builder.add_storage_buffer_decleration("time", time_ubo);
         WBE::GraphicsPipelineCompilerVKContext compiler_context{
             .allocator = render_allocator,
             .render_data = base_render_data,
@@ -97,25 +95,24 @@ public:
             .renderer = renderer,
             .color_attachment_formats = {base_render_data->swap_chain_format},
         };
-        auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
-                            .compile("draw_triangle_pipeline", pipeline_resource, bindpoint_builder.build());
+        auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_triangle_pipeline", pipeline_resource);
         auto graphics_pipeline = compiled.graphics_pipeline;
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
         WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangle_submesh->vertices);
 
-        triangle_vertex_buffer = WBE::ROBufferVK::Builder()
-                                     .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-                                     .initial_data(triangle_submesh->vertices.binary.binary->data.get() +
-                                             triangle_submesh->vertices.binary.start,
-                                         triangle_submesh->vertices.binary.size)
-                                     .create_ref(base_render_data);
-        triangle_index_buffer = WBE::ROBufferVK::Builder()
-                                    .set_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
-                                    .initial_data(triangle_submesh->indices.binary.binary->data.get() +
-                                            triangle_submesh->indices.binary.start,
-                                        triangle_submesh->indices.binary.size)
-                                    .create_ref(base_render_data);
+        triangle_vertex_buffer =
+            WBE::ROBufferVK::Builder()
+                .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+                .initial_data(triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start,
+                    triangle_submesh->vertices.binary.size)
+                .create_ref(base_render_data);
+        triangle_index_buffer =
+            WBE::ROBufferVK::Builder()
+                .set_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+                .initial_data(triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start,
+                    triangle_submesh->indices.binary.size)
+                .create_ref(base_render_data);
 
         const WBE::IndexedDrawRegionVK indexed_draw_region{
             .first_index = 0,
@@ -123,7 +120,8 @@ public:
             .vertex_offset = 0,
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
+        pipeline_desc.add_resource("time", time_ubo)
+            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;

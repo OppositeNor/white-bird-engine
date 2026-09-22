@@ -289,8 +289,9 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(uniform_buffer.binding.size, 8);
     ASSERT_EQ(uniform_buffer.user_attributes.size(), 1U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].name, "WBE_DESCRIPTOR");
-    ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 1U);
+    ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 2U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[0].string_value, "uniform_buffer");
+    EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[1].string_value, "uniform_buffer");
 
     const ShaderMetadataTypeField& images = push_data.type.fields[1];
     EXPECT_EQ(images.name, "images");
@@ -321,8 +322,9 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(acceleration_structure_index.binding.size, 8);
     ASSERT_EQ(acceleration_structure_index.user_attributes.size(), 1U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "WBE_DESCRIPTOR");
-    ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 1U);
+    ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 2U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
+    EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[1].string_value, "acceleration_structure");
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
@@ -389,8 +391,9 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
         EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(uint32_t) * 2));
         ASSERT_EQ(field.user_attributes.size(), 1U);
         EXPECT_EQ(field.user_attributes[0].name, "WBE_DESCRIPTOR");
-        ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
+        ASSERT_EQ(field.user_attributes[0].arguments.size(), 2U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
+        EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_names[i]);
     }
 }
 

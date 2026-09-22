@@ -110,7 +110,8 @@ ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeFie
     return metadata;
 }
 
-ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset) {
+ShaderMetadataTypeField make_descriptor_heap_field(
+    std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset, std::string_view p_resource_id = {}) {
     ShaderMetadataTypeField field;
     field.name = p_name;
     field.type.kind = "vector";
@@ -125,6 +126,8 @@ ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name, std:
     ShaderMetadataUserAttributeArgument argument;
     argument.kind = "string";
     argument.string_value = p_descriptor_type;
+    attribute.arguments.push_back(argument);
+    argument.string_value = p_resource_id.empty() ? p_name : p_resource_id;
     attribute.arguments.push_back(argument);
     field.user_attributes.push_back(attribute);
     return field;
@@ -174,6 +177,7 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     ASSERT_EQ(layout.fields.size(), 6U);
     EXPECT_EQ(layout.fields[0].field_path, "uniform");
     EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER);
+    EXPECT_EQ(layout.fields[0].resource_id, "uniform");
     EXPECT_EQ(layout.fields[0].offset, 0U);
     EXPECT_EQ(layout.fields[1].field_path, "images.sampled");
     EXPECT_EQ(layout.fields[1].type, ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE);
@@ -249,6 +253,11 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedDescriptorHeapFields) {
     EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed.user_attributes[0].arguments[1].string_value.clear();
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_descriptor_heap_field("value", "sampler", 0);
     malformed.user_attributes.push_back(malformed.user_attributes[0]);
     metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
     EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
@@ -281,6 +290,23 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
     fragment_metadata.parameters[0].type.fields[0].type.element_count = 1;
     EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
+
+    ShaderMetadataTypeField mismatched_resource = make_descriptor_heap_field("uniform", "uniform_buffer", 0, "other");
+    fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&mismatched_resource, 1));
+    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+        std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, AllowsMultipleFieldsToUseOneResourceId) {
+    const std::array<ShaderMetadataTypeField, 2> fields{{
+        make_descriptor_heap_field("first", "uniform_buffer", 0, "shared"),
+        make_descriptor_heap_field("second", "uniform_buffer", 8, "shared"),
+    }};
+    ShaderDescriptorHeapLayoutVK layout =
+        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "main", fields), "compute", "main");
+    ASSERT_EQ(layout.fields.size(), 2U);
+    EXPECT_EQ(layout.fields[0].resource_id, "shared");
+    EXPECT_EQ(layout.fields[1].resource_id, "shared");
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat) {

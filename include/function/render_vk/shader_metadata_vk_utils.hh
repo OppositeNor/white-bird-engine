@@ -48,6 +48,8 @@ struct ShaderDescriptorHeapFieldVK {
     std::string field_path;
     /** Descriptor heap category required by this field. */
     ShaderDescriptorHeapTypeVK type = ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER;
+    /** Logical render-graph resource identifier resolved by the owning task. */
+    std::string resource_id;
     /** Byte offset of the explicit uint2 inside push data. */
     uint32_t offset = 0;
 };
@@ -90,7 +92,7 @@ VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata&
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.
  *
  * A descriptor-free entry point produces an empty layout. Otherwise it may use exactly one pushConstantBuffer parameter.
- * Annotated fields must be eight-byte uint2 values with one supported WBE_DESCRIPTOR string argument.
+ * Annotated fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments.
  *
  * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.
  */
@@ -100,7 +102,7 @@ ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
 /**
  * @brief Collect and merge explicit descriptor-heap push-data contracts from all supported graphics stages.
  *
- * Equal field paths must agree on descriptor category and byte offset. Distinct fields must not overlap in push data.
+ * Equal field paths must agree on descriptor category, resource id, and byte offset. Distinct fields must not overlap in push data.
  *
  * @throws std::runtime_error When stage contracts conflict.
  */

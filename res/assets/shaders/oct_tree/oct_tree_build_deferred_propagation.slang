@@ -16,15 +16,15 @@
 #include "oct_tree/oct_tree_utils.slang"
 
 struct OctTreeDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
     uint2 oct_tree_info;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "tree_nodes")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "tree_leaves")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "deferred_list_read")]
     uint2 deferred_list_read;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "deferred_list_write")]
     uint2 deferred_list_write;
 };
 

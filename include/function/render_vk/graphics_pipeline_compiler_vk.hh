@@ -108,12 +108,9 @@ public:
      *
      * @param p_resource_key Key of the graphics pipeline resource.
      * @param p_pipeline_resource Loaded graphics pipeline resource unit.
-     * @param p_bindpoint_declarations Caller-provided shader bindpoint data.
-     * @return Compiled pipeline objects and a descriptor-scope name to set/binding map.
+     * @return Compiled immutable pipeline state and its reflected descriptor layout.
      */
-    CompileResult compile(std::string_view p_resource_key,
-        RefRes<RUGraphicsPipeline> p_pipeline_resource,
-        const RenderBindpointDeclarations& p_bindpoint_declarations = {});
+    CompileResult compile(std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource);
 
     /**
      * @brief Compile a texture resource view for descriptor-heap use.

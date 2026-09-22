@@ -17,8 +17,10 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -79,6 +81,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     if (graphics_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: graphics pipeline is null.");
     }
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
 }
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
@@ -109,6 +113,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     if (graphics_pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: graphics pipeline is null.");
     }
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() const {
@@ -131,6 +137,7 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() c
 }
 
 void RTRunGraphicsPipelineVK::bind_resources(const RendResViewVK& p_resources) {
+    descriptor_bindings->bind_resources(p_resources);
     color_attachment_containers.clear();
     color_attachment_containers.reserve(color_attachment_ids.size());
     for (const std::string& color_attachment_id : color_attachment_ids) {
@@ -219,7 +226,7 @@ void RTRunGraphicsPipelineVK::record( // NOLINT
     VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = render_extent};
     vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
 
-    graphics_pipeline->push_descriptor_indices(p_command_buffer);
+    descriptor_bindings->push(p_command_buffer);
 
     if (vertex_buffer != MEM_NULL && index_buffer != MEM_NULL) {
         if (render_data->command_set_vertex_input == nullptr) {

@@ -101,6 +101,7 @@ private:
     static constexpr std::string_view RSM_NORMAL_IMAGE_VIEW = "rsm_normal";
     static constexpr std::string_view SHADOWMAP_DEPTH_IMAGE_VIEW = "shadowmap_depth";
     static constexpr std::string_view SHADOW_MOMENTS_IMAGE_VIEW = "shadow_moments";
+    static constexpr std::string_view SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW = "shadow_moments_sampled";
     static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW = "shadow_sat_horizontal";
     static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW = "shadow_sat";
     static constexpr std::string_view DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
@@ -178,14 +179,8 @@ private:
         int32_t parent_index;
     };
 
-    struct TaskUniformBinding {
-        RTRunStaticSetVK* task = nullptr;
-        std::string field_path;
-    };
-
     void control(double p_delta);
     void update_descriptors();
-    void write_task_uniform_bindings(std::span<const TaskUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container);
 
     void setup_render_context();
     void load_resources();
@@ -199,27 +194,14 @@ private:
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
-    RenderBindpointDeclarations build_direct_lighting_bindpoints(Ref<IRenderObjectContainer> p_camera_buffer_container,
-        Ref<IRenderObjectContainer> p_light_info_buffer_container,
-        Ref<ROBufferVK> p_light_count_buffer,
-        Ref<ROImageViewVK> p_shadow_moments_view,
-        bool p_use_summed_area_table) const;
-    RenderBindpointDeclarations build_indirect_lighting_bindpoints(Ref<IRenderObjectContainer> p_camera_buffer_container,
-        Ref<IRenderObjectContainer> p_light_info_buffer_container,
-        Ref<ROBufferVK> p_light_count_buffer) const;
-    RenderBindpointDeclarations build_combine_lighting_bindpoints() const;
-    RenderBindpointDeclarations build_bloom_extract_bindpoints() const;
-    RenderBindpointDeclarations build_bloom_bindpoints(Ref<ROImageViewVK> p_image_view) const;
-    RenderBindpointDeclarations build_oct_tree_build_bindpoints() const;
-    RenderBindpointDeclarations build_present_post_processing_bindpoints() const;
     Unique<RTRunStaticSetVK> compile_shadow_task(
         RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     Unique<RTRunStaticSetVK> compile_gbuffer_task(
         RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
-    void write_dynamic_camera_descriptors(std::span<RTRunStaticSetVK* const> p_gbuffer_tasks);
-    void write_dynamic_light_descriptors(std::span<RTRunStaticSetVK* const> p_shadow_tasks);
+    void write_dynamic_camera_descriptors();
+    void write_dynamic_light_descriptors();
     void register_deferred_render_graph(std::string_view p_graph_id,
         bool p_use_summed_area_table,
         Unique<RTRunStaticSetVK>& p_shadow_opaque_task,
@@ -311,7 +293,9 @@ private:
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
     Ref<ROCMultislotsVK> spot_light_info_buffers;
+    Ref<ROBufferVK> spot_light_count_buffer;
     Ref<ROBufferVK> light_billboard_ubo;
+    Ref<ROImageViewVK> light_billboard_texture_view;
     Ref<ROSamplerVK> light_billboard_sampler;
 
     Ref<ROBufferVK> oct_tree_info;
@@ -319,8 +303,6 @@ private:
     Ref<ROBufferVK> oct_tree_leaves;
     Ref<ROBufferVK> oct_tree_deferred_list_ping;
     Ref<ROBufferVK> oct_tree_deferred_list_pong;
-    std::vector<TaskUniformBinding> gbuffer_camera_bindings;
-    std::vector<TaskUniformBinding> shadow_light_bindings;
     ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;

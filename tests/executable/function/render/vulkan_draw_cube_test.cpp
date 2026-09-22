@@ -292,15 +292,16 @@ void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
 }
 
 void ApplicationVulkanDrawCubeTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    static_cast<void>(p_task);
     WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .initial_data(&spot_light_info, sizeof(spot_light_info))
                               .create_ref(base_render_data);
-    p_task.set_descriptor_binding("light_camera_info", spot_light_info_ubo);
 }
 
 void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    static_cast<void>(p_task);
     WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     uint32_t spot_light_count = 1;
     camera_info_ubo = WBE::ROBufferVK::Builder()
@@ -311,15 +312,6 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunSta
                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                                .initial_data(&spot_light_count, sizeof(spot_light_count))
                                .create_ref(base_render_data);
-
-    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROBufferVK> p_buffer) {
-        p_task.set_descriptor_binding(p_name, p_buffer);
-    };
-    write_uniform_buffer("camera_info", camera_info_ubo);
-    write_uniform_buffer("light.lights[0].info", spot_light_info_ubo);
-    write_uniform_buffer("light.light_count", spot_light_count_ubo);
-    p_task.set_descriptor_binding("light.lights[0].shadowmap", shadow_depth_view);
-    p_task.set_descriptor_binding("light.lights[0].shadowmap_sampler", shadow_sampler);
 }
 
 void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
@@ -328,7 +320,14 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
     pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
         .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
         .container = WBE::MEM_NULL});
-    pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view).add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
+    pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource("shadow_light_info", spot_light_info_ubo)
+        .add_resource("camera_info", camera_info_ubo)
+        .add_resource("spot_light_info", spot_light_info_ubo)
+        .add_resource("spot_light_count", spot_light_count_ubo)
+        .add_resource("shadowmap", shadow_depth_view)
+        .add_resource("shadow_sampler", shadow_sampler);
 
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
 

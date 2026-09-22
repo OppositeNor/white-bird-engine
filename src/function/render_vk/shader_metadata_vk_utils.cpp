@@ -120,10 +120,11 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
         std::string field_path = p_parent_path.empty() ? field.name : std::format("{}.{}", p_parent_path, field.name);
         const ShaderMetadataUserAttribute* attribute = find_descriptor_attribute(field);
         if (attribute != nullptr) {
-            if (attribute->arguments.size() != 1 || attribute->arguments.front().kind != "string" ||
-                attribute->arguments.front().string_value.empty()) {
-                throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_DESCRIPTOR: field '{}' requires one non-empty string argument.", field_path));
+            if (attribute->arguments.size() != 2 || attribute->arguments[0].kind != "string" ||
+                attribute->arguments[0].string_value.empty() || attribute->arguments[1].kind != "string" ||
+                attribute->arguments[1].string_value.empty()) {
+                throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments.",
+                    field_path));
             }
             if (field.type.kind != "vector" || field.type.element_scalar_type != "uint32" || field.type.element_count != 2 ||
                 field.binding.kind != "uniform" || std::cmp_not_equal(field.binding.size, sizeof(uint32_t) * 2) ||
@@ -134,7 +135,8 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
             append_descriptor_field(p_layout,
                 ShaderDescriptorHeapFieldVK{
                     .field_path = field_path,
-                    .type = descriptor_heap_type_from_name(attribute->arguments.front().string_value),
+                    .type = descriptor_heap_type_from_name(attribute->arguments[0].string_value),
+                    .resource_id = attribute->arguments[1].string_value,
                     .offset = static_cast<uint32_t>(field_offset),
                 });
         }
@@ -169,7 +171,7 @@ void merge_descriptor_heap_layout(ShaderDescriptorHeapLayoutVK& p_result, const 
             return p_existing.field_path == field.field_path;
         });
         if (existing != p_result.fields.end()) {
-            if (existing->type != field.type || existing->offset != field.offset) {
+            if (existing->type != field.type || existing->resource_id != field.resource_id || existing->offset != field.offset) {
                 throw std::runtime_error(
                     std::format("Conflicting descriptor-heap push-data declarations for field '{}'.", field.field_path));
             }

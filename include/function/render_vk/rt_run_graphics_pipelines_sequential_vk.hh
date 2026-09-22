@@ -15,10 +15,13 @@
 #ifndef WBE_FILE_RT_RUN_GRAPHICS_PIPELINES_SEQUENTIAL_VK_HH
 #define WBE_FILE_RT_RUN_GRAPHICS_PIPELINES_SEQUENTIAL_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -135,11 +138,11 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
 
 private:
     struct BoundEntry {
-        BoundEntry(RenderAllocator* p_allocator, const Entry& p_entry);
+        BoundEntry(const BaseRenderDataVK* p_render_data, const Entry& p_entry);
         ~BoundEntry() = default;
-        BoundEntry(const BoundEntry&) = default;
+        BoundEntry(const BoundEntry&) = delete;
         BoundEntry(BoundEntry&&) noexcept = default;
-        BoundEntry& operator=(const BoundEntry&) = default;
+        BoundEntry& operator=(const BoundEntry&) = delete;
         BoundEntry& operator=(BoundEntry&&) noexcept = default;
 
         Entry entry;
@@ -147,6 +150,7 @@ private:
         Ref<RenderObjectContainerVK> depth_attachment_container;
         Ref<RenderObjectContainerVK> vertex_buffer_container;
         Ref<RenderObjectContainerVK> index_buffer_container;
+        Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     };
 
     const BaseRenderDataVK* render_data = nullptr;

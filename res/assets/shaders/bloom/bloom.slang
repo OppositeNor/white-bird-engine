@@ -15,9 +15,17 @@
 #include "utils.slang"
 
 struct BloomDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image")] uint2 bloom_input;
-    [WBE_DESCRIPTOR("storage_image")] uint2 bloom_output;
-    [WBE_DESCRIPTOR("sampler")] uint2 gbuffer_sampler;
+#ifdef BLOOM_EXTRACT
+    [WBE_DESCRIPTOR("sampled_image", "result_image")] uint2 bloom_input;
+    [WBE_DESCRIPTOR("storage_image", "bloom_extract")] uint2 bloom_output;
+#elif defined(BLOOM_HORIZONTAL)
+    [WBE_DESCRIPTOR("sampled_image", "bloom_downsampled")] uint2 bloom_input;
+    [WBE_DESCRIPTOR("storage_image", "bloom_horizontal")] uint2 bloom_output;
+#else
+    [WBE_DESCRIPTOR("sampled_image", "bloom_horizontal")] uint2 bloom_input;
+    [WBE_DESCRIPTOR("storage_image", "bloom")] uint2 bloom_output;
+#endif
+    [WBE_DESCRIPTOR("sampler", "bloom_sampler")] uint2 gbuffer_sampler;
 };
 
 static const int KERNEL_RADIUS = 2;

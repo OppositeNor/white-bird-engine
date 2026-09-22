@@ -13,13 +13,23 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_run_graphics_pipelines_sequential_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -35,13 +45,14 @@ RTRunGraphicsPipelinesSequentialVK::Dispatch& RTRunGraphicsPipelinesSequentialVK
     return *this;
 }
 
-RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(RenderAllocator* p_allocator, const Entry& p_entry)
-    : entry(p_allocator), color_attachment_containers(p_allocator) {
+RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataVK* p_render_data, const Entry& p_entry)
+    : entry(p_render_data->allocator), color_attachment_containers(p_render_data->allocator) {
     entry = p_entry;
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        p_render_data->allocator, p_render_data, entry.pipeline->get_descriptor_layout());
 }
 
-RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(
-    const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
+RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
     : render_data(p_render_data), entries(p_render_data->allocator) {
     if (p_dispatch.entries.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: at least one graphics pass is required.");
@@ -57,8 +68,7 @@ RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(
         if (entry.color_attachment_ids.size() != entry.pipeline->get_config().attachment_config.color_formats.size()) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: color attachment count does not match graphics pipeline.");
         }
-        const size_t required_clear_value_count =
-            entry.color_attachment_ids.size() + (entry.depth_attachment_id.has_value() ? 1 : 0);
+        const size_t required_clear_value_count = entry.color_attachment_ids.size() + (entry.depth_attachment_id.has_value() ? 1 : 0);
         if (entry.clear_values.size() < required_clear_value_count) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: insufficient clear values for attachments.");
         }
@@ -71,7 +81,7 @@ RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(
         if (!entry.vertex_buffer_id.has_value() && entry.draw_vertex_count == 0) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: vertex-less draw count must be non-zero.");
         }
-        entries.emplace_back(p_render_data->allocator, entry);
+        entries.emplace_back(p_render_data, entry);
     }
 }
 
@@ -112,6 +122,7 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelinesSequentialVK::write_r
 void RTRunGraphicsPipelinesSequentialVK::bind_resources(const RendResViewVK& p_resources) {
     for (BoundEntry& bound_entry : entries) {
         const Entry& entry = bound_entry.entry;
+        bound_entry.descriptor_bindings->bind_resources(p_resources);
         bound_entry.color_attachment_containers.clear();
         bound_entry.color_attachment_containers.reserve(entry.color_attachment_ids.size());
         for (const std::string& color_attachment_id : entry.color_attachment_ids) {
@@ -135,9 +146,8 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
         Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
         color_attachments.reserve(entry.color_attachment_ids.size());
         for (size_t attachment_index = 0; attachment_index < entry.color_attachment_ids.size(); ++attachment_index) {
-            Ref<ROImageViewVK> color_attachment = WBE_REQUIRES_VALID(bound_entry.color_attachment_containers[attachment_index]
-                    ->get(render_data->current_frame_slot)
-                    .dynamic_cast_ref<ROImageViewVK>());
+            Ref<ROImageViewVK> color_attachment = WBE_REQUIRES_VALID(
+                bound_entry.color_attachment_containers[attachment_index]->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
             color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
                     .set_load_op(entry.color_attachment_load_op)
                     .set_clear_value(entry.clear_values[attachment_index])
@@ -153,9 +163,8 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
             .pColorAttachments = color_attachments.data(),
         };
         if (entry.depth_attachment_id.has_value()) {
-            Ref<ROImageViewVK> depth_attachment = WBE_REQUIRES_VALID(bound_entry.depth_attachment_container
-                    ->get(render_data->current_frame_slot)
-                    .dynamic_cast_ref<ROImageViewVK>());
+            Ref<ROImageViewVK> depth_attachment = WBE_REQUIRES_VALID(
+                bound_entry.depth_attachment_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
             depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
                                         .set_load_op(entry.depth_attachment_load_op)
                                         .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)
@@ -172,7 +181,7 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
         vkCmdSetViewport(p_command_buffer, 0, 1, &viewport);
         VkRect2D scissor{.offset = {.x = 0, .y = 0}, .extent = entry.render_extent};
         vkCmdSetScissor(p_command_buffer, 0, 1, &scissor);
-        entry.pipeline->push_descriptor_indices(p_command_buffer);
+        bound_entry.descriptor_bindings->push(p_command_buffer);
 
         if (render_data->command_set_vertex_input == nullptr) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: dynamic vertex-input command is unavailable.");
@@ -183,8 +192,7 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
             Ref<ROBufferVK> index_buffer = WBE_REQUIRES_VALID(
                 bound_entry.index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
             VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
-            vkCmdBindVertexBuffers(
-                p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &entry.vertex_buffer_offset);
+            vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &entry.vertex_buffer_offset);
             render_data->command_set_vertex_input(p_command_buffer,
                 static_cast<uint32_t>(entry.vertex_input.bindings.size()),
                 entry.vertex_input.bindings.data(),

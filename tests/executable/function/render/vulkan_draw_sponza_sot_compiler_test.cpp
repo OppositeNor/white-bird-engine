@@ -63,7 +63,7 @@ public:
 
 private:
     void create_depth_resources();
-    void write_camera_descriptor(RTRunStaticSetVK& p_task);
+    void write_camera_descriptor();
 
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
@@ -159,12 +159,12 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     RTRunStaticSetVK::Config task_config;
     task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
     auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_set, graphics_pipeline, task_config);
-    write_camera_descriptor(*task);
+    write_camera_descriptor();
 
     RendGraphDescVK graph_desc(render_allocator);
     graph_desc.resources.emplace_back(RendResVK{
         .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL});
-    graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view);
+    graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view).add_resource("camera_info", camera_info_buffer);
     graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_SET, std::move(task));
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
     write_descriptor_debug_output("draw_sponza_indirect_graph_descriptors", graph->list_descriptors());
@@ -173,9 +173,7 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
 
 void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
     depth_image = ROImageVK::Builder()
-                      .set_properties_2d(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT,
-                          base_render_data->swap_chain_extent,
-                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                      .set_properties_2d(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                       .create_ref(base_render_data);
     depth_view =
         ROImageViewVK::Builder()
@@ -187,13 +185,10 @@ void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
             .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStaticSetVK& p_task) {
+void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor() {
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    camera_info_buffer = ROBufferVK::Builder()
-                             .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                             .initial_data(&camera_info, sizeof(camera_info))
-                             .create_ref(base_render_data);
-    p_task.set_descriptor_binding("camera_info", camera_info_buffer);
+    camera_info_buffer =
+        ROBufferVK::Builder().set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).initial_data(&camera_info, sizeof(camera_info)).create_ref(base_render_data);
 }
 
 } // namespace WhiteBirdEngine

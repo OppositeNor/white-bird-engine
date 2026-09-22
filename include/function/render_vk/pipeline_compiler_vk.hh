@@ -42,10 +42,6 @@ protected:
     explicit PipelineCompilerVK(const PipelineCompilerVKContext& p_context, std::string_view p_compiler_name);
 
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
-    void compile_descriptor_indices(Ref<ROPipelineVK> p_pipeline,
-        const ShaderDescriptorHeapLayoutVK& p_layout,
-        const RenderBindpointDeclarations& p_bindpoint_declarations) const;
-
     template <typename RenderObjectType>
     static Ref<RenderObjectType> get_registered_render_object(
         Ref<RenderDatabase> p_render_database, std::string_view p_resource_key, HashCode p_render_object_type_id) {

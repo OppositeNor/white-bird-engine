@@ -35,6 +35,14 @@
 #define WBE_USE_RSM_INDIRECT_LIGHTING 1
 #endif
 
+#ifndef WBE_SHADOWMAP_RESOURCE_ID
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+#define WBE_SHADOWMAP_RESOURCE_ID "shadow_moments"
+#else
+#define WBE_SHADOWMAP_RESOURCE_ID "shadow_moments_sampled"
+#endif
+#endif
+
 #include "utils.slang"
 
 static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
@@ -69,27 +77,27 @@ struct CompositionCamera {
 };
 
 struct LightParamDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", WBE_SHADOWMAP_RESOURCE_ID)]
     uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "shadow_sat")]
     uint2 shadow_moments_summed_area_table;
 #endif
 #if WBE_USE_RSM_INDIRECT_LIGHTING
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "shadowmap_color")]
     uint2 rsm_flux;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "rsm_normal")]
     uint2 rsm_octa_normal;
 #endif
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
 };
 
 struct LightParamsDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos")]
     uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
     uint2 light_count;
 };
 

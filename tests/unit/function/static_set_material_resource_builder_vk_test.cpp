@@ -16,10 +16,9 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/core_utils.hh"
 #include "function/render/material_texture_contract.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_role.hh"
-#include "function/render_vk/static_set_material_binding_builder_vk.hh"
+#include "function/render_vk/static_set_material_resource_builder_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -109,7 +108,7 @@ int32_t read_int32(const std::vector<uint8_t>& p_buffer, size_t p_offset) {
 
 } // namespace
 
-TEST(WBEStaticSetMaterialBindingBuilderVKTest, BuildsPackedRowsAndDeduplicatesTextures) {
+TEST(WBEStaticSetMaterialResourceBuilderVKTest, BuildsPackedRowsAndDeduplicatesTextures) {
     StackAllocator allocator(WBE_KI_B(16));
     RefRes<RUTexture> default_albedo = make_test_texture_ref(allocator);
     RefRes<RUTexture> default_normal = make_test_texture_ref(allocator);
@@ -135,25 +134,18 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, BuildsPackedRowsAndDeduplicatesTe
     RefRes<RUMaterial> second_material = make_test_material(allocator, "second_material", second_material_slots);
     const std::array<RefRes<RUMaterial>, 2> ordered_materials{first_material, second_material};
 
-    RenderBindpointDeclarations declarations = StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
-        std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
-        default_material,
-        "custom_textures",
-        "custom_params",
-        8);
+    StaticSetMaterialResourcesVK resources = StaticSetMaterialResourceBuilderVK().build(
+        make_material_contract(), std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()), default_material, 8);
 
-    ASSERT_EQ(declarations.buffer_declerations.size(), 1U);
-    EXPECT_EQ(declarations.buffer_declerations[0].field_path, "custom_params");
-    ASSERT_EQ(declarations.sampler_declerations.size(), 1U);
-    EXPECT_EQ(declarations.sampler_declerations[0].field_path, "custom_textures.material_sampler");
-    ASSERT_EQ(declarations.image_declerations.size(), 5U);
-    EXPECT_EQ(declarations.image_declerations[0].field_path, "custom_textures.textures[0]");
-    EXPECT_EQ(declarations.image_declerations[1].field_path, "custom_textures.textures[1]");
-    EXPECT_EQ(declarations.image_declerations[2].field_path, "custom_textures.textures[2]");
-    EXPECT_EQ(declarations.image_declerations[3].field_path, "custom_textures.textures[3]");
-    EXPECT_EQ(declarations.image_declerations[4].field_path, "custom_textures.textures[4]");
+    ASSERT_EQ(resources.material_textures.size(), 5U);
+    EXPECT_EQ(resources.material_textures[0], default_albedo);
+    EXPECT_EQ(resources.material_textures[1], default_normal);
+    EXPECT_EQ(resources.material_textures[2], default_rma);
+    EXPECT_EQ(resources.material_textures[3], bound_albedo);
+    EXPECT_EQ(resources.material_textures[4], bound_rma);
+    EXPECT_EQ(resources.material_sampler, MEM_NULL);
 
-    const std::vector<uint8_t>& packed_data = declarations.buffer_data;
+    const std::vector<uint8_t>& packed_data = resources.material_params_data;
     ASSERT_EQ(packed_data.size(), 80U);
     EXPECT_EQ(read_int32(packed_data, 16), 3);
     EXPECT_EQ(read_int32(packed_data, 20), 1);
@@ -165,31 +157,29 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, BuildsPackedRowsAndDeduplicatesTe
     EXPECT_EQ(read_int32(packed_data, 52), 1);
     EXPECT_EQ(read_int32(packed_data, 56), 2);
 
-    RenderBindpointDeclarations heap_declarations = StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
+    StaticSetMaterialResourcesVK heap_resources = StaticSetMaterialResourceBuilderVK().build(make_material_contract(),
         std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
         default_material,
-        "custom_textures",
-        "custom_params",
         8,
         MEM_NULL,
         [&](RefRes<RUTexture> p_texture) {
-            for (size_t i = 0; i < declarations.image_declerations.size(); ++i) {
-                if (declarations.image_declerations[i].image_resource == p_texture) {
+            for (size_t i = 0; i < resources.material_textures.size(); ++i) {
+                if (resources.material_textures[i] == p_texture) {
                     return static_cast<uint32_t>(100 + i);
                 }
             }
             throw std::runtime_error("Unexpected texture in descriptor-index resolver test.");
         });
-    EXPECT_EQ(heap_declarations.image_declerations.size(), 5U);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 16), 103);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 20), 101);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 24), 104);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 48), 100);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 52), 101);
-    EXPECT_EQ(read_int32(heap_declarations.buffer_data, 56), 102);
+    EXPECT_EQ(heap_resources.material_textures.size(), 5U);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 16), 103);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 20), 101);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 24), 104);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 48), 100);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 52), 101);
+    EXPECT_EQ(read_int32(heap_resources.material_params_data, 56), 102);
 }
 
-TEST(WBEStaticSetMaterialBindingBuilderVKTest, MatchesFallbackFieldRoleNames) {
+TEST(WBEStaticSetMaterialResourceBuilderVKTest, MatchesFallbackFieldRoleNames) {
     StackAllocator allocator(WBE_KI_B(8));
     RefRes<RUTexture> default_albedo = make_test_texture_ref(allocator);
     RefRes<RUTexture> default_detail = make_test_texture_ref(allocator);
@@ -209,19 +199,17 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, MatchesFallbackFieldRoleNames) {
     RefRes<RUMaterial> material = make_test_material(allocator, "detail_material", material_slots);
     const std::array<RefRes<RUMaterial>, 1> ordered_materials{material};
 
-    RenderBindpointDeclarations declarations = StaticSetMaterialBindingBuilderVK().build(make_material_contract("detail_index"),
+    StaticSetMaterialResourcesVK resources = StaticSetMaterialResourceBuilderVK().build(make_material_contract("detail_index"),
         std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
         default_material,
-        "material_textures",
-        "material_params",
         8);
 
-    EXPECT_EQ(read_int32(declarations.buffer_data, 16), 0);
-    EXPECT_EQ(read_int32(declarations.buffer_data, 20), 3);
-    EXPECT_EQ(read_int32(declarations.buffer_data, 24), 2);
+    EXPECT_EQ(read_int32(resources.material_params_data, 16), 0);
+    EXPECT_EQ(read_int32(resources.material_params_data, 20), 3);
+    EXPECT_EQ(read_int32(resources.material_params_data, 24), 2);
 }
 
-TEST(WBEStaticSetMaterialBindingBuilderVKTest, RejectsCapacityAndDescriptorLimitOverflow) {
+TEST(WBEStaticSetMaterialResourceBuilderVKTest, RejectsCapacityAndDescriptorLimitOverflow) {
     StackAllocator allocator(WBE_KI_B(16));
     RefRes<RUTexture> default_albedo = make_test_texture_ref(allocator);
     RefRes<RUTexture> default_normal = make_test_texture_ref(allocator);
@@ -244,25 +232,19 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, RejectsCapacityAndDescriptorLimit
     RefRes<RUMaterial> default_material = make_test_material(allocator, "default_material", default_slots);
     RefRes<RUMaterial> material = make_test_material(allocator, "overflow_material", material_slots);
     const std::array<RefRes<RUMaterial>, 5> too_many_materials{material, material, material, material, material};
-    EXPECT_THROW(StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
+    EXPECT_THROW(StaticSetMaterialResourceBuilderVK().build(make_material_contract(),
                      std::span<const RefRes<RUMaterial>>(too_many_materials.data(), too_many_materials.size()),
                      default_material,
-                     "material_textures",
-                     "material_params",
                      8),
         std::runtime_error);
 
     const std::array<RefRes<RUMaterial>, 1> one_material{material};
-    EXPECT_THROW(StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
-                     std::span<const RefRes<RUMaterial>>(one_material.data(), one_material.size()),
-                     default_material,
-                     "material_textures",
-                     "material_params",
-                     4),
+    EXPECT_THROW(StaticSetMaterialResourceBuilderVK().build(
+                     make_material_contract(), std::span<const RefRes<RUMaterial>>(one_material.data(), one_material.size()), default_material, 4),
         std::runtime_error);
 }
 
-TEST(WBEStaticSetMaterialBindingBuilderVKTest, RejectsMissingDefaultRolesAndDuplicateMaterialRoles) {
+TEST(WBEStaticSetMaterialResourceBuilderVKTest, RejectsMissingDefaultRolesAndDuplicateMaterialRoles) {
     StackAllocator allocator(WBE_KI_B(16));
     RefRes<RUTexture> default_albedo = make_test_texture_ref(allocator);
     RefRes<RUTexture> default_normal = make_test_texture_ref(allocator);
@@ -282,11 +264,9 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, RejectsMissingDefaultRolesAndDupl
     RefRes<RUMaterial> duplicate_material = make_test_material(allocator, "duplicate_material", duplicate_slots);
     const std::array<RefRes<RUMaterial>, 1> ordered_materials{duplicate_material};
 
-    EXPECT_THROW(StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
+    EXPECT_THROW(StaticSetMaterialResourceBuilderVK().build(make_material_contract(),
                      std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
                      incomplete_default,
-                     "material_textures",
-                     "material_params",
                      8),
         std::runtime_error);
 
@@ -296,11 +276,9 @@ TEST(WBEStaticSetMaterialBindingBuilderVKTest, RejectsMissingDefaultRolesAndDupl
         {.role = make_test_shader_role(allocator, "rma"), .texture = make_test_texture_ref(allocator)},
     }};
     RefRes<RUMaterial> complete_default = make_test_material(allocator, "default_material_complete", complete_default_slots);
-    EXPECT_THROW(StaticSetMaterialBindingBuilderVK().build(make_material_contract(),
+    EXPECT_THROW(StaticSetMaterialResourceBuilderVK().build(make_material_contract(),
                      std::span<const RefRes<RUMaterial>>(ordered_materials.data(), ordered_materials.size()),
                      complete_default,
-                     "material_textures",
-                     "material_params",
                      8),
         std::runtime_error);
 }

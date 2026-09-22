@@ -72,16 +72,6 @@ std::string resolve_pipeline_stage_entry(
     return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
 }
 
-std::string texture_resource_cache_key(RefRes<RUTexture> p_texture_resource) {
-    if (p_texture_resource == nullptr) {
-        throw std::runtime_error("Failed to build texture cache key: texture resource is missing.");
-    }
-    if (p_texture_resource->resource_key != nullptr && p_texture_resource->resource_key[0] != '\0') {
-        return std::format("texture_resource:{}", p_texture_resource->resource_key);
-    }
-    return std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(p_texture_resource.get()));
-}
-
 } // namespace
 
 GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCompilerVKContext& p_context)
@@ -99,9 +89,8 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
     }
 }
 
-GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(std::string_view p_resource_key,
-    RefRes<RUGraphicsPipeline> p_pipeline_resource,
-    const RenderBindpointDeclarations& p_bindpoint_declarations) {
+GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
+    std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource) {
     if (p_pipeline_resource == nullptr || p_pipeline_resource->vertex_stage == nullptr || p_pipeline_resource->fragment_stage == nullptr) {
         throw std::runtime_error(
             std::format("Failed to compile graphics pipeline '{}': vertex and fragment stages are required.", p_resource_key));
@@ -128,35 +117,7 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(st
     Ref<ROGraphicsPipelineVK> graphics_pipeline = compile_graphics_pipeline(
         p_resource_key, *p_pipeline_resource, vertex_shader, geometry_shader, fragment_shader, vertex_entry, geometry_entry, fragment_entry);
 
-    RenderBindpointDeclarations resolved_bindpoints = p_bindpoint_declarations;
-    for (RenderBindpointImageDeclaration& declaration : resolved_bindpoints.image_declerations) {
-        if (declaration.image_render_object == MEM_NULL && declaration.image_resource != nullptr) {
-            declaration.image_render_object =
-                compile_texture_view(texture_resource_cache_key(declaration.image_resource), declaration.image_resource);
-        }
-    }
-    for (const ShaderDescriptorHeapFieldVK& field : descriptor_layout.fields) {
-        if (field.type != ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE || context.default_texture_resource == nullptr) {
-            continue;
-        }
-        bool found = false;
-        for (const RenderBindpointImageDeclaration& declaration : resolved_bindpoints.image_declerations) {
-            found = found || declaration.field_path == field.field_path;
-        }
-        if (!found) {
-            resolved_bindpoints.image_declerations.push_back(RenderBindpointImageDeclaration{
-                .field_path = field.field_path,
-                .image_render_object = compile_texture_view(
-                    texture_resource_cache_key(context.default_texture_resource), context.default_texture_resource),
-            });
-        }
-    }
-    compile_descriptor_indices(graphics_pipeline, descriptor_layout, resolved_bindpoints);
-    for (const RenderBindpointImageDeclaration& declaration : resolved_bindpoints.image_declerations) {
-        if (declaration.image_render_object != MEM_NULL) {
-            graphics_pipeline->retain_descriptor_resource(declaration.image_render_object);
-        }
-    }
+    graphics_pipeline->set_descriptor_layout(descriptor_layout);
     return CompileResult{.graphics_pipeline = graphics_pipeline};
 }
 

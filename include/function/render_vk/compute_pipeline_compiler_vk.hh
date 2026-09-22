@@ -51,9 +51,7 @@ public:
 
     explicit ComputePipelineCompilerVK(const ComputePipelineCompilerVKContext& p_context);
 
-    CompileResult compile(std::string_view p_resource_key,
-        RefRes<RUShader> p_shader_resource,
-        const RenderBindpointDeclarations& p_bindpoint_declarations = {});
+    CompileResult compile(std::string_view p_resource_key, RefRes<RUShader> p_shader_resource);
 
 private:
     ComputePipelineCompilerVKContext context;

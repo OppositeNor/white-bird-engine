@@ -17,8 +17,10 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <vulkan/vulkan_core.h>
@@ -59,12 +61,15 @@ struct RTRunComputePipelineVK final : public IRenderTaskVK {
 
     virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
 
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
+
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
     Ref<ROComputePipelineVK> pipeline;
+    Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
 };
 

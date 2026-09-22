@@ -33,6 +33,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_run_static_set_vk.hh"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -50,7 +51,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
-#include <span>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
@@ -82,10 +82,8 @@ SpotLightInfosVKUBO make_spot_light_infos_ubo(const ComponentSpotLight& p_spot_l
     return result;
 }
 
-Ref<ROCMultislotsVK> create_per_frame_buffers(RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
-    VkDeviceSize p_buffer_size,
-    VkBufferUsageFlags p_usage) {
+Ref<ROCMultislotsVK> create_per_frame_buffers(
+    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
     return make_ref<ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
@@ -231,19 +229,6 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     });
 }
 
-void ApplicationVulkanDeferredPBRTest::write_task_uniform_bindings(
-    std::span<const TaskUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container) {
-    if (p_buffer_container == MEM_NULL) {
-        throw std::runtime_error("Failed to write deferred task uniform bindings: buffer container is null.");
-    }
-    for (const TaskUniformBinding& binding : p_bindings) {
-        if (binding.task == nullptr) {
-            throw std::runtime_error("Failed to write deferred task uniform binding: task is null.");
-        }
-        binding.task->set_descriptor_binding(binding.field_path, p_buffer_container);
-    }
-}
-
 void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
     WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
@@ -270,16 +255,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     auto summed_area_table_shadow_opaque_task = compile_shadow_task(sponza_opaque_set, shadow_opaque_pipeline_resource, false);
     auto mipmap_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
     auto summed_area_table_gbuffer_opaque_task = compile_gbuffer_task(sponza_opaque_set, gbuffer_opaque_pipeline_resource, false);
-    std::array<RTRunStaticSetVK*, 2> gbuffer_tasks{
-        mipmap_gbuffer_opaque_task.get(),
-        summed_area_table_gbuffer_opaque_task.get(),
-    };
-    std::array<RTRunStaticSetVK*, 2> shadow_tasks{
-        mipmap_shadow_opaque_task.get(),
-        summed_area_table_shadow_opaque_task.get(),
-    };
-    write_dynamic_camera_descriptors(gbuffer_tasks);
-    write_dynamic_light_descriptors(shadow_tasks);
+    write_dynamic_camera_descriptors();
+    write_dynamic_light_descriptors();
     setup_light_billboard_overlay_resources();
     register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, mipmap_shadow_opaque_task, mipmap_gbuffer_opaque_task);
     register_deferred_render_graph(
@@ -376,11 +353,6 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
                                   .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                                   .create_ref(base_render_data);
 
-    RenderBindpointDeclarationsBuilder bindpoint_builder;
-    bindpoint_builder.add_storage_buffer_decleration("camera_info", gbuffer_camera_info_ubos)
-        .add_storage_buffer_decleration("billboard_info", light_billboard_ubo)
-        .add_image_decleration("texture_image", texture_resource)
-        .add_sampler_decleration("texture_sampler", light_billboard_sampler);
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
         .render_data = base_render_data,
@@ -389,42 +361,41 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
         .color_attachment_formats = {base_render_data->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
     };
-    auto compiled = GraphicsPipelineCompilerVK(compiler_context)
-                        .compile("deferred_light_billboard_pipeline", pipeline_resource, bindpoint_builder.build());
+    GraphicsPipelineCompilerVK compiler(compiler_context);
+    light_billboard_texture_view = compiler.compile_texture_view("spot_light_billboard", texture_resource);
+    auto compiled = compiler.compile("deferred_light_billboard_pipeline", pipeline_resource);
     light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
     shadow_depth_image = ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
     shadow_color_image = ROImageVK::Builder()
-        .set_properties_2d(
-                RSM_FLUX_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-        .create_ref(base_render_data);
+                             .set_properties_2d(RSM_FLUX_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                             .create_ref(base_render_data);
     shadow_normal_image = ROImageVK::Builder()
-        .set_properties_2d(
-                RSM_NORMAL_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-        .create_ref(base_render_data);
+                              .set_properties_2d(RSM_NORMAL_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                              .create_ref(base_render_data);
     shadow_moments_image = ROImageVK::Builder()
-        .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent,
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-        .set_mipmap_level(shadow_mipmap_level_count)
-        .create_ref(base_render_data);
-    shadow_moments_summed_area_table_horizontal_image = ROImageVK::Builder()
-        .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent,
-                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-        .create_ref(base_render_data);
-    shadow_moments_summed_area_table_image = ROImageVK::Builder()
-        .set_properties_2d(SHADOW_MOMENTS_FORMAT,
-                shadow_extent,
-                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-        .create_ref(base_render_data);
+                               .set_properties_2d(SHADOW_MOMENTS_FORMAT,
+                                   shadow_extent,
+                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                               .set_mipmap_level(shadow_mipmap_level_count)
+                               .create_ref(base_render_data);
+    shadow_moments_summed_area_table_horizontal_image =
+        ROImageVK::Builder()
+            .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+            .create_ref(base_render_data);
+    shadow_moments_summed_area_table_image =
+        ROImageVK::Builder()
+            .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+            .create_ref(base_render_data);
     shadow_depth_view = ROImageViewVK::Builder()
-        .set_image(shadow_depth_image)
-        .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-        .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
-        .set_format(SHADOWMAP_DEPTH_FORMAT)
-        .create_ref(base_render_data);
+                            .set_image(shadow_depth_image)
+                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                            .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
+                            .set_format(SHADOWMAP_DEPTH_FORMAT)
+                            .create_ref(base_render_data);
     shadow_color_view = ROImageViewVK::Builder()
                             .set_image(shadow_color_image)
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
@@ -466,22 +437,19 @@ void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
 
 void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
     VkExtent2D extent = base_render_data->swap_chain_extent;
-    gbuffer_albedo_image = ROImageVK::Builder()
-                               .set_properties_2d(
-                                   GBUFFER_ALBEDO_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                               .create_ref(base_render_data);
-    gbuffer_normal_image = ROImageVK::Builder()
-                               .set_properties_2d(
-                                   GBUFFER_NORMAL_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                               .create_ref(base_render_data);
+    gbuffer_albedo_image =
+        ROImageVK::Builder()
+            .set_properties_2d(GBUFFER_ALBEDO_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+            .create_ref(base_render_data);
+    gbuffer_normal_image =
+        ROImageVK::Builder()
+            .set_properties_2d(GBUFFER_NORMAL_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+            .create_ref(base_render_data);
     gbuffer_rma_image = ROImageVK::Builder()
-                            .set_properties_2d(
-                                GBUFFER_RMA_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                            .set_properties_2d(GBUFFER_RMA_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                             .create_ref(base_render_data);
     gbuffer_depth_image = ROImageVK::Builder()
-                              .set_properties_2d(GBUFFER_DEPTH_FORMAT,
-                                  extent,
-                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                              .set_properties_2d(GBUFFER_DEPTH_FORMAT, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                               .create_ref(base_render_data);
     gbuffer_albedo_view = ROImageViewVK::Builder()
                               .set_image(gbuffer_albedo_image)
@@ -524,16 +492,13 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     }
     bloom_acquire_buffer.resize(static_cast<size_t>(bloom_extent.width) * bloom_extent.height * BLOOM_BYTES_PER_PIXEL);
     direct_lighting_image = ROImageVK::Builder()
-                                .set_properties_2d(
-                                    LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                                .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                 .create_ref(base_render_data);
     indirect_lighting_image = ROImageVK::Builder()
-                                  .set_properties_2d(
-                                      LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                                  .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                                   .create_ref(base_render_data);
     result_image = ROImageVK::Builder()
-                       .set_properties_2d(
-                           LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                       .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                        .create_ref(base_render_data);
     bloom_extract_image = ROImageVK::Builder()
                               .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
@@ -542,10 +507,10 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                                       VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                               .set_mipmap_level(bloom_mipmap_level_count)
                               .create_ref(base_render_data);
-    bloom_horizontal_image = ROImageVK::Builder()
-                                 .set_properties_2d(
-                                     LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                 .create_ref(base_render_data);
+    bloom_horizontal_image =
+        ROImageVK::Builder()
+            .set_properties_2d(LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+            .create_ref(base_render_data);
     bloom_image = ROImageVK::Builder()
                       .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
                           bloom_extent,
@@ -602,19 +567,20 @@ void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
         .width = OCT_TREE_WIDTH,
         .max_depth = OCT_TREE_MAX_DEPTH,
     };
-    oct_tree_info = create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &initial_oct_tree_info, sizeof(initial_oct_tree_info));
+    oct_tree_info =
+        create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &initial_oct_tree_info, sizeof(initial_oct_tree_info));
     oct_tree_nodes = ROBufferVK::Builder()
-        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-        .create_ref(base_render_data);
+                         .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                         .create_ref(base_render_data);
     oct_tree_leaves = ROBufferVK::Builder()
-        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-        .create_ref(base_render_data);
+                          .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                          .create_ref(base_render_data);
     oct_tree_deferred_list_ping = ROBufferVK::Builder()
-        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-        .create_ref(base_render_data);
+                                      .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                                      .create_ref(base_render_data);
     oct_tree_deferred_list_pong = ROBufferVK::Builder()
-        .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-        .create_ref(base_render_data);
+                                      .set_properties(sizeof(OctTreeInfo), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                                      .create_ref(base_render_data);
 }
 
 Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task(
@@ -650,31 +616,18 @@ void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_
         .render_database = renderer_vk->get_render_database(),
     };
 
-    RenderBindpointDeclarationsBuilder horizontal_bindpoints;
-    horizontal_bindpoints.add_image_decleration("shadow_moments_input", shadow_moments_attachment_view)
-        .add_image_decleration("shadow_moments_horizontal_output", shadow_moments_summed_area_table_horizontal_view);
-    auto horizontal_compiled = ComputePipelineCompilerVK(compute_context)
-                                   .compile("shadow_moments_summed_area_table_horizontal_shader",
-                                       shadow_moments_summed_area_table_horizontal_shader_resource,
-                                       horizontal_bindpoints.build());
+    auto horizontal_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("shadow_moments_summed_area_table_horizontal_shader", shadow_moments_summed_area_table_horizontal_shader_resource);
     shadow_moments_summed_area_table_horizontal_compute_pipeline = horizontal_compiled.compute_pipeline;
 
-    RenderBindpointDeclarationsBuilder vertical_bindpoints;
-    vertical_bindpoints
-        .add_image_decleration("shadow_moments_horizontal_input", shadow_moments_summed_area_table_horizontal_view)
-        .add_image_decleration("shadow_moments_summed_area_table_output", shadow_moments_summed_area_table_view);
-    auto vertical_compiled = ComputePipelineCompilerVK(compute_context)
-                                 .compile("shadow_moments_summed_area_table_vertical_shader",
-                                     shadow_moments_summed_area_table_vertical_shader_resource,
-                                     vertical_bindpoints.build());
+    auto vertical_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("shadow_moments_summed_area_table_vertical_shader", shadow_moments_summed_area_table_vertical_shader_resource);
     shadow_moments_summed_area_table_vertical_compute_pipeline = vertical_compiled.compute_pipeline;
 }
 
-Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
-    return ROBufferVK::Builder()
-        .set_usage(p_buffer_usage)
-        .initial_data(p_data, p_size)
-        .create_ref(base_render_data);
+Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(
+    VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
+    return ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size).create_ref(base_render_data);
 }
 
 ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_pipeline_context() const {
@@ -695,95 +648,6 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
     };
 }
 
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_direct_lighting_bindpoints(
-    Ref<IRenderObjectContainer> p_camera_buffer_container,
-    Ref<IRenderObjectContainer> p_light_info_buffer_container,
-    Ref<ROBufferVK> p_light_count_buffer,
-    Ref<ROImageViewVK> p_shadow_moments_view,
-    bool p_use_summed_area_table) const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer_container)
-        .add_storage_buffer_decleration("light.light_infos", p_light_info_buffer_container)
-        .add_image_decleration("light.lights[0].shadowmap", p_shadow_moments_view);
-    if (p_use_summed_area_table) {
-        bindpoints.add_image_decleration("light.lights[0].shadow_moments_summed_area_table", shadow_moments_summed_area_table_view);
-    }
-    bindpoints.add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
-        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
-        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
-        .add_storage_buffer_decleration("light.light_count", p_light_count_buffer)
-        .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
-        .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
-        .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-        .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
-        .add_image_decleration("direct_lighting_output", direct_lighting_view);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_indirect_lighting_bindpoints(
-    Ref<IRenderObjectContainer> p_camera_buffer_container,
-    Ref<IRenderObjectContainer> p_light_info_buffer_container,
-    Ref<ROBufferVK> p_light_count_buffer) const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer_container)
-        .add_storage_buffer_decleration("light.light_infos", p_light_info_buffer_container)
-        .add_image_decleration("light.lights[0].shadowmap", shadow_moments_attachment_view)
-        .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
-        .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
-        .add_sampler_decleration("light.lights[0].shadowmap_sampler", shadow_sampler)
-        .add_storage_buffer_decleration("light.light_count", p_light_count_buffer)
-        .add_image_decleration("gbuffer_albedo", gbuffer_albedo_view)
-        .add_image_decleration("gbuffer_octa_normal", gbuffer_normal_view)
-        .add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-        .add_image_decleration("gbuffer_depth", gbuffer_depth_view)
-        .add_sampler_decleration("gbuffer_sampler", gbuffer_sampler)
-        .add_image_decleration("indirect_lighting_output", indirect_lighting_view);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_combine_lighting_bindpoints() const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_image_decleration("gbuffer_rma", gbuffer_rma_view)
-        .add_image_decleration("direct_lighting", direct_lighting_view)
-        .add_image_decleration("indirect_lighting", indirect_lighting_view)
-        .add_image_decleration("result_image", result_image_view);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_extract_bindpoints() const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_image_decleration("bloom_input", result_image_view)
-        .add_image_decleration("bloom_output", bloom_extract_image_view)
-        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_bloom_bindpoints() const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_image_decleration("bloom_input", bloom_downsampled_image_view)
-        .add_image_decleration("bloom_output", bloom_horizontal_image_view)
-        .add_sampler_decleration("gbuffer_sampler", bloom_sampler);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_oct_tree_build_bindpoints() const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_storage_buffer_decleration("oct_tree_info", oct_tree_info)
-        .add_storage_buffer_decleration("tree_nodes", oct_tree_nodes)
-        .add_storage_buffer_decleration("tree_leaves", oct_tree_leaves)
-        .add_storage_buffer_decleration("deferred_list", oct_tree_deferred_list_ping);
-    return bindpoints.build();
-}
-
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_present_post_processing_bindpoints() const {
-    RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_image_decleration("result_image", result_image_view)
-        .add_image_decleration("bloom_image", bloom_image_view)
-        .add_sampler_decleration("result_sampler", bloom_sampler);
-    return bindpoints.build();
-}
-
 void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     composition_camera_info_ubos = create_per_frame_buffers(
         render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -792,100 +656,51 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         sizeof(SpotLightInfoVKUBO) * MAX_SPOT_LIGHT_INFO_COUNT,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     uint32_t spot_light_count = 1;
-    Ref<ROBufferVK> light_count_buffer = create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &spot_light_count, sizeof(spot_light_count));
+    spot_light_count_buffer =
+        create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &spot_light_count, sizeof(spot_light_count));
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
-    auto direct_compiled = ComputePipelineCompilerVK(compute_context)
-                               .compile("direct_lighting_shader",
-                                   direct_lighting_shader_resource,
-                                   build_direct_lighting_bindpoints(
-                                       composition_camera_info_ubos,
-                                       spot_light_info_buffers,
-                                       light_count_buffer,
-                                       shadow_moments_sampled_view,
-                                       false));
+    auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
     direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
     auto direct_summed_area_table_compiled =
-        ComputePipelineCompilerVK(compute_context)
-            .compile("direct_lighting_summed_area_table_shader",
-                direct_lighting_summed_area_table_shader_resource,
-                build_direct_lighting_bindpoints(
-                    composition_camera_info_ubos,
-                    spot_light_info_buffers,
-                    light_count_buffer,
-                    shadow_moments_attachment_view,
-                    true));
+        ComputePipelineCompilerVK(compute_context).compile("direct_lighting_summed_area_table_shader", direct_lighting_summed_area_table_shader_resource);
     direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
-    auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
-                                 .compile("indirect_lighting_rsm_shader",
-                                     indirect_lighting_rsm_shader_resource,
-                                     build_indirect_lighting_bindpoints(
-                                         composition_camera_info_ubos, spot_light_info_buffers, light_count_buffer));
+    auto indirect_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("indirect_lighting_rsm_shader", indirect_lighting_rsm_shader_resource);
     indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
     auto combine_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource);
     combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
     auto bloom_extract_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource, build_bloom_extract_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
     auto bloom_horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource, build_bloom_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource);
     bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
     auto bloom_vertical_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource, build_bloom_bindpoints());
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource);
     bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
     auto present_compiled =
-        GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context())
-            .compile("present_post_processing", present_post_processing_pipeline_resource, build_present_post_processing_bindpoints());
+        GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;
-    auto oct_tree_build_x_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("oct_tree_build_x", oct_tree_build_x_shader_resource, build_oct_tree_build_bindpoints());
 }
 
-void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::span<RTRunStaticSetVK* const> p_gbuffer_tasks) {
-    if (p_gbuffer_tasks.empty()) {
-        throw std::runtime_error("Failed to setup deferred test: compiled pipelines are unavailable.");
-    }
-    gbuffer_camera_info_ubos = create_per_frame_buffers(
-        render_allocator, base_render_data, sizeof(CameraInfoVKUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
+    gbuffer_camera_info_ubos =
+        create_per_frame_buffers(render_allocator, base_render_data, sizeof(CameraInfoVKUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
-    gbuffer_camera_bindings.clear();
-    gbuffer_camera_bindings.reserve(p_gbuffer_tasks.size());
-    for (RTRunStaticSetVK* gbuffer_task : p_gbuffer_tasks) {
-        if (gbuffer_task == nullptr) {
-            throw std::runtime_error("Failed to setup deferred test: a G-buffer task is null.");
-        }
-        gbuffer_camera_bindings.push_back(TaskUniformBinding{.task = gbuffer_task, .field_path = "camera_info"});
-    }
-
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
 
     gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
     composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
     log_uniform_buffer_descriptors(gbuffer_camera_info_ubos, "G-buffer camera buffer");
     log_uniform_buffer_descriptors(composition_camera_info_ubos, "Composition camera buffer");
-
-    write_task_uniform_bindings(gbuffer_camera_bindings, gbuffer_camera_info_ubos);
 }
 
-void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span<RTRunStaticSetVK* const> p_shadow_tasks) {
-    if (p_shadow_tasks.empty()) {
-        throw std::runtime_error("Failed to setup deferred test: compiled light pipelines are unavailable.");
-    }
+void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
     SpotLightInfosVKUBO spot_light_infos = make_spot_light_infos_ubo(spot_light_component);
-    shadow_light_bindings.clear();
 
-    for (RTRunStaticSetVK* shadow_task : p_shadow_tasks) {
-        if (shadow_task == nullptr) {
-            throw std::runtime_error("Failed to setup deferred test: a shadow task is null.");
-        }
-        shadow_light_bindings.push_back(TaskUniformBinding{.task = shadow_task, .field_path = "light_camera_info"});
-    }
-
-    spot_light_info_buffers->publish_buffer_update(
-        spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
+    spot_light_info_buffers->publish_buffer_update(spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
     log_uniform_buffer_descriptors(spot_light_info_buffers, "Spot light buffer");
-
-    write_task_uniform_bindings(shadow_light_bindings, spot_light_info_buffers);
 }
 
 } // namespace WhiteBirdEngine

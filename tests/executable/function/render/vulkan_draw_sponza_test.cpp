@@ -131,9 +131,7 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
         p_allocator,
         p_render_data->frames_in_flight,
         WBE::ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
-            return WBE::ROBufferVK::Builder()
-                .set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .create_ref(p_render_data);
+            return WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).create_ref(p_render_data);
         }});
 }
 
@@ -186,6 +184,7 @@ private:
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
     WBE::Ref<WBE::ROBufferVK> light_billboard_ubo;
+    WBE::Ref<WBE::ROImageViewVK> light_billboard_texture_view;
     WBE::Ref<WBE::ROGraphicsPipelineVK> light_billboard_pipeline;
     WBE::Ref<WBE::ROSamplerVK> light_billboard_sampler;
     WBE::ComponentCamera camera_component{};
@@ -512,8 +511,7 @@ void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
 
 void ApplicationVulkanDrawSponzaTest::create_main_depth_resources() {
     main_depth_image = WBE::ROImageVK::Builder()
-                           .set_properties_2d(
-                               MAIN_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                           .set_properties_2d(MAIN_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                            .create_ref(base_render_data);
     VkImageSubresourceRange depth_subresource{
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -554,11 +552,6 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
                                   .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
                                   .create_ref(base_render_data);
 
-    WBE::RenderBindpointDeclarationsBuilder bindpoint_builder;
-    bindpoint_builder.add_storage_buffer_decleration("camera_info", camera_info_ubos)
-        .add_storage_buffer_decleration("billboard_info", light_billboard_ubo)
-        .add_image_decleration("texture_image", texture_resource)
-        .add_sampler_decleration("texture_sampler", light_billboard_sampler);
     WBE::GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
         .render_data = base_render_data,
@@ -566,22 +559,24 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
         .renderer = renderer_vk,
         .color_attachment_formats = {base_render_data->swap_chain_format},
     };
-    auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context)
-                        .compile("light_billboard_pipeline", pipeline_resource, bindpoint_builder.build());
+    WBE::GraphicsPipelineCompilerVK compiler(compiler_context);
+    light_billboard_texture_view = compiler.compile_texture_view("spot_light_billboard", texture_resource);
+    auto compiled = compiler.compile("light_billboard_pipeline", pipeline_resource);
     light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
 void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    static_cast<void>(p_task);
     if (spot_light_info_ubos == WBE::MEM_NULL) {
         spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
     }
     WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
     log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza shadow light buffer");
-    p_task.set_descriptor_binding("light_camera_info", spot_light_info_ubos);
 }
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    static_cast<void>(p_task);
     if (camera_info_ubos == WBE::MEM_NULL) {
         camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
     }
@@ -601,15 +596,6 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
     log_uniform_buffer_descriptors(camera_info_ubos, "forward sponza camera buffer");
     log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza main light buffer");
     log_uniform_buffer_descriptors(spot_light_count_ubos, "forward sponza light count buffer");
-
-    auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROCMultislotsVK> p_buffer) {
-        p_task.set_descriptor_binding(p_name, p_buffer);
-    };
-    write_uniform_buffer("camera_info", camera_info_ubos);
-    write_uniform_buffer("light.lights[0].info", spot_light_info_ubos);
-    write_uniform_buffer("light.light_count", spot_light_count_ubos);
-    p_task.set_descriptor_binding("light.lights[0].shadowmap", shadow_depth_view);
-    p_task.set_descriptor_binding("light.lights[0].shadowmap_sampler", shadow_sampler);
 }
 
 void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
@@ -622,7 +608,17 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
         .container = WBE::MEM_NULL});
     pipeline_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view);
+        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_resource("shadow_light_info", spot_light_info_ubos)
+        .add_resource("camera_info", camera_info_ubos)
+        .add_resource("spot_light_info", spot_light_info_ubos)
+        .add_resource("spot_light_count", spot_light_count_ubos)
+        .add_resource("shadowmap", shadow_depth_view)
+        .add_resource("shadow_sampler", shadow_sampler)
+        .add_resource("gbuffer_camera_info", camera_info_ubos)
+        .add_resource("light_billboard_info", light_billboard_ubo)
+        .add_resource("light_billboard_texture", light_billboard_texture_view)
+        .add_resource("light_billboard_sampler", light_billboard_sampler);
 
     pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_SHADOWMAP_OPAQUE, std::move(p_shadow_opaque_task));
 

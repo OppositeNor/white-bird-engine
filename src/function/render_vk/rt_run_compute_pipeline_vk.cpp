@@ -16,8 +16,11 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <stdexcept>
@@ -33,6 +36,12 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(
     if (pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline is null.");
     }
+    descriptor_bindings =
+        make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, pipeline->get_descriptor_layout());
+}
+
+void RTRunComputePipelineVK::bind_resources(const RendResViewVK& p_resources) {
+    descriptor_bindings->bind_resources(p_resources);
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::read_resources() const {
@@ -45,7 +54,7 @@ Vector<ResAccessVK, RenderAllocator> RTRunComputePipelineVK::write_resources() c
 
 void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->get_pipeline());
-    pipeline->push_descriptor_indices(p_command_buffer);
+    descriptor_bindings->push(p_command_buffer);
     vkCmdDispatch(p_command_buffer, dispatch_group_count.width, dispatch_group_count.height, dispatch_group_count.depth);
 }
 

@@ -14,22 +14,28 @@
 */
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -71,6 +77,63 @@ public:
 
 private:
     DebugDataRows rows;
+};
+
+Ref<ROCSingleVK> make_test_container(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
+    return make_ref<ROCSingleVK>(p_allocator,
+        make_ref<TestDescriptorResourceVK>(p_allocator, p_render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObjectVK>());
+}
+
+class RTGraphResourceProbeVK final : public IRenderTaskVK {
+public:
+    RTGraphResourceProbeVK(
+        RenderAllocator* p_allocator, Ref<ROCSingleVK> p_container, size_t p_registration_count, bool p_require_missing_resource, bool p_write_resource)
+        : allocator(p_allocator), container(std::move(p_container)), registration_count(p_registration_count),
+          require_missing_resource(p_require_missing_resource), write_resource(p_write_resource) {
+    }
+    ~RTGraphResourceProbeVK() override = default;
+    RTGraphResourceProbeVK(const RTGraphResourceProbeVK&) = delete;
+    RTGraphResourceProbeVK(RTGraphResourceProbeVK&&) noexcept = delete;
+    RTGraphResourceProbeVK& operator=(const RTGraphResourceProbeVK&) = delete;
+    RTGraphResourceProbeVK& operator=(RTGraphResourceProbeVK&&) noexcept = delete;
+
+    QueueFamilyVK queue_family() const override {
+        return QueueFamilyVK::GRAPHICS;
+    }
+
+    void register_resources(RendResRegistrarVK& p_registrar) override {
+        for (size_t i = 0; i < registration_count; ++i) {
+            p_registrar.add_resource("logical", container->get_resource_type_id(), container);
+        }
+    }
+
+    void bind_resources(const RendResViewVK& p_resources) override {
+        if (require_missing_resource) {
+            static_cast<void>(p_resources.get("missing"));
+        }
+    }
+
+    Vector<ResAccessVK, RenderAllocator> read_resources() const override {
+        return Vector<ResAccessVK, RenderAllocator>(allocator);
+    }
+
+    Vector<ResAccessVK, RenderAllocator> write_resources() const override {
+        Vector<ResAccessVK, RenderAllocator> result(allocator);
+        if (write_resource) {
+            result.push_back({.res_id = "logical", .usage = RendResUsageVK::STORAGE_BUFFER});
+        }
+        return result;
+    }
+
+    void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    }
+
+private:
+    RenderAllocator* allocator;
+    Ref<ROCSingleVK> container;
+    size_t registration_count;
+    bool require_missing_resource;
+    bool write_resource;
 };
 
 } // namespace
@@ -139,6 +202,72 @@ TEST(WBERenderGraphVKTest, ListDescriptorsReturnsEmptyJsonForEmptyGraph) {
     DebugDataArray rows = descriptor_data.get<DebugDataArray>();
 
     EXPECT_TRUE(rows.empty());
+}
+
+TEST(WBERenderGraphVKTest, TaskResourceViewPrefersQualifiedResourcesAndFallsBackToGlobals) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
+    Ref<ROCSingleVK> global_container = make_test_container(&allocator, &render_data);
+    Ref<ROCSingleVK> local_container = make_test_container(&allocator, &render_data);
+
+    auto global_resource = make_ref<RendResVK>(&allocator);
+    global_resource->res_id = "shared";
+    global_resource->res_type_id = global_container->get_resource_type_id();
+    global_resource->container = global_container;
+    resources.emplace("shared", global_resource);
+    auto local_resource = make_ref<RendResVK>(&allocator);
+    local_resource->res_id = "lighting.shared";
+    local_resource->res_type_id = local_container->get_resource_type_id();
+    local_resource->container = local_container;
+    resources.emplace("lighting.shared", local_resource);
+
+    RendResViewVK lighting_view(&resources, "lighting");
+    RendResViewVK other_view(&resources, "other");
+    EXPECT_EQ(lighting_view.get("shared").container, local_container);
+    EXPECT_EQ(other_view.get("shared").container, global_container);
+    EXPECT_TRUE(lighting_view.contains("shared"));
+    EXPECT_THROW(lighting_view.get("missing"), std::runtime_error);
+}
+
+TEST(WBERenderGraphVKTest, RejectsDuplicateTaskPrivateResourceRegistration) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task("duplicate",
+        make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, make_test_container(&allocator, &render_data), 2, false, false));
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
+}
+
+TEST(WBERenderGraphVKTest, MissingReflectedResourceFailsDuringTaskBinding) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task("missing",
+        make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, make_test_container(&allocator, &render_data), 0, true, false));
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
+}
+
+TEST(WBERenderGraphVKTest, NormalizesSameLogicalTaskResourcesBeforeConflictValidation) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task("first",
+        make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, make_test_container(&allocator, &render_data), 1, false, true));
+    descriptor.add_task("second",
+        make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, make_test_container(&allocator, &render_data), 1, false, true));
+    RenderGraphVK graph(&render_data);
+
+    try {
+        graph.build_from_descriptor(descriptor);
+        FAIL() << "Expected graph construction to reach command-pool allocation.";
+    } catch (const std::runtime_error& error) {
+        EXPECT_STREQ(error.what(), "Failed to create command pool for queue family: 0.");
+    }
 }
 
 } // namespace WhiteBirdEngine

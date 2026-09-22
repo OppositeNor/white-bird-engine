@@ -21,14 +21,14 @@ ParameterBlock<StaticSetContractMetadata> static_set;
 #endif
 
 struct MaterialSamplerDescriptorIndices {
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
 };
 
 struct ForwardDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
     LightParamsDescriptorIndices light;
     MaterialSamplerDescriptorIndices material_textures;

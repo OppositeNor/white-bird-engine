@@ -27,6 +27,8 @@ struct WBE_VERTEX_INPUTAttribute {
 struct WBE_DESCRIPTORAttribute {
     /** Descriptor category interpreted by the Vulkan pipeline compiler. */
     string descriptor_type;
+    /** Logical render-graph resource identifier resolved by the owning task. */
+    string resource_id;
 };
 
 /** Marks a struct as an engine-discoverable data type in reflection metadata. */
@@ -129,9 +131,9 @@ struct WBE_TEXTUREAttribute {
 
 /** Descriptor-heap indices shared by material shaders. */
 struct MaterialDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
 };
 
@@ -209,11 +211,11 @@ struct StaticSetContractMetadata {
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
  */
 struct StaticSetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "submeshes")]
     uint2 submeshes;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "nodes")]
     uint2 nodes;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "instances")]
     uint2 instances;
 };
 

@@ -98,12 +98,11 @@ public:
 
         WBE::RTRunStaticSetVK::Config task_config;
         auto task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer, cube_set, pipeline_resource, task_config);
-        task->set_descriptor_binding("camera_info", camera_info_ubo);
-
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
             .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
             .container = WBE::MEM_NULL});
+        pipeline_desc.add_resource("camera_info", camera_info_ubo);
         pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_STATIC_SET, std::move(task));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));

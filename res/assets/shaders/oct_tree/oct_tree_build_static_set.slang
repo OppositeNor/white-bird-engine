@@ -45,16 +45,16 @@ struct VSOutput {
 };
 
 struct OctTreeDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
     uint2 oct_tree_info;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "tree_nodes")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "tree_leaves")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "deferred_list")]
     uint2 deferred_list;
 
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "node_data")]
     uint2 node_data;
     StaticSetDescriptorIndices static_set;
 };

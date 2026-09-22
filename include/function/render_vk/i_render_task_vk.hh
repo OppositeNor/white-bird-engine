@@ -42,6 +42,7 @@ enum class QueueFamilyVK : uint32_t {
  */
 struct RendResVK;
 class RendResViewVK;
+class RendResRegistrarVK;
 
 /**
  * @class RendResUsageVK
@@ -108,6 +109,17 @@ struct IRenderTaskVK : public IRenderTask {
      * @return The queue family index.
      */
     virtual QueueFamilyVK queue_family() const = 0;
+
+    /**
+     * @brief Register resources privately owned by this task.
+     *
+     * Registered logical ids are qualified by the render graph with the task id and take precedence over graph-global ids.
+     *
+     * @param p_registrar Graph-owned registrar for this task.
+     */
+    virtual void register_resources(RendResRegistrarVK& p_registrar) {
+        static_cast<void>(p_registrar);
+    }
 
     /**
      * @brief Bind stable graph resource containers before the task is first recorded.

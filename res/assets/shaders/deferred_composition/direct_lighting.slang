@@ -15,20 +15,20 @@
 #include "deferred_composition/deferred_composition_utils.slang"
 
 struct DirectLightingDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "composition_camera_info")]
     uint2 camera_info;
     LightParamsDescriptorIndices light;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_albedo")]
     uint2 gbuffer_albedo;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_normal")]
     uint2 gbuffer_octa_normal;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "gbuffer_depth")]
     uint2 gbuffer_depth;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "gbuffer_sampler")]
     uint2 gbuffer_sampler;
-    [WBE_DESCRIPTOR("storage_image")] uint2 direct_lighting_output;
+    [WBE_DESCRIPTOR("storage_image", "direct_lighting")] uint2 direct_lighting_output;
 };
 
 [[vk::push_constant]]

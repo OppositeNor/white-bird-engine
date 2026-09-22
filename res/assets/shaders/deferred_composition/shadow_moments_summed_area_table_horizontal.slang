@@ -15,9 +15,9 @@
 #include "utils.slang"
 
 struct ShadowMomentsHorizontalDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "shadow_moments")]
     uint2 shadow_moments_input;
-    [WBE_DESCRIPTOR("storage_image")]
+    [WBE_DESCRIPTOR("storage_image", "shadow_sat_horizontal")]
     uint2 shadow_moments_horizontal_output;
 };
 

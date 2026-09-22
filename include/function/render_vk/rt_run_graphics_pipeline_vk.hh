@@ -17,8 +17,10 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -160,6 +162,7 @@ private:
     std::optional<std::string> depth_attachment_id;
     Ref<RenderObjectContainerVK> depth_attachment_container;
     Ref<ROGraphicsPipelineVK> graphics_pipeline;
+    Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     std::optional<std::string> vertex_buffer_id;
     std::optional<std::string> index_buffer_id;
     Ref<RenderObjectContainerVK> vertex_buffer_container;

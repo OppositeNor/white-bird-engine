@@ -19,23 +19,23 @@ struct DescriptorHeapProbeUniform {
 };
 
 struct DescriptorHeapProbeImages {
-    [WBE_DESCRIPTOR("sampled_image")]
+    [WBE_DESCRIPTOR("sampled_image", "sampled_image")]
     uint2 sampled_image;
-    [WBE_DESCRIPTOR("storage_image")]
+    [WBE_DESCRIPTOR("storage_image", "storage_image")]
     uint2 storage_image;
 };
 
 struct DescriptorHeapProbeIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "uniform_buffer")]
     uint2 uniform_buffer;
     DescriptorHeapProbeImages images;
-    [WBE_DESCRIPTOR("storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "storage_buffer")]
     uint2 storage_buffer;
-    [WBE_DESCRIPTOR("sampler")]
+    [WBE_DESCRIPTOR("sampler", "sampler")]
     uint2 sampler;
-    [WBE_DESCRIPTOR("uniform_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "scalar_uniform")]
     uint2 scalar_uniform;
-    [WBE_DESCRIPTOR("acceleration_structure")]
+    [WBE_DESCRIPTOR("acceleration_structure", "acceleration_structure")]
     uint2 acceleration_structure;
 };
 
