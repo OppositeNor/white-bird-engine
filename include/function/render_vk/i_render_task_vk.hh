@@ -12,12 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_TASK_VK_HH
-#define WBE_FILE_RENDER_TASK_VK_HH
+#ifndef WBE_FILE_I_RENDER_TASK_VK_HH
+#define WBE_FILE_I_RENDER_TASK_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include <cstdint>
 #include <string>
 #include <vulkan/vulkan_core.h>
@@ -37,7 +37,7 @@ enum class QueueFamilyVK : uint32_t {
 
 /**
  * @class RendResVK
- * @brief A Vulkan resource binding (forward-declared here so that RenderTaskVK
+ * @brief A Vulkan resource binding (forward-declared here so that IRenderTaskVK
  * subclasses can refer to it without including the render graph header).
  */
 struct RendResVK;
@@ -86,19 +86,19 @@ struct ResAccessVK {
 };
 
 /**
- * @class RenderTaskVK
- * @brief Vulkan render task. A RenderTaskVK records work into a single
+ * @class IRenderTaskVK
+ * @brief Vulkan render task. A IRenderTaskVK records work into a single
  * Vulkan command buffer per frame; the owning RenderGraphVK schedules it
  * onto a queue family chosen by `queue_family()` and synchronises it with
  * other tasks via the read/write resource declarations and execution edges.
  */
-struct RenderTaskVK : public RenderTask {
-    RenderTaskVK() = default;
-    virtual ~RenderTaskVK() = default;
-    RenderTaskVK(const RenderTaskVK&) = default;
-    RenderTaskVK(RenderTaskVK&&) noexcept = default;
-    RenderTaskVK& operator=(const RenderTaskVK&) = default;
-    RenderTaskVK& operator=(RenderTaskVK&&) noexcept = default;
+struct IRenderTaskVK : public IRenderTask {
+    IRenderTaskVK() = default;
+    virtual ~IRenderTaskVK() = default;
+    IRenderTaskVK(const IRenderTaskVK&) = default;
+    IRenderTaskVK(IRenderTaskVK&&) noexcept = default;
+    IRenderTaskVK& operator=(const IRenderTaskVK&) = default;
+    IRenderTaskVK& operator=(IRenderTaskVK&&) noexcept = default;
 
     /**
      * @brief The queue family this task should run on. The render graph uses

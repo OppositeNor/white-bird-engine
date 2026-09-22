@@ -12,14 +12,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/render_task_vk.hh"
 #include "core/logging/log.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RenderTaskVK::RecordCommandBufferGuard::RecordCommandBufferGuard(
+IRenderTaskVK::RecordCommandBufferGuard::RecordCommandBufferGuard(
     VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info)
     : command_buffer(p_command_buffer) {
     VkCommandBufferBeginInfo begin_info{};
@@ -31,7 +31,7 @@ RenderTaskVK::RecordCommandBufferGuard::RecordCommandBufferGuard(
     }
 }
 
-RenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
+IRenderTaskVK::RecordCommandBufferGuard::~RecordCommandBufferGuard() {
     if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
         // Destructor cannot throw an exception.
         stdout_log()->error("Failed to record command buffer.");

@@ -28,9 +28,9 @@
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -72,6 +72,7 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <semaphore>
@@ -150,7 +151,7 @@ std::vector<uint8_t> convert_bloom_to_rgba8(std::span<const uint8_t> p_bloom_dat
             if (!std::isfinite(value)) {
                 value = value > 0.0F ? 1.0F : 0.0F;
             }
-            rgba8[pixel * 4 + channel] = static_cast<uint8_t>(std::clamp(value, 0.0F, 1.0F) * 255.0F + 0.5F);
+            rgba8[pixel * 4 + channel] = static_cast<uint8_t>(std::lround(std::clamp(value, 0.0F, 1.0F) * 255.0F));
         }
         rgba8[pixel * 4 + 3] = UINT8_MAX;
     }
@@ -186,6 +187,7 @@ private:
     static constexpr std::string_view BLOOM_DOWNSAMPLED_IMAGE_VIEW = "bloom_downsampled";
     static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
     static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
+
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
@@ -1231,7 +1233,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
                            horizontal_pipeline = shadow_moments_summed_area_table_horizontal_compute_pipeline,
-                           vertical_pipeline = shadow_moments_summed_area_table_vertical_compute_pipeline]() -> Unique<RenderTaskVK> {
+                           vertical_pipeline = shadow_moments_summed_area_table_vertical_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D horizontal_dispatch_group_count{
             .width = (task_shadow_extent.height + 63U) / 64U,
             .height = 1,
@@ -1258,7 +1260,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
-                           task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<RenderTaskVK> {
+                           task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<IRenderTaskVK> {
         return make_unique<RTGenerateMipmapsVK>(
             task_render_allocator, task_base_render_data, SHADOW_MOMENTS_IMAGE_VIEW, task_shadow_extent, task_shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
     };
@@ -1285,7 +1287,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
         p_use_summed_area_table ? direct_lighting_summed_area_table_compute_pipeline : direct_lighting_compute_pipeline;
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = std::move(pipeline)]() -> Unique<RenderTaskVK> {
+                           task_pipeline = std::move(pipeline)]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
@@ -1315,7 +1317,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     }
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = indirect_lighting_compute_pipeline]() -> Unique<RenderTaskVK> {
+                           task_pipeline = indirect_lighting_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
@@ -1337,7 +1339,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
         .write(RESULT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = combine_lighting_compute_pipeline]() -> Unique<RenderTaskVK> {
+                           task_pipeline = combine_lighting_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
@@ -1354,7 +1356,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc(
     task_desc.after(RT_COMBINE_LIGHTING).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).write(BLOOM_EXTRACT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = bloom_extract_compute_pipeline]() -> Unique<RenderTaskVK> {
+                           task_pipeline = bloom_extract_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
@@ -1371,7 +1373,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_mipmap_task_desc()
     task_desc.after(RT_EXTRACT_BLOOM);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_bloom_mipmap_level_count = bloom_mipmap_level_count]() -> Unique<RenderTaskVK> {
+                           task_bloom_mipmap_level_count = bloom_mipmap_level_count]() -> Unique<IRenderTaskVK> {
         return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
             task_base_render_data,
             BLOOM_EXTRACT_IMAGE_VIEW,
@@ -1394,7 +1396,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
                            task_base_render_data = base_render_data,
                            task_bloom_extent = bloom_extent,
                            horizontal_pipeline = bloom_horizontal_compute_pipeline,
-                           vertical_pipeline = bloom_vertical_compute_pipeline]() -> Unique<RenderTaskVK> {
+                           vertical_pipeline = bloom_vertical_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_bloom_extent.width + 7U) / 8U,
             .height = (task_bloom_extent.height + 7U) / 8U,
@@ -1417,7 +1419,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
                            task_base_render_data = base_render_data,
                            task_destination = std::span<uint8_t>(bloom_acquire_buffer),
                            task_acquire_requested = &bloom_acquire_requested,
-                           task_acquire_completed = &bloom_acquire_completed]() -> Unique<RenderTaskVK> {
+                           task_acquire_completed = &bloom_acquire_completed]() -> Unique<IRenderTaskVK> {
         return make_unique<RTCPUInFlightAcquireVK>(
             task_render_allocator, task_base_render_data, BLOOM_IMAGE_VIEW, task_destination, task_acquire_requested, task_acquire_completed);
     };
@@ -1430,7 +1432,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
     task_desc.after(RT_ACQUIRE_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<RenderTaskVK> {
+                           task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<IRenderTaskVK> {
         return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
@@ -1462,7 +1464,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
     task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
-                           task_pipeline = light_billboard_pipeline]() -> Unique<RenderTaskVK> {
+                           task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
         std::array<VkClearValue, 2> clear_values{};
         std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN_IMAGE};
         return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,

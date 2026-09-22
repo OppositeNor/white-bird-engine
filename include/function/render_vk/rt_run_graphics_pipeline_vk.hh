@@ -18,9 +18,9 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -46,7 +46,7 @@ struct IndexedDrawRegionVK {
  *
  * Graph resources are bound to stable containers when the graph is built.
  */
-struct RTRunGraphicsPipelineVK final : public RenderTaskVK {
+struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
     RTRunGraphicsPipelineVK() = delete;
     virtual ~RTRunGraphicsPipelineVK() override = default;
     RTRunGraphicsPipelineVK(const RTRunGraphicsPipelineVK&) = delete;

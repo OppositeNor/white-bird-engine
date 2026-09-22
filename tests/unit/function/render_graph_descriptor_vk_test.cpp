@@ -15,8 +15,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -25,18 +25,17 @@
 namespace WhiteBirdEngine {
 
 /** @brief Minimal render task used to verify direct descriptor ownership transfer. */
-class DirectDescriptorRenderTaskVK final : public RenderTaskVK {
+class RTDirectDescriptorVK final : public IRenderTaskVK {
 public:
-    DirectDescriptorRenderTaskVK(RenderAllocator* p_allocator, bool* p_destroyed)
-        : allocator(p_allocator), destroyed(p_destroyed) {
+    RTDirectDescriptorVK(RenderAllocator* p_allocator, bool* p_destroyed) : allocator(p_allocator), destroyed(p_destroyed) {
     }
-    virtual ~DirectDescriptorRenderTaskVK() override {
+    virtual ~RTDirectDescriptorVK() override {
         *destroyed = true;
     }
-    DirectDescriptorRenderTaskVK(const DirectDescriptorRenderTaskVK&) = delete;
-    DirectDescriptorRenderTaskVK(DirectDescriptorRenderTaskVK&&) noexcept = delete;
-    DirectDescriptorRenderTaskVK& operator=(const DirectDescriptorRenderTaskVK&) = delete;
-    DirectDescriptorRenderTaskVK& operator=(DirectDescriptorRenderTaskVK&&) noexcept = delete;
+    RTDirectDescriptorVK(const RTDirectDescriptorVK&) = delete;
+    RTDirectDescriptorVK(RTDirectDescriptorVK&&) noexcept = delete;
+    RTDirectDescriptorVK& operator=(const RTDirectDescriptorVK&) = delete;
+    RTDirectDescriptorVK& operator=(RTDirectDescriptorVK&&) noexcept = delete;
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -61,10 +60,10 @@ private:
 TEST(WBERenderGraphDescriptorVKTest, DescriptorCopiesShareOneDirectTaskTransfer) {
     RenderAllocator allocator(WBE_KI_B(64));
     bool destroyed = false;
-    RendTaskDescVK descriptor(&allocator, "direct_task", make_unique<DirectDescriptorRenderTaskVK>(&allocator, &allocator, &destroyed));
+    RendTaskDescVK descriptor(&allocator, "direct_task", make_unique<RTDirectDescriptorVK>(&allocator, &allocator, &destroyed));
     const RendTaskDescVK& descriptor_copy = descriptor;
 
-    Unique<RenderTaskVK> task = descriptor_copy.create();
+    Unique<IRenderTaskVK> task = descriptor_copy.create();
 
     EXPECT_FALSE(task.is_null());
     EXPECT_EQ(descriptor.task_id, "direct_task");

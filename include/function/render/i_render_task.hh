@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_TASK_HH
-#define WBE_FILE_RENDER_TASK_HH
+#ifndef WBE_FILE_I_RENDER_TASK_HH
+#define WBE_FILE_I_RENDER_TASK_HH
 
 #include "utils/utils.hh"
 #include <string>
@@ -27,16 +27,17 @@ using RendTaskID = std::string;
 inline constexpr std::string_view RT_UNDEFINED = "undefined";
 
 /**
- * @class RenderTask
+ * @class IRenderTask
  * @brief The abstract struct for render task.
  */
-struct RenderTask {
-    RenderTask() = default;
-    virtual ~RenderTask() = default;
-    RenderTask(const RenderTask&) = default;
-    RenderTask(RenderTask&&) noexcept = default;
-    RenderTask& operator=(const RenderTask&) = default;
-    RenderTask& operator=(RenderTask&&) noexcept = default;
+class IRenderTask {
+public:
+    IRenderTask() = default;
+    virtual ~IRenderTask() = default;
+    IRenderTask(const IRenderTask&) = default;
+    IRenderTask(IRenderTask&&) noexcept = default;
+    IRenderTask& operator=(const IRenderTask&) = default;
+    IRenderTask& operator=(IRenderTask&&) noexcept = default;
 
     /**
      * @brief Initialize the render task.

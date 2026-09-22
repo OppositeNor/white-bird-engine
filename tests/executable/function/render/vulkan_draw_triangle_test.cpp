@@ -22,9 +22,9 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -134,7 +134,7 @@ public:
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.create =
-            [render_allocator, base_render_data, graphics_pipeline, vertex_input, indexed_draw_region]() -> WBE::Unique<WBE::RenderTaskVK> {
+            [render_allocator, base_render_data, graphics_pipeline, vertex_input, indexed_draw_region]() -> WBE::Unique<WBE::IRenderTaskVK> {
             return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),

@@ -18,11 +18,11 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <cstddef>
@@ -108,7 +108,7 @@ struct RGNode {
         : exec_before(p_allocator), exec_after(p_allocator), reads(p_allocator), writes(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
-    Unique<RenderTaskVK> render_task;
+    Unique<IRenderTaskVK> render_task;
     // String identifier copied from the graph descriptor for diagnostics.
     RendTaskID task_id;
     // The execution process edge before this node. All of these need
@@ -201,7 +201,7 @@ public:
      * retrievable via get_terminal_semaphore().
      *
      * @param p_frame_index The current frame counter (timeline base value).
-     * @param p_delta       Frame delta forwarded to RenderTaskVK::record().
+     * @param p_delta       Frame delta forwarded to IRenderTaskVK::record().
      * @param p_extra_waits_first_submit  Extra waits on the first graphics
      * submit.
      * @param p_extra_signals_last_submit Extra signals on the last graphics
@@ -253,7 +253,7 @@ private:
     void free_command_buffers();
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
-    Ref<RGNode> add_node(Unique<RenderTaskVK> p_task);
+    Ref<RGNode> add_node(Unique<IRenderTaskVK> p_task);
     Ref<RGExecEdge> add_exec_edge(
         Ref<RGNode> p_before, Ref<RGNode> p_after, VkPipelineStageFlags2 p_before_finish_stage, VkPipelineStageFlags2 p_after_start_stage);
 

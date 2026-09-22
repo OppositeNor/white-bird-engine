@@ -12,9 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/render_task_vk.hh"
+#include "core/allocator/stl_allocator.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
+#include "utils/defs.hh"
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -22,6 +25,7 @@
 #include <semaphore>
 #include <span>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

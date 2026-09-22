@@ -16,11 +16,11 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include <stdexcept>
 #include <string>
@@ -30,7 +30,7 @@
 namespace WhiteBirdEngine {
 
 struct RendTaskDescVKDirectTaskState {
-    explicit RendTaskDescVKDirectTaskState(Unique<RenderTaskVK> p_task) : task(std::move(p_task)) {
+    explicit RendTaskDescVKDirectTaskState(Unique<IRenderTaskVK> p_task) : task(std::move(p_task)) {
         if (task.is_null()) {
             throw std::runtime_error("Failed to construct render task descriptor: direct task is null.");
         }
@@ -41,23 +41,23 @@ struct RendTaskDescVKDirectTaskState {
     RendTaskDescVKDirectTaskState& operator=(const RendTaskDescVKDirectTaskState&) = delete;
     RendTaskDescVKDirectTaskState& operator=(RendTaskDescVKDirectTaskState&&) noexcept = delete;
 
-    Unique<RenderTaskVK> take_task() {
+    Unique<IRenderTaskVK> take_task() {
         if (task.is_null()) {
             throw std::runtime_error("Failed to build render graph: direct task descriptor was already consumed.");
         }
         return std::move(task);
     }
 
-    Unique<RenderTaskVK> task;
+    Unique<IRenderTaskVK> task;
 };
 
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator), reads(p_allocator), writes(p_allocator) {
 }
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<RenderTaskVK> p_task)
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task)
     : task_id(p_task_id), prev(p_allocator), reads(p_allocator), writes(p_allocator) {
     Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
-    create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<RenderTaskVK> {
+    create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<IRenderTaskVK> {
         return direct_task_state->take_task();
     };
 }
@@ -82,7 +82,7 @@ RendGraphDescVK& RendGraphDescVK::add_task(RendTaskDescVK p_task_desc) {
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_task(std::string_view p_task_id, Unique<RenderTaskVK> p_task) {
+RendGraphDescVK& RendGraphDescVK::add_task(std::string_view p_task_id, Unique<IRenderTaskVK> p_task) {
     tasks.emplace_back(allocator, p_task_id, std::move(p_task));
     return *this;
 }

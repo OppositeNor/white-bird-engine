@@ -17,13 +17,13 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -288,7 +288,7 @@ DebugDataRows RendResViewVK::descriptor_debug_data() const {
     return rows;
 }
 
-Ref<RGNode> RenderGraphVK::add_node(Unique<RenderTaskVK> p_task) {
+Ref<RGNode> RenderGraphVK::add_node(Unique<IRenderTaskVK> p_task) {
     auto node = make_ref<RGNode>(render_data->allocator, render_data->allocator);
     node->render_task = std::move(p_task);
     node->in_queue = node->render_task->queue_family();

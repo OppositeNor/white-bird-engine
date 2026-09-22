@@ -19,7 +19,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <span>
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  * @brief Render task that dispatches an ordered sequence of synchronized compute passes in one command buffer.
  * Shader resource reads and writes are declared fluently on RendTaskDescVK.
  */
-struct RTRunComputePipelinesSequentialVK final : public RenderTaskVK {
+struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
     /**
      * @class Dispatch
      * @brief One retained compute pipeline plus its workgroup counts.

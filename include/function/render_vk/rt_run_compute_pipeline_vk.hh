@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_task_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <vulkan/vulkan_core.h>
@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  * @brief Render task that binds a compute pipeline and dispatches workgroups.
  * Shader resource reads and writes are declared fluently on RendTaskDescVK.
  */
-struct RTRunComputePipelineVK final : public RenderTaskVK {
+struct RTRunComputePipelineVK final : public IRenderTaskVK {
     RTRunComputePipelineVK() = delete;
     virtual ~RTRunComputePipelineVK() override = default;
     RTRunComputePipelineVK(const RTRunComputePipelineVK&) = delete;

@@ -18,12 +18,12 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_task.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include <functional>
 #include <string_view>
 
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
 /**
  * @class RendTaskDescVK
  * @brief A high-level Vulkan render task descriptor. A single std::function
- * defers the concrete RenderTaskVK instantiation until the graph is built.
+ * defers the concrete IRenderTaskVK instantiation until the graph is built.
  */
 struct RendTaskDescVK {
     /** @brief Construct an empty task descriptor backed by the supplied allocator. */
@@ -46,7 +46,7 @@ struct RendTaskDescVK {
      * @param p_task_id Task id used for graph dependencies.
      * @param p_task Task transferred to the graph when the descriptor is built.
      */
-    RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<RenderTaskVK> p_task);
+    RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
     ~RendTaskDescVK() = default;
     RendTaskDescVK(const RendTaskDescVK&) = default;
     RendTaskDescVK(RendTaskDescVK&&) noexcept = default;
@@ -85,8 +85,8 @@ struct RendTaskDescVK {
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
     // Factory invoked at graph-build time to construct the concrete task. The
-    // resulting Unique<RenderTaskVK> is owned by the graph.
-    std::function<Unique<RenderTaskVK>()> create;
+    // resulting Unique<IRenderTaskVK> is owned by the graph.
+    std::function<Unique<IRenderTaskVK>()> create;
 };
 
 /**
@@ -113,7 +113,7 @@ struct RendGraphDescVK {
      * @param p_task The concrete task transferred into the graph.
      * @return This graph descriptor.
      */
-    RendGraphDescVK& add_task(std::string_view p_task_id, Unique<RenderTaskVK> p_task);
+    RendGraphDescVK& add_task(std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
 
     /**
      * @brief Append a resource binding to the graph.

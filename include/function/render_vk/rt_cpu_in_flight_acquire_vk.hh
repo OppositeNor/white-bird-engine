@@ -18,8 +18,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <atomic>
 #include <cstdint>
@@ -40,7 +40,7 @@ namespace WhiteBirdEngine {
  * When requested, the task acquires the complete underlying image into caller-owned storage, clears the request flag, and
  * releases the CPU semaphore after the storage has been populated. Instances are neither copyable nor movable.
  */
-class RTCPUInFlightAcquireVK final : public RenderTaskVK {
+class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
     RTCPUInFlightAcquireVK() = delete;
     ~RTCPUInFlightAcquireVK() override = default;

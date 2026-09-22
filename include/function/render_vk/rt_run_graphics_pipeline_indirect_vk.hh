@@ -19,9 +19,9 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -42,7 +42,7 @@ namespace WhiteBirdEngine {
  *
  * Pipelines are retained directly while graph resources are bound to stable containers during graph construction.
  */
-struct RTRunGraphicsPipelineIndirectVK final : public RenderTaskVK {
+struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     /**
      * @class PipelineBatch
      * @brief One graphics pipeline and its contiguous range of indirect commands.

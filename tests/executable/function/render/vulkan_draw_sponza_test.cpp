@@ -27,9 +27,9 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -648,7 +648,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
     light_billboard_task_desc.after(RT_RUN_MAIN_MASKED);
     light_billboard_task_desc.create = [render_allocator = render_allocator,
                                            base_render_data = base_render_data,
-                                           light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::RenderTaskVK> {
+                                           light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::IRenderTaskVK> {
         return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
             base_render_data,
             glm::vec4(0.0F),

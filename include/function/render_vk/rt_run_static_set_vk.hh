@@ -23,14 +23,13 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -52,7 +51,7 @@ inline constexpr std::string_view RT_RUN_STATIC_SET = "run_static_set";
  * retain descriptor bindings, and group indirect indexed draws by compatible vertex input. Groups follow first appearance,
  * preserving source order within each group; submesh and material identity remains in the original instance tables.
  */
-class RTRunStaticSetVK final : public RenderTaskVK {
+class RTRunStaticSetVK final : public IRenderTaskVK {
 public:
     /**
      * @class Config
