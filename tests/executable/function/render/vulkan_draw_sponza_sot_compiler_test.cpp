@@ -188,13 +188,11 @@ void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
 }
 
 void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor(RTRunStaticSetVK& p_task) {
-    camera_info_buffer = ROBufferVK::Builder()
-                             .set_domain(DeviceDomain::HOST_DEVICE)
-                             .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                             .set_size(sizeof(CameraInfoVKUBO))
-                             .create_ref(base_render_data);
     CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    camera_info_buffer->update_buffer(&camera_info, sizeof(camera_info));
+    camera_info_buffer = ROBufferVK::Builder()
+                             .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                             .initial_data(&camera_info, sizeof(camera_info))
+                             .create_ref(base_render_data);
     p_task.set_descriptor_binding("camera_info", camera_info_buffer);
 }
 

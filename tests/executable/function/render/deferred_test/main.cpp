@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "/home/oppositenormal/Documents/programming/white-bird-engine/tests/executable/function/render/render_test.hh"
+#include "../render_test.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/logging/log.hh"
 #include "core/profiling/profiler.hh"

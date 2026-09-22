@@ -93,10 +93,8 @@ public:
 
         camera_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(WBE::CameraInfoVKUBO))
+                              .initial_data(&camera_info, sizeof(camera_info))
                               .create_ref(base_render_data);
-        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
 
         WBE::RTRunStaticSetVK::Config task_config;
         auto task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer, cube_set, pipeline_resource, task_config);

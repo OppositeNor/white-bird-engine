@@ -82,10 +82,8 @@ public:
         WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
         time_ubo = WBE::ROBufferVK::Builder()
                        .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                       .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                       .set_size(sizeof(WBE::TimeVKUBO))
+                       .initial_data(&time_ubo_data, sizeof(time_ubo_data))
                        .create_ref(base_render_data);
-        time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
         auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
         if (pipeline_resource == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
@@ -107,21 +105,17 @@ public:
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangle_submesh->vertices);
 
         triangle_vertex_buffer = WBE::ROBufferVK::Builder()
-                                     .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                     .set_size(triangle_submesh->vertices.binary.size)
                                      .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+                                     .initial_data(triangle_submesh->vertices.binary.binary->data.get() +
+                                             triangle_submesh->vertices.binary.start,
+                                         triangle_submesh->vertices.binary.size)
                                      .create_ref(base_render_data);
-        triangle_vertex_buffer->update_buffer(
-            triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start,
-            triangle_submesh->vertices.binary.size);
         triangle_index_buffer = WBE::ROBufferVK::Builder()
-                                    .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                    .set_size(triangle_submesh->indices.binary.size)
                                     .set_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+                                    .initial_data(triangle_submesh->indices.binary.binary->data.get() +
+                                            triangle_submesh->indices.binary.start,
+                                        triangle_submesh->indices.binary.size)
                                     .create_ref(base_render_data);
-        triangle_index_buffer->update_buffer(
-            triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start,
-            triangle_submesh->indices.binary.size);
 
         const WBE::IndexedDrawRegionVK indexed_draw_region{
             .first_index = 0,

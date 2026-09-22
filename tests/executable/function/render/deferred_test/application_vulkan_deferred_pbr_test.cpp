@@ -13,14 +13,13 @@
    limitations under the License.
 */
 #include "application_vulkan_deferred_pbr_test.hh"
-#include "/home/oppositenormal/Documents/programming/white-bird-engine/tests/executable/function/render/render_test.hh"
+#include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/ecs/components.hh"
-#include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
@@ -84,8 +83,7 @@ Ref<ROCMultislotsVK> create_per_frame_uniform_buffers(
         ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
             return ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .set_domain(DeviceDomain::HOST_DEVICE)
-                .set_size(p_buffer_size)
+                .build(p_buffer_size)
                 .create_ref(p_render_data);
         }});
 }
@@ -369,13 +367,11 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
         throw std::runtime_error("Failed to setup deferred light billboard overlay: texture resource was not found.");
     }
 
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
     light_billboard_ubo = ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .set_domain(DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(BillboardInfoVKUBO))
+                              .initial_data(&light_billboard_info, sizeof(light_billboard_info))
                               .create_ref(base_render_data);
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
-    light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     light_billboard_sampler = ROSamplerVK::Builder()
                                   .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                                   .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
@@ -665,13 +661,10 @@ void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_
 }
 
 Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_uniform_buffer(const void* p_data, size_t p_size) const {
-    Ref<ROBufferVK> buffer = ROBufferVK::Builder()
-                                 .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                 .set_size(p_size)
-                                 .create_ref(base_render_data);
-    buffer->update_buffer(p_data, p_size);
-    return buffer;
+    return ROBufferVK::Builder()
+        .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+        .initial_data(p_data, p_size)
+        .create_ref(base_render_data);
 }
 
 ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_pipeline_context() const {

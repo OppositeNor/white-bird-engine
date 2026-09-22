@@ -133,8 +133,7 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
         WBE::ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
             return WBE::ROBufferVK::Builder()
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                .set_size(p_buffer_size)
+                .build(p_buffer_size)
                 .create_ref(p_render_data);
         }});
 }
@@ -547,13 +546,11 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     if (camera_info_ubos == WBE::MEM_NULL) {
         camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
     }
+    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
     light_billboard_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(BillboardInfoVKUBO))
+                              .initial_data(&light_billboard_info, sizeof(light_billboard_info))
                               .create_ref(base_render_data);
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
-    light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     light_billboard_sampler = WBE::ROSamplerVK::Builder()
                                   .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                                   .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)

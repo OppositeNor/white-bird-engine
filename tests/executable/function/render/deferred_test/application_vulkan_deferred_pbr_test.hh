@@ -105,6 +105,11 @@ private:
     static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
     static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
 
+    static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
+    static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";
+    static constexpr std::string_view OCT_TREE_LEAVES_BUFFER = "oct_tree_node_buffer";
+    static constexpr std::string_view OCT_TREE_DEFERRED_LIST = "oct_tree_deferred_list";
+
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
@@ -119,9 +124,51 @@ private:
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE = "run_build_oct_tree";
+
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
         glm::vec4 camera_world_position;
+    };
+
+    struct OctTreeInfo {
+        glm::mat4 matrices[3];
+        glm::vec3 origin;
+        float width;
+        uint32_t max_depth;
+        uint32_t node_count;
+        uint32_t leaves_count;
+        uint32_t data_count;
+        uint32_t deferred_task_count;
+    };
+
+    struct OctTreeNode {
+        enum class ChildrenState {
+            NODE,
+            LEAF,
+            EMPTY,
+            ALLOCATING
+        };
+        enum Subregion {
+            XYZ_000,
+            XYZ_001,
+            XYZ_010,
+            XYZ_011,
+            XYZ_100,
+            XYZ_101,
+            XYZ_110,
+            XYZ_111,
+            MAX_SUBREGION
+        };
+        uint32_t children_state;
+        uint32_t children;
+        uint32_t data_index;
+        int32_t parent_index;
+    };
+
+    struct OctTreeLeaf {
+        uint32_t data_index;
+        int32_t parent_index;
     };
 
     struct TaskUniformBinding {

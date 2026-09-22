@@ -293,31 +293,25 @@ void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
 }
 
 void ApplicationVulkanDrawCubeTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(WBE::SpotLightInfoVKUBO))
+                              .initial_data(&spot_light_info, sizeof(spot_light_info))
                               .create_ref(base_render_data);
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    spot_light_info_ubo->update_buffer(&spot_light_info, sizeof(spot_light_info));
     p_task.set_descriptor_binding("light_camera_info", spot_light_info_ubo);
 }
 
 void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
+    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
+    uint32_t spot_light_count = 1;
     camera_info_ubo = WBE::ROBufferVK::Builder()
                           .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                          .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                          .set_size(sizeof(WBE::CameraInfoVKUBO))
+                          .initial_data(&camera_info, sizeof(camera_info))
                           .create_ref(base_render_data);
     spot_light_count_ubo = WBE::ROBufferVK::Builder()
                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                               .set_size(sizeof(uint32_t))
+                               .initial_data(&spot_light_count, sizeof(spot_light_count))
                                .create_ref(base_render_data);
-    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    uint32_t spot_light_count = 1;
-    camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
-    spot_light_count_ubo->update_buffer(&spot_light_count, sizeof(uint32_t));
 
     auto write_uniform_buffer = [&p_task](const char* p_name, WBE::Ref<WBE::ROBufferVK> p_buffer) {
         p_task.set_descriptor_binding(p_name, p_buffer);

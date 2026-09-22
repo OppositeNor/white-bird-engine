@@ -21,21 +21,34 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstddef>
-#include <span>
 #include <stdexcept>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
+RTRunComputePipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator) : entries(p_allocator) {
+}
+
+RTRunComputePipelinesSequentialVK::Dispatch& RTRunComputePipelinesSequentialVK::Dispatch::add_entry(Entry p_entry) {
+    entries.push_back(std::move(p_entry));
+    return *this;
+}
+
+RTRunComputePipelinesSequentialVK::Dispatch& RTRunComputePipelinesSequentialVK::Dispatch::add_entry(
+    Ref<ROComputePipelineVK> p_pipeline, VkExtent3D p_group_count) {
+    return add_entry(Entry{.pipeline = std::move(p_pipeline), .group_count = p_group_count});
+}
+
 RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
-    const BaseRenderDataVK* p_render_data, std::span<const Dispatch> p_dispatches, QueueFamilyVK p_queue_family)
-    : render_data(p_render_data), queue_family_id(p_queue_family), dispatches(p_render_data->allocator) {
-    if (p_dispatches.empty()) {
+    const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family)
+    : render_data(p_render_data), queue_family_id(p_queue_family), entries(p_render_data->allocator) {
+    if (p_dispatch.entries.empty()) {
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one compute pipeline is required.");
     }
-    dispatches.assign(p_dispatches.begin(), p_dispatches.end());
-    for (const Dispatch& dispatch : dispatches) {
-        if (dispatch.pipeline == MEM_NULL) {
+    entries.assign(p_dispatch.entries.begin(), p_dispatch.entries.end());
+    for (const Entry& entry : entries) {
+        if (entry.pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: compute pipeline is null.");
         }
     }
@@ -50,13 +63,13 @@ Vector<ResAccessVK, RenderAllocator> RTRunComputePipelinesSequentialVK::write_re
 }
 
 void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
-    for (size_t i = 0; i < dispatches.size(); ++i) {
-        Dispatch& dispatch = dispatches[i];
-        vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, dispatch.pipeline->get_pipeline());
-        dispatch.pipeline->push_descriptor_indices(p_command_buffer);
-        vkCmdDispatch(p_command_buffer, dispatch.group_count.width, dispatch.group_count.height, dispatch.group_count.depth);
+    for (size_t i = 0; i < entries.size(); ++i) {
+        Entry& entry = entries[i];
+        vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, entry.pipeline->get_pipeline());
+        entry.pipeline->push_descriptor_indices(p_command_buffer);
+        vkCmdDispatch(p_command_buffer, entry.group_count.width, entry.group_count.height, entry.group_count.depth);
 
-        if (i + 1 >= dispatches.size()) {
+        if (i + 1 >= entries.size()) {
             continue;
         }
 

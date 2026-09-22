@@ -32,7 +32,9 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <span>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -75,6 +77,53 @@ public:
         Required<DeviceDomain> domain;
         std::optional<uint32_t> uniform_view_index;
         std::optional<uint32_t> storage_view_index;
+        /** Initial bytes copied into the buffer during creation. */
+        std::vector<uint8_t> initial_data_bytes;
+
+        /**
+         * @brief Configure storage for an array of equally sized elements.
+         *
+         * @param p_element_size Size of one element in bytes.
+         * @param p_element_count Number of elements.
+         * @param p_domain Memory domain used by the buffer.
+         * @return *this.
+         * @throws std::runtime_error If either dimension is zero or the total size overflows.
+         */
+        Builder& build(size_t p_element_size,
+            size_t p_element_count,
+            DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+        /**
+         * @brief Configure storage for one element.
+         *
+         * @param p_element_size Element size in bytes.
+         * @param p_domain Memory domain used by the buffer.
+         * @return *this.
+         * @throws std::runtime_error If the element size is zero.
+         */
+        Builder& build(size_t p_element_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+        /**
+         * @brief Configure the buffer and retain initial bytes for upload during creation.
+         *
+         * Device-local uploads automatically add transfer-destination usage and use a staging buffer.
+         *
+         * @param p_data Initial bytes copied into builder-owned storage.
+         * @param p_domain Memory domain used by the buffer.
+         * @return *this.
+         * @throws std::runtime_error If the data span is empty.
+         */
+        Builder& initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+        /**
+         * @brief Configure the buffer and retain initial bytes from an untyped memory region.
+         * @param p_data Initial byte address.
+         * @param p_size Initial byte count.
+         * @param p_domain Memory domain used by the buffer.
+         * @return *this.
+         */
+        Builder& initial_data(
+            const void* p_data, size_t p_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief The domain where the memory of this buffer will be allocated.

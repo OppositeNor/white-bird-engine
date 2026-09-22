@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "/home/oppositenormal/Documents/programming/white-bird-engine/tests/executable/function/render/render_test.hh"
+#include "../render_test.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -152,11 +152,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
             .height = 1,
             .depth = 1,
         };
-        std::array<RTRunComputePipelinesSequentialVK::Dispatch, 2> dispatches{{
-            {.pipeline = horizontal_pipeline, .group_count = horizontal_dispatch_group_count},
-            {.pipeline = vertical_pipeline, .group_count = vertical_dispatch_group_count},
-        }};
-        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatches);
+        RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
+        dispatch.add_entry(horizontal_pipeline, horizontal_dispatch_group_count)
+            .add_entry(vertical_pipeline, vertical_dispatch_group_count);
+        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
     };
     return task_desc;
 }
@@ -310,11 +309,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
             .height = (task_bloom_extent.height + 7U) / 8U,
             .depth = 1,
         };
-        std::array<RTRunComputePipelinesSequentialVK::Dispatch, 2> dispatches{{
-            {.pipeline = horizontal_pipeline, .group_count = dispatch_group_count},
-            {.pipeline = vertical_pipeline, .group_count = dispatch_group_count},
-        }};
-        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatches);
+        RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
+        dispatch.add_entry(horizontal_pipeline, dispatch_group_count).add_entry(vertical_pipeline, dispatch_group_count);
+        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
     };
     return task_desc;
 }

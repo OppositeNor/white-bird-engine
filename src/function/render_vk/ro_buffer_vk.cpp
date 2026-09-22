@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -35,6 +36,40 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+ROBufferVK::Builder& ROBufferVK::Builder::build(
+    size_t p_element_size, size_t p_element_count, DeviceDomain p_domain) {
+    if (p_element_size == 0 || p_element_count == 0) {
+        throw std::runtime_error("Failed to build buffer configuration: element size and count must be non-zero.");
+    }
+    if (p_element_count > std::numeric_limits<size_t>::max() / p_element_size) {
+        throw std::runtime_error("Failed to build buffer configuration: buffer size overflows size_t.");
+    }
+    size = p_element_size * p_element_count;
+    domain = p_domain;
+    return *this;
+}
+
+ROBufferVK::Builder& ROBufferVK::Builder::build(size_t p_element_size, DeviceDomain p_domain) {
+    return build(p_element_size, 1, p_domain);
+}
+
+ROBufferVK::Builder& ROBufferVK::Builder::initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain) {
+    build(sizeof(uint8_t), p_data.size(), p_domain);
+    initial_data_bytes.assign(p_data.begin(), p_data.end());
+    if (p_domain == DeviceDomain::DEVICE) {
+        add_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    }
+    return *this;
+}
+
+ROBufferVK::Builder& ROBufferVK::Builder::initial_data(
+    const void* p_data, size_t p_size, DeviceDomain p_domain) {
+    if (p_data == nullptr) {
+        throw std::runtime_error("Failed to configure initial buffer data: data is null.");
+    }
+    return initial_data(std::span<const uint8_t>(static_cast<const uint8_t*>(p_data), p_size), p_domain);
+}
 
 namespace {
 
@@ -105,6 +140,9 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size = p_builder.size;
     usage = WBE_REQUIRED(p_builder.usage);
+    if (!p_builder.initial_data_bytes.empty() && WBE_REQUIRED(p_builder.domain) == DeviceDomain::DEVICE) {
+        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
     if ((usage & (VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) != 0) {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
@@ -160,6 +198,19 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     if (p_builder.storage_view_index.has_value()) {
         storage_view_index = p_builder.storage_view_index;
         write_buffer_descriptor(render_data, *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer, exposed_fields.buffer_size);
+    }
+    if (!p_builder.initial_data_bytes.empty()) {
+        if (exposed_fields.domain == DeviceDomain::DEVICE) {
+            Ref<ROStagingBufferVK> staging_buffer = ROStagingBufferVK::Builder()
+                                                        .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
+                                                        .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                                                        .create_ref(p_render_data);
+            void* staging_data = staging_buffer->allocate(p_builder.initial_data_bytes.size());
+            std::memcpy(staging_data, p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
+            update_buffer(staging_buffer, staging_data, p_builder.initial_data_bytes.size());
+        } else {
+            update_buffer(p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
+        }
     }
 }
 

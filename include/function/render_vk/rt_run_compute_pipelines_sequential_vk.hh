@@ -22,7 +22,6 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include <span>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -34,12 +33,47 @@ namespace WhiteBirdEngine {
  */
 struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
     /**
-     * @class Dispatch
+     * @class Entry
      * @brief One retained compute pipeline plus its workgroup counts.
      */
-    struct Dispatch {
+    struct Entry {
+        /** Compute pipeline retained by the dispatch and task. */
         Ref<ROComputePipelineVK> pipeline = MEM_NULL;
+        /** Workgroup count dispatched in each dimension. */
         VkExtent3D group_count{.width = 1, .height = 1, .depth = 1};
+    };
+
+    /**
+     * @class Dispatch
+     * @brief Allocator-owned ordered compute-pass entries.
+     *
+     * Dispatches are copyable and movable. Their allocator must outlive every copy retaining entries.
+     */
+    struct Dispatch {
+        explicit Dispatch(RenderAllocator* p_allocator);
+        ~Dispatch() = default;
+        Dispatch(const Dispatch&) = default;
+        Dispatch(Dispatch&&) noexcept = default;
+        Dispatch& operator=(const Dispatch&) = default;
+        Dispatch& operator=(Dispatch&&) noexcept = default;
+
+        /**
+         * @brief Append one compute pass.
+         * @param p_entry Entry transferred into the dispatch.
+         * @return This dispatch.
+         */
+        Dispatch& add_entry(Entry p_entry);
+
+        /**
+         * @brief Append one compute pass from its pipeline and workgroup count.
+         * @param p_pipeline Compute pipeline retained by the dispatch.
+         * @param p_group_count Workgroup count dispatched in each dimension.
+         * @return This dispatch.
+         */
+        Dispatch& add_entry(Ref<ROComputePipelineVK> p_pipeline, VkExtent3D p_group_count);
+
+        /** Ordered compute passes. */
+        Vector<Entry, RenderAllocator> entries;
     };
 
     RTRunComputePipelinesSequentialVK() = delete;
@@ -53,11 +87,11 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
      * @brief Constructor.
      *
      * @param p_render_data Base render data.
-     * @param p_dispatches Ordered compute dispatches retained by the task.
+     * @param p_dispatch Ordered compute entries retained by the task.
      * @param p_queue_family Queue family used to submit the compute dispatches.
      */
     RTRunComputePipelinesSequentialVK(const BaseRenderDataVK* p_render_data,
-        std::span<const Dispatch> p_dispatches,
+        const Dispatch& p_dispatch,
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     virtual QueueFamilyVK queue_family() const override {
@@ -73,7 +107,7 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
 private:
     const BaseRenderDataVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
-    Vector<Dispatch, RenderAllocator> dispatches;
+    Vector<Entry, RenderAllocator> entries;
 };
 
 } // namespace WhiteBirdEngine
