@@ -11,7 +11,7 @@
                 },
                 {
                     "name" : "vulkan_draw_sponza_deferred_test",
-                    "sources" : ["vulkan_draw_sponza_deferred_test.cpp"]
+                    "sources" : ["deferred_test/*"]
                 },
                 {
                     "name" : "vulkan_draw_cube_test",
