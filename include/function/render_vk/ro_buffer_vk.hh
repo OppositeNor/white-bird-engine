@@ -85,23 +85,28 @@ public:
          *
          * @param p_element_size Size of one element in bytes.
          * @param p_element_count Number of elements.
+         * @param p_usage Vulkan usage flags for the buffer.
          * @param p_domain Memory domain used by the buffer.
          * @return *this.
          * @throws std::runtime_error If either dimension is zero or the total size overflows.
          */
-        Builder& build(size_t p_element_size,
+        Builder& set_properties(size_t p_element_size,
             size_t p_element_count,
+            VkBufferUsageFlags p_usage,
             DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief Configure storage for one element.
          *
          * @param p_element_size Element size in bytes.
+         * @param p_usage Vulkan usage flags for the buffer.
          * @param p_domain Memory domain used by the buffer.
          * @return *this.
          * @throws std::runtime_error If the element size is zero.
          */
-        Builder& build(size_t p_element_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+        Builder& set_properties(size_t p_element_size,
+            VkBufferUsageFlags p_usage,
+            DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief Configure the buffer and retain initial bytes for upload during creation.

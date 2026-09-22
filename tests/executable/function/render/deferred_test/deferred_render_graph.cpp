@@ -126,7 +126,11 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(BLOOM_EXTRACT_IMAGE_VIEW, bloom_extract_image_view)
         .add_resource(BLOOM_DOWNSAMPLED_IMAGE_VIEW, bloom_downsampled_image_view)
         .add_resource(BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
-        .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view);
+        .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view)
+        .add_resource(OCT_TREE_INFO, oct_tree_info)
+        .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
+        .add_resource(OCT_TREE_LEAVES_BUFFER, oct_tree_leaves)
+        .add_resource(OCT_TREE_DEFERRED_LIST, oct_tree_deferred_list);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {

@@ -176,15 +176,9 @@ private:
         std::string field_path;
     };
 
-    struct ComputeUniformBinding {
-        ROComputePipelineVK* pipeline = nullptr;
-        std::string field_path;
-    };
-
     void control(double p_delta);
     void update_descriptors();
     void write_task_uniform_bindings(std::span<const TaskUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container);
-    void write_compute_uniform_bindings(std::span<const ComputeUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container);
 
     void setup_render_context();
     void load_resources();
@@ -197,13 +191,14 @@ private:
     Ref<ROBufferVK> create_initialized_uniform_buffer(const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
-    RenderBindpointDeclarations build_direct_lighting_bindpoints(Ref<ROBufferVK> p_camera_buffer,
-        Ref<ROBufferVK> p_light_info_buffer,
+    RenderBindpointDeclarations build_direct_lighting_bindpoints(Ref<IRenderObjectContainer> p_camera_buffer_container,
+        Ref<IRenderObjectContainer> p_light_info_buffer_container,
         Ref<ROBufferVK> p_light_count_buffer,
         Ref<ROImageViewVK> p_shadow_moments_view,
         bool p_use_summed_area_table) const;
-    RenderBindpointDeclarations build_indirect_lighting_bindpoints(
-        Ref<ROBufferVK> p_camera_buffer, Ref<ROBufferVK> p_light_info_buffer, Ref<ROBufferVK> p_light_count_buffer) const;
+    RenderBindpointDeclarations build_indirect_lighting_bindpoints(Ref<IRenderObjectContainer> p_camera_buffer_container,
+        Ref<IRenderObjectContainer> p_light_info_buffer_container,
+        Ref<ROBufferVK> p_light_count_buffer) const;
     RenderBindpointDeclarations build_combine_lighting_bindpoints() const;
     RenderBindpointDeclarations build_bloom_extract_bindpoints() const;
     RenderBindpointDeclarations build_bloom_horizontal_bindpoints() const;
@@ -303,13 +298,16 @@ private:
     Ref<ROSamplerVK> bloom_sampler;
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
-    Ref<ROCMultislotsVK> spot_light_info_ubos;
+    Ref<ROCMultislotsVK> spot_light_info_buffers;
     Ref<ROBufferVK> light_billboard_ubo;
     Ref<ROSamplerVK> light_billboard_sampler;
+
+    Ref<ROBufferVK> oct_tree_info;
+    Ref<ROBufferVK> oct_tree_nodes;
+    Ref<ROBufferVK> oct_tree_leaves;
+    Ref<ROBufferVK> oct_tree_deferred_list;
     std::vector<TaskUniformBinding> gbuffer_camera_bindings;
     std::vector<TaskUniformBinding> shadow_light_bindings;
-    std::vector<ComputeUniformBinding> composition_camera_bindings;
-    std::vector<ComputeUniformBinding> spot_light_bindings;
     ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;

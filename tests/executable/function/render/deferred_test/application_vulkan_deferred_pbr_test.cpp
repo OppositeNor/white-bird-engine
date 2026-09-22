@@ -75,17 +75,23 @@ BillboardInfoVKUBO make_light_billboard_info(const ComponentSpotLight& p_spot_li
     };
 }
 
-Ref<ROCMultislotsVK> create_per_frame_uniform_buffers(
-    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
+SpotLightInfosVKUBO make_spot_light_infos_ubo(const ComponentSpotLight& p_spot_light_component) {
+    SpotLightInfosVKUBO result;
+    result.spot_light_info[0] = make_spot_light_info_ubo(p_spot_light_component);
+    result.spot_light_count = 1;
+    return result;
+}
+
+Ref<ROCMultislotsVK> create_per_frame_buffers(RenderAllocator* p_allocator,
+    const BaseRenderDataVK* p_render_data,
+    VkDeviceSize p_buffer_size,
+    VkBufferUsageFlags p_usage) {
     return make_ref<ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
-        ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
-            return ROBufferVK::Builder()
-                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .build(p_buffer_size)
-                .create_ref(p_render_data);
-        }});
+        [p_render_data, p_buffer_size, p_usage](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
+            return ROBufferVK::Builder().set_properties(p_buffer_size, p_usage).create_ref(p_render_data);
+        });
 }
 
 } // namespace
@@ -210,16 +216,17 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
-    SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    SpotLightInfosVKUBO spot_light_infos = make_spot_light_infos_ubo(spot_light_component);
     BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
-    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_info, light_billboard_info]() {
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_info]() {
         if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL ||
-            spot_light_info_ubos == MEM_NULL || light_billboard_ubo == MEM_NULL) {
-            throw std::runtime_error("Failed to update deferred descriptors: per-frame uniform buffers are not initialized.");
+            spot_light_info_buffers == MEM_NULL || light_billboard_ubo == MEM_NULL) {
+            throw std::runtime_error("Failed to update deferred descriptors: per-frame buffers are not initialized.");
         }
         gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
         composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
-        spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
+        spot_light_info_buffers->publish_buffer_update(
+            spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
         light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     });
 }
@@ -234,19 +241,6 @@ void ApplicationVulkanDeferredPBRTest::write_task_uniform_bindings(
             throw std::runtime_error("Failed to write deferred task uniform binding: task is null.");
         }
         binding.task->set_descriptor_binding(binding.field_path, p_buffer_container);
-    }
-}
-
-void ApplicationVulkanDeferredPBRTest::write_compute_uniform_bindings(
-    std::span<const ComputeUniformBinding> p_bindings, Ref<ROCMultislotsVK> p_buffer_container) {
-    if (p_buffer_container == MEM_NULL) {
-        throw std::runtime_error("Failed to write deferred compute uniform bindings: buffer container is null.");
-    }
-    for (const ComputeUniformBinding& binding : p_bindings) {
-        if (binding.pipeline == nullptr) {
-            throw std::runtime_error("Failed to write deferred compute uniform binding: pipeline is null.");
-        }
-        binding.pipeline->set_descriptor_binding(binding.field_path, p_buffer_container);
     }
 }
 
@@ -685,14 +679,15 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
     };
 }
 
-RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_direct_lighting_bindpoints(Ref<ROBufferVK> p_camera_buffer,
-    Ref<ROBufferVK> p_light_info_buffer,
+RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_direct_lighting_bindpoints(
+    Ref<IRenderObjectContainer> p_camera_buffer_container,
+    Ref<IRenderObjectContainer> p_light_info_buffer_container,
     Ref<ROBufferVK> p_light_count_buffer,
     Ref<ROImageViewVK> p_shadow_moments_view,
     bool p_use_summed_area_table) const {
     RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer)
-        .add_storage_buffer_decleration("light.lights[0].info", p_light_info_buffer)
+    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer_container)
+        .add_storage_buffer_decleration("light.light_infos", p_light_info_buffer_container)
         .add_image_decleration("light.lights[0].shadowmap", p_shadow_moments_view);
     if (p_use_summed_area_table) {
         bindpoints.add_image_decleration("light.lights[0].shadow_moments_summed_area_table", shadow_moments_summed_area_table_view);
@@ -711,10 +706,12 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_direct_light
 }
 
 RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_indirect_lighting_bindpoints(
-    Ref<ROBufferVK> p_camera_buffer, Ref<ROBufferVK> p_light_info_buffer, Ref<ROBufferVK> p_light_count_buffer) const {
+    Ref<IRenderObjectContainer> p_camera_buffer_container,
+    Ref<IRenderObjectContainer> p_light_info_buffer_container,
+    Ref<ROBufferVK> p_light_count_buffer) const {
     RenderBindpointDeclarationsBuilder bindpoints;
-    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer)
-        .add_storage_buffer_decleration("light.lights[0].info", p_light_info_buffer)
+    bindpoints.add_storage_buffer_decleration("camera_info", p_camera_buffer_container)
+        .add_storage_buffer_decleration("light.light_infos", p_light_info_buffer_container)
         .add_image_decleration("light.lights[0].shadowmap", shadow_moments_attachment_view)
         .add_image_decleration("light.lights[0].rsm_flux", shadow_color_view)
         .add_image_decleration("light.lights[0].rsm_octa_normal", shadow_normal_view)
@@ -771,30 +768,41 @@ RenderBindpointDeclarations ApplicationVulkanDeferredPBRTest::build_present_post
 }
 
 void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
-    CompositionCameraInfo camera_info = make_composition_camera_info();
-    SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    composition_camera_info_ubos = create_per_frame_buffers(
+        render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    spot_light_info_buffers = create_per_frame_buffers(render_allocator,
+        base_render_data,
+        sizeof(SpotLightInfoVKUBO) * MAX_SPOT_LIGHT_INFO_COUNT,
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     uint32_t spot_light_count = 1;
-    Ref<ROBufferVK> camera_buffer = create_initialized_uniform_buffer(&camera_info, sizeof(camera_info));
-    Ref<ROBufferVK> light_info_buffer = create_initialized_uniform_buffer(&spot_light_info, sizeof(spot_light_info));
     Ref<ROBufferVK> light_count_buffer = create_initialized_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context)
                                .compile("direct_lighting_shader",
                                    direct_lighting_shader_resource,
                                    build_direct_lighting_bindpoints(
-                                       camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_sampled_view, false));
+                                       composition_camera_info_ubos,
+                                       spot_light_info_buffers,
+                                       light_count_buffer,
+                                       shadow_moments_sampled_view,
+                                       false));
     direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
     auto direct_summed_area_table_compiled =
         ComputePipelineCompilerVK(compute_context)
             .compile("direct_lighting_summed_area_table_shader",
                 direct_lighting_summed_area_table_shader_resource,
                 build_direct_lighting_bindpoints(
-                    camera_buffer, light_info_buffer, light_count_buffer, shadow_moments_attachment_view, true));
+                    composition_camera_info_ubos,
+                    spot_light_info_buffers,
+                    light_count_buffer,
+                    shadow_moments_attachment_view,
+                    true));
     direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
     auto indirect_compiled = ComputePipelineCompilerVK(compute_context)
                                  .compile("indirect_lighting_rsm_shader",
                                      indirect_lighting_rsm_shader_resource,
-                                     build_indirect_lighting_bindpoints(camera_buffer, light_info_buffer, light_count_buffer));
+                                     build_indirect_lighting_bindpoints(
+                                         composition_camera_info_ubos, spot_light_info_buffers, light_count_buffer));
     indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
     auto combine_compiled =
         ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource, build_combine_lighting_bindpoints());
@@ -818,7 +826,8 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
     if (p_gbuffer_tasks.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled pipelines are unavailable.");
     }
-    gbuffer_camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CameraInfoVKUBO));
+    gbuffer_camera_info_ubos = create_per_frame_buffers(
+        render_allocator, base_render_data, sizeof(CameraInfoVKUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
     gbuffer_camera_bindings.clear();
     gbuffer_camera_bindings.reserve(p_gbuffer_tasks.size());
@@ -829,21 +838,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
         gbuffer_camera_bindings.push_back(TaskUniformBinding{.task = gbuffer_task, .field_path = "camera_info"});
     }
 
-    composition_camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CompositionCameraInfo));
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
-    composition_camera_bindings.clear();
-    composition_camera_bindings.push_back(ComputeUniformBinding{
-        .pipeline = direct_lighting_compute_pipeline.get(),
-        .field_path = "camera_info",
-    });
-    composition_camera_bindings.push_back(ComputeUniformBinding{
-        .pipeline = direct_lighting_summed_area_table_compute_pipeline.get(),
-        .field_path = "camera_info",
-    });
-    composition_camera_bindings.push_back(ComputeUniformBinding{
-        .pipeline = indirect_lighting_compute_pipeline.get(),
-        .field_path = "camera_info",
-    });
 
     gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
     composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
@@ -851,15 +846,13 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors(std::spa
     log_uniform_buffer_descriptors(composition_camera_info_ubos, "Composition camera buffer");
 
     write_task_uniform_bindings(gbuffer_camera_bindings, gbuffer_camera_info_ubos);
-    write_compute_uniform_bindings(composition_camera_bindings, composition_camera_info_ubos);
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span<RTRunStaticSetVK* const> p_shadow_tasks) {
     if (p_shadow_tasks.empty()) {
         throw std::runtime_error("Failed to setup deferred test: compiled light pipelines are unavailable.");
     }
-    spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoVKUBO));
-    SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    SpotLightInfosVKUBO spot_light_infos = make_spot_light_infos_ubo(spot_light_component);
     shadow_light_bindings.clear();
 
     for (RTRunStaticSetVK* shadow_task : p_shadow_tasks) {
@@ -869,25 +862,11 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors(std::span
         shadow_light_bindings.push_back(TaskUniformBinding{.task = shadow_task, .field_path = "light_camera_info"});
     }
 
-    spot_light_bindings.clear();
-    spot_light_bindings.push_back(ComputeUniformBinding{
-        .pipeline = direct_lighting_compute_pipeline.get(),
-        .field_path = "light.lights[0].info",
-    });
-    spot_light_bindings.push_back(ComputeUniformBinding{
-        .pipeline = direct_lighting_summed_area_table_compute_pipeline.get(),
-        .field_path = "light.lights[0].info",
-    });
-    spot_light_bindings.push_back(ComputeUniformBinding{
-        .pipeline = indirect_lighting_compute_pipeline.get(),
-        .field_path = "light.lights[0].info",
-    });
+    spot_light_info_buffers->publish_buffer_update(
+        spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
+    log_uniform_buffer_descriptors(spot_light_info_buffers, "Spot light buffer");
 
-    spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
-    log_uniform_buffer_descriptors(spot_light_info_ubos, "Spot light buffer");
-
-    write_task_uniform_bindings(shadow_light_bindings, spot_light_info_ubos);
-    write_compute_uniform_bindings(spot_light_bindings, spot_light_info_ubos);
+    write_task_uniform_bindings(shadow_light_bindings, spot_light_info_buffers);
 }
 
 } // namespace WhiteBirdEngine

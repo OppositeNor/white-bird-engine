@@ -69,8 +69,6 @@ struct CompositionCamera {
 };
 
 struct LightParamDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer")]
-    uint2 info;
     [WBE_DESCRIPTOR("sampled_image")]
     uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
@@ -88,10 +86,17 @@ struct LightParamDescriptorIndices {
 };
 
 struct LightParamsDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer")]
+    uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
     [WBE_DESCRIPTOR("uniform_buffer")]
     uint2 light_count;
 };
+
+SpotLightInfo get_spot_light_info(LightParamsDescriptorIndices p_light, uint p_spot_light_index) {
+    StructuredBuffer<SpotLightInfo> light_infos = ResourceDescriptorHeap[p_light.light_infos.x];
+    return light_infos[p_spot_light_index];
+}
 
 VSOutput build_fullscreen_triangle(uint p_vertex_id) {
     VSOutput output;
@@ -229,7 +234,7 @@ float2 random_rsm_disk_offset(float2 p_receiver_uv, uint p_spot_light_index, uin
 }
 
 float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_light_index, float2 p_receiver_uv, float3 p_world_position, float3 p_normal) {
-    ConstantBuffer<SpotLightInfo> spot_light_info = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    SpotLightInfo spot_light_info = get_spot_light_info(p_light, p_spot_light_index);
     Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     Texture2D<float4> rsm_flux = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_flux.x];
     Texture2D<float2> rsm_octa_normal = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_octa_normal.x];
@@ -292,7 +297,7 @@ float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_li
 float compute_spot_shadow_pcf(LightParamsDescriptorIndices p_light,
     uint p_spot_light_index,
     float3 p_world_position) {
-    ConstantBuffer<SpotLightInfo> spot_light_info = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    SpotLightInfo spot_light_info = get_spot_light_info(p_light, p_spot_light_index);
     Texture2D<float> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     SamplerState shadowmap_sampler = SamplerDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap_sampler.x];
     float4 light_view_position = software_mul_float4x4_vector(
@@ -327,7 +332,7 @@ float compute_spot_shadow(LightParamsDescriptorIndices p_light,
 #if WBE_SPOT_SHADOW_IMPLEMENTATION == WBE_SPOT_SHADOW_IMPLEMENTATION_PCF
     return compute_spot_shadow_pcf(p_light, p_spot_light_index, p_world_position);
 #else
-    ConstantBuffer<SpotLightInfo> spot_light_info = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].info.x];
+    SpotLightInfo spot_light_info = get_spot_light_info(p_light, p_spot_light_index);
     Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     float4 light_view_position = software_mul_float4x4_vector(
         WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view), float4(p_world_position, 1.0));

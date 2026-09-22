@@ -23,31 +23,34 @@
 
 namespace WhiteBirdEngine {
 
-TEST(WBEROBufferVKBuilderTest, BuildConfiguresSingleElementWithDefaultDomain) {
+TEST(WBEROBufferVKBuilderTest, SetPropertiesConfiguresSingleElementWithDefaultDomain) {
     ROBufferVK::Builder builder;
 
-    ROBufferVK::Builder& result = builder.build(64);
+    ROBufferVK::Builder& result = builder.set_properties(64, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     EXPECT_EQ(&result, &builder);
     EXPECT_EQ(builder.size, 64);
+    EXPECT_EQ(WBE_REQUIRED(builder.usage), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     EXPECT_EQ(WBE_REQUIRED(builder.domain), DeviceDomain::HOST_DEVICE);
 }
 
-TEST(WBEROBufferVKBuilderTest, BuildConfiguresElementArrayAndExplicitDomain) {
+TEST(WBEROBufferVKBuilderTest, SetPropertiesConfiguresElementArrayAndExplicitDomain) {
     ROBufferVK::Builder builder;
 
-    builder.build(16, 8, DeviceDomain::DEVICE);
+    builder.set_properties(16, 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, DeviceDomain::DEVICE);
 
     EXPECT_EQ(builder.size, 128);
+    EXPECT_EQ(WBE_REQUIRED(builder.usage), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     EXPECT_EQ(WBE_REQUIRED(builder.domain), DeviceDomain::DEVICE);
 }
 
-TEST(WBEROBufferVKBuilderTest, BuildRejectsInvalidSizes) {
+TEST(WBEROBufferVKBuilderTest, SetPropertiesRejectsInvalidSizes) {
     ROBufferVK::Builder builder;
 
-    EXPECT_THROW(builder.build(0), std::runtime_error);
-    EXPECT_THROW(builder.build(1, 0), std::runtime_error);
-    EXPECT_THROW(builder.build(std::numeric_limits<size_t>::max(), 2), std::runtime_error);
+    EXPECT_THROW(builder.set_properties(0, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
+    EXPECT_THROW(builder.set_properties(1, 0, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
+    EXPECT_THROW(
+        builder.set_properties(std::numeric_limits<size_t>::max(), 2, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
 }
 
 TEST(WBEROBufferVKBuilderTest, InitialDataOwnsSourceBytes) {

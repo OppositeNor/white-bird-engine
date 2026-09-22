@@ -132,8 +132,7 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
         p_render_data->frames_in_flight,
         WBE::ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
             return WBE::ROBufferVK::Builder()
-                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                .build(p_buffer_size)
+                .set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                 .create_ref(p_render_data);
         }});
 }

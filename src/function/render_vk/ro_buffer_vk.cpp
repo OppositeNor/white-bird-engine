@@ -37,25 +37,31 @@
 
 namespace WhiteBirdEngine {
 
-ROBufferVK::Builder& ROBufferVK::Builder::build(
-    size_t p_element_size, size_t p_element_count, DeviceDomain p_domain) {
+ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
+    size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
     if (p_element_size == 0 || p_element_count == 0) {
-        throw std::runtime_error("Failed to build buffer configuration: element size and count must be non-zero.");
+        throw std::runtime_error("Failed to set buffer properties: element size and count must be non-zero.");
     }
     if (p_element_count > std::numeric_limits<size_t>::max() / p_element_size) {
-        throw std::runtime_error("Failed to build buffer configuration: buffer size overflows size_t.");
+        throw std::runtime_error("Failed to set buffer properties: buffer size overflows size_t.");
     }
     size = p_element_size * p_element_count;
+    usage = p_usage;
     domain = p_domain;
     return *this;
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::build(size_t p_element_size, DeviceDomain p_domain) {
-    return build(p_element_size, 1, p_domain);
+ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
+    size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
+    return set_properties(p_element_size, 1, p_usage, p_domain);
 }
 
 ROBufferVK::Builder& ROBufferVK::Builder::initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain) {
-    build(sizeof(uint8_t), p_data.size(), p_domain);
+    if (p_data.empty()) {
+        throw std::runtime_error("Failed to configure initial buffer data: data is empty.");
+    }
+    size = p_data.size();
+    domain = p_domain;
     initial_data_bytes.assign(p_data.begin(), p_data.end());
     if (p_domain == DeviceDomain::DEVICE) {
         add_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT);
@@ -90,7 +96,9 @@ TypeID ROBufferVK::get_type_uuid() const {
     return TypeUUID<ROBufferVK>::UUID;
 }
 
-static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_domain) {
+namespace {
+
+VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_domain) {
     VmaAllocationCreateInfo result{};
     switch (p_domain) {
     case DeviceDomain::HOST:
@@ -111,12 +119,10 @@ static VmaAllocationCreateInfo buffer_allocation_create_info(DeviceDomain p_doma
     return result;
 }
 
-static VkDeviceAddressRangeEXT get_buffer_address_range(const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
+VkDeviceAddressRangeEXT get_buffer_address_range(const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
     VkBufferDeviceAddressInfo address_info{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = p_buffer};
     return VkDeviceAddressRangeEXT{.address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info), .size = p_size};
 }
-
-namespace {
 
 void write_buffer_descriptor(
     const BaseRenderDataVK* p_render_data, uint32_t p_index, VkDescriptorType p_type, VkBuffer p_buffer, VkDeviceSize p_size) {
@@ -129,89 +135,136 @@ void write_buffer_descriptor(
     p_render_data->descriptor_heap_allocator->write_resource_descriptor(arena.heap_id, arena.arena_id, p_index, descriptor);
 }
 
-} // namespace
-
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
-    if (p_builder.uniform_view_index.has_value() && p_builder.storage_view_index.has_value() &&
-        p_builder.uniform_view_index == p_builder.storage_view_index) {
-        throw std::runtime_error("Failed to create buffer: uniform and storage descriptors cannot adopt the same heap index.");
-    }
-    VkBufferCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = p_builder.size;
-    usage = WBE_REQUIRED(p_builder.usage);
+VkBufferUsageFlags get_buffer_usage(const ROBufferVK::Builder& p_builder) {
+    VkBufferUsageFlags usage = WBE_REQUIRED(p_builder.usage);
     if (!p_builder.initial_data_bytes.empty() && WBE_REQUIRED(p_builder.domain) == DeviceDomain::DEVICE) {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
     if ((usage & (VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) != 0) {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
-    create_info.usage = usage;
-    std::vector<uint32_t> initial_queues;
+    return usage;
+}
+
+std::vector<uint32_t> get_initial_queue_families(
+    const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder) {
     if (p_builder.queue_family_indices.empty()) {
-        initial_queues =
-            std::vector<uint32_t>(p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end());
-    } else {
-        initial_queues = std::vector<uint32_t>(p_builder.queue_family_indices.begin(), p_builder.queue_family_indices.end());
+        return {p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end()};
     }
-    if (initial_queues.size() > 1) {
-        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.pQueueFamilyIndices = initial_queues.data();
-        create_info.queueFamilyIndexCount = static_cast<uint32_t>(initial_queues.size());
-    } else {
-        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    return {p_builder.queue_family_indices.begin(), p_builder.queue_family_indices.end()};
+}
+
+void validate_distinct_descriptor_indices(const ROBufferVK::Builder& p_builder) {
+    if (p_builder.uniform_view_index.has_value() && p_builder.storage_view_index.has_value() &&
+        p_builder.uniform_view_index == p_builder.storage_view_index) {
+        throw std::runtime_error("Failed to create buffer: uniform and storage descriptors cannot adopt the same heap index.");
     }
-    exposed_fields.buffer_size = p_builder.size;
-    exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
+}
+
+void validate_adopted_descriptor_indices(
+    const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder, VkBufferUsageFlags p_usage) {
     if (p_builder.uniform_view_index.has_value()) {
-        if ((usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) == 0) {
+        if ((p_usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) == 0) {
             throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: buffer does not have uniform-buffer usage.");
         }
-        if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_descriptor(
-                render_data->buffer_descriptor_arena.heap_id, render_data->buffer_descriptor_arena.arena_id, *p_builder.uniform_view_index)) {
+        if (p_render_data->descriptor_heap_allocator == nullptr ||
+            !p_render_data->descriptor_heap_allocator->owns_descriptor(p_render_data->buffer_descriptor_arena.heap_id,
+                p_render_data->buffer_descriptor_arena.arena_id,
+                *p_builder.uniform_view_index)) {
             throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: the index is not allocated by the buffer arena.");
         }
     }
     if (p_builder.storage_view_index.has_value()) {
-        if ((usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) == 0) {
+        if ((p_usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) == 0) {
             throw std::runtime_error("Failed to adopt storage-buffer descriptor index: buffer does not have storage-buffer usage.");
         }
-        if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_descriptor(
-                render_data->buffer_descriptor_arena.heap_id, render_data->buffer_descriptor_arena.arena_id, *p_builder.storage_view_index)) {
+        if (p_render_data->descriptor_heap_allocator == nullptr ||
+            !p_render_data->descriptor_heap_allocator->owns_descriptor(p_render_data->buffer_descriptor_arena.heap_id,
+                p_render_data->buffer_descriptor_arena.arena_id,
+                *p_builder.storage_view_index)) {
             throw std::runtime_error("Failed to adopt storage-buffer descriptor index: the index is not allocated by the buffer arena.");
         }
     }
-    VmaAllocationCreateInfo allocation_create_info = buffer_allocation_create_info(exposed_fields.domain);
+}
+
+VmaAllocationInfo create_buffer(const BaseRenderDataVK* p_render_data,
+    const ROBufferVK::Builder& p_builder,
+    VkBufferUsageFlags p_usage,
+    const std::vector<uint32_t>& p_initial_queues,
+    VkBuffer& p_buffer,
+    VmaAllocation& p_allocation) {
+    VkBufferCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size = p_builder.size;
+    create_info.usage = p_usage;
+    if (p_initial_queues.size() > 1) {
+        create_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.pQueueFamilyIndices = p_initial_queues.data();
+        create_info.queueFamilyIndexCount = static_cast<uint32_t>(p_initial_queues.size());
+    } else {
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    VmaAllocationCreateInfo allocation_create_info = buffer_allocation_create_info(WBE_REQUIRED(p_builder.domain));
     VmaAllocationInfo allocation_info{};
     VkResult result =
-        vmaCreateBuffer(render_data->vma_allocator, &create_info, &allocation_create_info, &buffer, &allocation, &allocation_info);
+        vmaCreateBuffer(p_render_data->vma_allocator, &create_info, &allocation_create_info, &p_buffer, &p_allocation, &allocation_info);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan buffer: {}.", string_VkResult(result)));
     }
-    mapped_memory = allocation_info.pMappedData;
+    return allocation_info;
+}
+
+void adopt_buffer_descriptors(const BaseRenderDataVK* p_render_data,
+    const ROBufferVK::Builder& p_builder,
+    VkBuffer p_buffer,
+    VkDeviceSize p_buffer_size,
+    std::optional<uint32_t>& p_uniform_view_index,
+    std::optional<uint32_t>& p_storage_view_index) {
     if (p_builder.uniform_view_index.has_value()) {
-        uniform_view_index = p_builder.uniform_view_index;
-        write_buffer_descriptor(render_data, *uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buffer, exposed_fields.buffer_size);
+        p_uniform_view_index = p_builder.uniform_view_index;
+        write_buffer_descriptor(
+            p_render_data, *p_uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, p_buffer, p_buffer_size);
     }
     if (p_builder.storage_view_index.has_value()) {
-        storage_view_index = p_builder.storage_view_index;
-        write_buffer_descriptor(render_data, *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer, exposed_fields.buffer_size);
+        p_storage_view_index = p_builder.storage_view_index;
+        write_buffer_descriptor(
+            p_render_data, *p_storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, p_buffer, p_buffer_size);
     }
-    if (!p_builder.initial_data_bytes.empty()) {
-        if (exposed_fields.domain == DeviceDomain::DEVICE) {
-            Ref<ROStagingBufferVK> staging_buffer = ROStagingBufferVK::Builder()
-                                                        .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
-                                                        .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                                                        .create_ref(p_render_data);
-            void* staging_data = staging_buffer->allocate(p_builder.initial_data_bytes.size());
-            std::memcpy(staging_data, p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
-            update_buffer(staging_buffer, staging_data, p_builder.initial_data_bytes.size());
-        } else {
-            update_buffer(p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
-        }
+}
+
+void upload_initial_data(
+    ROBufferVK* p_buffer, const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder, DeviceDomain p_domain) {
+    if (p_builder.initial_data_bytes.empty()) {
+        return;
     }
+    if (p_domain == DeviceDomain::DEVICE) {
+        Ref<ROStagingBufferVK> staging_buffer = ROStagingBufferVK::Builder()
+                                                    .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
+                                                    .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                                                    .create_ref(p_render_data);
+        void* staging_data = staging_buffer->allocate(p_builder.initial_data_bytes.size());
+        std::memcpy(staging_data, p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
+        p_buffer->update_buffer(staging_buffer, staging_data, p_builder.initial_data_bytes.size());
+        return;
+    }
+    p_buffer->update_buffer(p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
+}
+
+} // namespace
+
+ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
+    validate_distinct_descriptor_indices(p_builder);
+    usage = get_buffer_usage(p_builder);
+    validate_adopted_descriptor_indices(render_data, p_builder, usage);
+    std::vector<uint32_t> initial_queues = get_initial_queue_families(render_data, p_builder);
+    exposed_fields.buffer_size = p_builder.size;
+    exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
+    VmaAllocationInfo allocation_info = create_buffer(render_data, p_builder, usage, initial_queues, buffer, allocation);
+    mapped_memory = allocation_info.pMappedData;
+    adopt_buffer_descriptors(
+        render_data, p_builder, buffer, exposed_fields.buffer_size, uniform_view_index, storage_view_index);
+    upload_initial_data(this, render_data, p_builder, exposed_fields.domain);
 }
 
 ROBufferVK::~ROBufferVK() {

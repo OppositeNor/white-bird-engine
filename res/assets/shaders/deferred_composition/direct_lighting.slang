@@ -71,8 +71,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 direct_lighting = float3(0.0);
     uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        ConstantBuffer<SpotLightInfo> spot_light_info =
-            ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
+        SpotLightInfo spot_light_info = get_spot_light_info(descriptor_indices.light, spot_light_index);
         float3 to_light = spot_light_info.position - world_pos;
         float light_distance = length(to_light);
         float3 light_direction = to_light / max(light_distance, 0.0001);
