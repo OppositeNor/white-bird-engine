@@ -45,7 +45,6 @@
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
-#include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/defs.hh"
@@ -101,6 +100,7 @@ std::string get_physical_device_name(VkPhysicalDevice p_device) {
 template <typename EnumerateFunction>
 ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char* const> p_extensions,
     std::span<const char* const> p_enabled_layers,
+    std::string_view p_enumerate_function_name,
     const EnumerateFunction& p_enumerate_extensions) {
     ExtensionSupportQueryResult result;
     std::set<std::string> unsupported_extensions(p_extensions.begin(), p_extensions.end());
@@ -113,8 +113,9 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
                 result.success = false;
                 result.error_message =
                     p_layer_name == nullptr
-                        ? std::format("vkEnumerateDeviceExtensionProperties failed: {}", string_VkResult(enumerate_result))
-                        : std::format("vkEnumerateDeviceExtensionProperties failed for layer '{}': {}",
+                        ? std::format("{} failed: {}", p_enumerate_function_name, string_VkResult(enumerate_result))
+                        : std::format("{} failed for layer '{}': {}",
+                              p_enumerate_function_name,
                               p_layer_name,
                               string_VkResult(enumerate_result));
                 return false;
@@ -125,8 +126,9 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
                 result.success = false;
                 result.error_message =
                     p_layer_name == nullptr
-                        ? std::format("vkEnumerateDeviceExtensionProperties failed: {}", string_VkResult(enumerate_result))
-                        : std::format("vkEnumerateDeviceExtensionProperties failed for layer '{}': {}",
+                        ? std::format("{} failed: {}", p_enumerate_function_name, string_VkResult(enumerate_result))
+                        : std::format("{} failed for layer '{}': {}",
+                              p_enumerate_function_name,
                               p_layer_name,
                               string_VkResult(enumerate_result));
                 return false;
@@ -399,7 +401,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.frames_in_flight = frames_in_flight;
 }
 
-void RendererVK::create_instance() {
+void RendererVK::create_instance() { // NOLINT
     // Get configuration informations.
     const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
@@ -435,18 +437,26 @@ void RendererVK::create_instance() {
             required_extensions.push_back(required_extension);
         }
     }
-    if (!RenderPluginVK::check_extension_support(required_extensions,
-            enabled_layers,
-            [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
-                return vkEnumerateInstanceExtensionProperties(p_layer_name, p_extension_count, p_extension_properties);
-            })) {
-        throw std::runtime_error("Required Vulkan instance extensions are not supported.");
-    }
     create_info.enabledExtensionCount = required_extensions.size();
     create_info.ppEnabledExtensionNames = required_extensions.data();
 
     for (auto& plugin : registered_plugins) {
         plugin->on_before_instance_creation(&create_info);
+    }
+
+    ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(
+        std::span<const char* const>(create_info.ppEnabledExtensionNames, create_info.enabledExtensionCount),
+        std::span<const char* const>(create_info.ppEnabledLayerNames, create_info.enabledLayerCount),
+        "vkEnumerateInstanceExtensionProperties",
+        [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+            return vkEnumerateInstanceExtensionProperties(p_layer_name, p_extension_count, p_extension_properties);
+        });
+    if (!extension_support.success) {
+        throw std::runtime_error(std::format("Unable to query Vulkan instance extension support: {}.", extension_support.error_message));
+    }
+    if (!extension_support.unsupported_extensions.empty()) {
+        throw std::runtime_error(std::format(
+            "Required Vulkan instance extensions are not supported: {}.", join_string_list(extension_support.unsupported_extensions)));
     }
 
     // Create instance.
@@ -891,6 +901,22 @@ void RendererVK::create_logical_device() { // NOLINT
         plugin->on_before_device_creation(physical_device, &create_info, &device_features);
     }
 
+    ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(
+        std::span<const char* const>(create_info.ppEnabledExtensionNames, create_info.enabledExtensionCount),
+        enabled_layers,
+        "vkEnumerateDeviceExtensionProperties",
+        [this](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+            return vkEnumerateDeviceExtensionProperties(
+                physical_device, p_layer_name, p_extension_count, p_extension_properties);
+        });
+    if (!extension_support.success) {
+        throw std::runtime_error(std::format("Unable to query Vulkan device extension support: {}.", extension_support.error_message));
+    }
+    if (!extension_support.unsupported_extensions.empty()) {
+        throw std::runtime_error(std::format(
+            "Required Vulkan device extensions are not supported: {}.", join_string_list(extension_support.unsupported_extensions)));
+    }
+
     // Create logical device.
     auto result = vkCreateDevice(physical_device, &create_info, get_allocation_callbacks(), &logical_device);
     if (result != VK_SUCCESS) {
@@ -971,6 +997,7 @@ std::vector<std::string> RendererVK::collect_device_unsuitability_reasons(VkPhys
 
     ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(enabled_device_extensions,
         enabled_layers,
+        "vkEnumerateDeviceExtensionProperties",
         [p_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
             return vkEnumerateDeviceExtensionProperties(p_device, p_layer_name, p_extension_count, p_extension_properties);
         });
