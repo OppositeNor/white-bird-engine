@@ -380,6 +380,7 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
     EXPECT_EQ(static_set->type.kind, "struct");
 
     const std::array<std::string_view, 3> expected_names{"submeshes", "nodes", "instances"};
+    const std::array<std::string_view, 3> expected_resource_ids{"static_set_submeshes", "static_set_nodes", "static_set_instances"};
     ASSERT_EQ(static_set->fields.size(), expected_names.size());
     for (size_t i = 0; i < expected_names.size(); ++i) {
         const ShaderMetadataTypeField& field = static_set->fields[i];
@@ -393,7 +394,7 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
         EXPECT_EQ(field.user_attributes[0].name, "WBE_DESCRIPTOR");
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 2U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
-        EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_names[i]);
+        EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_resource_ids[i]);
     }
 }
 

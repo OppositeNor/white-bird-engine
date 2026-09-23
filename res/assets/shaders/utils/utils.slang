@@ -211,11 +211,11 @@ struct StaticSetContractMetadata {
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
  */
 struct StaticSetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "submeshes")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_submeshes")]
     uint2 submeshes;
-    [WBE_DESCRIPTOR("storage_buffer", "nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_nodes")]
     uint2 nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "instances")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_instances")]
     uint2 instances;
 };
 

@@ -38,9 +38,9 @@ inline constexpr std::string_view REND_RES_STATIC_SET_VERTICES = "static_set_ver
 inline constexpr std::string_view REND_RES_STATIC_SET_INDICES = "static_set_indices";
 inline constexpr std::string_view REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES = "static_set_opaque_draw_batches";
 inline constexpr std::string_view REND_RES_STATIC_SET_MASKED_DRAW_BATCHES = "static_set_masked_draw_batches";
-inline constexpr std::string_view REND_RES_STATIC_SET_SUBMESHES = "submeshes";
-inline constexpr std::string_view REND_RES_STATIC_SET_NODES = "nodes";
-inline constexpr std::string_view REND_RES_STATIC_SET_INSTANCES = "instances";
+inline constexpr std::string_view REND_RES_STATIC_SET_SUBMESHES = "static_set_submeshes";
+inline constexpr std::string_view REND_RES_STATIC_SET_NODES = "static_set_nodes";
+inline constexpr std::string_view REND_RES_STATIC_SET_INSTANCES = "static_set_instances";
 inline constexpr std::string_view REND_RES_STATIC_SET_MATERIAL_SAMPLER = "material_sampler";
 inline constexpr std::string_view REND_RES_STATIC_SET_TEXTURES = "static_set_textures";
 

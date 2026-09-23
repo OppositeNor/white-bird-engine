@@ -15,7 +15,6 @@
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
-#include "core/core_utils.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -125,6 +124,36 @@ struct StaticSetStorageBuffers {
     Ref<ROBufferVK> instance_buffer = MEM_NULL;
 };
 
+struct StaticSetResourceInputs {
+    bool has_opaque_draws = false;
+    bool has_masked_draws = false;
+};
+
+struct StaticSetGeometryBuffers {
+    StaticSetGeometryBuffers() = default;
+    ~StaticSetGeometryBuffers() = default;
+    StaticSetGeometryBuffers(const StaticSetGeometryBuffers&) = delete;
+    StaticSetGeometryBuffers(StaticSetGeometryBuffers&&) noexcept = default;
+    StaticSetGeometryBuffers& operator=(const StaticSetGeometryBuffers&) = delete;
+    StaticSetGeometryBuffers& operator=(StaticSetGeometryBuffers&&) noexcept = default;
+
+    Ref<ROBufferVK> vertex_buffer = MEM_NULL;
+    Ref<ROBufferVK> index_buffer = MEM_NULL;
+};
+
+struct StaticSetDrawBuild {
+    explicit StaticSetDrawBuild(RenderAllocator* p_allocator) : batches(p_allocator) {
+    }
+    ~StaticSetDrawBuild() = default;
+    StaticSetDrawBuild(const StaticSetDrawBuild&) = delete;
+    StaticSetDrawBuild(StaticSetDrawBuild&&) noexcept = default;
+    StaticSetDrawBuild& operator=(const StaticSetDrawBuild&) = delete;
+    StaticSetDrawBuild& operator=(StaticSetDrawBuild&&) noexcept = default;
+
+    Ref<ROBufferVK> draw_buffer = MEM_NULL;
+    Vector<StaticSetRenderResourcesVK::DrawBatch, RenderAllocator> batches;
+};
+
 struct IndirectDrawPlanData {
     explicit IndirectDrawPlanData(RenderAllocator* p_allocator) : draw_plan(p_allocator), pipeline_batches(p_allocator) {
     }
@@ -166,18 +195,16 @@ Ref<ROBufferVK> build_indirect_buffer(const BaseRenderDataVK* p_render_data, std
 }
 
 template <typename TValue>
-Ref<ROBufferVK> build_storage_buffer(
-    const BaseRenderDataVK* p_render_data, const std::vector<TValue>& p_values, std::optional<uint32_t> p_descriptor_index) {
+Ref<ROBufferVK> build_storage_buffer(const BaseRenderDataVK* p_render_data, const std::vector<TValue>& p_values) {
     if (p_values.empty()) {
         return MEM_NULL;
     }
     const size_t buffer_size = p_values.size() * sizeof(TValue);
-    ROBufferVK::Builder builder;
-    builder.set_domain(DeviceDomain::HOST_DEVICE).set_size(buffer_size).set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    if (p_descriptor_index.has_value()) {
-        builder.set_storage_view_index(*p_descriptor_index);
-    }
-    Ref<ROBufferVK> result = builder.create_ref(p_render_data);
+    Ref<ROBufferVK> result = ROBufferVK::Builder()
+                                 .set_domain(DeviceDomain::HOST_DEVICE)
+                                 .set_size(buffer_size)
+                                 .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                                 .create_ref(p_render_data);
     result->update_buffer(p_values.data(), buffer_size);
     return result;
 }
@@ -301,35 +328,13 @@ StaticSetBufferCompilerVK::BuildResult build_geometry_buffers(const BaseRenderDa
     return StaticSetBufferCompilerVK(p_render_data).build(p_set, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
-std::optional<uint32_t> allocate_storage_descriptor_range(
-    const BaseRenderDataVK* p_render_data, const StaticInstanceBufferData& p_instance_data) {
-    uint32_t storage_descriptor_count = static_cast<uint32_t>(!p_instance_data.submeshes.empty()) +
-                                        static_cast<uint32_t>(!p_instance_data.nodes.empty()) +
-                                        static_cast<uint32_t>(!p_instance_data.instances.empty());
-    if (storage_descriptor_count == 0) {
-        return std::nullopt;
-    }
-    const DescriptorArenaLocationVK arena = p_render_data->buffer_descriptor_arena;
-    return p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id, storage_descriptor_count);
-}
-
 StaticSetStorageBuffers build_static_set_storage_buffers_from_data(
     const BaseRenderDataVK* p_render_data, StaticInstanceBufferData p_instance_data) {
     StaticSetStorageBuffers result;
     result.instance_data = std::move(p_instance_data);
-    std::optional<uint32_t> next_storage_descriptor_index = allocate_storage_descriptor_range(p_render_data, result.instance_data);
-    auto take_storage_descriptor_index = [&next_storage_descriptor_index](bool p_has_buffer) -> std::optional<uint32_t> {
-        if (!p_has_buffer || !next_storage_descriptor_index.has_value()) {
-            return std::nullopt;
-        }
-        return (*next_storage_descriptor_index)++;
-    };
-    result.submesh_buffer = build_storage_buffer(
-        p_render_data, result.instance_data.submeshes, take_storage_descriptor_index(!result.instance_data.submeshes.empty()));
-    result.node_buffer = build_storage_buffer(
-        p_render_data, result.instance_data.nodes, take_storage_descriptor_index(!result.instance_data.nodes.empty()));
-    result.instance_buffer = build_storage_buffer(
-        p_render_data, result.instance_data.instances, take_storage_descriptor_index(!result.instance_data.instances.empty()));
+    result.submesh_buffer = build_storage_buffer(p_render_data, result.instance_data.submeshes);
+    result.node_buffer = build_storage_buffer(p_render_data, result.instance_data.nodes);
+    result.instance_buffer = build_storage_buffer(p_render_data, result.instance_data.instances);
     return result;
 }
 
@@ -607,6 +612,84 @@ NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
     return result;
 }
 
+StaticSetResourceInputs validate_static_set_resource_inputs(RendererVK* p_renderer,
+    RefRes<RUStaticOpaqueSet> p_opaque_set,
+    RefRes<RUStaticMaskedSet> p_masked_set,
+    const ShaderMetadata& p_opaque_vertex_metadata,
+    const ShaderMetadata& p_masked_vertex_metadata) {
+    if (p_renderer == nullptr || p_renderer->get_base_render_data() == nullptr || p_renderer->get_base_render_data()->allocator == nullptr) {
+        throw std::runtime_error("Failed to compile static-set resources: renderer state is missing.");
+    }
+    StaticSetResourceInputs result{
+        .has_opaque_draws = p_opaque_set != MEM_NULL && !is_empty_set(*p_opaque_set),
+        .has_masked_draws = p_masked_set != MEM_NULL && !is_empty_set(*p_masked_set),
+    };
+    if (!result.has_opaque_draws && !result.has_masked_draws) {
+        throw std::runtime_error("Failed to compile static-set resources: no drawable opaque or masked set was supplied.");
+    }
+    if (result.has_opaque_draws) {
+        validate_submesh_materials(p_opaque_set);
+        validate_static_set_node_layout(p_opaque_vertex_metadata);
+    }
+    if (result.has_masked_draws) {
+        validate_submesh_materials(p_masked_set);
+        validate_static_set_node_layout(p_masked_vertex_metadata);
+    }
+    return result;
+}
+
+StaticSetGeometryBuffers build_shared_static_set_geometry_buffers(const BaseRenderDataVK* p_render_data,
+    RefRes<RUStaticOpaqueSet> p_opaque_set,
+    RefRes<RUStaticMaskedSet> p_masked_set,
+    const StaticSetResourceInputs& p_inputs) {
+    StaticSetBufferCompilerVK::BuildResult opaque_geometry;
+    StaticSetBufferCompilerVK::BuildResult masked_geometry;
+    if (p_inputs.has_opaque_draws) {
+        opaque_geometry = build_geometry_buffers(p_render_data, p_opaque_set);
+    }
+    if (p_inputs.has_masked_draws) {
+        masked_geometry = build_geometry_buffers(p_render_data, p_masked_set);
+    }
+    if (opaque_geometry.vertex_buffer != MEM_NULL && masked_geometry.vertex_buffer != MEM_NULL &&
+        (opaque_geometry.vertex_buffer != masked_geometry.vertex_buffer || opaque_geometry.index_buffer != masked_geometry.index_buffer)) {
+        throw std::runtime_error("Failed to compile static-set resources: opaque and masked sets must share vertex and index buffers.");
+    }
+    StaticSetGeometryBuffers result;
+    result.vertex_buffer = opaque_geometry.vertex_buffer != MEM_NULL ? std::move(opaque_geometry.vertex_buffer)
+                                                                     : std::move(masked_geometry.vertex_buffer);
+    result.index_buffer = opaque_geometry.index_buffer != MEM_NULL ? std::move(opaque_geometry.index_buffer)
+                                                                   : std::move(masked_geometry.index_buffer);
+    if (result.vertex_buffer == MEM_NULL || result.index_buffer == MEM_NULL) {
+        throw std::runtime_error("Failed to compile static-set resources: shared vertex or index buffer is missing.");
+    }
+    return result;
+}
+
+StaticSetDrawBuild compile_static_set_draw_batches(const BaseRenderDataVK* p_render_data,
+    RefRes<RUStaticGeometrySet> p_set,
+    std::span<const uint32_t> p_first_instances,
+    const ShaderMetadata& p_vertex_metadata,
+    std::string_view p_vertex_entry) {
+    StaticSetDrawBatchPlannerVK::BuildResult draw_plan = StaticSetDrawBatchPlannerVK().build(p_render_data->allocator,
+        std::span<const RUStaticGeometrySubmesh>(p_set->submeshes.get(), p_set->submesh_count),
+        p_first_instances,
+        p_vertex_metadata,
+        p_vertex_entry,
+        p_render_data->max_draw_indirect_count);
+    StaticSetDrawBuild result(p_render_data->allocator);
+    result.draw_buffer = build_indirect_buffer(p_render_data, draw_plan.commands);
+    result.batches.reserve(draw_plan.batches.size());
+    for (StaticSetDrawBatchPlannerVK::Batch& source_batch : draw_plan.batches) {
+        StaticSetRenderResourcesVK::DrawBatch draw_batch;
+        draw_batch.first_draw = source_batch.first_draw;
+        draw_batch.draw_count = source_batch.draw_count;
+        draw_batch.vertex_input = std::move(source_batch.vertex_input);
+        draw_batch.vertex_buffer_offset = source_batch.vertex_buffer_offset;
+        result.batches.push_back(std::move(draw_batch));
+    }
+    return result;
+}
+
 } // namespace
 
 CompiledStaticSetVK::PassConfig::PassConfig(RenderAllocator* p_allocator)
@@ -730,46 +813,16 @@ Ref<StaticSetRenderResourcesVK> StaticSetCompilerVK::compile_resources(RefRes<RU
     std::string_view p_masked_vertex_entry,
     const std::optional<MaterialTextureContract>& p_material_contract,
     const Config& p_config) const {
-    if (renderer == nullptr || renderer->get_base_render_data() == nullptr || renderer->get_base_render_data()->allocator == nullptr) {
-        throw std::runtime_error("Failed to compile static-set resources: renderer state is missing.");
-    }
-    const bool has_opaque_draws = p_opaque_set != MEM_NULL && !is_empty_set(*p_opaque_set);
-    const bool has_masked_draws = p_masked_set != MEM_NULL && !is_empty_set(*p_masked_set);
-    if (!has_opaque_draws && !has_masked_draws) {
-        throw std::runtime_error("Failed to compile static-set resources: no drawable opaque or masked set was supplied.");
-    }
-    if (has_opaque_draws) {
-        validate_submesh_materials(p_opaque_set);
-        validate_static_set_node_layout(p_opaque_vertex_metadata);
-    }
-    if (has_masked_draws) {
-        validate_submesh_materials(p_masked_set);
-        validate_static_set_node_layout(p_masked_vertex_metadata);
-    }
-
+    const StaticSetResourceInputs inputs = validate_static_set_resource_inputs(
+        renderer, p_opaque_set, p_masked_set, p_opaque_vertex_metadata, p_masked_vertex_metadata);
     const BaseRenderDataVK* render_data = renderer->get_base_render_data();
     Ref<StaticSetRenderResourcesVK> result = make_ref<StaticSetRenderResourcesVK>(render_data->allocator, render_data->allocator);
     result->material_params_resource_id = p_config.material_params_variable_name;
 
-    StaticSetBufferCompilerVK::BuildResult opaque_geometry;
-    StaticSetBufferCompilerVK::BuildResult masked_geometry;
-    if (has_opaque_draws) {
-        opaque_geometry = build_geometry_buffers(render_data, p_opaque_set);
-    }
-    if (has_masked_draws) {
-        masked_geometry = build_geometry_buffers(render_data, p_masked_set);
-    }
-    if (opaque_geometry.vertex_buffer != MEM_NULL && masked_geometry.vertex_buffer != MEM_NULL &&
-        (opaque_geometry.vertex_buffer != masked_geometry.vertex_buffer || opaque_geometry.index_buffer != masked_geometry.index_buffer)) {
-        throw std::runtime_error("Failed to compile static-set resources: opaque and masked sets must share vertex and index buffers.");
-    }
-    result->vertices = opaque_geometry.vertex_buffer != MEM_NULL ? std::move(opaque_geometry.vertex_buffer)
-                                                                 : std::move(masked_geometry.vertex_buffer);
-    result->indices = opaque_geometry.index_buffer != MEM_NULL ? std::move(opaque_geometry.index_buffer)
-                                                               : std::move(masked_geometry.index_buffer);
-    if (result->vertices == MEM_NULL || result->indices == MEM_NULL) {
-        throw std::runtime_error("Failed to compile static-set resources: shared vertex or index buffer is missing.");
-    }
+    StaticSetGeometryBuffers geometry_buffers =
+        build_shared_static_set_geometry_buffers(render_data, p_opaque_set, p_masked_set, inputs);
+    result->vertices = std::move(geometry_buffers.vertex_buffer);
+    result->indices = std::move(geometry_buffers.index_buffer);
 
     CombinedStaticInstanceBufferData combined_data = build_combined_static_instance_buffer_data(p_opaque_set, p_masked_set);
     StaticSetStorageBuffers storage_buffers = build_static_set_storage_buffers_from_data(render_data, std::move(combined_data.data));
@@ -777,44 +830,17 @@ Ref<StaticSetRenderResourcesVK> StaticSetCompilerVK::compile_resources(RefRes<RU
     result->nodes = std::move(storage_buffers.node_buffer);
     result->instances = std::move(storage_buffers.instance_buffer);
 
-    auto compile_draw_batches = [render_data](RefRes<RUStaticGeometrySet> p_set,
-                                    std::span<const uint32_t> p_first_instances,
-                                    const ShaderMetadata& p_vertex_metadata,
-                                    std::string_view p_vertex_entry,
-                                    Ref<ROBufferVK>& p_draw_buffer,
-                                    Vector<StaticSetRenderResourcesVK::DrawBatch, RenderAllocator>& p_batches) {
-        StaticSetDrawBatchPlannerVK::BuildResult draw_plan = StaticSetDrawBatchPlannerVK().build(render_data->allocator,
-            std::span<const RUStaticGeometrySubmesh>(p_set->submeshes.get(), p_set->submesh_count),
-            p_first_instances,
-            p_vertex_metadata,
-            p_vertex_entry,
-            render_data->max_draw_indirect_count);
-        p_draw_buffer = build_indirect_buffer(render_data, draw_plan.commands);
-        p_batches.reserve(draw_plan.batches.size());
-        for (StaticSetDrawBatchPlannerVK::Batch& source_batch : draw_plan.batches) {
-            StaticSetRenderResourcesVK::DrawBatch draw_batch;
-            draw_batch.first_draw = source_batch.first_draw;
-            draw_batch.draw_count = source_batch.draw_count;
-            draw_batch.vertex_input = std::move(source_batch.vertex_input);
-            draw_batch.vertex_buffer_offset = source_batch.vertex_buffer_offset;
-            p_batches.push_back(std::move(draw_batch));
-        }
-    };
-    if (has_opaque_draws) {
-        compile_draw_batches(p_opaque_set,
-            combined_data.opaque_first_instances,
-            p_opaque_vertex_metadata,
-            p_opaque_vertex_entry,
-            result->opaque_draw_batches,
-            result->opaque_batches);
+    if (inputs.has_opaque_draws) {
+        StaticSetDrawBuild draw_build = compile_static_set_draw_batches(
+            render_data, p_opaque_set, combined_data.opaque_first_instances, p_opaque_vertex_metadata, p_opaque_vertex_entry);
+        result->opaque_draw_batches = std::move(draw_build.draw_buffer);
+        result->opaque_batches = std::move(draw_build.batches);
     }
-    if (has_masked_draws) {
-        compile_draw_batches(p_masked_set,
-            combined_data.masked_first_instances,
-            p_masked_vertex_metadata,
-            p_masked_vertex_entry,
-            result->masked_draw_batches,
-            result->masked_batches);
+    if (inputs.has_masked_draws) {
+        StaticSetDrawBuild draw_build = compile_static_set_draw_batches(
+            render_data, p_masked_set, combined_data.masked_first_instances, p_masked_vertex_metadata, p_masked_vertex_entry);
+        result->masked_draw_batches = std::move(draw_build.draw_buffer);
+        result->masked_batches = std::move(draw_build.batches);
     }
 
     StaticSetMaterialBuild material_build = compile_static_set_materials(renderer,

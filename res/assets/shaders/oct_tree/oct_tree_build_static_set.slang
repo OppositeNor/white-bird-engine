@@ -47,11 +47,11 @@ struct VSOutput {
 struct OctTreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
     uint2 oct_tree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "tree_nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "tree_leaves")]
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_leaves_buffer")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "deferred_list")]
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_deferred_list_ping")]
     uint2 deferred_list;
 
     [WBE_DESCRIPTOR("storage_buffer", "node_data")]
