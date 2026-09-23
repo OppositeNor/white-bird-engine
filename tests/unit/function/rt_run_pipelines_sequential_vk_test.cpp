@@ -12,7 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipelines_sequential_vk.hh"
 #include "utils/defs.hh"
@@ -38,21 +41,26 @@ TEST(WBERunPipelinesSequentialVKTest, ComputeDispatchAddsPipelineAndGroupCount) 
     EXPECT_EQ(dispatch.entries[0].group_count.depth, group_count.depth);
 }
 
-TEST(WBERunPipelinesSequentialVKTest, GraphicsDispatchAddsEntry) {
+TEST(WBERunPipelinesSequentialVKTest, GraphicsSequenceKeepsRegularAndIndirectDispatchTypes) {
     RenderAllocator allocator(WBE_KI_B(64));
-    RTRunGraphicsPipelinesSequentialVK::Dispatch dispatch(&allocator);
-    RTRunGraphicsPipelinesSequentialVK::Entry entry(&allocator);
-    entry.render_extent = {.width = 1280, .height = 720};
-    entry.color_attachment_ids.push_back("color");
+    RTRunGraphicsPipelinesSequentialVK::Sequence sequence(&allocator);
+    RTRunGraphicsPipelinesSequentialVK::RegularDispatch regular_dispatch(&allocator);
+    regular_dispatch.render_extent = {.width = 1280, .height = 720};
+    regular_dispatch.color_attachment_ids.emplace_back("color");
+    RTRunGraphicsPipelinesSequentialVK::IndirectDispatch indirect_dispatch(&allocator);
+    indirect_dispatch.vertex_buffer_id = "vertices";
+    indirect_dispatch.index_buffer_id = "indices";
+    indirect_dispatch.indirect_buffer_id = "draw_batches";
+    indirect_dispatch.first_indirect_draw = 4;
+    indirect_dispatch.indirect_draw_count = 12;
 
-    RTRunGraphicsPipelinesSequentialVK::Dispatch& result = dispatch.add_entry(std::move(entry));
+    RTRunGraphicsPipelinesSequentialVK::Sequence& result =
+        sequence.add_dispatch(std::move(regular_dispatch)).add_dispatch(std::move(indirect_dispatch));
 
-    EXPECT_EQ(&result, &dispatch);
-    ASSERT_EQ(dispatch.entries.size(), 1U);
-    EXPECT_EQ(dispatch.entries[0].render_extent.width, 1280U);
-    EXPECT_EQ(dispatch.entries[0].render_extent.height, 720U);
-    ASSERT_EQ(dispatch.entries[0].color_attachment_ids.size(), 1U);
-    EXPECT_EQ(dispatch.entries[0].color_attachment_ids[0], "color");
+    EXPECT_EQ(&result, &sequence);
+    ASSERT_EQ(sequence.get_dispatch_count(), 2U);
+    EXPECT_FALSE(sequence.is_indirect(0));
+    EXPECT_TRUE(sequence.is_indirect(1));
 }
 
 } // namespace WhiteBirdEngine

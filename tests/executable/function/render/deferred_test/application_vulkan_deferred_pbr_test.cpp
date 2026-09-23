@@ -33,7 +33,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -264,21 +264,31 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
-Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_gbuffer_task(
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::compile_gbuffer_task(
     RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing) {
-    RTRunStaticSetVK::Config task_config;
     VkClearValue color_clear{};
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    task_config.add_color_attachment(GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_FORMAT)
-        .add_color_attachment(GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_FORMAT)
-        .add_color_attachment(GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_FORMAT)
-        .set_depth_attachment(GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_FORMAT);
+    StaticSetCompilerVK::Config compiler_config;
+    compiler_config.color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT};
+    compiler_config.depth_attachment_format = GBUFFER_DEPTH_FORMAT;
+    Ref<CompiledStaticSetVK> static_set = StaticSetCompilerVK(renderer_vk).compile(p_set, p_pipeline, compiler_config);
+    CompiledStaticSetVK::PassConfig pass(render_allocator);
+    pass.render_extent = base_render_data->swap_chain_extent;
+    pass.color_attachment_ids.emplace_back(GBUFFER_ALBEDO_IMAGE_VIEW);
+    pass.color_attachment_ids.emplace_back(GBUFFER_NORMAL_IMAGE_VIEW);
+    pass.color_attachment_ids.emplace_back(GBUFFER_RMA_IMAGE_VIEW);
+    pass.depth_attachment_id = GBUFFER_DEPTH_IMAGE_VIEW;
+    pass.clear_values.push_back(color_clear);
+    pass.clear_values.push_back(color_clear);
+    pass.clear_values.push_back(color_clear);
+    pass.clear_values.push_back(depth_clear);
     if (p_load_existing) {
-        task_config.set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD).set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    } else {
-        task_config.add_clear_value(color_clear).add_clear_value(color_clear).add_clear_value(color_clear).add_clear_value(depth_clear);
+        pass.color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+        pass.depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
     }
-    return make_unique<RTRunStaticSetVK>(render_allocator, renderer_vk, p_set, p_pipeline, task_config);
+    RendTaskDescVK descriptor(render_allocator, RT_RUN_DEFERRED_GBUFFER, static_set->create_render_task(base_render_data, pass));
+    static_set->configure_task(descriptor);
+    return descriptor;
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
@@ -583,30 +593,35 @@ void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
                                       .create_ref(base_render_data);
 }
 
-Unique<RTRunStaticSetVK> ApplicationVulkanDeferredPBRTest::compile_shadow_task(
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::compile_shadow_task(
     RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing) {
-    RTRunStaticSetVK::Config task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
     VkClearValue shadow_moments_clear{};
     shadow_moments_clear.color.float32[0] = 1.0F;
     shadow_moments_clear.color.float32[1] = 1.0F;
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(SHADOWMAP_COLOR_IMAGE_VIEW, RSM_FLUX_FORMAT)
-        .add_color_attachment(RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_FORMAT)
-        .add_color_attachment(SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_FORMAT)
-        .set_depth_attachment(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT);
+    StaticSetCompilerVK::Config compiler_config;
+    compiler_config.color_attachment_formats = {RSM_FLUX_FORMAT, RSM_NORMAL_FORMAT, SHADOW_MOMENTS_FORMAT};
+    compiler_config.depth_attachment_format = SHADOWMAP_DEPTH_FORMAT;
+    Ref<CompiledStaticSetVK> static_set = StaticSetCompilerVK(renderer_vk).compile(p_set, p_pipeline, compiler_config);
+    CompiledStaticSetVK::PassConfig pass(render_allocator);
+    pass.render_extent = shadow_extent;
+    pass.color_attachment_ids.emplace_back(SHADOWMAP_COLOR_IMAGE_VIEW);
+    pass.color_attachment_ids.emplace_back(RSM_NORMAL_IMAGE_VIEW);
+    pass.color_attachment_ids.emplace_back(SHADOW_MOMENTS_IMAGE_VIEW);
+    pass.depth_attachment_id = SHADOWMAP_DEPTH_IMAGE_VIEW;
+    pass.clear_values.push_back(shadow_color_clear);
+    pass.clear_values.push_back(shadow_normal_clear);
+    pass.clear_values.push_back(shadow_moments_clear);
+    pass.clear_values.push_back(shadow_depth_clear);
     if (p_load_existing) {
-        task_config.set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD).set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    } else {
-        task_config.add_clear_value(shadow_color_clear)
-            .add_clear_value(shadow_normal_clear)
-            .add_clear_value(shadow_moments_clear)
-            .add_clear_value(shadow_depth_clear);
+        pass.color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+        pass.depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
     }
-    auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer_vk, p_set, p_pipeline, task_config);
-    return task;
+    RendTaskDescVK descriptor(render_allocator, RT_RUN_DEFERRED_SHADOW_OPAQUE, static_set->create_render_task(base_render_data, pass));
+    static_set->configure_task(descriptor);
+    return descriptor;
 }
 
 void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_pipelines() {

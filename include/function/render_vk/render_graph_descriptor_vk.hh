@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -76,6 +77,30 @@ struct RendTaskDescVK {
      */
     RendTaskDescVK& write(std::string_view p_resource_id, RendResUsageVK p_usage);
 
+    /**
+     * @brief Add a task-private resource binding.
+     * @param p_resource_id Logical identifier resolved before graph-global resources.
+     * @param p_resource Task-private Vulkan render object.
+     * @return This descriptor.
+     */
+    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource);
+
+    /**
+     * @brief Add a task-private resource-container binding.
+     * @param p_resource_id Logical identifier resolved before graph-global resources.
+     * @param p_resource_container Stable task-private resource container.
+     * @return This descriptor.
+     */
+    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container);
+
+    /**
+     * @brief Add a task-private aggregate resource-list binding.
+     * @param p_resource_id Logical aggregate identifier.
+     * @param p_resource_list Resource list expanded into indexed task-private resources.
+     * @return This descriptor.
+     */
+    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
+
     // The id of this task within the graph.
     RendTaskID task_id;
     // The ids of tasks that must complete before this task starts. Used by the
@@ -84,6 +109,8 @@ struct RendTaskDescVK {
     // Additional descriptor-mediated resource reads and writes.
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
+    // Resources scoped to this task id and preferred over graph-global resources.
+    Vector<RendResVK, RenderAllocator> resources;
     // Factory invoked at graph-build time to construct the concrete task. The
     // resulting Unique<IRenderTaskVK> is owned by the graph.
     std::function<Unique<IRenderTaskVK>()> create;
@@ -144,6 +171,18 @@ struct RendGraphDescVK {
      * @return This graph descriptor.
      */
     RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container);
+
+    /**
+     * @brief Append an aggregate resource list binding.
+     *
+     * Graph construction registers the aggregate under p_resource_id and every entry under
+     * `<p_resource_id>[<index>]`.
+     *
+     * @param p_resource_id Graph resource identifier for the aggregate.
+     * @param p_resource_list Resource list to retain and expand.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-

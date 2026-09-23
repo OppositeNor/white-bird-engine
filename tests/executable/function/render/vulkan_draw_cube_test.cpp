@@ -34,7 +34,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
@@ -65,12 +65,12 @@ namespace {
 
 constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_DEPTH_FORMAT;
 constexpr VkFormat SHADOWMAP_COLOR_FORMAT = WBE::ROImageVK::Builder::SHADOW_MAP_COLOR_FORMAT;
-static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
-static constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
-static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
-static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
-static constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
-static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
+constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
+constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
+constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
+constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
+constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
+constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
 
 } // namespace
 
@@ -86,9 +86,9 @@ private:
     void load_resources();
     void setup_spot_light();
     void create_shadow_map_resources();
-    void write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
-    void write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
-    void register_draw_cube_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticSetVK>& p_main_task);
+    void write_shadow_dynamic_descriptors();
+    void write_main_dynamic_descriptors();
+    void register_draw_cube_render_graph(WBE::RendTaskDescVK p_shadow_task, WBE::RendTaskDescVK p_main_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
@@ -204,25 +204,37 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     setup_spot_light();
     create_shadow_map_resources();
 
-    WBE::RTRunStaticSetVK::Config shadow_task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    shadow_task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
-        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
-        .add_clear_value(shadow_color_clear)
-        .add_clear_value(shadow_depth_clear);
-    auto shadow_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
-        render_allocator, renderer_vk, cube_set, shadow_pipeline_resource, shadow_task_config);
-    write_shadow_dynamic_descriptors(*shadow_task);
+    WBE::StaticSetCompilerVK::Config shadow_compiler_config;
+    shadow_compiler_config.color_attachment_formats.push_back(SHADOWMAP_COLOR_FORMAT);
+    shadow_compiler_config.depth_attachment_format = SHADOWMAP_DEPTH_FORMAT;
+    WBE::Ref<WBE::CompiledStaticSetVK> shadow_set =
+        WBE::StaticSetCompilerVK(renderer_vk).compile(cube_set, shadow_pipeline_resource, shadow_compiler_config);
+    WBE::CompiledStaticSetVK::PassConfig shadow_pass(render_allocator);
+    shadow_pass.render_extent = shadow_extent;
+    shadow_pass.color_attachment_ids.emplace_back(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW);
+    shadow_pass.depth_attachment_id = REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW;
+    shadow_pass.clear_values.push_back(shadow_color_clear);
+    shadow_pass.clear_values.push_back(shadow_depth_clear);
+    WBE::RendTaskDescVK shadow_task(
+        render_allocator, RT_RUN_PIPELINE_SHADOWMAP, shadow_set->create_render_task(base_render_data, shadow_pass));
+    shadow_set->configure_task(shadow_task);
+    write_shadow_dynamic_descriptors();
 
-    WBE::RTRunStaticSetVK::Config main_task_config;
-    main_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format);
-    auto main_task =
-        WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, cube_set, main_pipeline_resource, main_task_config);
-    write_main_dynamic_descriptors(*main_task);
+    WBE::StaticSetCompilerVK::Config main_compiler_config;
+    main_compiler_config.color_attachment_formats.push_back(base_render_data->swap_chain_format);
+    WBE::Ref<WBE::CompiledStaticSetVK> main_set =
+        WBE::StaticSetCompilerVK(renderer_vk).compile(cube_set, main_pipeline_resource, main_compiler_config);
+    WBE::CompiledStaticSetVK::PassConfig main_pass(render_allocator);
+    main_pass.render_extent = base_render_data->swap_chain_extent;
+    main_pass.color_attachment_ids.emplace_back(WBE::REND_RES_SWAP_CHAIN);
+    main_pass.clear_values.emplace_back();
+    WBE::RendTaskDescVK main_task(render_allocator, RT_RUN_PIPELINE, main_set->create_render_task(base_render_data, main_pass));
+    main_set->configure_task(main_task);
+    write_main_dynamic_descriptors();
 
-    register_draw_cube_render_graph(shadow_task, main_task);
+    register_draw_cube_render_graph(std::move(shadow_task), std::move(main_task));
 }
 
 void ApplicationVulkanDrawCubeTest::setup_render_context() {
@@ -298,8 +310,7 @@ void ApplicationVulkanDrawCubeTest::create_shadow_map_resources() {
                          .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawCubeTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    static_cast<void>(p_task);
+void ApplicationVulkanDrawCubeTest::write_shadow_dynamic_descriptors() {
     WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
     spot_light_info_ubo = WBE::ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
@@ -307,8 +318,7 @@ void ApplicationVulkanDrawCubeTest::write_shadow_dynamic_descriptors(WBE::RTRunS
                               .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    static_cast<void>(p_task);
+void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
     WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
     uint32_t spot_light_count = 1;
     camera_info_ubo = WBE::ROBufferVK::Builder()
@@ -321,8 +331,7 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunSta
                                .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
-    WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticSetVK>& p_main_task) {
+void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTaskDescVK p_shadow_task, WBE::RendTaskDescVK p_main_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
@@ -334,11 +343,9 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
         .add_resource(SHADOWMAP_SAMPLED_IMAGE_VIEW, shadow_depth_view)
         .add_resource(SHADOW_SAMPLER, shadow_sampler);
 
-    pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_PIPELINE_SHADOWMAP, std::move(p_shadow_task));
-
-    WBE::RendTaskDescVK main_task_desc(render_allocator, RT_RUN_PIPELINE, std::move(p_main_task));
-    main_task_desc.after(RT_RUN_PIPELINE_SHADOWMAP);
-    pipeline_desc.tasks.emplace_back(std::move(main_task_desc));
+    pipeline_desc.tasks.emplace_back(std::move(p_shadow_task));
+    p_main_task.after(RT_RUN_PIPELINE_SHADOWMAP);
+    pipeline_desc.tasks.emplace_back(std::move(p_main_task));
 
     WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_cube_pipeline", std::move(pipeline_desc));
     WBE::write_descriptor_debug_output("draw_cube_pipeline_graph_descriptors", graph->list_descriptors());

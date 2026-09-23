@@ -19,6 +19,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -29,7 +30,9 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +53,40 @@ namespace {
 
 std::string qualify_task_resource_id(std::string_view p_task_id, std::string_view p_resource_id) {
     return std::format("{}.{}", p_task_id, p_resource_id);
+}
+
+void register_resource_list(Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources,
+    RenderAllocator* p_allocator,
+    std::string_view p_resource_id,
+    Ref<RenderResourceList> p_resource_list) {
+    if (p_resources == nullptr || p_allocator == nullptr || p_resource_id.empty() || p_resource_list == MEM_NULL) {
+        throw std::runtime_error("RenderGraphVK: invalid render resource list registration.");
+    }
+    if (p_resources->contains(p_resource_id)) {
+        throw std::runtime_error(std::format("RenderGraphVK: duplicate resource id: {}.", p_resource_id));
+    }
+    Ref<RendResVK> aggregate = make_ref<RendResVK>(p_allocator);
+    aggregate->res_id = p_resource_id;
+    aggregate->res_type_id = static_hash("RenderResourceList");
+    aggregate->resource_list = p_resource_list;
+    p_resources->emplace(std::string(p_resource_id), std::move(aggregate));
+
+    for (size_t index = 0; index < p_resource_list->get_resource_count(); ++index) {
+        const std::string indexed_id = std::format("{}[{}]", p_resource_id, index);
+        if (p_resources->contains(indexed_id)) {
+            throw std::runtime_error(std::format("RenderGraphVK: duplicate resource-list entry id: {}.", indexed_id));
+        }
+        Ref<IRenderObjectVK> resource = p_resource_list->acquire_resource(index).dynamic_cast_ref<IRenderObjectVK>();
+        if (resource == MEM_NULL) {
+            throw std::runtime_error(std::format("RenderGraphVK: resource-list entry '{}' is not a Vulkan render object.", indexed_id));
+        }
+        Ref<ROCSingleVK> container = make_ref<ROCSingleVK>(p_allocator, std::move(resource));
+        Ref<RendResVK> indexed_resource = make_ref<RendResVK>(p_allocator);
+        indexed_resource->res_id = indexed_id;
+        indexed_resource->res_type_id = container->get_resource_type_id();
+        indexed_resource->container = std::move(container);
+        p_resources->emplace(indexed_id, std::move(indexed_resource));
+    }
 }
 
 Ref<IRenderObjectVK> resolve_render_object(const RendResVK& p_resource, uint32_t p_slot) {
@@ -256,25 +293,29 @@ bool RendResViewVK::contains(std::string_view p_resource_id) const {
     if (!task_id.empty()) {
         auto local_resource = resources->find(qualify_task_resource_id(task_id, p_resource_id));
         if (local_resource != resources->end()) {
-            return local_resource->second != MEM_NULL && local_resource->second->container != MEM_NULL;
+            return local_resource->second != MEM_NULL &&
+                   (local_resource->second->container != MEM_NULL || local_resource->second->resource_list != MEM_NULL);
         }
     }
     auto resource = resources->find(p_resource_id);
-    return resource != resources->end() && resource->second != MEM_NULL && resource->second->container != MEM_NULL;
+    return resource != resources->end() && resource->second != MEM_NULL &&
+           (resource->second->container != MEM_NULL || resource->second->resource_list != MEM_NULL);
 }
 
 const RendResVK& RendResViewVK::get(std::string_view p_resource_id) const {
     if (!task_id.empty()) {
         auto local_resource = resources->find(qualify_task_resource_id(task_id, p_resource_id));
         if (local_resource != resources->end()) {
-            if (local_resource->second == MEM_NULL || local_resource->second->container == MEM_NULL) {
+            if (local_resource->second == MEM_NULL ||
+                (local_resource->second->container == MEM_NULL && local_resource->second->resource_list == MEM_NULL)) {
                 throw std::runtime_error(std::format("Render graph task-private resource is null: {}.", p_resource_id));
             }
             return *local_resource->second;
         }
     }
     auto resource = resources->find(p_resource_id);
-    if (resource == resources->end() || resource->second == MEM_NULL || resource->second->container == MEM_NULL) {
+    if (resource == resources->end() || resource->second == MEM_NULL ||
+        (resource->second->container == MEM_NULL && resource->second->resource_list == MEM_NULL)) {
         throw std::runtime_error(std::format("Render graph resource was not declared: {}.", p_resource_id));
     }
     return *resource->second;
@@ -493,12 +534,27 @@ void RendResRegistrarVK::add_resource(
     resources->emplace(physical_id, std::move(resource));
 }
 
+void RendResRegistrarVK::add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("RenderGraphVK: task-private resource-list id is empty.");
+    }
+    register_resource_list(resources, allocator, qualify_task_resource_id(task_id, p_resource_id), std::move(p_resource_list));
+}
+
 Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources_by_id(render_data->allocator);
     resources_by_id.reserve(p_desc.resources.size());
     for (const auto& resource_desc : p_desc.resources) {
         if (resource_desc.res_id.empty()) {
             throw std::runtime_error("RenderGraphVK: resource id is empty.");
+        }
+        if (resource_desc.resource_list != MEM_NULL) {
+            if (resource_desc.container != MEM_NULL) {
+                throw std::runtime_error(
+                    std::format("RenderGraphVK: aggregate resource '{}' also has a concrete container.", resource_desc.res_id));
+            }
+            register_resource_list(&resources_by_id, render_data->allocator, resource_desc.res_id, resource_desc.resource_list);
+            continue;
         }
         if (resource_desc.container == MEM_NULL) {
             throw std::runtime_error(
@@ -530,6 +586,17 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendG
         if (std::find(task_ids.begin(), task_ids.end(), task_desc.task_id) != task_ids.end()) {
             throw std::runtime_error(std::format("RenderGraphVK: duplicate task id: {}.", task_desc.task_id));
         }
+        RendResRegistrarVK registrar(&all_resources, render_data->allocator, task_desc.task_id);
+        for (const RendResVK& resource : task_desc.resources) {
+            if (resource.resource_list != MEM_NULL) {
+                registrar.add_resource(resource.res_id, resource.resource_list);
+            } else {
+                registrar.add_resource(resource.res_id, resource.res_type_id, resource.container);
+            }
+        }
+        task_ids.emplace_back(task_desc.task_id);
+    }
+    for (const auto& task_desc : p_desc.tasks) {
         if (!task_desc.create) {
             throw std::runtime_error(std::format("RenderGraphVK: task factory is missing for: {}.", task_desc.task_id));
         }
@@ -547,19 +614,29 @@ Vector<RendTaskID, RenderAllocator> RenderGraphVK::instantiate_tasks(const RendG
         node->reads.insert(node->reads.end(), task_desc.reads.begin(), task_desc.reads.end());
         node->writes.insert(node->writes.end(), task_desc.writes.begin(), task_desc.writes.end());
         normalize_task_accesses(node);
-        task_ids.emplace_back(task_desc.task_id);
     }
     return task_ids;
 }
 
 void RenderGraphVK::normalize_task_accesses(Ref<RGNode> p_node) const {
     auto normalize = [this, &p_node](Vector<ResAccessVK, RenderAllocator>& p_accesses) {
-        for (ResAccessVK& access : p_accesses) {
+        Vector<ResAccessVK, RenderAllocator> normalized(render_data->allocator);
+        for (const ResAccessVK& access : p_accesses) {
+            std::string resource_id = access.res_id;
             const std::string physical_id = qualify_task_resource_id(p_node->task_id, access.res_id);
             if (all_resources.contains(physical_id)) {
-                access.res_id = physical_id;
+                resource_id = physical_id;
+            }
+            auto resource = all_resources.find(resource_id);
+            if (resource == all_resources.end() || resource->second == MEM_NULL || resource->second->resource_list == MEM_NULL) {
+                normalized.push_back({.res_id = std::move(resource_id), .usage = access.usage});
+                continue;
+            }
+            for (size_t index = 0; index < resource->second->resource_list->get_resource_count(); ++index) {
+                normalized.push_back({.res_id = std::format("{}[{}]", resource_id, index), .usage = access.usage});
             }
         }
+        p_accesses = std::move(normalized);
     };
     normalize(p_node->reads);
     normalize(p_node->writes);

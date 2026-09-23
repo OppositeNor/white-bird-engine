@@ -12,9 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "utils/defs.hh"
@@ -88,6 +91,31 @@ TEST(WBERenderGraphDescriptorVKTest, FluentResourceDeclarationsUseStringsAndComp
     ASSERT_EQ(descriptor.writes.size(), 1U);
     EXPECT_EQ(descriptor.writes.front().res_id, "lighting_output");
     EXPECT_EQ(descriptor.writes.front().usage, RendResUsageVK::STORAGE_IMAGE);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, ResourceListIsStoredAsAnAggregateBinding) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
+
+    descriptor.add_resource("textures", resource_list);
+
+    ASSERT_EQ(descriptor.resources.size(), 1U);
+    EXPECT_EQ(descriptor.resources.front().res_id, "textures");
+    EXPECT_EQ(descriptor.resources.front().resource_list, resource_list);
+    EXPECT_EQ(descriptor.resources.front().container, MEM_NULL);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, TaskPrivateResourceListIsStoredOnTaskDescriptor) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendTaskDescVK descriptor(&allocator);
+    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
+
+    descriptor.add_resource("_private_textures", resource_list);
+
+    ASSERT_EQ(descriptor.resources.size(), 1U);
+    EXPECT_EQ(descriptor.resources.front().res_id, "_private_textures");
+    EXPECT_EQ(descriptor.resources.front().resource_list, resource_list);
 }
 
 } // namespace WhiteBirdEngine

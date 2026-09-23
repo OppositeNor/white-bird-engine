@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
@@ -48,6 +49,8 @@ struct RendResVK {
     RendResTID res_type_id = 0;
     // The resource container bound during graph construction.
     Ref<RenderObjectContainerVK> container;
+    // Aggregate CPU-side resource list. Aggregate accesses expand to its indexed graph resources.
+    Ref<RenderResourceList> resource_list;
 };
 
 /**
@@ -121,6 +124,13 @@ public:
      * @param p_container Stable container retained by the graph.
      */
     void add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectContainerVK> p_container);
+
+    /**
+     * @brief Register one task-private aggregate resource list and its indexed entries.
+     * @param p_resource_id Logical aggregate id used by task accesses.
+     * @param p_resource_list Resource list retained by the graph.
+     */
+    void add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
 
 private:
     friend class RenderGraphVK;

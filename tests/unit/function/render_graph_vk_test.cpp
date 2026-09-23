@@ -16,7 +16,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
@@ -41,11 +43,11 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-static constexpr std::string_view TEST_LOGICAL_RESOURCE = "logical";
-static constexpr std::string_view TEST_MISSING_RESOURCE = "missing";
-static constexpr std::string_view TEST_SHARED_RESOURCE = "shared";
-static constexpr std::string_view TEST_LIGHTING_TASK = "lighting";
-static constexpr std::string_view TEST_LIGHTING_SHARED_RESOURCE = "lighting.shared";
+constexpr std::string_view TEST_LOGICAL_RESOURCE = "logical";
+constexpr std::string_view TEST_MISSING_RESOURCE = "missing";
+constexpr std::string_view TEST_SHARED_RESOURCE = "shared";
+constexpr std::string_view TEST_LIGHTING_TASK = "lighting";
+constexpr std::string_view TEST_LIGHTING_SHARED_RESOURCE = "lighting.shared";
 
 DebugData make_descriptor_row(
     std::string_view p_resource_type, std::string_view p_descriptor_type, std::string_view p_heap, uint32_t p_heap_index) {
@@ -140,6 +142,46 @@ private:
     size_t registration_count;
     bool require_missing_resource;
     bool write_resource;
+};
+
+class RTGraphListAccessProbeVK final : public IRenderTaskVK {
+public:
+    RTGraphListAccessProbeVK(RenderAllocator* p_allocator, std::string_view p_resource_id, bool p_write)
+        : allocator(p_allocator), resource_id(p_resource_id), write(p_write) {
+    }
+    ~RTGraphListAccessProbeVK() override = default;
+    RTGraphListAccessProbeVK(const RTGraphListAccessProbeVK&) = delete;
+    RTGraphListAccessProbeVK(RTGraphListAccessProbeVK&&) noexcept = delete;
+    RTGraphListAccessProbeVK& operator=(const RTGraphListAccessProbeVK&) = delete;
+    RTGraphListAccessProbeVK& operator=(RTGraphListAccessProbeVK&&) noexcept = delete;
+
+    QueueFamilyVK queue_family() const override {
+        return QueueFamilyVK::GRAPHICS;
+    }
+
+    Vector<ResAccessVK, RenderAllocator> read_resources() const override {
+        Vector<ResAccessVK, RenderAllocator> result(allocator);
+        if (!write) {
+            result.push_back({.res_id = resource_id, .usage = RendResUsageVK::SAMPLED_IMAGE});
+        }
+        return result;
+    }
+
+    Vector<ResAccessVK, RenderAllocator> write_resources() const override {
+        Vector<ResAccessVK, RenderAllocator> result(allocator);
+        if (write) {
+            result.push_back({.res_id = resource_id, .usage = RendResUsageVK::STORAGE_IMAGE});
+        }
+        return result;
+    }
+
+    void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    }
+
+private:
+    RenderAllocator* allocator;
+    std::string resource_id;
+    bool write;
 };
 
 } // namespace
@@ -273,6 +315,51 @@ TEST(WBERenderGraphVKTest, NormalizesSameLogicalTaskResourcesBeforeConflictValid
         FAIL() << "Expected graph construction to reach command-pool allocation.";
     } catch (const std::runtime_error& error) {
         EXPECT_STREQ(error.what(), "Failed to create command pool for queue family: 0.");
+    }
+}
+
+TEST(WBERenderGraphVKTest, ResourceListAccessExpandsToIndexedResourcesForConflictValidation) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
+    resource_list->add_resource(
+        make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObject>());
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource("textures", resource_list);
+    descriptor.add_task("writer", make_unique<RTGraphListAccessProbeVK>(&allocator, &allocator, "textures", true));
+    descriptor.add_task("reader", make_unique<RTGraphListAccessProbeVK>(&allocator, &allocator, "textures", false));
+    RenderGraphVK graph(&render_data);
+
+    try {
+        graph.build_from_descriptor(descriptor);
+        FAIL() << "Expected conflicting expanded resource-list accesses to fail.";
+    } catch (const std::runtime_error& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("tasks '"), std::string::npos);
+        EXPECT_NE(message.find("writer"), std::string::npos);
+        EXPECT_NE(message.find("reader"), std::string::npos);
+        EXPECT_NE(message.find("resource 'textures[0]' without an explicit execution path"), std::string::npos);
+    }
+}
+
+TEST(WBERenderGraphVKTest, DescriptorTaskResourcesAreAvailableToEarlierTaskFactories) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task("compute", make_unique<RTGraphListAccessProbeVK>(&allocator, &allocator, "graphics._draw_batches", true));
+    RendTaskDescVK graphics_descriptor(
+        &allocator, "graphics", make_unique<RTGraphListAccessProbeVK>(&allocator, &allocator, "_draw_batches", false));
+    graphics_descriptor.add_resource("_draw_batches", make_test_container(&allocator, &render_data));
+    descriptor.add_task(std::move(graphics_descriptor));
+    RenderGraphVK graph(&render_data);
+
+    try {
+        graph.build_from_descriptor(descriptor);
+        FAIL() << "Expected cross-task access to the task-private draw buffer to conflict.";
+    } catch (const std::runtime_error& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("graphics._draw_batches"), std::string::npos);
+        EXPECT_NE(message.find("without an explicit execution path"), std::string::npos);
     }
 }
 

@@ -20,16 +20,13 @@
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
-#include "function/function_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
-#include "generated/type_uuid.gen.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -44,7 +41,6 @@
 #include <glm/ext/vector_float4.hpp>
 #include <memory>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -99,13 +95,23 @@ public:
                               .initial_data(&camera_info, sizeof(camera_info))
                               .create_ref(base_render_data);
 
-        WBE::RTRunStaticSetVK::Config task_config;
-        task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format);
-        auto task = WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer, cube_set, pipeline_resource, task_config);
+        WBE::StaticSetCompilerVK::Config compiler_config;
+        compiler_config.color_attachment_formats.push_back(base_render_data->swap_chain_format);
+        WBE::Ref<WBE::CompiledStaticSetVK> static_set =
+            WBE::StaticSetCompilerVK(renderer).compile(cube_set, pipeline_resource, compiler_config);
+        if (static_set->acquire_texture_list() == WBE::MEM_NULL) {
+            throw std::runtime_error("Failed to setup draw cube unshaded test: static-set texture list was not compiled.");
+        }
+        WBE::CompiledStaticSetVK::PassConfig pass_config(render_allocator);
+        pass_config.render_extent = base_render_data->swap_chain_extent;
+        pass_config.color_attachment_ids.emplace_back(WBE::REND_RES_SWAP_CHAIN);
+        pass_config.clear_values.emplace_back();
+        WBE::RendTaskDescVK task_desc(render_allocator, "run_static_set", static_set->create_render_task(base_render_data, pass_config));
+        static_set->configure_task(task_desc);
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
             .add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
-        pipeline_desc.tasks.emplace_back(render_allocator, WBE::RT_RUN_STATIC_SET, std::move(task));
+        pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());

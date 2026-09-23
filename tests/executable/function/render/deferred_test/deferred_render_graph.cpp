@@ -22,14 +22,11 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
 #include "resource/resource_utils.hh"
@@ -80,21 +77,18 @@ std::vector<uint8_t> convert_bloom_to_rgba8(std::span<const uint8_t> p_bloom_dat
 
 } // namespace
 
-void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::string_view p_graph_id,
-    bool p_use_summed_area_table,
-    Unique<RTRunStaticSetVK>& p_shadow_opaque_task,
-    Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task) {
+void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
+    std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
-    pipeline_desc.add_task(RT_RUN_DEFERRED_SHADOW_OPAQUE, std::move(p_shadow_opaque_task));
+    pipeline_desc.add_task(std::move(p_shadow_opaque_task));
     if (p_use_summed_area_table) {
         pipeline_desc.add_task(create_shadow_moments_summed_area_table_task_desc());
     } else {
         pipeline_desc.add_task(create_shadow_mipmap_task_desc());
     }
-    RendTaskDescVK gbuffer_opaque_task_desc(render_allocator, RT_RUN_DEFERRED_GBUFFER, std::move(p_gbuffer_opaque_task));
-    gbuffer_opaque_task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
-    pipeline_desc.add_task(std::move(gbuffer_opaque_task_desc));
+    p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
+    pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
@@ -415,6 +409,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
+        // TODO RTRunGraphicsPipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
         std::array<VkClearValue, 2> clear_values{};
         std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN};
         return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,

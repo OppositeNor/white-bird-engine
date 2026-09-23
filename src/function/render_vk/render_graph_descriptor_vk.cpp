@@ -18,6 +18,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
@@ -52,11 +53,12 @@ struct RendTaskDescVKDirectTaskState {
     Unique<IRenderTaskVK> task;
 };
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator), reads(p_allocator), writes(p_allocator) {
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator)
+    : prev(p_allocator), reads(p_allocator), writes(p_allocator), resources(p_allocator) {
 }
 
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task)
-    : task_id(p_task_id), prev(p_allocator), reads(p_allocator), writes(p_allocator) {
+    : task_id(p_task_id), prev(p_allocator), reads(p_allocator), writes(p_allocator), resources(p_allocator) {
     Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
     create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<IRenderTaskVK> {
         return direct_task_state->take_task();
@@ -75,6 +77,42 @@ RendTaskDescVK& RendTaskDescVK::read(std::string_view p_resource_id, RendResUsag
 
 RendTaskDescVK& RendTaskDescVK::write(std::string_view p_resource_id, RendResUsageVK p_usage) {
     writes.push_back({.res_id = std::string(p_resource_id), .usage = p_usage});
+    return *this;
+}
+
+RendTaskDescVK& RendTaskDescVK::add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource) {
+    if (p_resource == MEM_NULL) {
+        throw std::runtime_error("Failed to add task-private render resource: render object is null.");
+    }
+    return add_resource(p_resource_id, make_ref<ROCSingleVK>(resources.get_allocator().allocator, std::move(p_resource)));
+}
+
+RendTaskDescVK& RendTaskDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add task-private render resource: resource id is empty.");
+    }
+    if (p_resource_container == MEM_NULL) {
+        throw std::runtime_error("Failed to add task-private render resource: resource container is null.");
+    }
+    resources.push_back(RendResVK{
+        .res_id = std::string(p_resource_id),
+        .res_type_id = p_resource_container->get_resource_type_id(),
+        .container = std::move(p_resource_container),
+    });
+    return *this;
+}
+
+RendTaskDescVK& RendTaskDescVK::add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add task-private render resource list: resource id is empty.");
+    }
+    if (p_resource_list == MEM_NULL) {
+        throw std::runtime_error("Failed to add task-private render resource list: resource list is null.");
+    }
+    resources.push_back(RendResVK{
+        .res_id = std::string(p_resource_id),
+        .resource_list = std::move(p_resource_list),
+    });
     return *this;
 }
 
@@ -122,6 +160,19 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, R
         .res_id = std::string(p_resource_id),
         .res_type_id = p_resource_container->get_resource_type_id(),
         .container = std::move(p_resource_container),
+    });
+}
+
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add render graph resource list: resource id is empty.");
+    }
+    if (p_resource_list == MEM_NULL) {
+        throw std::runtime_error("Failed to add render graph resource list: resource list is null.");
+    }
+    return add_resource(RendResVK{
+        .res_id = std::string(p_resource_id),
+        .resource_list = std::move(p_resource_list),
     });
 }
 

@@ -27,6 +27,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -42,22 +43,22 @@ namespace WhiteBirdEngine {
  */
 struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
     /**
-     * @class Entry
-     * @brief Configuration for one graphics pass in the ordered sequence.
+     * @class DispatchBase
+     * @brief Attachment and pipeline state shared by regular and indirect dispatches.
      *
-     * Entries are copyable and movable. Their allocator must outlive every copy that retains their containers.
+     * Dispatches are copyable and movable. Their allocator must outlive every copy that retains their containers.
      */
-    struct Entry {
+    struct DispatchBase {
         /**
          * @brief Construct an empty pass configuration using the supplied allocator.
          * @param p_allocator Allocator used by owned attachment identifiers and clear values.
          */
-        explicit Entry(RenderAllocator* p_allocator);
-        ~Entry() = default;
-        Entry(const Entry&) = default;
-        Entry(Entry&&) noexcept = default;
-        Entry& operator=(const Entry&) = default;
-        Entry& operator=(Entry&&) noexcept = default;
+        explicit DispatchBase(RenderAllocator* p_allocator);
+        ~DispatchBase() = default;
+        DispatchBase(const DispatchBase&) = default;
+        DispatchBase(DispatchBase&&) noexcept = default;
+        DispatchBase& operator=(const DispatchBase&) = default;
+        DispatchBase& operator=(DispatchBase&&) noexcept = default;
 
         /** Graphics pipeline retained by the task. */
         Ref<ROGraphicsPipelineVK> pipeline = MEM_NULL;
@@ -69,16 +70,31 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         Vector<std::string, RenderAllocator> color_attachment_ids;
         /** Optional depth attachment graph-resource identifier. */
         std::optional<std::string> depth_attachment_id;
+        /** Load operation used by every color attachment. */
+        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        /** Load operation used by the optional depth attachment. */
+        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    };
+
+    /**
+     * @class RegularDispatch
+     * @brief One regular vertex, indexed, or vertex-less graphics draw.
+     */
+    struct RegularDispatch final : public DispatchBase {
+        explicit RegularDispatch(RenderAllocator* p_allocator) : DispatchBase(p_allocator) {
+        }
+        ~RegularDispatch() = default;
+        RegularDispatch(const RegularDispatch&) = default;
+        RegularDispatch(RegularDispatch&&) noexcept = default;
+        RegularDispatch& operator=(const RegularDispatch&) = default;
+        RegularDispatch& operator=(RegularDispatch&&) noexcept = default;
+
         /** Optional vertex-buffer graph-resource identifier. */
         std::optional<std::string> vertex_buffer_id;
         /** Optional index-buffer graph-resource identifier. */
         std::optional<std::string> index_buffer_id;
         /** Optional indexed subregion; valid only when vertex and index buffers are configured. */
         std::optional<IndexedDrawRegionVK> indexed_draw_region;
-        /** Load operation used by every color attachment. */
-        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        /** Load operation used by the optional depth attachment. */
-        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
         /** Dynamic vertex-input state for indexed draws. */
         VertexInputDescriptionVK vertex_input;
         /** Byte offset bound for the optional vertex buffer. */
@@ -88,28 +104,102 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
     };
 
     /**
-     * @class Dispatch
-     * @brief Allocator-owned ordered graphics-pass entries.
-     *
-     * Dispatches are copyable and movable. Their allocator must outlive every copy retaining entries.
+     * @class IndirectDispatch
+     * @brief One indexed-indirect graphics draw range.
      */
+    struct IndirectDispatch final : public DispatchBase {
+        explicit IndirectDispatch(RenderAllocator* p_allocator) : DispatchBase(p_allocator) {
+        }
+        ~IndirectDispatch() = default;
+        IndirectDispatch(const IndirectDispatch&) = default;
+        IndirectDispatch(IndirectDispatch&&) noexcept = default;
+        IndirectDispatch& operator=(const IndirectDispatch&) = default;
+        IndirectDispatch& operator=(IndirectDispatch&&) noexcept = default;
+
+        /** Vertex-buffer graph-resource identifier. */
+        std::string vertex_buffer_id;
+        /** Index-buffer graph-resource identifier. */
+        std::string index_buffer_id;
+        /** Indexed-indirect command-buffer graph-resource identifier. */
+        std::string indirect_buffer_id;
+        /** First tightly packed indirect command consumed by this dispatch. */
+        uint32_t first_indirect_draw = 0;
+        /** Number of tightly packed indirect commands consumed by this dispatch. */
+        uint32_t indirect_draw_count = 0;
+        /** Dynamic vertex-input state for indexed draws. */
+        VertexInputDescriptionVK vertex_input;
+        /** Byte offset bound for the vertex buffer. */
+        VkDeviceSize vertex_buffer_offset = 0;
+    };
+
+private:
+    enum class DispatchType : uint8_t {
+        REGULAR,
+        INDIRECT,
+    };
+
     struct Dispatch {
-        explicit Dispatch(RenderAllocator* p_allocator);
+        Dispatch(RenderAllocator* p_allocator, RegularDispatch p_dispatch);
+        Dispatch(RenderAllocator* p_allocator, IndirectDispatch p_dispatch);
         ~Dispatch() = default;
         Dispatch(const Dispatch&) = default;
         Dispatch(Dispatch&&) noexcept = default;
         Dispatch& operator=(const Dispatch&) = default;
         Dispatch& operator=(Dispatch&&) noexcept = default;
 
-        /**
-         * @brief Append one graphics pass.
-         * @param p_entry Entry transferred into the dispatch.
-         * @return This dispatch.
-         */
-        Dispatch& add_entry(Entry p_entry);
+        DispatchBase base;
+        DispatchType type = DispatchType::REGULAR;
+        std::optional<std::string> vertex_buffer_id;
+        std::optional<std::string> index_buffer_id;
+        std::string indirect_buffer_id;
+        uint32_t first_indirect_draw = 0;
+        uint32_t indirect_draw_count = 0;
+        std::optional<IndexedDrawRegionVK> indexed_draw_region;
+        VertexInputDescriptionVK vertex_input;
+        VkDeviceSize vertex_buffer_offset = 0;
+        uint32_t draw_vertex_count = 3;
+    };
 
-        /** Ordered graphics passes. */
-        Vector<Entry, RenderAllocator> entries;
+public:
+    /**
+     * @class Sequence
+     * @brief Allocator-owned ordered graphics dispatches.
+     */
+    struct Sequence {
+        explicit Sequence(RenderAllocator* p_allocator);
+        ~Sequence() = default;
+        Sequence(const Sequence&) = default;
+        Sequence(Sequence&&) noexcept = default;
+        Sequence& operator=(const Sequence&) = default;
+        Sequence& operator=(Sequence&&) noexcept = default;
+
+        /**
+         * @brief Append one regular graphics dispatch.
+         * @param p_dispatch Dispatch transferred into the sequence.
+         * @return This sequence.
+         */
+        Sequence& add_dispatch(RegularDispatch p_dispatch);
+
+        /**
+         * @brief Append one indexed-indirect graphics dispatch.
+         * @param p_dispatch Dispatch transferred into the sequence.
+         * @return This sequence.
+         */
+        Sequence& add_dispatch(IndirectDispatch p_dispatch);
+
+        /** @brief Return the number of ordered dispatches. */
+        size_t get_dispatch_count() const {
+            return dispatches.size();
+        }
+
+        /** @brief Return whether one ordered dispatch is indirect. */
+        bool is_indirect(size_t p_index) const;
+
+    private:
+        friend struct RTRunGraphicsPipelinesSequentialVK;
+
+        RenderAllocator* allocator = nullptr;
+        Vector<Dispatch, RenderAllocator> dispatches;
     };
 
     RTRunGraphicsPipelinesSequentialVK() = delete;
@@ -122,10 +212,10 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
     /**
      * @brief Construct an ordered graphics-pass task.
      * @param p_render_data Renderer state used to retain and record the passes.
-     * @param p_dispatch Ordered pass configurations copied into task-owned storage.
+     * @param p_sequence Ordered dispatch configurations copied into task-owned storage.
      * @throws std::runtime_error When no pass is provided or a pass configuration is invalid.
      */
-    RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch);
+    RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -138,18 +228,19 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
 
 private:
     struct BoundEntry {
-        BoundEntry(const BaseRenderDataVK* p_render_data, const Entry& p_entry);
+        BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch);
         ~BoundEntry() = default;
         BoundEntry(const BoundEntry&) = delete;
         BoundEntry(BoundEntry&&) noexcept = default;
         BoundEntry& operator=(const BoundEntry&) = delete;
         BoundEntry& operator=(BoundEntry&&) noexcept = default;
 
-        Entry entry;
+        Dispatch dispatch;
         Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
         Ref<RenderObjectContainerVK> depth_attachment_container;
         Ref<RenderObjectContainerVK> vertex_buffer_container;
         Ref<RenderObjectContainerVK> index_buffer_container;
+        Ref<RenderObjectContainerVK> indirect_buffer_container;
         Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     };
 

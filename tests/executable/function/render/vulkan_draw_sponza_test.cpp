@@ -39,7 +39,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
@@ -88,16 +88,16 @@ constexpr std::string_view RT_RUN_SHADOWMAP_MASKED = "run_shadowmap_masked";
 constexpr std::string_view RT_RUN_MAIN_OPAQUE = "run_main_opaque";
 constexpr std::string_view RT_RUN_MAIN_MASKED = "run_main_masked";
 constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
-static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
-static constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
-static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
-static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
-static constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
-static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
-static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
-static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
-static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
-static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
+constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
+constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
+constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
+constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
+constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
+constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
+constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
+constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
+constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
+constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
 
 struct ForwardSceneViewConfig {
@@ -163,12 +163,12 @@ private:
     void create_shadow_map_resources();
     void create_main_depth_resources();
     void setup_light_billboard_overlay_resources();
-    void write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
-    void write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task);
-    void register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
-        WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_masked_task,
-        WBE::Unique<WBE::RTRunStaticSetVK>& p_main_opaque_task,
-        WBE::Unique<WBE::RTRunStaticSetVK>& p_main_masked_task);
+    void write_shadow_dynamic_descriptors();
+    void write_main_dynamic_descriptors();
+    void register_draw_sponza_render_graph(WBE::RendTaskDescVK p_shadow_opaque_task,
+        WBE::RendTaskDescVK p_shadow_masked_task,
+        WBE::RendTaskDescVK p_main_opaque_task,
+        WBE::RendTaskDescVK p_main_masked_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
@@ -389,47 +389,78 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
     create_shadow_map_resources();
     create_main_depth_resources();
 
-    WBE::RTRunStaticSetVK::Config shadow_opaque_task_config;
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    shadow_opaque_task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
-        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
-        .add_clear_value(shadow_color_clear)
-        .add_clear_value(shadow_depth_clear);
-    auto shadow_opaque_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
-        render_allocator, renderer_vk, sponza_opaque_set, shadow_opaque_pipeline, shadow_opaque_task_config);
-    write_shadow_dynamic_descriptors(*shadow_opaque_task);
-
-    WBE::RTRunStaticSetVK::Config shadow_masked_task_config;
-    shadow_masked_task_config.set_render_extent(shadow_extent)
-        .add_color_attachment(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_FORMAT)
-        .set_depth_attachment(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_FORMAT)
-        .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-        .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    auto shadow_masked_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
-        render_allocator, renderer_vk, sponza_masked_set, shadow_masked_pipeline, shadow_masked_task_config);
-    write_shadow_dynamic_descriptors(*shadow_masked_task);
-
-    WBE::RTRunStaticSetVK::Config main_opaque_task_config;
-    main_opaque_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format)
-        .set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
-    auto main_opaque_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
-        render_allocator, renderer_vk, sponza_opaque_set, main_opaque_pipeline, main_opaque_task_config);
-    write_main_dynamic_descriptors(*main_opaque_task);
-
-    WBE::RTRunStaticSetVK::Config main_masked_task_config;
-    main_masked_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format)
-        .set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT)
-        .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-        .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    auto main_masked_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
-        render_allocator, renderer_vk, sponza_masked_set, main_masked_pipeline, main_masked_task_config);
-    write_main_dynamic_descriptors(*main_masked_task);
+    auto compile_task = [this, shadow_color_clear, shadow_depth_clear](std::string_view p_task_id,
+                            WBE::RefRes<WBE::RUStaticGeometrySet> p_set,
+                            WBE::RefRes<WBE::RUGraphicsPipeline> p_pipeline,
+                            std::string_view p_color_attachment,
+                            VkFormat p_color_format,
+                            std::string_view p_depth_attachment,
+                            VkFormat p_depth_format,
+                            VkExtent2D p_extent,
+                            bool p_load) {
+        WBE::StaticSetCompilerVK::Config compiler_config;
+        compiler_config.color_attachment_formats.push_back(p_color_format);
+        compiler_config.depth_attachment_format = p_depth_format;
+        WBE::Ref<WBE::CompiledStaticSetVK> static_set = WBE::StaticSetCompilerVK(renderer_vk).compile(p_set, p_pipeline, compiler_config);
+        WBE::CompiledStaticSetVK::PassConfig pass(render_allocator);
+        pass.render_extent = p_extent;
+        pass.color_attachment_ids.emplace_back(p_color_attachment);
+        pass.depth_attachment_id = p_depth_attachment;
+        pass.clear_values.push_back(shadow_color_clear);
+        pass.clear_values.push_back(shadow_depth_clear);
+        if (p_load) {
+            pass.color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+            pass.depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+        }
+        WBE::RendTaskDescVK descriptor(render_allocator, p_task_id, static_set->create_render_task(base_render_data, pass));
+        static_set->configure_task(descriptor);
+        return descriptor;
+    };
+    WBE::RendTaskDescVK shadow_opaque_task = compile_task(RT_RUN_SHADOWMAP_OPAQUE,
+        sponza_opaque_set,
+        shadow_opaque_pipeline,
+        REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
+        SHADOWMAP_COLOR_FORMAT,
+        REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
+        SHADOWMAP_DEPTH_FORMAT,
+        shadow_extent,
+        false);
+    WBE::RendTaskDescVK shadow_masked_task = compile_task(RT_RUN_SHADOWMAP_MASKED,
+        sponza_masked_set,
+        shadow_masked_pipeline,
+        REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
+        SHADOWMAP_COLOR_FORMAT,
+        REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
+        SHADOWMAP_DEPTH_FORMAT,
+        shadow_extent,
+        true);
+    WBE::RendTaskDescVK main_opaque_task = compile_task(RT_RUN_MAIN_OPAQUE,
+        sponza_opaque_set,
+        main_opaque_pipeline,
+        WBE::REND_RES_SWAP_CHAIN,
+        base_render_data->swap_chain_format,
+        REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
+        MAIN_DEPTH_FORMAT,
+        base_render_data->swap_chain_extent,
+        false);
+    WBE::RendTaskDescVK main_masked_task = compile_task(RT_RUN_MAIN_MASKED,
+        sponza_masked_set,
+        main_masked_pipeline,
+        WBE::REND_RES_SWAP_CHAIN,
+        base_render_data->swap_chain_format,
+        REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
+        MAIN_DEPTH_FORMAT,
+        base_render_data->swap_chain_extent,
+        true);
+    write_shadow_dynamic_descriptors();
+    write_main_dynamic_descriptors();
 
     setup_light_billboard_overlay_resources();
 
-    register_draw_sponza_render_graph(shadow_opaque_task, shadow_masked_task, main_opaque_task, main_masked_task);
+    register_draw_sponza_render_graph(
+        std::move(shadow_opaque_task), std::move(shadow_masked_task), std::move(main_opaque_task), std::move(main_masked_task));
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_render_context() {
@@ -577,8 +608,7 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
-void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    static_cast<void>(p_task);
+void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
     if (spot_light_info_ubos == WBE::MEM_NULL) {
         spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
     }
@@ -587,8 +617,7 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors(WBE::RTRu
     log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza shadow light buffer");
 }
 
-void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunStaticSetVK& p_task) {
-    static_cast<void>(p_task);
+void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors() {
     if (camera_info_ubos == WBE::MEM_NULL) {
         camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
     }
@@ -610,10 +639,10 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors(WBE::RTRunS
     log_uniform_buffer_descriptors(spot_light_count_ubos, "forward sponza light count buffer");
 }
 
-void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_opaque_task,
-    WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_masked_task,
-    WBE::Unique<WBE::RTRunStaticSetVK>& p_main_opaque_task,
-    WBE::Unique<WBE::RTRunStaticSetVK>& p_main_masked_task) {
+void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::RendTaskDescVK p_shadow_opaque_task,
+    WBE::RendTaskDescVK p_shadow_masked_task,
+    WBE::RendTaskDescVK p_main_opaque_task,
+    WBE::RendTaskDescVK p_main_masked_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
@@ -630,19 +659,13 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
         .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
 
-    pipeline_desc.tasks.emplace_back(render_allocator, RT_RUN_SHADOWMAP_OPAQUE, std::move(p_shadow_opaque_task));
-
-    WBE::RendTaskDescVK shadow_masked_task_desc(render_allocator, RT_RUN_SHADOWMAP_MASKED, std::move(p_shadow_masked_task));
-    shadow_masked_task_desc.after(RT_RUN_SHADOWMAP_OPAQUE);
-    pipeline_desc.tasks.emplace_back(std::move(shadow_masked_task_desc));
-
-    WBE::RendTaskDescVK main_opaque_task_desc(render_allocator, RT_RUN_MAIN_OPAQUE, std::move(p_main_opaque_task));
-    main_opaque_task_desc.after(RT_RUN_SHADOWMAP_MASKED).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
-    pipeline_desc.tasks.emplace_back(std::move(main_opaque_task_desc));
-
-    WBE::RendTaskDescVK main_masked_task_desc(render_allocator, RT_RUN_MAIN_MASKED, std::move(p_main_masked_task));
-    main_masked_task_desc.after(RT_RUN_MAIN_OPAQUE).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
-    pipeline_desc.tasks.emplace_back(std::move(main_masked_task_desc));
+    pipeline_desc.tasks.emplace_back(std::move(p_shadow_opaque_task));
+    p_shadow_masked_task.after(RT_RUN_SHADOWMAP_OPAQUE);
+    pipeline_desc.tasks.emplace_back(std::move(p_shadow_masked_task));
+    p_main_opaque_task.after(RT_RUN_SHADOWMAP_MASKED).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    pipeline_desc.tasks.emplace_back(std::move(p_main_opaque_task));
+    p_main_masked_task.after(RT_RUN_MAIN_OPAQUE).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    pipeline_desc.tasks.emplace_back(std::move(p_main_masked_task));
 
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
     light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;

@@ -17,6 +17,8 @@
   - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `RenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
   - Descriptor building, explicit-path validation, execution, bind-once resource contracts, and terminal semaphore access.
+- `include/function/render/render_resource_list.hh`
+  - CPU-side aggregate of render objects that can be bound once and accessed through one graph resource key.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
   - General compute dispatch task with compute-queue default and additional resource accesses.
 - `include/function/render_vk/rt_generate_mipmaps_vk.hh`
@@ -25,6 +27,17 @@
 ## Descriptor pattern
 
 Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null `RenderObjectContainerVK`. `RenderGraphVK::build_from_descriptor()` now rejects null containers, so descriptor construction must be complete before registration.
+
+`RenderResourceList` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
+as `<resource_list_key>[<index>]`. A task read or write on the aggregate expands to all indexed entries before dependency
+validation and synchronization scope derivation. Populate the list before graph construction; the list itself is CPU-only and
+does not create a GPU object.
+
+Task-private resources belong on `RendTaskDescVK`. `StaticSetRenderResourcesVK::register_resources()` adds its vertex, index,
+opaque and masked indirect draw-command, reflected shader, and texture-list resources together. Generic sequential graphics
+indirect dispatches receive the public resource IDs, vertex layout, and draw range at construction;
+`REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_SET_MASKED_DRAW_BATCHES` are also storage-buffer capable for
+explicitly ordered compute writes.
 
 A pipeline-run task descriptor captures only construction data. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:
 
@@ -90,6 +103,8 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 
 - Confirm every read ID appears in the graph resource declarations.
 - Confirm every `RendResVK` is bound to a non-null container before registration and that container UUIDs match their declarations.
+- For a `RenderResourceList`, confirm every entry is a render object for the active backend and populate the list before graph
+  registration.
 - Confirm task IDs and `prev` references are valid and acyclic.
 - Confirm each compact usage describes the actual command and that reads and writes are declared on the correct side.
 - Add explicit ordering for every read-write, write-read, and write-write hazard.

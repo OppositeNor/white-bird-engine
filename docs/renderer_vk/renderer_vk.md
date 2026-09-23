@@ -98,12 +98,12 @@ extension and feature are rejected; there is no static vertex-input fallback. Di
 reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
 state.
 
-## Static Set Tasks
+## Static Set Resources
 
-`RTRunStaticSetVK` is the current Vulkan path for static geometry. One task instance consumes exactly one explicit
-`RUStaticGeometrySet` resource and one explicit `RUGraphicsPipeline` resource. If a pass needs separate opaque and masked
-pipelines, build two tasks and order them in the render graph. The second task should normally use `VK_ATTACHMENT_LOAD_OP_LOAD`
-for the attachments written by the first task.
+`StaticSetCompilerVK::compile_resources()` compiles opaque and masked geometry into one pipeline-independent
+`StaticSetRenderResourcesVK`. It owns shared vertex and index buffers, separate opaque and masked indirect command buffers,
+submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed by the generic
+`RTRunGraphicsPipelinesSequentialVK`; callers provide the graphics pipeline when constructing each regular or indirect dispatch.
 
 ### Loading Static Geometry
 
@@ -118,14 +118,14 @@ Each static set stores:
 - For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
 - One shared instance array containing `glm::mat4` transforms.
 
-All drawable submeshes in one `RTRunStaticSetVK` task must reference the same vertex `RUBinary` resource and the same index
+All drawable submeshes in one compiled static set must reference the same vertex `RUBinary` resource and the same index
 `RUBinary` resource. Vertex and index binaries may be distinct from each other. The task validates that each vertex view and
 index view stays within its binary bounds before it creates any Vulkan buffers.
 
 ### Vertex Assembly And Upload
 
-`RTRunStaticSetVK` does not flatten mesh data through `RenderDatabase`. Instead, construction follows this path in
-`src/function/render_vk/rt_run_static_set_vk.cpp`:
+`StaticSetCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
+`src/function/render_vk/static_set_compiler_vk.cpp`:
 
 1. `StaticSetBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
   also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
@@ -153,6 +153,17 @@ named storage buffers into the reflected shader contract:
 
 The task still uses shader reflection for material fallback textures. `get_default_image()` resolves the configured default
 material, and `GraphicsPipelineCompilerVK` binds any reflected texture and parameter resources needed by the selected pipeline.
+The compiled material image views are also returned as a CPU-side `RenderResourceList`, available through
+`CompiledStaticSetVK::acquire_texture_list()`.
+
+When `CompiledStaticSetVK::configure_task()` configures a task descriptor, it registers the compiled vertex buffer as task-private
+`REND_RES_STATIC_SET_VERTICES`, the compiled index buffer as `REND_RES_STATIC_SET_INDICES`, the opaque indirect command buffer as
+`REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES`, and the material texture list as
+`REND_RES_STATIC_SET_TEXTURES`. These public identifiers let callers pass the compiled resources into reusable render tasks.
+A `RenderResourceList` does not create GPU resources; graph construction retains the list under its aggregate key and registers
+its entries as `<resource_list_key>[<index>]`. Declaring one access to the aggregate expands to accesses on all indexed entries, so
+the configured task can declare one sampled-image read on `REND_RES_STATIC_SET_TEXTURES` while graph dependency validation still
+sees every texture.
 
 `StaticSetDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
 layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their
@@ -166,17 +177,17 @@ binds its minimum vertex-view byte offset, and is split at the device's `maxDraw
 - `firstInstance` from the precomputed first-instance table.
 - `instanceCount` from the submesh's instance count.
 
-`build_indirect_buffer()` uploads that command array, and `build_non_empty_indirect_task()` packages the geometry buffer, indirect
-buffer, pipeline batch, attachment ids, clear values, and load ops into one `RTRunGraphicsPipelineIndirectVK`. During recording,
-`RTRunStaticSetVK::record()` delegates to that indirect task, which binds the compiled graphics pipeline, binds the cached binary
-buffer as vertex and index input, pushes the pipeline's descriptor-heap indices, and issues the indirect indexed draws.
+The indirect command buffer has both `VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT` and `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`. Each
+sequential graphics entry selects a contiguous command range and records one `vkCmdDrawIndexedIndirect`; a future compute task can
+write the same graph resource as a storage buffer when an explicit execution path orders it before the graphics task.
 
 Before constructing the task:
 
 1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
 2. Create every attachment resource referenced by the task configuration. Bind the renderer's swap-chain image-view container
   explicitly under `REND_RES_SWAP_CHAIN` when the graph renders to the swap chain.
-3. Construct one `RTRunStaticSetVK` per set-plus-pipeline combination and order them explicitly with `RendTaskDescVK::after()`.
+3. Compile one `CompiledStaticSetVK` per set-plus-pipeline combination and order its generic graphics task explicitly with
+  `RendTaskDescVK::after()`.
 
 ```cpp
 RendererVK* renderer = RendererVK::get_singleton();
@@ -186,16 +197,26 @@ ResourceManager* resource_manager = ResourceManager::get_singleton();
 RefRes<RUStaticOpaqueSet> opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("scene.static_opaque_set");
 RefRes<RUGraphicsPipeline> opaque_pipeline = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
 
-RTRunStaticSetVK::Config config;
-config.add_color_attachment(REND_RES_SWAP_CHAIN, renderer->get_base_render_data()->swap_chain_format)
-   .set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
-auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer, opaque_set, opaque_pipeline, config);
+StaticSetCompilerVK::Config compiler_config;
+compiler_config.color_attachment_formats.push_back(renderer->get_base_render_data()->swap_chain_format);
+compiler_config.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
+Ref<CompiledStaticSetVK> static_set = StaticSetCompilerVK(renderer).compile(opaque_set, opaque_pipeline, compiler_config);
+
+CompiledStaticSetVK::PassConfig pass_config(render_allocator);
+pass_config.render_extent = renderer->get_base_render_data()->swap_chain_extent;
+pass_config.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN);
+pass_config.depth_attachment_id = "scene_depth_view";
+pass_config.clear_values.resize(2);
+RendTaskDescVK task_desc(render_allocator,
+    "run_static_set",
+    static_set->create_render_task(renderer->get_base_render_data(), pass_config));
+static_set->configure_task(task_desc);
 
 RendGraphDescVK graph_desc(render_allocator);
 graph_desc
    .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
    .add_resource("scene_depth_view", depth_image_view)
-   .add_task(RT_RUN_STATIC_SET, std::move(task));
+   .add_task(std::move(task_desc));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
@@ -219,7 +240,7 @@ building the graph. The task retains its compiled Vulkan objects directly, and t
 ### Static Geometry Updates
 
 `RendererVK::update_static_geometry_sets()` no longer rebuilds raster draw tasks or flatten `RUMesh3D` data. Raster passes stay
-application-owned through explicit `RTRunStaticSetVK` tasks. The renderer-side update path exists only for derived shared state
+application-owned through compiled static sets and generic graphics tasks. The renderer-side update path exists only for derived shared state
 that is keyed by the published static sets.
 
 The current opaque update flow is:

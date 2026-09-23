@@ -36,7 +36,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/rt_run_static_set_vk.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <atomic>
 #include <cstdint>
@@ -87,6 +87,7 @@ private:
     static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = 1024;
     static constexpr size_t OCT_TREE_MAX_DEPTH = 16;
     static constexpr float OCT_TREE_WIDTH = 100.0F;
+    static constexpr size_t OCT_TREE_EXTENT = 512;
     static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(0.0);
 
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
@@ -204,18 +205,14 @@ private:
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_oct_tree_graphics_pipeline_context() const;
-    Unique<RTRunStaticSetVK> compile_shadow_task(
-        RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
-    Unique<RTRunStaticSetVK> compile_gbuffer_task(
-        RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
+    RendTaskDescVK compile_shadow_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
+    RendTaskDescVK compile_gbuffer_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(std::string_view p_graph_id,
-        bool p_use_summed_area_table,
-        Unique<RTRunStaticSetVK>& p_shadow_opaque_task,
-        Unique<RTRunStaticSetVK>& p_gbuffer_opaque_task);
+    void register_deferred_render_graph(
+        std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_task_desc() const;
