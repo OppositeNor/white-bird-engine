@@ -648,6 +648,16 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
     };
 }
 
+GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_oct_tree_graphics_pipeline_context() const {
+    return GraphicsPipelineCompilerVKContext{
+        .allocator = render_allocator,
+        .render_data = base_render_data,
+        .render_database = renderer_vk->get_render_database(),
+        .renderer = renderer_vk,
+        .color_attachment_formats = {}, // No color attachments for oct tree building.
+    };
+}
+
 void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     composition_camera_info_ubos = create_per_frame_buffers(
         render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);

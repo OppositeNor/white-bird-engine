@@ -791,14 +791,10 @@ void RenderGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) 
     if (renderer == nullptr) {
         throw std::runtime_error("RenderGraphVK: renderer singleton is unavailable.");
     }
-    Ref<ROCMultislotsVK> swap_chain_images = renderer->get_swap_chain_image_container();
-    if (swap_chain_images == MEM_NULL) {
-        throw std::runtime_error("RenderGraphVK: swap-chain image container is unavailable.");
-    }
-
-    auto image_view = swap_chain_images->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
+    Ref<ROCMultislotsVK> swap_chain_image_views = renderer->acquire_swap_chain_image_view_container();
+    auto image_view = swap_chain_image_views->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
-        throw std::runtime_error("RenderGraphVK: swap-chain image container did not resolve to an image view.");
+        throw std::runtime_error("RenderGraphVK: swap-chain image-view container did not resolve to an image view.");
     }
 
     Ref<ROImageVK> image = image_view->fields().image;

@@ -5,7 +5,7 @@
 1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` factories.
 2. `RendererVK::register_render_graph` stores the descriptor and immediately builds a `RenderGraphVK`.
 3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds explicit predecessor edges, topologically sorts nodes, validates that those edges order every resource conflict, allocates per-node command buffers, and creates terminal semaphores.
-4. Each frame, the renderer acquires a swap-chain image, updates the prebound swap-chain per-frame container for the current frame slot, executes the graph, and presents.
+4. Each frame, the renderer acquires a swap-chain image, updates the explicitly bound swap-chain image-view container for the current frame slot, executes the graph, and presents.
 5. `RenderGraphVK::execute` records and submits nodes individually in topological order to their selected graphics or compute queue.
 
 ## Core APIs
@@ -80,7 +80,7 @@ Ensure every compute node whose completion matters to presentation reaches the f
 
 Registration builds the graph immediately. During a frame the renderer updates the contents of already-bound containers before execution; it does not rebind graph resources after build.
 
-The swap-chain image view is held in an `ROCPerFrameVK` container that is prebound during `RendererVK::register_render_graph()`. Swap-chain recreation keeps that container stable when possible and replaces its per-slot image views in place. Use `ROCPerFrameVK(..., false)` for swap-chain-style replacement so `set()` skips buffer-update generation flushing. `ROPipelineVK` likewise resolves descriptor bindings backed by a `RenderObjectContainerVK` from `current_frame_slot` before pushing indices. All render objects and backend helpers remain rendering-thread-confined; cross-thread work goes through `IRenderer::add_job()`.
+The swap-chain image view is held in a renderer-owned `ROCMultislotsVK` container. Applications acquire shared ownership through `RendererVK::acquire_swap_chain_image_view_container()` and bind it under `REND_RES_SWAP_CHAIN` before graph registration; registration never inserts or replaces descriptor resources. Swap-chain recreation keeps that container stable when possible and replaces its per-slot image views in place. Use `ROCMultislotsVK(..., false)` for swap-chain-style replacement so `set()` skips buffer-update generation flushing. `ROPipelineVK` likewise resolves descriptor bindings backed by a `RenderObjectContainerVK` from `current_frame_slot` before pushing indices. All render objects and backend helpers remain rendering-thread-confined; cross-thread work goes through `IRenderer::add_job()`.
 
 `ROCBindingVK` has been removed from the codebase. Late persistent rebinding and transient graph-resource override APIs were removed from the graph path; if a resource must vary, represent that variation inside its bound container instead.
 
@@ -103,4 +103,4 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - `tests/executable/function/render/vulkan_draw_sponza_deferred_test.cpp`: graphics-to-compute deferred pipeline, declared shader accesses, and final presentation dependency.
 - `tests/unit/function/render_graph_descriptor_vk_test.cpp`: direct-task ownership and descriptor-copy behavior.
 - `src/function/render_vk/render_graph_vk.cpp`: authoritative build, dependency validation, heap binding, barrier, and submission behavior.
-- `src/function/render_vk/renderer_vk.cpp`: graph registration, swap-chain prebinding, per-frame container updates, execution, presentation, and delayed destruction.
+- `src/function/render_vk/renderer_vk.cpp`: graph registration, swap-chain image-view container acquisition and per-frame updates, execution, presentation, and delayed destruction.

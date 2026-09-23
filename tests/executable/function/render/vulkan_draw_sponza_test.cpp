@@ -412,13 +412,15 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
     write_shadow_dynamic_descriptors(*shadow_masked_task);
 
     WBE::RTRunStaticSetVK::Config main_opaque_task_config;
-    main_opaque_task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
+    main_opaque_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format)
+        .set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT);
     auto main_opaque_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
         render_allocator, renderer_vk, sponza_opaque_set, main_opaque_pipeline, main_opaque_task_config);
     write_main_dynamic_descriptors(*main_opaque_task);
 
     WBE::RTRunStaticSetVK::Config main_masked_task_config;
-    main_masked_task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT)
+    main_masked_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format)
+        .set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_FORMAT)
         .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     auto main_masked_task = WBE::make_unique<WBE::RTRunStaticSetVK>(
@@ -613,10 +615,8 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
     WBE::Unique<WBE::RTRunStaticSetVK>& p_main_opaque_task,
     WBE::Unique<WBE::RTRunStaticSetVK>& p_main_masked_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container = WBE::MEM_NULL});
-    pipeline_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
+    pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
+        .add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubos)
@@ -654,7 +654,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Uni
             base_render_data,
             glm::vec4(0.0F),
             base_render_data->swap_chain_extent,
-            WBE::REND_RES_SWAP_CHAIN_IMAGE,
+            WBE::REND_RES_SWAP_CHAIN,
             light_billboard_pipeline,
             std::optional<std::string_view>{},
             std::optional<std::string_view>{},

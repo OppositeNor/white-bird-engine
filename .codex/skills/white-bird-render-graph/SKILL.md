@@ -37,7 +37,7 @@ Presentation remains graphics-specific: swap-chain acquire waits attach to the f
 
 Render-graph resources are now bind-once for the graph lifetime. `RenderGraphVK::build_from_descriptor()` rejects any `RendResVK` whose container is null. When a resource varies by frame, bind one stable container up front and mutate the render objects inside it instead of rebinding the graph resource.
 
-The swap-chain path uses this pattern: `RendererVK::register_render_graph()` prebinds `REND_RES_SWAP_CHAIN_IMAGE` to the renderer-owned `ROCPerFrameVK`, and each frame the renderer replaces only the current slot's image view before execution. Construct swap-chain `ROCPerFrameVK` containers with `p_flush = false` so slot replacement does not trigger buffer-update generation tracking.
+The swap-chain path uses this pattern: the application binds `REND_RES_SWAP_CHAIN` to `RendererVK::acquire_swap_chain_image_view_container()` before graph registration, and each frame the renderer replaces only the current slot's image view before execution. Construct swap-chain `ROCMultislotsVK` containers with `p_flush = false` so slot replacement does not trigger buffer-update generation tracking.
 
 Do not rely on post-build `set_resource()` or transient graph-resource overrides; those late-binding paths are no longer supported. `ROCBindingVK` was removed from the codebase; if a resource must vary, represent that variation inside the bound container itself.
 

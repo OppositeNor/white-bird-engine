@@ -203,6 +203,7 @@ private:
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
+    GraphicsPipelineCompilerVKContext make_oct_tree_graphics_pipeline_context() const;
     Unique<RTRunStaticSetVK> compile_shadow_task(
         RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
     Unique<RTRunStaticSetVK> compile_gbuffer_task(

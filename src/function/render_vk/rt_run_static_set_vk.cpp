@@ -275,9 +275,6 @@ StaticSetAttachmentDataVK build_attachment_data(const RTRunStaticSetVK::Config& 
     for (size_t i = 0; i < p_config.get_clear_value_count(); ++i) {
         result.clear_values.push_back(p_config.get_clear_value(i));
     }
-    if (result.color_attachment_ids.empty()) {
-        result.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN_IMAGE);
-    }
     if (p_config.has_depth_attachment() != (p_config.get_depth_attachment_format() != VK_FORMAT_UNDEFINED)) {
         throw std::runtime_error("Failed to construct static set task: depth attachment id and format must be provided together.");
     }
@@ -372,14 +369,11 @@ RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
     return material->textures.get()[0].texture;
 }
 
-std::vector<VkFormat> get_color_attachment_formats(const RTRunStaticSetVK::Config& p_config, const BaseRenderDataVK* p_render_data) {
+std::vector<VkFormat> get_color_attachment_formats(const RTRunStaticSetVK::Config& p_config) {
     std::vector<VkFormat> result;
     result.reserve(p_config.get_color_attachment_count());
     for (size_t i = 0; i < p_config.get_color_attachment_count(); ++i) {
         result.push_back(p_config.get_color_attachment_format(i));
-    }
-    if (result.empty()) {
-        result.push_back(p_render_data->swap_chain_format);
     }
     return result;
 }
@@ -627,7 +621,7 @@ StaticSetPipelineBuild compile_static_set_pipeline(RendererVK* p_renderer,
         .render_database = p_renderer->get_render_database(),
         .renderer = p_renderer,
         .default_texture_resource = get_default_image(p_config.get_default_material_resource_key()),
-        .color_attachment_formats = get_color_attachment_formats(p_config, render_data),
+        .color_attachment_formats = get_color_attachment_formats(p_config),
         .depth_attachment_format = p_config.get_depth_attachment_format(),
         .stencil_attachment_format = p_config.get_stencil_attachment_format(),
     };

@@ -121,7 +121,8 @@ public:
             .vertex_offset = 0,
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER, time_ubo)
+        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
+            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER, time_ubo)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
         WBE::RendTaskDescVK task_desc(render_allocator);
@@ -132,7 +133,7 @@ public:
                 base_render_data,
                 glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
                 base_render_data->swap_chain_extent,
-                WBE::REND_RES_SWAP_CHAIN_IMAGE,
+                WBE::REND_RES_SWAP_CHAIN,
                 graphics_pipeline,
                 REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
                 REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,

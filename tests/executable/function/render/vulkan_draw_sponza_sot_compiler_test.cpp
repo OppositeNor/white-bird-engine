@@ -158,14 +158,14 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     create_depth_resources();
 
     RTRunStaticSetVK::Config task_config;
-    task_config.set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
+    task_config.add_color_attachment(REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format)
+        .set_depth_attachment(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
     auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer_vk, sponza_set, graphics_pipeline, task_config);
     write_camera_descriptor();
 
     RendGraphDescVK graph_desc(render_allocator);
-    graph_desc.resources.emplace_back(RendResVK{
-        .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE), .res_type_id = TypeUUID<ROImageViewVK>::UUID, .container = MEM_NULL});
-    graph_desc.add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view)
+    graph_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
+        .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view)
         .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_CAMERA_INFO_BUFFER, camera_info_buffer);
     graph_desc.tasks.emplace_back(render_allocator, RT_RUN_STATIC_SET, std::move(task));
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));

@@ -58,7 +58,7 @@
 
 namespace WhiteBirdEngine {
 
-static constexpr std::string_view REND_RES_SWAP_CHAIN_IMAGE = "swap_chain_image";
+static constexpr std::string_view REND_RES_SWAP_CHAIN = "swap_chain";
 
 /**
  * @class RendererVK
@@ -183,9 +183,16 @@ public:
         return &base_render_data;
     }
 
-    Ref<ROCMultislotsVK> get_swap_chain_image_container() const {
-        return swap_chain_image_container;
-    }
+    /**
+     * @brief Acquire shared ownership of the per-frame swap-chain image-view container.
+     *
+     * Render graphs bind this stable container explicitly under `REND_RES_SWAP_CHAIN`. The renderer updates the current frame
+     * slot after acquiring a swap-chain image.
+     *
+     * @return The renderer-owned swap-chain image-view container.
+     * @throws std::runtime_error If the renderer has no swap-chain image-view container.
+     */
+    Ref<ROCMultislotsVK> acquire_swap_chain_image_view_container() const;
 
     /**
      * @brief Register a task to be called after a number of frames. This could
@@ -262,7 +269,7 @@ private:
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
     Unique<DescriptorHeapAllocatorVK> descriptor_heap_allocator;
-    Ref<ROCMultislotsVK> swap_chain_image_container;
+    Ref<ROCMultislotsVK> swap_chain_image_view_container;
 
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
@@ -406,7 +413,7 @@ private:
     void create_command_pools();
     void create_ktx_vulkan_device_info();
     void create_gpu_job_command_buffer();
-    void refresh_swap_chain_image_container();
+    void refresh_swap_chain_image_view_container();
     void create_descriptor_heap_allocator();
     void create_async_objects();
 

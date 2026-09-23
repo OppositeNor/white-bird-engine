@@ -238,13 +238,13 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
 
     vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
 
-    // Update the current frame slot so the pre-bound swap-chain container
+    // Update the current frame slot so the graph-bound swap-chain image-view container
     // resolves to the correct image view during task recording.
     base_render_data.current_swap_chain_index = image_index;
-    if (swap_chain_image_container == MEM_NULL) {
-        throw std::runtime_error("RendererVK: swap-chain image container is unavailable.");
+    if (swap_chain_image_view_container == MEM_NULL) {
+        throw std::runtime_error("RendererVK: swap-chain image-view container is unavailable.");
     }
-    swap_chain_image_container->set(base_render_data.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
+    swap_chain_image_view_container->set(base_render_data.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
@@ -266,6 +266,13 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     ++(base_render_data.current_frame);
 }
 
+Ref<ROCMultislotsVK> RendererVK::acquire_swap_chain_image_view_container() const {
+    if (swap_chain_image_view_container == MEM_NULL) {
+        throw std::runtime_error("RendererVK: swap-chain image-view container is unavailable.");
+    }
+    return swap_chain_image_view_container;
+}
+
 void RendererVK::init(RendererCapabilities& p_capabilities) {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Initializing Vulkan renderer.");
     render_objects = make_unique<RenderObjects>(allocator, allocator);
@@ -281,7 +288,7 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
     base_render_data.current_frame = 1;
     init_swap_chain_image_views();
-    refresh_swap_chain_image_container();
+    refresh_swap_chain_image_view_container();
     image_available_semaphores.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
@@ -292,8 +299,8 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
 void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
     registered_plugins.clear();
-    if (swap_chain_image_container != MEM_NULL) {
-        swap_chain_image_container->clear();
+    if (swap_chain_image_view_container != MEM_NULL) {
+        swap_chain_image_view_container->clear();
     }
     render_objects.reset();
 
@@ -306,7 +313,7 @@ void RendererVK::terminate() {
     render_graphs.clear();
     render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
-    swap_chain_image_container = MEM_NULL;
+    swap_chain_image_view_container = MEM_NULL;
 
     synchronize_gpu_and_flush_delayed_calls();
     base_render_data.descriptor_heap_allocator = nullptr;
@@ -346,7 +353,7 @@ void RendererVK::recreate_swap_chain() {
     create_swap_chain();
     setup_base_render_data();
     init_swap_chain_image_views();
-    refresh_swap_chain_image_container();
+    refresh_swap_chain_image_view_container();
 }
 
 void RendererVK::setup_base_render_data() {
@@ -596,8 +603,8 @@ void RendererVK::create_swap_chain_images() {
 }
 
 void RendererVK::clean_up_swap_chain() {
-    if (swap_chain_image_container != MEM_NULL) {
-        swap_chain_image_container->clear();
+    if (swap_chain_image_view_container != MEM_NULL) {
+        swap_chain_image_view_container->clear();
     }
     render_objects->swap_chain_image_views.clear();
     render_objects->swap_chain_images.clear();
@@ -628,22 +635,22 @@ void RendererVK::init_swap_chain_image_views() {
     }
 }
 
-void RendererVK::refresh_swap_chain_image_container() {
+void RendererVK::refresh_swap_chain_image_view_container() {
     if (render_objects->swap_chain_image_views.empty()) {
         throw std::runtime_error("RendererVK: swap-chain image views are unavailable.");
     }
 
-    if (swap_chain_image_container == MEM_NULL || swap_chain_image_container->get_slot_count() != frames_in_flight) {
-        swap_chain_image_container = make_ref<ROCMultislotsVK>(allocator, allocator, frames_in_flight, false);
+    if (swap_chain_image_view_container == MEM_NULL || swap_chain_image_view_container->get_slot_count() != frames_in_flight) {
+        swap_chain_image_view_container = make_ref<ROCMultislotsVK>(allocator, allocator, frames_in_flight, false);
     } else {
-        swap_chain_image_container->clear();
+        swap_chain_image_view_container->clear();
     }
 
     const uint32_t image_view_count = static_cast<uint32_t>(render_objects->swap_chain_image_views.size());
-    const uint32_t slot_count = swap_chain_image_container->get_slot_count();
+    const uint32_t slot_count = swap_chain_image_view_container->get_slot_count();
     for (uint32_t slot = 0; slot < slot_count; ++slot) {
         uint32_t image_index = slot % image_view_count;
-        swap_chain_image_container->set(slot, render_objects->swap_chain_image_views[image_index]);
+        swap_chain_image_view_container->set(slot, render_objects->swap_chain_image_views[image_index]);
     }
 }
 
@@ -1503,23 +1510,6 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
 Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc) {
     if (render_graphs.contains(p_resource_key)) {
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
-    }
-
-    bool has_swap_chain_resource = false;
-    for (auto& resource : p_desc.resources) {
-        if (resource.res_id != REND_RES_SWAP_CHAIN_IMAGE) {
-            continue;
-        }
-        has_swap_chain_resource = true;
-        resource.res_type_id = TypeUUID<ROImageViewVK>::UUID;
-        resource.container = swap_chain_image_container;
-    }
-    if (!has_swap_chain_resource) {
-        p_desc.resources.push_back(RendResVK{
-            .res_id = std::string(REND_RES_SWAP_CHAIN_IMAGE),
-            .res_type_id = TypeUUID<ROImageViewVK>::UUID,
-            .container = swap_chain_image_container,
-        });
     }
 
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));

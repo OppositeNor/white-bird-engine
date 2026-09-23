@@ -700,8 +700,9 @@ public:
          * @brief Apply default opaque-rendering pipeline configuration.
          *
          * This helper configures empty static vertex input, viewport/scissor
-         * from render data, a default color attachment state,
-         * swap chain color format, and dynamic vertex input state.
+         * from render data, undefined depth/stencil formats, and dynamic vertex
+         * input state. Color formats and blend attachments must be added
+         * explicitly by the caller.
          *
          * @param p_render_data Base render data for viewport/scissor defaults.
          * @param p_shader_config Shader stage configuration.
@@ -713,8 +714,7 @@ public:
             config.vertex_input = {};
             config.viewport.viewports = {p_render_data->viewport};
             config.viewport.scissors = {p_render_data->scissor};
-            config.color_blend.add_default_color_attachment();
-            config.attachment_config.add_color_format(p_render_data->swap_chain_format).set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
+            config.attachment_config.set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
             config.dynamic_state.add_default_dynamic_states().add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
             return *this;
         }

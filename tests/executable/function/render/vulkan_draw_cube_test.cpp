@@ -217,6 +217,7 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     write_shadow_dynamic_descriptors(*shadow_task);
 
     WBE::RTRunStaticSetVK::Config main_task_config;
+    main_task_config.add_color_attachment(WBE::REND_RES_SWAP_CHAIN, base_render_data->swap_chain_format);
     auto main_task =
         WBE::make_unique<WBE::RTRunStaticSetVK>(render_allocator, renderer_vk, cube_set, main_pipeline_resource, main_task_config);
     write_main_dynamic_descriptors(*main_task);
@@ -323,10 +324,8 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors(WBE::RTRunSta
 void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
     WBE::Unique<WBE::RTRunStaticSetVK>& p_shadow_task, WBE::Unique<WBE::RTRunStaticSetVK>& p_main_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    pipeline_desc.resources.emplace_back(WBE::RendResVK{.res_id = std::string(WBE::REND_RES_SWAP_CHAIN_IMAGE),
-        .res_type_id = WBE::TypeUUID<WBE::ROImageViewVK>::UUID,
-        .container = WBE::MEM_NULL});
-    pipeline_desc.add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
+    pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
+        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubo)
         .add_resource(CAMERA_INFO_BUFFER, camera_info_ubo)

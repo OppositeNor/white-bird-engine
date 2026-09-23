@@ -84,7 +84,7 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
           "graphics pipeline"),
       context(p_context) {
     if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL ||
-        context.renderer == nullptr || context.color_attachment_formats.empty()) {
+        context.renderer == nullptr) {
         throw std::runtime_error("Failed to create graphics pipeline compiler: invalid context.");
     }
 }
@@ -138,7 +138,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     pipeline_builder.config.attachment_config.set_color_formats(context.color_attachment_formats)
         .set_depth_format(context.depth_attachment_format)
         .set_stencil_format(context.stencil_attachment_format);
-    for (uint32_t additional_index = 1; additional_index < context.color_attachment_formats.size(); ++additional_index) {
+    for (size_t attachment_index = 0; attachment_index < context.color_attachment_formats.size(); ++attachment_index) {
         pipeline_builder.config.color_blend.add_default_color_attachment();
     }
     pipeline_builder.config.depth_test.set_depth_test(p_pipeline_resource.depth_test ? VK_TRUE : VK_FALSE);

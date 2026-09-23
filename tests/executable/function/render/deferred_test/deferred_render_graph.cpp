@@ -109,7 +109,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN_IMAGE, TypeUUID<ROImageViewVK>::UUID)
+    p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
         .add_resource(SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
@@ -359,7 +359,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
             task_base_render_data,
             glm::vec4(0.0F, 0.0F, 0.0F, 1.0F),
             task_base_render_data->swap_chain_extent,
-            REND_RES_SWAP_CHAIN_IMAGE,
+            REND_RES_SWAP_CHAIN,
             task_pipeline,
             VK_ATTACHMENT_LOAD_OP_CLEAR);
     };
@@ -388,7 +388,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
         std::array<VkClearValue, 2> clear_values{};
-        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN_IMAGE};
+        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN};
         return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             clear_values,
@@ -416,7 +416,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
         std::array<VkClearValue, 2> clear_values{};
-        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN_IMAGE};
+        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN};
         return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
             task_base_render_data,
             clear_values,

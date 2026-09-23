@@ -7,7 +7,7 @@ description: Capture and inspect White Bird Engine rendering-test PNGs, and inte
 
 ## Inspect current implementation
 
-Read `tests/executable/function/render/render_test.hh` and `render_test.cpp`, the relevant test's `main()` and `render_update()`, and the capture contract in `include/function/render/i_renderer.hh`. Check `git diff` first for updated probes or user changes. Do not assume old binaries or screenshots reflect current source.
+Read the header-only shared utility in `tests/executable/function/render/render_test.hh`, the relevant test's `main()` and `render_update()`, and the capture contract in `include/function/render/i_renderer.hh`. Check `git diff` first for updated probes or user changes. Read `tests/executable/function/render/generate.json` only when adding, removing, or renaming a rendering executable. Do not assume old binaries or screenshots reflect current source.
 
 ## Shared test hooks
 
@@ -15,7 +15,8 @@ Every executable test that renders must:
 
 - Include `render_test.hh` and call `WBE::on_exec_test_start()` at the beginning of `main()`, before application/renderer initialization and thread startup. This configures capture and optionally waits for process injection.
 - Call `WBE::on_exec_test_render(renderer, current_frame)` from its render-thread `render_update()`, before any early return. Pass the renderer by reference and its monotonic frame counter, not the rotating frame slot or acquired swapchain image index.
-- Link `render_test.cpp`: add it to the executable's `sources` in `tests/executable/function/render/generate.json`. Do not edit `executable_test.gen.cmake`.
+
+The shared utility is header-only; there is no `render_test.cpp` to link. When adding a new rendering executable, add only that executable's source pattern to `tests/executable/function/render/generate.json`. Do not edit `executable_test.gen.cmake`.
 
 The shared test utility owns environment parsing and one-shot trigger state. Keep those policies out of the engine. Use `IRenderer::request_frame_capture()` for capture, never a hard-coded engine screenshot path or environment hook. Renderer access is render-thread confined; requests originating elsewhere must use `IRenderer::add_job()`.
 

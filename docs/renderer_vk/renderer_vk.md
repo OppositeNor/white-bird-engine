@@ -174,8 +174,8 @@ buffer as vertex and index input, pushes the pipeline's descriptor-heap indices,
 Before constructing the task:
 
 1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
-2. Create every attachment resource referenced by the task configuration. The swap-chain image view is represented in the graph by
-  a `REND_RES_SWAP_CHAIN_IMAGE` resource with a null object; the renderer resolves it for each frame.
+2. Create every attachment resource referenced by the task configuration. Bind the renderer's swap-chain image-view container
+  explicitly under `REND_RES_SWAP_CHAIN` when the graph renders to the swap chain.
 3. Construct one `RTRunStaticSetVK` per set-plus-pipeline combination and order them explicitly with `RendTaskDescVK::after()`.
 
 ```cpp
@@ -187,28 +187,27 @@ RefRes<RUStaticOpaqueSet> opaque_set = resource_manager->get_resource<RUStaticOp
 RefRes<RUGraphicsPipeline> opaque_pipeline = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
 
 RTRunStaticSetVK::Config config;
-config.set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
+config.add_color_attachment(REND_RES_SWAP_CHAIN, renderer->get_base_render_data()->swap_chain_format)
+   .set_depth_attachment("scene_depth_view", VK_FORMAT_D32_SFLOAT);
 auto task = make_unique<RTRunStaticSetVK>(render_allocator, renderer, opaque_set, opaque_pipeline, config);
 
 RendGraphDescVK graph_desc(render_allocator);
 graph_desc
-   .add_resource(REND_RES_SWAP_CHAIN_IMAGE,
-      TypeUUID<ROImageViewVK>::UUID,
-      Ref<RenderObjectContainerVK>(MEM_NULL))
-   .add_resource("scene_depth_view", TypeUUID<ROImageViewVK>::UUID, depth_image_view)
+   .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
+   .add_resource("scene_depth_view", depth_image_view)
    .add_task(RT_RUN_STATIC_SET, std::move(task));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
 ```
 
-The application contributes only graph-visible attachments and any later descriptor binding replacements. The task retains its compiled Vulkan
-objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
+The application contributes all graph-visible attachments before registration. The renderer does not add or replace descriptor resources while
+building the graph. The task retains its compiled Vulkan objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
 
 ### Configuring Explicit Passes
 
-- `add_color_attachment()` adds color attachments in rendering order. With no explicit color attachment, the swap-chain image view
-  and format are used.
+- `add_color_attachment()` adds color attachments in rendering order. With no explicit color attachment, the graphics pipeline and
+  dynamic-rendering task use zero color attachments.
 - `set_depth_attachment()` requires both a graph resource id and its Vulkan format. `set_render_extent()` overrides the swap-chain
   extent.
 - `add_clear_value()` follows attachment order: all color values first, then depth. Missing color values default to opaque black;
