@@ -103,6 +103,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
+    add_static_set_graph_resources(p_pipeline_desc, static_set_resources);
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)

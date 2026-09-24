@@ -20,7 +20,6 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
-#include "function/function_utils.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
@@ -40,7 +39,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
-#include "generated/type_uuid.gen.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
@@ -48,6 +47,7 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -68,7 +68,6 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -179,6 +178,11 @@ private:
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_masked_pipeline;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_opaque_pipeline;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_masked_pipeline;
+    WBE::Ref<WBE::StaticSetResourcesVK> static_set_resources;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_masked_graphics_pipeline;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> main_opaque_graphics_pipeline;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> main_masked_graphics_pipeline;
     WBE::Ref<WBE::ROImageVK> shadow_depth_image;
     WBE::Ref<WBE::ROImageVK> shadow_color_image;
     WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;
@@ -391,67 +395,45 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
 
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    auto compile_task = [this, shadow_color_clear, shadow_depth_clear](std::string_view p_task_id,
-                            WBE::RefRes<WBE::RUStaticGeometrySet> p_set,
-                            WBE::RefRes<WBE::RUGraphicsPipeline> p_pipeline,
-                            std::string_view p_color_attachment,
-                            VkFormat p_color_format,
-                            std::string_view p_depth_attachment,
-                            VkFormat p_depth_format,
-                            VkExtent2D p_extent,
-                            bool p_load) {
-        WBE::StaticSetCompilerVK::Config compiler_config;
-        compiler_config.color_attachment_formats.push_back(p_color_format);
-        compiler_config.depth_attachment_format = p_depth_format;
-        WBE::Ref<WBE::CompiledStaticSetVK> static_set = WBE::StaticSetCompilerVK(renderer_vk).compile(p_set, p_pipeline, compiler_config);
-        WBE::CompiledStaticSetVK::PassConfig pass(render_allocator);
-        pass.render_extent = p_extent;
-        pass.color_attachment_ids.emplace_back(p_color_attachment);
-        pass.depth_attachment_id = p_depth_attachment;
-        pass.clear_values.push_back(shadow_color_clear);
-        pass.clear_values.push_back(shadow_depth_clear);
-        if (p_load) {
-            pass.color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-            pass.depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-        }
-        WBE::RendTaskDescVK descriptor(render_allocator, p_task_id, static_set->create_render_task(base_render_data, pass));
-        static_set->configure_task(descriptor);
-        return descriptor;
+    auto create_task = [this, shadow_color_clear, shadow_depth_clear](std::string_view p_task_id,
+                           WBE::Ref<WBE::ROGraphicsPipelineVK> p_pipeline,
+                           bool p_masked,
+                           std::string_view p_color_attachment,
+                           std::string_view p_depth_attachment,
+                           VkExtent2D p_extent,
+                           bool p_load) {
+        const std::array<VkClearValue, 2> clear_values{shadow_color_clear, shadow_depth_clear};
+        const std::array<std::string_view, 1> color_attachments{p_color_attachment};
+        const VkAttachmentLoadOp load_op = p_load ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+        return WBE::make_static_set_task_desc(
+            render_allocator, base_render_data, p_task_id, static_set_resources, p_pipeline, p_masked, clear_values, p_extent, color_attachments, p_depth_attachment, load_op, load_op);
     };
-    WBE::RendTaskDescVK shadow_opaque_task = compile_task(RT_RUN_SHADOWMAP_OPAQUE,
-        sponza_opaque_set,
-        shadow_opaque_pipeline,
+    WBE::RendTaskDescVK shadow_opaque_task = create_task(RT_RUN_SHADOWMAP_OPAQUE,
+        shadow_opaque_graphics_pipeline,
+        false,
         REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
-        SHADOWMAP_COLOR_FORMAT,
         REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-        SHADOWMAP_DEPTH_FORMAT,
         shadow_extent,
         false);
-    WBE::RendTaskDescVK shadow_masked_task = compile_task(RT_RUN_SHADOWMAP_MASKED,
-        sponza_masked_set,
-        shadow_masked_pipeline,
+    WBE::RendTaskDescVK shadow_masked_task = create_task(RT_RUN_SHADOWMAP_MASKED,
+        shadow_masked_graphics_pipeline,
+        true,
         REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
-        SHADOWMAP_COLOR_FORMAT,
         REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-        SHADOWMAP_DEPTH_FORMAT,
         shadow_extent,
         true);
-    WBE::RendTaskDescVK main_opaque_task = compile_task(RT_RUN_MAIN_OPAQUE,
-        sponza_opaque_set,
-        main_opaque_pipeline,
+    WBE::RendTaskDescVK main_opaque_task = create_task(RT_RUN_MAIN_OPAQUE,
+        main_opaque_graphics_pipeline,
+        false,
         WBE::REND_RES_SWAP_CHAIN,
-        base_render_data->swap_chain_format,
         REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
-        MAIN_DEPTH_FORMAT,
         base_render_data->swap_chain_extent,
         false);
-    WBE::RendTaskDescVK main_masked_task = compile_task(RT_RUN_MAIN_MASKED,
-        sponza_masked_set,
-        main_masked_pipeline,
+    WBE::RendTaskDescVK main_masked_task = create_task(RT_RUN_MAIN_MASKED,
+        main_masked_graphics_pipeline,
+        true,
         WBE::REND_RES_SWAP_CHAIN,
-        base_render_data->swap_chain_format,
         REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
-        MAIN_DEPTH_FORMAT,
         base_render_data->swap_chain_extent,
         true);
     write_shadow_dynamic_descriptors();
@@ -503,6 +485,18 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
+    static_set_resources = WBE::create_static_set_resources(
+        renderer_vk, sponza_opaque_set, sponza_masked_set, main_opaque_pipeline, main_masked_pipeline, main_opaque_pipeline);
+    const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
+    shadow_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
+        renderer_vk, "forward_sponza_shadow_opaque", shadow_opaque_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
+    shadow_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
+        renderer_vk, "forward_sponza_shadow_masked", shadow_masked_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
+    const std::array main_formats{base_render_data->swap_chain_format};
+    main_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
+        renderer_vk, "forward_sponza_main_opaque", main_opaque_pipeline, main_formats, MAIN_DEPTH_FORMAT);
+    main_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
+        renderer_vk, "forward_sponza_main_masked", main_masked_pipeline, main_formats, MAIN_DEPTH_FORMAT);
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
@@ -644,6 +638,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     WBE::RendTaskDescVK p_main_opaque_task,
     WBE::RendTaskDescVK p_main_masked_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
+    WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)

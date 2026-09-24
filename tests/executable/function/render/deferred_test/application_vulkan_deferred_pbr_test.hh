@@ -36,6 +36,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <atomic>
 #include <cstdint>
@@ -204,8 +205,8 @@ private:
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_oct_tree_graphics_pipeline_context() const;
-    RendTaskDescVK compile_shadow_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
-    RendTaskDescVK compile_gbuffer_task(RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_pipeline, bool p_load_existing);
+    RendTaskDescVK create_shadow_task(bool p_load_existing) const;
+    RendTaskDescVK create_gbuffer_task(bool p_load_existing) const;
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors();
@@ -248,6 +249,9 @@ private:
     RefRes<RUShader> oct_tree_build_z_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
+    Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_horizontal_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_vertical_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> direct_lighting_compute_pipeline = MEM_NULL;

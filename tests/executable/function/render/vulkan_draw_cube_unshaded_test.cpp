@@ -26,7 +26,9 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -35,6 +37,7 @@
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <array>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_transform.hpp>
@@ -95,20 +98,27 @@ public:
                               .initial_data(&camera_info, sizeof(camera_info))
                               .create_ref(base_render_data);
 
-        WBE::StaticSetCompilerVK::Config compiler_config;
-        compiler_config.color_attachment_formats.push_back(base_render_data->swap_chain_format);
-        WBE::Ref<WBE::CompiledStaticSetVK> static_set =
-            WBE::StaticSetCompilerVK(renderer).compile(cube_set, pipeline_resource, compiler_config);
-        if (static_set->acquire_texture_list() == WBE::MEM_NULL) {
+        WBE::Ref<WBE::StaticSetResourcesVK> static_set_resources =
+            WBE::create_static_set_resources(renderer, cube_set, WBE::MEM_NULL, pipeline_resource, WBE::MEM_NULL, WBE::MEM_NULL);
+        if (static_set_resources->acquire_textures() == WBE::MEM_NULL) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: static-set texture list was not compiled.");
         }
-        WBE::CompiledStaticSetVK::PassConfig pass_config(render_allocator);
-        pass_config.render_extent = base_render_data->swap_chain_extent;
-        pass_config.color_attachment_ids.emplace_back(WBE::REND_RES_SWAP_CHAIN);
-        pass_config.clear_values.emplace_back();
-        WBE::RendTaskDescVK task_desc(render_allocator, "run_static_set", static_set->create_render_task(base_render_data, pass_config));
-        static_set->configure_task(task_desc);
+        const std::array color_formats{base_render_data->swap_chain_format};
+        WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline =
+            WBE::compile_render_test_graphics_pipeline(renderer, "draw_cube_unshaded_pipeline", pipeline_resource, color_formats);
+        const std::array<VkClearValue, 1> clear_values{};
+        const std::array<std::string_view, 1> color_attachments{WBE::REND_RES_SWAP_CHAIN};
+        WBE::RendTaskDescVK task_desc = WBE::make_static_set_task_desc(render_allocator,
+            base_render_data,
+            "run_static_set",
+            static_set_resources,
+            graphics_pipeline,
+            false,
+            clear_values,
+            base_render_data->swap_chain_extent,
+            color_attachments);
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
+        WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
             .add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
         pipeline_desc.tasks.emplace_back(std::move(task_desc));

@@ -17,34 +17,25 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/function_utils.hh"
 #include "function/render/material_texture_contract.hh"
-#include "function/render/material_texture_contract_resolver.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render/shader_metadata_loader.hh"
 #include "function/render/static_set_node_contract.hh"
 #include "function/render/static_set_node_contract_resolver.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/rt_clear_attachments_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipelines_sequential_vk.hh"
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
 #include "function/render_vk/static_set_material_resource_builder_vk.hh"
-#include "function/render_vk/static_set_render_resources_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "glm/common.hpp"
 #include "glm/matrix.hpp"
 #include "resource/resource_manager/resource_manager.hh"
@@ -96,27 +87,6 @@ struct StaticInstanceBufferData {
     std::vector<RefRes<RUMaterial>> ordered_materials;
 };
 
-struct NonEmptyStaticSetTaskBuild {
-    Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
-    Ref<ROBufferVK> submesh_buffer = MEM_NULL;
-    Ref<ROBufferVK> node_buffer = MEM_NULL;
-    Ref<ROBufferVK> instance_buffer = MEM_NULL;
-    Ref<ROBufferVK> material_params_buffer = MEM_NULL;
-    Ref<ROSamplerVK> material_sampler = MEM_NULL;
-    Ref<ROBufferVK> vertex_buffer = MEM_NULL;
-    Ref<ROBufferVK> index_buffer = MEM_NULL;
-    Ref<ROBufferVK> draw_batches_buffer = MEM_NULL;
-    Ref<RenderResourceList> texture_list = MEM_NULL;
-    std::vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch> pipeline_batches;
-};
-
-struct StaticSetPipelineBuild {
-    GraphicsPipelineCompilerVK::CompileResult compiled_pipeline;
-    Ref<ROBufferVK> material_params_buffer = MEM_NULL;
-    Ref<ROSamplerVK> material_sampler = MEM_NULL;
-    Ref<RenderResourceList> texture_list = MEM_NULL;
-};
-
 struct StaticSetStorageBuffers {
     StaticInstanceBufferData instance_data;
     Ref<ROBufferVK> submesh_buffer = MEM_NULL;
@@ -151,30 +121,10 @@ struct StaticSetDrawBuild {
     StaticSetDrawBuild& operator=(StaticSetDrawBuild&&) noexcept = default;
 
     Ref<ROBufferVK> draw_buffer = MEM_NULL;
-    Vector<StaticSetRenderResourcesVK::DrawBatch, RenderAllocator> batches;
-};
-
-struct IndirectDrawPlanData {
-    explicit IndirectDrawPlanData(RenderAllocator* p_allocator) : draw_plan(p_allocator), pipeline_batches(p_allocator) {
-    }
-
-    StaticSetDrawBatchPlannerVK::BuildResult draw_plan;
-    Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> pipeline_batches;
+    Vector<StaticSetResourcesVK::DrawBatch, RenderAllocator> batches;
 };
 
 StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeometrySet> p_set);
-
-void validate_constructor_inputs(RendererVK* p_renderer, RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline) {
-    if (p_renderer == nullptr || p_renderer->get_base_render_data() == nullptr || p_renderer->get_base_render_data()->allocator == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: renderer state is missing.");
-    }
-    if (p_set == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: static geometry set is missing.");
-    }
-    if (p_graphics_pipeline == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: graphics pipeline is missing.");
-    }
-}
 
 bool is_empty_set(const RUStaticGeometrySet& p_set) {
     return p_set.submesh_count == 0 || p_set.instance_count == 0;
@@ -209,19 +159,6 @@ Ref<ROBufferVK> build_storage_buffer(const BaseRenderDataVK* p_render_data, cons
     return result;
 }
 
-std::string_view get_vertex_stage_entry_name(RefRes<RUGraphicsPipeline> p_pipeline) {
-    if (p_pipeline == nullptr || p_pipeline->vertex_stage == nullptr) {
-        throw std::runtime_error("Failed to construct static set task: vertex shader stage is missing.");
-    }
-    if (p_pipeline->vertex_stage_entry != nullptr && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
-        return p_pipeline->vertex_stage_entry.get();
-    }
-    if (p_pipeline->vertex_stage->vertex_entry != nullptr && p_pipeline->vertex_stage->vertex_entry.get()[0] != '\0') {
-        return p_pipeline->vertex_stage->vertex_entry.get();
-    }
-    return {};
-}
-
 RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr || p_default_material_key.empty()) {
@@ -236,29 +173,6 @@ RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
         return MEM_NULL;
     }
     return material->textures.get()[0].texture;
-}
-
-std::string pipeline_resource_key(RefRes<RUGraphicsPipeline> p_pipeline) {
-    if (p_pipeline != nullptr && p_pipeline->resource_key != nullptr) {
-        return p_pipeline->resource_key;
-    }
-    return "static_set_explicit_pipeline";
-}
-
-std::optional<MaterialTextureContract> load_material_contract(RefRes<RUGraphicsPipeline> p_graphics_pipeline,
-    std::string_view p_material_textures_variable_name,
-    std::string_view p_material_params_variable_name) {
-    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
-    std::optional<ShaderMetadata> geometry_metadata;
-    if (p_graphics_pipeline->geometry_stage != nullptr) {
-        geometry_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->geometry_stage);
-    }
-    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->fragment_stage);
-    return MaterialTextureContractResolver().resolve(vertex_metadata,
-        geometry_metadata.has_value() ? &*geometry_metadata : nullptr,
-        fragment_metadata,
-        p_material_textures_variable_name,
-        p_material_params_variable_name);
 }
 
 void validate_static_set_node_layout(const ShaderMetadata& p_vertex_metadata) {
@@ -319,7 +233,7 @@ Ref<ROBufferVK> create_material_params_buffer(const BaseRenderDataVK* p_render_d
 void validate_submesh_materials(RefRes<RUStaticGeometrySet> p_set) {
     for (size_t i = 0; i < p_set->submesh_count; ++i) {
         if (p_set->submeshes.get()[i].material == nullptr) {
-            throw std::runtime_error("Failed to construct static set task: submesh material is missing.");
+            throw std::runtime_error("Failed to compile static-set resources: submesh material is missing.");
         }
     }
 }
@@ -338,41 +252,6 @@ StaticSetStorageBuffers build_static_set_storage_buffers_from_data(
     return result;
 }
 
-StaticSetStorageBuffers build_static_set_storage_buffers(const BaseRenderDataVK* p_render_data, RefRes<RUStaticGeometrySet> p_set) {
-    return build_static_set_storage_buffers_from_data(p_render_data, build_static_instance_buffer_data(p_set));
-}
-
-IndirectDrawPlanData build_indirect_draw_plan_data(const BaseRenderDataVK* p_render_data,
-    RefRes<RUGraphicsPipeline> p_graphics_pipeline,
-    RefRes<RUStaticGeometrySet> p_set,
-    const StaticInstanceBufferData& p_instance_data) {
-    IndirectDrawPlanData result(p_render_data->allocator);
-    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_graphics_pipeline->vertex_stage);
-    validate_static_set_node_layout(vertex_metadata);
-    const std::string_view vertex_entry_name = get_vertex_stage_entry_name(p_graphics_pipeline);
-    result.draw_plan = StaticSetDrawBatchPlannerVK().build(p_render_data->allocator,
-        std::span<const RUStaticGeometrySubmesh>(p_set->submeshes.get(), p_set->submesh_count),
-        p_instance_data.first_instances,
-        vertex_metadata,
-        vertex_entry_name,
-        p_render_data->max_draw_indirect_count);
-    result.pipeline_batches.reserve(result.draw_plan.batches.size());
-    return result;
-}
-
-void fill_pipeline_batches(
-    IndirectDrawPlanData& p_draw_plan_data, const BaseRenderDataVK* p_render_data, Ref<ROGraphicsPipelineVK> p_compiled_graphics_pipeline) {
-    for (auto& batch : p_draw_plan_data.draw_plan.batches) {
-        RTRunGraphicsPipelineIndirectVK::PipelineBatch pipeline_batch(p_render_data->allocator);
-        pipeline_batch.graphics_pipeline = p_compiled_graphics_pipeline;
-        pipeline_batch.first_draw = batch.first_draw;
-        pipeline_batch.draw_count = batch.draw_count;
-        pipeline_batch.vertex_input = std::move(batch.vertex_input);
-        pipeline_batch.vertex_buffer_offset = batch.vertex_buffer_offset;
-        p_draw_plan_data.pipeline_batches.push_back(std::move(pipeline_batch));
-    }
-}
-
 uint32_t get_or_append_material_index(std::vector<RefRes<RUMaterial>>& p_materials, RefRes<RUMaterial> p_material) {
     for (size_t i = 0; i < p_materials.size(); ++i) {
         if (p_materials[i] == p_material) {
@@ -380,7 +259,7 @@ uint32_t get_or_append_material_index(std::vector<RefRes<RUMaterial>>& p_materia
         }
     }
     if (p_materials.size() > std::numeric_limits<uint32_t>::max()) {
-        throw std::runtime_error("Failed to construct static set task: material table exceeds uint32.");
+        throw std::runtime_error("Failed to compile static-set resources: material table exceeds uint32.");
     }
     p_materials.push_back(p_material);
     return static_cast<uint32_t>(p_materials.size() - 1);
@@ -406,7 +285,7 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
     for (size_t submesh_index = 0; submesh_index < p_set->submesh_count; ++submesh_index) {
         const RUStaticGeometrySubmesh& submesh = p_set->submeshes.get()[submesh_index];
         if (result.instances.size() > std::numeric_limits<uint32_t>::max()) {
-            throw std::runtime_error("Failed to construct static set task: instance table exceeds uint32.");
+            throw std::runtime_error("Failed to compile static-set resources: instance table exceeds uint32.");
         }
         result.first_instances.push_back(static_cast<uint32_t>(result.instances.size()));
         if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
@@ -418,7 +297,7 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
         for (size_t instance_index = 0; instance_index < submesh.instance_count; ++instance_index) {
             const size_t node_index = submesh.first_instance + instance_index;
             if (node_index > std::numeric_limits<uint32_t>::max()) {
-                throw std::runtime_error("Failed to construct static set task: node index exceeds uint32.");
+                throw std::runtime_error("Failed to compile static-set resources: node index exceeds uint32.");
             }
             result.instances.push_back(StaticSetInstanceGPU{
                 .submesh_index = drawable_submesh_index,
@@ -486,52 +365,6 @@ CombinedStaticInstanceBufferData build_combined_static_instance_buffer_data(
     return result;
 }
 
-StaticSetPipelineBuild compile_static_set_pipeline(RendererVK* p_renderer,
-    RefRes<RUGraphicsPipeline> p_graphics_pipeline,
-    const StaticSetCompilerVK::Config& p_config,
-    std::span<const RefRes<RUMaterial>> p_materials) {
-    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
-    const std::optional<MaterialTextureContract> material_contract = load_material_contract(
-        p_graphics_pipeline, p_config.material_textures_variable_name, p_config.material_params_variable_name);
-    Ref<ROSamplerVK> material_sampler = create_material_sampler(render_data, material_contract.has_value());
-    GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = render_data->allocator,
-        .render_data = render_data,
-        .render_database = p_renderer->get_render_database(),
-        .renderer = p_renderer,
-        .default_texture_resource = get_default_image(p_config.default_material_resource_key),
-        .color_attachment_formats = p_config.color_attachment_formats,
-        .depth_attachment_format = p_config.depth_attachment_format,
-        .stencil_attachment_format = p_config.stencil_attachment_format,
-    };
-    GraphicsPipelineCompilerVK pipeline_compiler(compiler_context);
-    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> material_texture_views;
-    const std::string compiled_pipeline_key = std::format("{}#static_set", pipeline_resource_key(p_graphics_pipeline));
-    StaticSetMaterialResourcesVK material_resources = StaticSetMaterialResourceBuilderVK().build(material_contract,
-        p_materials,
-        get_default_material(p_config.default_material_resource_key),
-        render_data->sampled_image_descriptor_capacity,
-        material_sampler,
-        [&pipeline_compiler, &material_texture_views](RefRes<RUTexture> p_texture) {
-            return get_material_texture_view_index(pipeline_compiler, material_texture_views, p_texture);
-        });
-    StaticSetPipelineBuild result;
-    result.texture_list = make_ref<RenderResourceList>(render_data->allocator, render_data->allocator);
-    result.compiled_pipeline = pipeline_compiler.compile(compiled_pipeline_key, p_graphics_pipeline);
-    result.material_sampler = material_resources.material_sampler.dynamic_cast_ref<ROSamplerVK>();
-    if (material_contract.has_value()) {
-        if (material_resources.material_params_data.empty()) {
-            throw std::runtime_error("Failed to compile static-set material resources: material parameter buffer is missing.");
-        }
-        result.material_params_buffer = create_material_params_buffer(render_data, material_resources.material_params_data);
-    }
-    for (auto& [texture, image_view] : material_texture_views) {
-        static_cast<void>(texture);
-        result.texture_list->add_resource(image_view);
-    }
-    return result;
-}
-
 struct StaticSetMaterialBuild {
     Ref<ROBufferVK> material_params_buffer = MEM_NULL;
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
@@ -574,41 +407,6 @@ StaticSetMaterialBuild compile_static_set_materials(RendererVK* p_renderer,
         static_cast<void>(texture);
         result.texture_list->add_resource(image_view);
     }
-    return result;
-}
-
-NonEmptyStaticSetTaskBuild build_non_empty_indirect_task(RendererVK* p_renderer,
-    RefRes<RUStaticGeometrySet> p_set,
-    RefRes<RUGraphicsPipeline> p_graphics_pipeline,
-    const StaticSetCompilerVK::Config& p_config) {
-    NonEmptyStaticSetTaskBuild result;
-    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
-    validate_submesh_materials(p_set);
-    StaticSetBufferCompilerVK::BuildResult geometry_buffers = build_geometry_buffers(render_data, p_set);
-    if (geometry_buffers.vertex_buffer == MEM_NULL || geometry_buffers.index_buffer == MEM_NULL) {
-        return result;
-    }
-    StaticSetStorageBuffers storage_buffers = build_static_set_storage_buffers(render_data, p_set);
-    StaticSetPipelineBuild pipeline_build =
-        compile_static_set_pipeline(p_renderer, p_graphics_pipeline, p_config, storage_buffers.instance_data.ordered_materials);
-    result.graphics_pipeline = pipeline_build.compiled_pipeline.graphics_pipeline;
-    result.submesh_buffer = storage_buffers.submesh_buffer;
-    result.node_buffer = storage_buffers.node_buffer;
-    result.instance_buffer = storage_buffers.instance_buffer;
-    result.material_params_buffer = pipeline_build.material_params_buffer;
-    result.material_sampler = pipeline_build.material_sampler;
-    result.vertex_buffer = geometry_buffers.vertex_buffer;
-    result.index_buffer = geometry_buffers.index_buffer;
-    result.texture_list = std::move(pipeline_build.texture_list);
-    IndirectDrawPlanData draw_plan_data =
-        build_indirect_draw_plan_data(render_data, p_graphics_pipeline, p_set, storage_buffers.instance_data);
-    fill_pipeline_batches(draw_plan_data, render_data, pipeline_build.compiled_pipeline.graphics_pipeline);
-    Ref<ROBufferVK> indirect_buffer = build_indirect_buffer(render_data, draw_plan_data.draw_plan.commands);
-    if (indirect_buffer == nullptr) {
-        return result;
-    }
-    result.draw_batches_buffer = indirect_buffer;
-    result.pipeline_batches.assign(draw_plan_data.pipeline_batches.begin(), draw_plan_data.pipeline_batches.end());
     return result;
 }
 
@@ -680,7 +478,7 @@ StaticSetDrawBuild compile_static_set_draw_batches(const BaseRenderDataVK* p_ren
     result.draw_buffer = build_indirect_buffer(p_render_data, draw_plan.commands);
     result.batches.reserve(draw_plan.batches.size());
     for (StaticSetDrawBatchPlannerVK::Batch& source_batch : draw_plan.batches) {
-        StaticSetRenderResourcesVK::DrawBatch draw_batch;
+        StaticSetResourcesVK::DrawBatch draw_batch;
         draw_batch.first_draw = source_batch.first_draw;
         draw_batch.draw_count = source_batch.draw_count;
         draw_batch.vertex_input = std::move(source_batch.vertex_input);
@@ -692,120 +490,13 @@ StaticSetDrawBuild compile_static_set_draw_batches(const BaseRenderDataVK* p_ren
 
 } // namespace
 
-CompiledStaticSetVK::PassConfig::PassConfig(RenderAllocator* p_allocator)
-    : color_attachment_ids(p_allocator), clear_values(p_allocator) {
-}
-
-CompiledStaticSetVK::CompiledStaticSetVK(RenderAllocator* p_allocator)
-    : allocator(p_allocator), render_resources(make_ref<StaticSetRenderResourcesVK>(p_allocator, p_allocator)),
-      pipeline_batches(p_allocator) {
-    if (allocator == nullptr) {
-        throw std::runtime_error("Failed to construct compiled static set: allocator is null.");
-    }
-}
-
-RendTaskDescVK& CompiledStaticSetVK::configure_task(RendTaskDescVK& p_task_desc) const {
-    return render_resources->register_resources(p_task_desc);
-}
-
-Unique<IRenderTaskVK> CompiledStaticSetVK::create_render_task(const BaseRenderDataVK* p_render_data, const PassConfig& p_config) const {
-    std::vector<std::string_view> color_attachment_ids;
-    color_attachment_ids.reserve(p_config.color_attachment_ids.size());
-    for (const std::string& id : p_config.color_attachment_ids) {
-        color_attachment_ids.push_back(id);
-    }
-    const std::optional<std::string_view> depth_attachment_id =
-        p_config.depth_attachment_id.has_value() ? std::optional<std::string_view>(*p_config.depth_attachment_id) : std::nullopt;
-    if (graphics_pipeline == MEM_NULL) {
-        return make_unique<RTClearAttachmentsVK>(allocator,
-            p_render_data,
-            std::span<const VkClearValue>(p_config.clear_values.data(), p_config.clear_values.size()),
-            p_config.render_extent,
-            std::span<const std::string_view>(color_attachment_ids.data(), color_attachment_ids.size()),
-            depth_attachment_id,
-            p_config.color_attachment_load_op,
-            p_config.depth_attachment_load_op);
-    }
-    RTRunGraphicsPipelinesSequentialVK::Sequence sequence(allocator);
-    for (size_t batch_index = 0; batch_index < pipeline_batches.size(); ++batch_index) {
-        const RTRunGraphicsPipelineIndirectVK::PipelineBatch& batch = pipeline_batches[batch_index];
-        RTRunGraphicsPipelinesSequentialVK::IndirectDispatch dispatch(allocator);
-        dispatch.pipeline = batch.graphics_pipeline;
-        dispatch.clear_values = p_config.clear_values;
-        dispatch.render_extent = p_config.render_extent;
-        dispatch.color_attachment_ids = p_config.color_attachment_ids;
-        dispatch.depth_attachment_id = p_config.depth_attachment_id;
-        dispatch.vertex_buffer_id = REND_RES_STATIC_SET_VERTICES;
-        dispatch.index_buffer_id = REND_RES_STATIC_SET_INDICES;
-        dispatch.indirect_buffer_id = REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
-        dispatch.first_indirect_draw = batch.first_draw;
-        dispatch.indirect_draw_count = batch.draw_count;
-        dispatch.color_attachment_load_op = batch_index == 0 ? p_config.color_attachment_load_op : VK_ATTACHMENT_LOAD_OP_LOAD;
-        dispatch.depth_attachment_load_op = batch_index == 0 ? p_config.depth_attachment_load_op : VK_ATTACHMENT_LOAD_OP_LOAD;
-        dispatch.vertex_input = batch.vertex_input;
-        dispatch.vertex_buffer_offset = batch.vertex_buffer_offset;
-        sequence.add_dispatch(std::move(dispatch));
-    }
-    return make_unique<RTRunGraphicsPipelinesSequentialVK>(allocator, p_render_data, sequence);
-}
-
-Ref<RenderResourceList> CompiledStaticSetVK::acquire_texture_list() const {
-    return render_resources->acquire_textures();
-}
-
-Ref<ROBufferVK> CompiledStaticSetVK::acquire_draw_batches_buffer() const {
-    return render_resources->acquire_opaque_draw_batches();
-}
-
-Ref<StaticSetRenderResourcesVK> CompiledStaticSetVK::acquire_render_resources() const {
-    return render_resources;
-}
-
 StaticSetCompilerVK::StaticSetCompilerVK(RendererVK* p_renderer) : renderer(p_renderer) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to construct static-set compiler: renderer is null.");
     }
 }
 
-Ref<CompiledStaticSetVK> StaticSetCompilerVK::compile(
-    RefRes<RUStaticGeometrySet> p_set, RefRes<RUGraphicsPipeline> p_graphics_pipeline, const Config& p_config) const {
-    validate_constructor_inputs(renderer, p_set, p_graphics_pipeline);
-    const BaseRenderDataVK* render_data = renderer->get_base_render_data();
-    Ref<CompiledStaticSetVK> result = make_ref<CompiledStaticSetVK>(render_data->allocator, render_data->allocator);
-    result->render_resources->material_params_resource_id = p_config.material_params_variable_name;
-    if (is_empty_set(*p_set)) {
-        return result;
-    }
-
-    NonEmptyStaticSetTaskBuild compiled = build_non_empty_indirect_task(renderer, p_set, p_graphics_pipeline, p_config);
-    if (compiled.graphics_pipeline == MEM_NULL || compiled.vertex_buffer == MEM_NULL || compiled.index_buffer == MEM_NULL ||
-        compiled.draw_batches_buffer == MEM_NULL || compiled.pipeline_batches.empty()) {
-        throw std::runtime_error("Failed to compile static set: drawable set produced incomplete draw resources.");
-    }
-    result->graphics_pipeline = std::move(compiled.graphics_pipeline);
-    result->render_resources->vertices = std::move(compiled.vertex_buffer);
-    result->render_resources->indices = std::move(compiled.index_buffer);
-    result->render_resources->opaque_draw_batches = std::move(compiled.draw_batches_buffer);
-    result->render_resources->submeshes = std::move(compiled.submesh_buffer);
-    result->render_resources->nodes = std::move(compiled.node_buffer);
-    result->render_resources->instances = std::move(compiled.instance_buffer);
-    result->render_resources->material_params = std::move(compiled.material_params_buffer);
-    result->render_resources->material_sampler = std::move(compiled.material_sampler);
-    result->render_resources->textures = std::move(compiled.texture_list);
-    result->pipeline_batches.assign(compiled.pipeline_batches.begin(), compiled.pipeline_batches.end());
-    result->render_resources->opaque_batches.reserve(compiled.pipeline_batches.size());
-    for (const RTRunGraphicsPipelineIndirectVK::PipelineBatch& pipeline_batch : compiled.pipeline_batches) {
-        StaticSetRenderResourcesVK::DrawBatch draw_batch;
-        draw_batch.first_draw = pipeline_batch.first_draw;
-        draw_batch.draw_count = pipeline_batch.draw_count;
-        draw_batch.vertex_input = pipeline_batch.vertex_input;
-        draw_batch.vertex_buffer_offset = pipeline_batch.vertex_buffer_offset;
-        result->render_resources->opaque_batches.push_back(std::move(draw_batch));
-    }
-    return result;
-}
-
-Ref<StaticSetRenderResourcesVK> StaticSetCompilerVK::compile_resources(RefRes<RUStaticOpaqueSet> p_opaque_set,
+Ref<StaticSetResourcesVK> StaticSetCompilerVK::compile(RefRes<RUStaticOpaqueSet> p_opaque_set,
     RefRes<RUStaticMaskedSet> p_masked_set,
     const ShaderMetadata& p_opaque_vertex_metadata,
     std::string_view p_opaque_vertex_entry,
@@ -816,7 +507,7 @@ Ref<StaticSetRenderResourcesVK> StaticSetCompilerVK::compile_resources(RefRes<RU
     const StaticSetResourceInputs inputs = validate_static_set_resource_inputs(
         renderer, p_opaque_set, p_masked_set, p_opaque_vertex_metadata, p_masked_vertex_metadata);
     const BaseRenderDataVK* render_data = renderer->get_base_render_data();
-    Ref<StaticSetRenderResourcesVK> result = make_ref<StaticSetRenderResourcesVK>(render_data->allocator, render_data->allocator);
+    Ref<StaticSetResourcesVK> result = make_ref<StaticSetResourcesVK>(render_data->allocator, render_data->allocator);
     result->material_params_resource_id = p_config.material_params_variable_name;
 
     StaticSetGeometryBuffers geometry_buffers =

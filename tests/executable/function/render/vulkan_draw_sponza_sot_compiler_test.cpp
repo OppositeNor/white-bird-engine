@@ -29,9 +29,11 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
@@ -40,6 +42,7 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
@@ -158,25 +161,31 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
     create_depth_resources();
 
-    StaticSetCompilerVK::Config compiler_config;
-    compiler_config.color_attachment_formats.push_back(base_render_data->swap_chain_format);
-    compiler_config.depth_attachment_format = DRAW_SPONZA_INDIRECT_DEPTH_FORMAT;
-    Ref<CompiledStaticSetVK> static_set = StaticSetCompilerVK(renderer_vk).compile(sponza_set, graphics_pipeline, compiler_config);
-    Ref<RenderResourceList> texture_list = static_set->acquire_texture_list();
+    Ref<StaticSetResourcesVK> static_set_resources =
+        create_static_set_resources(renderer_vk, sponza_set, MEM_NULL, graphics_pipeline, MEM_NULL, graphics_pipeline);
+    Ref<RenderResourceList> texture_list = static_set_resources->acquire_textures();
     if (texture_list == MEM_NULL || texture_list->get_resource_count() == 0) {
         throw std::runtime_error("Failed to setup indirect Sponza test: static-set texture list is empty.");
     }
-    CompiledStaticSetVK::PassConfig pass_config(render_allocator);
-    pass_config.render_extent = base_render_data->swap_chain_extent;
-    pass_config.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN);
-    pass_config.depth_attachment_id = REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW;
-    pass_config.clear_values.emplace_back();
-    pass_config.clear_values.emplace_back();
-    RendTaskDescVK task_desc(render_allocator, "run_static_set", static_set->create_render_task(base_render_data, pass_config));
-    static_set->configure_task(task_desc);
+    const std::array color_formats{base_render_data->swap_chain_format};
+    Ref<ROGraphicsPipelineVK> graphics_pipeline_vk = compile_render_test_graphics_pipeline(
+        renderer_vk, "draw_sponza_indirect_pipeline", graphics_pipeline, color_formats, DRAW_SPONZA_INDIRECT_DEPTH_FORMAT);
+    const std::array<VkClearValue, 2> clear_values{};
+    const std::array<std::string_view, 1> color_attachments{REND_RES_SWAP_CHAIN};
+    RendTaskDescVK task_desc = make_static_set_task_desc(render_allocator,
+        base_render_data,
+        "run_static_set",
+        static_set_resources,
+        graphics_pipeline_vk,
+        false,
+        clear_values,
+        base_render_data->swap_chain_extent,
+        color_attachments,
+        REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW);
     write_camera_descriptor();
 
     RendGraphDescVK graph_desc(render_allocator);
+    add_static_set_graph_resources(graph_desc, static_set_resources);
     graph_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view)
         .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_CAMERA_INFO_BUFFER, camera_info_buffer);

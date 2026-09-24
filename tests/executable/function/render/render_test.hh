@@ -14,14 +14,33 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/ecs/components.hh"
 #include "function/render/i_renderer.hh"
+#include "function/render/material_texture_contract.hh"
+#include "function/render/material_texture_contract_resolver.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "platform/os/os.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cmath>
@@ -40,12 +59,17 @@
 #include <iostream>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <print>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
+#include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
 
@@ -130,6 +154,162 @@ inline void on_exec_test_start() {
         std::println("WBE_WAIT_PROCESS_INJECT is set. Running on PID: {}, Press Enter to continue...", OS::get_pid());
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
+}
+
+inline std::string_view static_set_vertex_entry(RefRes<RUGraphicsPipeline> p_pipeline) {
+    if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL) {
+        throw std::runtime_error("Failed to resolve static-set vertex entry: graphics pipeline or vertex stage is null.");
+    }
+    if (p_pipeline->vertex_stage_entry != MEM_NULL && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
+        return p_pipeline->vertex_stage_entry.get();
+    }
+    if (p_pipeline->vertex_stage->vertex_entry != MEM_NULL && p_pipeline->vertex_stage->vertex_entry.get()[0] != '\0') {
+        return p_pipeline->vertex_stage->vertex_entry.get();
+    }
+    return {};
+}
+
+inline std::optional<MaterialTextureContract> load_static_set_material_contract(RefRes<RUGraphicsPipeline> p_pipeline) {
+    if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL || p_pipeline->fragment_stage == MEM_NULL) {
+        throw std::runtime_error("Failed to load static-set material contract: graphics pipeline stages are missing.");
+    }
+    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline->vertex_stage);
+    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline->fragment_stage);
+    std::optional<ShaderMetadata> geometry_metadata;
+    if (p_pipeline->geometry_stage != MEM_NULL) {
+        geometry_metadata = ShaderMetadataLoader().load(p_pipeline->geometry_stage);
+    }
+    return MaterialTextureContractResolver().resolve(
+        vertex_metadata, geometry_metadata.has_value() ? &*geometry_metadata : nullptr, fragment_metadata, "material_textures", REND_RES_STATIC_SET_MATERIAL_PARAMS);
+}
+
+inline Ref<StaticSetResourcesVK> create_static_set_resources(RendererVK* p_renderer,
+    RefRes<RUStaticOpaqueSet> p_opaque_set,
+    RefRes<RUStaticMaskedSet> p_masked_set,
+    RefRes<RUGraphicsPipeline> p_opaque_pipeline,
+    RefRes<RUGraphicsPipeline> p_masked_pipeline,
+    RefRes<RUGraphicsPipeline> p_material_pipeline) {
+    ShaderMetadata opaque_metadata;
+    ShaderMetadata masked_metadata;
+    if (p_opaque_set != MEM_NULL) {
+        opaque_metadata = ShaderMetadataLoader().load(p_opaque_pipeline->vertex_stage);
+    }
+    if (p_masked_set != MEM_NULL) {
+        masked_metadata = ShaderMetadataLoader().load(p_masked_pipeline->vertex_stage);
+    }
+    const std::optional<MaterialTextureContract> material_contract =
+        p_material_pipeline != MEM_NULL ? load_static_set_material_contract(p_material_pipeline) : std::nullopt;
+    return StaticSetCompilerVK(p_renderer)
+        .compile(p_opaque_set,
+            p_masked_set,
+            opaque_metadata,
+            p_opaque_set != MEM_NULL ? static_set_vertex_entry(p_opaque_pipeline) : std::string_view{},
+            masked_metadata,
+            p_masked_set != MEM_NULL ? static_set_vertex_entry(p_masked_pipeline) : std::string_view{},
+            material_contract,
+            StaticSetCompilerVK::Config{});
+}
+
+inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticSetResourcesVK> p_resources) {
+    p_graph.add_resource(REND_RES_STATIC_SET_VERTICES, p_resources->acquire_vertices())
+        .add_resource(REND_RES_STATIC_SET_INDICES, p_resources->acquire_indices())
+        .add_resource(REND_RES_STATIC_SET_SUBMESHES, p_resources->acquire_submeshes())
+        .add_resource(REND_RES_STATIC_SET_NODES, p_resources->acquire_nodes())
+        .add_resource(REND_RES_STATIC_SET_INSTANCES, p_resources->acquire_instances())
+        .add_resource(REND_RES_STATIC_SET_TEXTURES, p_resources->acquire_textures());
+    if (p_resources->acquire_opaque_draw_batches() != MEM_NULL) {
+        p_graph.add_resource(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES, p_resources->acquire_opaque_draw_batches());
+    }
+    if (p_resources->acquire_masked_draw_batches() != MEM_NULL) {
+        p_graph.add_resource(REND_RES_STATIC_SET_MASKED_DRAW_BATCHES, p_resources->acquire_masked_draw_batches());
+    }
+    if (p_resources->acquire_material_params() != MEM_NULL) {
+        p_graph.add_resource(p_resources->get_material_params_resource_id(), p_resources->acquire_material_params());
+    }
+    if (p_resources->acquire_material_sampler() != MEM_NULL) {
+        p_graph.add_resource(REND_RES_STATIC_SET_MATERIAL_SAMPLER, p_resources->acquire_material_sampler());
+    }
+}
+
+inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_static_set_pipeline_batches(
+    RenderAllocator* p_allocator, Ref<StaticSetResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked) {
+    Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
+    const size_t batch_count = p_masked ? p_resources->get_masked_draw_batch_count() : p_resources->get_opaque_draw_batch_count();
+    result.reserve(batch_count);
+    for (size_t i = 0; i < batch_count; ++i) {
+        const StaticSetResourcesVK::DrawBatch& source =
+            p_masked ? p_resources->get_masked_draw_batch(i) : p_resources->get_opaque_draw_batch(i);
+        RTRunGraphicsPipelineIndirectVK::PipelineBatch batch(p_allocator);
+        batch.graphics_pipeline = p_pipeline;
+        batch.first_draw = source.first_draw;
+        batch.draw_count = source.draw_count;
+        batch.vertex_input = source.vertex_input;
+        batch.vertex_buffer_offset = source.vertex_buffer_offset;
+        result.push_back(std::move(batch));
+    }
+    return result;
+}
+
+inline RendTaskDescVK& declare_static_set_shader_reads(RendTaskDescVK& p_task, Ref<StaticSetResourcesVK> p_resources) {
+    p_task.read(REND_RES_STATIC_SET_SUBMESHES, RendResUsageVK::STORAGE_BUFFER)
+        .read(REND_RES_STATIC_SET_NODES, RendResUsageVK::STORAGE_BUFFER)
+        .read(REND_RES_STATIC_SET_INSTANCES, RendResUsageVK::STORAGE_BUFFER);
+    if (p_resources->acquire_material_params() != MEM_NULL) {
+        p_task.read(p_resources->get_material_params_resource_id(), RendResUsageVK::UNIFORM_BUFFER);
+    }
+    if (p_resources->acquire_textures()->get_resource_count() > 0) {
+        p_task.read(REND_RES_STATIC_SET_TEXTURES, RendResUsageVK::SAMPLED_IMAGE);
+    }
+    return p_task;
+}
+
+inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererVK* p_renderer,
+    std::string_view p_key,
+    RefRes<RUGraphicsPipeline> p_pipeline,
+    std::span<const VkFormat> p_color_formats,
+    VkFormat p_depth_format = VK_FORMAT_UNDEFINED) {
+    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
+    GraphicsPipelineCompilerVKContext context{
+        .allocator = render_data->allocator,
+        .render_data = render_data,
+        .render_database = p_renderer->get_render_database(),
+        .renderer = p_renderer,
+        .color_attachment_formats = std::vector<VkFormat>(p_color_formats.begin(), p_color_formats.end()),
+        .depth_attachment_format = p_depth_format,
+    };
+    return GraphicsPipelineCompilerVK(context).compile(p_key, p_pipeline).graphics_pipeline;
+}
+
+inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator,
+    const BaseRenderDataVK* p_render_data,
+    std::string_view p_task_id,
+    Ref<StaticSetResourcesVK> p_resources,
+    Ref<ROGraphicsPipelineVK> p_pipeline,
+    bool p_masked,
+    std::span<const VkClearValue> p_clear_values,
+    VkExtent2D p_render_extent,
+    std::span<const std::string_view> p_color_attachment_ids,
+    std::optional<std::string_view> p_depth_attachment_id = std::nullopt,
+    VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR) {
+    auto batches = make_static_set_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked);
+    const std::string_view indirect_buffer_id = p_masked ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
+    RendTaskDescVK result(p_allocator,
+        p_task_id,
+        make_unique<RTRunGraphicsPipelineIndirectVK>(p_allocator,
+            p_render_data,
+            p_clear_values,
+            p_render_extent,
+            p_color_attachment_ids,
+            p_depth_attachment_id,
+            REND_RES_STATIC_SET_VERTICES,
+            REND_RES_STATIC_SET_INDICES,
+            indirect_buffer_id,
+            batches,
+            p_color_load_op,
+            p_depth_load_op));
+    declare_static_set_shader_reads(result, p_resources);
+    return result;
 }
 } // namespace WhiteBirdEngine
 

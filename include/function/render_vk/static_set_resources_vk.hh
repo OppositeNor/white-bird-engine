@@ -12,15 +12,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_SET_RENDER_RESOURCES_VK_HH
-#define WBE_FILE_STATIC_SET_RENDER_RESOURCES_VK_HH
+#ifndef WBE_FILE_STATIC_SET_RESOURCES_VK_HH
+#define WBE_FILE_STATIC_SET_RESOURCES_VK_HH
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -32,8 +31,6 @@
 
 namespace WhiteBirdEngine {
 
-struct RendTaskDescVK;
-
 inline constexpr std::string_view REND_RES_STATIC_SET_VERTICES = "static_set_vertices";
 inline constexpr std::string_view REND_RES_STATIC_SET_INDICES = "static_set_indices";
 inline constexpr std::string_view REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES = "static_set_opaque_draw_batches";
@@ -41,17 +38,18 @@ inline constexpr std::string_view REND_RES_STATIC_SET_MASKED_DRAW_BATCHES = "sta
 inline constexpr std::string_view REND_RES_STATIC_SET_SUBMESHES = "static_set_submeshes";
 inline constexpr std::string_view REND_RES_STATIC_SET_NODES = "static_set_nodes";
 inline constexpr std::string_view REND_RES_STATIC_SET_INSTANCES = "static_set_instances";
+inline constexpr std::string_view REND_RES_STATIC_SET_MATERIAL_PARAMS = "material_params";
 inline constexpr std::string_view REND_RES_STATIC_SET_MATERIAL_SAMPLER = "material_sampler";
 inline constexpr std::string_view REND_RES_STATIC_SET_TEXTURES = "static_set_textures";
 
 /**
- * @class StaticSetRenderResourcesVK
- * @brief Pipeline-independent Vulkan resources compiled for static opaque and masked geometry.
+ * @class StaticSetResourcesVK
+ * @brief Pipeline-independent Vulkan resources compiled from one static opaque/masked set pair.
  *
- * The object is neither copyable nor movable and is shared through Ref. Its allocator and every contained render object must
- * outlive task descriptors configured from it. Render objects remain confined to the rendering thread.
+ * The object owns no pipeline or render-task state. It is neither copyable nor movable and is shared through Ref. Every
+ * contained render object is rendering-thread-confined and must be registered explicitly with each graph that uses it.
  */
-class StaticSetRenderResourcesVK final {
+class StaticSetResourcesVK final {
 public:
     /**
      * @class DrawBatch
@@ -75,21 +73,15 @@ public:
         VkDeviceSize vertex_buffer_offset = 0;
     };
 
-    StaticSetRenderResourcesVK() = delete;
-    ~StaticSetRenderResourcesVK() = default;
-    StaticSetRenderResourcesVK(const StaticSetRenderResourcesVK&) = delete;
-    StaticSetRenderResourcesVK(StaticSetRenderResourcesVK&&) noexcept = delete;
-    StaticSetRenderResourcesVK& operator=(const StaticSetRenderResourcesVK&) = delete;
-    StaticSetRenderResourcesVK& operator=(StaticSetRenderResourcesVK&&) noexcept = delete;
+    StaticSetResourcesVK() = delete;
+    ~StaticSetResourcesVK() = default;
+    StaticSetResourcesVK(const StaticSetResourcesVK&) = delete;
+    StaticSetResourcesVK(StaticSetResourcesVK&&) noexcept = delete;
+    StaticSetResourcesVK& operator=(const StaticSetResourcesVK&) = delete;
+    StaticSetResourcesVK& operator=(StaticSetResourcesVK&&) noexcept = delete;
 
     /** @brief Construct empty allocator-owned static-set resource storage. */
-    explicit StaticSetRenderResourcesVK(RenderAllocator* p_allocator);
-
-    /**
-     * @brief Register all available resources on one task descriptor and declare reflected shader reads.
-     * @return The supplied descriptor.
-     */
-    RendTaskDescVK& register_resources(RendTaskDescVK& p_task_desc) const;
+    explicit StaticSetResourcesVK(RenderAllocator* p_allocator);
 
     /** @brief Acquire the shared vertex buffer. */
     Ref<ROBufferVK> acquire_vertices() const {
@@ -101,11 +93,6 @@ public:
         return indices;
     }
 
-    /** @brief Acquire every sampled material texture retained by this static set. */
-    Ref<RenderResourceList> acquire_textures() const {
-        return textures;
-    }
-
     /** @brief Acquire opaque indexed-indirect draw commands. */
     Ref<ROBufferVK> acquire_opaque_draw_batches() const {
         return opaque_draw_batches;
@@ -114,6 +101,41 @@ public:
     /** @brief Acquire masked indexed-indirect draw commands. */
     Ref<ROBufferVK> acquire_masked_draw_batches() const {
         return masked_draw_batches;
+    }
+
+    /** @brief Acquire per-submesh information addressed by instance records. */
+    Ref<ROBufferVK> acquire_submeshes() const {
+        return submeshes;
+    }
+
+    /** @brief Acquire per-node transforms addressed by instance records. */
+    Ref<ROBufferVK> acquire_nodes() const {
+        return nodes;
+    }
+
+    /** @brief Acquire drawn-instance links between submeshes and nodes. */
+    Ref<ROBufferVK> acquire_instances() const {
+        return instances;
+    }
+
+    /** @brief Acquire the reflected material parameter table. */
+    Ref<ROBufferVK> acquire_material_params() const {
+        return material_params;
+    }
+
+    /** @brief Acquire the sampler used by static-set materials. */
+    Ref<ROSamplerVK> acquire_material_sampler() const {
+        return material_sampler;
+    }
+
+    /** @brief Acquire every sampled image retained by the material table. */
+    Ref<RenderResourceList> acquire_textures() const {
+        return textures;
+    }
+
+    /** @brief Return the graph-resource id expected by the material parameter reflection contract. */
+    std::string_view get_material_params_resource_id() const {
+        return material_params_resource_id;
     }
 
     /** @brief Return the number of opaque draw batches. */
@@ -133,7 +155,6 @@ public:
     const DrawBatch& get_masked_draw_batch(size_t p_index) const;
 
 private:
-    friend class CompiledStaticSetVK;
     friend class StaticSetCompilerVK;
 
     RenderAllocator* allocator = nullptr;
@@ -149,7 +170,7 @@ private:
     Ref<RenderResourceList> textures = MEM_NULL;
     Vector<DrawBatch, RenderAllocator> opaque_batches;
     Vector<DrawBatch, RenderAllocator> masked_batches;
-    std::string material_params_resource_id;
+    std::string material_params_resource_id = std::string(REND_RES_STATIC_SET_MATERIAL_PARAMS);
 };
 
 } // namespace WhiteBirdEngine

@@ -14,30 +14,26 @@
 */
 #include "core/allocator/i_allocator.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/static_set_render_resources_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
-TEST(WBEStaticSetRenderResourcesVKTest, RegistersEmptyTextureAggregateAndExposesPublicResources) {
+TEST(WBEStaticSetResourcesVKTest, StartsWithIndependentEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
-    StaticSetRenderResourcesVK resources(&allocator);
-    RendTaskDescVK task_desc(&allocator);
+    StaticSetResourcesVK resources(&allocator);
 
-    RendTaskDescVK& result = resources.register_resources(task_desc);
-
-    EXPECT_EQ(&result, &task_desc);
-    ASSERT_EQ(task_desc.resources.size(), 1U);
-    EXPECT_EQ(task_desc.resources[0].res_id, REND_RES_STATIC_SET_TEXTURES);
-    EXPECT_NE(task_desc.resources[0].resource_list, MEM_NULL);
-    EXPECT_TRUE(task_desc.reads.empty());
     EXPECT_EQ(resources.acquire_vertices(), MEM_NULL);
     EXPECT_EQ(resources.acquire_indices(), MEM_NULL);
     EXPECT_EQ(resources.acquire_opaque_draw_batches(), MEM_NULL);
     EXPECT_EQ(resources.acquire_masked_draw_batches(), MEM_NULL);
     EXPECT_NE(resources.acquire_textures(), MEM_NULL);
+    EXPECT_EQ(resources.get_opaque_draw_batch_count(), 0U);
+    EXPECT_EQ(resources.get_masked_draw_batch_count(), 0U);
+    EXPECT_THROW(resources.get_opaque_draw_batch(0), std::runtime_error);
+    EXPECT_THROW(resources.get_masked_draw_batch(0), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

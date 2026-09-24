@@ -31,10 +31,12 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
@@ -44,6 +46,7 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -96,6 +99,7 @@ private:
     WBE::RefRes<WBE::RUStaticOpaqueSet> cube_set;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_pipeline_resource;
+    WBE::Ref<WBE::StaticSetResourcesVK> static_set_resources;
     WBE::Ref<WBE::ROImageVK> shadow_depth_image;
     WBE::Ref<WBE::ROImageVK> shadow_color_image;
     WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;
@@ -204,34 +208,39 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     setup_spot_light();
     create_shadow_map_resources();
 
-    VkClearValue shadow_color_clear{};
-    VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
-    WBE::StaticSetCompilerVK::Config shadow_compiler_config;
-    shadow_compiler_config.color_attachment_formats.push_back(SHADOWMAP_COLOR_FORMAT);
-    shadow_compiler_config.depth_attachment_format = SHADOWMAP_DEPTH_FORMAT;
-    WBE::Ref<WBE::CompiledStaticSetVK> shadow_set =
-        WBE::StaticSetCompilerVK(renderer_vk).compile(cube_set, shadow_pipeline_resource, shadow_compiler_config);
-    WBE::CompiledStaticSetVK::PassConfig shadow_pass(render_allocator);
-    shadow_pass.render_extent = shadow_extent;
-    shadow_pass.color_attachment_ids.emplace_back(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW);
-    shadow_pass.depth_attachment_id = REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW;
-    shadow_pass.clear_values.push_back(shadow_color_clear);
-    shadow_pass.clear_values.push_back(shadow_depth_clear);
-    WBE::RendTaskDescVK shadow_task(
-        render_allocator, RT_RUN_PIPELINE_SHADOWMAP, shadow_set->create_render_task(base_render_data, shadow_pass));
-    shadow_set->configure_task(shadow_task);
+    static_set_resources = WBE::create_static_set_resources(
+        renderer_vk, cube_set, WBE::MEM_NULL, main_pipeline_resource, WBE::MEM_NULL, main_pipeline_resource);
+    const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
+    WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_pipeline = WBE::compile_render_test_graphics_pipeline(
+        renderer_vk, "draw_cube_shadow_pipeline", shadow_pipeline_resource, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
+    const std::array<VkClearValue, 2> shadow_clear_values{VkClearValue{}, VkClearValue{.depthStencil = {.depth = 0.0F, .stencil = 0}}};
+    const std::array<std::string_view, 1> shadow_color_attachments{REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
+    WBE::RendTaskDescVK shadow_task = WBE::make_static_set_task_desc(render_allocator,
+        base_render_data,
+        RT_RUN_PIPELINE_SHADOWMAP,
+        static_set_resources,
+        shadow_pipeline,
+        false,
+        shadow_clear_values,
+        shadow_extent,
+        shadow_color_attachments,
+        REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     write_shadow_dynamic_descriptors();
 
-    WBE::StaticSetCompilerVK::Config main_compiler_config;
-    main_compiler_config.color_attachment_formats.push_back(base_render_data->swap_chain_format);
-    WBE::Ref<WBE::CompiledStaticSetVK> main_set =
-        WBE::StaticSetCompilerVK(renderer_vk).compile(cube_set, main_pipeline_resource, main_compiler_config);
-    WBE::CompiledStaticSetVK::PassConfig main_pass(render_allocator);
-    main_pass.render_extent = base_render_data->swap_chain_extent;
-    main_pass.color_attachment_ids.emplace_back(WBE::REND_RES_SWAP_CHAIN);
-    main_pass.clear_values.emplace_back();
-    WBE::RendTaskDescVK main_task(render_allocator, RT_RUN_PIPELINE, main_set->create_render_task(base_render_data, main_pass));
-    main_set->configure_task(main_task);
+    const std::array main_formats{base_render_data->swap_chain_format};
+    WBE::Ref<WBE::ROGraphicsPipelineVK> main_pipeline =
+        WBE::compile_render_test_graphics_pipeline(renderer_vk, "draw_cube_main_pipeline", main_pipeline_resource, main_formats);
+    const std::array<VkClearValue, 1> main_clear_values{};
+    const std::array<std::string_view, 1> main_color_attachments{WBE::REND_RES_SWAP_CHAIN};
+    WBE::RendTaskDescVK main_task = WBE::make_static_set_task_desc(render_allocator,
+        base_render_data,
+        RT_RUN_PIPELINE,
+        static_set_resources,
+        main_pipeline,
+        false,
+        main_clear_values,
+        base_render_data->swap_chain_extent,
+        main_color_attachments);
     write_main_dynamic_descriptors();
 
     register_draw_cube_render_graph(std::move(shadow_task), std::move(main_task));
@@ -333,6 +342,7 @@ void ApplicationVulkanDrawCubeTest::write_main_dynamic_descriptors() {
 
 void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTaskDescVK p_shadow_task, WBE::RendTaskDescVK p_main_task) {
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
+    WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
