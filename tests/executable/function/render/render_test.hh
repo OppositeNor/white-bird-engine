@@ -294,20 +294,27 @@ inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator,
     VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR) {
     auto batches = make_static_set_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked);
     const std::string_view indirect_buffer_id = p_masked ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
-    RendTaskDescVK result(p_allocator,
-        p_task_id,
-        make_unique<RTRunGraphicsPipelineIndirectVK>(p_allocator,
-            p_render_data,
-            p_clear_values,
-            p_render_extent,
-            p_color_attachment_ids,
-            p_depth_attachment_id,
-            REND_RES_STATIC_SET_VERTICES,
-            REND_RES_STATIC_SET_INDICES,
-            indirect_buffer_id,
-            batches,
-            p_color_load_op,
-            p_depth_load_op));
+    const size_t required_clear_value_count = p_color_attachment_ids.size() + (p_depth_attachment_id.has_value() ? 1 : 0);
+    if (p_clear_values.size() < required_clear_value_count) {
+        throw std::runtime_error("Failed to build static-set task: insufficient clear values for attachments.");
+    }
+    RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
+    task_builder.set_render_extent(p_render_extent)
+        .set_vertex_buffer(REND_RES_STATIC_SET_VERTICES)
+        .set_index_buffer(REND_RES_STATIC_SET_INDICES)
+        .set_indirect_buffer(indirect_buffer_id)
+        .set_color_attachment_load_op(p_color_load_op)
+        .set_depth_attachment_load_op(p_depth_load_op);
+    for (size_t i = 0; i < p_color_attachment_ids.size(); ++i) {
+        task_builder.add_color_attachment(p_color_attachment_ids[i], p_clear_values[i]);
+    }
+    if (p_depth_attachment_id.has_value()) {
+        task_builder.set_depth_attachment(*p_depth_attachment_id, p_clear_values[p_color_attachment_ids.size()]);
+    }
+    for (auto& batch : batches) {
+        task_builder.add_pipeline_batch(std::move(batch));
+    }
+    RendTaskDescVK result(p_allocator, p_task_id, task_builder.create_unique(p_render_data));
     declare_static_set_shader_reads(result, p_resources);
     return result;
 }

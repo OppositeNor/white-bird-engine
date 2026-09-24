@@ -29,9 +29,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
-#include <glm/ext/vector_float4.hpp>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -71,6 +69,128 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         VkDeviceSize vertex_buffer_offset = 0;
     };
 
+    /**
+     * @class Builder
+     * @brief Configures an indexed-indirect graphics task without constructor variants.
+     *
+     * Attachments are optional. Leaving both attachment collections empty creates an attachment-less dynamic-rendering task.
+     * Each draw buffer may independently be supplied as a graph resource id or as a task-owned render object.
+     */
+    struct Builder {
+        Builder() = delete;
+        ~Builder() = default;
+        Builder(const Builder&) = default;
+        Builder(Builder&&) noexcept = default;
+        Builder& operator=(const Builder&) = default;
+        Builder& operator=(Builder&&) noexcept = default;
+
+        /**
+         * @brief Construct allocator-owned builder storage.
+         */
+        explicit Builder(RenderAllocator* p_allocator);
+
+        /**
+         * @brief Set the dynamic-rendering area.
+         */
+        Builder& set_render_extent(VkExtent2D p_render_extent);
+
+        /**
+         * @brief Append one color attachment and its clear value in pipeline order.
+         */
+        Builder& add_color_attachment(std::string_view p_resource_id, const VkClearValue& p_clear_value = {});
+
+        /**
+         * @brief Set the optional depth attachment and its clear value.
+         */
+        Builder& set_depth_attachment(std::string_view p_resource_id, const VkClearValue& p_clear_value = {});
+
+        /**
+         * @brief Set the load operation shared by color attachments.
+         */
+        Builder& set_color_attachment_load_op(VkAttachmentLoadOp p_load_op);
+
+        /**
+         * @brief Set the depth attachment load operation.
+         */
+        Builder& set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op);
+
+        /**
+         * @brief Resolve the vertex buffer from a graph resource.
+         */
+        Builder& set_vertex_buffer(std::string_view p_resource_id);
+
+        /**
+         * @brief Retain a task-owned vertex buffer.
+         */
+        Builder& set_vertex_buffer(Ref<ROBufferVK> p_buffer);
+
+        /**
+         * @brief Resolve the index buffer from a graph resource.
+         */
+        Builder& set_index_buffer(std::string_view p_resource_id);
+
+        /**
+         * @brief Retain a task-owned index buffer.
+         */
+        Builder& set_index_buffer(Ref<ROBufferVK> p_buffer);
+
+        /**
+         * @brief Resolve the indexed-indirect command buffer from a graph resource.
+         */
+        Builder& set_indirect_buffer(std::string_view p_resource_id);
+
+        /**
+         * @brief Retain a task-owned indexed-indirect command buffer.
+         */
+        Builder& set_indirect_buffer(Ref<ROBufferVK> p_buffer);
+
+        /**
+         * @brief Replace the draw plan with one graphics pipeline batch beginning at command zero.
+         */
+        Builder& set_pipeline(Ref<ROGraphicsPipelineVK> p_pipeline,
+            uint32_t p_draw_count,
+            VertexInputDescriptionVK p_vertex_input = {},
+            VkDeviceSize p_vertex_buffer_offset = 0);
+
+        /**
+         * @brief Append one graphics pipeline batch.
+         */
+        Builder& add_pipeline_batch(Ref<ROGraphicsPipelineVK> p_pipeline,
+            uint32_t p_first_draw,
+            uint32_t p_draw_count,
+            VertexInputDescriptionVK p_vertex_input = {},
+            VkDeviceSize p_vertex_buffer_offset = 0);
+
+        /**
+         * @brief Append one preconfigured graphics pipeline batch.
+         */
+        Builder& add_pipeline_batch(PipelineBatch p_batch);
+
+        /**
+         * @brief Create an allocator-owned render task.
+         */
+        Unique<RTRunGraphicsPipelineIndirectVK> create_unique(const BaseRenderDataVK* p_render_data) const;
+
+    private:
+        friend RTRunGraphicsPipelineIndirectVK;
+
+        RenderAllocator* allocator = nullptr;
+        VkExtent2D render_extent{};
+        Vector<VkClearValue, RenderAllocator> color_clear_values;
+        Vector<std::string, RenderAllocator> color_attachment_ids;
+        std::optional<VkClearValue> depth_clear_value;
+        std::optional<std::string> depth_attachment_id;
+        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        std::string vertex_buffer_id;
+        std::string index_buffer_id;
+        std::string indirect_buffer_id;
+        Ref<ROBufferVK> vertex_buffer = MEM_NULL;
+        Ref<ROBufferVK> index_buffer = MEM_NULL;
+        Ref<ROBufferVK> indirect_buffer = MEM_NULL;
+        Vector<PipelineBatch, RenderAllocator> pipeline_batches;
+    };
+
     RTRunGraphicsPipelineIndirectVK() = delete;
     virtual ~RTRunGraphicsPipelineIndirectVK() override = default;
     RTRunGraphicsPipelineIndirectVK(const RTRunGraphicsPipelineIndirectVK&) = delete;
@@ -79,138 +199,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     RTRunGraphicsPipelineIndirectVK& operator=(RTRunGraphicsPipelineIndirectVK&&) noexcept = delete;
 
     /**
-     * @brief Construct a task with one color attachment.
-     *
-     * @param p_render_data Renderer state used while recording.
-     * @param p_clear_color Clear value for the color attachment.
-     * @param p_render_extent Render area extent.
-     * @param p_color_attachment_id Color attachment graph resource id.
-     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
-     * @param p_vertex_buffer_id Vertex buffer graph resource id.
-     * @param p_index_buffer_id Index buffer graph resource id.
-     * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
-     * @param p_draw_count Number of tightly packed VkDrawIndexedIndirectCommand records to execute.
-     * @param p_color_attachment_load_op Color attachment load operation.
-     * @param p_vertex_input Dynamic vertex-input state for the draw range.
-     * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
+     * @brief Construct a task from a complete builder configuration.
      */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
-        const glm::vec4& p_clear_color,
-        VkExtent2D p_render_extent,
-        std::string_view p_color_attachment_id,
-        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
-        std::string_view p_vertex_buffer_id,
-        std::string_view p_index_buffer_id,
-        std::string_view p_indirect_buffer_id,
-        uint32_t p_draw_count,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0);
-
-    /**
-     * @brief Construct a task with multiple color attachments and an optional depth attachment.
-     *
-     * @param p_render_data Renderer state used while recording.
-     * @param p_clear_values Color clear values followed by the depth clear value when present.
-     * @param p_render_extent Render area extent.
-     * @param p_color_attachment_ids Color attachment graph resource ids in pipeline order.
-     * @param p_depth_attachment_id Optional depth attachment graph resource id.
-     * @param p_graphics_pipeline Graphics pipeline retained directly by the task.
-     * @param p_vertex_buffer_id Vertex buffer graph resource id.
-     * @param p_index_buffer_id Index buffer graph resource id.
-     * @param p_indirect_buffer_id Indexed-indirect command buffer graph resource id.
-     * @param p_draw_count Number of tightly packed VkDrawIndexedIndirectCommand records to execute.
-     * @param p_color_attachment_load_op Load operation used for every color attachment.
-     * @param p_depth_attachment_load_op Depth attachment load operation.
-     * @param p_vertex_input Dynamic vertex-input state for the draw range.
-     * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
-     */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
-        std::span<const VkClearValue> p_clear_values,
-        VkExtent2D p_render_extent,
-        std::span<const std::string_view> p_color_attachment_ids,
-        std::optional<std::string_view> p_depth_attachment_id,
-        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
-        std::string_view p_vertex_buffer_id,
-        std::string_view p_index_buffer_id,
-        std::string_view p_indirect_buffer_id,
-        uint32_t p_draw_count,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VertexInputDescriptionVK p_vertex_input = {},
-        VkDeviceSize p_vertex_buffer_offset = 0);
-
-    /**
-     * @brief Construct a task with task-owned pipelines and an indirect-command buffer.
-     *
-     * Each pipeline batch must provide graphics_pipeline. The immutable pipelines and command buffer are retained directly
-     * and are therefore not declared as render-graph resources.
-     *
-     * @param p_render_data Renderer state used while recording.
-     * @param p_clear_values Color clear values followed by depth when present.
-     * @param p_render_extent Render area extent.
-     * @param p_color_attachment_ids Color attachment graph resource ids.
-     * @param p_depth_attachment_id Optional depth attachment graph resource id.
-     * @param p_vertex_buffer_id Vertex buffer graph resource id.
-     * @param p_index_buffer_id Index buffer graph resource id.
-     * @param p_indirect_buffer Task-owned indexed-indirect command buffer.
-     * @param p_pipeline_batches Ordered task-owned pipeline batches covering the command buffer.
-     * @param p_color_attachment_load_op Load operation used for every color attachment.
-     * @param p_depth_attachment_load_op Depth attachment load operation.
-     */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
-        std::span<const VkClearValue> p_clear_values,
-        VkExtent2D p_render_extent,
-        std::span<const std::string_view> p_color_attachment_ids,
-        std::optional<std::string_view> p_depth_attachment_id,
-        std::string_view p_vertex_buffer_id,
-        std::string_view p_index_buffer_id,
-        Ref<ROBufferVK> p_indirect_buffer,
-        std::span<const PipelineBatch> p_pipeline_batches,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
-
-    /**
-     * @brief Construct a task with task-owned pipelines and draw buffers.
-     */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
-        std::span<const VkClearValue> p_clear_values,
-        VkExtent2D p_render_extent,
-        std::span<const std::string_view> p_color_attachment_ids,
-        std::optional<std::string_view> p_depth_attachment_id,
-        Ref<ROBufferVK> p_vertex_buffer,
-        Ref<ROBufferVK> p_index_buffer,
-        Ref<ROBufferVK> p_indirect_buffer,
-        std::span<const PipelineBatch> p_pipeline_batches,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
-
-    /**
-     * @brief Construct one render task containing multiple contiguous graphics-pipeline batches.
-     *
-     * @param p_render_data Renderer state used while recording.
-     * @param p_clear_values Color clear values followed by depth when present.
-     * @param p_render_extent Render area extent.
-     * @param p_color_attachment_ids Color attachment graph resource ids.
-     * @param p_depth_attachment_id Optional depth attachment graph resource id.
-     * @param p_vertex_buffer_id Vertex buffer graph resource id.
-     * @param p_index_buffer_id Index buffer graph resource id.
-     * @param p_indirect_buffer_id Shared indexed-indirect command buffer graph resource id.
-     * @param p_pipeline_batches Ordered pipeline batches covering the command buffer.
-     * @param p_color_attachment_load_op Load operation used for every color attachment.
-     * @param p_depth_attachment_load_op Depth attachment load operation.
-     */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data,
-        std::span<const VkClearValue> p_clear_values,
-        VkExtent2D p_render_extent,
-        std::span<const std::string_view> p_color_attachment_ids,
-        std::optional<std::string_view> p_depth_attachment_id,
-        std::string_view p_vertex_buffer_id,
-        std::string_view p_index_buffer_id,
-        std::string_view p_indirect_buffer_id,
-        std::span<const PipelineBatch> p_pipeline_batches,
-        VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VkAttachmentLoadOp p_depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
+    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

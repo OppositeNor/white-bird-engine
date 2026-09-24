@@ -18,7 +18,6 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/ecs/components.hh"
 #include "function/input_manager/input_manager.hh"
 #include "function/input_manager/key_codes.hh"
@@ -33,9 +32,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -271,22 +268,18 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{color_clear, color_clear, color_clear, depth_clear};
     std::array<std::string_view, 3> color_attachments{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
-    auto batches = make_static_set_pipeline_batches(render_allocator, static_set_resources, gbuffer_opaque_graphics_pipeline, false);
-    RendTaskDescVK descriptor(render_allocator,
+    RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
+        base_render_data,
         RT_RUN_DEFERRED_GBUFFER,
-        make_unique<RTRunGraphicsPipelineIndirectVK>(render_allocator,
-            base_render_data,
-            clear_values,
-            base_render_data->swap_chain_extent,
-            color_attachments,
-            GBUFFER_DEPTH_IMAGE_VIEW,
-            REND_RES_STATIC_SET_VERTICES,
-            REND_RES_STATIC_SET_INDICES,
-            REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES,
-            batches,
-            p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
-            p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR));
-    declare_static_set_shader_reads(descriptor, static_set_resources);
+        static_set_resources,
+        gbuffer_opaque_graphics_pipeline,
+        false,
+        clear_values,
+        base_render_data->swap_chain_extent,
+        color_attachments,
+        GBUFFER_DEPTH_IMAGE_VIEW,
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR);
     return descriptor;
 }
 
@@ -623,22 +616,18 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{shadow_color_clear, shadow_normal_clear, shadow_moments_clear, shadow_depth_clear};
     std::array<std::string_view, 3> color_attachments{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
-    auto batches = make_static_set_pipeline_batches(render_allocator, static_set_resources, shadow_opaque_graphics_pipeline, false);
-    RendTaskDescVK descriptor(render_allocator,
+    RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
+        base_render_data,
         RT_RUN_DEFERRED_SHADOW_OPAQUE,
-        make_unique<RTRunGraphicsPipelineIndirectVK>(render_allocator,
-            base_render_data,
-            clear_values,
-            shadow_extent,
-            color_attachments,
-            SHADOWMAP_DEPTH_IMAGE_VIEW,
-            REND_RES_STATIC_SET_VERTICES,
-            REND_RES_STATIC_SET_INDICES,
-            REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES,
-            batches,
-            p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
-            p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR));
-    declare_static_set_shader_reads(descriptor, static_set_resources);
+        static_set_resources,
+        shadow_opaque_graphics_pipeline,
+        false,
+        clear_values,
+        shadow_extent,
+        color_attachments,
+        SHADOWMAP_DEPTH_IMAGE_VIEW,
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR);
     return descriptor;
 }
 
@@ -682,6 +671,9 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
 }
 
 GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_oct_tree_graphics_pipeline_context() const {
+    WBE::RendGraphDescVK pipeline_desc(render_allocator);
+    WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
+    // TODO
     return GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
         .render_data = base_render_data,
