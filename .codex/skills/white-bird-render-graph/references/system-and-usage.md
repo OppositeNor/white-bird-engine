@@ -33,9 +33,9 @@ as `<resource_list_key>[<index>]`. A task read or write on the aggregate expands
 validation and synchronization scope derivation. Populate the list before graph construction; the list itself is CPU-only and
 does not create a GPU object.
 
-Task-private resources belong on `RendTaskDescVK`. `StaticSetRenderResourcesVK::register_resources()` adds its vertex, index,
-opaque and masked indirect draw-command, reflected shader, and texture-list resources together. Generic sequential graphics
-indirect dispatches receive the public resource IDs, vertex layout, and draw range at construction;
+All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
+IDs in their intrinsic or descriptor-level read and write declarations. Static-set vertex, index, opaque and masked indirect
+draw-command, reflected shader, and texture-list resources follow this rule;
 `REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_SET_MASKED_DRAW_BATCHES` are also storage-buffer capable for
 explicitly ordered compute writes.
 

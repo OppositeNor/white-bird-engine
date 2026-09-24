@@ -74,7 +74,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
      * @brief Configures an indexed-indirect graphics task without constructor variants.
      *
      * Attachments are optional. Leaving both attachment collections empty creates an attachment-less dynamic-rendering task.
-     * Each draw buffer may independently be supplied as a graph resource id or as a task-owned render object.
+     * Draw buffers are identified by graph resource ids and resolved when the graph is built.
      */
     struct Builder {
         Builder() = delete;
@@ -120,29 +120,14 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_vertex_buffer(std::string_view p_resource_id);
 
         /**
-         * @brief Retain a task-owned vertex buffer.
-         */
-        Builder& set_vertex_buffer(Ref<ROBufferVK> p_buffer);
-
-        /**
          * @brief Resolve the index buffer from a graph resource.
          */
         Builder& set_index_buffer(std::string_view p_resource_id);
 
         /**
-         * @brief Retain a task-owned index buffer.
-         */
-        Builder& set_index_buffer(Ref<ROBufferVK> p_buffer);
-
-        /**
          * @brief Resolve the indexed-indirect command buffer from a graph resource.
          */
         Builder& set_indirect_buffer(std::string_view p_resource_id);
-
-        /**
-         * @brief Retain a task-owned indexed-indirect command buffer.
-         */
-        Builder& set_indirect_buffer(Ref<ROBufferVK> p_buffer);
 
         /**
          * @brief Replace the draw plan with one graphics pipeline batch beginning at command zero.
@@ -185,9 +170,6 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         std::string vertex_buffer_id;
         std::string index_buffer_id;
         std::string indirect_buffer_id;
-        Ref<ROBufferVK> vertex_buffer = MEM_NULL;
-        Ref<ROBufferVK> index_buffer = MEM_NULL;
-        Ref<ROBufferVK> indirect_buffer = MEM_NULL;
         Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     };
 
@@ -229,9 +211,6 @@ private:
     Ref<RenderObjectContainerVK> vertex_buffer_container;
     Ref<RenderObjectContainerVK> index_buffer_container;
     Ref<RenderObjectContainerVK> indirect_buffer_container;
-    Ref<ROBufferVK> vertex_buffer = MEM_NULL;
-    Ref<ROBufferVK> index_buffer = MEM_NULL;
-    Ref<ROBufferVK> indirect_buffer = MEM_NULL;
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
 

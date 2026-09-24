@@ -404,6 +404,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc() const {
+    // TODO
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
     task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);

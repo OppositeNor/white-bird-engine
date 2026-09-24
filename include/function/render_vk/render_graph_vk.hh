@@ -68,8 +68,7 @@ public:
      *
      * @param p_resources The resource map to view.
      */
-    RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, std::string_view p_task_id = {})
-        : resources(p_resources), task_id(p_task_id) {
+    explicit RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources) : resources(p_resources) {
     }
 
     /**
@@ -101,44 +100,6 @@ public:
 
 private:
     const Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
-    std::string task_id;
-};
-
-/**
- * @class RendResRegistrarVK
- * @brief Registers task-private render resources into a graph-owned namespace.
- */
-class RendResRegistrarVK {
-public:
-    RendResRegistrarVK() = delete;
-    ~RendResRegistrarVK() = default;
-    RendResRegistrarVK(const RendResRegistrarVK&) = delete;
-    RendResRegistrarVK(RendResRegistrarVK&&) noexcept = delete;
-    RendResRegistrarVK& operator=(const RendResRegistrarVK&) = delete;
-    RendResRegistrarVK& operator=(RendResRegistrarVK&&) noexcept = delete;
-
-    /**
-     * @brief Register one task-private logical resource id.
-     * @param p_resource_id Logical id used by shader reflection and task accesses.
-     * @param p_resource_type_id Runtime type id of the contained render object.
-     * @param p_container Stable container retained by the graph.
-     */
-    void add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id, Ref<RenderObjectContainerVK> p_container);
-
-    /**
-     * @brief Register one task-private aggregate resource list and its indexed entries.
-     * @param p_resource_id Logical aggregate id used by task accesses.
-     * @param p_resource_list Resource list retained by the graph.
-     */
-    void add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
-
-private:
-    friend class RenderGraphVK;
-    RendResRegistrarVK(Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, RenderAllocator* p_allocator, std::string_view p_task_id);
-
-    Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
-    RenderAllocator* allocator;
-    std::string task_id;
 };
 
 /**

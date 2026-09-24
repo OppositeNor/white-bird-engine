@@ -87,16 +87,6 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: vertex buffer resource id is empty.");
     }
     vertex_buffer_id = p_resource_id;
-    vertex_buffer = MEM_NULL;
-    return *this;
-}
-
-RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_vertex_buffer(Ref<ROBufferVK> p_buffer) {
-    if (p_buffer == MEM_NULL) {
-        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: task-owned vertex buffer is null.");
-    }
-    vertex_buffer = std::move(p_buffer);
-    vertex_buffer_id.clear();
     return *this;
 }
 
@@ -105,16 +95,6 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: index buffer resource id is empty.");
     }
     index_buffer_id = p_resource_id;
-    index_buffer = MEM_NULL;
-    return *this;
-}
-
-RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_index_buffer(Ref<ROBufferVK> p_buffer) {
-    if (p_buffer == MEM_NULL) {
-        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: task-owned index buffer is null.");
-    }
-    index_buffer = std::move(p_buffer);
-    index_buffer_id.clear();
     return *this;
 }
 
@@ -123,16 +103,6 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: indirect buffer resource id is empty.");
     }
     indirect_buffer_id = p_resource_id;
-    indirect_buffer = MEM_NULL;
-    return *this;
-}
-
-RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_indirect_buffer(Ref<ROBufferVK> p_buffer) {
-    if (p_buffer == MEM_NULL) {
-        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: task-owned indirect buffer is null.");
-    }
-    indirect_buffer = std::move(p_buffer);
-    indirect_buffer_id.clear();
     return *this;
 }
 
@@ -176,8 +146,7 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
       color_attachment_ids(p_builder.color_attachment_ids.begin(), p_builder.color_attachment_ids.end(), p_render_data->allocator),
       color_attachment_containers(p_render_data->allocator), depth_attachment_id(p_builder.depth_attachment_id),
       vertex_buffer_id(p_builder.vertex_buffer_id), index_buffer_id(p_builder.index_buffer_id),
-      indirect_buffer_id(p_builder.indirect_buffer_id), vertex_buffer(p_builder.vertex_buffer),
-      index_buffer(p_builder.index_buffer), indirect_buffer(p_builder.indirect_buffer),
+      indirect_buffer_id(p_builder.indirect_buffer_id),
       pipeline_batches(p_builder.pipeline_batches.begin(), p_builder.pipeline_batches.end(), p_render_data->allocator),
       descriptor_bindings(p_render_data->allocator) {
     if (render_extent.width == 0 || render_extent.height == 0) {
@@ -186,9 +155,8 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     if (depth_attachment_id.has_value()) {
         clear_values.push_back(*p_builder.depth_clear_value);
     }
-    if ((vertex_buffer == MEM_NULL) == vertex_buffer_id.empty() || (index_buffer == MEM_NULL) == index_buffer_id.empty() ||
-        (indirect_buffer == MEM_NULL) == indirect_buffer_id.empty()) {
-        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: every draw buffer requires exactly one source.");
+    if (vertex_buffer_id.empty() || index_buffer_id.empty() || indirect_buffer_id.empty()) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: every draw buffer requires a graph resource id.");
     }
     if (pipeline_batches.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: no pipeline batches were configured.");
@@ -217,15 +185,9 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resou
     if (depth_attachment_id.has_value() && depth_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
         read_accesses.push_back({.res_id = *depth_attachment_id, .usage = RendResUsageVK::DEPTH_ATTACHMENT});
     }
-    if (vertex_buffer == nullptr) {
-        read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
-    }
-    if (index_buffer == nullptr) {
-        read_accesses.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
-    }
-    if (indirect_buffer == nullptr) {
-        read_accesses.push_back({.res_id = indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
-    }
+    read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    read_accesses.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
+    read_accesses.push_back({.res_id = indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
     return read_accesses;
 }
 
@@ -241,15 +203,9 @@ void RTRunGraphicsPipelineIndirectVK::bind_resources(const RendResViewVK& p_reso
     if (depth_attachment_id.has_value()) {
         depth_attachment_container = p_resources.get(*depth_attachment_id).container;
     }
-    if (vertex_buffer == MEM_NULL) {
-        vertex_buffer_container = p_resources.get(vertex_buffer_id).container;
-    }
-    if (index_buffer == MEM_NULL) {
-        index_buffer_container = p_resources.get(index_buffer_id).container;
-    }
-    if (indirect_buffer == MEM_NULL) {
-        indirect_buffer_container = p_resources.get(indirect_buffer_id).container;
-    }
+    vertex_buffer_container = p_resources.get(vertex_buffer_id).container;
+    index_buffer_container = p_resources.get(index_buffer_id).container;
+    indirect_buffer_container = p_resources.get(indirect_buffer_id).container;
     for (const PipelineBatch& pipeline_batch : pipeline_batches) {
         if (pipeline_batch.graphics_pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: graphics pipeline is null.");
@@ -272,21 +228,12 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::write_reso
 void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     VkCommandBuffer p_command_buffer,
     double /*p_delta*/) {
-    Ref<ROBufferVK> resolved_vertex_buffer = vertex_buffer;
-    if (resolved_vertex_buffer == nullptr) {
-        resolved_vertex_buffer =
-            WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-    }
-    Ref<ROBufferVK> resolved_index_buffer = index_buffer;
-    if (resolved_index_buffer == nullptr) {
-        resolved_index_buffer =
-            WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-    }
-    Ref<ROBufferVK> resolved_indirect_buffer = indirect_buffer;
-    if (resolved_indirect_buffer == nullptr) {
-        resolved_indirect_buffer =
-            WBE_REQUIRES_VALID(indirect_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-    }
+    Ref<ROBufferVK> resolved_vertex_buffer =
+        WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+    Ref<ROBufferVK> resolved_index_buffer =
+        WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+    Ref<ROBufferVK> resolved_indirect_buffer =
+        WBE_REQUIRES_VALID(indirect_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
     uint64_t required_draw_count = 0;
     for (const auto& batch : pipeline_batches) {
         required_draw_count = std::max(required_draw_count, static_cast<uint64_t>(batch.first_draw) + batch.draw_count);

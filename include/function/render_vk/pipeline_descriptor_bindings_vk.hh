@@ -30,7 +30,7 @@ class RendResViewVK;
 
 /**
  * @class PipelineDescriptorBindingsVK
- * @brief Task-owned resolution and push-data storage for one reflected pipeline descriptor layout.
+ * @brief Resolution and push-data storage for one reflected pipeline descriptor layout.
  *
  * The object is neither copyable nor movable. It retains graph resource containers and resolves their current frame slots
  * while recording on the rendering thread.
@@ -45,15 +45,15 @@ public:
     PipelineDescriptorBindingsVK& operator=(PipelineDescriptorBindingsVK&&) noexcept = delete;
 
     /**
-     * @brief Construct task-owned state for a reflected descriptor layout.
+     * @brief Construct binding state for a reflected descriptor layout.
      * @param p_render_data Renderer state used for frame-slot resolution and push-data commands.
      * @param p_layout Immutable pipeline descriptor layout.
      */
     PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
 
     /**
-     * @brief Resolve and retain every reflected logical resource from a task-scoped graph view.
-     * @param p_resources Task-local-first resource view.
+     * @brief Resolve and retain every reflected logical resource from the graph resource view.
+     * @param p_resources Graph-global resource view.
      */
     void bind_resources(const RendResViewVK& p_resources);
 

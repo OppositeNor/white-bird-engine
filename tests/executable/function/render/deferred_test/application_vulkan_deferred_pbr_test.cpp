@@ -671,15 +671,11 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
 }
 
 GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_oct_tree_graphics_pipeline_context() const {
-    WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
-    // TODO
     return GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
         .render_data = base_render_data,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {}, // No color attachments for oct tree building.
     };
 }
 

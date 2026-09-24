@@ -156,14 +156,11 @@ material, and `GraphicsPipelineCompilerVK` binds any reflected texture and param
 The compiled material image views are also returned as a CPU-side `RenderResourceList`, available through
 `CompiledStaticSetVK::acquire_texture_list()`.
 
-When `CompiledStaticSetVK::configure_task()` configures a task descriptor, it registers the compiled vertex buffer as task-private
-`REND_RES_STATIC_SET_VERTICES`, the compiled index buffer as `REND_RES_STATIC_SET_INDICES`, the opaque indirect command buffer as
-`REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES`, and the material texture list as
-`REND_RES_STATIC_SET_TEXTURES`. These public identifiers let callers pass the compiled resources into reusable render tasks.
-A `RenderResourceList` does not create GPU resources; graph construction retains the list under its aggregate key and registers
-its entries as `<resource_list_key>[<index>]`. Declaring one access to the aggregate expands to accesses on all indexed entries, so
-the configured task can declare one sampled-image read on `REND_RES_STATIC_SET_TEXTURES` while graph dependency validation still
-sees every texture.
+The application registers each compiled static-set resource once on `RendGraphDescVK`. Tasks refer to the shared vertex, index,
+indirect-command, metadata, material, and texture resources by their graph resource identifiers. A `RenderResourceList` does not
+create GPU resources; graph construction retains the list under its aggregate key and registers its entries as
+`<resource_list_key>[<index>]`. Declaring one access to the aggregate expands to accesses on all indexed entries, so a task can
+declare one sampled-image read on `REND_RES_STATIC_SET_TEXTURES` while graph dependency validation still sees every texture.
 
 `StaticSetDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
 layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their

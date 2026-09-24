@@ -77,30 +77,6 @@ struct RendTaskDescVK {
      */
     RendTaskDescVK& write(std::string_view p_resource_id, RendResUsageVK p_usage);
 
-    /**
-     * @brief Add a task-private resource binding.
-     * @param p_resource_id Logical identifier resolved before graph-global resources.
-     * @param p_resource Task-private Vulkan render object.
-     * @return This descriptor.
-     */
-    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource);
-
-    /**
-     * @brief Add a task-private resource-container binding.
-     * @param p_resource_id Logical identifier resolved before graph-global resources.
-     * @param p_resource_container Stable task-private resource container.
-     * @return This descriptor.
-     */
-    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container);
-
-    /**
-     * @brief Add a task-private aggregate resource-list binding.
-     * @param p_resource_id Logical aggregate identifier.
-     * @param p_resource_list Resource list expanded into indexed task-private resources.
-     * @return This descriptor.
-     */
-    RendTaskDescVK& add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
-
     // The id of this task within the graph.
     RendTaskID task_id;
     // The ids of tasks that must complete before this task starts. Used by the
@@ -109,8 +85,6 @@ struct RendTaskDescVK {
     // Additional descriptor-mediated resource reads and writes.
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
-    // Resources scoped to this task id and preferred over graph-global resources.
-    Vector<RendResVK, RenderAllocator> resources;
     // Factory invoked at graph-build time to construct the concrete task. The
     // resulting Unique<IRenderTaskVK> is owned by the graph.
     std::function<Unique<IRenderTaskVK>()> create;
@@ -118,9 +92,10 @@ struct RendTaskDescVK {
 
 /**
  * @class RendGraphDescVK
- * @brief A high-level Vulkan render pipeline descriptor. Resources are
- * concrete RendResVK (containing RenderObjectContainerVK), and tasks reference
- * each other by id.
+ * @brief A high-level Vulkan render pipeline descriptor.
+ *
+ * Every resource is declared once in this graph-wide descriptor. Tasks refer to those bindings by id through their read,
+ * write, attachment, and reflected shader declarations.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)

@@ -40,7 +40,6 @@
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <charconv>
 #include <cmath>
@@ -280,7 +279,7 @@ inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererV
     return GraphicsPipelineCompilerVK(context).compile(p_key, p_pipeline).graphics_pipeline;
 }
 
-inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator,
+inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator, // NOLINT
     const BaseRenderDataVK* p_render_data,
     std::string_view p_task_id,
     Ref<StaticSetResourcesVK> p_resources,

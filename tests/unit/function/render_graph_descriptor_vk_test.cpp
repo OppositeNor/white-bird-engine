@@ -106,16 +106,4 @@ TEST(WBERenderGraphDescriptorVKTest, ResourceListIsStoredAsAnAggregateBinding) {
     EXPECT_EQ(descriptor.resources.front().container, MEM_NULL);
 }
 
-TEST(WBERenderGraphDescriptorVKTest, TaskPrivateResourceListIsStoredOnTaskDescriptor) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RendTaskDescVK descriptor(&allocator);
-    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
-
-    descriptor.add_resource("_private_textures", resource_list);
-
-    ASSERT_EQ(descriptor.resources.size(), 1U);
-    EXPECT_EQ(descriptor.resources.front().res_id, "_private_textures");
-    EXPECT_EQ(descriptor.resources.front().resource_list, resource_list);
-}
-
 } // namespace WhiteBirdEngine
