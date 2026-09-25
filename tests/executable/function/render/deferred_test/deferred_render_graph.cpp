@@ -90,10 +90,15 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
+        .add_task(create_oct_tree_build_task_desc(
+            RT_RUN_BUILD_OCT_TREE_X, RT_RUN_DIRECT_LIGHTING, oct_tree_build_x_graphics_pipeline))
+        .add_task(create_oct_tree_build_task_desc(
+            RT_RUN_BUILD_OCT_TREE_Y, RT_RUN_BUILD_OCT_TREE_X, oct_tree_build_y_graphics_pipeline))
+        .add_task(create_oct_tree_build_task_desc(
+            RT_RUN_BUILD_OCT_TREE_Z, RT_RUN_BUILD_OCT_TREE_Y, oct_tree_build_z_graphics_pipeline))
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_extract_task_desc())
-        .add_task(create_bloom_mipmap_task_desc())
         .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc())
         .add_task(create_present_result_image_task_desc())
@@ -119,10 +124,8 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
         .add_resource(INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
         .add_resource(RESULT_IMAGE_VIEW, result_image_view)
-        .add_resource(BLOOM_EXTRACT_IMAGE_VIEW, bloom_extract_image_view)
-        .add_resource(BLOOM_DOWNSAMPLED_IMAGE_VIEW, bloom_downsampled_image_view)
-        .add_resource(BLOOM_HORIZONTAL_IMAGE_VIEW, bloom_horizontal_image_view)
-        .add_resource(BLOOM_IMAGE_VIEW, bloom_image_view)
+        .add_resource(BLOOM_PING_IMAGE_VIEW, bloom_ping_image_view)
+        .add_resource(BLOOM_PONG_IMAGE_VIEW, bloom_pong_image_view)
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, gbuffer_camera_info_ubos)
         .add_resource(COMPOSITION_CAMERA_INFO_BUFFER, composition_camera_info_ubos)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_buffers)
@@ -221,6 +224,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
     task_desc.after(RT_RUN_DEFERRED_GBUFFER)
+        .after(RT_RUN_BUILD_OCT_TREE_Z)
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -272,7 +276,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_EXTRACT_BLOOM;
-    task_desc.after(RT_COMBINE_LIGHTING).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).write(BLOOM_EXTRACT_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+    task_desc.after(RT_COMBINE_LIGHTING)
+        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = bloom_extract_compute_pipeline]() -> Unique<IRenderTaskVK> {
@@ -286,43 +292,28 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc(
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_mipmap_task_desc() const {
-    RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_GENERATE_BLOOM_MIPMAPS;
-    task_desc.after(RT_EXTRACT_BLOOM);
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_bloom_mipmap_level_count = bloom_mipmap_level_count]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
-            task_base_render_data,
-            BLOOM_EXTRACT_IMAGE_VIEW,
-            task_base_render_data->swap_chain_extent,
-            task_bloom_mipmap_level_count,
-            LIGHTING_OUTPUT_FORMAT);
-    };
-    return task_desc;
-}
-
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BLUR_BLOOM;
-    task_desc.after(RT_GENERATE_BLOOM_MIPMAPS)
-        .read(BLOOM_DOWNSAMPLED_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .read(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
-        .write(BLOOM_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
-        .write(BLOOM_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+    task_desc.after(RT_EXTRACT_BLOOM)
+        .read(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(BLOOM_PONG_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
+        .write(BLOOM_PONG_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_bloom_extent = bloom_extent,
-                           horizontal_pipeline = bloom_horizontal_compute_pipeline,
-                           vertical_pipeline = bloom_vertical_compute_pipeline]() -> Unique<IRenderTaskVK> {
+                           ping_write_pipeline = bloom_ping_write_compute_pipeline,
+                           pong_write_pipeline = bloom_pong_write_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_bloom_extent.width + 7U) / 8U,
             .height = (task_bloom_extent.height + 7U) / 8U,
             .depth = 1,
         };
         RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
-        dispatch.add_entry(horizontal_pipeline, dispatch_group_count).add_entry(vertical_pipeline, dispatch_group_count);
+        for (uint32_t pass_index = 0; pass_index < BLOOM_BLUR_PASS_COUNT; ++pass_index) {
+            dispatch.add_entry(pass_index % 2U == 0U ? pong_write_pipeline : ping_write_pipeline, dispatch_group_count);
+        }
         return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
     };
     return task_desc;
@@ -338,7 +329,12 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
                            task_acquire_requested = &bloom_acquire_requested,
                            task_acquire_completed = &bloom_acquire_completed]() -> Unique<IRenderTaskVK> {
         return make_unique<RTCPUInFlightAcquireVK>(
-            task_render_allocator, task_base_render_data, BLOOM_IMAGE_VIEW, task_destination, task_acquire_requested, task_acquire_completed);
+            task_render_allocator,
+            task_base_render_data,
+            BLOOM_PING_IMAGE_VIEW,
+            task_destination,
+            task_acquire_requested,
+            task_acquire_completed);
     };
     return task_desc;
 }
@@ -346,7 +342,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
-    task_desc.after(RT_ACQUIRE_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    task_desc.after(RT_ACQUIRE_BLOOM)
+        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<IRenderTaskVK> {
@@ -403,33 +401,28 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc() const {
-    // TODO
-    RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
-    task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {
-        // TODO RTRunGraphicsPipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
-        std::array<VkClearValue, 2> clear_values{};
-        std::array<std::string_view, 1> color_attachment_ids{REND_RES_SWAP_CHAIN};
-        return make_unique<RTRunGraphicsPipelineVK>(task_render_allocator,
-            task_base_render_data,
-            clear_values,
-            task_base_render_data->swap_chain_extent,
-            color_attachment_ids,
-            GBUFFER_DEPTH_IMAGE_VIEW,
-            task_pipeline,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt,
-            VK_ATTACHMENT_LOAD_OP_LOAD,
-            VK_ATTACHMENT_LOAD_OP_LOAD,
-            VertexInputDescriptionVK{},
-            0,
-            6);
-    };
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc(
+    std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline) const {
+    constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
+    constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
+    RendTaskDescVK task_desc = make_static_set_task_desc(render_allocator,
+        base_render_data,
+        p_task_id,
+        static_set_resources,
+        std::move(p_pipeline),
+        false,
+        CLEAR_VALUES,
+        VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
+        COLOR_ATTACHMENT_IDS);
+    task_desc.after(p_previous_task_id)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER);
     return task_desc;
 }
 

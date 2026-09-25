@@ -14,6 +14,15 @@
             ]
         },
         {
+            "id": "oct_tree_build_static_set_x_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "oct_tree_build_static_set_x",
+            "fragment_stage_id": "oct_tree_build_static_set_x",
+            "depth_test": false,
+            "depth_write": false,
+            "cull_backfaces": false
+        },
+        {
             "id": "oct_tree_build_static_set_y",
             "source_type": "shader",
             "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
@@ -26,6 +35,15 @@
             ]
         },
         {
+            "id": "oct_tree_build_static_set_y_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "oct_tree_build_static_set_y",
+            "fragment_stage_id": "oct_tree_build_static_set_y",
+            "depth_test": false,
+            "depth_write": false,
+            "cull_backfaces": false
+        },
+        {
             "id": "oct_tree_build_static_set_z",
             "source_type": "shader",
             "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
@@ -36,8 +54,15 @@
             "macros": [
                 {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "2"}
             ]
+        },
+        {
+            "id": "oct_tree_build_static_set_z_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "oct_tree_build_static_set_z",
+            "fragment_stage_id": "oct_tree_build_static_set_z",
+            "depth_test": false,
+            "depth_write": false,
+            "cull_backfaces": false
         }
-
-
     ]
 }

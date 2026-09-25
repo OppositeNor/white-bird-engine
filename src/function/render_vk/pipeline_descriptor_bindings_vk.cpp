@@ -104,12 +104,12 @@ uint32_t descriptor_index(ShaderDescriptorHeapTypeVK p_type, Ref<IRenderObject> 
 
 PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout)
     : render_data(p_render_data), layout(p_layout),
-      descriptor_index_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
+      push_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
       containers(p_render_data != nullptr ? p_render_data->allocator : nullptr) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to construct pipeline descriptor bindings: render data is missing.");
     }
-    descriptor_index_data.resize(layout.size, uint8_t{0});
+    push_data.resize(layout.size, uint8_t{0});
     containers.resize(layout.fields.size(), MEM_NULL);
 }
 
@@ -130,7 +130,7 @@ void PipelineDescriptorBindingsVK::bind_resources(const RendResViewVK& p_resourc
 }
 
 void PipelineDescriptorBindingsVK::push(VkCommandBuffer p_command_buffer) {
-    if (layout.fields.empty()) {
+    if (layout.fields.empty() && layout.default_fields.empty()) {
         return;
     }
     constexpr size_t DESCRIPTOR_INDEX_SIZE = sizeof(uint32_t) * 2;
@@ -146,17 +146,30 @@ void PipelineDescriptorBindingsVK::push(VkCommandBuffer p_command_buffer) {
                 std::format("Failed to push pipeline descriptor resource '{}': current frame slot is null.", field.resource_id));
         }
         const uint32_t index_data[2] = {descriptor_index(field.type, resource, field.resource_id), 0};
-        if (field.offset > descriptor_index_data.size() || DESCRIPTOR_INDEX_SIZE > descriptor_index_data.size() - field.offset) {
+        if (field.offset > push_data.size() || DESCRIPTOR_INDEX_SIZE > push_data.size() - field.offset) {
             throw std::runtime_error("Failed to push pipeline descriptor indices: reflected offset is out of bounds.");
         }
-        std::memcpy(descriptor_index_data.data() + field.offset, index_data, DESCRIPTOR_INDEX_SIZE);
+        std::memcpy(push_data.data() + field.offset, index_data, DESCRIPTOR_INDEX_SIZE);
+    }
+    constexpr size_t DEFAULT_PUSH_VALUE_SIZE = sizeof(uint32_t);
+    for (const ShaderDefaultPushFieldVK& field : layout.default_fields) {
+        if (field.offset > push_data.size() || DEFAULT_PUSH_VALUE_SIZE > push_data.size() - field.offset) {
+            throw std::runtime_error("Failed to push renderer default value: reflected offset is out of bounds.");
+        }
+        switch (field.value) {
+        case ShaderDefaultPushValueVK::TIME: {
+            const float time = static_cast<float>(render_data->time);
+            std::memcpy(push_data.data() + field.offset, &time, sizeof(time));
+            break;
+        }
+        }
     }
     if (render_data->command_push_data == nullptr) {
-        throw std::runtime_error("Failed to push pipeline descriptor indices: descriptor heap command is unavailable.");
+        throw std::runtime_error("Failed to push pipeline data: push-data command is unavailable.");
     }
     VkPushDataInfoEXT push_data_info{
         .sType = VK_STRUCTURE_TYPE_PUSH_DATA_INFO_EXT,
-        .data = {.address = descriptor_index_data.data(), .size = descriptor_index_data.size()},
+        .data = {.address = push_data.data(), .size = push_data.size()},
     };
     render_data->command_push_data(p_command_buffer, &push_data_info);
 }

@@ -51,19 +51,15 @@ namespace WBE = WhiteBirdEngine;
 
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER = "draw_triangle_vertex_buffer";
 inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "draw_triangle_index_buffer";
-static constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER = "time";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
     virtual void logic_update(double p_delta) override {
     }
 
-    virtual void render_update(double p_delta) override {
+    virtual void render_update(double /*p_delta*/) override {
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
-        time_accumulator += p_delta;
-        WBE::TimeVKUBO time_ubo_data{.duration_sec = static_cast<float>(time_accumulator)};
-        time_ubo->update_buffer(&time_ubo_data, sizeof(WBE::TimeVKUBO));
     }
 
     void setup_graphics_pipeline() {
@@ -80,11 +76,6 @@ public:
             throw std::runtime_error("Failed to setup draw triangle test: triangle geometry storage is missing.");
         }
 
-        WBE::TimeVKUBO time_ubo_data{.duration_sec = 0.5F};
-        time_ubo = WBE::ROBufferVK::Builder()
-                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                       .initial_data(&time_ubo_data, sizeof(time_ubo_data))
-                       .create_ref(base_render_data);
         auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
         if (pipeline_resource == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
@@ -122,7 +113,6 @@ public:
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
-            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_TIME_BUFFER, time_ubo)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
             .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
         WBE::RendTaskDescVK task_desc(render_allocator);
@@ -150,10 +140,8 @@ public:
     }
 
 private:
-    WBE::Ref<WBE::ROBufferVK> time_ubo;
     WBE::Ref<WBE::ROBufferVK> triangle_vertex_buffer;
     WBE::Ref<WBE::ROBufferVK> triangle_index_buffer;
-    double time_accumulator = 0.0;
 };
 
 int main(int p_argc, char* p_argv[]) {

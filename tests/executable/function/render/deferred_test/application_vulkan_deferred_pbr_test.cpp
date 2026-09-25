@@ -310,11 +310,14 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     indirect_lighting_rsm_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_rsm_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
-    bloom_horizontal_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_horizontal");
-    bloom_vertical_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_vertical");
-    oct_tree_build_x_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_x");
-    oct_tree_build_y_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_y");
-    oct_tree_build_z_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_build_static_set_z");
+    bloom_ping_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_ping_write");
+    bloom_pong_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_pong_write");
+    oct_tree_build_x_pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_x_pipeline");
+    oct_tree_build_y_pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_y_pipeline");
+    oct_tree_build_z_pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_z_pipeline");
 
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
@@ -342,6 +345,13 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     };
     gbuffer_opaque_graphics_pipeline =
         GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_opaque", gbuffer_opaque_pipeline_resource).graphics_pipeline;
+    GraphicsPipelineCompilerVK oct_tree_compiler(make_oct_tree_graphics_pipeline_context());
+    oct_tree_build_x_graphics_pipeline =
+        oct_tree_compiler.compile("oct_tree_build_static_set_x_pipeline", oct_tree_build_x_pipeline_resource).graphics_pipeline;
+    oct_tree_build_y_graphics_pipeline =
+        oct_tree_compiler.compile("oct_tree_build_static_set_y_pipeline", oct_tree_build_y_pipeline_resource).graphics_pipeline;
+    oct_tree_build_z_graphics_pipeline =
+        oct_tree_compiler.compile("oct_tree_build_static_set_z_pipeline", oct_tree_build_z_pipeline_resource).graphics_pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -504,13 +514,7 @@ void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
 
 void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     VkExtent2D extent = base_render_data->swap_chain_extent;
-    uint32_t maximum_bloom_mipmap_level = std::bit_width(std::min(extent.width, extent.height)) - 1U;
-    uint32_t bloom_mipmap_level = std::min(BLOOM_DOWNSAMPLE_LEVEL, maximum_bloom_mipmap_level);
-    bloom_mipmap_level_count = bloom_mipmap_level + 1U;
-    bloom_extent = VkExtent2D{
-        .width = std::max(extent.width >> bloom_mipmap_level, 1U),
-        .height = std::max(extent.height >> bloom_mipmap_level, 1U),
-    };
+    bloom_extent = extent;
     if (bloom_extent.width > std::numeric_limits<size_t>::max() / bloom_extent.height / BLOOM_BYTES_PER_PIXEL) {
         throw std::runtime_error("Failed to allocate the deferred bloom acquisition buffer: image byte size is too large.");
     }
@@ -524,22 +528,15 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
     result_image = ROImageVK::Builder()
                        .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
                        .create_ref(base_render_data);
-    bloom_extract_image = ROImageVK::Builder()
-                              .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
-                                  extent,
-                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                      VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-                              .set_mipmap_level(bloom_mipmap_level_count)
-                              .create_ref(base_render_data);
-    bloom_horizontal_image =
-        ROImageVK::Builder()
-            .set_properties_2d(LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-            .create_ref(base_render_data);
-    bloom_image = ROImageVK::Builder()
-                      .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
-                          bloom_extent,
-                          VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-                      .create_ref(base_render_data);
+    bloom_ping_image = ROImageVK::Builder()
+                           .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
+                               bloom_extent,
+                               VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+                           .create_ref(base_render_data);
+    bloom_pong_image = ROImageVK::Builder()
+                           .set_properties_2d(
+                               LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+                           .create_ref(base_render_data);
     direct_lighting_view = ROImageViewVK::Builder()
                                .set_image(direct_lighting_image)
                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
@@ -555,29 +552,16 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
                             .set_format(LIGHTING_OUTPUT_FORMAT)
                             .create_ref(base_render_data);
-    bloom_extract_image_view = ROImageViewVK::Builder()
-                                   .set_image(bloom_extract_image)
-                                   .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                   .set_format(LIGHTING_OUTPUT_FORMAT)
-                                   .create_ref(base_render_data);
-    bloom_downsampled_image_view =
-        ROImageViewVK::Builder()
-            .set_image(bloom_extract_image)
-            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-            .set_format(LIGHTING_OUTPUT_FORMAT)
-            .set_subresource_range(VkImageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = bloom_mipmap_level, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
-            .create_ref(base_render_data);
-    bloom_horizontal_image_view = ROImageViewVK::Builder()
-                                      .set_image(bloom_horizontal_image)
-                                      .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                      .set_format(LIGHTING_OUTPUT_FORMAT)
-                                      .create_ref(base_render_data);
-    bloom_image_view = ROImageViewVK::Builder()
-                           .set_image(bloom_image)
-                           .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                           .set_format(LIGHTING_OUTPUT_FORMAT)
-                           .create_ref(base_render_data);
+    bloom_ping_image_view = ROImageViewVK::Builder()
+                                .set_image(bloom_ping_image)
+                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                .set_format(LIGHTING_OUTPUT_FORMAT)
+                                .create_ref(base_render_data);
+    bloom_pong_image_view = ROImageViewVK::Builder()
+                                .set_image(bloom_pong_image)
+                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
+                                .set_format(LIGHTING_OUTPUT_FORMAT)
+                                .create_ref(base_render_data);
     bloom_sampler = ROSamplerVK::Builder()
                         .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
                         .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
@@ -704,12 +688,12 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto bloom_extract_compiled =
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
-    auto bloom_horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_horizontal", bloom_horizontal_shader_resource);
-    bloom_horizontal_compute_pipeline = bloom_horizontal_compiled.compute_pipeline;
-    auto bloom_vertical_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_vertical", bloom_vertical_shader_resource);
-    bloom_vertical_compute_pipeline = bloom_vertical_compiled.compute_pipeline;
+    auto bloom_ping_write_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_ping_write", bloom_ping_write_shader_resource);
+    bloom_ping_write_compute_pipeline = bloom_ping_write_compiled.compute_pipeline;
+    auto bloom_pong_write_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_pong_write", bloom_pong_write_shader_resource);
+    bloom_pong_write_compute_pipeline = bloom_pong_write_compiled.compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;

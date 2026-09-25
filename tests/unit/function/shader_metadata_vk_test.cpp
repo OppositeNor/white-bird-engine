@@ -278,7 +278,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(push_data.name, "descriptor_indices");
     EXPECT_EQ(push_data.binding.kind, "pushConstantBuffer");
     EXPECT_EQ(push_data.type.kind, "constantBuffer");
-    ASSERT_EQ(push_data.type.fields.size(), 6U);
+    ASSERT_EQ(push_data.type.fields.size(), 7U);
 
     const ShaderMetadataTypeField& uniform_buffer = push_data.type.fields[0];
     EXPECT_EQ(uniform_buffer.name, "uniform_buffer");
@@ -325,6 +325,17 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 2U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[1].string_value, "acceleration_structure");
+
+    const ShaderMetadataTypeField& time = push_data.type.fields[6];
+    EXPECT_EQ(time.name, "time");
+    EXPECT_EQ(time.type.kind, "scalar");
+    EXPECT_EQ(time.type.scalar_type, "float32");
+    EXPECT_EQ(time.binding.offset, 56);
+    EXPECT_EQ(time.binding.size, 4);
+    ASSERT_EQ(time.user_attributes.size(), 1U);
+    EXPECT_EQ(time.user_attributes[0].name, "WBE_DEFAULT_PUSH");
+    ASSERT_EQ(time.user_attributes[0].arguments.size(), 1U);
+    EXPECT_EQ(time.user_attributes[0].arguments[0].string_value, "time");
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {

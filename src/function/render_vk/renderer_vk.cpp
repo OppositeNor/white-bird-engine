@@ -207,6 +207,7 @@ RendererVK::~RendererVK() {
 void RendererVK::tick(double p_delta) {
     WBE_DEBUG_ASSERT(!(this_ref.is_null()));
 
+    base_render_data.time += p_delta;
     execute_graph(active_graph, p_delta);
 }
 

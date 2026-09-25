@@ -133,6 +133,25 @@ ShaderMetadataTypeField make_descriptor_heap_field(
     return field;
 }
 
+ShaderMetadataTypeField make_default_push_field(
+    std::string_view p_name, std::string_view p_value, std::string_view p_scalar_type, int32_t p_offset) {
+    ShaderMetadataTypeField field;
+    field.name = p_name;
+    field.type.kind = "scalar";
+    field.type.scalar_type = p_scalar_type;
+    field.binding.kind = "uniform";
+    field.binding.offset = p_offset;
+    field.binding.size = 4;
+    ShaderMetadataUserAttribute attribute;
+    attribute.name = "WBE_DEFAULT_PUSH";
+    ShaderMetadataUserAttributeArgument argument;
+    argument.kind = "string";
+    argument.string_value = p_value;
+    attribute.arguments.push_back(argument);
+    field.user_attributes.push_back(attribute);
+    return field;
+}
+
 ShaderMetadata make_descriptor_heap_metadata(
     std::string_view p_stage, std::string_view p_entry_name, std::span<const ShaderMetadataTypeField> p_fields) {
     ShaderMetadata metadata;
@@ -190,6 +209,56 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
     EXPECT_EQ(layout.fields[5].field_path, "acceleration_structure");
     EXPECT_EQ(layout.fields[5].type, ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE);
     EXPECT_EQ(layout.fields[5].offset, 40U);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, CollectsRendererDefaultPushFields) {
+    const std::array<ShaderMetadataTypeField, 1> fields{{
+        make_default_push_field("elapsed", "time", "float32", 0),
+    }};
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    EXPECT_EQ(layout.size, 4U);
+    EXPECT_TRUE(layout.fields.empty());
+    ASSERT_EQ(layout.default_fields.size(), 1U);
+    EXPECT_EQ(layout.default_fields[0].field_path, "elapsed");
+    EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::TIME);
+    EXPECT_EQ(layout.default_fields[0].offset, 0U);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedRendererDefaultPushFields) {
+    ShaderMetadataTypeField malformed = make_default_push_field("value", "unknown", "float32", 0);
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_default_push_field("value", "time", "uint32", 0);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_default_push_field("value", "time", "bool", 0);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_default_push_field("value", "time", "float32", 0);
+    malformed.user_attributes[0].arguments.clear();
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_default_push_field("value", "time", "float32", 0);
+    malformed.user_attributes.push_back(malformed.user_attributes[0]);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsOverlappingDescriptorAndDefaultPushFields) {
+    const std::array<ShaderMetadataTypeField, 2> fields{{
+        make_descriptor_heap_field("descriptor", "uniform_buffer", 0),
+        make_default_push_field("time", "time", "float32", 4),
+    }};
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPaths) {
@@ -294,6 +363,25 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
     ShaderMetadataTypeField mismatched_resource = make_descriptor_heap_field("uniform", "uniform_buffer", 0, "other");
     fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&mismatched_resource, 1));
     EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+        std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsRendererDefaultPushFields) {
+    ShaderMetadataTypeField time = make_default_push_field("time", "time", "float32", 0);
+    ShaderMetadata vertex_metadata = make_descriptor_heap_metadata("vertex", "vertex_main", std::span(&time, 1));
+    ShaderMetadata fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&time, 1));
+    ShaderMetadata geometry_metadata = make_descriptor_heap_metadata("geometry", "geometry_main", std::span(&time, 1));
+
+    ShaderDescriptorHeapLayoutVK layout = collect_graphics_pipeline_descriptor_heap_layout(
+        vertex_metadata, "vertex_main", &geometry_metadata, "geometry_main", fragment_metadata, "fragment_main");
+
+    EXPECT_EQ(layout.size, 4U);
+    ASSERT_EQ(layout.default_fields.size(), 1U);
+    EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::TIME);
+
+    fragment_metadata.parameters[0].type.fields[0].type.scalar_type = "bool";
+    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(
+                     vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 }
 

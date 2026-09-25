@@ -12,20 +12,20 @@
             ]
         },
         {
-            "id": "bloom_shader_vertical",
+            "id": "bloom_shader_pong_write",
             "source_type": "shader",
             "src": "assets/shaders/bloom/bloom.slang",
-            "dst": "assets/shaders/bloom/bloom_vertical.spv",
-            "metadata": "assets/shaders/bloom/bloom_vertical.json"
+            "dst": "assets/shaders/bloom/bloom_pong_write.spv",
+            "metadata": "assets/shaders/bloom/bloom_pong_write.json"
         },
         {
-            "id": "bloom_shader_horizontal",
+            "id": "bloom_shader_ping_write",
             "source_type": "shader",
             "src": "assets/shaders/bloom/bloom.slang",
-            "dst": "assets/shaders/bloom/bloom_horizontal.spv",
-            "metadata": "assets/shaders/bloom/bloom_horizontal.json",
+            "dst": "assets/shaders/bloom/bloom_ping_write.spv",
+            "metadata": "assets/shaders/bloom/bloom_ping_write.json",
             "macros": [
-                {"name": "BLOOM_HORIZONTAL"}
+                {"name": "WBE_USE_PING_WRITE"}
             ]
         }
     ]

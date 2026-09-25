@@ -54,8 +54,6 @@ struct OctTreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "oct_tree_deferred_list_ping")]
     uint2 deferred_list;
 
-    [WBE_DESCRIPTOR("storage_buffer", "node_data")]
-    uint2 node_data;
     StaticSetDescriptorIndices static_set;
 };
 

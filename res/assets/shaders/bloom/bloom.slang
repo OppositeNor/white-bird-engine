@@ -17,27 +17,22 @@
 struct BloomDescriptorIndices {
 #ifdef BLOOM_EXTRACT
     [WBE_DESCRIPTOR("sampled_image", "result_image")] uint2 bloom_input;
-    [WBE_DESCRIPTOR("storage_image", "bloom_extract")] uint2 bloom_output;
-#elif defined(BLOOM_HORIZONTAL)
-    [WBE_DESCRIPTOR("sampled_image", "bloom_downsampled")] uint2 bloom_input;
-    [WBE_DESCRIPTOR("storage_image", "bloom_horizontal")] uint2 bloom_output;
+    [WBE_DESCRIPTOR("storage_image", "bloom_ping")] uint2 bloom_output;
 #else
-    [WBE_DESCRIPTOR("sampled_image", "bloom_horizontal")] uint2 bloom_input;
-    [WBE_DESCRIPTOR("storage_image", "bloom")] uint2 bloom_output;
+#ifdef WBE_USE_PING_WRITE
+    [WBE_DESCRIPTOR("storage_image", "bloom_ping")] uint2 blur_texture_write;
+    [WBE_DESCRIPTOR("sampled_image", "bloom_pong")] uint2 blur_texture_read;
+#else
+    [WBE_DESCRIPTOR("storage_image", "bloom_pong")] uint2 blur_texture_write;
+    [WBE_DESCRIPTOR("sampled_image", "bloom_ping")] uint2 blur_texture_read;
 #endif
-    [WBE_DESCRIPTOR("sampler", "bloom_sampler")] uint2 gbuffer_sampler;
+#endif
+    [WBE_DESCRIPTOR("sampler", "bloom_sampler")] uint2 bloom_sampler;
 };
 
-static const int KERNEL_RADIUS = 2;
 static const float BLOOM_THRESHOLD = 1.0;
 static const float BLOOM_THRESHOLD_EPSILON = 0.0001;
-static const float KERNEL[5] = {
-    1.0 / 16.0,
-    4.0 / 16.0,
-    6.0 / 16.0,
-    4.0 / 16.0,
-    1.0 / 16.0
-};
+static const float KAWASE_SAMPLE_OFFSET = 1.5;
 
 [[vk::push_constant]]
 ConstantBuffer<BloomDescriptorIndices> descriptor_indices;
@@ -45,33 +40,43 @@ ConstantBuffer<BloomDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+#ifdef BLOOM_EXTRACT
     Texture2D<float4> bloom_input = ResourceDescriptorHeap[descriptor_indices.bloom_input.x];
     RWTexture2D<float4> bloom_output = ResourceDescriptorHeap[descriptor_indices.bloom_output.x];
-    SamplerState gbuffer_sampler = SamplerDescriptorHeap[descriptor_indices.gbuffer_sampler.x];
+#else
+    Texture2D<float4> blur_texture_read = ResourceDescriptorHeap[descriptor_indices.blur_texture_read.x];
+    RWTexture2D<float4> blur_texture_write = ResourceDescriptorHeap[descriptor_indices.blur_texture_write.x];
+#endif
+    SamplerState bloom_sampler = SamplerDescriptorHeap[descriptor_indices.bloom_sampler.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
+#ifdef BLOOM_EXTRACT
     bloom_output.GetDimensions(width, height);
+#else
+    blur_texture_write.GetDimensions(width, height);
+#endif
     if (dispatch_thread_id.x >= width || dispatch_thread_id.y >= height) {
         return;
     }
 #ifdef BLOOM_EXTRACT
     float2 sample_uv = (float2(dispatch_thread_id.xy) + 0.5) / float2(width, height);
-    float3 sample_color = bloom_input.SampleLevel(gbuffer_sampler, sample_uv, 0).rgb;
+    float3 sample_color = bloom_input.SampleLevel(bloom_sampler, sample_uv, 0).rgb;
     float brightness = dot(sample_color, float3(0.2126, 0.7152, 0.0722));
     float contribution = max(brightness - BLOOM_THRESHOLD, 0.0) / max(brightness, BLOOM_THRESHOLD_EPSILON);
     bloom_output[dispatch_thread_id.xy] = float4(sample_color * contribution, 1.0);
 #else
-    float3 accumulated_color = 0.0;
-    for (int offset = -KERNEL_RADIUS; offset <= KERNEL_RADIUS; ++offset) {
-#ifdef BLOOM_HORIZONTAL
-        float2 sample_uv = (float2(int2(dispatch_thread_id) + int2(offset, 0)) + 0.5) / float2(width, height);
-#else
-        float2 sample_uv = (float2(int2(dispatch_thread_id) + int2(0, offset)) + 0.5) / float2(width, height);
-#endif
-        float3 sample_color = bloom_input.SampleLevel(gbuffer_sampler, sample_uv, 0).rgb;
-        accumulated_color += sample_color * KERNEL[offset + KERNEL_RADIUS];
-    }
-    bloom_output[dispatch_thread_id.xy] = float4(accumulated_color, 1.0);
+    float2 inverse_extent = 1.0 / float2(width, height);
+    float2 sample_uv = (float2(dispatch_thread_id.xy) + 0.5) * inverse_extent;
+    float2 sample_offset = KAWASE_SAMPLE_OFFSET * inverse_extent;
+    float3 accumulated_color =
+        blur_texture_read.SampleLevel(bloom_sampler, sample_uv + float2(-sample_offset.x, -sample_offset.y), 0).rgb;
+    accumulated_color +=
+        blur_texture_read.SampleLevel(bloom_sampler, sample_uv + float2(sample_offset.x, -sample_offset.y), 0).rgb;
+    accumulated_color +=
+        blur_texture_read.SampleLevel(bloom_sampler, sample_uv + float2(-sample_offset.x, sample_offset.y), 0).rgb;
+    accumulated_color +=
+        blur_texture_read.SampleLevel(bloom_sampler, sample_uv + float2(sample_offset.x, sample_offset.y), 0).rgb;
+    blur_texture_write[dispatch_thread_id.xy] = float4(accumulated_color * 0.25, 1.0);
 #endif
 }

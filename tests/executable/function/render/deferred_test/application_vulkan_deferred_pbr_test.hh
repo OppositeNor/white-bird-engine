@@ -80,7 +80,8 @@ private:
     static constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
     static constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
     static constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
-    static constexpr uint32_t BLOOM_DOWNSAMPLE_LEVEL = 4;
+    static constexpr uint32_t BLOOM_BLUR_PASS_COUNT = 6;
+    static_assert(BLOOM_BLUR_PASS_COUNT % 2U == 0U);
     static constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
     static constexpr size_t OCT_TREE_MAX_NODE_COUNT = 1024;
     static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = 1024;
@@ -106,10 +107,8 @@ private:
     static constexpr std::string_view DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
     static constexpr std::string_view INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
     static constexpr std::string_view RESULT_IMAGE_VIEW = "result_image";
-    static constexpr std::string_view BLOOM_EXTRACT_IMAGE_VIEW = "bloom_extract";
-    static constexpr std::string_view BLOOM_DOWNSAMPLED_IMAGE_VIEW = "bloom_downsampled";
-    static constexpr std::string_view BLOOM_HORIZONTAL_IMAGE_VIEW = "bloom_horizontal";
-    static constexpr std::string_view BLOOM_IMAGE_VIEW = "bloom";
+    static constexpr std::string_view BLOOM_PING_IMAGE_VIEW = "bloom_ping";
+    static constexpr std::string_view BLOOM_PONG_IMAGE_VIEW = "bloom_pong";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
     static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
@@ -136,13 +135,14 @@ private:
     static constexpr std::string_view RT_RUN_INDIRECT_LIGHTING = "run_indirect_lighting";
     static constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
     static constexpr std::string_view RT_EXTRACT_BLOOM = "extract_bloom";
-    static constexpr std::string_view RT_GENERATE_BLOOM_MIPMAPS = "generate_bloom_mipmaps";
     static constexpr std::string_view RT_BLUR_BLOOM = "blur_bloom";
     static constexpr std::string_view RT_ACQUIRE_BLOOM = "acquire_bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
-    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE = "run_build_oct_tree";
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_X = "run_build_oct_tree_x";
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_Y = "run_build_oct_tree_y";
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_Z = "run_build_oct_tree_z";
 
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
@@ -220,12 +220,12 @@ private:
     RendTaskDescVK create_indirect_lighting_task_desc(bool p_use_summed_area_table) const;
     RendTaskDescVK create_combine_lighting_task_desc() const;
     RendTaskDescVK create_bloom_extract_task_desc() const;
-    RendTaskDescVK create_bloom_mipmap_task_desc() const;
     RendTaskDescVK create_bloom_blur_task_desc() const;
     RendTaskDescVK create_bloom_acquire_task_desc();
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
-    RendTaskDescVK create_oct_tree_build_task_desc() const;
+    RendTaskDescVK create_oct_tree_build_task_desc(
+        std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline) const;
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 
@@ -242,11 +242,11 @@ private:
     RefRes<RUShader> indirect_lighting_rsm_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
     RefRes<RUShader> bloom_extract_shader_resource;
-    RefRes<RUShader> bloom_horizontal_shader_resource;
-    RefRes<RUShader> bloom_vertical_shader_resource;
-    RefRes<RUShader> oct_tree_build_x_shader_resource;
-    RefRes<RUShader> oct_tree_build_y_shader_resource;
-    RefRes<RUShader> oct_tree_build_z_shader_resource;
+    RefRes<RUShader> bloom_ping_write_shader_resource;
+    RefRes<RUShader> bloom_pong_write_shader_resource;
+    RefRes<RUGraphicsPipeline> oct_tree_build_x_pipeline_resource;
+    RefRes<RUGraphicsPipeline> oct_tree_build_y_pipeline_resource;
+    RefRes<RUGraphicsPipeline> oct_tree_build_z_pipeline_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
@@ -259,10 +259,13 @@ private:
     Ref<ROComputePipelineVK> indirect_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> bloom_horizontal_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> bloom_vertical_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> bloom_ping_write_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> bloom_pong_write_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> oct_tree_build_x_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> oct_tree_build_y_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> oct_tree_build_z_graphics_pipeline = MEM_NULL;
     Ref<ROImageVK> gbuffer_albedo_image;
     Ref<ROImageVK> gbuffer_normal_image;
     Ref<ROImageVK> gbuffer_rma_image;
@@ -270,9 +273,8 @@ private:
     Ref<ROImageVK> direct_lighting_image;
     Ref<ROImageVK> indirect_lighting_image;
     Ref<ROImageVK> result_image;
-    Ref<ROImageVK> bloom_extract_image;
-    Ref<ROImageVK> bloom_horizontal_image;
-    Ref<ROImageVK> bloom_image;
+    Ref<ROImageVK> bloom_ping_image;
+    Ref<ROImageVK> bloom_pong_image;
     Ref<ROImageViewVK> gbuffer_albedo_view;
     Ref<ROImageViewVK> gbuffer_normal_view;
     Ref<ROImageViewVK> gbuffer_rma_view;
@@ -280,10 +282,8 @@ private:
     Ref<ROImageViewVK> direct_lighting_view;
     Ref<ROImageViewVK> indirect_lighting_view;
     Ref<ROImageViewVK> result_image_view;
-    Ref<ROImageViewVK> bloom_extract_image_view;
-    Ref<ROImageViewVK> bloom_downsampled_image_view;
-    Ref<ROImageViewVK> bloom_horizontal_image_view;
-    Ref<ROImageViewVK> bloom_image_view;
+    Ref<ROImageViewVK> bloom_ping_image_view;
+    Ref<ROImageViewVK> bloom_pong_image_view;
     Ref<ROImageVK> shadow_depth_image;
     Ref<ROImageVK> shadow_color_image;
     Ref<ROImageVK> shadow_normal_image;
@@ -319,7 +319,6 @@ private:
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
-    uint32_t bloom_mipmap_level_count = 1;
     std::vector<uint8_t> bloom_acquire_buffer;
     std::atomic_bool bloom_acquire_requested = false;
     std::binary_semaphore bloom_acquire_completed{0};

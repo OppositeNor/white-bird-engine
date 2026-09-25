@@ -198,6 +198,8 @@ struct BaseRenderDataVK {
 
     /** The current number of frames. */
     uint64_t current_frame = 0;
+    /** Elapsed renderer update time in seconds. */
+    double time = 0.0;
     /** The maximum depth of the render graph in the current pipeline. */
     uint64_t max_depth = 0;
 

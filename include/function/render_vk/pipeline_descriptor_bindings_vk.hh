@@ -58,7 +58,7 @@ public:
     void bind_resources(const RendResViewVK& p_resources);
 
     /**
-     * @brief Resolve the current frame slot and push descriptor indices for this pipeline.
+     * @brief Resolve the current frame slot and push descriptor indices and renderer default values for this pipeline.
      * @param p_command_buffer Command buffer receiving push data.
      */
     void push(VkCommandBuffer p_command_buffer);
@@ -66,7 +66,7 @@ public:
 private:
     const BaseRenderDataVK* render_data;
     ShaderDescriptorHeapLayoutVK layout;
-    Vector<uint8_t, RenderAllocator> descriptor_index_data;
+    Vector<uint8_t, RenderAllocator> push_data;
     Vector<Ref<RenderObjectContainerVK>, RenderAllocator> containers;
 };
 

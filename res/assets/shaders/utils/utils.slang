@@ -31,6 +31,13 @@ struct WBE_DESCRIPTORAttribute {
     string resource_id;
 };
 
+/** Marks a push-data scalar whose value is supplied automatically by the renderer. */
+[__AttributeUsage(_AttributeTargets.Var)]
+struct WBE_DEFAULT_PUSHAttribute {
+    /** Renderer default value identifier. */
+    string value;
+};
+
 /** Marks a struct as an engine-discoverable data type in reflection metadata. */
 [__AttributeUsage(_AttributeTargets.Struct)]
 struct WBE_DATA_TYPEAttribute {

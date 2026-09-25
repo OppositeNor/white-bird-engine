@@ -104,6 +104,22 @@ Relevant files:
 - `src/function/render/vertex_input_contract_resolver.cpp`
 - `tests/unit/function/shader_metadata_vk_utils_test.cpp`
 
+### `WBE_DEFAULT_PUSH`
+
+`WBE_DEFAULT_PUSH` marks a four-byte scalar in the pipeline push-data block whose value is supplied by the renderer for every
+recorded pipeline. It requires one string argument. `"time"` requires a shader `float` and receives elapsed renderer-update time
+converted from CPU `double` to GPU `float`. Default fields share layout and overlap validation with `WBE_DESCRIPTOR` fields and
+merge consistently across graphics stages.
+
+Relevant files:
+
+- `res/assets/shaders/utils/utils.slang`
+- `include/function/render_vk/shader_metadata_vk_utils.hh`
+- `src/function/render_vk/shader_metadata_vk_utils.cpp`
+- `src/function/render_vk/pipeline_descriptor_bindings_vk.cpp`
+- `tests/unit/function/shader_metadata_vk_utils_test.cpp`
+- `tests/unit/function/pipeline_descriptor_bindings_vk_test.cpp`
+
 ### `WBE_TEXTURE`
 
 `MaterialTextureContractResolver` reads direct children of each `MaterialParams` element. Each annotated index must be a four-byte uniform `int32` scalar. Roles must be unique by both name and hash. The role string is open-ended and comes from the shader; an omitted string defaults to the field name.

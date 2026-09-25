@@ -65,24 +65,38 @@ ShaderDescriptorHeapTypeVK descriptor_heap_type_from_name(std::string_view p_nam
     throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
 }
 
-const ShaderMetadataUserAttribute* find_descriptor_attribute(const ShaderMetadataTypeField& p_field) {
+const ShaderMetadataUserAttribute* find_unique_attribute(
+    const ShaderMetadataTypeField& p_field, std::string_view p_attribute_name) {
     const ShaderMetadataUserAttribute* result = nullptr;
     for (const ShaderMetadataUserAttribute& attribute : p_field.user_attributes) {
-        if (attribute.name != "WBE_DESCRIPTOR") {
+        if (attribute.name != p_attribute_name) {
             continue;
         }
         if (result != nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' repeats the annotation.", p_field.name));
+            throw std::runtime_error(std::format(
+                "Failed to resolve {}: field '{}' repeats the annotation.", p_attribute_name, p_field.name));
         }
         result = &attribute;
     }
     return result;
 }
 
+bool ranges_overlap(uint32_t p_first_offset, uint32_t p_first_size, uint32_t p_second_offset, uint32_t p_second_size) {
+    const uint64_t first_offset = p_first_offset;
+    const uint64_t second_offset = p_second_offset;
+    return first_offset < second_offset + p_second_size && second_offset < first_offset + p_first_size;
+}
+
 bool fields_overlap(const ShaderDescriptorHeapFieldVK& p_first, const ShaderDescriptorHeapFieldVK& p_second) {
-    constexpr uint32_t DESCRIPTOR_INDEX_SIZE = sizeof(uint32_t) * 2;
-    return p_first.offset < p_second.offset + DESCRIPTOR_INDEX_SIZE && p_second.offset < p_first.offset + DESCRIPTOR_INDEX_SIZE;
+    return ranges_overlap(p_first.offset, sizeof(uint32_t) * 2, p_second.offset, sizeof(uint32_t) * 2);
+}
+
+bool fields_overlap(const ShaderDefaultPushFieldVK& p_first, const ShaderDefaultPushFieldVK& p_second) {
+    return ranges_overlap(p_first.offset, sizeof(uint32_t), p_second.offset, sizeof(uint32_t));
+}
+
+bool fields_overlap(const ShaderDescriptorHeapFieldVK& p_first, const ShaderDefaultPushFieldVK& p_second) {
+    return ranges_overlap(p_first.offset, sizeof(uint32_t) * 2, p_second.offset, sizeof(uint32_t));
 }
 
 void append_descriptor_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDescriptorHeapFieldVK p_field) {
@@ -96,7 +110,41 @@ void append_descriptor_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDescr
                 "Failed to resolve WBE_DESCRIPTOR: fields '{}' and '{}' overlap in push data.", existing.field_path, p_field.field_path));
         }
     }
+    for (const ShaderDefaultPushFieldVK& existing : p_layout.default_fields) {
+        if (fields_overlap(p_field, existing)) {
+            throw std::runtime_error(std::format(
+                "Failed to resolve push data: fields '{}' and '{}' overlap.", p_field.field_path, existing.field_path));
+        }
+    }
     p_layout.fields.push_back(std::move(p_field));
+}
+
+ShaderDefaultPushValueVK default_push_value_from_name(std::string_view p_name) {
+    if (p_name == "time") {
+        return ShaderDefaultPushValueVK::TIME;
+    }
+    throw std::runtime_error(std::format("Failed to resolve WBE_DEFAULT_PUSH: unsupported value '{}'.", p_name));
+}
+
+void append_default_push_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDefaultPushFieldVK p_field) {
+    for (const ShaderDefaultPushFieldVK& existing : p_layout.default_fields) {
+        if (existing.field_path == p_field.field_path) {
+            throw std::runtime_error(std::format(
+                "Failed to resolve WBE_DEFAULT_PUSH: field path '{}' is declared more than once.", p_field.field_path));
+        }
+        if (fields_overlap(existing, p_field)) {
+            throw std::runtime_error(std::format("Failed to resolve WBE_DEFAULT_PUSH: fields '{}' and '{}' overlap in push data.",
+                existing.field_path,
+                p_field.field_path));
+        }
+    }
+    for (const ShaderDescriptorHeapFieldVK& existing : p_layout.fields) {
+        if (fields_overlap(existing, p_field)) {
+            throw std::runtime_error(std::format(
+                "Failed to resolve push data: fields '{}' and '{}' overlap.", existing.field_path, p_field.field_path));
+        }
+    }
+    p_layout.default_fields.push_back(std::move(p_field));
 }
 
 uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeField>& p_fields,
@@ -118,11 +166,16 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
         extent = std::max(extent, field_extent);
 
         std::string field_path = p_parent_path.empty() ? field.name : std::format("{}.{}", p_parent_path, field.name);
-        const ShaderMetadataUserAttribute* attribute = find_descriptor_attribute(field);
-        if (attribute != nullptr) {
-            if (attribute->arguments.size() != 2 || attribute->arguments[0].kind != "string" ||
-                attribute->arguments[0].string_value.empty() || attribute->arguments[1].kind != "string" ||
-                attribute->arguments[1].string_value.empty()) {
+        const ShaderMetadataUserAttribute* descriptor_attribute = find_unique_attribute(field, "WBE_DESCRIPTOR");
+        const ShaderMetadataUserAttribute* default_push_attribute = find_unique_attribute(field, "WBE_DEFAULT_PUSH");
+        if (descriptor_attribute != nullptr && default_push_attribute != nullptr) {
+            throw std::runtime_error(
+                std::format("Failed to resolve push data: field '{}' has both WBE_DESCRIPTOR and WBE_DEFAULT_PUSH.", field_path));
+        }
+        if (descriptor_attribute != nullptr) {
+            if (descriptor_attribute->arguments.size() != 2 || descriptor_attribute->arguments[0].kind != "string" ||
+                descriptor_attribute->arguments[0].string_value.empty() || descriptor_attribute->arguments[1].kind != "string" ||
+                descriptor_attribute->arguments[1].string_value.empty()) {
                 throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments.",
                     field_path));
             }
@@ -135,8 +188,28 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
             append_descriptor_field(p_layout,
                 ShaderDescriptorHeapFieldVK{
                     .field_path = field_path,
-                    .type = descriptor_heap_type_from_name(attribute->arguments[0].string_value),
-                    .resource_id = attribute->arguments[1].string_value,
+                    .type = descriptor_heap_type_from_name(descriptor_attribute->arguments[0].string_value),
+                    .resource_id = descriptor_attribute->arguments[1].string_value,
+                    .offset = static_cast<uint32_t>(field_offset),
+                });
+        }
+        if (default_push_attribute != nullptr) {
+            if (default_push_attribute->arguments.size() != 1 || default_push_attribute->arguments[0].kind != "string" ||
+                default_push_attribute->arguments[0].string_value.empty()) {
+                throw std::runtime_error(std::format(
+                    "Failed to resolve WBE_DEFAULT_PUSH: field '{}' requires one non-empty string argument.", field_path));
+            }
+            ShaderDefaultPushValueVK value = default_push_value_from_name(default_push_attribute->arguments[0].string_value);
+            const bool valid_scalar_type = value == ShaderDefaultPushValueVK::TIME && field.type.scalar_type == "float32";
+            if (field.type.kind != "scalar" || !valid_scalar_type || field.binding.kind != "uniform" ||
+                std::cmp_not_equal(field.binding.size, sizeof(uint32_t)) || field_offset % sizeof(uint32_t) != 0) {
+                throw std::runtime_error(std::format(
+                    "Failed to resolve WBE_DEFAULT_PUSH: field '{}' has an invalid type or four-byte scalar layout.", field_path));
+            }
+            append_default_push_field(p_layout,
+                ShaderDefaultPushFieldVK{
+                    .field_path = field_path,
+                    .value = value,
                     .offset = static_cast<uint32_t>(field_offset),
                 });
         }
@@ -183,7 +256,38 @@ void merge_descriptor_heap_layout(ShaderDescriptorHeapLayoutVK& p_result, const 
                     "Conflicting descriptor-heap push-data fields '{}' and '{}' overlap.", other.field_path, field.field_path));
             }
         }
+        for (const ShaderDefaultPushFieldVK& other : p_result.default_fields) {
+            if (fields_overlap(field, other)) {
+                throw std::runtime_error(std::format(
+                    "Conflicting push-data fields '{}' and '{}' overlap.", field.field_path, other.field_path));
+            }
+        }
         p_result.fields.push_back(field);
+    }
+    for (const ShaderDefaultPushFieldVK& field : p_stage_layout.default_fields) {
+        auto existing = std::ranges::find_if(p_result.default_fields, [&field](const ShaderDefaultPushFieldVK& p_existing) {
+            return p_existing.field_path == field.field_path;
+        });
+        if (existing != p_result.default_fields.end()) {
+            if (existing->value != field.value || existing->offset != field.offset) {
+                throw std::runtime_error(
+                    std::format("Conflicting default push-data declarations for field '{}'.", field.field_path));
+            }
+            continue;
+        }
+        for (const ShaderDefaultPushFieldVK& other : p_result.default_fields) {
+            if (fields_overlap(other, field)) {
+                throw std::runtime_error(std::format(
+                    "Conflicting default push-data fields '{}' and '{}' overlap.", other.field_path, field.field_path));
+            }
+        }
+        for (const ShaderDescriptorHeapFieldVK& other : p_result.fields) {
+            if (fields_overlap(other, field)) {
+                throw std::runtime_error(std::format(
+                    "Conflicting push-data fields '{}' and '{}' overlap.", other.field_path, field.field_path));
+            }
+        }
+        p_result.default_fields.push_back(field);
     }
 }
 
