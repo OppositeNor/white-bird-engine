@@ -34,6 +34,10 @@ WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
  */
 struct RendererCapabilities {
     /**
+     * @brief Whether GPU shader reports are retrieved, logged, and treated as fatal errors.
+     */
+    bool shader_debug = false;
+    /**
      * @brief Whether ray tracing is requested and was enabled.
      */
     bool ray_tracing = false;

@@ -53,6 +53,8 @@ struct OctTreeDescriptorIndices {
     uint2 tree_leaves;
     [WBE_DESCRIPTOR("storage_buffer", "oct_tree_deferred_list_ping")]
     uint2 deferred_list;
+    [WBE_DEFAULT_PUSH("frame_slot")]
+    uint shader_debug_frame_slot;
 
     StaticSetDescriptorIndices static_set;
 };
@@ -100,11 +102,17 @@ void fragment_main(VSOutput p_input) : SV_Target0 {
     trace_info.remain_depth = oct_tree_info[0].max_depth;
     trace_info.svo_position = p_input.svo_position;
     // Try to allocate the node.
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info)) {
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
-        InterlockedAdd(oct_tree_info[0].deferred_task_count, 1, new_task_index);
-        deferred_list[new_task_index].unfinished_trace_info = trace_info;
+        InterlockedAdd(oct_tree_info[0].deferred_task_count_ping, 1, new_task_index);
+        if (new_task_index < oct_tree_info[0].max_deferred_task_count) {
+            deferred_list[new_task_index].unfinished_trace_info = trace_info;
+        }
+        else {
+            report_shader_debug_error(
+                ShaderDebugError::OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+        }
     }
 }
 

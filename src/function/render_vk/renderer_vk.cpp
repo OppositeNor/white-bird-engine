@@ -27,6 +27,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -114,10 +115,7 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
                 result.error_message =
                     p_layer_name == nullptr
                         ? std::format("{} failed: {}", p_enumerate_function_name, string_VkResult(enumerate_result))
-                        : std::format("{} failed for layer '{}': {}",
-                              p_enumerate_function_name,
-                              p_layer_name,
-                              string_VkResult(enumerate_result));
+                        : std::format("{} failed for layer '{}': {}", p_enumerate_function_name, p_layer_name, string_VkResult(enumerate_result));
                 return false;
             }
             std::vector<VkExtensionProperties> extension_properties(extension_count);
@@ -127,10 +125,7 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
                 result.error_message =
                     p_layer_name == nullptr
                         ? std::format("{} failed: {}", p_enumerate_function_name, string_VkResult(enumerate_result))
-                        : std::format("{} failed for layer '{}': {}",
-                              p_enumerate_function_name,
-                              p_layer_name,
-                              string_VkResult(enumerate_result));
+                        : std::format("{} failed for layer '{}': {}", p_enumerate_function_name, p_layer_name, string_VkResult(enumerate_result));
                 return false;
             }
             for (const auto& extension : extension_properties) {
@@ -223,6 +218,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     run_stored_jobs();
 
     run_delayed_calls();
+    check_shader_debug_buffer();
     run_gpu_jobs();
     uint32_t frame_counter = *tick_frame_counter;
 
@@ -284,6 +280,7 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
     create_descriptor_heap_allocator();
+    create_shader_debug_buffer();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
     // setup_base_render_data() (which is also re-invoked on swap chain
@@ -317,6 +314,7 @@ void RendererVK::terminate() {
     render_database->clear_compiled_render_resources();
     image_available_semaphores.clear();
     swap_chain_image_view_container = MEM_NULL;
+    shader_debug_buffer = MEM_NULL;
 
     synchronize_gpu_and_flush_delayed_calls();
     base_render_data.descriptor_heap_allocator = nullptr;
@@ -456,8 +454,8 @@ void RendererVK::create_instance() { // NOLINT
         throw std::runtime_error(std::format("Unable to query Vulkan instance extension support: {}.", extension_support.error_message));
     }
     if (!extension_support.unsupported_extensions.empty()) {
-        throw std::runtime_error(std::format(
-            "Required Vulkan instance extensions are not supported: {}.", join_string_list(extension_support.unsupported_extensions)));
+        throw std::runtime_error(std::format("Required Vulkan instance extensions are not supported: {}.",
+            join_string_list(extension_support.unsupported_extensions)));
     }
 
     // Create instance.
@@ -702,7 +700,8 @@ void RendererVK::create_gpu_job_command_buffer() {
 }
 
 void RendererVK::create_descriptor_heap_allocator() {
-    constexpr uint32_t BUFFER_DESCRIPTOR_CAPACITY = 272;
+    // One additional entry is reserved by the renderer-owned shader-debug buffer at index zero.
+    constexpr uint32_t BUFFER_DESCRIPTOR_CAPACITY = 273;
     constexpr uint32_t SAMPLED_IMAGE_DESCRIPTOR_CAPACITY = 256;
     constexpr uint32_t STORAGE_IMAGE_DESCRIPTOR_CAPACITY = 64;
     constexpr uint32_t SAMPLER_DESCRIPTOR_CAPACITY = 256;
@@ -781,6 +780,25 @@ void RendererVK::create_descriptor_heap_allocator() {
     }
 }
 
+void RendererVK::create_shader_debug_buffer() {
+    if (frames_in_flight == 0) {
+        throw std::runtime_error("Failed to create shader-debug buffer: frame count is invalid.");
+    }
+    Vector<uint32_t> initial_data(SHADER_DEBUG_FRAME_WORD_COUNT * frames_in_flight, uint32_t{0}, allocator);
+    for (size_t frame_slot = 0; frame_slot < frames_in_flight; ++frame_slot) {
+        initial_data[frame_slot * SHADER_DEBUG_FRAME_WORD_COUNT + 1] = SHADER_DEBUG_FRAME_ENTRY_CAPACITY;
+    }
+    shader_debug_buffer = ROBufferVK::Builder()
+                              .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
+                              .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                              .create_ref(&base_render_data);
+    const uint32_t descriptor_index = shader_debug_buffer->get_storage_view_index();
+    if (descriptor_index != SHADER_DEBUG_DESCRIPTOR_INDEX) {
+        throw std::runtime_error(std::format(
+            "Failed to create shader-debug buffer: descriptor index is {}, expected {}.", descriptor_index, SHADER_DEBUG_DESCRIPTOR_INDEX));
+    }
+}
+
 void RendererVK::create_async_objects() {
     VkFenceCreateInfo fence_create_info{};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -852,6 +870,7 @@ void RendererVK::create_logical_device() { // NOLINT
     vkGetPhysicalDeviceFeatures(physical_device, &supported_device_features);
     VkPhysicalDeviceFeatures device_features{};
     device_features.depthClamp = VK_TRUE;
+    device_features.fillModeNonSolid = VK_TRUE;
     device_features.multiDrawIndirect = VK_TRUE;
     device_features.drawIndirectFirstInstance = VK_TRUE;
     device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
@@ -907,15 +926,14 @@ void RendererVK::create_logical_device() { // NOLINT
         enabled_layers,
         "vkEnumerateDeviceExtensionProperties",
         [this](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
-            return vkEnumerateDeviceExtensionProperties(
-                physical_device, p_layer_name, p_extension_count, p_extension_properties);
+            return vkEnumerateDeviceExtensionProperties(physical_device, p_layer_name, p_extension_count, p_extension_properties);
         });
     if (!extension_support.success) {
         throw std::runtime_error(std::format("Unable to query Vulkan device extension support: {}.", extension_support.error_message));
     }
     if (!extension_support.unsupported_extensions.empty()) {
-        throw std::runtime_error(std::format(
-            "Required Vulkan device extensions are not supported: {}.", join_string_list(extension_support.unsupported_extensions)));
+        throw std::runtime_error(std::format("Required Vulkan device extensions are not supported: {}.",
+            join_string_list(extension_support.unsupported_extensions)));
     }
 
     // Create logical device.
@@ -1022,6 +1040,9 @@ std::vector<std::string> RendererVK::collect_device_unsuitability_reasons(VkPhys
     std::vector<std::string> missing_features;
     if (supported_device_features.depthClamp != VK_TRUE) {
         missing_features.emplace_back("VkPhysicalDeviceFeatures.depthClamp");
+    }
+    if (supported_device_features.fillModeNonSolid != VK_TRUE) {
+        missing_features.emplace_back("VkPhysicalDeviceFeatures.fillModeNonSolid");
     }
     if (supported_device_features.multiDrawIndirect != VK_TRUE) {
         missing_features.emplace_back("VkPhysicalDeviceFeatures.multiDrawIndirect");
@@ -1378,6 +1399,57 @@ void RendererVK::run_gpu_jobs() {
     running_gpu_jobs = std::move(submitted_jobs);
     running_gpu_job_fenses = std::move(completion_fenses);
     running_gpu_job_semaphore = std::move(completion_semaphore);
+}
+
+void RendererVK::check_shader_debug_buffer() {
+    if (shader_debug_buffer == MEM_NULL) {
+        throw std::runtime_error("RendererVK: shader-debug buffer is unavailable.");
+    }
+
+    const size_t frame_offset = static_cast<size_t>(base_render_data.current_frame_slot) * SHADER_DEBUG_FRAME_BYTE_SIZE;
+    if (!base_render_data.renderer_capabilities.shader_debug) {
+        constexpr uint32_t EMPTY_SIZE = 0;
+        shader_debug_buffer->update_buffer(&EMPTY_SIZE, frame_offset, sizeof(EMPTY_SIZE));
+        return;
+    }
+
+    std::array<uint8_t, sizeof(uint32_t)> size_bytes{};
+    std::future<void> size_future = shader_debug_buffer->acquire_buffer_content(frame_offset, size_bytes);
+    run_gpu_jobs();
+    size_future.get();
+    wait_for_running_gpu_jobs();
+    run_stored_jobs();
+
+    uint32_t reported_size = 0;
+    std::memcpy(&reported_size, size_bytes.data(), sizeof(reported_size));
+    if (reported_size == 0) {
+        return;
+    }
+
+    std::array<uint8_t, SHADER_DEBUG_FRAME_BYTE_SIZE> content{};
+    std::future<void> content_future = shader_debug_buffer->acquire_buffer_content(frame_offset, content);
+    run_gpu_jobs();
+    content_future.get();
+    wait_for_running_gpu_jobs();
+    run_stored_jobs();
+
+    std::array<uint32_t, SHADER_DEBUG_FRAME_WORD_COUNT> words{};
+    std::memcpy(words.data(), content.data(), content.size());
+    if (words[1] != SHADER_DEBUG_FRAME_ENTRY_CAPACITY) {
+        throw std::runtime_error(
+            std::format("Shader-debug buffer reported capacity {}; expected {}.", words[1], SHADER_DEBUG_FRAME_ENTRY_CAPACITY));
+    }
+
+    const size_t entry_count = std::min<size_t>(words[0], SHADER_DEBUG_FRAME_ENTRY_CAPACITY);
+    for (size_t i = 0; i < entry_count; ++i) {
+        const uint32_t error_value = words[i + 2];
+        const auto error = static_cast<ShaderDebugError>(error_value);
+        stdout_log(WBE_CHANNEL_RENDER)->error(std::format("Shader debug report [{}]: {} ({}).", i, shader_debug_error_name(error), error_value));
+    }
+
+    constexpr uint32_t EMPTY_SIZE = 0;
+    shader_debug_buffer->update_buffer(&EMPTY_SIZE, frame_offset, sizeof(EMPTY_SIZE));
+    throw std::runtime_error(std::format("GPU shaders reported {} error(s).", entry_count));
 }
 
 void RendererVK::wait_for_running_gpu_jobs() {

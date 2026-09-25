@@ -44,7 +44,7 @@ public:
      *
      * @param p_renderer_capabilities Features to request before renderer creation.
      */
-    explicit ApplicationGame(RendererCapabilities p_renderer_capabilities = {.ray_tracing = true});
+    explicit ApplicationGame(RendererCapabilities p_renderer_capabilities = {});
     virtual ~ApplicationGame() = default;
     ApplicationGame(const ApplicationGame&) = delete;
     ApplicationGame(ApplicationGame&&) noexcept = delete;

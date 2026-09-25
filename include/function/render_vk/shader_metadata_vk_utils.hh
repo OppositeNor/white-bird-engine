@@ -58,7 +58,10 @@ struct ShaderDescriptorHeapFieldVK {
  * @brief Renderer-provided value selected by a reflected WBE_DEFAULT_PUSH annotation.
  */
 enum class ShaderDefaultPushValueVK : uint8_t {
+    /** Elapsed renderer time as a float. */
     TIME,
+    /** Current frame-in-flight slot as a uint32. */
+    FRAME_SLOT,
 };
 
 /**

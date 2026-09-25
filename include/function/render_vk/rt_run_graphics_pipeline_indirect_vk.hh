@@ -115,7 +115,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op);
 
         /**
-         * @brief Resolve the vertex buffer from a graph resource.
+         * @brief Resolve the optional vertex buffer from a graph resource.
+         *
+         * Omit this for vertex shaders that derive all positions from vertex and instance IDs.
          */
         Builder& set_vertex_buffer(std::string_view p_resource_id);
 
@@ -208,7 +210,7 @@ private:
     std::string vertex_buffer_id;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
-    Ref<RenderObjectContainerVK> vertex_buffer_container;
+    Ref<RenderObjectContainerVK> vertex_buffer_container = MEM_NULL;
     Ref<RenderObjectContainerVK> index_buffer_container;
     Ref<RenderObjectContainerVK> indirect_buffer_container;
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;

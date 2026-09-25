@@ -25,6 +25,7 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
+#include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
@@ -270,6 +271,7 @@ private:
 
     Unique<DescriptorHeapAllocatorVK> descriptor_heap_allocator;
     Ref<ROCMultislotsVK> swap_chain_image_view_container;
+    Ref<ROBufferVK> shader_debug_buffer;
 
     Vector<VkFence> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
@@ -415,6 +417,7 @@ private:
     void create_gpu_job_command_buffer();
     void refresh_swap_chain_image_view_container();
     void create_descriptor_heap_allocator();
+    void create_shader_debug_buffer();
     void create_async_objects();
 
     bool check_layer_support();
@@ -443,6 +446,7 @@ private:
     std::optional<uint32_t> tick_setup_pipeline();
     void run_delayed_calls();
     void run_gpu_jobs();
+    void check_shader_debug_buffer();
     void synchronize_gpu_and_flush_delayed_calls();
     void flush_delayed_calls();
     void wait_for_running_gpu_jobs();

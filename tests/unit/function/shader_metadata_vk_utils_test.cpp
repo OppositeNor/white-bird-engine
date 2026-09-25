@@ -212,19 +212,23 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, CollectsRendererDefaultPushFields) {
-    const std::array<ShaderMetadataTypeField, 1> fields{{
+    const std::array<ShaderMetadataTypeField, 2> fields{{
         make_default_push_field("elapsed", "time", "float32", 0),
+        make_default_push_field("frame_slot", "frame_slot", "uint32", 4),
     }};
     ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
 
     ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
 
-    EXPECT_EQ(layout.size, 4U);
+    EXPECT_EQ(layout.size, 8U);
     EXPECT_TRUE(layout.fields.empty());
-    ASSERT_EQ(layout.default_fields.size(), 1U);
+    ASSERT_EQ(layout.default_fields.size(), 2U);
     EXPECT_EQ(layout.default_fields[0].field_path, "elapsed");
     EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::TIME);
     EXPECT_EQ(layout.default_fields[0].offset, 0U);
+    EXPECT_EQ(layout.default_fields[1].field_path, "frame_slot");
+    EXPECT_EQ(layout.default_fields[1].value, ShaderDefaultPushValueVK::FRAME_SLOT);
+    EXPECT_EQ(layout.default_fields[1].offset, 4U);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedRendererDefaultPushFields) {
@@ -237,6 +241,10 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedRendererDefaultPushFields) {
     EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "time", "bool", 0);
+    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+
+    malformed = make_default_push_field("value", "frame_slot", "float32", 0);
     metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
     EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
@@ -380,8 +388,7 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsRendererDefaultPushFields) {
     EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::TIME);
 
     fragment_metadata.parameters[0].type.fields[0].type.scalar_type = "bool";
-    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(
-                     vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 }
 

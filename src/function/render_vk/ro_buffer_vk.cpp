@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "core/async/worker.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
@@ -27,6 +28,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <future>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -36,6 +38,122 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+namespace {
+
+struct BufferReadbackOperation {
+    std::future<Ref<ROFenseVK>> submission_future;
+    Ref<ROStagingBufferVK> staging_buffer;
+    const void* mapped_memory = nullptr;
+    size_t size = 0;
+};
+
+void validate_buffer_readback_range(size_t p_buffer_size, size_t p_source_offset, size_t p_size) {
+    if (p_size == 0) {
+        throw std::runtime_error("Failed to acquire buffer content: byte count is zero.");
+    }
+    if (p_source_offset > p_buffer_size || p_size > p_buffer_size - p_source_offset) {
+        throw std::runtime_error(std::format(
+            "Failed to acquire buffer content: {} bytes at offset {} exceed buffer size {}.", p_size, p_source_offset, p_buffer_size));
+    }
+}
+
+void record_buffer_readback(VkCommandBuffer p_command_buffer,
+    VkBuffer p_source_buffer,
+    size_t p_source_offset,
+    Ref<ROStagingBufferVK> p_staging_buffer,
+    VkDeviceSize p_staging_offset,
+    size_t p_size) {
+    const VkBufferMemoryBarrier2 source_barrier =
+        ROBufferVK::MemoryBarrierBuilder()
+            .set_buffer(p_source_buffer, p_source_offset + p_size)
+            .set_src_access(VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT)
+            .set_dst_access(VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT)
+            .set_data_region(p_source_offset, p_size)
+            .build();
+    VkDependencyInfo source_dependency{};
+    source_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    source_dependency.bufferMemoryBarrierCount = 1;
+    source_dependency.pBufferMemoryBarriers = &source_barrier;
+    vkCmdPipelineBarrier2(p_command_buffer, &source_dependency);
+
+    const VkBufferCopy copy_region{
+        .srcOffset = p_source_offset,
+        .dstOffset = p_staging_offset,
+        .size = p_size,
+    };
+    vkCmdCopyBuffer(p_command_buffer, p_source_buffer, p_staging_buffer->get_buffer(), 1, &copy_region);
+
+    const VkBufferMemoryBarrier2 destination_barrier =
+        ROBufferVK::MemoryBarrierBuilder()
+            .set_buffer(p_staging_buffer->get_buffer(), p_staging_buffer->fields().buffer_size)
+            .set_src_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT)
+            .set_dst_access(VK_ACCESS_2_HOST_READ_BIT, VK_PIPELINE_STAGE_2_HOST_BIT)
+            .set_data_region(p_staging_offset, p_size)
+            .build();
+    VkDependencyInfo destination_dependency{};
+    destination_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    destination_dependency.bufferMemoryBarrierCount = 1;
+    destination_dependency.pBufferMemoryBarriers = &destination_barrier;
+    vkCmdPipelineBarrier2(p_command_buffer, &destination_dependency);
+}
+
+BufferReadbackOperation begin_device_buffer_readback(
+    const BaseRenderDataVK* p_render_data, VkBuffer p_source_buffer, size_t p_source_offset, size_t p_size) {
+    RendererVK* renderer = RendererVK::get_singleton();
+    if (renderer == nullptr) {
+        throw std::runtime_error("Failed to acquire buffer content: the Vulkan renderer is unavailable.");
+    }
+    const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(p_size);
+    Ref<ROStagingBufferVK> staging_buffer =
+        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(p_render_data);
+    const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(p_size);
+    std::future<Ref<ROFenseVK>> submission_future = renderer->register_gpu_job([source_buffer = p_source_buffer,
+                                                                                   source_offset = p_source_offset,
+                                                                                   staging_buffer,
+                                                                                   staging_offset = staging_allocation.offset,
+                                                                                   size = p_size](VkCommandBuffer p_command_buffer) {
+        record_buffer_readback(p_command_buffer, source_buffer, source_offset, staging_buffer, staging_offset, size);
+    });
+    return BufferReadbackOperation{.submission_future = std::move(submission_future),
+        .staging_buffer = std::move(staging_buffer),
+        .mapped_memory = staging_allocation.data,
+        .size = p_size};
+}
+
+void finish_device_buffer_readback(BufferReadbackOperation p_operation, std::span<uint8_t> p_destination) {
+    Ref<ROFenseVK> completion_fense = p_operation.submission_future.get();
+    completion_fense->wait();
+    std::memcpy(p_destination.data(), p_operation.mapped_memory, p_operation.size);
+    RendererVK::get_singleton()->add_job([completion_fense, staging_buffer = p_operation.staging_buffer]() {
+        static_cast<void>(completion_fense);
+        static_cast<void>(staging_buffer);
+    });
+}
+
+template <typename TCompletion>
+auto schedule_device_buffer_readback(const BaseRenderDataVK* p_render_data,
+    VkBuffer p_source_buffer,
+    size_t p_buffer_size,
+    VkBufferUsageFlags p_usage,
+    size_t p_source_offset,
+    size_t p_size,
+    TCompletion p_completion) {
+    Worker* worker = Worker::get_singleton();
+    if (worker == nullptr) {
+        throw std::runtime_error("Failed to acquire buffer content: the engine worker is unavailable.");
+    }
+    validate_buffer_readback_range(p_buffer_size, p_source_offset, p_size);
+    if ((p_usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0) {
+        throw std::runtime_error("Failed to acquire buffer content: buffer was not created with transfer-source usage.");
+    }
+    BufferReadbackOperation operation = begin_device_buffer_readback(p_render_data, p_source_buffer, p_source_offset, p_size);
+    return worker->submit_task([operation = std::move(operation), completion = std::move(p_completion)]() mutable {
+        return completion(std::move(operation));
+    });
+}
+
+} // namespace
 
 ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
     size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
@@ -51,8 +169,7 @@ ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
     return *this;
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
-    size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
+ROBufferVK::Builder& ROBufferVK::Builder::set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
     return set_properties(p_element_size, 1, p_usage, p_domain);
 }
 
@@ -69,8 +186,7 @@ ROBufferVK::Builder& ROBufferVK::Builder::initial_data(std::span<const uint8_t> 
     return *this;
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::initial_data(
-    const void* p_data, size_t p_size, DeviceDomain p_domain) {
+ROBufferVK::Builder& ROBufferVK::Builder::initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain) {
     if (p_data == nullptr) {
         throw std::runtime_error("Failed to configure initial buffer data: data is null.");
     }
@@ -146,8 +262,7 @@ VkBufferUsageFlags get_buffer_usage(const ROBufferVK::Builder& p_builder) {
     return usage;
 }
 
-std::vector<uint32_t> get_initial_queue_families(
-    const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder) {
+std::vector<uint32_t> get_initial_queue_families(const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder) {
     if (p_builder.queue_family_indices.empty()) {
         return {p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end()};
     }
@@ -207,8 +322,8 @@ VmaAllocationInfo create_buffer(const BaseRenderDataVK* p_render_data,
 
     VmaAllocationCreateInfo allocation_create_info = buffer_allocation_create_info(WBE_REQUIRED(p_builder.domain));
     VmaAllocationInfo allocation_info{};
-    VkResult result =
-        vmaCreateBuffer(p_render_data->vma_allocator, &create_info, &allocation_create_info, &p_buffer, &p_allocation, &allocation_info);
+    VkResult result = vmaCreateBuffer(
+        p_render_data->vma_allocator, &create_info, &allocation_create_info, &p_buffer, &p_allocation, &allocation_info);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan buffer: {}.", string_VkResult(result)));
     }
@@ -223,13 +338,11 @@ void adopt_buffer_descriptors(const BaseRenderDataVK* p_render_data,
     std::optional<uint32_t>& p_storage_view_index) {
     if (p_builder.uniform_view_index.has_value()) {
         p_uniform_view_index = p_builder.uniform_view_index;
-        write_buffer_descriptor(
-            p_render_data, *p_uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, p_buffer, p_buffer_size);
+        write_buffer_descriptor(p_render_data, *p_uniform_view_index, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, p_buffer, p_buffer_size);
     }
     if (p_builder.storage_view_index.has_value()) {
         p_storage_view_index = p_builder.storage_view_index;
-        write_buffer_descriptor(
-            p_render_data, *p_storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, p_buffer, p_buffer_size);
+        write_buffer_descriptor(p_render_data, *p_storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, p_buffer, p_buffer_size);
     }
 }
 
@@ -239,10 +352,11 @@ void upload_initial_data(
         return;
     }
     if (p_domain == DeviceDomain::DEVICE) {
-        Ref<ROStagingBufferVK> staging_buffer = ROStagingBufferVK::Builder()
-                                                    .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
-                                                    .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                                                    .create_ref(p_render_data);
+        Ref<ROStagingBufferVK> staging_buffer =
+            ROStagingBufferVK::Builder()
+                .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
+                .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                .create_ref(p_render_data);
         void* staging_data = staging_buffer->allocate(p_builder.initial_data_bytes.size());
         std::memcpy(staging_data, p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
         p_buffer->update_buffer(staging_buffer, staging_data, p_builder.initial_data_bytes.size());
@@ -262,8 +376,7 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
     VmaAllocationInfo allocation_info = create_buffer(render_data, p_builder, usage, initial_queues, buffer, allocation);
     mapped_memory = allocation_info.pMappedData;
-    adopt_buffer_descriptors(
-        render_data, p_builder, buffer, exposed_fields.buffer_size, uniform_view_index, storage_view_index);
+    adopt_buffer_descriptors(render_data, p_builder, buffer, exposed_fields.buffer_size, uniform_view_index, storage_view_index);
     upload_initial_data(this, render_data, p_builder, exposed_fields.domain);
 }
 
@@ -321,6 +434,31 @@ uint32_t ROBufferVK::get_storage_view_index() const {
         write_buffer_descriptor(render_data, *storage_view_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer, exposed_fields.buffer_size);
     }
     return *storage_view_index;
+}
+
+std::future<std::vector<uint8_t>> ROBufferVK::acquire_buffer_content() const {
+    return schedule_device_buffer_readback(
+        render_data, buffer, exposed_fields.buffer_size, usage, 0, exposed_fields.buffer_size, [](BufferReadbackOperation p_operation) {
+            std::vector<uint8_t> content(p_operation.size);
+            finish_device_buffer_readback(std::move(p_operation), content);
+            return content;
+        });
+}
+
+std::future<void> ROBufferVK::acquire_buffer_content(std::span<uint8_t> p_destination) const {
+    if (p_destination.size_bytes() < exposed_fields.buffer_size) {
+        throw std::runtime_error(std::format("Failed to acquire buffer content: destination has {} bytes but {} bytes are required.",
+            p_destination.size_bytes(),
+            exposed_fields.buffer_size));
+    }
+    return acquire_buffer_content(0, p_destination.first(exposed_fields.buffer_size));
+}
+
+std::future<void> ROBufferVK::acquire_buffer_content(size_t p_source_offset, std::span<uint8_t> p_destination) const {
+    return schedule_device_buffer_readback(
+        render_data, buffer, exposed_fields.buffer_size, usage, p_source_offset, p_destination.size_bytes(), [p_destination](BufferReadbackOperation p_operation) {
+            finish_device_buffer_readback(std::move(p_operation), p_destination);
+        });
 }
 
 DebugDataRows ROBufferVK::descriptor_debug_data() const {

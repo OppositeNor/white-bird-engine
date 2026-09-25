@@ -103,8 +103,7 @@ uint32_t descriptor_index(ShaderDescriptorHeapTypeVK p_type, Ref<IRenderObject> 
 } // namespace
 
 PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout)
-    : render_data(p_render_data), layout(p_layout),
-      push_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
+    : render_data(p_render_data), layout(p_layout), push_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
       containers(p_render_data != nullptr ? p_render_data->allocator : nullptr) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to construct pipeline descriptor bindings: render data is missing.");
@@ -162,6 +161,9 @@ void PipelineDescriptorBindingsVK::push(VkCommandBuffer p_command_buffer) {
             std::memcpy(push_data.data() + field.offset, &time, sizeof(time));
             break;
         }
+        case ShaderDefaultPushValueVK::FRAME_SLOT:
+            std::memcpy(push_data.data() + field.offset, &render_data->current_frame_slot, sizeof(render_data->current_frame_slot));
+            break;
         }
     }
     if (render_data->command_push_data == nullptr) {

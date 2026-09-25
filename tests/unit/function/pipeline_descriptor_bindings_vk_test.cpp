@@ -27,11 +27,10 @@
 namespace WhiteBirdEngine {
 namespace {
 
-std::array<uint8_t, 4> captured_push_data{};
+std::array<uint8_t, 8> captured_push_data{};
 size_t captured_push_data_size = 0;
 
-VKAPI_ATTR void VKAPI_CALL capture_push_data(
-    VkCommandBuffer /*p_command_buffer*/, const VkPushDataInfoEXT* p_push_data_info) {
+VKAPI_ATTR void VKAPI_CALL capture_push_data(VkCommandBuffer /*p_command_buffer*/, const VkPushDataInfoEXT* p_push_data_info) {
     captured_push_data_size = p_push_data_info->data.size;
     std::memcpy(captured_push_data.data(), p_push_data_info->data.address, captured_push_data_size);
 }
@@ -43,10 +42,12 @@ TEST(WBEPipelineDescriptorBindingsVKTest, PushesCurrentRendererDefaultValues) {
     BaseRenderDataVK render_data(&allocator);
     render_data.command_push_data = capture_push_data;
     render_data.time = 12.5;
+    render_data.current_frame_slot = 2;
     ShaderDescriptorHeapLayoutVK layout;
     layout.size = captured_push_data.size();
     layout.default_fields = {
         ShaderDefaultPushFieldVK{.field_path = "time", .value = ShaderDefaultPushValueVK::TIME, .offset = 0},
+        ShaderDefaultPushFieldVK{.field_path = "frame_slot", .value = ShaderDefaultPushValueVK::FRAME_SLOT, .offset = 4},
     };
     PipelineDescriptorBindingsVK bindings(&render_data, layout);
 
@@ -56,11 +57,17 @@ TEST(WBEPipelineDescriptorBindingsVKTest, PushesCurrentRendererDefaultValues) {
     float time = 0.0F;
     std::memcpy(&time, captured_push_data.data(), sizeof(time));
     EXPECT_FLOAT_EQ(time, 12.5F);
+    uint32_t frame_slot = 0;
+    std::memcpy(&frame_slot, captured_push_data.data() + sizeof(time), sizeof(frame_slot));
+    EXPECT_EQ(frame_slot, 2U);
 
     render_data.time = 23.25;
+    render_data.current_frame_slot = 3;
     bindings.push(VK_NULL_HANDLE);
     std::memcpy(&time, captured_push_data.data(), sizeof(time));
     EXPECT_FLOAT_EQ(time, 23.25F);
+    std::memcpy(&frame_slot, captured_push_data.data() + sizeof(time), sizeof(frame_slot));
+    EXPECT_EQ(frame_slot, 3U);
 }
 
 } // namespace WhiteBirdEngine

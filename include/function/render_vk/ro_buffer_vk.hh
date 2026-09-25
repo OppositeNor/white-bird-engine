@@ -30,6 +30,7 @@
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
+#include <future>
 #include <optional>
 #include <set>
 #include <span>
@@ -449,6 +450,34 @@ public:
      * @brief Get or lazily create the whole-buffer storage descriptor index.
      */
     uint32_t get_storage_view_index() const;
+
+    /**
+     * @brief Acquire the complete buffer as CPU bytes.
+     *
+     * Device-local buffers must have transfer-source usage. The returned future and this buffer must finish before renderer
+     * shutdown.
+     *
+     * @return A future containing the buffer bytes.
+     * @throws std::runtime_error If the buffer cannot be copied or no engine worker is available.
+     */
+    std::future<std::vector<uint8_t>> acquire_buffer_content() const;
+
+    /**
+     * @brief Acquire the complete buffer into caller-owned CPU storage.
+     * @param p_destination Storage that receives the buffer bytes and remains alive until completion.
+     * @return A future completed after the destination has been populated.
+     * @throws std::runtime_error If the destination is too small, the buffer cannot be copied, or no engine worker is available.
+     */
+    std::future<void> acquire_buffer_content(std::span<uint8_t> p_destination) const;
+
+    /**
+     * @brief Acquire one byte range into caller-owned CPU storage.
+     * @param p_source_offset First source byte in this buffer.
+     * @param p_destination Storage that receives the selected bytes and remains alive until completion.
+     * @return A future completed after the destination has been populated.
+     * @throws std::runtime_error If the range is invalid, the buffer cannot be copied, or no engine worker is available.
+     */
+    std::future<void> acquire_buffer_content(size_t p_source_offset, std::span<uint8_t> p_destination) const;
 
     /**
      * @brief Update the buffer. Updating from main memory must specify the

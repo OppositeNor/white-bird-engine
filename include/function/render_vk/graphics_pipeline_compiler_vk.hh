@@ -78,6 +78,10 @@ struct GraphicsPipelineCompilerVKContext {
      * @brief Dynamic-rendering stencil attachment format.
      */
     VkFormat stencil_attachment_format = VK_FORMAT_UNDEFINED;
+    /**
+     * @brief Polygon rasterization mode used by the compiled pipeline.
+     */
+    VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
 };
 
 /**

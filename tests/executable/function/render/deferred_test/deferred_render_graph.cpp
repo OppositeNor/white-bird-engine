@@ -26,6 +26,7 @@
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
@@ -90,18 +91,22 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
+        .add_task(create_oct_tree_reset_task_desc())
         .add_task(create_oct_tree_build_task_desc(
-            RT_RUN_BUILD_OCT_TREE_X, RT_RUN_DIRECT_LIGHTING, oct_tree_build_x_graphics_pipeline))
+            RT_RUN_BUILD_OCT_TREE_X, RT_RESET_OCT_TREE, oct_tree_build_x_graphics_pipeline))
         .add_task(create_oct_tree_build_task_desc(
             RT_RUN_BUILD_OCT_TREE_Y, RT_RUN_BUILD_OCT_TREE_X, oct_tree_build_y_graphics_pipeline))
         .add_task(create_oct_tree_build_task_desc(
             RT_RUN_BUILD_OCT_TREE_Z, RT_RUN_BUILD_OCT_TREE_Y, oct_tree_build_z_graphics_pipeline))
+        .add_task(create_oct_tree_deferred_propagation_task_desc())
+        .add_task(create_oct_tree_debug_draw_setup_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_extract_task_desc())
         .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc())
         .add_task(create_present_result_image_task_desc())
+        .add_task(create_oct_tree_debug_draw_task_desc())
         .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
@@ -141,7 +146,9 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
         .add_resource(OCT_TREE_LEAF_BUFFER, oct_tree_leaves)
         .add_resource(OCT_TREE_DEFERRED_LIST_PING, oct_tree_deferred_list_ping)
-        .add_resource(OCT_TREE_DEFERRED_LIST_PONG, oct_tree_deferred_list_pong);
+        .add_resource(OCT_TREE_DEFERRED_LIST_PONG, oct_tree_deferred_list_pong)
+        .add_resource(OCT_TREE_DEBUG_DRAW_INDEX_BUFFER, oct_tree_debug_draw_index_buffer)
+        .add_resource(OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER, oct_tree_debug_draw_indirect_buffer);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
@@ -359,6 +366,95 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
     return task_desc;
 }
 
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_reset_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_RESET_OCT_TREE;
+    task_desc.after(RT_RUN_DIRECT_LIGHTING)
+        .write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = oct_tree_reset_compute_pipeline]() -> Unique<IRenderTaskVK> {
+        return make_unique<RTRunComputePipelineVK>(
+            task_render_allocator, task_base_render_data, task_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1});
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_debug_draw_setup_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_SETUP_OCT_TREE_DEBUG_DRAW;
+    task_desc.after(RT_RUN_BUILD_OCT_TREE_DEFERRED_PROPAGATION)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = oct_tree_debug_draw_setup_compute_pipeline]() -> Unique<IRenderTaskVK> {
+        return make_unique<RTRunComputePipelineVK>(task_render_allocator,
+            task_base_render_data,
+            task_pipeline,
+            VkExtent3D{.width = 1, .height = 1, .depth = 1});
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_deferred_propagation_task_desc() const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_RUN_BUILD_OCT_TREE_DEFERRED_PROPAGATION;
+    task_desc.after(RT_RUN_BUILD_OCT_TREE_Z)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DEFERRED_LIST_PONG, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_DEFERRED_LIST_PONG, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           reset_ping_pipeline = oct_tree_deferred_count_reset_ping_compute_pipeline,
+                           reset_pong_pipeline = oct_tree_deferred_count_reset_pong_compute_pipeline,
+                           ping_write_pipeline = oct_tree_deferred_propagation_ping_write_compute_pipeline,
+                           pong_write_pipeline = oct_tree_deferred_propagation_pong_write_compute_pipeline]() -> Unique<IRenderTaskVK> {
+        constexpr uint32_t THREADS_PER_GROUP = 64;
+        constexpr uint32_t DISPATCH_GROUP_COUNT =
+            static_cast<uint32_t>((OCT_TREE_MAX_DEFERRED_TASK_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP);
+        constexpr uint32_t ITERATION_COUNT = 4;
+        constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
+        constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
+        RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
+        for (uint32_t i = 0; i < ITERATION_COUNT; ++i) {
+            const bool write_ping = i % 2U != 0U;
+            dispatch.add_entry(write_ping ? reset_ping_pipeline : reset_pong_pipeline, RESET_GROUP_COUNT)
+                .add_entry(write_ping ? ping_write_pipeline : pong_write_pipeline, PROPAGATION_GROUP_COUNT);
+        }
+        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_debug_draw_task_desc() const {
+    RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
+    task_builder.set_render_extent(base_render_data->swap_chain_extent)
+        .set_index_buffer(OCT_TREE_DEBUG_DRAW_INDEX_BUFFER)
+        .set_indirect_buffer(OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER)
+        .set_pipeline(oct_tree_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .add_color_attachment(REND_RES_SWAP_CHAIN)
+        .set_depth_attachment(GBUFFER_DEPTH_IMAGE_VIEW)
+        .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+        .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
+    RendTaskDescVK task_desc(render_allocator, RT_RUN_OCT_TREE_DEBUG_DRAW, task_builder.create_unique(base_render_data));
+    task_desc.after(RT_SETUP_OCT_TREE_DEBUG_DRAW)
+        .after(RT_RUN_PRESENT_RESULT_IMAGE)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
+    return task_desc;
+}
+
 void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
     if (!bloom_acquire_completed.try_acquire()) {
         return;
@@ -376,7 +472,7 @@ void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
-    task_desc.after(RT_RUN_PRESENT_RESULT_IMAGE);
+    task_desc.after(RT_RUN_OCT_TREE_DEBUG_DRAW);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {

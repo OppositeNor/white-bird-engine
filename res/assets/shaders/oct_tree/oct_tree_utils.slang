@@ -89,6 +89,14 @@ struct OctTreeInfo {
      */
     uint max_depth;
     /**
+     * @brief The capacity of the node buffer.
+     */
+    uint max_node_count;
+    /**
+     * @brief The capacity of the leaf buffer.
+     */
+    uint max_leaves_count;
+    /**
      * @brief The number of nodes.
      */
     uint node_count;
@@ -101,9 +109,17 @@ struct OctTreeInfo {
      */
     uint data_count;
     /**
-     * @brief The number of deferred tasks.
+     * @brief The number of deferred tasks in the ping list.
      */
-    uint deferred_task_count;
+    uint deferred_task_count_ping;
+    /**
+     * @brief The number of deferred tasks in the pong list.
+     */
+    uint deferred_task_count_pong;
+    /**
+     * @brief The maximum number of deferred tasks the list can hold.
+     */
+    uint max_deferred_task_count;
 };
 
 [WBE_DATA_TYPE]
@@ -153,41 +169,89 @@ void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNod
     p_trace_info.remain_depth = 0;
 }
 
-uint create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
-    uint children_index;
-    InterlockedAdd(p_tree_info[0].node_count, 8, children_index);
+bool try_reserve_oct_tree_nodes(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
+    uint current_count = p_tree_info[0].node_count;
+    for (;;) {
+        if (current_count > p_tree_info[0].max_node_count || p_tree_info[0].max_node_count - current_count < 8) {
+            report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+            return false;
+        }
+        uint original_count;
+        InterlockedCompareExchange(p_tree_info[0].node_count, current_count, current_count + 8, original_count);
+        if (original_count == current_count) {
+            p_children_index = current_count;
+            return true;
+        }
+        current_count = original_count;
+    }
+}
+
+bool create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes,
+    RWStructuredBuffer<OctTreeInfo> p_tree_info,
+    uint p_parent_node_index,
+    uint p_frame_slot,
+    out uint p_children_index) {
+    if (!try_reserve_oct_tree_nodes(p_tree_info, p_frame_slot, p_children_index)) {
+        return false;
+    }
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Initialize all of the children to empty
-        uint child_index = children_index + i;
+        uint child_index = p_children_index + i;
         p_nodes[child_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
         p_nodes[child_index].parent_index = p_parent_node_index;
     }
     uint new_data_index;
     InterlockedAdd(p_tree_info[0].data_count, 8, new_data_index);
     [unroll] for (uint i = 0; i < 8; ++i) {
-        p_nodes[children_index + i].data_index = new_data_index + i;
+        p_nodes[p_children_index + i].data_index = new_data_index + i;
     }
-    return children_index;
+    return true;
 }
 
-uint create_oct_tree_children_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves, RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_parent_node_index) {
-    uint children_index;
-    InterlockedAdd(p_tree_info[0].leaves_count, 8, children_index);
+bool try_reserve_oct_tree_leaves(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
+    uint current_count = p_tree_info[0].leaves_count;
+    for (;;) {
+        if (current_count > p_tree_info[0].max_leaves_count || p_tree_info[0].max_leaves_count - current_count < 8) {
+            report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+            return false;
+        }
+        uint original_count;
+        InterlockedCompareExchange(p_tree_info[0].leaves_count, current_count, current_count + 8, original_count);
+        if (original_count == current_count) {
+            p_children_index = current_count;
+            return true;
+        }
+        current_count = original_count;
+    }
+}
+
+bool create_oct_tree_children_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves,
+    RWStructuredBuffer<OctTreeInfo> p_tree_info,
+    uint p_parent_node_index,
+    uint p_frame_slot,
+    out uint p_children_index) {
+    if (!try_reserve_oct_tree_leaves(p_tree_info, p_frame_slot, p_children_index)) {
+        return false;
+    }
     [unroll] for (uint i = 0; i < 8; ++i) {
-        uint child_index = children_index + i;
+        uint child_index = p_children_index + i;
         p_leaves[child_index].parent_index = p_parent_node_index;
     }
     uint new_data_index;
     InterlockedAdd(p_tree_info[0].data_count, 8, new_data_index);
     [unroll] for (uint i = 0; i < 8; ++i) {
-        p_leaves[children_index + i].data_index = new_data_index + i;
+        p_leaves[p_children_index + i].data_index = new_data_index + i;
     }
-    return children_index;
+    return true;
 }
 
 bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
     RWStructuredBuffer<OctTreeInfo> p_tree_info,
-    uint p_node_index, bool p_is_leaf) {
+    uint p_node_index, bool p_is_leaf, uint p_frame_slot) {
+    if (p_node_index >= p_tree_info[0].max_node_count) {
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        return false;
+    }
     uint original;
     // Try swaping to ALLOCATE state
     InterlockedCompareExchange(
@@ -201,30 +265,71 @@ bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStruct
         return false;
     }
     // CAS succeeded. Allocate the child node:
+    uint children_index;
     if (p_is_leaf) {
-        p_nodes[p_node_index].children = create_oct_tree_children_leaf(p_leaves, p_tree_info, p_node_index);
-        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::NODE);
+        if (!create_oct_tree_children_leaf(p_leaves, p_tree_info, p_node_index, p_frame_slot, children_index)) {
+            p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
+            return false;
+        }
+        p_nodes[p_node_index].children = children_index;
+        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::LEAF);
     }
     else {
-        p_nodes[p_node_index].children = create_oct_tree_children_node(p_nodes, p_tree_info, p_node_index);
-        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::LEAF);
+        if (!create_oct_tree_children_node(p_nodes, p_tree_info, p_node_index, p_frame_slot, children_index)) {
+            p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
+            return false;
+        }
+        p_nodes[p_node_index].children = children_index;
+        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::NODE);
     }
     return true;
 }
 
 bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
-    RWStructuredBuffer<OctTreeInfo> p_tree_info, inout OctTreeNodeTraceInfo p_trace_info) {
+    RWStructuredBuffer<OctTreeInfo> p_tree_info, inout OctTreeNodeTraceInfo p_trace_info, uint p_frame_slot) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
+    if (p_tree_info[0].max_depth == 0 || p_tree_info[0].max_node_count == 0 || p_tree_info[0].max_leaves_count == 0) {
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+        return false;
+    }
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
+        if (curr_depth >= p_tree_info[0].max_depth) {
+            report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            return false;
+        }
+        if (node_index >= p_tree_info[0].max_node_count) {
+            report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+            return false;
+        }
         OctTreeNode node = p_nodes[node_index];
         OctTreeNode::ChildrenState child_state = OctTreeNode::ChildrenState(node.children_state);
         switch (child_state) {
         case OctTreeNode::ChildrenState::NODE:
             // A node, keep on looking deeper.
+            if (curr_depth >= p_tree_info[0].max_depth - 1) {
+                report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+                return false;
+            }
+            if (node.children > p_tree_info[0].max_node_count || p_tree_info[0].max_node_count - node.children < 8) {
+                report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+                return false;
+            }
             break;
         case OctTreeNode::ChildrenState::LEAF:
             // Found a leaf, allocation success.
+            if (curr_depth < p_tree_info[0].max_depth - 1) {
+                report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+                return false;
+            }
+            if (curr_depth > p_tree_info[0].max_depth - 1) {
+                report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+                return false;
+            }
+            if (node.children > p_tree_info[0].max_leaves_count || p_tree_info[0].max_leaves_count - node.children < 8) {
+                report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+                return false;
+            }
             return true;
         case OctTreeNode::ChildrenState::ALLOCATING:
             // Traced to an empty/allocating/leaf node, set p_state and return.
@@ -234,14 +339,22 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
             return false;
         case OctTreeNode::ChildrenState::EMPTY:
             // Try to allocate if found child empty.
-            if (!try_create_oct_tree_entry(p_nodes, p_leaves, p_tree_info, node_index, curr_depth == p_tree_info[0].max_depth - 1)) {
+            if (!try_create_oct_tree_entry(
+                    p_nodes, p_leaves, p_tree_info, node_index, curr_depth == p_tree_info[0].max_depth - 1, p_frame_slot)) {
                 // If allocation failed, add this task to the deferred list.
                 p_trace_info.node_index = node_index;
                 p_trace_info.curr_depth = curr_depth;
                 p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
                 return false;
             }
+            node = p_nodes[node_index];
             break;
+        default:
+            report_shader_debug_error(curr_depth < p_tree_info[0].max_depth - 1
+                    ? ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED
+                    : ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED,
+                p_frame_slot);
+            return false;
         }
         uint child_index = node.children + get_oct_tree_node_subregion(p_trace_info.svo_position);
         node_index = child_index;

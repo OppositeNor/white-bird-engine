@@ -15,6 +15,44 @@
 #ifndef WBE_FILE_UTILS_SLANG
 #define WBE_FILE_UTILS_SLANG
 
+/** Stable error codes shared with the CPU shader-debug reader. */
+enum class ShaderDebugError {
+    DEBUG_BUFFER_FULL = 1,
+    OCT_TREE_NODE_INDEX_OVERFLOW = 2,
+    OCT_TREE_LEAF_INDEX_OVERFLOW = 3,
+    OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
+    OCT_TREE_DEEPER_THAN_EXPECTED = 5,
+    OCT_TREE_SHALLOWER_THAN_EXPECTED = 6,
+};
+
+/** Shader-visible buffer descriptor reserved by the renderer. */
+static const uint WBE_SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
+
+/**
+ * @brief Atomically append one error to the renderer-owned shader-debug buffer.
+ * @param p_error Error code to append.
+ * @param p_frame_slot Renderer frame slot whose independent report region receives the error.
+ */
+void report_shader_debug_error(ShaderDebugError p_error, uint p_frame_slot) {
+    RWStructuredBuffer<uint> debug_buffer = ResourceDescriptorHeap[WBE_SHADER_DEBUG_DESCRIPTOR_INDEX];
+    static const uint FRAME_ENTRY_CAPACITY = 512;
+    static const uint FRAME_WORD_COUNT = FRAME_ENTRY_CAPACITY + 2;
+    uint frame_offset = p_frame_slot * FRAME_WORD_COUNT;
+    uint capacity = debug_buffer[frame_offset + 1];
+    uint entry_index;
+    InterlockedAdd(debug_buffer[frame_offset], 1, entry_index);
+
+    // Reserve the last physical entry for an unambiguous overflow marker. No normal writer can race with this store.
+    if (capacity > 0 && entry_index < capacity - 1) {
+        debug_buffer[frame_offset + entry_index + 2] = uint(p_error);
+        return;
+    }
+    if (capacity > 0) {
+        InterlockedMin(debug_buffer[frame_offset], capacity);
+        InterlockedExchange(debug_buffer[frame_offset + capacity + 1], uint(ShaderDebugError::DEBUG_BUFFER_FULL));
+    }
+}
+
 /** Marks a vertex entry-point field and selects a resource attribute by role. */
 [__AttributeUsage(_AttributeTargets.Var)]
 struct WBE_VERTEX_INPUTAttribute {

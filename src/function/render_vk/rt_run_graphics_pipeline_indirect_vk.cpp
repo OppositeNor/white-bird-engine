@@ -155,8 +155,8 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
     if (depth_attachment_id.has_value()) {
         clear_values.push_back(*p_builder.depth_clear_value);
     }
-    if (vertex_buffer_id.empty() || index_buffer_id.empty() || indirect_buffer_id.empty()) {
-        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: every draw buffer requires a graph resource id.");
+    if (index_buffer_id.empty() || indirect_buffer_id.empty()) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: index and indirect buffers require graph resource ids.");
     }
     if (pipeline_batches.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: no pipeline batches were configured.");
@@ -185,7 +185,9 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::read_resou
     if (depth_attachment_id.has_value() && depth_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
         read_accesses.push_back({.res_id = *depth_attachment_id, .usage = RendResUsageVK::DEPTH_ATTACHMENT});
     }
-    read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    if (!vertex_buffer_id.empty()) {
+        read_accesses.push_back({.res_id = vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    }
     read_accesses.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
     read_accesses.push_back({.res_id = indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
     return read_accesses;
@@ -203,7 +205,9 @@ void RTRunGraphicsPipelineIndirectVK::bind_resources(const RendResViewVK& p_reso
     if (depth_attachment_id.has_value()) {
         depth_attachment_container = p_resources.get(*depth_attachment_id).container;
     }
-    vertex_buffer_container = p_resources.get(vertex_buffer_id).container;
+    if (!vertex_buffer_id.empty()) {
+        vertex_buffer_container = p_resources.get(vertex_buffer_id).container;
+    }
     index_buffer_container = p_resources.get(index_buffer_id).container;
     indirect_buffer_container = p_resources.get(indirect_buffer_id).container;
     for (const PipelineBatch& pipeline_batch : pipeline_batches) {
@@ -228,8 +232,11 @@ Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineIndirectVK::write_reso
 void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     VkCommandBuffer p_command_buffer,
     double /*p_delta*/) {
-    Ref<ROBufferVK> resolved_vertex_buffer =
-        WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+    Ref<ROBufferVK> resolved_vertex_buffer = MEM_NULL;
+    if (vertex_buffer_container != MEM_NULL) {
+        resolved_vertex_buffer =
+            WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+    }
     Ref<ROBufferVK> resolved_index_buffer =
         WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
     Ref<ROBufferVK> resolved_indirect_buffer =
@@ -302,8 +309,10 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: pipeline batch attachment counts do not match.");
         }
         vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline->get_pipeline());
-        VkBuffer vertex_buffer_handle = resolved_vertex_buffer->get_buffer();
-        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &batch.vertex_buffer_offset);
+        if (resolved_vertex_buffer != MEM_NULL) {
+            VkBuffer vertex_buffer_handle = resolved_vertex_buffer->get_buffer();
+            vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &batch.vertex_buffer_offset);
+        }
         render_data->command_set_vertex_input(p_command_buffer,
             static_cast<uint32_t>(batch.vertex_input.bindings.size()),
             batch.vertex_input.bindings.data(),

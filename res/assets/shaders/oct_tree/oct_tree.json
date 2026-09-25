@@ -63,6 +63,70 @@
             "depth_test": false,
             "depth_write": false,
             "cull_backfaces": false
+        },
+        {
+            "id": "oct_tree_reset_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_reset.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_reset.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_reset.json"
+        },
+        {
+            "id": "oct_tree_deferred_count_reset_pong_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_deferred_count_reset.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_deferred_count_reset_pong.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_deferred_count_reset_pong.json"
+        },
+        {
+            "id": "oct_tree_deferred_count_reset_ping_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_deferred_count_reset.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_deferred_count_reset_ping.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_deferred_count_reset_ping.json",
+            "macros": [
+                {"name": "WBE_RESET_PING_COUNT"}
+            ]
+        },
+        {
+            "id": "oct_tree_build_deferred_propagation_pong_write_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation_pong_write.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation_pong_write.json"
+        },
+        {
+            "id": "oct_tree_build_deferred_propagation_ping_write_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation_ping_write.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_build_deferred_propagation_ping_write.json",
+            "macros": [
+                {"name": "WBE_USE_PING_WRITE"}
+            ]
+        },
+        {
+            "id": "oct_tree_debug_draw_setup_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_debug_draw_setup.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_debug_draw_setup.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_debug_draw_setup.json"
+        },
+        {
+            "id": "oct_tree_debug_draw_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_debug_draw.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_debug_draw.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_debug_draw.json"
+        },
+        {
+            "id": "oct_tree_debug_draw_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "oct_tree_debug_draw_shader",
+            "fragment_stage_id": "oct_tree_debug_draw_shader",
+            "depth_test": true,
+            "depth_write": false,
+            "cull_backfaces": false
         }
     ]
 }
