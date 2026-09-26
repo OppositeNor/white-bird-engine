@@ -1215,7 +1215,8 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
             "fragment_stage_entry": "fragment_main",
             "depth_test": false,
             "depth_write": false,
-            "cull_backfaces": false
+            "cull_backfaces": false,
+            "conservative_rasterization": true
         }
     }
     )";
@@ -1240,6 +1241,7 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
     EXPECT_FALSE(captured_pipeline->depth_test);
     EXPECT_FALSE(captured_pipeline->depth_write);
     EXPECT_FALSE(captured_pipeline->cull_backfaces);
+    EXPECT_TRUE(captured_pipeline->conservative_rasterization);
     ASSERT_EQ(created_ref_keys.size(), 2U);
     EXPECT_EQ(created_ref_keys[0], "vertex_shader");
     EXPECT_EQ(created_ref_keys[1], "fragment_shader");

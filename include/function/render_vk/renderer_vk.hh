@@ -25,7 +25,6 @@
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_graph_resource_binding.hh"
-#include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"

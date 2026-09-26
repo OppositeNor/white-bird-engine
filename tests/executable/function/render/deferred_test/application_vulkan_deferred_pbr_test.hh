@@ -40,6 +40,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -88,12 +89,14 @@ private:
     static_assert(BLOOM_BLUR_PASS_COUNT % 2U == 0U);
     static constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
     static constexpr size_t OCT_TREE_MAX_DEPTH = 6;
-    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = WBE_KI_B(128);
-    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(128);
-    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = WBE_KI_B(512);
-    static constexpr float OCT_TREE_WIDTH = 42.0F;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
-    static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(-32.0F, -32.0F, -32.0F);
+    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = static_cast<size_t>(OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT * 0.25);
+    // Conservative rasterization can touch widely separated voxels, so reserve the exact maximum number of internal nodes for
+    // a fully populated tree instead of assuming that surface coverage will keep their allocation dense.
+    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(512);
+    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = WBE_KI_B(512);
+    static constexpr float OCT_TREE_WIDTH = 32.0F;
+    static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
 
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
@@ -150,7 +153,7 @@ private:
     static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_X = "run_build_oct_tree_x";
     static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_Y = "run_build_oct_tree_y";
     static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_Z = "run_build_oct_tree_z";
-    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_DEFERRED_PROPAGATION = "run_build_oct_tree_deferred_propagation";
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_DEFERRED = "run_build_oct_tree_deferred";
     static constexpr std::string_view RT_SETUP_OCT_TREE_DEBUG_DRAW = "setup_oct_tree_debug_draw";
     static constexpr std::string_view RT_RUN_OCT_TREE_DEBUG_DRAW = "run_oct_tree_debug_draw";
 
@@ -207,8 +210,11 @@ private:
         uint32_t node_index;
         uint32_t current_depth;
         int32_t remaining_depth;
-        glm::vec3 oct_tree_position;
+        alignas(16) glm::vec3 oct_tree_position;
     };
+
+    static_assert(offsetof(OctTreeDeferredListEntry, oct_tree_position) == 16);
+    static_assert(sizeof(OctTreeDeferredListEntry) == 32);
 
     void control(double p_delta);
     void update_descriptors();
@@ -248,10 +254,10 @@ private:
     RendTaskDescVK create_oct_tree_debug_draw_setup_task_desc() const;
     RendTaskDescVK create_oct_tree_debug_draw_task_desc() const;
     RendTaskDescVK create_oct_tree_reset_task_desc() const;
-    RendTaskDescVK create_oct_tree_deferred_propagation_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
     RendTaskDescVK create_oct_tree_build_task_desc(
         std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline) const;
+    RendTaskDescVK create_oct_tree_deferred_propagation_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 

@@ -472,6 +472,27 @@ void RendererVK::create_instance() { // NOLINT
 
 void RendererVK::create_device(RendererCapabilities& p_capabilities) {
     create_physical_device();
+    if (p_capabilities.conservative_rasterization) {
+        constexpr std::array<const char*, 1> CONSERVATIVE_RASTERIZATION_EXTENSIONS{
+            VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME};
+        ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(CONSERVATIVE_RASTERIZATION_EXTENSIONS,
+            enabled_layers,
+            "vkEnumerateDeviceExtensionProperties",
+            [this](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+                return vkEnumerateDeviceExtensionProperties(
+                    physical_device, p_layer_name, p_extension_count, p_extension_properties);
+            });
+        if (!extension_support.success) {
+            throw std::runtime_error(
+                std::format("Unable to query conservative-rasterization support: {}.", extension_support.error_message));
+        }
+        if (extension_support.unsupported_extensions.empty()) {
+            enabled_device_extensions.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
+        }
+        else {
+            p_capabilities.conservative_rasterization = false;
+        }
+    }
     for (size_t i = 0; i < registered_plugins.size();) {
         auto& plugin = registered_plugins[i];
         if (!plugin->try_enable(p_capabilities, physical_device, enabled_layers.data(), enabled_layers.size())) {

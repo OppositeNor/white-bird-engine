@@ -134,6 +134,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // Should cull back-facing triangles.
     WBE_META(WBE_REFLECT)
     bool cull_backfaces = true;
+    /**
+     * @brief Whether the pipeline overestimates primitive coverage using conservative rasterization.
+     */
+    WBE_META(WBE_REFLECT)
+    bool conservative_rasterization = false;
 };
 
 /**
@@ -445,6 +450,10 @@ struct RUGraphicsPipeline : public ResourceUnit {
     bool depth_write = true;
     // Should cull back-facing triangles.
     bool cull_backfaces = true;
+    /**
+     * @brief Whether the pipeline overestimates primitive coverage using conservative rasterization.
+     */
+    bool conservative_rasterization = false;
 };
 
 /**

@@ -144,7 +144,8 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     pipeline_builder.config.depth_test.set_depth_test(p_pipeline_resource.depth_test ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.depth_test.set_depth_write(p_pipeline_resource.depth_write ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.rasterization.set_polygon_mode(context.polygon_mode)
-        .set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE);
+        .set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE)
+        .set_conservative_rasterization(p_pipeline_resource.conservative_rasterization);
     Ref<ROGraphicsPipelineVK> graphics_pipeline = pipeline_builder.create_ref(context.render_data);
     context.render_database->register_compiled_render_resource(p_resource_key, graphics_pipeline);
     return graphics_pipeline;

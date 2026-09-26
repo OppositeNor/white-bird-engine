@@ -115,6 +115,10 @@ VkGraphicsPipelineCreateInfo ROGraphicsPipelineVK::make_graphics_pipeline_create
         create_info.pTessellationState = &(p_state_create_info.tessellation_state.value());
     }
     create_info.pViewportState = &(p_state_create_info.viewport_state);
+    if (p_state_create_info.conservative_rasterization_state.sType ==
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT) {
+        p_state_create_info.rasterization_state.pNext = &p_state_create_info.conservative_rasterization_state;
+    }
     create_info.pRasterizationState = &(p_state_create_info.rasterization_state);
     create_info.pMultisampleState = &(p_state_create_info.multisample_state);
     create_info.pDepthStencilState = &(p_state_create_info.depth_stencil_state);
@@ -189,6 +193,9 @@ void ROGraphicsPipelineVK::setup_tessellation_state_create_info(const Config& p_
 
 void ROGraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p_config, PipelineStateCreateInfo& p_pipeline_create_infos) {
     const auto& rasterization_config = p_config.rasterization;
+    if (rasterization_config.conservative_rasterization && !render_data->renderer_capabilities.conservative_rasterization) {
+        throw std::runtime_error("ROGraphicsPipelineVK: conservative rasterization was requested but is unavailable.");
+    }
     VkPipelineRasterizationStateCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     create_info.depthClampEnable = rasterization_config.depth_clamp_enabled;
@@ -198,6 +205,13 @@ void ROGraphicsPipelineVK::setup_rasterization_state_create_info(const Config& p
     create_info.frontFace = rasterization_config.front_face;
     create_info.depthBiasEnable = VK_FALSE;
     create_info.lineWidth = 1.0F;
+    if (rasterization_config.conservative_rasterization) {
+        VkPipelineRasterizationConservativeStateCreateInfoEXT conservative_create_info{};
+        conservative_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT;
+        conservative_create_info.conservativeRasterizationMode = VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+        conservative_create_info.extraPrimitiveOverestimationSize = 0.0F;
+        p_pipeline_create_infos.conservative_rasterization_state = conservative_create_info;
+    }
     p_pipeline_create_infos.rasterization_state = create_info;
 }
 

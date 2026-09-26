@@ -296,6 +296,7 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     resource_unit.depth_test = p_scheme.depth_test;
     resource_unit.depth_write = p_scheme.depth_write;
     resource_unit.cull_backfaces = p_scheme.cull_backfaces;
+    resource_unit.conservative_rasterization = p_scheme.conservative_rasterization;
     auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUGraphicsPipeline>();
     create_pipeline_stage_ref(p_res_chunk, saved_resource->vertex_stage, p_scheme.vertex_stage_id);
     create_pipeline_stage_ref(p_res_chunk, saved_resource->tessellation_stage, p_scheme.tessellation_stage_id);

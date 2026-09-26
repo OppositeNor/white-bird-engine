@@ -319,6 +319,10 @@ public:
             // Which direction is considered front, default to
             // counter-clockwise.
             VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+            /**
+             * @brief Whether rasterization overestimates primitive coverage.
+             */
+            bool conservative_rasterization = false;
 
             /**
              * @brief Enalbe depth clamp.
@@ -382,6 +386,16 @@ public:
              */
             RasterizationConfig& set_front_face(VkFrontFace p_front_face) {
                 front_face = p_front_face;
+                return *this;
+            }
+
+            /**
+             * @brief Enable or disable conservative overestimation rasterization.
+             * @param p_conservative_rasterization Whether conservative rasterization is enabled.
+             * @return This rasterization configuration.
+             */
+            RasterizationConfig& set_conservative_rasterization(bool p_conservative_rasterization) {
+                conservative_rasterization = p_conservative_rasterization;
                 return *this;
             }
         };
@@ -785,6 +799,7 @@ private:
         VkPipelineInputAssemblyStateCreateInfo input_assembly_state{};
         Required<VkPipelineTessellationStateCreateInfo> tessellation_state;
         VkPipelineRasterizationStateCreateInfo rasterization_state{};
+        VkPipelineRasterizationConservativeStateCreateInfoEXT conservative_rasterization_state{};
         VkPipelineMultisampleStateCreateInfo multisample_state{};
         VkPipelineDepthStencilStateCreateInfo depth_stencil_state{};
         VkPipelineColorBlendStateCreateInfo color_blend_state{};

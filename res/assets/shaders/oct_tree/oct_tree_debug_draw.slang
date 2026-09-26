@@ -28,6 +28,20 @@ struct OctTreeDebugDrawDescriptorIndices {
     uint shader_debug_frame_slot;
 };
 
+/**
+ * @brief Vertex output for oct-tree debug wireframes.
+ */
+struct OctTreeDebugDrawVertexOutput {
+    /**
+     * @brief Clip-space vertex position.
+     */
+    float4 position : SV_Position;
+    /**
+     * @brief Wireframe color.
+     */
+    float4 color : COLOR0;
+};
+
 [[vk::push_constant]]
 ConstantBuffer<OctTreeDebugDrawDescriptorIndices> descriptor_indices;
 
@@ -80,30 +94,40 @@ uint3 get_leaf_grid_position(uint p_leaf_index,
 }
 
 /**
- * @brief Produces one of the eight corners of a leaf voxel without a vertex buffer.
+ * @brief Produces one of the eight corners of a leaf voxel or the oct-tree bounds without a vertex buffer.
  */
 [shader("vertex")]
-float4 vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) : SV_Position {
+OctTreeDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
     StructuredBuffer<OctTreeInfo> oct_tree_info_buffer = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     StructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<OctTreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     OctTreeInfo oct_tree_info = oct_tree_info_buffer[0];
 
-    uint3 leaf_grid_position =
-        get_leaf_grid_position(p_instance_id, tree_nodes, tree_leaves, oct_tree_info, descriptor_indices.shader_debug_frame_slot);
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
-    float voxel_width = oct_tree_info.width / float(1u << oct_tree_info.max_depth);
-    float3 world_position = oct_tree_info.origin + float3(leaf_grid_position + corner) * voxel_width;
+    bool is_bounds = p_instance_id == oct_tree_info.leaves_count;
+    float3 world_position;
+    if (is_bounds) {
+        world_position = oct_tree_info.origin + float3(corner) * oct_tree_info.width;
+    }
+    else {
+        uint3 leaf_grid_position =
+            get_leaf_grid_position(p_instance_id, tree_nodes, tree_leaves, oct_tree_info, descriptor_indices.shader_debug_frame_slot);
+        float voxel_width = oct_tree_info.width / float(1u << oct_tree_info.max_depth);
+        world_position = oct_tree_info.origin + float3(leaf_grid_position + corner) * voxel_width;
+    }
     float4 view_position =
         software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), float4(world_position, 1.0));
-    return software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
+    OctTreeDebugDrawVertexOutput output;
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
+    output.color = is_bounds ? float4(1.0, 0.0, 0.0, 1.0) : float4(1.0);
+    return output;
 }
 
 /**
- * @brief Colors every voxel edge white.
+ * @brief Colors each debug wireframe.
  */
 [shader("fragment")]
-float4 fragment_main() : SV_Target0 {
-    return float4(1.0);
+float4 fragment_main(OctTreeDebugDrawVertexOutput p_input) : SV_Target0 {
+    return p_input.color;
 }

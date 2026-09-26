@@ -38,6 +38,10 @@ struct RendererCapabilities {
      */
     bool shader_debug = false;
     /**
+     * @brief Whether conservative rasterization is requested and was enabled.
+     */
+    bool conservative_rasterization = false;
+    /**
      * @brief Whether ray tracing is requested and was enabled.
      */
     bool ray_tracing = false;

@@ -91,6 +91,12 @@ VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) 
 
 [shader("fragment")]
 void fragment_main(VSOutput p_input) : SV_Target0 {
+    // Oct-tree descent remaps each selected child with frac(position * 2). Positions outside the tree's half-open [0, 1) range
+    // would therefore wrap back into unrelated interior cells instead of being clipped. Geometry intersecting the projection
+    // boundary can still produce such fragment varyings, so reject them before the first child selection loses that information.
+    if (any(p_input.svo_position < 0.0) || any(p_input.svo_position >= 1.0)) {
+        return;
+    }
     RWStructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     RWStructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<OctTreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];

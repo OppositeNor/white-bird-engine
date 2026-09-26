@@ -145,11 +145,40 @@ struct OctTreeNodeTraceInfo {
     float3 svo_position;
 };
 
+/**
+ * @brief Loads an octree node after acquiring its published child state.
+ * @details Reserving a chunk of eight children prevents overlapping allocations, but does not make the initializing invocation's
+ * writes visible to other invocations. Once NODE or LEAF is observed, the barrier makes the child chunk and children index written
+ * before publication visible before they are read below.
+ */
+OctTreeNode load_oct_tree_node(RWStructuredBuffer<OctTreeNode> p_nodes, uint p_node_index) {
+    uint children_state;
+    InterlockedAdd(p_nodes[p_node_index].children_state, 0, children_state);
+    if (children_state == uint(OctTreeNode::ChildrenState::NODE) || children_state == uint(OctTreeNode::ChildrenState::LEAF)) {
+        DeviceMemoryBarrier();
+    }
+    OctTreeNode result = p_nodes[p_node_index];
+    result.children_state = children_state;
+    return result;
+}
+
+/**
+ * @brief Publishes an octree node's initialized children to other shader invocations.
+ * @details The barrier orders initialization of all eight children and the parent's children index before the atomic state update.
+ * Readers may therefore treat an observed NODE or LEAF state as a guarantee that the entire child chunk is visible.
+ */
+void publish_oct_tree_children_state(
+    RWStructuredBuffer<OctTreeNode> p_nodes, uint p_node_index, OctTreeNode::ChildrenState p_children_state) {
+    DeviceMemoryBarrier();
+    uint original_state;
+    InterlockedExchange(p_nodes[p_node_index].children_state, uint(p_children_state), original_state);
+}
+
 void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNodeTraceInfo p_trace_info) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
-        OctTreeNode node = p_nodes[node_index];
+        OctTreeNode node = load_oct_tree_node(p_nodes, node_index);
         OctTreeNode::ChildrenState children_state = OctTreeNode::ChildrenState(node.children_state);
         if (children_state != OctTreeNode::ChildrenState::NODE) {
             // Traced to an empty/allocating/leaf node, set p_state and return.
@@ -268,19 +297,19 @@ bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStruct
     uint children_index;
     if (p_is_leaf) {
         if (!create_oct_tree_children_leaf(p_leaves, p_tree_info, p_node_index, p_frame_slot, children_index)) {
-            p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
+            publish_oct_tree_children_state(p_nodes, p_node_index, OctTreeNode::ChildrenState::EMPTY);
             return false;
         }
         p_nodes[p_node_index].children = children_index;
-        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::LEAF);
+        publish_oct_tree_children_state(p_nodes, p_node_index, OctTreeNode::ChildrenState::LEAF);
     }
     else {
         if (!create_oct_tree_children_node(p_nodes, p_tree_info, p_node_index, p_frame_slot, children_index)) {
-            p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
+            publish_oct_tree_children_state(p_nodes, p_node_index, OctTreeNode::ChildrenState::EMPTY);
             return false;
         }
         p_nodes[p_node_index].children = children_index;
-        p_nodes[p_node_index].children_state = uint(OctTreeNode::ChildrenState::NODE);
+        publish_oct_tree_children_state(p_nodes, p_node_index, OctTreeNode::ChildrenState::NODE);
     }
     return true;
 }
@@ -302,7 +331,7 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
             report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
             return false;
         }
-        OctTreeNode node = p_nodes[node_index];
+        OctTreeNode node = load_oct_tree_node(p_nodes, node_index);
         OctTreeNode::ChildrenState child_state = OctTreeNode::ChildrenState(node.children_state);
         switch (child_state) {
         case OctTreeNode::ChildrenState::NODE:
@@ -347,7 +376,7 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
                 p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
                 return false;
             }
-            node = p_nodes[node_index];
+            node = load_oct_tree_node(p_nodes, node_index);
             break;
         default:
             report_shader_debug_error(curr_depth < p_tree_info[0].max_depth - 1
