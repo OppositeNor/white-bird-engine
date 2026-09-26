@@ -73,5 +73,8 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         indirect_irradiance += compute_rsm_indirect(descriptor_indices.light, spot_light_index, uv, world_pos, normal);
     }
     float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
+#if WBE_VOXEL_DEBUG_VIEW
+    indirect_lighting += base_color * 0.24;
+#endif
     indirect_lighting_output[dispatch_thread_id] = float4(indirect_lighting, 1.0);
 }

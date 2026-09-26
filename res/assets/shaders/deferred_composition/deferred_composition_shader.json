@@ -51,6 +51,16 @@
             "metadata": "assets/shaders/deferred_composition/indirect_lighting_rsm.json"
         },
         {
+            "id": "indirect_lighting_rsm_debug_view_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
+            "dst": "assets/shaders/deferred_composition/indirect_lighting_rsm_debug_view.spv",
+            "metadata": "assets/shaders/deferred_composition/indirect_lighting_rsm_debug_view.json",
+            "macros": [
+                {"name": "WBE_VOXEL_DEBUG_VIEW", "value": "1"}
+            ]
+        },
+        {
             "id": "combine_lighting_shader",
             "source_type": "shader",
             "src": "assets/shaders/deferred_composition/combine_lighting.slang",

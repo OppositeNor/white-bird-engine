@@ -64,8 +64,8 @@ namespace WhiteBirdEngine {
  */
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
-    ApplicationVulkanDeferredPBRTest()
-        : ApplicationGame(RendererCapabilities{.shader_debug = true}) {}
+    ApplicationVulkanDeferredPBRTest() : ApplicationGame(RendererCapabilities{.shader_debug = true}) {
+    }
 
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;
@@ -91,8 +91,8 @@ private:
     static constexpr size_t OCT_TREE_MAX_DEPTH = 6;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
     static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = static_cast<size_t>(OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT * 0.25);
-    // Conservative rasterization can touch widely separated voxels, so reserve the exact maximum number of internal nodes for
-    // a fully populated tree instead of assuming that surface coverage will keep their allocation dense.
+    // Conservative rasterization can touch widely separated voxels, so reserve the exact maximum number of internal nodes
+    // for a fully populated tree instead of assuming that surface coverage will keep their allocation dense.
     static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(512);
     static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = WBE_KI_B(512);
     static constexpr float OCT_TREE_WIDTH = 32.0F;
@@ -272,6 +272,7 @@ private:
     RefRes<RUShader> direct_lighting_shader_resource;
     RefRes<RUShader> direct_lighting_summed_area_table_shader_resource;
     RefRes<RUShader> indirect_lighting_rsm_shader_resource;
+    RefRes<RUShader> indirect_lighting_rsm_debug_view_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
     RefRes<RUShader> bloom_extract_shader_resource;
     RefRes<RUShader> bloom_ping_write_shader_resource;
@@ -296,6 +297,7 @@ private:
     Ref<ROComputePipelineVK> direct_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> direct_lighting_summed_area_table_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> indirect_lighting_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> indirect_lighting_debug_view_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_ping_write_compute_pipeline = MEM_NULL;
@@ -373,7 +375,9 @@ private:
     bool bloom_acquire_key_was_down = false;
     bool bloom_acquire_in_flight = false;
     bool render_graph_switch_key_was_down = false;
+    bool voxel_debug_view_key_was_down = false;
     std::atomic<bool> summed_area_table_requested = false;
+    std::atomic<bool> voxel_debug_view_visible = true;
     bool summed_area_table_active = false;
     ComponentCamera camera_component{};
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;

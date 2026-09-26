@@ -59,12 +59,42 @@ namespace {
 
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
 constexpr std::array<uint32_t, 36> OCT_TREE_DEBUG_CUBE_INDICES{
-    0, 2, 3, 0, 3, 1,
-    4, 5, 7, 4, 7, 6,
-    0, 1, 5, 0, 5, 4,
-    2, 6, 7, 2, 7, 3,
-    0, 4, 6, 0, 6, 2,
-    1, 3, 7, 1, 7, 5,
+    0,
+    2,
+    3,
+    0,
+    3,
+    1,
+    4,
+    5,
+    7,
+    4,
+    7,
+    6,
+    0,
+    1,
+    5,
+    0,
+    5,
+    4,
+    2,
+    6,
+    7,
+    2,
+    7,
+    3,
+    0,
+    4,
+    6,
+    0,
+    6,
+    2,
+    1,
+    3,
+    7,
+    1,
+    7,
+    5,
 };
 
 struct BillboardInfoVKUBO {
@@ -146,6 +176,13 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         summed_area_table_requested.store(requested, std::memory_order_relaxed);
     }
     render_graph_switch_key_was_down = render_graph_switch_key_down;
+
+    bool voxel_debug_view_key_down = input_manager->get_input_status(KEYCODE_V).is_down();
+    if (voxel_debug_view_key_down && !voxel_debug_view_key_was_down) {
+        bool visible = !voxel_debug_view_visible.load(std::memory_order_relaxed);
+        voxel_debug_view_visible.store(visible, std::memory_order_relaxed);
+    }
+    voxel_debug_view_key_was_down = voxel_debug_view_key_down;
 
     bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
     if (bloom_acquire_key_down && !bloom_acquire_key_was_down && !bloom_acquire_in_flight) {
@@ -343,6 +380,8 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     direct_lighting_summed_area_table_shader_resource =
         resource_manager->get_resource<RUShader>("direct_lighting_summed_area_table_shader");
     indirect_lighting_rsm_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_rsm_shader");
+    indirect_lighting_rsm_debug_view_shader_resource =
+        resource_manager->get_resource<RUShader>("indirect_lighting_rsm_debug_view_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
     bloom_ping_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_ping_write");
@@ -791,6 +830,9 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto indirect_compiled =
         ComputePipelineCompilerVK(compute_context).compile("indirect_lighting_rsm_shader", indirect_lighting_rsm_shader_resource);
     indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
+    auto indirect_debug_view_compiled =
+        ComputePipelineCompilerVK(compute_context).compile("indirect_lighting_rsm_debug_view_shader", indirect_lighting_rsm_debug_view_shader_resource);
+    indirect_lighting_debug_view_compute_pipeline = indirect_debug_view_compiled.compute_pipeline;
     auto combine_compiled =
         ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource);
     combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
