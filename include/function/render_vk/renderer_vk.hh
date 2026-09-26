@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -77,7 +78,7 @@ public:
     /**
      * @brief The number of jobs that would be runned per frame.
      */
-    static constexpr size_t RUN_MAX_JOBS_PER_FRAME = 32;
+    static constexpr size_t RUN_MAX_JOBS_PER_FRAME = std::numeric_limits<size_t>::max();
     static constexpr size_t MAX_DELAYED_CALLS = WBE_KI_B(5);
 
     virtual ~RendererVK() override;

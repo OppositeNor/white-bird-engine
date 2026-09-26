@@ -59,42 +59,12 @@ namespace {
 
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
 constexpr std::array<uint32_t, 36> OCT_TREE_DEBUG_CUBE_INDICES{
-    0,
-    2,
-    3,
-    0,
-    3,
-    1,
-    4,
-    5,
-    7,
-    4,
-    7,
-    6,
-    0,
-    1,
-    5,
-    0,
-    5,
-    4,
-    2,
-    6,
-    7,
-    2,
-    7,
-    3,
-    0,
-    4,
-    6,
-    0,
-    6,
-    2,
-    1,
-    3,
-    7,
-    1,
-    7,
-    5,
+    0, 2, 3, 0, 3, 1,
+    4, 5, 7, 4, 7, 6,
+    0, 1, 5, 0, 5, 4,
+    2, 6, 7, 2, 7, 3,
+    0, 4, 6, 0, 6, 2,
+    1, 3, 7, 1, 7, 5,
 };
 
 struct BillboardInfoVKUBO {
@@ -179,8 +149,25 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
 
     bool voxel_debug_view_key_down = input_manager->get_input_status(KEYCODE_V).is_down();
     if (voxel_debug_view_key_down && !voxel_debug_view_key_was_down) {
-        bool visible = !voxel_debug_view_visible.load(std::memory_order_relaxed);
-        voxel_debug_view_visible.store(visible, std::memory_order_relaxed);
+        VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
+        switch (mode) {
+        case VoxelDebugViewMode::DISABLED:
+            mode = VoxelDebugViewMode::POST_OCT_TREE_BUILD;
+            break;
+        case VoxelDebugViewMode::POST_OCT_TREE_BUILD:
+            mode = VoxelDebugViewMode::POST_X_PROCESS;
+            break;
+        case VoxelDebugViewMode::POST_X_PROCESS:
+            mode = VoxelDebugViewMode::POST_Y_PROCESS;
+            break;
+        case VoxelDebugViewMode::POST_Y_PROCESS:
+            mode = VoxelDebugViewMode::POST_Z_PROCESS;
+            break;
+        case VoxelDebugViewMode::POST_Z_PROCESS:
+            mode = VoxelDebugViewMode::DISABLED;
+            break;
+        }
+        voxel_debug_view_mode.store(mode, std::memory_order_relaxed);
     }
     voxel_debug_view_key_was_down = voxel_debug_view_key_down;
 
@@ -398,8 +385,12 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         resource_manager->get_resource<RUShader>("oct_tree_build_deferred_propagation_ping_write_shader");
     oct_tree_deferred_propagation_pong_write_shader_resource =
         resource_manager->get_resource<RUShader>("oct_tree_build_deferred_propagation_pong_write_shader");
+    oct_tree_pre_deferred_debug_capture_shader_resource =
+        resource_manager->get_resource<RUShader>("oct_tree_pre_deferred_debug_capture_shader");
     oct_tree_debug_draw_setup_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_debug_draw_setup_shader");
     oct_tree_debug_draw_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_debug_draw_pipeline");
+    oct_tree_pre_deferred_debug_draw_pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_pre_deferred_debug_draw_pipeline");
 
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
@@ -453,6 +444,10 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
         oct_tree_compute_compiler
             .compile("oct_tree_build_deferred_propagation_pong_write_shader", oct_tree_deferred_propagation_pong_write_shader_resource)
             .compute_pipeline;
+    oct_tree_pre_deferred_debug_capture_compute_pipeline =
+        oct_tree_compute_compiler
+            .compile("oct_tree_pre_deferred_debug_capture_shader", oct_tree_pre_deferred_debug_capture_shader_resource)
+            .compute_pipeline;
     oct_tree_debug_draw_setup_compute_pipeline =
         oct_tree_compute_compiler.compile("oct_tree_debug_draw_setup_shader", oct_tree_debug_draw_setup_shader_resource).compute_pipeline;
     GraphicsPipelineCompilerVKContext oct_tree_debug_draw_context{
@@ -467,6 +462,10 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     oct_tree_debug_draw_graphics_pipeline = GraphicsPipelineCompilerVK(oct_tree_debug_draw_context)
                                                 .compile("oct_tree_debug_draw_pipeline", oct_tree_debug_draw_pipeline_resource)
                                                 .graphics_pipeline;
+    oct_tree_pre_deferred_debug_draw_graphics_pipeline =
+        GraphicsPipelineCompilerVK(oct_tree_debug_draw_context)
+            .compile("oct_tree_pre_deferred_debug_draw_pipeline", oct_tree_pre_deferred_debug_draw_pipeline_resource)
+            .graphics_pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -708,6 +707,16 @@ void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
         .firstInstance = 0,
     };
     oct_tree_debug_draw_indirect_buffer = create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        &initial_debug_draw_command,
+        sizeof(initial_debug_draw_command));
+    oct_tree_pre_deferred_debug_info_buffer =
+        ROBufferVK::Builder().set_properties(sizeof(OctTreeInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
+    oct_tree_pre_deferred_debug_list_buffer =
+        ROBufferVK::Builder()
+            .set_properties(sizeof(OctTreeDeferredListEntry), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .create_ref(base_render_data);
+    oct_tree_pre_deferred_debug_draw_indirect_buffer = create_initialized_buffer(
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         &initial_debug_draw_command,
         sizeof(initial_debug_draw_command));
     initialize_oct_tree();

@@ -57,10 +57,16 @@ constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
 
 class VoxelDebugViewTask final : public IRenderTaskVK {
 public:
-    VoxelDebugViewTask(Unique<IRenderTaskVK> p_task, const std::atomic<bool>* p_visible)
-        : task(std::move(p_task)), visible(p_visible) {
-        if (task == MEM_NULL || visible == nullptr) {
-            throw std::runtime_error("Failed to create the voxel debug-view task: task or visibility state is null.");
+    VoxelDebugViewTask(Unique<IRenderTaskVK> p_task,
+        const std::atomic<VoxelDebugViewMode>* p_mode,
+        VoxelDebugViewMode p_first_mode,
+        VoxelDebugViewMode p_last_mode)
+        : task(std::move(p_task)), mode(p_mode), first_mode(p_first_mode), last_mode(p_last_mode) {
+        if (task == MEM_NULL || mode == nullptr) {
+            throw std::runtime_error("Failed to create the voxel debug-view task: task or mode state is null.");
+        }
+        if (first_mode > last_mode) {
+            throw std::runtime_error("Failed to create the voxel debug-view task: mode range is invalid.");
         }
     }
     ~VoxelDebugViewTask() override = default;
@@ -86,23 +92,26 @@ public:
     }
 
     void record(VkCommandBuffer p_command_buffer, double p_delta) override {
-        if (visible->load(std::memory_order_relaxed)) {
+        VoxelDebugViewMode current_mode = mode->load(std::memory_order_relaxed);
+        if (current_mode >= first_mode && current_mode <= last_mode) {
             task->record(p_command_buffer, p_delta);
         }
     }
 
 private:
     Unique<IRenderTaskVK> task;
-    const std::atomic<bool>* visible;
+    const std::atomic<VoxelDebugViewMode>* mode;
+    VoxelDebugViewMode first_mode;
+    VoxelDebugViewMode last_mode;
 };
 
 class VoxelDebugIndirectLightingTask final : public IRenderTaskVK {
 public:
     VoxelDebugIndirectLightingTask(
-        Unique<IRenderTaskVK> p_task, Unique<IRenderTaskVK> p_debug_view_task, const std::atomic<bool>* p_debug_view_visible)
-        : task(std::move(p_task)), debug_view_task(std::move(p_debug_view_task)), debug_view_visible(p_debug_view_visible) {
-        if (task == MEM_NULL || debug_view_task == MEM_NULL || debug_view_visible == nullptr) {
-            throw std::runtime_error("Failed to create the voxel debug indirect-lighting task: task or visibility state is null.");
+        Unique<IRenderTaskVK> p_task, Unique<IRenderTaskVK> p_debug_view_task, const std::atomic<VoxelDebugViewMode>* p_debug_view_mode)
+        : task(std::move(p_task)), debug_view_task(std::move(p_debug_view_task)), debug_view_mode(p_debug_view_mode) {
+        if (task == MEM_NULL || debug_view_task == MEM_NULL || debug_view_mode == nullptr) {
+            throw std::runtime_error("Failed to create the voxel debug indirect-lighting task: task or mode state is null.");
         }
         if (task->queue_family() != debug_view_task->queue_family()) {
             throw std::runtime_error("Failed to create the voxel debug indirect-lighting task: queue families do not match.");
@@ -132,14 +141,15 @@ public:
     }
 
     void record(VkCommandBuffer p_command_buffer, double p_delta) override {
-        IRenderTaskVK* selected_task = debug_view_visible->load(std::memory_order_relaxed) ? debug_view_task.get() : task.get();
+        IRenderTaskVK* selected_task =
+            debug_view_mode->load(std::memory_order_relaxed) == VoxelDebugViewMode::DISABLED ? task.get() : debug_view_task.get();
         selected_task->record(p_command_buffer, p_delta);
     }
 
 private:
     Unique<IRenderTaskVK> task;
     Unique<IRenderTaskVK> debug_view_task;
-    const std::atomic<bool>* debug_view_visible;
+    const std::atomic<VoxelDebugViewMode>* debug_view_mode;
 };
 
 std::vector<uint8_t> convert_bloom_to_rgba8(std::span<const uint8_t> p_bloom_data) {
@@ -181,9 +191,18 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_oct_tree_reset_task_desc())
-        .add_task(create_oct_tree_build_task_desc(RT_RUN_BUILD_OCT_TREE_X, RT_RESET_OCT_TREE, oct_tree_build_x_graphics_pipeline))
-        .add_task(create_oct_tree_build_task_desc(RT_RUN_BUILD_OCT_TREE_Y, RT_RUN_BUILD_OCT_TREE_X, oct_tree_build_y_graphics_pipeline))
-        .add_task(create_oct_tree_build_task_desc(RT_RUN_BUILD_OCT_TREE_Z, RT_RUN_BUILD_OCT_TREE_Y, oct_tree_build_z_graphics_pipeline));
+        .add_task(create_oct_tree_build_task_desc(
+            RT_RUN_BUILD_OCT_TREE_X, RT_RESET_OCT_TREE, oct_tree_build_x_graphics_pipeline));
+    pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
+        RT_CAPTURE_OCT_TREE_POST_X_DEBUG, RT_RUN_BUILD_OCT_TREE_X, VoxelDebugViewMode::POST_X_PROCESS));
+    pipeline_desc.add_task(create_oct_tree_build_task_desc(
+        RT_RUN_BUILD_OCT_TREE_Y, RT_CAPTURE_OCT_TREE_POST_X_DEBUG, oct_tree_build_y_graphics_pipeline));
+    pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
+        RT_CAPTURE_OCT_TREE_POST_Y_DEBUG, RT_RUN_BUILD_OCT_TREE_Y, VoxelDebugViewMode::POST_Y_PROCESS));
+    pipeline_desc.add_task(create_oct_tree_build_task_desc(
+        RT_RUN_BUILD_OCT_TREE_Z, RT_CAPTURE_OCT_TREE_POST_Y_DEBUG, oct_tree_build_z_graphics_pipeline));
+    pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
+        RT_CAPTURE_OCT_TREE_POST_Z_DEBUG, RT_RUN_BUILD_OCT_TREE_Z, VoxelDebugViewMode::POST_Z_PROCESS));
     pipeline_desc.add_task(create_oct_tree_deferred_propagation_task_desc());
     pipeline_desc.add_task(create_oct_tree_debug_draw_setup_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
@@ -193,6 +212,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_bloom_acquire_task_desc())
         .add_task(create_present_result_image_task_desc())
         .add_task(create_oct_tree_debug_draw_task_desc())
+        .add_task(create_oct_tree_pre_deferred_debug_draw_task_desc())
         .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
@@ -234,7 +254,10 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(OCT_TREE_DEFERRED_LIST_PING, oct_tree_deferred_list_ping)
         .add_resource(OCT_TREE_DEFERRED_LIST_PONG, oct_tree_deferred_list_pong)
         .add_resource(OCT_TREE_DEBUG_DRAW_INDEX_BUFFER, oct_tree_debug_draw_index_buffer)
-        .add_resource(OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER, oct_tree_debug_draw_indirect_buffer);
+        .add_resource(OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER, oct_tree_debug_draw_indirect_buffer)
+        .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, oct_tree_pre_deferred_debug_info_buffer)
+        .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, oct_tree_pre_deferred_debug_list_buffer)
+        .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, oct_tree_pre_deferred_debug_draw_indirect_buffer);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
@@ -335,7 +358,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
                            task_base_render_data = base_render_data,
                            task_pipeline = indirect_lighting_compute_pipeline,
                            task_debug_view_pipeline = indirect_lighting_debug_view_compute_pipeline,
-                           task_debug_view_visible = &voxel_debug_view_visible]() -> Unique<IRenderTaskVK> {
+                           task_debug_view_mode = &voxel_debug_view_mode]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_base_render_data->swap_chain_extent.width + 7U) / 8U,
             .height = (task_base_render_data->swap_chain_extent.height + 7U) / 8U,
@@ -346,7 +369,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
         Unique<IRenderTaskVK> debug_view_task = make_unique<RTRunComputePipelineVK>(
             task_render_allocator, task_base_render_data, task_debug_view_pipeline, dispatch_group_count);
         return make_unique<VoxelDebugIndirectLightingTask>(
-            task_render_allocator, std::move(task), std::move(debug_view_task), task_debug_view_visible);
+            task_render_allocator, std::move(task), std::move(debug_view_task), task_debug_view_mode);
     };
     return task_desc;
 }
@@ -376,7 +399,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_EXTRACT_BLOOM;
-    task_desc.after(RT_COMBINE_LIGHTING).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).write(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
+    task_desc.after(RT_COMBINE_LIGHTING)
+        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .write(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = bloom_extract_compute_pipeline]() -> Unique<IRenderTaskVK> {
@@ -426,8 +451,12 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
                            task_destination = std::span<uint8_t>(bloom_acquire_buffer),
                            task_acquire_requested = &bloom_acquire_requested,
                            task_acquire_completed = &bloom_acquire_completed]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTCPUInFlightAcquireVK>(
-            task_render_allocator, task_base_render_data, BLOOM_PING_IMAGE_VIEW, task_destination, task_acquire_requested, task_acquire_completed);
+        return make_unique<RTCPUInFlightAcquireVK>(task_render_allocator,
+            task_base_render_data,
+            BLOOM_PING_IMAGE_VIEW,
+            task_destination,
+            task_acquire_requested,
+            task_acquire_completed);
     };
     return task_desc;
 }
@@ -435,7 +464,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
-    task_desc.after(RT_ACQUIRE_BLOOM).read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE).read(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
+    task_desc.after(RT_ACQUIRE_BLOOM)
+        .read(RESULT_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
+        .read(BLOOM_PING_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = present_post_processing_graphics_pipeline]() -> Unique<IRenderTaskVK> {
@@ -453,12 +484,16 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_reset_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RESET_OCT_TREE;
-    task_desc.after(RT_RUN_DIRECT_LIGHTING).write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER).write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.after(RT_RUN_DIRECT_LIGHTING)
+        .write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = oct_tree_reset_compute_pipeline]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTRunComputePipelineVK>(
-            task_render_allocator, task_base_render_data, task_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1});
+        return make_unique<RTRunComputePipelineVK>(task_render_allocator,
+            task_base_render_data,
+            task_pipeline,
+            VkExtent3D{.width = 1, .height = 1, .depth = 1});
     };
     return task_desc;
 }
@@ -478,10 +513,41 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_debug_draw_setu
     return task_desc;
 }
 
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_process_debug_capture_task_desc(
+    std::string_view p_task_id, std::string_view p_previous_task_id, VoxelDebugViewMode p_mode) const {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = p_task_id;
+    task_desc.after(p_previous_task_id)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.create = [task_render_allocator = render_allocator,
+                           task_base_render_data = base_render_data,
+                           task_pipeline = oct_tree_pre_deferred_debug_capture_compute_pipeline,
+                           task_debug_view_mode = &voxel_debug_view_mode,
+                           task_required_mode = p_mode]() -> Unique<IRenderTaskVK> {
+        constexpr uint32_t THREADS_PER_GROUP = 64;
+        constexpr uint32_t DISPATCH_GROUP_COUNT =
+            static_cast<uint32_t>((OCT_TREE_MAX_DEFERRED_TASK_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP);
+        Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(task_render_allocator,
+            task_base_render_data,
+            task_pipeline,
+            VkExtent3D{.width = DISPATCH_GROUP_COUNT, .height = 1, .depth = 1});
+        return make_unique<VoxelDebugViewTask>(task_render_allocator,
+            std::move(task),
+            task_debug_view_mode,
+            task_required_mode,
+            task_required_mode);
+    };
+    return task_desc;
+}
+
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_deferred_propagation_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_BUILD_OCT_TREE_DEFERRED;
-    task_desc.after(RT_RUN_BUILD_OCT_TREE_Z)
+    task_desc.after(RT_CAPTURE_OCT_TREE_POST_Z_DEBUG)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -497,14 +563,20 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_deferred_propag
                            reset_ping_pipeline = oct_tree_deferred_count_reset_pong_compute_pipeline,
                            reset_pong_pipeline = oct_tree_deferred_count_reset_ping_compute_pipeline,
                            ping_pipeline = oct_tree_deferred_propagation_pong_write_compute_pipeline,
-                           pong_pipeline = oct_tree_deferred_propagation_ping_write_compute_pipeline]() -> Unique<IRenderTaskVK> {
+                           pong_pipeline = oct_tree_deferred_propagation_ping_write_compute_pipeline]()
+        -> Unique<IRenderTaskVK> {
         constexpr uint32_t THREADS_PER_GROUP = 64;
         constexpr uint32_t DISPATCH_GROUP_COUNT =
             static_cast<uint32_t>((OCT_TREE_MAX_DEFERRED_TASK_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP);
         constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
         constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
-        Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(
-            task_render_allocator, task_base_render_data, ping_pipeline, pong_pipeline, false, static_cast<uint32_t>(OCT_TREE_MAX_DEPTH), PROPAGATION_GROUP_COUNT);
+        Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(task_render_allocator,
+            task_base_render_data,
+            ping_pipeline,
+            pong_pipeline,
+            false,
+            static_cast<uint32_t>(OCT_TREE_MAX_DEPTH),
+            PROPAGATION_GROUP_COUNT);
         task->set_iteration_prefixes(reset_ping_pipeline, reset_pong_pipeline, RESET_GROUP_COUNT);
         return task;
     };
@@ -524,12 +596,43 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_debug_draw_task
     Unique<IRenderTaskVK> debug_draw_task = task_builder.create_unique(base_render_data);
     RendTaskDescVK task_desc(render_allocator,
         RT_RUN_OCT_TREE_DEBUG_DRAW,
-        make_unique<VoxelDebugViewTask>(render_allocator, std::move(debug_draw_task), &voxel_debug_view_visible));
+        make_unique<VoxelDebugViewTask>(render_allocator,
+            std::move(debug_draw_task),
+            &voxel_debug_view_mode,
+            VoxelDebugViewMode::POST_OCT_TREE_BUILD,
+            VoxelDebugViewMode::POST_OCT_TREE_BUILD));
     task_desc.after(RT_SETUP_OCT_TREE_DEBUG_DRAW)
         .after(RT_RUN_PRESENT_RESULT_IMAGE)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_pre_deferred_debug_draw_task_desc() const {
+    RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
+    task_builder.set_render_extent(base_render_data->swap_chain_extent)
+        .set_index_buffer(OCT_TREE_DEBUG_DRAW_INDEX_BUFFER)
+        .set_indirect_buffer(OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER)
+        .set_pipeline(oct_tree_pre_deferred_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .add_color_attachment(REND_RES_SWAP_CHAIN)
+        .set_depth_attachment(GBUFFER_DEPTH_IMAGE_VIEW)
+        .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+        .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
+    Unique<IRenderTaskVK> debug_draw_task = task_builder.create_unique(base_render_data);
+    RendTaskDescVK task_desc(render_allocator,
+        RT_RUN_OCT_TREE_PRE_DEFERRED_DEBUG_DRAW,
+        make_unique<VoxelDebugViewTask>(render_allocator,
+            std::move(debug_draw_task),
+            &voxel_debug_view_mode,
+            VoxelDebugViewMode::POST_X_PROCESS,
+            VoxelDebugViewMode::POST_Z_PROCESS));
+    task_desc.after(RT_RUN_OCT_TREE_DEBUG_DRAW)
+        .read(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
     return task_desc;
 }
@@ -551,7 +654,7 @@ void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
-    task_desc.after(RT_RUN_OCT_TREE_DEBUG_DRAW);
+    task_desc.after(RT_RUN_OCT_TREE_PRE_DEFERRED_DEBUG_DRAW);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {

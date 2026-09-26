@@ -20,7 +20,8 @@
             "fragment_stage_id": "oct_tree_build_static_set_x",
             "depth_test": false,
             "depth_write": false,
-            "cull_backfaces": false
+            "cull_backfaces": false,
+            "conservative_rasterization": true
         },
         {
             "id": "oct_tree_build_static_set_y",
@@ -41,7 +42,8 @@
             "fragment_stage_id": "oct_tree_build_static_set_y",
             "depth_test": false,
             "depth_write": false,
-            "cull_backfaces": false
+            "cull_backfaces": false,
+            "conservative_rasterization": true
         },
         {
             "id": "oct_tree_build_static_set_z",
@@ -62,7 +64,8 @@
             "fragment_stage_id": "oct_tree_build_static_set_z",
             "depth_test": false,
             "depth_write": false,
-            "cull_backfaces": false
+            "cull_backfaces": false,
+            "conservative_rasterization": true
         },
         {
             "id": "oct_tree_reset_shader",
@@ -106,6 +109,13 @@
             ]
         },
         {
+            "id": "oct_tree_pre_deferred_debug_capture_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_capture.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_capture.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_capture.json"
+        },
+        {
             "id": "oct_tree_debug_draw_setup_shader",
             "source_type": "shader",
             "src": "assets/shaders/oct_tree/oct_tree_debug_draw_setup.slang",
@@ -124,6 +134,22 @@
             "type": "graphics_pipeline",
             "vertex_stage_id": "oct_tree_debug_draw_shader",
             "fragment_stage_id": "oct_tree_debug_draw_shader",
+            "depth_test": true,
+            "depth_write": false,
+            "cull_backfaces": false
+        },
+        {
+            "id": "oct_tree_pre_deferred_debug_draw_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_draw.slang",
+            "dst": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_draw.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_pre_deferred_debug_draw.json"
+        },
+        {
+            "id": "oct_tree_pre_deferred_debug_draw_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "oct_tree_pre_deferred_debug_draw_shader",
+            "fragment_stage_id": "oct_tree_pre_deferred_debug_draw_shader",
             "depth_test": true,
             "depth_write": false,
             "cull_backfaces": false
