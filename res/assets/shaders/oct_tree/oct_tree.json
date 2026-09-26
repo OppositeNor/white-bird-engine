@@ -2,70 +2,24 @@
     "include": [],
     "resources": [
         {
-            "id": "oct_tree_build_static_set_x",
+            "id": "oct_tree_build_static_set",
             "source_type": "shader",
             "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
-            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_x.spv",
-            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_x.json",
+            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set.spv",
+            "metadata": "assets/shaders/oct_tree/oct_tree_build_static_set.json",
             "depth_test": false,
-            "cull_backfaces": false,
-            "macros": [
-                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "0"}
-            ]
+            "cull_backfaces": false
         },
         {
-            "id": "oct_tree_build_static_set_x_pipeline",
+            "id": "oct_tree_build_static_set_pipeline",
             "type": "graphics_pipeline",
-            "vertex_stage_id": "oct_tree_build_static_set_x",
-            "fragment_stage_id": "oct_tree_build_static_set_x",
+            "vertex_stage_id": "oct_tree_build_static_set",
+            "geometry_stage_id": "oct_tree_build_static_set",
+            "fragment_stage_id": "oct_tree_build_static_set",
             "depth_test": false,
             "depth_write": false,
             "cull_backfaces": false,
-            "conservative_rasterization": true
-        },
-        {
-            "id": "oct_tree_build_static_set_y",
-            "source_type": "shader",
-            "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
-            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_y.spv",
-            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_y.json",
-            "depth_test": false,
-            "cull_backfaces": false,
-            "macros": [
-                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "1"}
-            ]
-        },
-        {
-            "id": "oct_tree_build_static_set_y_pipeline",
-            "type": "graphics_pipeline",
-            "vertex_stage_id": "oct_tree_build_static_set_y",
-            "fragment_stage_id": "oct_tree_build_static_set_y",
-            "depth_test": false,
-            "depth_write": false,
-            "cull_backfaces": false,
-            "conservative_rasterization": true
-        },
-        {
-            "id": "oct_tree_build_static_set_z",
-            "source_type": "shader",
-            "src": "assets/shaders/oct_tree/oct_tree_build_static_set.slang",
-            "dst": "assets/shaders/oct_tree/oct_tree_build_static_set_z.spv",
-            "metadata": "assets/shaders/shadowmap_spot/oct_tree_build_static_set_z.json",
-            "depth_test": false,
-            "cull_backfaces": false,
-            "macros": [
-                {"name": "WBE_OCT_TREE_VIEW_INDEX", "value": "2"}
-            ]
-        },
-        {
-            "id": "oct_tree_build_static_set_z_pipeline",
-            "type": "graphics_pipeline",
-            "vertex_stage_id": "oct_tree_build_static_set_z",
-            "fragment_stage_id": "oct_tree_build_static_set_z",
-            "depth_test": false,
-            "depth_write": false,
-            "cull_backfaces": false,
-            "conservative_rasterization": true
+            "conservative_rasterization": false
         },
         {
             "id": "oct_tree_reset_shader",

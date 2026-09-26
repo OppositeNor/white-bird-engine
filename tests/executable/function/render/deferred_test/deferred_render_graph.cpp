@@ -192,17 +192,9 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_oct_tree_reset_task_desc())
         .add_task(create_oct_tree_build_task_desc(
-            RT_RUN_BUILD_OCT_TREE_X, RT_RESET_OCT_TREE, oct_tree_build_x_graphics_pipeline));
+            RT_RUN_BUILD_OCT_TREE, RT_RESET_OCT_TREE, oct_tree_build_graphics_pipeline));
     pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
-        RT_CAPTURE_OCT_TREE_POST_X_DEBUG, RT_RUN_BUILD_OCT_TREE_X, VoxelDebugViewMode::POST_X_PROCESS));
-    pipeline_desc.add_task(create_oct_tree_build_task_desc(
-        RT_RUN_BUILD_OCT_TREE_Y, RT_CAPTURE_OCT_TREE_POST_X_DEBUG, oct_tree_build_y_graphics_pipeline));
-    pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
-        RT_CAPTURE_OCT_TREE_POST_Y_DEBUG, RT_RUN_BUILD_OCT_TREE_Y, VoxelDebugViewMode::POST_Y_PROCESS));
-    pipeline_desc.add_task(create_oct_tree_build_task_desc(
-        RT_RUN_BUILD_OCT_TREE_Z, RT_CAPTURE_OCT_TREE_POST_Y_DEBUG, oct_tree_build_z_graphics_pipeline));
-    pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
-        RT_CAPTURE_OCT_TREE_POST_Z_DEBUG, RT_RUN_BUILD_OCT_TREE_Z, VoxelDebugViewMode::POST_Z_PROCESS));
+        RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCT_TREE, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
     pipeline_desc.add_task(create_oct_tree_deferred_propagation_task_desc());
     pipeline_desc.add_task(create_oct_tree_debug_draw_setup_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
@@ -547,7 +539,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_process_debug_c
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_deferred_propagation_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_BUILD_OCT_TREE_DEFERRED;
-    task_desc.after(RT_CAPTURE_OCT_TREE_POST_Z_DEBUG)
+    task_desc.after(RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -575,6 +567,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_deferred_propag
             ping_pipeline,
             pong_pipeline,
             false,
+            // A single raster pass can leave contenders at any depth; allow one retry per tree level.
             static_cast<uint32_t>(OCT_TREE_MAX_DEPTH),
             PROPAGATION_GROUP_COUNT);
         task->set_iteration_prefixes(reset_ping_pipeline, reset_pong_pipeline, RESET_GROUP_COUNT);
@@ -626,8 +619,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_pre_deferred_de
         make_unique<VoxelDebugViewTask>(render_allocator,
             std::move(debug_draw_task),
             &voxel_debug_view_mode,
-            VoxelDebugViewMode::POST_X_PROCESS,
-            VoxelDebugViewMode::POST_Z_PROCESS));
+            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
     task_desc.after(RT_RUN_OCT_TREE_DEBUG_DRAW)
         .read(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)

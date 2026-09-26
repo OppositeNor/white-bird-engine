@@ -177,5 +177,5 @@ OctTreePreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_Vulkan
  */
 [shader("fragment")]
 float4 fragment_main(OctTreePreDeferredDebugDrawVertexOutput p_input) : SV_Target0 {
-    return float4(p_input.color.xyz * p_input.position.z, 1.0);
+    return p_input.color;
 }

@@ -897,6 +897,7 @@ void RendererVK::create_logical_device() { // NOLINT
     device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     device_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
     device_features.textureCompressionBC = supported_device_features.textureCompressionBC;
+    device_features.geometryShader = supported_device_features.geometryShader;
     create_info.pEnabledFeatures = &device_features;
 
     VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features{};

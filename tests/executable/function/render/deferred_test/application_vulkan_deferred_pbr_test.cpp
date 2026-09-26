@@ -38,6 +38,7 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
+#include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -45,10 +46,13 @@
 #include <array>
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <format>
 #include <limits>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -73,33 +77,6 @@ struct BillboardInfoVKUBO {
     glm::vec2 size_padding = glm::vec2(0.0F);
     glm::vec4 rotation_axis = glm::vec4(0.0F);
 };
-
-std::array<glm::mat4, 3> make_oct_tree_projection_matrices(const glm::vec3& p_origin, float p_width) {
-    const float clip_scale = 2.0F / p_width;
-    const glm::vec3 clip_offset = -1.0F - p_origin * clip_scale;
-    const float depth_scale = 1.0F / p_width;
-    const glm::vec3 depth_offset = -p_origin * depth_scale;
-
-    glm::mat4 project_x(0.0F);
-    project_x[1][0] = clip_scale;
-    project_x[2][1] = clip_scale;
-    project_x[0][2] = depth_scale;
-    project_x[3] = glm::vec4(clip_offset.y, clip_offset.z, depth_offset.x, 1.0F);
-
-    glm::mat4 project_y(0.0F);
-    project_y[0][0] = clip_scale;
-    project_y[2][1] = clip_scale;
-    project_y[1][2] = depth_scale;
-    project_y[3] = glm::vec4(clip_offset.x, clip_offset.z, depth_offset.y, 1.0F);
-
-    glm::mat4 project_z(0.0F);
-    project_z[0][0] = clip_scale;
-    project_z[1][1] = clip_scale;
-    project_z[2][2] = depth_scale;
-    project_z[3] = glm::vec4(clip_offset.x, clip_offset.y, depth_offset.z, 1.0F);
-
-    return {project_x, project_y, project_z};
-}
 
 BillboardInfoVKUBO make_light_billboard_info(const ComponentSpotLight& p_spot_light_component) {
     return BillboardInfoVKUBO{
@@ -155,21 +132,21 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
             mode = VoxelDebugViewMode::POST_OCT_TREE_BUILD;
             break;
         case VoxelDebugViewMode::POST_OCT_TREE_BUILD:
-            mode = VoxelDebugViewMode::POST_X_PROCESS;
+            mode = VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
             break;
-        case VoxelDebugViewMode::POST_X_PROCESS:
-            mode = VoxelDebugViewMode::POST_Y_PROCESS;
-            break;
-        case VoxelDebugViewMode::POST_Y_PROCESS:
-            mode = VoxelDebugViewMode::POST_Z_PROCESS;
-            break;
-        case VoxelDebugViewMode::POST_Z_PROCESS:
+        case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
             mode = VoxelDebugViewMode::DISABLED;
             break;
         }
         voxel_debug_view_mode.store(mode, std::memory_order_relaxed);
     }
     voxel_debug_view_key_was_down = voxel_debug_view_key_down;
+
+    bool frame_capture_key_down = input_manager->get_input_status(KEYCODE_F1).is_down();
+    if (frame_capture_key_down && !frame_capture_key_was_down) {
+        frame_capture_requested.store(true, std::memory_order_relaxed);
+    }
+    frame_capture_key_was_down = frame_capture_key_down;
 
     bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
     if (bloom_acquire_key_down && !bloom_acquire_key_was_down && !bloom_acquire_in_flight) {
@@ -288,7 +265,17 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
-    WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+    if (frame_capture_requested.exchange(false, std::memory_order_relaxed)) {
+        const Path output_directory = std::filesystem::absolute(Path("test_env") / "captures");
+        std::filesystem::create_directories(output_directory);
+        const auto timestamp =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const Path output_path =
+            output_directory / std::format("deferred_{}_frame_{}.png", timestamp, base_render_data->current_frame);
+        renderer_vk->request_frame_capture(output_path.string());
+    } else {
+        WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+    }
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
     if (requested == summed_area_table_active) {
         return;
@@ -373,9 +360,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
     bloom_ping_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_ping_write");
     bloom_pong_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_pong_write");
-    oct_tree_build_x_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_x_pipeline");
-    oct_tree_build_y_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_y_pipeline");
-    oct_tree_build_z_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_z_pipeline");
+    oct_tree_build_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_pipeline");
     oct_tree_reset_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_reset_shader");
     oct_tree_deferred_count_reset_ping_shader_resource =
         resource_manager->get_resource<RUShader>("oct_tree_deferred_count_reset_ping_shader");
@@ -419,12 +404,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     gbuffer_opaque_graphics_pipeline =
         GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_opaque", gbuffer_opaque_pipeline_resource).graphics_pipeline;
     GraphicsPipelineCompilerVK oct_tree_compiler(make_oct_tree_graphics_pipeline_context());
-    oct_tree_build_x_graphics_pipeline =
-        oct_tree_compiler.compile("oct_tree_build_static_set_x_pipeline", oct_tree_build_x_pipeline_resource).graphics_pipeline;
-    oct_tree_build_y_graphics_pipeline =
-        oct_tree_compiler.compile("oct_tree_build_static_set_y_pipeline", oct_tree_build_y_pipeline_resource).graphics_pipeline;
-    oct_tree_build_z_graphics_pipeline =
-        oct_tree_compiler.compile("oct_tree_build_static_set_z_pipeline", oct_tree_build_z_pipeline_resource).graphics_pipeline;
+    oct_tree_build_graphics_pipeline =
+        oct_tree_compiler.compile("oct_tree_build_static_set_pipeline", oct_tree_build_pipeline_resource).graphics_pipeline;
     ComputePipelineCompilerVK oct_tree_compute_compiler(make_compute_pipeline_context());
     oct_tree_reset_compute_pipeline =
         oct_tree_compute_compiler.compile("oct_tree_reset_shader", oct_tree_reset_shader_resource).compute_pipeline;
@@ -723,9 +704,7 @@ void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::initialize_oct_tree() {
-    const std::array<glm::mat4, 3> projection_matrices = make_oct_tree_projection_matrices(OCT_TREE_ORIGIN, OCT_TREE_WIDTH);
     const OctTreeInfo initial_oct_tree_info{
-        .matrices = {projection_matrices[0], projection_matrices[1], projection_matrices[2]},
         .origin = OCT_TREE_ORIGIN,
         .width = OCT_TREE_WIDTH,
         .max_depth = OCT_TREE_MAX_DEPTH,

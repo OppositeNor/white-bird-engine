@@ -73,10 +73,6 @@ struct OctTreeLeaf {
 [WBE_DATA_TYPE]
 struct OctTreeInfo {
     /**
-     * @brief three directional matrices for oct tree setup.
-     */
-    float4x4 matrices[3];
-    /**
      * @brief The origin of the oct tree in world space.
      */
     float3 origin;
