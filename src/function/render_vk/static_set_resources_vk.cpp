@@ -24,7 +24,7 @@ namespace WhiteBirdEngine {
 
 StaticSetResourcesVK::StaticSetResourcesVK(RenderAllocator* p_allocator)
     : allocator(p_allocator), textures(make_ref<RenderResourceList>(p_allocator, p_allocator)), opaque_batches(p_allocator),
-      masked_batches(p_allocator) {
+      opaque_double_sided_batches(p_allocator), masked_batches(p_allocator) {
     if (allocator == nullptr) {
         throw std::runtime_error("Failed to construct static-set resources: allocator is null.");
     }
@@ -35,6 +35,13 @@ const StaticSetResourcesVK::DrawBatch& StaticSetResourcesVK::get_opaque_draw_bat
         throw std::runtime_error("Failed to get static-set opaque draw batch: index is out of bounds.");
     }
     return opaque_batches[p_index];
+}
+
+const StaticSetResourcesVK::DrawBatch& StaticSetResourcesVK::get_opaque_double_sided_draw_batch(size_t p_index) const {
+    if (p_index >= opaque_double_sided_batches.size()) {
+        throw std::runtime_error("Failed to get static-set opaque_double_sided draw batch: index is out of bounds.");
+    }
+    return opaque_double_sided_batches[p_index];
 }
 
 const StaticSetResourcesVK::DrawBatch& StaticSetResourcesVK::get_masked_draw_batch(size_t p_index) const {

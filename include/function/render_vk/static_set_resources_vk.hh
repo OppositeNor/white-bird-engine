@@ -34,6 +34,7 @@ namespace WhiteBirdEngine {
 inline constexpr std::string_view REND_RES_STATIC_SET_VERTICES = "static_set_vertices";
 inline constexpr std::string_view REND_RES_STATIC_SET_INDICES = "static_set_indices";
 inline constexpr std::string_view REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES = "static_set_opaque_draw_batches";
+inline constexpr std::string_view REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES = "static_set_opaque_double_sided_draw_batches";
 inline constexpr std::string_view REND_RES_STATIC_SET_MASKED_DRAW_BATCHES = "static_set_masked_draw_batches";
 inline constexpr std::string_view REND_RES_STATIC_SET_SUBMESHES = "static_set_submeshes";
 inline constexpr std::string_view REND_RES_STATIC_SET_NODES = "static_set_nodes";
@@ -44,7 +45,7 @@ inline constexpr std::string_view REND_RES_STATIC_SET_TEXTURES = "static_set_tex
 
 /**
  * @class StaticSetResourcesVK
- * @brief Pipeline-independent Vulkan resources compiled from one static opaque/masked set pair.
+ * @brief Pipeline-independent Vulkan resources compiled from static geometry categories.
  *
  * The object owns no pipeline or render-task state. It is neither copyable nor movable and is shared through Ref. Every
  * contained render object is rendering-thread-confined and must be registered explicitly with each graph that uses it.
@@ -98,6 +99,13 @@ public:
         return opaque_draw_batches;
     }
 
+    /**
+     * @brief Acquire opaque double-sided indexed-indirect draw commands.
+     */
+    Ref<ROBufferVK> acquire_opaque_double_sided_draw_batches() const {
+        return opaque_double_sided_draw_batches;
+    }
+
     /** @brief Acquire masked indexed-indirect draw commands. */
     Ref<ROBufferVK> acquire_masked_draw_batches() const {
         return masked_draw_batches;
@@ -146,6 +154,18 @@ public:
     /** @brief Return one opaque draw batch. */
     const DrawBatch& get_opaque_draw_batch(size_t p_index) const;
 
+    /**
+     * @brief Return the number of opaque double-sided draw batches.
+     */
+    size_t get_opaque_double_sided_draw_batch_count() const {
+        return opaque_double_sided_batches.size();
+    }
+
+    /**
+     * @brief Return one opaque double-sided draw batch.
+     */
+    const DrawBatch& get_opaque_double_sided_draw_batch(size_t p_index) const;
+
     /** @brief Return the number of masked draw batches. */
     size_t get_masked_draw_batch_count() const {
         return masked_batches.size();
@@ -161,6 +181,7 @@ private:
     Ref<ROBufferVK> vertices = MEM_NULL;
     Ref<ROBufferVK> indices = MEM_NULL;
     Ref<ROBufferVK> opaque_draw_batches = MEM_NULL;
+    Ref<ROBufferVK> opaque_double_sided_draw_batches = MEM_NULL;
     Ref<ROBufferVK> masked_draw_batches = MEM_NULL;
     Ref<ROBufferVK> submeshes = MEM_NULL;
     Ref<ROBufferVK> nodes = MEM_NULL;
@@ -169,6 +190,7 @@ private:
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
     Ref<RenderResourceList> textures = MEM_NULL;
     Vector<DrawBatch, RenderAllocator> opaque_batches;
+    Vector<DrawBatch, RenderAllocator> opaque_double_sided_batches;
     Vector<DrawBatch, RenderAllocator> masked_batches;
     std::string material_params_resource_id = std::string(REND_RES_STATIC_SET_MATERIAL_PARAMS);
 };

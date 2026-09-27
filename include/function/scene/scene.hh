@@ -138,6 +138,7 @@ private:
     String<HeapAllocatorDefault> resource_manifest_key;
     size_t active_world_index = 0;
     RefRes<RUStaticOpaqueSet> published_static_opaque_set = MEM_NULL;
+    RefRes<RUStaticOpaqueDoubleSidedSet> published_static_opaque_double_sided_set = MEM_NULL;
     RefRes<RUStaticMaskedSet> published_static_masked_set = MEM_NULL;
     LifecycleState lifecycle_state = LifecycleState::CONSTRUCTED;
 };

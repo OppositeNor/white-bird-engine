@@ -148,6 +148,9 @@ private:
     static constexpr std::string_view OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER =
         "oct_tree_pre_deferred_debug_draw_indirect_buffer";
 
+    static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED = "run_gbuffer_double_sided";
+    static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
+    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED = "run_build_oct_tree_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
@@ -244,8 +247,8 @@ private:
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_oct_tree_graphics_pipeline_context() const;
-    RendTaskDescVK create_shadow_task(bool p_load_existing) const;
-    RendTaskDescVK create_gbuffer_task(bool p_load_existing) const;
+    RendTaskDescVK create_shadow_task(bool p_load_existing, bool p_double_sided = false) const;
+    RendTaskDescVK create_gbuffer_task(bool p_load_existing, bool p_double_sided = false) const;
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors();
@@ -271,7 +274,7 @@ private:
     RendTaskDescVK create_oct_tree_reset_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
     RendTaskDescVK create_oct_tree_build_task_desc(
-        std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline) const;
+        std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_double_sided = false) const;
     RendTaskDescVK create_oct_tree_deferred_propagation_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
@@ -280,8 +283,11 @@ private:
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUStaticOpaqueSet> sponza_opaque_set;
+    RefRes<RUStaticOpaqueDoubleSidedSet> sponza_opaque_double_sided_set;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
+    RefRes<RUGraphicsPipeline> shadow_double_sided_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
+    RefRes<RUGraphicsPipeline> gbuffer_double_sided_pipeline_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_horizontal_shader_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
     RefRes<RUShader> direct_lighting_shader_resource;
@@ -306,7 +312,9 @@ private:
 
     Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> gbuffer_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_horizontal_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_vertical_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> direct_lighting_compute_pipeline = MEM_NULL;

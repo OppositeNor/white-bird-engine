@@ -167,10 +167,14 @@ public:
      * @param p_set Published static opaque set, or null to clear derived state.
      * @param p_vertex_buffer Shared static-opaque vertex buffer.
      * @param p_index_buffer Shared static-opaque index buffer.
+     * @param p_double_sided_set Additional opaque geometry without raster face culling, or null.
      * @return An optional GPU job to enqueue after the shared buffers are updated.
      */
-    virtual GPUJobVK on_static_opaque_set_updated(
-        BaseRenderDataVK* p_render_data, RefRes<RUStaticOpaqueSet> p_set, Ref<ROBufferVK> p_vertex_buffer, Ref<ROBufferVK> p_index_buffer) = 0;
+    virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
+        RefRes<RUStaticOpaqueSet> p_set,
+        Ref<ROBufferVK> p_vertex_buffer,
+        Ref<ROBufferVK> p_index_buffer,
+        RefRes<RUStaticOpaqueDoubleSidedSet> p_double_sided_set = MEM_NULL) = 0;
 
 protected:
     friend class RendererVK;

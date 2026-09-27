@@ -635,6 +635,23 @@ void ResourceUnitLoaderStaticOpaqueSet::populate_scheme_from_data(
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
+std::span<const std::string> ResourceUnitLoaderStaticOpaqueDoubleSidedSet::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"static_opaque_double_sided_set"};
+    return supported_resource_types;
+}
+
+std::any ResourceUnitLoaderStaticOpaqueDoubleSidedSet::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaStaticOpaqueDoubleSidedSet>(p_scheme, "static_opaque_double_sided_set");
+    return populate_static_geometry_set<RUStaticOpaqueDoubleSidedSet>(p_res_chunk, typed_scheme);
+}
+
+void ResourceUnitLoaderStaticOpaqueDoubleSidedSet::populate_scheme_from_data(
+    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemaStaticOpaqueDoubleSidedSet scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
+}
+
 std::span<const std::string> ResourceUnitLoaderStaticMaskedSet::get_supported_resource_types() const {
     static const std::array<std::string, 1> supported_resource_types = {"static_masked_set"};
     return supported_resource_types;
@@ -661,6 +678,7 @@ void register_renderer_vk_resource_unit_loaders() {
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticOpaqueSet>(global_allocator()));
+    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticOpaqueDoubleSidedSet>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticMaskedSet>(global_allocator()));
 }
 

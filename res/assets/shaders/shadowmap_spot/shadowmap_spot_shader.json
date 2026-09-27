@@ -104,6 +104,48 @@
             "depth_write": true,
             "cull_backfaces": false,
             "color_blend": false
+        },
+        {
+            "id": "rsm_spot_opaque_double_sided",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "rsm_spot_shader",
+            "fragment_stage_id": "rsm_spot_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false,
+            "cull_backfaces": false,
+            "fragment_stage_entry": "fragment_double_sided_main"
+        },
+        {
+            "id": "rsm_spot_opaque_double_sided_static",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "rsm_spot_shader",
+            "fragment_stage_id": "rsm_spot_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false,
+            "cull_backfaces": false,
+            "fragment_stage_entry": "fragment_double_sided_main"
+        },
+        {
+            "id": "shadowmap_spot_opaque_double_sided",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "shadowmap_spot_shader",
+            "fragment_stage_id": "shadowmap_spot_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false,
+            "cull_backfaces": false
+        },
+        {
+            "id": "shadowmap_spot_opaque_double_sided_static",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "shadowmap_spot_shader",
+            "fragment_stage_id": "shadowmap_spot_shader",
+            "depth_test": true,
+            "depth_write": true,
+            "color_blend": false,
+            "cull_backfaces": false
         }
     ]
 }

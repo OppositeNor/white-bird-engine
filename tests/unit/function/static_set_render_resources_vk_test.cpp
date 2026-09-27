@@ -28,11 +28,14 @@ TEST(WBEStaticSetResourcesVKTest, StartsWithIndependentEmptyResources) {
     EXPECT_EQ(resources.acquire_vertices(), MEM_NULL);
     EXPECT_EQ(resources.acquire_indices(), MEM_NULL);
     EXPECT_EQ(resources.acquire_opaque_draw_batches(), MEM_NULL);
+    EXPECT_EQ(resources.acquire_opaque_double_sided_draw_batches(), MEM_NULL);
     EXPECT_EQ(resources.acquire_masked_draw_batches(), MEM_NULL);
     EXPECT_NE(resources.acquire_textures(), MEM_NULL);
     EXPECT_EQ(resources.get_opaque_draw_batch_count(), 0U);
+    EXPECT_EQ(resources.get_opaque_double_sided_draw_batch_count(), 0U);
     EXPECT_EQ(resources.get_masked_draw_batch_count(), 0U);
     EXPECT_THROW(resources.get_opaque_draw_batch(0), std::runtime_error);
+    EXPECT_THROW(resources.get_opaque_double_sided_draw_batch(0), std::runtime_error);
     EXPECT_THROW(resources.get_masked_draw_batch(0), std::runtime_error);
 }
 

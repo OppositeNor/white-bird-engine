@@ -102,8 +102,10 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
     return output;
 }
 
-[shader("fragment")]
-RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
+/**
+ * @brief Shades a reflective shadow-map fragment, reversing back-face lighting normals when requested.
+ */
+RSMFragmentOutput shade_fragment(RSMVSOutput p_input, bool p_front_face) {
     ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
     SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
@@ -123,6 +125,7 @@ RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
     float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
     float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
     float3 world_normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
+    world_normal = p_front_face ? world_normal : -world_normal;
     float3 rsm_flux = compute_rsm_flux(p_input.world_position, world_normal, albedo_sample.rgb, clamp(rma.g, 0.0, 1.0));
     RSMFragmentOutput output;
     output.flux = float4(rsm_flux, 1.0);
@@ -131,4 +134,17 @@ RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
     float shadow_depth = saturate(length(light_camera_info.position - p_input.world_position) / max(light_camera_info.range, 0.0001));
     output.shadow_moments = float2(shadow_depth, shadow_depth * shadow_depth);
     return output;
+}
+
+[shader("fragment")]
+RSMFragmentOutput fragment_main(RSMVSOutput p_input) {
+    return shade_fragment(p_input, true);
+}
+
+/**
+ * @brief Emits flux and lighting normals for either side of opaque geometry.
+ */
+[shader("fragment")]
+RSMFragmentOutput fragment_double_sided_main(RSMVSOutput p_input, bool p_front_face : SV_IsFrontFace) {
+    return shade_fragment(p_input, p_front_face);
 }

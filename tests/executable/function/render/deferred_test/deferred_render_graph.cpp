@@ -182,19 +182,27 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
     pipeline_desc.add_task(std::move(p_shadow_opaque_task));
+    auto shadow_double_sided_task = create_shadow_task(true, true);
+    shadow_double_sided_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
+    pipeline_desc.add_task(std::move(shadow_double_sided_task));
     if (p_use_summed_area_table) {
         pipeline_desc.add_task(create_shadow_moments_summed_area_table_task_desc());
     } else {
         pipeline_desc.add_task(create_shadow_mipmap_task_desc());
     }
-    p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
+    p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED);
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
+    auto gbuffer_double_sided_task = create_gbuffer_task(true, true);
+    gbuffer_double_sided_task.after(RT_RUN_DEFERRED_GBUFFER);
+    pipeline_desc.add_task(std::move(gbuffer_double_sided_task));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_oct_tree_reset_task_desc())
         .add_task(create_oct_tree_build_task_desc(
             RT_RUN_BUILD_OCT_TREE, RT_RESET_OCT_TREE, oct_tree_build_graphics_pipeline));
+    pipeline_desc.add_task(create_oct_tree_build_task_desc(
+        RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, RT_RUN_BUILD_OCT_TREE, oct_tree_build_graphics_pipeline, true));
     pipeline_desc.add_task(create_oct_tree_process_debug_capture_task_desc(
-        RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCT_TREE, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
+        RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
     pipeline_desc.add_task(create_oct_tree_deferred_propagation_task_desc());
     pipeline_desc.add_task(create_oct_tree_debug_draw_setup_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
@@ -255,7 +263,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE)
+    task_desc.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED)
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .write(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
@@ -285,7 +293,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
+    task_desc.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
@@ -299,7 +307,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_desc(bool p_use_summed_area_table) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER)
+    task_desc.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED)
         .after(p_use_summed_area_table ? RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE : RT_GENERATE_SHADOW_MIPMAPS)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -331,7 +339,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc(bool p_use_summed_area_table) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER)
+    task_desc.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED)
         .after(RT_RUN_BUILD_OCT_TREE_DEFERRED)
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -673,7 +681,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc(
-    std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline) const {
+    std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_double_sided) const {
     constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
     constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
     RendTaskDescVK task_desc = make_static_set_task_desc(render_allocator,
@@ -684,7 +692,11 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_oct_tree_build_task_desc
         false,
         CLEAR_VALUES,
         VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
-        COLOR_ATTACHMENT_IDS);
+        COLOR_ATTACHMENT_IDS,
+        std::nullopt,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        p_double_sided);
     task_desc.after(p_previous_task_id)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)

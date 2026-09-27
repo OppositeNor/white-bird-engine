@@ -92,9 +92,10 @@ struct GBufferOutput {
  * @brief Sample the active material and pack its surface data into the G-buffer outputs.
  * @param p_input The interpolated vertex output.
  * @param p_masked Whether alpha-cutout discard should be applied.
+ * @param p_front_face Whether to retain the front-face lighting normal.
  * @return The packed G-buffer attachments for this fragment.
  */
-static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
+static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     GBufferOutput output;
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
     SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
@@ -120,6 +121,7 @@ static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
 
     float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
     float3 normal = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
+    normal = p_front_face ? normal : -normal;
     output.octahedron_normal = octahedron_encode(normal);
 
     float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
@@ -131,10 +133,18 @@ static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked) {
 
 [shader("fragment")]
 GBufferOutput fragment_main(VSOutput p_input) {
-    return shade_fragment(p_input, false);
+    return shade_fragment(p_input, false, true);
 }
 
 [shader("fragment")]
 GBufferOutput fragment_masked_main(VSOutput p_input) {
-    return shade_fragment(p_input, true);
+    return shade_fragment(p_input, true, true);
+}
+
+/**
+ * @brief Shades opaque back faces with reversed lighting normals.
+ */
+[shader("fragment")]
+GBufferOutput fragment_double_sided_main(VSOutput p_input, bool p_front_face : SV_IsFrontFace) {
+    return shade_fragment(p_input, false, p_front_face);
 }

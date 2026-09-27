@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+from threading import Lock
 from typing import Any, override
 
 from build_script.resource.acp.acp_compiler import (
@@ -38,11 +39,16 @@ _KTX2_IDENTIFIER = b"\xABKTX 20\xBB\r\n\x1A\n"
 class TextureCompilerPyKTX(TextureCompiler):
     """Compile raster images to upload-ready KTX2 files using pyktx/libktx."""
 
+    _encoder_initialization_lock = Lock()
+    _encoder_initialized = False
+
     def __init__(self, p_native_library_dir: Path, p_python_package_dir: Path) -> None:
         self._native_library_dir = p_native_library_dir
         self._python_package_dir = p_python_package_dir
         self._native_library: Any = None
         self._dynamic_library_directory: Any = None
+        self._initialization_lock = Lock()
+        self._pyktx: Any = None
 
     def _load_native_library(self) -> None:
         if self._native_library is not None:
@@ -62,15 +68,30 @@ class TextureCompilerPyKTX(TextureCompiler):
         self._native_library.ktxTexture2_Destroy.restype = None
 
     def _load_pyktx(self) -> Any:
-        self._load_native_library()
-        python_package_path = self._python_package_dir.resolve().as_posix()
-        if python_package_path not in sys.path:
-            sys.path.insert(0, python_package_path)
-        try:
-            import pyktx
-        except ImportError as error:
-            raise RuntimeError("Texture compilation requires the pyktx package.") from error
-        return pyktx
+        with self._initialization_lock:
+            if self._pyktx is not None:
+                return self._pyktx
+            self._load_native_library()
+            python_package_path = self._python_package_dir.resolve().as_posix()
+            if python_package_path not in sys.path:
+                sys.path.insert(0, python_package_path)
+            try:
+                import pyktx
+            except ImportError as error:
+                raise RuntimeError("Texture compilation requires the pyktx package.") from error
+            self._pyktx = pyktx
+            return pyktx
+
+    @classmethod
+    def _compress_basis(cls, p_texture: Any, p_parameters: Any) -> None:
+        # libktx's first compression initializes shared encoder state without its own guard.
+        if not cls._encoder_initialized:
+            with cls._encoder_initialization_lock:
+                if not cls._encoder_initialized:
+                    p_texture.compress_basis(p_parameters)
+                    cls._encoder_initialized = True
+                    return
+        p_texture.compress_basis(p_parameters)
 
     def _destroy_texture(self, p_pyktx: Any, p_texture: Any) -> None:
         texture_pointer = p_texture._ptr
@@ -124,6 +145,11 @@ class TextureCompilerPyKTX(TextureCompiler):
         if p_request.destination_path.suffix.lower() != ".ktx2":
             raise ValueError("Compiled texture destination must use the .ktx2 extension.")
 
+        thread_count = p_request.thread_count
+        if thread_count is None:
+            thread_count = min(16, os.cpu_count() or 1)
+        if not isinstance(thread_count, int) or thread_count < 1:
+            raise ValueError("Texture thread_count must be a positive integer.")
         pyktx = self._load_pyktx()
         try:
             import numpy
@@ -184,14 +210,14 @@ class TextureCompilerPyKTX(TextureCompiler):
                     uastc_flags |= int(pyktx.KtxPackUastcFlagBits.FAVOR_BC7_ERROR)
                 basis_params = pyktx.KtxBasisParams(
                     codec=pyktx.KtxBasisCodec.UASTC_LDR_4x4,
-                    thread_count=min(16, os.cpu_count() or 1),
+                    thread_count=thread_count,
                     uastc_flags=uastc_flags,
                     uastc_rdo=False,
                     # This will map R from source to R in basis, and G from source to A in basis. the BC5 transcoder then 
                     # is going to map R -> R and A -> G, so we're preserving the R and G channels.
                     normal_map=p_request.target_format == "bc5",
                 )
-                texture.compress_basis(basis_params)
+                self._compress_basis(texture, basis_params)
                 transcode_format = (
                     pyktx.KtxTranscodeFmt.BC5_RG
                     if p_request.target_format == "bc5"

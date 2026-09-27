@@ -187,10 +187,11 @@ inline Ref<StaticSetResourcesVK> create_static_set_resources(RendererVK* p_rende
     RefRes<RUStaticMaskedSet> p_masked_set,
     RefRes<RUGraphicsPipeline> p_opaque_pipeline,
     RefRes<RUGraphicsPipeline> p_masked_pipeline,
-    RefRes<RUGraphicsPipeline> p_material_pipeline) {
+    RefRes<RUGraphicsPipeline> p_material_pipeline,
+    RefRes<RUStaticOpaqueDoubleSidedSet> p_opaque_double_sided_set = MEM_NULL) {
     ShaderMetadata opaque_metadata;
     ShaderMetadata masked_metadata;
-    if (p_opaque_set != MEM_NULL) {
+    if (p_opaque_set != MEM_NULL || p_opaque_double_sided_set != MEM_NULL) {
         opaque_metadata = ShaderMetadataLoader().load(p_opaque_pipeline->vertex_stage);
     }
     if (p_masked_set != MEM_NULL) {
@@ -202,11 +203,13 @@ inline Ref<StaticSetResourcesVK> create_static_set_resources(RendererVK* p_rende
         .compile(p_opaque_set,
             p_masked_set,
             opaque_metadata,
-            p_opaque_set != MEM_NULL ? static_set_vertex_entry(p_opaque_pipeline) : std::string_view{},
+            (p_opaque_set != MEM_NULL || p_opaque_double_sided_set != MEM_NULL) ? static_set_vertex_entry(p_opaque_pipeline)
+                                                                                : std::string_view{},
             masked_metadata,
             p_masked_set != MEM_NULL ? static_set_vertex_entry(p_masked_pipeline) : std::string_view{},
             material_contract,
-            StaticSetCompilerVK::Config{});
+            StaticSetCompilerVK::Config{},
+            p_opaque_double_sided_set);
 }
 
 inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticSetResourcesVK> p_resources) {
@@ -218,6 +221,10 @@ inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticS
         .add_resource(REND_RES_STATIC_SET_TEXTURES, p_resources->acquire_textures());
     if (p_resources->acquire_opaque_draw_batches() != MEM_NULL) {
         p_graph.add_resource(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES, p_resources->acquire_opaque_draw_batches());
+    }
+    if (p_resources->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
+        p_graph.add_resource(
+            REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_resources->acquire_opaque_double_sided_draw_batches());
     }
     if (p_resources->acquire_masked_draw_batches() != MEM_NULL) {
         p_graph.add_resource(REND_RES_STATIC_SET_MASKED_DRAW_BATCHES, p_resources->acquire_masked_draw_batches());
@@ -231,13 +238,16 @@ inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticS
 }
 
 inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_static_set_pipeline_batches(
-    RenderAllocator* p_allocator, Ref<StaticSetResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked) {
+    RenderAllocator* p_allocator, Ref<StaticSetResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
     Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
-    const size_t batch_count = p_masked ? p_resources->get_masked_draw_batch_count() : p_resources->get_opaque_draw_batch_count();
+    const size_t batch_count = p_double_sided ? p_resources->get_opaque_double_sided_draw_batch_count()
+                               : p_masked     ? p_resources->get_masked_draw_batch_count()
+                                              : p_resources->get_opaque_draw_batch_count();
     result.reserve(batch_count);
     for (size_t i = 0; i < batch_count; ++i) {
-        const StaticSetResourcesVK::DrawBatch& source =
-            p_masked ? p_resources->get_masked_draw_batch(i) : p_resources->get_opaque_draw_batch(i);
+        const StaticSetResourcesVK::DrawBatch& source = p_double_sided ? p_resources->get_opaque_double_sided_draw_batch(i)
+                                                        : p_masked     ? p_resources->get_masked_draw_batch(i)
+                                                                       : p_resources->get_opaque_draw_batch(i);
         RTRunGraphicsPipelineIndirectVK::PipelineBatch batch(p_allocator);
         batch.graphics_pipeline = p_pipeline;
         batch.first_draw = source.first_draw;
@@ -290,9 +300,12 @@ inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator, //
     std::span<const std::string_view> p_color_attachment_ids,
     std::optional<std::string_view> p_depth_attachment_id = std::nullopt,
     VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR) {
-    auto batches = make_static_set_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked);
-    const std::string_view indirect_buffer_id = p_masked ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
+    VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    bool p_double_sided = false) {
+    auto batches = make_static_set_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
+    const std::string_view indirect_buffer_id = p_double_sided ? REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES
+                                                : p_masked     ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES
+                                                               : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
     const size_t required_clear_value_count = p_color_attachment_ids.size() + (p_depth_attachment_id.has_value() ? 1 : 0);
     if (p_clear_values.size() < required_clear_value_count) {
         throw std::runtime_error("Failed to build static-set task: insufficient clear values for attachments.");

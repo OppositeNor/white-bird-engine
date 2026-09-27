@@ -1703,7 +1703,12 @@ void RendererVK::update_static_geometry_sets() {
     synchronize_gpu_and_flush_delayed_calls();
 
     RefRes<RUStaticOpaqueSet> static_opaque_set = render_database->get_static_opaque_set();
-    if (static_opaque_set != nullptr) {
+    RefRes<RUStaticOpaqueDoubleSidedSet> double_sided_set = render_database->get_static_opaque_double_sided_set();
+    RefRes<RUStaticGeometrySet> geometry_set = static_opaque_set;
+    if (geometry_set == MEM_NULL || geometry_set->submesh_count == 0) {
+        geometry_set = double_sided_set;
+    }
+    if (geometry_set != MEM_NULL) {
         VkBufferUsageFlags vertex_usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
         VkBufferUsageFlags index_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
         for (auto& plugin : registered_plugins) {
@@ -1712,12 +1717,19 @@ void RendererVK::update_static_geometry_sets() {
             index_usage |= buffer_usage.index_buffer_usage;
         }
         StaticSetBufferCompilerVK::BuildResult geometry_buffers =
-            StaticSetBufferCompilerVK(&base_render_data).build(static_opaque_set, vertex_usage, index_usage);
+            StaticSetBufferCompilerVK(&base_render_data).build(geometry_set, vertex_usage, index_usage);
+        if (double_sided_set != MEM_NULL && double_sided_set->submesh_count > 0) {
+            auto double_sided_buffers = StaticSetBufferCompilerVK(&base_render_data).build(double_sided_set, vertex_usage, index_usage);
+            if (geometry_buffers.vertex_buffer != double_sided_buffers.vertex_buffer ||
+                geometry_buffers.index_buffer != double_sided_buffers.index_buffer) {
+                throw std::runtime_error("Static opaque categories must share vertex and index buffers.");
+            }
+        }
         render_objects->static_opaque_vertices = geometry_buffers.vertex_buffer;
         render_objects->static_opaque_indices = geometry_buffers.index_buffer;
         for (auto& plugin : registered_plugins) {
             auto plugin_job = plugin->on_static_opaque_set_updated(
-                &base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer);
+                &base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer, double_sided_set);
             if (plugin_job) {
                 register_gpu_job(std::move(plugin_job));
             }

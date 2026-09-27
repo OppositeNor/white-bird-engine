@@ -104,6 +104,7 @@ void Scene::update(double p_delta) {
 
     Ref<World> active_world = get_active_world();
     RefRes<RUStaticOpaqueSet> static_opaque_set = MEM_NULL;
+    RefRes<RUStaticOpaqueDoubleSidedSet> static_opaque_double_sided_set = MEM_NULL;
     RefRes<RUStaticMaskedSet> static_masked_set = MEM_NULL;
     if (active_world != MEM_NULL) {
         std::string_view graph_key = active_world->get_render_graph_resource_key();
@@ -111,14 +112,18 @@ void Scene::update(double p_delta) {
             renderer->activate_render_graph(graph_key);
         }
         static_opaque_set = active_world->get_static_opaque_set();
+        static_opaque_double_sided_set = active_world->get_static_opaque_double_sided_set();
         static_masked_set = active_world->get_static_masked_set();
     }
 
-    if (static_opaque_set != published_static_opaque_set || static_masked_set != published_static_masked_set) {
+    if (static_opaque_set != published_static_opaque_set || static_masked_set != published_static_masked_set ||
+        static_opaque_double_sided_set != published_static_opaque_double_sided_set) {
         renderer->get_render_database()->set_static_opaque_set(static_opaque_set);
+        renderer->get_render_database()->set_static_opaque_double_sided_set(static_opaque_double_sided_set);
         renderer->get_render_database()->set_static_masked_set(static_masked_set);
         renderer->update_static_geometry_sets();
         published_static_opaque_set = static_opaque_set;
+        published_static_opaque_double_sided_set = static_opaque_double_sided_set;
         published_static_masked_set = static_masked_set;
     }
 
@@ -140,11 +145,14 @@ void Scene::teardown() {
             renderer->unregister_render_graph(graph_key);
         }
     }
-    if (published_static_opaque_set != MEM_NULL || published_static_masked_set != MEM_NULL) {
+    if (published_static_opaque_set != MEM_NULL || published_static_masked_set != MEM_NULL ||
+        published_static_opaque_double_sided_set != MEM_NULL) {
         renderer->get_render_database()->set_static_opaque_set(MEM_NULL);
+        renderer->get_render_database()->set_static_opaque_double_sided_set(MEM_NULL);
         renderer->get_render_database()->set_static_masked_set(MEM_NULL);
         renderer->update_static_geometry_sets();
         published_static_opaque_set = MEM_NULL;
+        published_static_opaque_double_sided_set = MEM_NULL;
         published_static_masked_set = MEM_NULL;
     }
     lifecycle_state = LifecycleState::TORN_DOWN;

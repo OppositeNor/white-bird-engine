@@ -231,6 +231,14 @@ public:
     }
 
     /**
+     * @brief Set or clear the published static opaque double-sided geometry set.
+     * @param p_set Static opaque double-sided set resource, or null to clear the publication.
+     */
+    void set_static_opaque_double_sided_set(RefRes<RUStaticOpaqueDoubleSidedSet> p_set) {
+        static_opaque_double_sided_set = p_set;
+    }
+
+    /**
      * @brief Set or clear the published static masked geometry set.
      * @param p_set Static masked set resource, or null to clear the publication.
      */
@@ -252,6 +260,13 @@ public:
      */
     RefRes<RUStaticOpaqueSet> get_static_opaque_set() const {
         return static_opaque_set;
+    }
+
+    /**
+     * @brief Get the current static opaque double-sided set resource.
+     */
+    RefRes<RUStaticOpaqueDoubleSidedSet> get_static_opaque_double_sided_set() const {
+        return static_opaque_double_sided_set;
     }
 
     /**
@@ -308,6 +323,7 @@ private:
 
     OpaqueTrianglesInfo dynamic_opaque;
     RefRes<RUStaticOpaqueSet> static_opaque_set;
+    RefRes<RUStaticOpaqueDoubleSidedSet> static_opaque_double_sided_set;
     RefRes<RUStaticMaskedSet> static_masked_set;
     void set_opaque_triangles_linear(
         OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh, const uint32_t* p_preserved_object_ids, size_t p_preserved_object_id_count);

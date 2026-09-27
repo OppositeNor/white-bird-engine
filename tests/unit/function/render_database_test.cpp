@@ -185,17 +185,22 @@ TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObject
 
 TEST_F(WBERenderDatabaseTest, StoresStaticGeometrySetReferences) {
     RefRes<RUStaticOpaqueSet> opaque_set = resource_storage.make_object<RUStaticOpaqueSet>();
+    RefRes<RUStaticOpaqueDoubleSidedSet> opaque_double_sided_set = resource_storage.make_object<RUStaticOpaqueDoubleSidedSet>();
     RefRes<RUStaticMaskedSet> masked_set = resource_storage.make_object<RUStaticMaskedSet>();
 
     render_database.set_static_opaque_set(opaque_set);
+    render_database.set_static_opaque_double_sided_set(opaque_double_sided_set);
     render_database.set_static_masked_set(masked_set);
 
     EXPECT_EQ(render_database.get_static_opaque_set(), opaque_set);
+    EXPECT_EQ(render_database.get_static_opaque_double_sided_set(), opaque_double_sided_set);
     EXPECT_EQ(render_database.get_static_masked_set(), masked_set);
 
     render_database.set_static_opaque_set(MEM_NULL);
+    render_database.set_static_opaque_double_sided_set(MEM_NULL);
     render_database.set_static_masked_set(MEM_NULL);
     EXPECT_EQ(render_database.get_static_opaque_set(), MEM_NULL);
+    EXPECT_EQ(render_database.get_static_opaque_double_sided_set(), MEM_NULL);
     EXPECT_EQ(render_database.get_static_masked_set(), MEM_NULL);
 }
 

@@ -309,23 +309,24 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load_existing) const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load_existing, bool p_double_sided) const {
     VkClearValue color_clear{};
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{color_clear, color_clear, color_clear, depth_clear};
     std::array<std::string_view, 3> color_attachments{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
     RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
         base_render_data,
-        RT_RUN_DEFERRED_GBUFFER,
+        p_double_sided ? RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED : RT_RUN_DEFERRED_GBUFFER,
         static_set_resources,
-        gbuffer_opaque_graphics_pipeline,
+        p_double_sided ? gbuffer_double_sided_graphics_pipeline : gbuffer_opaque_graphics_pipeline,
         false,
         clear_values,
         base_render_data->swap_chain_extent,
         color_attachments,
         GBUFFER_DEPTH_IMAGE_VIEW,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
-        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR);
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
+        p_double_sided);
     return descriptor;
 }
 
@@ -343,7 +344,12 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
-    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("intel_sponza.static_opaque_set");
+    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("intel_sponza_with_curtains.static_opaque_set");
+    sponza_opaque_double_sided_set =
+        resource_manager->get_resource<RUStaticOpaqueDoubleSidedSet>("intel_sponza_with_curtains.static_opaque_double_sided_set");
+    shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided_static");
+    gbuffer_double_sided_pipeline_resource =
+        resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided_static");
     shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_static");
     gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
     shadow_moments_summed_area_table_horizontal_shader_resource =
@@ -382,7 +388,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     static_set_resources = create_static_set_resources(
-        renderer_vk, sponza_opaque_set, MEM_NULL, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource);
+        renderer_vk, sponza_opaque_set, MEM_NULL, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, sponza_opaque_double_sided_set);
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
         .render_data = base_render_data,
@@ -393,6 +399,9 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     };
     shadow_opaque_graphics_pipeline =
         GraphicsPipelineCompilerVK(shadow_context).compile("deferred_shadow_opaque", shadow_opaque_pipeline_resource).graphics_pipeline;
+    shadow_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(shadow_context)
+                                                .compile("deferred_shadow_double_sided", shadow_double_sided_pipeline_resource)
+                                                .graphics_pipeline;
     GraphicsPipelineCompilerVKContext gbuffer_context{
         .allocator = render_allocator,
         .render_data = base_render_data,
@@ -403,6 +412,9 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     };
     gbuffer_opaque_graphics_pipeline =
         GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_opaque", gbuffer_opaque_pipeline_resource).graphics_pipeline;
+    gbuffer_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(gbuffer_context)
+                                                 .compile("deferred_gbuffer_double_sided", gbuffer_double_sided_pipeline_resource)
+                                                 .graphics_pipeline;
     GraphicsPipelineCompilerVK oct_tree_compiler(make_oct_tree_graphics_pipeline_context());
     oct_tree_build_graphics_pipeline =
         oct_tree_compiler.compile("oct_tree_build_static_set_pipeline", oct_tree_build_pipeline_resource).graphics_pipeline;
@@ -727,7 +739,7 @@ void ApplicationVulkanDeferredPBRTest::initialize_oct_tree() {
     oct_tree_nodes->update_buffer(&root_node, sizeof(root_node));
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing) const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
     VkClearValue shadow_moments_clear{};
@@ -738,16 +750,17 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
     std::array<std::string_view, 3> color_attachments{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
     RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
         base_render_data,
-        RT_RUN_DEFERRED_SHADOW_OPAQUE,
+        p_double_sided ? RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED : RT_RUN_DEFERRED_SHADOW_OPAQUE,
         static_set_resources,
-        shadow_opaque_graphics_pipeline,
+        p_double_sided ? shadow_double_sided_graphics_pipeline : shadow_opaque_graphics_pipeline,
         false,
         clear_values,
         shadow_extent,
         color_attachments,
         SHADOWMAP_DEPTH_IMAGE_VIEW,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
-        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR);
+        p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
+        p_double_sided);
     return descriptor;
 }
 

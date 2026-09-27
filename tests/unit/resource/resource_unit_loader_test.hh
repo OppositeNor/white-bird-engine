@@ -193,8 +193,9 @@ protected:
         return WBE::RefRes<T>(mem_id, &p_stack_allocator);
     }
 
+    template <typename StaticSet>
     std::unique_ptr<MockResourceChunk> create_static_set_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUStaticOpaqueSet>& p_captured_set) {
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<StaticSet>& p_captured_set) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -209,7 +210,7 @@ protected:
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
                     if (p_id == "loaded_static_set") {
-                        p_captured_set = resource.force_cast<WBE::RUStaticOpaqueSet>();
+                        p_captured_set = resource.force_cast<StaticSet>();
                     }
                     return resource;
                 })
@@ -347,12 +348,13 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderMesh mesh_loader;
     WBE::ResourceUnitLoaderSubmesh submesh_loader;
     WBE::ResourceUnitLoaderStaticOpaqueSet static_opaque_set_loader;
+    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedSet static_opaque_double_sided_set_loader;
     WBE::ResourceUnitLoaderStaticMaskedSet static_masked_set_loader;
     WBE::ResourceUnitLoaderComponent component_loader;
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 19> loaders = {&audio_loader,
+    const std::array<const WBE::IResourceUnitLoader*, 20> loaders = {&audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
@@ -366,12 +368,13 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &mesh_loader,
         &submesh_loader,
         &static_opaque_set_loader,
+        &static_opaque_double_sided_set_loader,
         &static_masked_set_loader,
         &component_loader,
         &prefab_loader,
         &world_loader,
         &scene_loader};
-    const std::array<std::string_view, 19> expected_resource_types = {"audio",
+    const std::array<std::string_view, 20> expected_resource_types = {"audio",
         "binary",
         "font",
         "image",
@@ -385,6 +388,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         "mesh",
         "submesh",
         "static_opaque_set",
+        "static_opaque_double_sided_set",
         "static_masked_set",
         "component",
         "prefab",
@@ -730,6 +734,49 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSubmeshViewsAndInstances) {
         {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
     };
     WBE::ResourceUnitLoaderStaticOpaqueSet loader;
+
+    loader.populate_scheme(*resource_chunk, scheme);
+
+    ASSERT_NE(captured_set, nullptr);
+    ASSERT_EQ(captured_set->submesh_count, 1U);
+    ASSERT_NE(captured_set->submeshes, nullptr);
+    ASSERT_EQ(captured_set->instance_count, 3U);
+    ASSERT_NE(captured_set->instances, nullptr);
+    const WBE::RUStaticGeometrySubmesh& submesh = captured_set->submeshes.get()[0];
+    ASSERT_NE(submesh.material, nullptr);
+    ASSERT_NE(submesh.vertices.binary.binary, nullptr);
+    ASSERT_NE(submesh.indices.binary.binary, nullptr);
+    EXPECT_EQ(submesh.vertices.vertex_count, 3U);
+    EXPECT_EQ(submesh.vertices.vertex_stride, sizeof(float) * 3);
+    ASSERT_EQ(submesh.vertices.attribute_count, 1U);
+    EXPECT_STREQ(submesh.vertices.attributes->role.name.get(), "position");
+    EXPECT_EQ(submesh.indices.index_count, 3U);
+    EXPECT_EQ(submesh.first_instance, 1U);
+    EXPECT_EQ(submesh.instance_count, 2U);
+    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][0], 2.0F);
+    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][1], 3.0F);
+    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][2], 4.0F);
+
+    scheme.submeshes[0].instance_count = 3;
+    EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+    scheme.submeshes[0].instance_count = 2;
+}
+
+TEST_F(ResourcePopulatorTest, StaticOpaqueDoubleSidedSetLoadsSubmeshViewsAndInstances) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedSet> captured_set = WBE::MEM_NULL;
+    auto resource_chunk = create_static_set_test_chunk(stack_allocator, stream, captured_set);
+    WBE::RUSchemaStaticOpaqueDoubleSidedSet scheme;
+    scheme.id = "loaded_static_set";
+    scheme.type = "static_opaque_double_sided_set";
+    scheme.submeshes = {make_static_geometry_submesh_scheme()};
+    scheme.instances = {
+        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
+        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
+        {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
+    };
+    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedSet loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 

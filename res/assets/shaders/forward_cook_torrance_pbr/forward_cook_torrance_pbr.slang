@@ -219,9 +219,10 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
  * @brief Evaluate the Cook-Torrance BRDF for one forward-shaded fragment lit by a single shadow-mapped spot light.
  * @param p_input The interpolated vertex output.
  * @param p_masked Whether fragments below the alpha-mask cutoff should be discarded.
+ * @param p_front_face Whether to retain the front-face lighting normal.
  * @return The linear shaded color with alpha = 1.0.
  */
-float4 shade_fragment(VSOutput p_input, bool p_masked) {
+float4 shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
     ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
@@ -251,6 +252,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
     float ambient_occlusion = clamp(rma.b, 0.0, 1.0);
 
     float3 n = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
+    n = p_front_face ? n : -n;
     float3 v = normalize(camera_info.world_position.xyz - p_input.world_position.xyz);
 
     float3 f0 = lerp(float3(0.04), base_color, metallic);
@@ -291,10 +293,18 @@ float4 shade_fragment(VSOutput p_input, bool p_masked) {
 
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
-    return shade_fragment(p_input, false);
+    return shade_fragment(p_input, false, true);
 }
 
 [shader("fragment")]
 float4 fragment_masked_main(VSOutput p_input) : SV_Target0 {
-    return shade_fragment(p_input, true);
+    return shade_fragment(p_input, true, true);
+}
+
+/**
+ * @brief Shades opaque back faces with reversed lighting normals.
+ */
+[shader("fragment")]
+float4 fragment_double_sided_main(VSOutput p_input, bool p_front_face : SV_IsFrontFace) : SV_Target0 {
+    return shade_fragment(p_input, false, p_front_face);
 }

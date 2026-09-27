@@ -369,6 +369,24 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueSet : public RUSchema {
 };
 
 /**
+ * @class RUSchemaStaticOpaqueDoubleSidedSet
+ * @brief Resource schema for opaque double-sided static geometry.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueDoubleSidedSet : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueDoubleSidedSet)
+    /**
+     * @brief Static submeshes in declared draw order.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
+    /**
+     * @brief Shared static instance transforms.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaStaticGeometryInstance> instances;
+};
+
+/**
  * @class RUSchemaStaticMaskedSet
  * @brief Resource schema for masked static geometry.
  */
@@ -760,6 +778,12 @@ struct RUStaticGeometrySet : public ResourceUnit {
  * @brief Opaque static geometry set resource.
  */
 struct RUStaticOpaqueSet : public RUStaticGeometrySet {};
+
+/**
+ * @class RUStaticOpaqueDoubleSidedSet
+ * @brief Opaque geometry rendered without face culling; payload lifetime belongs to its resource chunk.
+ */
+struct RUStaticOpaqueDoubleSidedSet : public RUStaticGeometrySet {};
 
 /**
  * @class RUStaticMaskedSet

@@ -64,11 +64,12 @@ public:
     explicit StaticSetCompilerVK(RendererVK* p_renderer);
 
     /**
-     * @brief Compile one resource set containing opaque and masked draw batches.
+     * @brief Compile shared geometry with opaque, masked, and opaque double-sided draw batches.
      *
      * Vertex metadata supplies layout and static-node contracts only. The result owns no pipeline or render-task behavior.
-     * Null opaque or masked sets are allowed, but at least one non-empty set is required. The returned object is neither
-     * copyable nor movable and must be shared through Ref.
+     * Null categories are allowed, but at least one non-empty set is required.
+     * Double-sided draws use the opaque vertex metadata and entry, with a separately selected no-culling graphics pipeline.
+     * The returned object is neither copyable nor movable and must be shared through Ref.
      *
      * @throws std::runtime_error If resource data or reflected contracts are invalid or incompatible.
      */
@@ -79,7 +80,8 @@ public:
         const ShaderMetadata& p_masked_vertex_metadata,
         std::string_view p_masked_vertex_entry,
         const std::optional<MaterialTextureContract>& p_material_contract,
-        const Config& p_config) const;
+        const Config& p_config,
+        RefRes<RUStaticOpaqueDoubleSidedSet> p_opaque_double_sided_set = MEM_NULL) const;
 
 private:
     RendererVK* renderer;
