@@ -154,9 +154,9 @@ private:
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t OCT_TREE_MAX_DEPTH = 9;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
-    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT / 8;
+    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT / 16;
     static constexpr size_t OCT_TREE_MAX_NODE_COUNT = OCT_TREE_MAX_LEAVES_COUNT / 4;
-    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT;
+    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT * 1.25;
     static constexpr size_t OCT_TREE_VOXEL_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT;
     static constexpr size_t OCT_TREE_CLAIM_WORD_COUNT = (OCT_TREE_VOXEL_COUNT + 31U) / 32U;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
