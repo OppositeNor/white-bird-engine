@@ -242,24 +242,22 @@ void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNod
 
 /**
  * @brief Reserves an eight-node block or reports capacity exhaustion to shader validation.
+ * @details Successful reservations use one atomic add. Failed tickets are rolled back before returning.
+ * The counter can temporarily exceed capacity during this pass; consumers must wait for the construction pass to finish.
  */
 bool try_reserve_oct_tree_nodes(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
-    InterlockedAdd(p_tree_info[0].node_count, 0, current_count);
-    for (;;) {
-        if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_node_count ||
-            p_tree_info[0].max_node_count - current_count < 8) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-            return false;
-        }
-        uint original_count;
-        InterlockedCompareExchange(p_tree_info[0].node_count, current_count, current_count + 8, original_count);
-        if (original_count == current_count) {
-            p_children_index = current_count;
-            return true;
-        }
-        current_count = original_count;
+    InterlockedAdd(p_tree_info[0].node_count, 8, current_count);
+    if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_node_count ||
+        p_tree_info[0].max_node_count - current_count < 8) {
+        // Only invalid tickets are returned. With no deallocation during construction, rollback cannot reissue a valid block.
+        uint ignored_count;
+        InterlockedAdd(p_tree_info[0].node_count, 0u - 8u, ignored_count);
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        return false;
     }
+    p_children_index = current_count;
+    return true;
 }
 
 /**
@@ -291,24 +289,22 @@ bool create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes,
 
 /**
  * @brief Reserves an eight-leaf block or reports capacity exhaustion to shader validation.
+ * @details Successful reservations use one atomic add. Failed tickets are rolled back before returning.
+ * The counter can temporarily exceed capacity during this pass; consumers must wait for the construction pass to finish.
  */
 bool try_reserve_oct_tree_leaves(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
-    InterlockedAdd(p_tree_info[0].leaves_count, 0, current_count);
-    for (;;) {
-        if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_leaves_count ||
-            p_tree_info[0].max_leaves_count - current_count < 8) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-            return false;
-        }
-        uint original_count;
-        InterlockedCompareExchange(p_tree_info[0].leaves_count, current_count, current_count + 8, original_count);
-        if (original_count == current_count) {
-            p_children_index = current_count;
-            return true;
-        }
-        current_count = original_count;
+    InterlockedAdd(p_tree_info[0].leaves_count, 8, current_count);
+    if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_leaves_count ||
+        p_tree_info[0].max_leaves_count - current_count < 8) {
+        // Only invalid tickets are returned. With no deallocation during construction, rollback cannot reissue a valid block.
+        uint ignored_count;
+        InterlockedAdd(p_tree_info[0].leaves_count, 0u - 8u, ignored_count);
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+        return false;
     }
+    p_children_index = current_count;
+    return true;
 }
 
 /**

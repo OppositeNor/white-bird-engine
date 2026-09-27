@@ -14,7 +14,6 @@
 */
 #include "function/render/shader_debug.hh"
 
-#include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
 

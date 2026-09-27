@@ -518,8 +518,8 @@ RendTaskDescVK OctTreeRenderFeature::get_pre_deferred_debug_draw_render_task_des
     return task_desc;
 }
 
-Ref<ROBufferVK> OctTreeRenderFeature::create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
-    return ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size).create_ref(base_render_data);
+Ref<ROBufferVK> OctTreeRenderFeature::create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const {
+    return ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size).create_ref(base_render_data);
 }
 
 void OctTreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) const {

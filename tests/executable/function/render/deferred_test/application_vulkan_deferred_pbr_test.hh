@@ -40,7 +40,6 @@
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
 #include <cstdint>

@@ -153,14 +153,16 @@ private:
     static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
-    static constexpr size_t OCT_TREE_MAX_DEPTH = 6;
+    static constexpr size_t OCT_TREE_MAX_DEPTH = 7;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
     static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT * 0.25;
     static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(1024);
-    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = WBE_KI_B(1024);
+    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT;
     static constexpr size_t OCT_TREE_VOXEL_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT;
     static constexpr size_t OCT_TREE_CLAIM_WORD_COUNT = (OCT_TREE_VOXEL_COUNT + 31U) / 32U;
-    static_assert(OCT_TREE_VOXEL_COUNT <= OCT_TREE_MAX_DEFERRED_TASK_COUNT);
+    // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
+    static_assert(OCT_TREE_VOXEL_COUNT <= (0xffffffffU - OCT_TREE_MAX_NODE_COUNT) / 8U);
+    static_assert(OCT_TREE_VOXEL_COUNT <= (0xffffffffU - OCT_TREE_MAX_LEAVES_COUNT) / 8U);
     static constexpr float OCT_TREE_WIDTH = 32.0F;
     static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
 
