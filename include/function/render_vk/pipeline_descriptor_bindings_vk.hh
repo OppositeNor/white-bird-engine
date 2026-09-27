@@ -18,6 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -50,6 +51,13 @@ public:
      * @param p_layout Immutable pipeline descriptor layout.
      */
     PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
+
+    /**
+     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
+     * @details Mapping references are borrowed only for this call and are not retained.
+     */
+    PipelineDescriptorBindingsVK(
+        const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout, const PipelineResourceMapVK& p_resource_map);
 
     /**
      * @brief Resolve and retain every reflected logical resource from the graph resource view.

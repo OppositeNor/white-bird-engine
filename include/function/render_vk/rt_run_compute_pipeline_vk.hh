@@ -53,6 +53,16 @@ struct RTRunComputePipelineVK final : public IRenderTaskVK {
         VkExtent3D p_dispatch_group_count,
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
+    /**
+     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
+     * @details Mapping references are borrowed only for this call and are not retained.
+     */
+    RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
+        Ref<ROComputePipelineVK> p_pipeline,
+        VkExtent3D p_dispatch_group_count,
+        QueueFamilyVK p_queue_family,
+        const PipelineResourceMapVK& p_resource_map);
+
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
     }

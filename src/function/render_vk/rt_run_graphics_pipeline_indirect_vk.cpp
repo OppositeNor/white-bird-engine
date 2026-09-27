@@ -171,7 +171,7 @@ void RTRunGraphicsPipelineIndirectVK::initialize_descriptor_bindings() {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: graphics pipeline is null.");
         }
         descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(
-            render_data->allocator, render_data, batch.graphics_pipeline->get_descriptor_layout()));
+            render_data->allocator, render_data, batch.graphics_pipeline->get_descriptor_layout(), batch.resource_map));
     }
 }
 

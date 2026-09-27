@@ -50,10 +50,57 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
           p_render_extent,
           p_color_attachment_id,
           std::move(p_graphics_pipeline),
+          p_color_attachment_load_op,
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr)) {
+}
+
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+    const glm::vec4& p_clear_color,
+    VkExtent2D p_render_extent,
+    std::string_view p_color_attachment_id,
+    Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    const PipelineResourceMapVK& p_resource_map)
+    : RTRunGraphicsPipelineVK(p_render_data,
+          p_clear_color,
+          p_render_extent,
+          p_color_attachment_id,
+          std::move(p_graphics_pipeline),
           std::nullopt,
           std::nullopt,
           std::nullopt,
-          p_color_attachment_load_op) {
+          p_color_attachment_load_op,
+          {},
+          0,
+          3,
+          p_resource_map) {
+}
+
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+    const glm::vec4& p_clear_color,
+    VkExtent2D p_render_extent,
+    std::string_view p_color_attachment_id,
+    Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+    std::optional<std::string_view> p_vertex_buffer_id,
+    std::optional<std::string_view> p_index_buffer_id,
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset,
+    uint32_t p_draw_vertex_count)
+    : RTRunGraphicsPipelineVK(p_render_data,
+          p_clear_color,
+          p_render_extent,
+          p_color_attachment_id,
+          std::move(p_graphics_pipeline),
+          p_vertex_buffer_id,
+          p_index_buffer_id,
+          p_indexed_draw_region,
+          p_color_attachment_load_op,
+          std::move(p_vertex_input),
+          p_vertex_buffer_offset,
+          p_draw_vertex_count,
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr)) {
 }
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
@@ -67,7 +114,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     VkAttachmentLoadOp p_color_attachment_load_op,
     VertexInputDescriptionVK p_vertex_input,
     VkDeviceSize p_vertex_buffer_offset,
-    uint32_t p_draw_vertex_count)
+    uint32_t p_draw_vertex_count,
+    const PipelineResourceMapVK& p_resource_map)
     : render_data(p_render_data), clear_values(p_render_data->allocator), color_attachment_load_op(p_color_attachment_load_op),
       render_extent(p_render_extent), color_attachment_ids(p_render_data->allocator),
       color_attachment_containers(p_render_data->allocator), graphics_pipeline(std::move(p_graphics_pipeline)),
@@ -82,7 +130,38 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
         throw std::runtime_error("RTRunGraphicsPipelineVK: graphics pipeline is null.");
     }
     descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout(), p_resource_map);
+}
+
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+    std::span<const VkClearValue> p_clear_values,
+    VkExtent2D p_render_extent,
+    std::span<const std::string_view> p_color_attachment_ids,
+    std::optional<std::string_view> p_depth_attachment_id,
+    Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+    std::optional<std::string_view> p_vertex_buffer_id,
+    std::optional<std::string_view> p_index_buffer_id,
+    std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+    VkAttachmentLoadOp p_color_attachment_load_op,
+    VkAttachmentLoadOp p_depth_attachment_load_op,
+    VertexInputDescriptionVK p_vertex_input,
+    VkDeviceSize p_vertex_buffer_offset,
+    uint32_t p_draw_vertex_count)
+    : RTRunGraphicsPipelineVK(p_render_data,
+          p_clear_values,
+          p_render_extent,
+          p_color_attachment_ids,
+          p_depth_attachment_id,
+          std::move(p_graphics_pipeline),
+          p_vertex_buffer_id,
+          p_index_buffer_id,
+          p_indexed_draw_region,
+          p_color_attachment_load_op,
+          p_depth_attachment_load_op,
+          std::move(p_vertex_input),
+          p_vertex_buffer_offset,
+          p_draw_vertex_count,
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr)) {
 }
 
 RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, // NOLINT
@@ -98,7 +177,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     VkAttachmentLoadOp p_depth_attachment_load_op,
     VertexInputDescriptionVK p_vertex_input,
     VkDeviceSize p_vertex_buffer_offset,
-    uint32_t p_draw_vertex_count)
+    uint32_t p_draw_vertex_count,
+    const PipelineResourceMapVK& p_resource_map)
     : render_data(p_render_data), clear_values(p_clear_values.begin(), p_clear_values.end(), p_render_data->allocator),
       color_attachment_load_op(p_color_attachment_load_op), depth_attachment_load_op(p_depth_attachment_load_op),
       render_extent(p_render_extent),
@@ -114,7 +194,7 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
         throw std::runtime_error("RTRunGraphicsPipelineVK: graphics pipeline is null.");
     }
     descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout(), p_resource_map);
 }
 
 Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelineVK::read_resources() const {

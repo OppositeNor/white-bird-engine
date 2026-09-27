@@ -22,6 +22,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -318,6 +319,32 @@ TEST(WBERenderGraphVKTest, ResourceListAccessExpandsToIndexedResourcesForConflic
         EXPECT_NE(message.find("writer"), std::string::npos);
         EXPECT_NE(message.find("reader"), std::string::npos);
         EXPECT_NE(message.find("resource 'textures[0]' without an explicit execution path"), std::string::npos);
+    }
+}
+
+TEST(WBERenderGraphVKTest, ExplicitMappedResourceAccessesStillRequireExecutionEdges) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    PipelineResourceMapVK mapping(&allocator);
+    mapping.bind("static_nodes", "dynamic_nodes");
+    ShaderDescriptorHeapLayoutVK layout;
+    layout.size = 8;
+    layout.fields = {
+        {.field_path = "nodes", .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER, .resource_id = "static_nodes", .offset = 0}};
+    PipelineDescriptorBindingsVK invocation(&render_data, layout, mapping);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource("dynamic_nodes", make_test_container(&allocator, &render_data));
+    RendTaskDescVK writer(&allocator, "writer", make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, false));
+    writer.write("dynamic_nodes", RendResUsageVK::STORAGE_BUFFER);
+    RendTaskDescVK reader(&allocator, "mapped_reader", make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, false));
+    reader.read("dynamic_nodes", RendResUsageVK::STORAGE_BUFFER);
+    descriptor.add_task(std::move(writer)).add_task(std::move(reader));
+    RenderGraphVK graph(&render_data);
+    try {
+        graph.build_from_descriptor(descriptor);
+        FAIL() << "A mapping must not infer an execution edge.";
+    } catch (const std::runtime_error& error) {
+        EXPECT_NE(std::string(error.what()).find("resource 'dynamic_nodes' without an explicit execution path"), std::string::npos);
     }
 }
 

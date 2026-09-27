@@ -34,7 +34,7 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelinesSequentialVK::DispatchBase::DispatchBase(RenderAllocator* p_allocator)
-    : clear_values(p_allocator), color_attachment_ids(p_allocator) {
+    : resource_map(p_allocator), clear_values(p_allocator), color_attachment_ids(p_allocator) {
 }
 
 RTRunGraphicsPipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator, RegularDispatch p_dispatch)
@@ -79,7 +79,7 @@ bool RTRunGraphicsPipelinesSequentialVK::Sequence::is_indirect(size_t p_index) c
 RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
     : dispatch(p_dispatch), color_attachment_containers(p_render_data->allocator) {
     descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout());
+        p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout(), dispatch.base.resource_map);
 }
 
 RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence)

@@ -112,6 +112,23 @@ PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataV
     containers.resize(layout.fields.size(), MEM_NULL);
 }
 
+PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(
+    const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout, const PipelineResourceMapVK& p_resource_map)
+    : PipelineDescriptorBindingsVK(p_render_data, p_layout) {
+    for (const auto& entry : p_resource_map.entries) {
+        bool found = false;
+        for (size_t i = 0; i < p_layout.fields.size(); ++i) {
+            if (p_layout.fields[i].resource_id == entry.source) {
+                layout.fields[i].resource_id = entry.target;
+                found = true;
+            }
+        }
+        if (!found) {
+            throw std::runtime_error(std::format("Unknown reflected resource mapping source '{}'.", entry.source));
+        }
+    }
+}
+
 void PipelineDescriptorBindingsVK::bind_resources(const RendResViewVK& p_resources) {
     for (size_t i = 0; i < layout.fields.size(); ++i) {
         const ShaderDescriptorHeapFieldVK& field = layout.fields[i];

@@ -63,10 +63,24 @@ struct RTPingPongVK final : public IRenderTaskVK {
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     /**
+     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
+     * @details Mapping references are borrowed only for this call and are not retained.
+     */
+    RTPingPongVK(const BaseRenderDataVK* p_render_data,
+        Ref<ROComputePipelineVK> p_ping_pipeline,
+        Ref<ROComputePipelineVK> p_pong_pipeline,
+        bool p_initial_state,
+        uint32_t p_iterations,
+        VkExtent3D p_dispatch_group_count,
+        QueueFamilyVK p_queue_family,
+        const PipelineResourceMapVK& p_ping_resource_map,
+        const PipelineResourceMapVK& p_pong_resource_map);
+
+    /**
      * @brief Configure one preparatory compute dispatch before each ping or pong dispatch.
      *
-     * This supports algorithms that must clear the destination state before each alternating iteration. Both prefix pipelines
-     * must be provided and this method must be called before render-graph resource binding.
+     * This supports algorithms that must clear the destination state before each alternating iteration. Both prefix
+     * pipelines must be provided and this method must be called before render-graph resource binding.
      *
      * @param p_ping_prefix_pipeline Pipeline recorded before every ping dispatch.
      * @param p_pong_prefix_pipeline Pipeline recorded before every pong dispatch.
@@ -75,6 +89,16 @@ struct RTPingPongVK final : public IRenderTaskVK {
     void set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix_pipeline,
         Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
         VkExtent3D p_dispatch_group_count);
+
+    /**
+     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
+     * @details Mapping references are borrowed only for this call and are not retained.
+     */
+    void set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix_pipeline,
+        Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
+        VkExtent3D p_dispatch_group_count,
+        const PipelineResourceMapVK& p_ping_resource_map,
+        const PipelineResourceMapVK& p_pong_resource_map);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -101,6 +125,7 @@ private:
     Unique<PipelineDescriptorBindingsVK> pong_prefix_descriptor_bindings;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};
     VkExtent3D prefix_dispatch_group_count{.width = 1, .height = 1, .depth = 1};
+    bool resources_bound = false;
     bool initial_state = false;
     uint32_t iterations = 0;
 };

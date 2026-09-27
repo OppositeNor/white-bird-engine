@@ -100,6 +100,16 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     write_completed_bloom_acquire();
     control(p_delta);
     update_descriptors();
+    dynamic_mesh_time += p_delta;
+    const float angle = static_cast<float>(dynamic_mesh_time);
+    std::array<glm::mat4, 2> transforms {};
+    transforms[0] = glm::translate(glm::mat4(1.0F), glm::vec3(0.6F * std::sin(angle * 0.5F), 0.75F, 0.0F)) *
+                    glm::rotate(glm::mat4(1.0F), angle, glm::vec3(0.0F, 1.0F, 0.0F)) *
+                    glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
+    transforms[1] = glm::translate(glm::mat4(1.0F), glm::vec3(-1.2F, 0.0F, -0.5F)) * transforms[0];
+    add_render_job([this, transforms]() {
+        dynamic_mesh->publish_visible_transforms(transforms);
+    });
 }
 
 void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
@@ -280,6 +290,11 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     setup_render_context();
     load_resources();
     setup_static_scene_resources();
+    dynamic_mesh = make_unique<DynamicMeshRenderFeature>(render_allocator,
+        renderer_vk,
+        ResourceManager::get_singleton()->get_resource<RUMesh3D>("model_cube.mesh"),
+        gbuffer_opaque_pipeline_resource,
+        2);
     setup_spot_light();
     create_shadow_map_resources();
     create_gbuffer_resources();

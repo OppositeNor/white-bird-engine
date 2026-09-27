@@ -17,9 +17,11 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipelines_sequential_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -61,6 +63,35 @@ TEST(WBERunPipelinesSequentialVKTest, GraphicsSequenceKeepsRegularAndIndirectDis
     ASSERT_EQ(sequence.get_dispatch_count(), 2U);
     EXPECT_FALSE(sequence.is_indirect(0));
     EXPECT_TRUE(sequence.is_indirect(1));
+}
+
+TEST(WBERunPipelinesSequentialVKTest, ComputeEntriesAndGraphicsBatchesCopyMappingsIndependently) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ShaderDescriptorHeapLayoutVK layout;
+    layout.size = 8;
+    layout.fields = {{.field_path = "nodes", .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER, .resource_id = "nodes", .offset = 0}};
+    RTRunComputePipelinesSequentialVK::Entry entry;
+    entry.resource_map.emplace(&allocator).bind("nodes", "dynamic_nodes");
+    RTRunComputePipelinesSequentialVK::Dispatch dispatch(&allocator);
+    dispatch.add_entry(entry);
+    entry.resource_map->bind("unknown", "unused");
+    EXPECT_NO_THROW(PipelineDescriptorBindingsVK(&render_data, layout, *dispatch.entries[0].resource_map));
+    EXPECT_THROW(PipelineDescriptorBindingsVK(&render_data, layout, *entry.resource_map), std::runtime_error);
+
+    RTRunGraphicsPipelineIndirectVK::PipelineBatch batch(&allocator);
+    batch.resource_map.bind("nodes", "dynamic_nodes");
+    auto copy = batch;
+    batch.resource_map.bind("unknown", "unused");
+    EXPECT_NO_THROW(PipelineDescriptorBindingsVK(&render_data, layout, copy.resource_map));
+    EXPECT_THROW(PipelineDescriptorBindingsVK(&render_data, layout, batch.resource_map), std::runtime_error);
+
+    RTRunGraphicsPipelinesSequentialVK::RegularDispatch regular(&allocator);
+    regular.resource_map = copy.resource_map;
+    auto regular_copy = regular;
+    regular.resource_map.bind("unknown", "unused");
+    EXPECT_NO_THROW(PipelineDescriptorBindingsVK(&render_data, layout, regular_copy.resource_map));
+    EXPECT_THROW(PipelineDescriptorBindingsVK(&render_data, layout, regular.resource_map), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

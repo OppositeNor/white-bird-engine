@@ -24,6 +24,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include <optional>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -43,6 +44,8 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
         Ref<ROComputePipelineVK> pipeline = MEM_NULL;
         /** Workgroup count dispatched in each dimension. */
         VkExtent3D group_count{.width = 1, .height = 1, .depth = 1};
+        /** Optional invocation-local mapping, copied with this entry. */
+        std::optional<PipelineResourceMapVK> resource_map;
     };
 
     /**

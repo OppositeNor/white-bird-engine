@@ -1,6 +1,6 @@
 ---
 name: white-bird-render-testing
-description: Capture and inspect White Bird Engine rendering-test PNGs, and integrate shared startup, process-injection, and screenshot hooks when adding or changing rendering executable tests.
+description: Capture and inspect White Bird Engine rendering-test PNGs, automate deferred lighting/voxel checks and clean shutdown on Linux/X11, and integrate shared capture hooks in rendering executables.
 ---
 
 # Rendering test screenshots
@@ -24,7 +24,7 @@ Do not add these hooks to non-rendering unit tests simply because they use rende
 
 ## Capture and inspect
 
-Build with `python validation.py -t debug` (or the requested target); inspect the end of failure logs first. Shader/resource compilation is part of the Python build pipeline. Do not edit generated shaders to establish a permanent fix, bypass SPIR-V validation, or invoke CMake directly.
+For iterative visual checks, build with `python build.py -t debug` (or the requested target) and run the application. Run only relevant unit tests during iteration; reserve `python validation.py` for final validation unless the user requests otherwise. Inspect the end of failure logs first. Shader/resource compilation is part of the Python build pipeline. Do not edit generated shaders to establish a permanent fix, bypass SPIR-V validation, or invoke CMake directly.
 
 From the repository root, choose a fresh absolute PNG path whose parent exists:
 
@@ -45,3 +45,23 @@ Open the actual PNG with the local image-viewing tool. Report the path, dimensio
 Vulkan capture requires swapchain transfer-source support and RGBA8/BGRA8 output; unsupported configurations and write failures throw. Inspect console/validation errors as well as the image. Do not silently substitute a desktop screenshot when testing renderer readback.
 
 Readback stalls the GPU and can change timing. Verify crashes and synchronization fixes in separate runs with capture disabled, long enough to exceed the observed failure window. Report visual correctness separately from stability, including duration, exit reason, and outstanding validation errors; a good screenshot does not establish that a segfault is fixed.
+
+## Automated deferred checks (Linux/X11)
+
+Use [scripts/check_deferred.py](scripts/check_deferred.py) for the deferred executable's existing `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read those handlers if they change. This helper does not build, run unit tests, or judge visual correctness. It requires `DISPLAY`, `xdotool`, `taskset`, and `libX11`; request GUI execution permission when the environment requires it.
+
+From the repository root:
+
+```sh
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 1
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2 --mode stability --duration 25
+```
+
+Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
+
+The helper limits the owned process to four available CPUs by default (`--cpus` overrides), removes inherited capture settings for stability runs, and targets only the window matching its child PID. It sends `WM_DELETE_WINDOW` through X11 for normal SDL shutdown. Do not substitute `xdotool windowclose`: it can destroy the drawable and cause `BadWindow` errors. Timeouts or forced cleanup are recorded as failures and never called clean exits.
+
+The demo always renders two animated instances of the cube mesh. Use `--target`, `--repo`, and `--output-dir` for another build or artifact location. Read `--help` for timing controls.
+
+On device loss or shader overflow, inspect that run's log before continuing the matrix. Do not silently increase octree capacity or alter shaders merely to obtain a capture. Report failed configurations separately from successful captures and capture-free stability runs.

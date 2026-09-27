@@ -30,6 +30,8 @@
 
 namespace WhiteBirdEngine {
 
+class DynamicMeshRenderFeature;
+
 /**
  * @enum VoxelDebugViewMode
  * @brief Selects the oct-tree construction state visualized by the deferred rendering test.
@@ -77,9 +79,10 @@ public:
      */
     void register_render_graph_data(RendGraphDescVK& p_graph) const;
     /**
-     * @brief Adds reset, both raster draws, initial publication when required, and pre-deferred capture.
+     * @brief Adds reset, static and dynamic raster draws, initial publication when required, and pre-deferred capture.
      */
-    void add_construction_render_tasks(RendGraphDescVK& p_graph, std::string_view p_previous_task_id) const;
+    void add_construction_render_tasks(
+        RendGraphDescVK& p_graph, std::string_view p_previous_task_id, const DynamicMeshRenderFeature& p_dynamic_mesh) const;
     /**
      * @brief Creates the per-frame reset ordered after the supplied graph task.
      */
@@ -87,8 +90,10 @@ public:
     /**
      * @brief Creates one raster construction pass over the retained scene.
      */
-    RendTaskDescVK get_construction_render_task_desc(
-        std::string_view p_task_id, std::string_view p_previous_task_id, bool p_double_sided = false) const;
+    RendTaskDescVK get_construction_render_task_desc(std::string_view p_task_id,
+        std::string_view p_previous_task_id,
+        bool p_double_sided = false,
+        const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr) const;
     /**
      * @brief Creates bounded deferred retries, including publication after every iteration for oct_tree_2.
      */
@@ -154,10 +159,14 @@ private:
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t OCT_TREE_MAX_DEPTH = 9;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
-    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT / 16;
-    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = OCT_TREE_MAX_LEAVES_COUNT / 4;
-    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT * 1.25;
     static constexpr size_t OCT_TREE_VOXEL_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT;
+    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_VOXEL_COUNT / 8;
+    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = OCT_TREE_VOXEL_COUNT / 64;
+    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT * 5 / 2;
+    // Matches deferred propagation and debug-capture shaders; keeps the expanded lists within 65535 workgroups.
+    static constexpr uint32_t OCT_TREE_DEFERRED_THREADS_PER_GROUP = 128;
+    static_assert((OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) /
+                      OCT_TREE_DEFERRED_THREADS_PER_GROUP <= 65535);
     static constexpr size_t OCT_TREE_CLAIM_WORD_COUNT = (OCT_TREE_VOXEL_COUNT + 31U) / 32U;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(OCT_TREE_VOXEL_COUNT <= (0xffffffffU - OCT_TREE_MAX_NODE_COUNT) / 8U);

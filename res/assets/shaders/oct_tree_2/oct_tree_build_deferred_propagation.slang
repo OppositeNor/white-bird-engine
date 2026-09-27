@@ -76,7 +76,7 @@ ConstantBuffer<OctTreeDescriptorIndices> descriptor_indices;
  * @brief Advances each retained voxel once and queues unfinished work in the opposite list.
  */
 [shader("compute")]
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
 #ifdef WBE_USE_PING_WRITE

@@ -60,6 +60,8 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         DispatchBase& operator=(const DispatchBase&) = default;
         DispatchBase& operator=(DispatchBase&&) noexcept = default;
 
+        /** Invocation-local reflected shader resource mappings. */
+        PipelineResourceMapVK resource_map;
         /** Graphics pipeline retained by the task. */
         Ref<ROGraphicsPipelineVK> pipeline = MEM_NULL;
         /** Clear values for color attachments followed by the optional depth attachment. */

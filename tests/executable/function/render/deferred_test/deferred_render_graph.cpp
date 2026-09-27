@@ -24,10 +24,8 @@
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
-#include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
@@ -135,18 +133,28 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     auto shadow_double_sided_task = create_shadow_task(true, true);
     shadow_double_sided_task.after(RT_RUN_DEFERRED_SHADOW_OPAQUE);
     pipeline_desc.add_task(std::move(shadow_double_sided_task));
+    const std::array<std::string_view, 3> shadow_colors{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
+    auto dynamic_shadow = dynamic_mesh->make_task(
+        "dynamic_shadow", shadow_opaque_graphics_pipeline, shadow_extent, shadow_colors, SHADOWMAP_DEPTH_IMAGE_VIEW);
+    dynamic_shadow.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED).read(SHADOW_LIGHT_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
+    pipeline_desc.add_task(std::move(dynamic_shadow));
     if (p_use_summed_area_table) {
         pipeline_desc.add_task(create_shadow_moments_summed_area_table_task_desc());
     } else {
         pipeline_desc.add_task(create_shadow_mipmap_task_desc());
     }
-    p_gbuffer_opaque_task.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED);
+    p_gbuffer_opaque_task.after("dynamic_shadow");
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     auto gbuffer_double_sided_task = create_gbuffer_task(true, true);
     gbuffer_double_sided_task.after(RT_RUN_DEFERRED_GBUFFER);
     pipeline_desc.add_task(std::move(gbuffer_double_sided_task));
+    const std::array<std::string_view, 3> gbuffer_colors{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
+    auto dynamic_gbuffer = dynamic_mesh->make_task(
+        "dynamic_gbuffer", gbuffer_opaque_graphics_pipeline, base_render_data->swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW);
+    dynamic_gbuffer.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED).read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
+    pipeline_desc.add_task(std::move(dynamic_gbuffer));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
-    oct_tree->add_construction_render_tasks(pipeline_desc, RT_RUN_DIRECT_LIGHTING);
+    oct_tree->add_construction_render_tasks(pipeline_desc, RT_RUN_DIRECT_LIGHTING, *dynamic_mesh);
     pipeline_desc.add_task(oct_tree->get_deferred_construction_render_task_desc());
     pipeline_desc.add_task(oct_tree->get_debug_draw_setup_render_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
@@ -164,6 +172,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
     add_static_set_graph_resources(p_pipeline_desc, static_set_resources);
+    dynamic_mesh->register_resources(p_pipeline_desc);
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
         .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
@@ -198,7 +207,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED)
+    task_desc.after("dynamic_shadow")
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .write(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, RendResUsageVK::STORAGE_IMAGE)
@@ -228,7 +237,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
-    task_desc.after(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED);
+    task_desc.after("dynamic_shadow");
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
@@ -242,7 +251,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_desc(bool p_use_summed_area_table) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED)
+    task_desc.after("dynamic_gbuffer")
         .after(p_use_summed_area_table ? RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE : RT_GENERATE_SHADOW_MIPMAPS)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -274,7 +283,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc(bool p_use_summed_area_table) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
-    task_desc.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED)
+    task_desc.after("dynamic_gbuffer")
         .after(OctTreeRenderFeature::RT_RUN_BUILD_OCT_TREE_DEFERRED)
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)

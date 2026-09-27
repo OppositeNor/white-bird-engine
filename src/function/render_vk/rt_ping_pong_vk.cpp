@@ -36,6 +36,26 @@ RTPingPongVK::RTPingPongVK(const BaseRenderDataVK* p_render_data,
     uint32_t p_iterations,
     VkExtent3D p_dispatch_group_count,
     QueueFamilyVK p_queue_family)
+    : RTPingPongVK(p_render_data,
+          std::move(p_ping_pipeline),
+          std::move(p_pong_pipeline),
+          p_initial_state,
+          p_iterations,
+          p_dispatch_group_count,
+          p_queue_family,
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr),
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr)) {
+}
+
+RTPingPongVK::RTPingPongVK(const BaseRenderDataVK* p_render_data,
+    Ref<ROComputePipelineVK> p_ping_pipeline,
+    Ref<ROComputePipelineVK> p_pong_pipeline,
+    bool p_initial_state,
+    uint32_t p_iterations,
+    VkExtent3D p_dispatch_group_count,
+    QueueFamilyVK p_queue_family,
+    const PipelineResourceMapVK& p_ping_resource_map,
+    const PipelineResourceMapVK& p_pong_resource_map)
     : render_data(p_render_data), queue_family_id(p_queue_family), ping_pipeline(std::move(p_ping_pipeline)),
       pong_pipeline(std::move(p_pong_pipeline)), dispatch_group_count(p_dispatch_group_count),
       initial_state(p_initial_state), iterations(p_iterations) {
@@ -49,14 +69,28 @@ RTPingPongVK::RTPingPongVK(const BaseRenderDataVK* p_render_data,
         throw std::runtime_error("RTPingPongVK: pong compute pipeline is null.");
     }
     ping_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, ping_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, ping_pipeline->get_descriptor_layout(), p_ping_resource_map);
     pong_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, pong_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, pong_pipeline->get_descriptor_layout(), p_pong_resource_map);
+}
+
+void RTPingPongVK::set_iteration_prefixes(
+    Ref<ROComputePipelineVK> p_ping_prefix_pipeline, Ref<ROComputePipelineVK> p_pong_prefix_pipeline, VkExtent3D p_dispatch_group_count) {
+    set_iteration_prefixes(std::move(p_ping_prefix_pipeline),
+        std::move(p_pong_prefix_pipeline),
+        p_dispatch_group_count,
+        PipelineResourceMapVK(render_data->allocator),
+        PipelineResourceMapVK(render_data->allocator));
 }
 
 void RTPingPongVK::set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix_pipeline,
     Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
-    VkExtent3D p_dispatch_group_count) {
+    VkExtent3D p_dispatch_group_count,
+    const PipelineResourceMapVK& p_ping_resource_map,
+    const PipelineResourceMapVK& p_pong_resource_map) {
+    if (resources_bound) {
+        throw std::runtime_error("RTPingPongVK: prefixes cannot change after graph binding.");
+    }
     if (p_ping_prefix_pipeline == MEM_NULL || p_pong_prefix_pipeline == MEM_NULL) {
         throw std::runtime_error("RTPingPongVK: ping and pong prefix pipelines must not be null.");
     }
@@ -64,12 +98,13 @@ void RTPingPongVK::set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix
     pong_prefix_pipeline = std::move(p_pong_prefix_pipeline);
     prefix_dispatch_group_count = p_dispatch_group_count;
     ping_prefix_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, ping_prefix_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, ping_prefix_pipeline->get_descriptor_layout(), p_ping_resource_map);
     pong_prefix_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        render_data->allocator, render_data, pong_prefix_pipeline->get_descriptor_layout());
+        render_data->allocator, render_data, pong_prefix_pipeline->get_descriptor_layout(), p_pong_resource_map);
 }
 
 void RTPingPongVK::bind_resources(const RendResViewVK& p_resources) {
+    resources_bound = true;
     ping_descriptor_bindings->bind_resources(p_resources);
     pong_descriptor_bindings->bind_resources(p_resources);
     if (ping_prefix_descriptor_bindings != MEM_NULL) {
@@ -93,8 +128,7 @@ void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) 
             if (current_state) {
                 vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pong_prefix_pipeline->get_pipeline());
                 pong_prefix_descriptor_bindings->push(p_command_buffer);
-            }
-            else {
+            } else {
                 vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, ping_prefix_pipeline->get_pipeline());
                 ping_prefix_descriptor_bindings->push(p_command_buffer);
             }
@@ -123,8 +157,7 @@ void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) 
         if (current_state) {
             vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pong_pipeline->get_pipeline());
             pong_descriptor_bindings->push(p_command_buffer);
-        }
-        else {
+        } else {
             vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, ping_pipeline->get_pipeline());
             ping_descriptor_bindings->push(p_command_buffer);
         }

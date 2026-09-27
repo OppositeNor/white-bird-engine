@@ -26,6 +26,7 @@
 #include "function/render/static_set_node_contract.hh"
 #include "function/render/static_set_node_contract_resolver.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/geometry_draw_data_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -60,29 +61,10 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-struct StaticSetSubmeshGPU {
-    uint32_t material_id = 0;
-    uint32_t padding_0 = 0;
-    uint32_t padding_1 = 0;
-    uint32_t padding_2 = 0;
-};
-
-struct StaticSetNodeGPU {
-    glm::mat4 transform{1.0F};
-    glm::mat4 normal_transform{1.0F};
-};
-
-struct StaticSetInstanceGPU {
-    uint32_t submesh_index = 0;
-    uint32_t node_index = 0;
-    uint32_t padding_0 = 0;
-    uint32_t padding_1 = 0;
-};
-
 struct StaticInstanceBufferData {
-    std::vector<StaticSetSubmeshGPU> submeshes;
-    std::vector<StaticSetNodeGPU> nodes;
-    std::vector<StaticSetInstanceGPU> instances;
+    std::vector<GeometrySubmeshGPU> submeshes;
+    std::vector<GeometryNodeGPU> nodes;
+    std::vector<GeometryInstanceGPU> instances;
     std::vector<uint32_t> first_instances;
     std::vector<RefRes<RUMaterial>> ordered_materials;
 };
@@ -179,9 +161,9 @@ RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
 void validate_static_set_node_layout(const ShaderMetadata& p_vertex_metadata) {
     StaticSetNodeContract reflected_contract = StaticSetNodeContractResolver().resolve(p_vertex_metadata, "static_set");
     StaticSetNodeContract cpu_contract;
-    cpu_contract.element_stride = sizeof(StaticSetNodeGPU);
-    cpu_contract.transform_offset = offsetof(StaticSetNodeGPU, transform);
-    cpu_contract.normal_transform_offset = offsetof(StaticSetNodeGPU, normal_transform);
+    cpu_contract.element_stride = sizeof(GeometryNodeGPU);
+    cpu_contract.transform_offset = offsetof(GeometryNodeGPU, transform);
+    cpu_contract.normal_transform_offset = offsetof(GeometryNodeGPU, normal_transform);
     if (cpu_contract.matches(reflected_contract)) {
         return;
     }
@@ -280,7 +262,7 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
         if (glm::abs(glm::determinant(transform_3x3)) >= 0.000001F) {
             normal_transform = glm::mat4(glm::inverseTranspose(transform_3x3));
         }
-        result.nodes.push_back(StaticSetNodeGPU{.transform = global_transform, .normal_transform = normal_transform});
+        result.nodes.push_back(GeometryNodeGPU{.transform = global_transform, .normal_transform = normal_transform});
     }
 
     for (size_t submesh_index = 0; submesh_index < p_set->submesh_count; ++submesh_index) {
@@ -293,14 +275,14 @@ StaticInstanceBufferData build_static_instance_buffer_data(RefRes<RUStaticGeomet
             continue;
         }
         const uint32_t material_index = get_or_append_material_index(result.ordered_materials, submesh.material);
-        result.submeshes.push_back(StaticSetSubmeshGPU{.material_id = material_index});
+        result.submeshes.push_back(GeometrySubmeshGPU{.material_id = material_index});
         const uint32_t drawable_submesh_index = static_cast<uint32_t>(result.submeshes.size() - 1);
         for (size_t instance_index = 0; instance_index < submesh.instance_count; ++instance_index) {
             const size_t node_index = submesh.first_instance + instance_index;
             if (node_index > std::numeric_limits<uint32_t>::max()) {
                 throw std::runtime_error("Failed to compile static-set resources: node index exceeds uint32.");
             }
-            result.instances.push_back(StaticSetInstanceGPU{
+            result.instances.push_back(GeometryInstanceGPU{
                 .submesh_index = drawable_submesh_index,
                 .node_index = static_cast<uint32_t>(node_index),
             });
@@ -334,21 +316,21 @@ void append_static_instance_buffer_data(StaticInstanceBufferData& p_destination,
         }
         p_destination_first_instances.push_back(static_cast<uint32_t>(instance_offset) + first_instance);
     }
-    for (const StaticSetSubmeshGPU& source_submesh : p_source.submeshes) {
+    for (const GeometrySubmeshGPU& source_submesh : p_source.submeshes) {
         if (source_submesh.material_id >= p_source.ordered_materials.size()) {
             throw std::runtime_error("Failed to compile static-set resources: source material index is out of bounds.");
         }
-        p_destination.submeshes.push_back(StaticSetSubmeshGPU{
+        p_destination.submeshes.push_back(GeometrySubmeshGPU{
             .material_id = get_or_append_material_index(
                 p_destination.ordered_materials, p_source.ordered_materials[source_submesh.material_id]),
         });
     }
-    for (const StaticSetInstanceGPU& source_instance : p_source.instances) {
+    for (const GeometryInstanceGPU& source_instance : p_source.instances) {
         if (source_instance.submesh_index > std::numeric_limits<uint32_t>::max() - submesh_offset ||
             source_instance.node_index > std::numeric_limits<uint32_t>::max() - node_offset) {
             throw std::runtime_error("Failed to compile static-set resources: combined instance index exceeds uint32.");
         }
-        p_destination.instances.push_back(StaticSetInstanceGPU{
+        p_destination.instances.push_back(GeometryInstanceGPU{
             .submesh_index = static_cast<uint32_t>(submesh_offset) + source_instance.submesh_index,
             .node_index = static_cast<uint32_t>(node_offset) + source_instance.node_index,
         });

@@ -31,13 +31,25 @@ namespace WhiteBirdEngine {
 
 RTRunComputePipelineVK::RTRunComputePipelineVK(
     const BaseRenderDataVK* p_render_data, Ref<ROComputePipelineVK> p_pipeline, VkExtent3D p_dispatch_group_count, QueueFamilyVK p_queue_family)
+    : RTRunComputePipelineVK(p_render_data,
+          std::move(p_pipeline),
+          p_dispatch_group_count,
+          p_queue_family,
+          PipelineResourceMapVK(p_render_data != nullptr ? p_render_data->allocator : nullptr)) {
+}
+
+RTRunComputePipelineVK::RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
+    Ref<ROComputePipelineVK> p_pipeline,
+    VkExtent3D p_dispatch_group_count,
+    QueueFamilyVK p_queue_family,
+    const PipelineResourceMapVK& p_resource_map)
     : render_data(p_render_data), queue_family_id(p_queue_family), pipeline(std::move(p_pipeline)),
       dispatch_group_count(p_dispatch_group_count) {
     if (pipeline == MEM_NULL) {
         throw std::runtime_error("RTRunComputePipelineVK: compute pipeline is null.");
     }
-    descriptor_bindings =
-        make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, pipeline->get_descriptor_layout());
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, pipeline->get_descriptor_layout(), p_resource_map);
 }
 
 void RTRunComputePipelineVK::bind_resources(const RendResViewVK& p_resources) {

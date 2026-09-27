@@ -48,8 +48,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
      * @brief One graphics pipeline and its contiguous range of indirect commands.
      */
     struct PipelineBatch {
-        explicit PipelineBatch(RenderAllocator* p_allocator) {
-            static_cast<void>(p_allocator);
+        explicit PipelineBatch(RenderAllocator* p_allocator) : resource_map(p_allocator) {
         }
         ~PipelineBatch() = default;
         PipelineBatch(const PipelineBatch&) = default;
@@ -57,6 +56,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         PipelineBatch& operator=(const PipelineBatch&) = default;
         PipelineBatch& operator=(PipelineBatch&&) noexcept = default;
 
+        /** Invocation-local reflected shader resource mappings. */
+        PipelineResourceMapVK resource_map;
         /** Graphics pipeline retained directly by the task. */
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
         /** First tightly packed indirect command in the shared command buffer. */

@@ -51,12 +51,15 @@ RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one compute pipeline is required.");
     }
     entries.assign(p_dispatch.entries.begin(), p_dispatch.entries.end());
+    const PipelineResourceMapVK empty_resource_map(render_data->allocator);
     for (const Entry& entry : entries) {
         if (entry.pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: compute pipeline is null.");
         }
-        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(
-            render_data->allocator, render_data, entry.pipeline->get_descriptor_layout()));
+        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(render_data->allocator,
+            render_data,
+            entry.pipeline->get_descriptor_layout(),
+            entry.resource_map ? *entry.resource_map : empty_resource_map));
     }
 }
 

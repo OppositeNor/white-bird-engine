@@ -15,6 +15,7 @@
 #include "oct_tree_render_feature.hh"
 #include "../render_test.hh"
 #include "core/memory/unique.hh"
+#include "dynamic_mesh_render_feature.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/rt_ping_pong_vk.hh"
@@ -320,22 +321,25 @@ RendTaskDescVK OctTreeRenderFeature::get_reset_render_task_desc(std::string_view
 }
 
 RendTaskDescVK OctTreeRenderFeature::get_construction_render_task_desc(
-    std::string_view p_task_id, std::string_view p_previous_task_id, bool p_double_sided) const {
+    std::string_view p_task_id, std::string_view p_previous_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh) const {
     constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
     constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
-    RendTaskDescVK task_desc = make_static_set_task_desc(render_allocator,
-        base_render_data,
-        p_task_id,
-        static_set_resources,
-        oct_tree_build_graphics_pipeline,
-        false,
-        CLEAR_VALUES,
-        VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
-        COLOR_ATTACHMENT_IDS,
-        std::nullopt,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        p_double_sided);
+    RendTaskDescVK task_desc = p_dynamic_mesh != nullptr ? p_dynamic_mesh->make_task(p_task_id,
+                                                               oct_tree_build_graphics_pipeline,
+                                                               VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT})
+                                                         : make_static_set_task_desc(render_allocator,
+                                                               base_render_data,
+                                                               p_task_id,
+                                                               static_set_resources,
+                                                               oct_tree_build_graphics_pipeline,
+                                                               false,
+                                                               CLEAR_VALUES,
+                                                               VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
+                                                               COLOR_ATTACHMENT_IDS,
+                                                               std::nullopt,
+                                                               VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                                               VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                                               p_double_sided);
     task_desc.after(p_previous_task_id)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -379,8 +383,8 @@ RendTaskDescVK OctTreeRenderFeature::get_deferred_construction_render_task_desc(
                            pong_pipeline = oct_tree_deferred_propagation_ping_write_compute_pipeline,
                            publication_pipeline = update_states_pipeline]() -> Unique<IRenderTaskVK> {
         constexpr uint32_t THREADS_PER_GROUP = 64;
-        constexpr uint32_t DISPATCH_GROUP_COUNT =
-            static_cast<uint32_t>((OCT_TREE_MAX_DEFERRED_TASK_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP);
+        constexpr uint32_t DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
+            (OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) / OCT_TREE_DEFERRED_THREADS_PER_GROUP);
         constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
         constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
         if (publication_pipeline != MEM_NULL) {
@@ -428,9 +432,8 @@ RendTaskDescVK OctTreeRenderFeature::get_debug_capture_render_task_desc(
                            task_pipeline = oct_tree_pre_deferred_debug_capture_compute_pipeline,
                            task_debug_view_mode = debug_view_mode,
                            task_required_mode = p_mode]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t THREADS_PER_GROUP = 64;
-        constexpr uint32_t DISPATCH_GROUP_COUNT =
-            static_cast<uint32_t>((OCT_TREE_MAX_DEFERRED_TASK_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP);
+        constexpr uint32_t DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
+            (OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) / OCT_TREE_DEFERRED_THREADS_PER_GROUP);
         Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(task_render_allocator,
             task_base_render_data,
             task_pipeline,
@@ -538,11 +541,13 @@ void OctTreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) 
     }
 }
 
-void OctTreeRenderFeature::add_construction_render_tasks(RendGraphDescVK& p_graph, std::string_view p_previous_task_id) const {
+void OctTreeRenderFeature::add_construction_render_tasks(
+    RendGraphDescVK& p_graph, std::string_view p_previous_task_id, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
     p_graph.add_task(get_reset_render_task_desc(p_previous_task_id))
         .add_task(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE, RT_RESET_OCT_TREE))
         .add_task(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, RT_RUN_BUILD_OCT_TREE, true));
-    std::string_view capture_previous_task = RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED;
+    p_graph.add_task(get_construction_render_task_desc("dynamic_oct_tree", RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, false, &p_dynamic_mesh));
+    std::string_view capture_previous_task = "dynamic_oct_tree";
     if (implementation == Implementation::PASS_PUBLISHED) {
         p_graph.add_task(get_state_update_render_task_desc(capture_previous_task));
         capture_previous_task = RT_UPDATE_OCT_TREE_STATES;

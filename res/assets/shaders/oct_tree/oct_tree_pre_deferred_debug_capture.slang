@@ -43,7 +43,7 @@ ConstantBuffer<OctTreePreDeferredDebugCaptureDescriptorIndices> descriptor_indic
  * @brief Captures the oct-tree state produced by the raster passes before deferred propagation changes it.
  */
 [shader("compute")]
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     StructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     StructuredBuffer<OctTreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];

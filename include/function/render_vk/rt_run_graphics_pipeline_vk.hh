@@ -74,6 +74,18 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
         VkAttachmentLoadOp p_color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR);
 
     /**
+     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
+     * @details Mapping references are borrowed only for this call and are not retained.
+     */
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+        const glm::vec4& p_clear_color,
+        VkExtent2D p_render_extent,
+        std::string_view p_color_attachment_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+        VkAttachmentLoadOp p_color_attachment_load_op,
+        const PipelineResourceMapVK& p_resource_map);
+
+    /**
      * @brief Constructor (single-color attachment convenience).
      *
      * @param p_render_data        Base render data.
@@ -101,6 +113,24 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
         VertexInputDescriptionVK p_vertex_input = {},
         VkDeviceSize p_vertex_buffer_offset = 0,
         uint32_t p_draw_vertex_count = 3);
+
+    /**
+     * @brief Construct invocation-local bindings by copying the supplied mapping.
+     * @details The mapping reference is borrowed only for construction and is not retained.
+     */
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+        const glm::vec4& p_clear_color,
+        VkExtent2D p_render_extent,
+        std::string_view p_color_attachment_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+        std::optional<std::string_view> p_vertex_buffer_id,
+        std::optional<std::string_view> p_index_buffer_id,
+        std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+        VkAttachmentLoadOp p_color_attachment_load_op,
+        VertexInputDescriptionVK p_vertex_input,
+        VkDeviceSize p_vertex_buffer_offset,
+        uint32_t p_draw_vertex_count,
+        const PipelineResourceMapVK& p_resource_map);
 
     /**
      * @brief Constructor (multi-attachment).
@@ -138,6 +168,26 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
         VertexInputDescriptionVK p_vertex_input = {},
         VkDeviceSize p_vertex_buffer_offset = 0,
         uint32_t p_draw_vertex_count = 3);
+
+    /**
+     * @brief Construct invocation-local bindings by copying the supplied mapping.
+     * @details The mapping reference is borrowed only for construction and is not retained.
+     */
+    RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data,
+        std::span<const VkClearValue> p_clear_values,
+        VkExtent2D p_render_extent,
+        std::span<const std::string_view> p_color_attachment_ids,
+        std::optional<std::string_view> p_depth_attachment_id,
+        Ref<ROGraphicsPipelineVK> p_graphics_pipeline,
+        std::optional<std::string_view> p_vertex_buffer_id,
+        std::optional<std::string_view> p_index_buffer_id,
+        std::optional<IndexedDrawRegionVK> p_indexed_draw_region,
+        VkAttachmentLoadOp p_color_attachment_load_op,
+        VkAttachmentLoadOp p_depth_attachment_load_op,
+        VertexInputDescriptionVK p_vertex_input,
+        VkDeviceSize p_vertex_buffer_offset,
+        uint32_t p_draw_vertex_count,
+        const PipelineResourceMapVK& p_resource_map);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

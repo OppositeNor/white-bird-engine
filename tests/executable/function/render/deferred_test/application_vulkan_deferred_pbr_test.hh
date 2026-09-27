@@ -16,10 +16,10 @@
 #define WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 
 #include "../render_test.hh"
-#include "oct_tree_render_feature.hh"
-#include "core/memory/unique.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "dynamic_mesh_render_feature.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
 #include "function/render/render_defs.hh"
@@ -39,6 +39,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
+#include "oct_tree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <atomic>
 #include <cstddef>
@@ -175,6 +176,8 @@ private:
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 
+    Unique<DynamicMeshRenderFeature> dynamic_mesh;
+    double dynamic_mesh_time = 0.0;
     Unique<OctTreeRenderFeature> oct_tree;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
