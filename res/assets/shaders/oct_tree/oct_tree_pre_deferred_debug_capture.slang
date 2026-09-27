@@ -53,7 +53,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
 
     OctTreeInfo info = oct_tree_info[0];
-    uint deferred_task_count = min(info.deferred_task_count_ping, info.max_deferred_task_count);
+    uint deferred_task_count = info.deferred_task_count_ping;
     if (p_dispatch_thread_id.x == 0) {
         captured_oct_tree_info[0] = info;
         DrawIndexedIndirectCommand command;

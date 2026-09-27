@@ -190,10 +190,8 @@ bool is_oct_tree_leaf_occupied(uint p_leaf_index,
     OctTreeInfo p_tree_info,
     uint p_frame_slot) {
     int parent_index = p_leaves[p_leaf_index].parent_index;
-    if (parent_index < 0 || uint(parent_index) >= p_tree_info.node_count) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        return false;
-    }
+    WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 && uint(parent_index) < p_tree_info.node_count,
+        ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
     return (p_nodes[parent_index].children_data & (1u << (22 + p_leaf_index % 8))) != 0;
 }
 
@@ -242,20 +240,15 @@ void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNod
 
 /**
  * @brief Reserves an eight-node block or reports capacity exhaustion to shader validation.
- * @details Successful reservations use one atomic add. Failed tickets are rolled back before returning.
- * The counter can temporarily exceed capacity during this pass; consumers must wait for the construction pass to finish.
+ * @details Uses one atomic add. Capacity and packed-index bounds are checked only when shader debugging is enabled.
  */
 bool try_reserve_oct_tree_nodes(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].node_count, 8, current_count);
-    if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_node_count ||
-        p_tree_info[0].max_node_count - current_count < 8) {
-        // Only invalid tickets are returned. With no deallocation during construction, rollback cannot reissue a valid block.
-        uint ignored_count;
-        InterlockedAdd(p_tree_info[0].node_count, 0u - 8u, ignored_count);
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        return false;
-    }
+    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x003fffffu &&
+        current_count <= p_tree_info[0].max_node_count &&
+        p_tree_info[0].max_node_count - current_count >= 8,
+        ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
     p_children_index = current_count;
     return true;
 }
@@ -289,20 +282,15 @@ bool create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes,
 
 /**
  * @brief Reserves an eight-leaf block or reports capacity exhaustion to shader validation.
- * @details Successful reservations use one atomic add. Failed tickets are rolled back before returning.
- * The counter can temporarily exceed capacity during this pass; consumers must wait for the construction pass to finish.
+ * @details Uses one atomic add. Capacity and packed-index bounds are checked only when shader debugging is enabled.
  */
 bool try_reserve_oct_tree_leaves(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].leaves_count, 8, current_count);
-    if (current_count / 8 > 0x003fffffu || current_count > p_tree_info[0].max_leaves_count ||
-        p_tree_info[0].max_leaves_count - current_count < 8) {
-        // Only invalid tickets are returned. With no deallocation during construction, rollback cannot reissue a valid block.
-        uint ignored_count;
-        InterlockedAdd(p_tree_info[0].leaves_count, 0u - 8u, ignored_count);
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-        return false;
-    }
+    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x003fffffu &&
+        current_count <= p_tree_info[0].max_leaves_count &&
+        p_tree_info[0].max_leaves_count - current_count >= 8,
+        ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
     p_children_index = current_count;
     return true;
 }
@@ -372,19 +360,15 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
     inout OctTreeNodeTraceInfo p_trace_info, uint p_frame_slot) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
-    if (p_tree_info[0].max_depth < 2 || p_tree_info[0].max_node_count < 8 || p_tree_info[0].max_leaves_count == 0) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-        return false;
-    }
+    WBE_SHADER_DEBUG_ASSERT(p_tree_info[0].max_depth >= 2 &&
+        p_tree_info[0].max_node_count >= 8 &&
+        p_tree_info[0].max_leaves_count != 0,
+        ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
-        if (curr_depth >= p_tree_info[0].max_depth) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-            return false;
-        }
-        if (node_index >= p_tree_info[0].max_node_count) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-            return false;
-        }
+        WBE_SHADER_DEBUG_ASSERT(curr_depth < p_tree_info[0].max_depth,
+            ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+        WBE_SHADER_DEBUG_ASSERT(node_index < p_tree_info[0].max_node_count,
+            ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
         OctTreeNode node = load_oct_tree_node(p_nodes, node_index);
         if (get_oct_tree_children_state(node) == OctTreeNode::ChildrenState::EMPTY) {
             try_create_oct_tree_entry(p_nodes, p_leaves, p_pending, p_tree_info, node_index,
@@ -399,31 +383,21 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
         switch (child_state) {
         case OctTreeNode::ChildrenState::NODE:
             // A node, keep on looking deeper.
-            if (curr_depth >= p_tree_info[0].max_depth - 1) {
-                report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-                return false;
-            }
-            if (get_oct_tree_children_index(node) > p_tree_info[0].max_node_count ||
-                p_tree_info[0].max_node_count - get_oct_tree_children_index(node) < 8) {
-                report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-                return false;
-            }
+            WBE_SHADER_DEBUG_ASSERT(curr_depth < p_tree_info[0].max_depth - 1,
+                ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            WBE_SHADER_DEBUG_ASSERT(get_oct_tree_children_index(node) <= p_tree_info[0].max_node_count &&
+                p_tree_info[0].max_node_count - get_oct_tree_children_index(node) >= 8,
+                ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
             break;
         case OctTreeNode::ChildrenState::LEAF:
             // Found a leaf, allocation success.
-            if (curr_depth < p_tree_info[0].max_depth - 1) {
-                report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-                return false;
-            }
-            if (curr_depth > p_tree_info[0].max_depth - 1) {
-                report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-                return false;
-            }
-            if (get_oct_tree_children_index(node) > p_tree_info[0].max_leaves_count ||
-                p_tree_info[0].max_leaves_count - get_oct_tree_children_index(node) < 8) {
-                report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-                return false;
-            }
+            WBE_SHADER_DEBUG_ASSERT(curr_depth >= p_tree_info[0].max_depth - 1,
+                ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+            WBE_SHADER_DEBUG_ASSERT(curr_depth <= p_tree_info[0].max_depth - 1,
+                ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            WBE_SHADER_DEBUG_ASSERT(get_oct_tree_children_index(node) <= p_tree_info[0].max_leaves_count &&
+                p_tree_info[0].max_leaves_count - get_oct_tree_children_index(node) >= 8,
+                ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
             occupy_oct_tree_leaf(p_pending, node_index, p_trace_info.svo_position);
             return true;
         case OctTreeNode::ChildrenState::ALLOCATING:
@@ -433,11 +407,11 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
             p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             return false;
         default:
-            report_shader_debug_error(curr_depth < p_tree_info[0].max_depth - 1
+            WBE_SHADER_DEBUG_ASSERT(false, curr_depth < p_tree_info[0].max_depth - 1
                     ? ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED
                     : ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED,
                 p_frame_slot);
-            return false;
+            break;
         }
         uint child_index = get_oct_tree_children_index(node) + get_oct_tree_node_subregion(p_trace_info.svo_position);
         node_index = child_index;

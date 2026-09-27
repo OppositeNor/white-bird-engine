@@ -208,6 +208,8 @@ class WBEACPCompilerShader(WBEACPCompiler):
             cmd.extend(["-entry", entry_name])
         if shader_stage is not None:
             cmd.extend(["-stage", shader_stage])
+        if build_setup.build_target.get("enable_shader_debug", False):
+            cmd.append("-DWBE_SHADER_DEBUG")
         for macro_definition in macro_definitions:
             cmd.append(f"-D{macro_definition}")
         cmd.extend([

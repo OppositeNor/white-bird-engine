@@ -15,12 +15,14 @@ import os
 from pathlib import Path
 from build_script.utils import list_files
 
+# enable_shader_debug defaults to False when omitted by a target.
 target_info = {
     "debug" : {
         "c-compiler" : "clang",
         "cpp-compiler" : "clang++",
         "export-directory" : "debug",
         "cmake-build-type" : "Debug",
+        "enable_shader_debug" : True,
         "build-shared" : True,
         "generate-tests" : True,
     },
@@ -37,6 +39,7 @@ target_info = {
         "cpp-compiler" : "clang++",
         "export-directory" : "debug",
         "cmake-build-type" : "Debug",
+        "enable_shader_debug" : True,
         "build-shared" : True,
         "generator" : "Ninja",
         "generate-tests" : True,
@@ -65,6 +68,7 @@ target_info = {
         "export-directory" : "debug-gcc",
         "build-shared" : True,
         "cmake-build-type" : "Debug",
+        "enable_shader_debug" : True,
         "generate-tests" : True,
     },
     "release-gcc" : {
@@ -80,6 +84,7 @@ target_info = {
         "cpp-compiler" : "g++",
         "export-directory" : "debug-gcc",
         "cmake-build-type" : "Debug",
+        "enable_shader_debug" : True,
         "build-shared" : True,
         "generator" : "Ninja",
         "generate-tests" : True,

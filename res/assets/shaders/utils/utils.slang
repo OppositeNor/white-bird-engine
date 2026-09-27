@@ -15,6 +15,24 @@
 #ifndef WBE_FILE_UTILS_SLANG
 #define WBE_FILE_UTILS_SLANG
 
+/**
+ * @brief Reports an error when the condition is false, only in shader-debug builds.
+ * @details Disabled builds do not evaluate any argument or guard the following operation.
+ * @param p_condition Required condition, evaluated once when shader debugging is enabled.
+ * @param p_error Stable shader error code.
+ * @param p_frame_slot Renderer frame slot receiving the error.
+ */
+#ifdef WBE_SHADER_DEBUG
+#define WBE_SHADER_DEBUG_ASSERT(p_condition, p_error, p_frame_slot) \
+    do { \
+        if (!(p_condition)) { \
+            report_shader_debug_error(p_error, p_frame_slot); \
+        } \
+    } while (0)
+#else
+#define WBE_SHADER_DEBUG_ASSERT(p_condition, p_error, p_frame_slot)
+#endif
+
 /** Stable error codes shared with the CPU shader-debug reader. */
 enum class ShaderDebugError {
     DEBUG_BUFFER_FULL = 1,
@@ -28,6 +46,7 @@ enum class ShaderDebugError {
 /** Shader-visible buffer descriptor reserved by the renderer. */
 static const uint WBE_SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
 
+#ifdef WBE_SHADER_DEBUG
 /**
  * @brief Atomically append one error to the renderer-owned shader-debug buffer.
  * @param p_error Error code to append.
@@ -52,6 +71,8 @@ void report_shader_debug_error(ShaderDebugError p_error, uint p_frame_slot) {
         InterlockedExchange(debug_buffer[frame_offset + capacity + 1], uint(ShaderDebugError::DEBUG_BUFFER_FULL));
     }
 }
+
+#endif
 
 /** Marks a vertex entry-point field and selects a resource attribute by role. */
 [__AttributeUsage(_AttributeTargets.Var)]

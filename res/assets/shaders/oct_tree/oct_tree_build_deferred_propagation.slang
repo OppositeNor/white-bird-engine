@@ -69,12 +69,8 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #else
         InterlockedAdd(oct_tree_info[0].deferred_task_count_pong, 1, new_task_index);
 #endif
-        if (new_task_index < oct_tree_info[0].max_deferred_task_count) {
-            deferred_list_write[new_task_index].unfinished_trace_info = trace_info;
-        }
-        else {
-            report_shader_debug_error(
-                ShaderDebugError::OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        }
+        WBE_SHADER_DEBUG_ASSERT(new_task_index < oct_tree_info[0].max_deferred_task_count,
+            ShaderDebugError::OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+        deferred_list_write[new_task_index].unfinished_trace_info = trace_info;
     }
 }

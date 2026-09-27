@@ -60,23 +60,18 @@ uint3 get_leaf_grid_position(uint p_leaf_index,
     OctTreeInfo p_tree_info,
     uint p_frame_slot) {
     uint3 result = uint3(0);
-    if (p_leaf_index >= p_tree_info.max_leaves_count) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-        return result;
-    }
+    WBE_SHADER_DEBUG_ASSERT(p_leaf_index < p_tree_info.max_leaves_count,
+        ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
     uint child_index = p_leaf_index;
     int parent_index = p_leaves[p_leaf_index].parent_index;
     uint traversed_depth = 0;
     for (; traversed_depth < p_tree_info.max_depth && parent_index >= 0; ++traversed_depth) {
-        if (uint(parent_index) >= p_tree_info.max_node_count) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-            return result;
-        }
+        WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < p_tree_info.max_node_count,
+            ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
         OctTreeNode parent = p_nodes[parent_index];
-        if (child_index < get_oct_tree_children_index(parent) || child_index - get_oct_tree_children_index(parent) >= 8) {
-            report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-            return result;
-        }
+        WBE_SHADER_DEBUG_ASSERT(child_index >= get_oct_tree_children_index(parent) &&
+            child_index - get_oct_tree_children_index(parent) < 8,
+            ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
         uint subregion = child_index % 8;
         result.x |= ((subregion >> 2) & 1) << traversed_depth;
         result.y |= ((subregion >> 1) & 1) << traversed_depth;
@@ -84,23 +79,19 @@ uint3 get_leaf_grid_position(uint p_leaf_index,
         child_index = uint(parent_index);
         parent_index = parent.parent_index;
     }
-    if (parent_index < 0 && child_index < 8 && traversed_depth < 32) {
+    if (parent_index < 0) {
+        WBE_SHADER_DEBUG_ASSERT(child_index < 8 && traversed_depth < 32,
+            ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
         // The remaining node is one of the eight sectors of the implicit root.
         result.x |= ((child_index >> 2) & 1) << traversed_depth;
         result.y |= ((child_index >> 1) & 1) << traversed_depth;
         result.z |= (child_index & 1) << traversed_depth;
         ++traversed_depth;
     }
-    else if (parent_index < 0) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        return result;
-    }
-    if (parent_index >= 0 || traversed_depth > p_tree_info.max_depth) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-    }
-    else if (traversed_depth < p_tree_info.max_depth) {
-        report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-    }
+    WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && traversed_depth <= p_tree_info.max_depth,
+        ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+    WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 || traversed_depth >= p_tree_info.max_depth,
+        ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
     return result;
 }
 
