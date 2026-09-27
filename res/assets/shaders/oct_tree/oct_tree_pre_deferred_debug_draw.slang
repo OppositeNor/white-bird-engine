@@ -66,18 +66,29 @@ uint3 get_node_grid_position(uint p_node_index,
             return result;
         }
         OctTreeNode parent = p_nodes[parent_index];
-        if (child_index < parent.children || child_index - parent.children >= 8) {
+        if (child_index < get_oct_tree_children_index(parent) || child_index - get_oct_tree_children_index(parent) >= 8) {
             report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
             return result;
         }
-        uint subregion = child_index - parent.children;
+        uint subregion = child_index % 8;
         result.x |= ((subregion >> 2) & 1) << traversed_depth;
         result.y |= ((subregion >> 1) & 1) << traversed_depth;
         result.z |= (subregion & 1) << traversed_depth;
         child_index = uint(parent_index);
         parent_index = parent.parent_index;
     }
-    if (parent_index >= 0) {
+    if (parent_index < 0 && child_index < 8 && traversed_depth < 32) {
+        // The remaining node is one of the eight sectors of the implicit root.
+        result.x |= ((child_index >> 2) & 1) << traversed_depth;
+        result.y |= ((child_index >> 1) & 1) << traversed_depth;
+        result.z |= (child_index & 1) << traversed_depth;
+        ++traversed_depth;
+    }
+    else if (parent_index < 0) {
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        return result;
+    }
+    if (parent_index >= 0 || traversed_depth > p_depth) {
         report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
     }
     else if (traversed_depth < p_depth) {
@@ -105,18 +116,29 @@ uint3 get_leaf_grid_position(uint p_leaf_index,
             return result;
         }
         OctTreeNode parent = p_nodes[parent_index];
-        if (child_index < parent.children || child_index - parent.children >= 8) {
+        if (child_index < get_oct_tree_children_index(parent) || child_index - get_oct_tree_children_index(parent) >= 8) {
             report_shader_debug_error(ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
             return result;
         }
-        uint subregion = child_index - parent.children;
+        uint subregion = child_index % 8;
         result.x |= ((subregion >> 2) & 1) << traversed_depth;
         result.y |= ((subregion >> 1) & 1) << traversed_depth;
         result.z |= (subregion & 1) << traversed_depth;
         child_index = uint(parent_index);
         parent_index = parent.parent_index;
     }
-    if (parent_index >= 0) {
+    if (parent_index < 0 && child_index < 8 && traversed_depth < 32) {
+        // The remaining node is one of the eight sectors of the implicit root.
+        result.x |= ((child_index >> 2) & 1) << traversed_depth;
+        result.y |= ((child_index >> 1) & 1) << traversed_depth;
+        result.z |= (child_index & 1) << traversed_depth;
+        ++traversed_depth;
+    }
+    else if (parent_index < 0) {
+        report_shader_debug_error(ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        return result;
+    }
+    if (parent_index >= 0 || traversed_depth > p_tree_info.max_depth) {
         report_shader_debug_error(ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
     }
     else if (traversed_depth < p_tree_info.max_depth) {
@@ -155,6 +177,13 @@ OctTreePreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_Vulkan
     OctTreeInfo oct_tree_info = oct_tree_info_buffer[0];
 
     bool is_deferred_task = p_instance_id >= oct_tree_info.leaves_count;
+    if (!is_deferred_task && !is_oct_tree_leaf_occupied(
+            p_instance_id, tree_nodes, tree_leaves, oct_tree_info, descriptor_indices.shader_debug_frame_slot)) {
+        OctTreePreDeferredDebugDrawVertexOutput empty_output;
+        empty_output.position = float4(2.0, 2.0, 2.0, 1.0);
+        empty_output.color = float4(0.0);
+        return empty_output;
+    }
     uint3 grid_position = is_deferred_task
         ? get_deferred_task_grid_position(
               deferred_list[p_instance_id - oct_tree_info.leaves_count], tree_nodes, oct_tree_info, descriptor_indices.shader_debug_frame_slot)

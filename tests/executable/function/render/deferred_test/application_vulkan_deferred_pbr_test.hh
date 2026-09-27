@@ -193,10 +193,10 @@ private:
 
     struct OctTreeNode {
         enum class ChildrenState {
-            NODE,
-            LEAF,
-            EMPTY,
-            ALLOCATING
+            NODE = 0,
+            EMPTY = 1,
+            ALLOCATING = 2,
+            LEAF = 3
         };
         enum Subregion {
             XYZ_000,
@@ -209,11 +209,20 @@ private:
             XYZ_111,
             MAX_SUBREGION
         };
-        uint32_t children_state;
-        uint32_t children;
+        // Mirrors the packed Slang description: state 31:30; leaf occupancy 29:22/block 21:0;
+        // nodes use block 21:0 with bits 29:22 unused. Block indices address eight entries.
+        uint32_t children_data;
         uint32_t data_index;
         int32_t parent_index;
     };
+
+    static_assert(sizeof(OctTreeNode) == 12);
+    static_assert(alignof(OctTreeNode) == alignof(uint32_t));
+    static_assert(offsetof(OctTreeNode, data_index) == 4);
+    static_assert(offsetof(OctTreeNode, parent_index) == 8);
+    static_assert(OCT_TREE_MAX_DEPTH >= 2);
+    static_assert(OCT_TREE_MAX_NODE_COUNT % 8 == 0 && OCT_TREE_MAX_NODE_COUNT <= (1U << 22U) * 8U);
+    static_assert(OCT_TREE_MAX_LEAVES_COUNT % 8 == 0 && OCT_TREE_MAX_LEAVES_COUNT <= (1U << 22U) * 8U);
 
     struct OctTreeLeaf {
         uint32_t data_index;

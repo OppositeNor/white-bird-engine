@@ -34,14 +34,15 @@ void main() {
     RWStructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     RWStructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
 
-    oct_tree_info[0].node_count = 1;
+    oct_tree_info[0].node_count = 8;
     oct_tree_info[0].leaves_count = 0;
-    oct_tree_info[0].data_count = 1;
+    oct_tree_info[0].data_count = 8;
     oct_tree_info[0].deferred_task_count_ping = 0;
     oct_tree_info[0].deferred_task_count_pong = 0;
 
-    tree_nodes[0].children_state = uint(OctTreeNode::ChildrenState::EMPTY);
-    tree_nodes[0].children = 0;
-    tree_nodes[0].data_index = 0;
-    tree_nodes[0].parent_index = -1;
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        tree_nodes[i].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 30;
+        tree_nodes[i].data_index = i;
+        tree_nodes[i].parent_index = -1;
+    }
 }

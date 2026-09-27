@@ -208,10 +208,10 @@ void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctTreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
     OctTreeNodeTraceInfo trace_info;
-    trace_info.node_index = 0;
-    trace_info.curr_depth = 0;
-    trace_info.remain_depth = oct_tree_info[0].max_depth;
-    trace_info.svo_position = p_svo_position;
+    trace_info.node_index = get_oct_tree_node_subregion(p_svo_position);
+    trace_info.curr_depth = 1;
+    trace_info.remain_depth = int(oct_tree_info[0].max_depth) - 1;
+    trace_info.svo_position = frac(p_svo_position * 2.0);
     // Try to allocate the node.
     if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
         // If allocation failed, push this to the deferred list.
@@ -232,6 +232,11 @@ void allocate_covered_voxel(float3 p_svo_position) {
  */
 [shader("fragment")]
 void fragment_main(GSOutput p_input) {
+    // Helper invocations cannot publish storage writes and receive undefined atomic results.
+    // Keep them out of allocation retry loops; this shader does not need derivatives.
+    if (IsHelperLane()) {
+        return;
+    }
     StructuredBuffer<OctTreeInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;

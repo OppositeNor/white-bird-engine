@@ -101,6 +101,8 @@ struct LightParamsDescriptorIndices {
     uint2 light_count;
 };
 
+// Structured-buffer matrices use ordinary mul(). The uniform-buffer scalar-load workaround
+// transposes these matrices and must not be applied to this returned value.
 SpotLightInfo get_spot_light_info(LightParamsDescriptorIndices p_light, uint p_spot_light_index) {
     StructuredBuffer<SpotLightInfo> light_infos = ResourceDescriptorHeap[p_light.light_infos.x];
     return light_infos[p_spot_light_index];
@@ -246,10 +248,8 @@ float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_li
     Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     Texture2D<float4> rsm_flux = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_flux.x];
     Texture2D<float2> rsm_octa_normal = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].rsm_octa_normal.x];
-    float4 light_view_position = software_mul_float4x4_vector(
-        WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view), float4(p_world_position, 1.0));
-    float4 light_space_position =
-        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.proj), light_view_position);
+    float4 light_view_position = mul(spot_light_info.view, float4(p_world_position, 1.0));
+    float4 light_space_position = mul(spot_light_info.proj, light_view_position);
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
     float2 center_uv = ndc.xy * 0.5 + 0.5;
     if (ndc.z < 0.0 || ndc.z > 1.0) {
@@ -279,8 +279,8 @@ float3 compute_rsm_indirect(LightParamsDescriptorIndices p_light, uint p_spot_li
             continue;
         }
         float2 sample_octa_normal = rsm_octa_normal.Load(int3(sample_texel, 0));
-        float3 shadow_ray_position =
-            world_position_from_depth(sample_texel_uv, 1.0, WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.inv_view_proj));
+        float4 shadow_ray_homogeneous = mul(spot_light_info.inv_view_proj, float4(sample_texel_uv * 2.0 - 1.0, 1.0, 1.0));
+        float3 shadow_ray_position = shadow_ray_homogeneous.xyz / shadow_ray_homogeneous.w;
         float3 shadow_ray_direction = normalize(shadow_ray_position - spot_light_info.position);
         float3 sample_world_position = spot_light_info.position + shadow_ray_direction * sample_depth * spot_light_info.range;
         float3 sample_world_normal = octahedron_decode(sample_octa_normal);
@@ -308,10 +308,8 @@ float compute_spot_shadow_pcf(LightParamsDescriptorIndices p_light,
     SpotLightInfo spot_light_info = get_spot_light_info(p_light, p_spot_light_index);
     Texture2D<float> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
     SamplerState shadowmap_sampler = SamplerDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap_sampler.x];
-    float4 light_view_position = software_mul_float4x4_vector(
-        WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view), float4(p_world_position, 1.0));
-    float4 light_space_position =
-        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.proj), light_view_position);
+    float4 light_view_position = mul(spot_light_info.view, float4(p_world_position, 1.0));
+    float4 light_space_position = mul(spot_light_info.proj, light_view_position);
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
     float2 uv = ndc.xy * 0.5 + 0.5;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z < 0.0 || ndc.z > 1.0) {
@@ -342,10 +340,8 @@ float compute_spot_shadow(LightParamsDescriptorIndices p_light,
 #else
     SpotLightInfo spot_light_info = get_spot_light_info(p_light, p_spot_light_index);
     Texture2D<float2> shadowmap = ResourceDescriptorHeap[p_light.lights[p_spot_light_index].shadowmap.x];
-    float4 light_view_position = software_mul_float4x4_vector(
-        WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view), float4(p_world_position, 1.0));
-    float4 light_space_position =
-        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.proj), light_view_position);
+    float4 light_view_position = mul(spot_light_info.view, float4(p_world_position, 1.0));
+    float4 light_space_position = mul(spot_light_info.proj, light_view_position);
     float3 ndc = light_space_position.xyz / max(light_space_position.w, 0.0001);
     float2 uv = ndc.xy * 0.5 + 0.5;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z < 0.0 || ndc.z > 1.0) {
@@ -361,8 +357,8 @@ float compute_spot_shadow(LightParamsDescriptorIndices p_light,
     uint shadow_height;
     shadowmap.GetDimensions(shadow_width, shadow_height);
     float emitter_width = max(spot_light_info.emitter_width, 0.0);
-    float3 light_near_position =
-        world_position_from_depth(float2(0.5, 0.5), 1.0, WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.inv_view_proj));
+    float4 light_near_homogeneous = mul(spot_light_info.inv_view_proj, float4(0.0, 0.0, 1.0, 1.0));
+    float3 light_near_position = light_near_homogeneous.xyz / light_near_homogeneous.w;
     float light_near_distance = max(length(light_near_position - spot_light_info.position), 0.0001);
     // r_light_uv = emitter_width * |projection_x_scale| / (4 * near_distance).
     float emitter_radius_near_uv = emitter_width * abs(spot_light_info.proj[0][0]) / (4.0 * light_near_distance);

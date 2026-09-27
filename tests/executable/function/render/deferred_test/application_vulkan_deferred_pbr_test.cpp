@@ -722,21 +722,23 @@ void ApplicationVulkanDeferredPBRTest::initialize_oct_tree() {
         .max_depth = OCT_TREE_MAX_DEPTH,
         .max_node_count = OCT_TREE_MAX_NODE_COUNT,
         .max_leaves_count = OCT_TREE_MAX_LEAVES_COUNT,
-        .node_count = 1,
+        .node_count = 8,
         .leaves_count = 0,
-        .data_count = 1,
+        .data_count = 8,
         .deferred_task_count_ping = 0,
         .deferred_task_count_pong = 0,
         .max_deferred_task_count = OCT_TREE_MAX_DEFERRED_TASK_COUNT,
     };
-    const OctTreeNode root_node{
-        .children_state = static_cast<uint32_t>(OctTreeNode::ChildrenState::EMPTY),
-        .children = 0,
-        .data_index = 0,
-        .parent_index = -1,
-    };
+    std::array<OctTreeNode, 8> first_sectors{};
+    for (uint32_t i = 0; i < first_sectors.size(); ++i) {
+        first_sectors[i] = OctTreeNode{
+            .children_data = static_cast<uint32_t>(OctTreeNode::ChildrenState::EMPTY) << 30U,
+            .data_index = i,
+            .parent_index = -1,
+        };
+    }
     oct_tree_info->update_buffer(&initial_oct_tree_info, sizeof(initial_oct_tree_info));
-    oct_tree_nodes->update_buffer(&root_node, sizeof(root_node));
+    oct_tree_nodes->update_buffer(first_sectors.data(), sizeof(first_sectors));
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {
