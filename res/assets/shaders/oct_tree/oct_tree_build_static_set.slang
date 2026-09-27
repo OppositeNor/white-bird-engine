@@ -240,6 +240,8 @@ void fragment_main(GSOutput p_input) {
     float3 center = float3(0.0);
     center[horizontal_axis] = floor(p_input.position.x) + 0.5;
     center[vertical_axis] = floor(p_input.position.y) + 0.5;
+    // Other than the voxel in the center, we also check if the triangle intersects any other voxels
+    // in the depth direction.
     float3 a = p_input.triangle_a;
     float3 b = p_input.triangle_b;
     float3 c = p_input.triangle_c;
