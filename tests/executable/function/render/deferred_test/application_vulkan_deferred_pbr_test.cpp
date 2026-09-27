@@ -62,15 +62,6 @@ namespace WhiteBirdEngine {
 namespace {
 
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
-constexpr std::array<uint32_t, 36> OCT_TREE_DEBUG_CUBE_INDICES{
-    0, 2, 3, 0, 3, 1,
-    4, 5, 7, 4, 7, 6,
-    0, 1, 5, 0, 5, 4,
-    2, 6, 7, 2, 7, 3,
-    0, 4, 6, 0, 6, 2,
-    1, 3, 7, 1, 7, 5,
-};
-
 struct BillboardInfoVKUBO {
     glm::vec4 position = glm::vec4(0.0F);
     glm::vec2 size = glm::vec2(0.0F);
@@ -293,7 +284,19 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     create_shadow_map_resources();
     create_gbuffer_resources();
     create_lighting_output_resources();
-    create_oct_tree_resources();
+    OctTreeRenderFeature::Implementation oct_tree_implementation = OctTreeRenderFeature::Implementation::PASS_PUBLISHED;
+    if (const char* selection = std::getenv("WBE_OCT_TREE_IMPLEMENTATION")) {
+        if (std::string_view(selection) == "1") {
+            oct_tree_implementation = OctTreeRenderFeature::Implementation::ATOMIC;
+        }
+        else if (std::string_view(selection) != "2") {
+            throw std::runtime_error("WBE_OCT_TREE_IMPLEMENTATION must be 1 or 2.");
+        }
+    }
+    oct_tree = make_unique<OctTreeRenderFeature>(render_allocator, renderer_vk, static_set_resources,
+        &voxel_debug_view_mode, oct_tree_implementation);
+    stdout_log(WBE_CHANNEL_DEBUG)->message(oct_tree_implementation == OctTreeRenderFeature::Implementation::PASS_PUBLISHED
+        ? "Octree construction: oct_tree_2 (pass publication)." : "Octree construction: oct_tree (atomic publication).");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
@@ -366,22 +369,6 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
     bloom_ping_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_ping_write");
     bloom_pong_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_pong_write");
-    oct_tree_build_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_build_static_set_pipeline");
-    oct_tree_reset_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_reset_shader");
-    oct_tree_deferred_count_reset_ping_shader_resource =
-        resource_manager->get_resource<RUShader>("oct_tree_deferred_count_reset_ping_shader");
-    oct_tree_deferred_count_reset_pong_shader_resource =
-        resource_manager->get_resource<RUShader>("oct_tree_deferred_count_reset_pong_shader");
-    oct_tree_deferred_propagation_ping_write_shader_resource =
-        resource_manager->get_resource<RUShader>("oct_tree_build_deferred_propagation_ping_write_shader");
-    oct_tree_deferred_propagation_pong_write_shader_resource =
-        resource_manager->get_resource<RUShader>("oct_tree_build_deferred_propagation_pong_write_shader");
-    oct_tree_pre_deferred_debug_capture_shader_resource =
-        resource_manager->get_resource<RUShader>("oct_tree_pre_deferred_debug_capture_shader");
-    oct_tree_debug_draw_setup_shader_resource = resource_manager->get_resource<RUShader>("oct_tree_debug_draw_setup_shader");
-    oct_tree_debug_draw_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_debug_draw_pipeline");
-    oct_tree_pre_deferred_debug_draw_pipeline_resource =
-        resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_pre_deferred_debug_draw_pipeline");
 
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
@@ -415,50 +402,7 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     gbuffer_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(gbuffer_context)
                                                  .compile("deferred_gbuffer_double_sided", gbuffer_double_sided_pipeline_resource)
                                                  .graphics_pipeline;
-    GraphicsPipelineCompilerVK oct_tree_compiler(make_oct_tree_graphics_pipeline_context());
-    oct_tree_build_graphics_pipeline =
-        oct_tree_compiler.compile("oct_tree_build_static_set_pipeline", oct_tree_build_pipeline_resource).graphics_pipeline;
-    ComputePipelineCompilerVK oct_tree_compute_compiler(make_compute_pipeline_context());
-    oct_tree_reset_compute_pipeline =
-        oct_tree_compute_compiler.compile("oct_tree_reset_shader", oct_tree_reset_shader_resource).compute_pipeline;
-    oct_tree_deferred_count_reset_ping_compute_pipeline =
-        oct_tree_compute_compiler
-            .compile("oct_tree_deferred_count_reset_ping_shader", oct_tree_deferred_count_reset_ping_shader_resource)
-            .compute_pipeline;
-    oct_tree_deferred_count_reset_pong_compute_pipeline =
-        oct_tree_compute_compiler
-            .compile("oct_tree_deferred_count_reset_pong_shader", oct_tree_deferred_count_reset_pong_shader_resource)
-            .compute_pipeline;
-    oct_tree_deferred_propagation_ping_write_compute_pipeline =
-        oct_tree_compute_compiler
-            .compile("oct_tree_build_deferred_propagation_ping_write_shader", oct_tree_deferred_propagation_ping_write_shader_resource)
-            .compute_pipeline;
-    oct_tree_deferred_propagation_pong_write_compute_pipeline =
-        oct_tree_compute_compiler
-            .compile("oct_tree_build_deferred_propagation_pong_write_shader", oct_tree_deferred_propagation_pong_write_shader_resource)
-            .compute_pipeline;
-    oct_tree_pre_deferred_debug_capture_compute_pipeline =
-        oct_tree_compute_compiler
-            .compile("oct_tree_pre_deferred_debug_capture_shader", oct_tree_pre_deferred_debug_capture_shader_resource)
-            .compute_pipeline;
-    oct_tree_debug_draw_setup_compute_pipeline =
-        oct_tree_compute_compiler.compile("oct_tree_debug_draw_setup_shader", oct_tree_debug_draw_setup_shader_resource).compute_pipeline;
-    GraphicsPipelineCompilerVKContext oct_tree_debug_draw_context{
-        .allocator = render_allocator,
-        .render_data = base_render_data,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
-        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-        .polygon_mode = VK_POLYGON_MODE_LINE,
-    };
-    oct_tree_debug_draw_graphics_pipeline = GraphicsPipelineCompilerVK(oct_tree_debug_draw_context)
-                                                .compile("oct_tree_debug_draw_pipeline", oct_tree_debug_draw_pipeline_resource)
-                                                .graphics_pipeline;
-    oct_tree_pre_deferred_debug_draw_graphics_pipeline =
-        GraphicsPipelineCompilerVK(oct_tree_debug_draw_context)
-            .compile("oct_tree_pre_deferred_debug_draw_pipeline", oct_tree_pre_deferred_debug_draw_pipeline_resource)
-            .graphics_pipeline;
+
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -674,73 +618,6 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
                         .create_ref(base_render_data);
 }
 
-void ApplicationVulkanDeferredPBRTest::create_oct_tree_resources() {
-    oct_tree_info = ROBufferVK::Builder().set_properties(sizeof(OctTreeInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
-    oct_tree_nodes = ROBufferVK::Builder()
-                         .set_properties(sizeof(OctTreeNode), OCT_TREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                         .create_ref(base_render_data);
-    oct_tree_leaves = ROBufferVK::Builder()
-                          .set_properties(sizeof(OctTreeLeaf), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                          .create_ref(base_render_data);
-    oct_tree_deferred_list_ping =
-        ROBufferVK::Builder()
-            .set_properties(sizeof(OctTreeDeferredListEntry), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-            .create_ref(base_render_data);
-    oct_tree_deferred_list_pong =
-        ROBufferVK::Builder()
-            .set_properties(sizeof(OctTreeDeferredListEntry), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-            .create_ref(base_render_data);
-    oct_tree_debug_draw_index_buffer = create_initialized_buffer(
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT, OCT_TREE_DEBUG_CUBE_INDICES.data(), sizeof(OCT_TREE_DEBUG_CUBE_INDICES));
-    const VkDrawIndexedIndirectCommand initial_debug_draw_command{
-        .indexCount = OCT_TREE_DEBUG_CUBE_INDICES.size(),
-        .instanceCount = 0,
-        .firstIndex = 0,
-        .vertexOffset = 0,
-        .firstInstance = 0,
-    };
-    oct_tree_debug_draw_indirect_buffer = create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-        &initial_debug_draw_command,
-        sizeof(initial_debug_draw_command));
-    oct_tree_pre_deferred_debug_info_buffer =
-        ROBufferVK::Builder().set_properties(sizeof(OctTreeInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
-    oct_tree_pre_deferred_debug_list_buffer =
-        ROBufferVK::Builder()
-            .set_properties(sizeof(OctTreeDeferredListEntry), OCT_TREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-            .create_ref(base_render_data);
-    oct_tree_pre_deferred_debug_draw_indirect_buffer = create_initialized_buffer(
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-        &initial_debug_draw_command,
-        sizeof(initial_debug_draw_command));
-    initialize_oct_tree();
-}
-
-void ApplicationVulkanDeferredPBRTest::initialize_oct_tree() {
-    const OctTreeInfo initial_oct_tree_info{
-        .origin = OCT_TREE_ORIGIN,
-        .width = OCT_TREE_WIDTH,
-        .max_depth = OCT_TREE_MAX_DEPTH,
-        .max_node_count = OCT_TREE_MAX_NODE_COUNT,
-        .max_leaves_count = OCT_TREE_MAX_LEAVES_COUNT,
-        .node_count = 8,
-        .leaves_count = 0,
-        .data_count = 8,
-        .deferred_task_count_ping = 0,
-        .deferred_task_count_pong = 0,
-        .max_deferred_task_count = OCT_TREE_MAX_DEFERRED_TASK_COUNT,
-    };
-    std::array<OctTreeNode, 8> first_sectors{};
-    for (uint32_t i = 0; i < first_sectors.size(); ++i) {
-        first_sectors[i] = OctTreeNode{
-            .children_data = static_cast<uint32_t>(OctTreeNode::ChildrenState::EMPTY) << 30U,
-            .data_index = i,
-            .parent_index = -1,
-        };
-    }
-    oct_tree_info->update_buffer(&initial_oct_tree_info, sizeof(initial_oct_tree_info));
-    oct_tree_nodes->update_buffer(first_sectors.data(), sizeof(first_sectors));
-}
-
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
@@ -802,15 +679,6 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
         .color_attachment_formats = {base_render_data->swap_chain_format},
-    };
-}
-
-GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_oct_tree_graphics_pipeline_context() const {
-    return GraphicsPipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = base_render_data,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
     };
 }
 

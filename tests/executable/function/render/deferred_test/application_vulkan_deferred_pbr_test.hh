@@ -16,6 +16,8 @@
 #define WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 
 #include "../render_test.hh"
+#include "oct_tree_render_feature.hh"
+#include "core/memory/unique.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/application/application_game.hh"
@@ -59,16 +61,6 @@
 namespace WhiteBirdEngine {
 
 /**
- * @enum VoxelDebugViewMode
- * @brief Selects the oct-tree construction state visualized by the deferred rendering test.
- */
-enum class VoxelDebugViewMode : uint32_t {
-    DISABLED,
-    POST_OCT_TREE_BUILD,
-    PRE_DEFERRED_PROPAGATION,
-};
-
-/**
  * @class ApplicationVulkanDeferredPBRTest
  * @brief Runs the Vulkan deferred-rendering executable test.
  */
@@ -98,14 +90,6 @@ private:
     static constexpr uint32_t BLOOM_BLUR_PASS_COUNT = 4;
     static_assert(BLOOM_BLUR_PASS_COUNT % 2U == 0U);
     static constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
-    static constexpr size_t OCT_TREE_MAX_DEPTH = 6;
-    static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
-    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT * 0.25;
-    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(1024);
-    static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = WBE_KI_B(1024);
-    static constexpr float OCT_TREE_WIDTH = 32.0F;
-    static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
-
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
     static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
@@ -136,21 +120,8 @@ private:
     static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
     static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 
-    static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
-    static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";
-    static constexpr std::string_view OCT_TREE_LEAF_BUFFER = "oct_tree_leaves_buffer";
-    static constexpr std::string_view OCT_TREE_DEFERRED_LIST_PING = "oct_tree_deferred_list_ping";
-    static constexpr std::string_view OCT_TREE_DEFERRED_LIST_PONG = "oct_tree_deferred_list_pong";
-    static constexpr std::string_view OCT_TREE_DEBUG_DRAW_INDEX_BUFFER = "oct_tree_debug_draw_index_buffer";
-    static constexpr std::string_view OCT_TREE_DEBUG_DRAW_INDIRECT_BUFFER = "oct_tree_debug_draw_indirect_buffer";
-    static constexpr std::string_view OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER = "oct_tree_pre_deferred_debug_info_buffer";
-    static constexpr std::string_view OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER = "oct_tree_pre_deferred_debug_list_buffer";
-    static constexpr std::string_view OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER =
-        "oct_tree_pre_deferred_debug_draw_indirect_buffer";
-
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED = "run_gbuffer_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
-    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED = "run_build_oct_tree_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
@@ -164,80 +135,10 @@ private:
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
 
-    static constexpr std::string_view RT_RESET_OCT_TREE = "reset_oct_tree";
-    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE = "run_build_oct_tree";
-    static constexpr std::string_view RT_RUN_BUILD_OCT_TREE_DEFERRED = "run_build_oct_tree_deferred";
-    static constexpr std::string_view RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG = "capture_oct_tree_pre_deferred_debug";
-    static constexpr std::string_view RT_SETUP_OCT_TREE_DEBUG_DRAW = "setup_oct_tree_debug_draw";
-    static constexpr std::string_view RT_RUN_OCT_TREE_DEBUG_DRAW = "run_oct_tree_debug_draw";
-    static constexpr std::string_view RT_RUN_OCT_TREE_PRE_DEFERRED_DEBUG_DRAW = "run_oct_tree_pre_deferred_debug_draw";
-
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
         glm::vec4 camera_world_position;
     };
-
-    struct OctTreeInfo {
-        glm::vec3 origin;
-        float width;
-        uint32_t max_depth;
-        uint32_t max_node_count;
-        uint32_t max_leaves_count;
-        uint32_t node_count;
-        uint32_t leaves_count;
-        uint32_t data_count;
-        uint32_t deferred_task_count_ping;
-        uint32_t deferred_task_count_pong;
-        uint32_t max_deferred_task_count;
-    };
-
-    struct OctTreeNode {
-        enum class ChildrenState {
-            NODE = 0,
-            EMPTY = 1,
-            ALLOCATING = 2,
-            LEAF = 3
-        };
-        enum Subregion {
-            XYZ_000,
-            XYZ_001,
-            XYZ_010,
-            XYZ_011,
-            XYZ_100,
-            XYZ_101,
-            XYZ_110,
-            XYZ_111,
-            MAX_SUBREGION
-        };
-        // Mirrors the packed Slang description: state 31:30; leaf occupancy 29:22/block 21:0;
-        // nodes use block 21:0 with bits 29:22 unused. Block indices address eight entries.
-        uint32_t children_data;
-        uint32_t data_index;
-        int32_t parent_index;
-    };
-
-    static_assert(sizeof(OctTreeNode) == 12);
-    static_assert(alignof(OctTreeNode) == alignof(uint32_t));
-    static_assert(offsetof(OctTreeNode, data_index) == 4);
-    static_assert(offsetof(OctTreeNode, parent_index) == 8);
-    static_assert(OCT_TREE_MAX_DEPTH >= 2);
-    static_assert(OCT_TREE_MAX_NODE_COUNT % 8 == 0 && OCT_TREE_MAX_NODE_COUNT <= (1U << 22U) * 8U);
-    static_assert(OCT_TREE_MAX_LEAVES_COUNT % 8 == 0 && OCT_TREE_MAX_LEAVES_COUNT <= (1U << 22U) * 8U);
-
-    struct OctTreeLeaf {
-        uint32_t data_index;
-        int32_t parent_index;
-    };
-
-    struct OctTreeDeferredListEntry {
-        uint32_t node_index;
-        uint32_t current_depth;
-        int32_t remaining_depth;
-        alignas(16) glm::vec3 oct_tree_position;
-    };
-
-    static_assert(offsetof(OctTreeDeferredListEntry, oct_tree_position) == 16);
-    static_assert(sizeof(OctTreeDeferredListEntry) == 32);
 
     void control(double p_delta);
     void update_descriptors();
@@ -249,13 +150,10 @@ private:
     void create_shadow_map_resources();
     void create_gbuffer_resources();
     void create_lighting_output_resources();
-    void create_oct_tree_resources();
-    void initialize_oct_tree();
     void setup_light_billboard_overlay_resources();
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
-    GraphicsPipelineCompilerVKContext make_oct_tree_graphics_pipeline_context() const;
     RendTaskDescVK create_shadow_task(bool p_load_existing, bool p_double_sided = false) const;
     RendTaskDescVK create_gbuffer_task(bool p_load_existing, bool p_double_sided = false) const;
     void compile_shadow_moments_summed_area_table_pipelines();
@@ -274,20 +172,11 @@ private:
     RendTaskDescVK create_bloom_blur_task_desc() const;
     RendTaskDescVK create_bloom_acquire_task_desc();
     RendTaskDescVK create_present_result_image_task_desc() const;
-    RendTaskDescVK create_oct_tree_process_debug_capture_task_desc(std::string_view p_task_id,
-        std::string_view p_previous_task_id,
-        VoxelDebugViewMode p_mode) const;
-    RendTaskDescVK create_oct_tree_debug_draw_setup_task_desc() const;
-    RendTaskDescVK create_oct_tree_debug_draw_task_desc() const;
-    RendTaskDescVK create_oct_tree_pre_deferred_debug_draw_task_desc() const;
-    RendTaskDescVK create_oct_tree_reset_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
-    RendTaskDescVK create_oct_tree_build_task_desc(
-        std::string_view p_task_id, std::string_view p_previous_task_id, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_double_sided = false) const;
-    RendTaskDescVK create_oct_tree_deferred_propagation_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 
+    Unique<OctTreeRenderFeature> oct_tree;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
@@ -307,16 +196,6 @@ private:
     RefRes<RUShader> bloom_extract_shader_resource;
     RefRes<RUShader> bloom_ping_write_shader_resource;
     RefRes<RUShader> bloom_pong_write_shader_resource;
-    RefRes<RUGraphicsPipeline> oct_tree_build_pipeline_resource;
-    RefRes<RUShader> oct_tree_reset_shader_resource;
-    RefRes<RUShader> oct_tree_deferred_count_reset_ping_shader_resource;
-    RefRes<RUShader> oct_tree_deferred_count_reset_pong_shader_resource;
-    RefRes<RUShader> oct_tree_deferred_propagation_ping_write_shader_resource;
-    RefRes<RUShader> oct_tree_deferred_propagation_pong_write_shader_resource;
-    RefRes<RUShader> oct_tree_pre_deferred_debug_capture_shader_resource;
-    RefRes<RUShader> oct_tree_debug_draw_setup_shader_resource;
-    RefRes<RUGraphicsPipeline> oct_tree_debug_draw_pipeline_resource;
-    RefRes<RUGraphicsPipeline> oct_tree_pre_deferred_debug_draw_pipeline_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
@@ -336,16 +215,6 @@ private:
     Ref<ROComputePipelineVK> bloom_pong_write_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> oct_tree_build_graphics_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_reset_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_deferred_count_reset_ping_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_deferred_count_reset_pong_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_deferred_propagation_ping_write_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_deferred_propagation_pong_write_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_pre_deferred_debug_capture_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> oct_tree_debug_draw_setup_compute_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> oct_tree_debug_draw_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> oct_tree_pre_deferred_debug_draw_graphics_pipeline = MEM_NULL;
     Ref<ROImageVK> gbuffer_albedo_image;
     Ref<ROImageVK> gbuffer_normal_image;
     Ref<ROImageVK> gbuffer_rma_image;
@@ -388,16 +257,6 @@ private:
     Ref<ROImageViewVK> light_billboard_texture_view;
     Ref<ROSamplerVK> light_billboard_sampler;
 
-    Ref<ROBufferVK> oct_tree_info;
-    Ref<ROBufferVK> oct_tree_nodes;
-    Ref<ROBufferVK> oct_tree_leaves;
-    Ref<ROBufferVK> oct_tree_deferred_list_ping;
-    Ref<ROBufferVK> oct_tree_deferred_list_pong;
-    Ref<ROBufferVK> oct_tree_debug_draw_index_buffer;
-    Ref<ROBufferVK> oct_tree_debug_draw_indirect_buffer;
-    Ref<ROBufferVK> oct_tree_pre_deferred_debug_info_buffer;
-    Ref<ROBufferVK> oct_tree_pre_deferred_debug_list_buffer;
-    Ref<ROBufferVK> oct_tree_pre_deferred_debug_draw_indirect_buffer;
     ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
