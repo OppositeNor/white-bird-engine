@@ -22,7 +22,6 @@
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
-#include "utils/defs.hh"
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -153,10 +152,10 @@ private:
     static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
-    static constexpr size_t OCT_TREE_MAX_DEPTH = 7;
+    static constexpr size_t OCT_TREE_MAX_DEPTH = 9;
     static constexpr size_t OCT_TREE_EXTENT = 1 << OCT_TREE_MAX_DEPTH;
-    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT * 0.25;
-    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = WBE_KI_B(1024);
+    static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT / 8;
+    static constexpr size_t OCT_TREE_MAX_NODE_COUNT = OCT_TREE_MAX_LEAVES_COUNT / 4;
     static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT;
     static constexpr size_t OCT_TREE_VOXEL_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT;
     static constexpr size_t OCT_TREE_CLAIM_WORD_COUNT = (OCT_TREE_VOXEL_COUNT + 31U) / 32U;
