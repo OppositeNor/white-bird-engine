@@ -58,7 +58,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float ambient_occlusion = clamp(rma_flags.b, 0.0, 1.0);
     float3 direct_lighting = direct_lighting_texture.Load(int3(dispatch_thread_id, 0)).rgb;
     float3 indirect_lighting = indirect_lighting_texture.Load(int3(dispatch_thread_id, 0)).rgb;
-    float3 color = (direct_lighting + indirect_lighting) * ambient_occlusion;
+    float3 color = (direct_lighting + indirect_lighting * ambient_occlusion);
     color = color / (color + float3(1.0));
     post_processed_output[dispatch_thread_id] = float4(color, 1.0);
 }
