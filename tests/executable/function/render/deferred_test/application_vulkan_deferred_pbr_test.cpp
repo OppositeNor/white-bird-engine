@@ -314,10 +314,22 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
             throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
         }
     }
+    bool rebuild_static_every_frame = false;
+    if (const char* selection = std::getenv("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT")) {
+        if (std::string_view(selection) == "1") {
+            rebuild_static_every_frame = true;
+        }
+        else if (std::string_view(selection) != "0") {
+            throw std::runtime_error("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT must be 0 or 1.");
+        }
+    }
     octree = make_unique<OctreeRenderFeature>(render_allocator, renderer_vk, static_set_resources,
-        &voxel_debug_view_mode, octree_implementation);
+        &voxel_debug_view_mode, octree_implementation, rebuild_static_every_frame);
     stdout_log(WBE_CHANNEL_DEBUG)->message(octree_implementation == OctreeRenderFeature::Implementation::PASS_PUBLISHED
         ? "Octree construction: octree_2 (pass publication)." : "Octree construction: octree (atomic publication).");
+    stdout_log(WBE_CHANNEL_DEBUG)->message(rebuild_static_every_frame
+        ? "Octree static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
+        : "Octree static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = create_shadow_task(false);

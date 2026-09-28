@@ -213,9 +213,11 @@ private:
 OctreeRenderFeature::OctreeRenderFeature(RendererVK* p_renderer,
     Ref<StaticSetResourcesVK> p_static_set_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-    Implementation p_implementation)
+    Implementation p_implementation,
+    bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_set_resources(std::move(p_static_set_resources)), debug_view_mode(p_debug_view_mode), implementation(p_implementation) {
+      static_set_resources(std::move(p_static_set_resources)), debug_view_mode(p_debug_view_mode), implementation(p_implementation),
+      rebuild_static_every_frame(p_rebuild_static_every_frame) {
     if (renderer_vk == nullptr || static_set_resources == MEM_NULL || debug_view_mode == nullptr) {
         throw std::runtime_error("OctreeRenderFeature: renderer, scene and debug state are required.");
     }
@@ -721,6 +723,10 @@ RendTaskDescVK OctreeRenderFeature::get_state_update_render_task_desc(std::strin
 }
 
 RendTaskDescVK OctreeRenderFeature::make_static_once(RendTaskDescVK p_task, bool p_finish) const {
+    if (rebuild_static_every_frame) {
+        // The reset stage clears the counters and root nodes, so every frame rebuilds from an empty tree.
+        return p_task;
+    }
     auto create = std::move(p_task.create);
     p_task.create = [create = std::move(create),
                         allocator = render_allocator,

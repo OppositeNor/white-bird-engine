@@ -63,11 +63,14 @@ public:
      * @brief Creates pipelines and buffers on the rendering thread.
      * @details The renderer, allocator, and debug-mode state must outlive this object and its registered graphs.
      * The feature retains shared ownership of the static scene. Invalid dependencies throw.
+     * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once,
+     * for observing its per-frame cost. Dynamic construction is unaffected either way.
      */
     OctreeRenderFeature(RendererVK* p_renderer,
         Ref<StaticSetResourcesVK> p_static_set_resources,
         const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-        Implementation p_implementation);
+        Implementation p_implementation,
+        bool p_rebuild_static_every_frame = false);
     ~OctreeRenderFeature() = default;
     OctreeRenderFeature(const OctreeRenderFeature&) = delete;
     OctreeRenderFeature(OctreeRenderFeature&&) = delete;
@@ -281,6 +284,8 @@ private:
     Ref<StaticSetResourcesVK> static_set_resources;
     const std::atomic<VoxelDebugViewMode>* debug_view_mode;
     Implementation implementation;
+    // Skips the run-once wrappers so the static scene is reset and rebuilt every frame.
+    bool rebuild_static_every_frame;
     // Render-thread completion shared by all graph variants using these buffers.
     Ref<bool> static_build_completed;
     Ref<ROBufferVK> dynamic_nodes;
