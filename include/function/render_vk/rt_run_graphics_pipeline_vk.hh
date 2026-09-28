@@ -21,6 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"

@@ -15,9 +15,12 @@
 #ifndef WBE_FILE_RT_TRIGGERED_VK_HH
 #define WBE_FILE_RT_TRIGGERED_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include <atomic>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

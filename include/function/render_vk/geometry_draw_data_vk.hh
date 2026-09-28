@@ -17,6 +17,8 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
+#include "glm/ext/matrix_float4x4.hpp"
+#include <cstdint>
 #include <glm/mat4x4.hpp>
 #include <span>
 #include <vulkan/vulkan_core.h>

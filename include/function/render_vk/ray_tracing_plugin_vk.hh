@@ -15,10 +15,12 @@
 #ifndef WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 #define WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"

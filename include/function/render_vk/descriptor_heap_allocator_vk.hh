@@ -103,7 +103,8 @@ public:
     /**
      * @brief Release a previously allocated descriptor range.
      */
-    void deallocate_descriptor(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_first_index, uint32_t p_count = 1);
+    void deallocate_descriptor(
+        DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_first_index, uint32_t p_count = 1);
     /**
      * @brief Check whether a range belongs to an arena and is currently allocated.
      */
@@ -112,10 +113,8 @@ public:
     /**
      * @brief Encode a resource descriptor into an allocated arena slot.
      */
-    void write_resource_descriptor(DescriptorHeapIDVK p_heap_id,
-        DescriptorArenaIDVK p_arena_id,
-        uint32_t p_index,
-        const VkResourceDescriptorInfoEXT& p_descriptor) const;
+    void write_resource_descriptor(
+        DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_index, const VkResourceDescriptorInfoEXT& p_descriptor) const;
     /**
      * @brief Encode a sampler descriptor into an allocated arena slot.
      */

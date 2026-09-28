@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_STATIC_SET_COMPILER_VK_HH
 #define WBE_FILE_STATIC_SET_COMPILER_VK_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/material_texture_contract.hh"
 #include "function/render/render_resource_unit.hh"

@@ -13,12 +13,14 @@
    limitations under the License.
 */
 #include "function/application/application_game.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/game_config/game_config.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
@@ -32,6 +34,7 @@
 #include <cstddef>
 #include <format>
 #include <thread>
+#include <utility>
 
 namespace WhiteBirdEngine {
 

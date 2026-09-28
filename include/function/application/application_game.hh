@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_APPLICATION_GAME_HH
 #define WBE_FILE_APPLICATION_GAME_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"

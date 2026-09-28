@@ -91,10 +91,8 @@ public:
          * @return *this.
          * @throws std::runtime_error If either dimension is zero or the total size overflows.
          */
-        Builder& set_properties(size_t p_element_size,
-            size_t p_element_count,
-            VkBufferUsageFlags p_usage,
-            DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+        Builder& set_properties(
+            size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief Configure storage for one element.
@@ -105,9 +103,7 @@ public:
          * @return *this.
          * @throws std::runtime_error If the element size is zero.
          */
-        Builder& set_properties(size_t p_element_size,
-            VkBufferUsageFlags p_usage,
-            DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+        Builder& set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief Configure the buffer and retain initial bytes for upload during creation.
@@ -128,8 +124,7 @@ public:
          * @param p_domain Memory domain used by the buffer.
          * @return *this.
          */
-        Builder& initial_data(
-            const void* p_data, size_t p_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+        Builder& initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
 
         /**
          * @brief The domain where the memory of this buffer will be allocated.

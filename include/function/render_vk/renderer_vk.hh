@@ -187,8 +187,8 @@ public:
     /**
      * @brief Acquire shared ownership of the per-frame swap-chain image-view container.
      *
-     * Render graphs bind this stable container explicitly under `REND_RES_SWAP_CHAIN`. The renderer updates the current frame
-     * slot after acquiring a swap-chain image.
+     * Render graphs bind this stable container explicitly under `REND_RES_SWAP_CHAIN`. The renderer updates the current
+     * frame slot after acquiring a swap-chain image.
      *
      * @return The renderer-owned swap-chain image-view container.
      * @throws std::runtime_error If the renderer has no swap-chain image-view container.

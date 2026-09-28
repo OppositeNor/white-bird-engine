@@ -14,6 +14,7 @@
 */
 
 #include "function/input_manager/input_manager_regular.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include <atomic>
 #include <cstdint>

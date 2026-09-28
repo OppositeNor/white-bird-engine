@@ -18,8 +18,8 @@
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include <array>
 #include <any>
+#include <array>
 #include <format>
 #include <span>
 #include <stdexcept>
@@ -96,9 +96,8 @@ public:
     std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const final {
         const auto* p_typed_scheme = dynamic_cast<const SchemaType*>(&p_scheme);
         if (p_typed_scheme == nullptr) {
-            throw std::runtime_error(std::format("Failed to populate resource: expected typed scheme {} but got type {}.",
-                expected_scheme_type,
-                p_scheme.type));
+            throw std::runtime_error(std::format(
+                "Failed to populate resource: expected typed scheme {} but got type {}.", expected_scheme_type, p_scheme.type));
         }
         return populate_typed_scheme_ptr(p_res_chunk, *p_typed_scheme);
     }

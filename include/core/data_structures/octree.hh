@@ -190,17 +190,16 @@ private:
     HeapAllocator* allocator = nullptr;
     Ref<OctreeNode> root;
     void check_position(glm::vec3 p_position) const {
-        if (!std::isfinite(p_position.x) || !std::isfinite(p_position.y) || !std::isfinite(p_position.z) ||
-            p_position.x < 0.0F || p_position.y < 0.0F || p_position.z < 0.0F || p_position.x >= 1.0F ||
-            p_position.y >= 1.0F || p_position.z >= 1.0F) {
+        if (!std::isfinite(p_position.x) || !std::isfinite(p_position.y) || !std::isfinite(p_position.z) || p_position.x < 0.0F ||
+            p_position.y < 0.0F || p_position.z < 0.0F || p_position.x >= 1.0F || p_position.y >= 1.0F || p_position.z >= 1.0F) {
             throw std::runtime_error("Octree position lies outside [0, 1)^3.");
         }
     }
 
-    static typename OctreeNode::Subregion get_subregion(glm::vec3 p_position) {
-        uint8_t subregion = (p_position.x >= 0.5F ? 0b100 : 0) | (p_position.y >= 0.5F ? 0b010 : 0) |
-                            (p_position.z >= 0.5F ? 0b001 : 0);
-        return static_cast<typename OctreeNode::Subregion>(subregion);
+    static OctreeNode::Subregion get_subregion(glm::vec3 p_position) {
+        uint8_t subregion =
+            (p_position.x >= 0.5F ? 0b100 : 0) | (p_position.y >= 0.5F ? 0b010 : 0) | (p_position.z >= 0.5F ? 0b001 : 0);
+        return static_cast<OctreeNode::Subregion>(subregion);
     }
 };
 
