@@ -278,12 +278,18 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
         WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
     }
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
-    if (requested == summed_area_table_active) {
-        return;
+    if (requested != summed_area_table_active) {
+        renderer_vk->activate_render_graph(requested ? DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH : DEFERRED_MIPMAP_RENDER_GRAPH);
+        summed_area_table_active = requested;
+        stdout_log(WBE_CHANNEL_DEBUG)->message(requested ? "Deferred shadow filtering: summed-area table." : "Deferred shadow filtering: mipmaps.");
     }
-    renderer_vk->activate_render_graph(requested ? DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH : DEFERRED_MIPMAP_RENDER_GRAPH);
-    summed_area_table_active = requested;
-    stdout_log(WBE_CHANNEL_DEBUG)->message(requested ? "Deferred shadow filtering: summed-area table." : "Deferred shadow filtering: mipmaps.");
+    if (bloom_acquire_requested.exchange(false, std::memory_order_acq_rel)) {
+        auto& task = bloom_acquire_tasks[summed_area_table_active ? 1 : 0];
+        if (task == MEM_NULL) {
+            throw std::runtime_error("Deferred bloom acquisition task is unavailable.");
+        }
+        task->activate.store(true, std::memory_order_release);
+    }
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_draw_task() {

@@ -21,7 +21,6 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include <atomic>
 #include <cstdint>
 #include <future>
 #include <semaphore>
@@ -34,11 +33,10 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RTCPUInFlightAcquireVK
- * @brief Starts an asynchronous CPU acquisition of a graph image when requested.
+ * @brief Starts an asynchronous CPU acquisition of a graph image on every recording.
  *
- * An unrequested task records no commands; its empty graph submission still signals the task's outgoing Vulkan semaphores.
- * When requested, the task acquires the complete underlying image into caller-owned storage, clears the request flag, and
- * releases the CPU semaphore after the storage has been populated. Instances are neither copyable nor movable.
+ * Acquires into caller-owned storage and releases the CPU completion semaphore after population.
+ * Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
  */
 class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
@@ -52,19 +50,17 @@ public:
     /**
      * @brief Construct an in-flight CPU image-acquisition task.
      *
-     * The request flag, completion semaphore, and destination storage are non-owning and must outlive the task and every
-     * acquisition it starts. The semaphore must be acquired before another request is issued.
+     * The completion semaphore and destination storage are non-owning and must outlive the task and every
+     * acquisition it starts. The semaphore must be acquired before recording another acquisition.
      *
      * @param p_render_data Base Vulkan render data.
      * @param p_image_view_id Render-graph resource id of the source image view.
      * @param p_destination CPU storage that receives the complete image.
-     * @param p_acquire_requested Atomic flag consumed and reset when an acquisition starts.
      * @param p_completion_semaphore CPU semaphore released after the destination has been populated.
      */
     RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data,
         std::string_view p_image_view_id,
         std::span<uint8_t> p_destination,
-        std::atomic_bool* p_acquire_requested,
         std::binary_semaphore* p_completion_semaphore);
 
     QueueFamilyVK queue_family() const override {
@@ -83,7 +79,6 @@ private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string image_view_id;
     std::span<uint8_t> destination;
-    std::atomic_bool* acquire_requested = nullptr;
     std::binary_semaphore* completion_semaphore = nullptr;
     Ref<RenderObjectContainerVK> image_view_container;
     std::future<void> pending_completion;

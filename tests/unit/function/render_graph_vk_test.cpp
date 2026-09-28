@@ -28,6 +28,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -287,6 +288,24 @@ TEST(WBERenderGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
     descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
     descriptor.add_task("first", make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, true));
     descriptor.add_task("second", make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, true));
+    RenderGraphVK graph(&render_data);
+
+    try {
+        graph.build_from_descriptor(descriptor);
+        FAIL() << "Expected conflicting graph-global resource accesses to fail.";
+    } catch (const std::runtime_error& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("resource 'logical' without an explicit execution path"), std::string::npos);
+    }
+}
+
+TEST(WBERenderGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_task("first", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, true)));
+    descriptor.add_task("second", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, &allocator, false, true)));
     RenderGraphVK graph(&render_data);
 
     try {

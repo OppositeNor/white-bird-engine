@@ -34,12 +34,9 @@
 
 namespace WhiteBirdEngine {
 
-RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data,
-    std::string_view p_buffer_id,
-    std::span<uint8_t> p_destination,
-    std::atomic_bool* p_acquire_requested,
-    std::binary_semaphore* p_completion_semaphore)
-    : render_data(p_render_data), buffer_id(p_buffer_id), destination(p_destination), acquire_requested(p_acquire_requested),
+RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(
+    const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id, std::span<uint8_t> p_destination, std::binary_semaphore* p_completion_semaphore)
+    : render_data(p_render_data), buffer_id(p_buffer_id), destination(p_destination),
       completion_semaphore(p_completion_semaphore) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
@@ -50,8 +47,8 @@ RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const BaseRenderDataV
     if (destination.empty()) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: CPU destination is empty.");
     }
-    if (acquire_requested == nullptr || completion_semaphore == nullptr) {
-        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: acquisition flag and completion semaphore are required.");
+    if (completion_semaphore == nullptr) {
+        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: completion semaphore is required.");
     }
 }
 
@@ -77,12 +74,12 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
         pending_completion = MEM_NULL;
     }
 
-    // An unrequested empty command buffer still completes the task's normal render-graph semaphore edges.
-    if (!acquire_requested->exchange(false, std::memory_order_acq_rel)) {
-        return;
-    }
     if (pending_completion != MEM_NULL) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: a new acquisition was requested before the previous one completed.");
+    }
+
+    if (buffer_container == MEM_NULL) {
+        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: source resource has not been bound.");
     }
 
     Ref<ROBufferVK> buffer = buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>();
@@ -95,10 +92,8 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
     }
 
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(buffer_size);
-    Ref<ROStagingBufferVK> staging_buffer = ROStagingBufferVK::Builder()
-                                                    .set_size(staging_buffer_size)
-                                                    .set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT)
-                                                    .create_ref(render_data);
+    Ref<ROStagingBufferVK> staging_buffer =
+        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(render_data);
     const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(buffer_size);
     const VkBufferCopy copy_region{
         .srcOffset = 0,
@@ -133,8 +128,8 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
             destination = destination,
             completion_semaphore = completion_semaphore]() mutable {
             std::memcpy(destination.data(), mapped_memory, buffer_size);
-            completion_semaphore->release();
             completion->store(true, std::memory_order_release);
+            completion_semaphore->release();
         },
         render_data->frames_in_flight - 1);
 }

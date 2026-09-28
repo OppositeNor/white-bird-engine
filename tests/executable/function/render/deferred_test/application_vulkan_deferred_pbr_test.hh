@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 #define WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 
+#include "core/memory/reference_raw.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
@@ -170,7 +172,7 @@ private:
     RendTaskDescVK create_combine_lighting_task_desc() const;
     RendTaskDescVK create_bloom_extract_task_desc() const;
     RendTaskDescVK create_bloom_blur_task_desc() const;
-    RendTaskDescVK create_bloom_acquire_task_desc();
+    RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
     CompositionCameraInfo make_composition_camera_info() const;
@@ -266,6 +268,9 @@ private:
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
     std::vector<uint8_t> bloom_acquire_buffer;
+    // Render-thread views of graph-owned wrappers, refreshed by each graph factory invocation.
+    std::array<RefRaw<RTTriggeredVK>, 2> bloom_acquire_tasks;
+    // Input-thread mailbox; render_update forwards requests to the active graph's wrapper.
     std::atomic_bool bloom_acquire_requested = false;
     std::binary_semaphore bloom_acquire_completed{0};
     bool bloom_acquire_key_was_down = false;

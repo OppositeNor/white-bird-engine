@@ -161,7 +161,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_extract_task_desc())
         .add_task(create_bloom_blur_task_desc())
-        .add_task(create_bloom_acquire_task_desc())
+        .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
         .add_task(oct_tree->get_debug_draw_render_task_desc(RT_RUN_PRESENT_RESULT_IMAGE))
         .add_task(oct_tree->get_pre_deferred_debug_draw_render_task_desc())
@@ -386,21 +386,24 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc() {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(bool p_use_summed_area_table) {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_ACQUIRE_BLOOM;
     task_desc.after(RT_BLUR_BLOOM);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_destination = std::span<uint8_t>(bloom_acquire_buffer),
-                           task_acquire_requested = &bloom_acquire_requested,
+                           this,
+                           task_index = p_use_summed_area_table ? 1U : 0U,
                            task_acquire_completed = &bloom_acquire_completed]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTCPUInFlightAcquireVK>(task_render_allocator,
+        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(task_render_allocator,
             task_base_render_data,
             BLOOM_PING_IMAGE_VIEW,
             task_destination,
-            task_acquire_requested,
             task_acquire_completed);
+        auto task = make_unique<RTTriggeredVK>(task_render_allocator, std::move(acquire_task));
+        bloom_acquire_tasks[task_index] = RefRaw<RTTriggeredVK>(task);
+        return task;
     };
     return task_desc;
 }

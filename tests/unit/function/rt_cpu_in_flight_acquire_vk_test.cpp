@@ -17,9 +17,9 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "utils/defs.hh"
 #include <array>
-#include <atomic>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <semaphore>
@@ -29,13 +29,12 @@
 
 namespace WhiteBirdEngine {
 
-TEST(WBERTCPUInFlightAcquireVKTest, UnrequestedRecordIsNoOp) {
+TEST(WBERTCPUInFlightAcquireVKTest, DirectRecordRequiresBoundSource) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     std::array<uint8_t, 4> destination{};
-    std::atomic_bool acquire_requested = false;
     std::binary_semaphore completion_semaphore(0);
-    RTCPUInFlightAcquireVK task(&render_data, "source_image", destination, &acquire_requested, &completion_semaphore);
+    RTCPUInFlightAcquireVK task(&render_data, "source_image", destination, &completion_semaphore);
 
     ASSERT_EQ(task.queue_family(), QueueFamilyVK::GRAPHICS);
     Vector<ResAccessVK, RenderAllocator> reads = task.read_resources();
@@ -44,8 +43,7 @@ TEST(WBERTCPUInFlightAcquireVKTest, UnrequestedRecordIsNoOp) {
     EXPECT_EQ(reads[0].usage, RendResUsageVK::TRANSFER_SRC);
     EXPECT_TRUE(task.write_resources().empty());
 
-    EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
-    EXPECT_FALSE(acquire_requested.load());
+    EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
     EXPECT_FALSE(completion_semaphore.try_acquire());
 }
 
@@ -53,15 +51,25 @@ TEST(WBERTCPUInFlightAcquireVKTest, RejectsInvalidNonOwningInputs) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     std::array<uint8_t, 4> destination{};
-    std::atomic_bool acquire_requested = false;
     std::binary_semaphore completion_semaphore(0);
 
-    EXPECT_THROW(RTCPUInFlightAcquireVK(nullptr, "source_image", destination, &acquire_requested, &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "", destination, &acquire_requested, &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", std::span<uint8_t>(), &acquire_requested, &completion_semaphore),
-        std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", destination, nullptr, &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", destination, &acquire_requested, nullptr), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(nullptr, "source_image", destination, &completion_semaphore), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "", destination, &completion_semaphore), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", std::span<uint8_t>(), &completion_semaphore), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", destination, nullptr), std::runtime_error);
+}
+
+TEST(WBERTCPUInFlightAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    std::array<uint8_t, 4> destination{};
+    std::binary_semaphore completion_semaphore(0);
+    RTTriggeredVK task(make_unique<RTCPUInFlightAcquireVK>(&allocator, &render_data, "source_image", destination, &completion_semaphore));
+    EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
+    task.activate.store(true);
+    EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
+    EXPECT_FALSE(task.activate.load());
+    EXPECT_FALSE(completion_semaphore.try_acquire());
 }
 
 } // namespace WhiteBirdEngine

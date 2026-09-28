@@ -23,7 +23,6 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
-#include <atomic>
 #include <chrono>
 #include <future>
 #include <semaphore>
@@ -36,13 +35,10 @@
 
 namespace WhiteBirdEngine {
 
-RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data,
-    std::string_view p_image_view_id,
-    std::span<uint8_t> p_destination,
-    std::atomic_bool* p_acquire_requested,
-    std::binary_semaphore* p_completion_semaphore)
+RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(
+    const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id, std::span<uint8_t> p_destination, std::binary_semaphore* p_completion_semaphore)
     : render_data(p_render_data), image_view_id(p_image_view_id), destination(p_destination),
-      acquire_requested(p_acquire_requested), completion_semaphore(p_completion_semaphore) {
+      completion_semaphore(p_completion_semaphore) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: render data is unavailable.");
     }
@@ -52,8 +48,8 @@ RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_
     if (destination.empty()) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: CPU destination is empty.");
     }
-    if (acquire_requested == nullptr || completion_semaphore == nullptr) {
-        throw std::runtime_error("RTCPUInFlightAcquireVK: acquisition flag and completion semaphore are required.");
+    if (completion_semaphore == nullptr) {
+        throw std::runtime_error("RTCPUInFlightAcquireVK: completion semaphore is required.");
     }
 }
 
@@ -80,12 +76,12 @@ void RTCPUInFlightAcquireVK::record(VkCommandBuffer /*p_command_buffer*/, double
         pending_completion.get();
     }
 
-    // An empty command buffer still completes the task's normal render-graph semaphore edges.
-    if (!acquire_requested->exchange(false, std::memory_order_acq_rel)) {
-        return;
-    }
     if (pending_completion.valid()) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: a new acquisition was requested before the previous one completed.");
+    }
+
+    if (image_view_container == MEM_NULL) {
+        throw std::runtime_error("RTCPUInFlightAcquireVK: source resource has not been bound.");
     }
 
     Ref<ROImageViewVK> image_view = image_view_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();

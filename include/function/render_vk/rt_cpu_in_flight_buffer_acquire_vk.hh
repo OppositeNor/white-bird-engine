@@ -33,11 +33,10 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RTCPUInFlightBufferAcquireVK
- * @brief Starts an asynchronous CPU acquisition of a graph buffer when requested.
+ * @brief Starts an asynchronous CPU acquisition of a graph buffer on every recording.
  *
- * An unrequested task records no commands; its empty graph submission still signals the task's outgoing Vulkan semaphores.
- * When requested, the task acquires the complete buffer into caller-owned storage, clears the request flag, and releases the CPU
- * semaphore after the storage has been populated. Instances are neither copyable nor movable.
+ * Acquires into caller-owned storage and releases the CPU completion semaphore after population.
+ * Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
  */
 class RTCPUInFlightBufferAcquireVK final : public IRenderTaskVK {
 public:
@@ -51,20 +50,18 @@ public:
     /**
      * @brief Construct an in-flight CPU buffer-acquisition task.
      *
-     * The source buffer must have transfer-source usage. The request flag, completion semaphore, and destination storage are
-     * non-owning and must outlive the task and every acquisition it starts. The semaphore must be acquired before another request
-     * is issued.
+     * The source buffer must have transfer-source usage. The completion semaphore and destination storage are
+     * non-owning and must outlive the task and every acquisition it starts. The semaphore must be acquired before
+     * recording another acquisition.
      *
      * @param p_render_data Base Vulkan render data.
      * @param p_buffer_id Render-graph resource id of the source buffer.
      * @param p_destination CPU storage that receives the complete buffer.
-     * @param p_acquire_requested Atomic flag consumed and reset when an acquisition starts.
      * @param p_completion_semaphore CPU semaphore released after the destination has been populated.
      */
     RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data,
         std::string_view p_buffer_id,
         std::span<uint8_t> p_destination,
-        std::atomic_bool* p_acquire_requested,
         std::binary_semaphore* p_completion_semaphore);
 
     QueueFamilyVK queue_family() const override {
@@ -83,7 +80,6 @@ private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string buffer_id;
     std::span<uint8_t> destination;
-    std::atomic_bool* acquire_requested = nullptr;
     std::binary_semaphore* completion_semaphore = nullptr;
     Ref<RenderObjectContainerVK> buffer_container;
     Ref<std::atomic_bool> pending_completion;
