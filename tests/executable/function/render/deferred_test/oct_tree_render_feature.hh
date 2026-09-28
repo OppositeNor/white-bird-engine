@@ -97,7 +97,7 @@ public:
     /**
      * @brief Creates bounded deferred retries, including publication after every iteration for oct_tree_2.
      */
-    RendTaskDescVK get_deferred_construction_render_task_desc() const;
+    RendTaskDescVK get_deferred_construction_render_task_desc(bool p_dynamic = true) const;
     /**
      * @brief Creates indirect debug-draw setup after construction is complete.
      */
@@ -162,11 +162,12 @@ private:
     static constexpr size_t OCT_TREE_VOXEL_COUNT = OCT_TREE_EXTENT * OCT_TREE_EXTENT * OCT_TREE_EXTENT;
     static constexpr size_t OCT_TREE_MAX_LEAVES_COUNT = OCT_TREE_VOXEL_COUNT / 8;
     static constexpr size_t OCT_TREE_MAX_NODE_COUNT = OCT_TREE_VOXEL_COUNT / 64;
+    static constexpr size_t OCT_TREE_MAX_DYNAMIC_NODE_COUNT = OCT_TREE_MAX_NODE_COUNT;
+    static constexpr size_t OCT_TREE_MAX_DYNAMIC_LEAVES_COUNT = OCT_TREE_MAX_LEAVES_COUNT;
     static constexpr size_t OCT_TREE_MAX_DEFERRED_TASK_COUNT = OCT_TREE_MAX_NODE_COUNT * 5 / 2;
     // Matches deferred propagation and debug-capture shaders; keeps the expanded lists within 65535 workgroups.
     static constexpr uint32_t OCT_TREE_DEFERRED_THREADS_PER_GROUP = 128;
-    static_assert((OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) /
-                      OCT_TREE_DEFERRED_THREADS_PER_GROUP <= 65535);
+    static_assert((OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) / OCT_TREE_DEFERRED_THREADS_PER_GROUP <= 65535);
     static constexpr size_t OCT_TREE_CLAIM_WORD_COUNT = (OCT_TREE_VOXEL_COUNT + 31U) / 32U;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(OCT_TREE_VOXEL_COUNT <= (0xffffffffU - OCT_TREE_MAX_NODE_COUNT) / 8U);
@@ -174,6 +175,8 @@ private:
     static constexpr float OCT_TREE_WIDTH = 32.0F;
     static constexpr glm::vec3 OCT_TREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
 
+    static constexpr std::string_view OCT_TREE_DYNAMIC_NODES = "oct_tree_dynamic_nodes";
+    static constexpr std::string_view OCT_TREE_DYNAMIC_LEAVES = "oct_tree_dynamic_leaves";
     static constexpr std::string_view OCT_TREE_INFO = "oct_tree_info";
     static constexpr std::string_view OCT_TREE_NODE_BUFFER = "oct_tree_node_buffer";
     static constexpr std::string_view OCT_TREE_LEAF_BUFFER = "oct_tree_leaves_buffer";
@@ -197,14 +200,24 @@ private:
         uint32_t deferred_task_count_ping;
         uint32_t deferred_task_count_pong;
         uint32_t max_deferred_task_count;
+        uint32_t max_dynamic_node_count;
+        uint32_t max_dynamic_leaves_count;
+        uint32_t dynamic_node_count;
+        uint32_t dynamic_leaves_count;
     };
+
+    static_assert(sizeof(OctTreeInfo) == 68);
+    static_assert(offsetof(OctTreeInfo, dynamic_node_count) == 60);
 
     struct OctTreeNode {
         enum class ChildrenState {
             NODE = 0,
             EMPTY = 1,
             ALLOCATING = 2,
-            LEAF = 3
+            LEAF = 3,
+            ALLOCATING_DYNAMIC = 4,
+            NODE_DYNAMIC = 5,
+            LEAF_DYNAMIC = 6
         };
         enum Subregion {
             XYZ_000,
@@ -217,25 +230,40 @@ private:
             XYZ_111,
             MAX_SUBREGION
         };
-        // Mirrors the packed Slang description: state 31:30; leaf occupancy 29:22/block 21:0;
-        // nodes use block 21:0 with bits 29:22 unused. Block indices address eight entries.
+        // Mirrors the packed Slang description: state 31:29; leaf occupancy 28:21/block 20:0;
+        // nodes use block 20:0 with bits 28:21 unused. Block indices address eight entries.
         uint32_t children_data;
         uint32_t data_index;
         int32_t parent_index;
+        uint32_t original_children_data;
     };
 
-    static_assert(sizeof(OctTreeNode) == 12);
+    static_assert(sizeof(OctTreeNode) == 16);
     static_assert(alignof(OctTreeNode) == alignof(uint32_t));
     static_assert(offsetof(OctTreeNode, data_index) == 4);
     static_assert(offsetof(OctTreeNode, parent_index) == 8);
     static_assert(OCT_TREE_MAX_DEPTH >= 2);
-    static_assert(OCT_TREE_MAX_NODE_COUNT % 8 == 0 && OCT_TREE_MAX_NODE_COUNT <= (1U << 22U) * 8U);
-    static_assert(OCT_TREE_MAX_LEAVES_COUNT % 8 == 0 && OCT_TREE_MAX_LEAVES_COUNT <= (1U << 22U) * 8U);
+    static_assert(OCT_TREE_MAX_NODE_COUNT % 8 == 0 && OCT_TREE_MAX_NODE_COUNT <= (1U << 21U) * 8U);
+    static_assert(OCT_TREE_MAX_LEAVES_COUNT % 8 == 0 && OCT_TREE_MAX_LEAVES_COUNT <= (1U << 21U) * 8U);
 
     struct OctTreeLeaf {
         uint32_t data_index;
         int32_t parent_index;
     };
+
+    struct OctTreeDynamicLeafBlock {
+        uint32_t original_children_data;
+        OctTreeLeaf leaves[8];
+    };
+    static_assert(OCT_TREE_MAX_DYNAMIC_LEAVES_COUNT % 8 == 0 && OCT_TREE_MAX_DYNAMIC_LEAVES_COUNT <= (1U << 21U) * 8U);
+    static_assert(sizeof(OctTreeDynamicLeafBlock) == 68);
+    static_assert(offsetof(OctTreeDynamicLeafBlock, leaves) == 4);
+    static_assert(offsetof(OctTreeNode, original_children_data) == 12);
+    static_assert(OCT_TREE_MAX_NODE_COUNT + OCT_TREE_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
+
+    RendTaskDescVK get_dynamic_clear_task_desc(std::string_view p_previous_task_id) const;
+    RendTaskDescVK get_dynamic_publication_task_desc(std::string_view p_previous_task_id) const;
+    RendTaskDescVK make_static_once(RendTaskDescVK p_task, bool p_finish = false) const;
 
     struct OctTreeDeferredListEntry {
         uint32_t node_index;
@@ -253,6 +281,15 @@ private:
     Ref<StaticSetResourcesVK> static_set_resources;
     const std::atomic<VoxelDebugViewMode>* debug_view_mode;
     Implementation implementation;
+    // Render-thread completion shared by all graph variants using these buffers.
+    Ref<bool> static_build_completed;
+    Ref<ROBufferVK> dynamic_nodes;
+    Ref<ROBufferVK> dynamic_leaves;
+    Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;
+    Ref<ROComputePipelineVK> dynamic_clear_pipeline;
+    Ref<ROComputePipelineVK> dynamic_publication_pipeline;
+    Ref<ROComputePipelineVK> dynamic_ping_pipeline;
+    Ref<ROComputePipelineVK> dynamic_pong_pipeline;
     Ref<ROBufferVK> pending_children;
     Ref<ROBufferVK> voxel_claims;
     Ref<ROComputePipelineVK> update_states_pipeline;

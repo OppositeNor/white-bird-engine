@@ -63,8 +63,8 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         voxel_claims[index] = 0;
     }
     if (index < 8) {
-        tree_nodes[index].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 30;
-        pending_children[index] = uint(OctTreeNode::ChildrenState::EMPTY) << 30;
+        tree_nodes[index].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
+        pending_children[index] = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
         tree_nodes[index].data_index = index;
         tree_nodes[index].parent_index = -1;
     }

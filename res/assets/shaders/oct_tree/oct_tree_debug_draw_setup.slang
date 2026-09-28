@@ -43,7 +43,7 @@ void main() {
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
     DrawIndexedIndirectCommand command;
     command.index_count = 36;
-    command.instance_count = oct_tree_info[0].leaves_count + 1;
+    command.instance_count = oct_tree_info[0].leaves_count + oct_tree_info[0].dynamic_leaves_count + 1;
     command.first_index = 0;
     command.vertex_offset = 0;
     command.first_instance = 0;

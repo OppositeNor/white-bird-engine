@@ -14,6 +14,7 @@
 */
 #include "oct_tree_render_feature.hh"
 #include "../render_test.hh"
+#include "core/logging/log.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
@@ -22,7 +23,9 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "resource/resource_manager/resource_manager.hh"
+#include <algorithm>
 #include <array>
 #include <format>
 #include <optional>
@@ -31,6 +34,86 @@
 
 namespace WhiteBirdEngine {
 namespace {
+
+/**
+ * @brief Shares static-build completion across graph variants; neither copyable nor movable.
+ */
+class RTOctTreeStaticStageVK final : public IRenderTaskVK {
+public:
+    RTOctTreeStaticStageVK() = delete;
+    RTOctTreeStaticStageVK(Unique<IRenderTaskVK> p_task, Ref<bool> p_completed, bool p_finish)
+        : task(std::move(p_task)), completed(std::move(p_completed)), finish(p_finish) {
+        WBE_DEBUG_ASSERT(task != MEM_NULL && completed != MEM_NULL);
+    }
+    ~RTOctTreeStaticStageVK() override = default;
+    RTOctTreeStaticStageVK(const RTOctTreeStaticStageVK&) = delete;
+    RTOctTreeStaticStageVK(RTOctTreeStaticStageVK&&) = delete;
+    RTOctTreeStaticStageVK& operator=(const RTOctTreeStaticStageVK&) = delete;
+    RTOctTreeStaticStageVK& operator=(RTOctTreeStaticStageVK&&) = delete;
+    QueueFamilyVK queue_family() const override {
+        return task->queue_family();
+    }
+    Vector<ResAccessVK, RenderAllocator> read_resources() const override {
+        return task->read_resources();
+    }
+    Vector<ResAccessVK, RenderAllocator> write_resources() const override {
+        return task->write_resources();
+    }
+    void bind_resources(const RendResViewVK& p_resources) override {
+        task->bind_resources(p_resources);
+    }
+    void record(VkCommandBuffer p_buffer, double p_delta) override {
+        if (*completed) {
+            return;
+        }
+        task->record(p_buffer, p_delta);
+        if (finish) {
+            *completed = true;
+            stdout_log(WBE_CHANNEL_DEBUG)->message("Octree static construction recorded once.");
+        }
+    }
+
+private:
+    Unique<IRenderTaskVK> task;
+    Ref<bool> completed;
+    bool finish;
+};
+
+/**
+ * @brief Orders mutation of the shared tree after the preceding frame's graphics consumers.
+ */
+class RTOctTreeFrameBeginVK final : public IRenderTaskVK {
+public:
+    RTOctTreeFrameBeginVK() = delete;
+    explicit RTOctTreeFrameBeginVK(RenderAllocator* p_allocator) : allocator(p_allocator) {
+    }
+    ~RTOctTreeFrameBeginVK() override = default;
+    RTOctTreeFrameBeginVK(const RTOctTreeFrameBeginVK&) = delete;
+    RTOctTreeFrameBeginVK(RTOctTreeFrameBeginVK&&) = delete;
+    RTOctTreeFrameBeginVK& operator=(const RTOctTreeFrameBeginVK&) = delete;
+    RTOctTreeFrameBeginVK& operator=(RTOctTreeFrameBeginVK&&) = delete;
+    QueueFamilyVK queue_family() const override {
+        return QueueFamilyVK::GRAPHICS;
+    }
+    Vector<ResAccessVK, RenderAllocator> read_resources() const override {
+        return Vector<ResAccessVK, RenderAllocator>(allocator);
+    }
+    Vector<ResAccessVK, RenderAllocator> write_resources() const override {
+        return Vector<ResAccessVK, RenderAllocator>(allocator);
+    }
+    void record(VkCommandBuffer p_buffer, double) override {
+        VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
+        VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .memoryBarrierCount = 1, .pMemoryBarriers = &barrier};
+        vkCmdPipelineBarrier2(p_buffer, &dependency);
+    }
+
+private:
+    RenderAllocator* allocator;
+};
 
 constexpr std::array<uint32_t, 36> OCT_TREE_DEBUG_CUBE_INDICES{
     0,
@@ -141,6 +224,7 @@ OctTreeRenderFeature::OctTreeRenderFeature(RendererVK* p_renderer,
     }
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = base_render_data->allocator;
+    static_build_completed = make_ref<bool>(render_allocator, false);
     compile_pipelines();
     create_resources();
 }
@@ -176,6 +260,28 @@ void OctTreeRenderFeature::compile_pipelines() {
             .graphics_pipeline;
     ComputePipelineCompilerVK oct_tree_compute_compiler(ComputePipelineCompilerVKContext{
         .allocator = render_allocator, .render_data = base_render_data, .render_database = renderer_vk->get_render_database()});
+    dynamic_build_pipeline = oct_tree_compiler
+                                 .compile("oct_tree_dynamic_build_static_set_pipeline",
+                                     resource_manager->get_resource<RUGraphicsPipeline>("oct_tree_dynamic_build_static_set_pipeline"))
+                                 .graphics_pipeline;
+    dynamic_clear_pipeline =
+        oct_tree_compute_compiler
+            .compile("oct_tree_clear_dynamic_shader", resource_manager->get_resource<RUShader>("oct_tree_clear_dynamic_shader"))
+            .compute_pipeline;
+    dynamic_publication_pipeline = oct_tree_compute_compiler
+                                       .compile("oct_tree_dynamic_update_states_shader",
+                                           resource_manager->get_resource<RUShader>("oct_tree_dynamic_update_states_shader"))
+                                       .compute_pipeline;
+    dynamic_ping_pipeline =
+        oct_tree_compute_compiler
+            .compile("oct_tree_dynamic_build_deferred_propagation_pong_write_shader",
+                resource_manager->get_resource<RUShader>("oct_tree_dynamic_build_deferred_propagation_pong_write_shader"))
+            .compute_pipeline;
+    dynamic_pong_pipeline =
+        oct_tree_compute_compiler
+            .compile("oct_tree_dynamic_build_deferred_propagation_ping_write_shader",
+                resource_manager->get_resource<RUShader>("oct_tree_dynamic_build_deferred_propagation_ping_write_shader"))
+            .compute_pipeline;
     oct_tree_reset_compute_pipeline =
         oct_tree_compute_compiler.compile(std::format("{}_reset_shader", shader_prefix), oct_tree_reset_shader_resource).compute_pipeline;
     oct_tree_deferred_count_reset_ping_compute_pipeline =
@@ -231,6 +337,12 @@ void OctTreeRenderFeature::create_resources() {
     oct_tree_nodes = ROBufferVK::Builder()
                          .set_properties(sizeof(OctTreeNode), OCT_TREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                          .create_ref(base_render_data);
+    dynamic_nodes = ROBufferVK::Builder()
+                        .set_properties(sizeof(OctTreeNode), OCT_TREE_MAX_DYNAMIC_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                        .create_ref(base_render_data);
+    dynamic_leaves = ROBufferVK::Builder()
+                         .set_properties(sizeof(OctTreeDynamicLeafBlock), OCT_TREE_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+                         .create_ref(base_render_data);
     oct_tree_leaves = ROBufferVK::Builder()
                           .set_properties(sizeof(OctTreeLeaf), OCT_TREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                           .create_ref(base_render_data);
@@ -264,7 +376,7 @@ void OctTreeRenderFeature::create_resources() {
         create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             &initial_debug_draw_command,
             sizeof(initial_debug_draw_command));
-    if (implementation == Implementation::PASS_PUBLISHED) {
+    {
         voxel_claims = ROBufferVK::Builder()
                            .set_properties(sizeof(uint32_t), OCT_TREE_CLAIM_WORD_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                            .create_ref(base_render_data);
@@ -288,11 +400,15 @@ void OctTreeRenderFeature::initialize() {
         .deferred_task_count_ping = 0,
         .deferred_task_count_pong = 0,
         .max_deferred_task_count = OCT_TREE_MAX_DEFERRED_TASK_COUNT,
+        .max_dynamic_node_count = OCT_TREE_MAX_DYNAMIC_NODE_COUNT,
+        .max_dynamic_leaves_count = OCT_TREE_MAX_DYNAMIC_LEAVES_COUNT,
+        .dynamic_node_count = 0,
+        .dynamic_leaves_count = 0,
     };
     std::array<OctTreeNode, 8> first_sectors{};
     for (uint32_t i = 0; i < first_sectors.size(); ++i) {
         first_sectors[i] = OctTreeNode{
-            .children_data = static_cast<uint32_t>(OctTreeNode::ChildrenState::EMPTY) << 30U,
+            .children_data = static_cast<uint32_t>(OctTreeNode::ChildrenState::EMPTY) << 29U,
             .data_index = i,
             .parent_index = -1,
         };
@@ -324,22 +440,22 @@ RendTaskDescVK OctTreeRenderFeature::get_construction_render_task_desc(
     std::string_view p_task_id, std::string_view p_previous_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh) const {
     constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
     constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
-    RendTaskDescVK task_desc = p_dynamic_mesh != nullptr ? p_dynamic_mesh->make_task(p_task_id,
-                                                               oct_tree_build_graphics_pipeline,
-                                                               VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT})
-                                                         : make_static_set_task_desc(render_allocator,
-                                                               base_render_data,
-                                                               p_task_id,
-                                                               static_set_resources,
-                                                               oct_tree_build_graphics_pipeline,
-                                                               false,
-                                                               CLEAR_VALUES,
-                                                               VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
-                                                               COLOR_ATTACHMENT_IDS,
-                                                               std::nullopt,
-                                                               VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                               VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                               p_double_sided);
+    RendTaskDescVK task_desc =
+        p_dynamic_mesh != nullptr
+            ? p_dynamic_mesh->make_task(p_task_id, dynamic_build_pipeline, VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT})
+            : make_static_set_task_desc(render_allocator,
+                  base_render_data,
+                  p_task_id,
+                  static_set_resources,
+                  oct_tree_build_graphics_pipeline,
+                  false,
+                  CLEAR_VALUES,
+                  VkExtent2D{.width = OCT_TREE_EXTENT, .height = OCT_TREE_EXTENT},
+                  COLOR_ATTACHMENT_IDS,
+                  std::nullopt,
+                  VK_ATTACHMENT_LOAD_OP_CLEAR,
+                  VK_ATTACHMENT_LOAD_OP_CLEAR,
+                  p_double_sided);
     task_desc.after(p_previous_task_id)
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -349,16 +465,22 @@ RendTaskDescVK OctTreeRenderFeature::get_construction_render_task_desc(
         .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .write(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .write(OCT_TREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER);
-    if (implementation == Implementation::PASS_PUBLISHED) {
+    if (implementation == Implementation::PASS_PUBLISHED || p_dynamic_mesh != nullptr) {
         task_desc.read(OCT_TREE_VOXEL_CLAIMS, RendResUsageVK::STORAGE_BUFFER)
             .write(OCT_TREE_VOXEL_CLAIMS, RendResUsageVK::STORAGE_BUFFER)
             .read(OCT_TREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER)
             .write(OCT_TREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER);
     }
+    if (p_dynamic_mesh != nullptr) {
+        task_desc.read(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+            .write(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+            .read(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER)
+            .write(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER);
+    }
     return task_desc;
 }
 
-RendTaskDescVK OctTreeRenderFeature::get_deferred_construction_render_task_desc() const {
+RendTaskDescVK OctTreeRenderFeature::get_deferred_construction_render_task_desc(bool p_dynamic) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_BUILD_OCT_TREE_DEFERRED;
     task_desc.after(RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG)
@@ -375,13 +497,20 @@ RendTaskDescVK OctTreeRenderFeature::get_deferred_construction_render_task_desc(
     if (implementation == Implementation::PASS_PUBLISHED) {
         task_desc.read(OCT_TREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER).write(OCT_TREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER);
     }
+    if (p_dynamic) {
+        task_desc.read(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+            .write(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+            .read(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER)
+            .write(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER);
+    }
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            reset_ping_pipeline = oct_tree_deferred_count_reset_pong_compute_pipeline,
                            reset_pong_pipeline = oct_tree_deferred_count_reset_ping_compute_pipeline,
-                           ping_pipeline = oct_tree_deferred_propagation_pong_write_compute_pipeline,
-                           pong_pipeline = oct_tree_deferred_propagation_ping_write_compute_pipeline,
-                           publication_pipeline = update_states_pipeline]() -> Unique<IRenderTaskVK> {
+                           ping_pipeline = p_dynamic ? dynamic_ping_pipeline : oct_tree_deferred_propagation_pong_write_compute_pipeline,
+                           pong_pipeline = p_dynamic ? dynamic_pong_pipeline : oct_tree_deferred_propagation_ping_write_compute_pipeline,
+                           publication_pipeline = p_dynamic ? dynamic_publication_pipeline : update_states_pipeline,
+                           dynamic = p_dynamic]() -> Unique<IRenderTaskVK> {
         constexpr uint32_t THREADS_PER_GROUP = 64;
         constexpr uint32_t DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
             (OCT_TREE_MAX_DEFERRED_TASK_COUNT + OCT_TREE_DEFERRED_THREADS_PER_GROUP - 1) / OCT_TREE_DEFERRED_THREADS_PER_GROUP);
@@ -389,8 +518,9 @@ RendTaskDescVK OctTreeRenderFeature::get_deferred_construction_render_task_desc(
         constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
         if (publication_pipeline != MEM_NULL) {
             RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
-            constexpr VkExtent3D PUBLICATION_GROUP_COUNT{
-                .width = static_cast<uint32_t>((OCT_TREE_MAX_NODE_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP),
+            const VkExtent3D PUBLICATION_GROUP_COUNT{
+                .width = static_cast<uint32_t>(dynamic ? (OCT_TREE_MAX_NODE_COUNT + OCT_TREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128
+                                                       : (OCT_TREE_MAX_NODE_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP),
                 .height = 1,
                 .depth = 1};
             // Rasterization allocates depth one's children. Each round publishes one further level;
@@ -486,6 +616,8 @@ RendTaskDescVK OctTreeRenderFeature::get_debug_draw_render_task_desc(std::string
         .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER)
         .read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
     return task_desc;
 }
@@ -516,6 +648,8 @@ RendTaskDescVK OctTreeRenderFeature::get_pre_deferred_debug_draw_render_task_des
         .read(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER)
         .read(OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
     return task_desc;
@@ -526,6 +660,7 @@ Ref<ROBufferVK> OctTreeRenderFeature::create_initialized_buffer(VkBufferUsageFla
 }
 
 void OctTreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) const {
+    p_graph.add_resource(OCT_TREE_DYNAMIC_NODES, dynamic_nodes).add_resource(OCT_TREE_DYNAMIC_LEAVES, dynamic_leaves);
     p_graph.add_resource(OCT_TREE_INFO, oct_tree_info)
         .add_resource(OCT_TREE_NODE_BUFFER, oct_tree_nodes)
         .add_resource(OCT_TREE_LEAF_BUFFER, oct_tree_leaves)
@@ -536,24 +671,36 @@ void OctTreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) 
         .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, oct_tree_pre_deferred_debug_info_buffer)
         .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, oct_tree_pre_deferred_debug_list_buffer)
         .add_resource(OCT_TREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, oct_tree_pre_deferred_debug_draw_indirect_buffer);
-    if (implementation == Implementation::PASS_PUBLISHED) {
-        p_graph.add_resource(OCT_TREE_PENDING_CHILDREN, pending_children).add_resource(OCT_TREE_VOXEL_CLAIMS, voxel_claims);
-    }
+    p_graph.add_resource(OCT_TREE_PENDING_CHILDREN, pending_children).add_resource(OCT_TREE_VOXEL_CLAIMS, voxel_claims);
 }
 
 void OctTreeRenderFeature::add_construction_render_tasks(
     RendGraphDescVK& p_graph, std::string_view p_previous_task_id, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
-    p_graph.add_task(get_reset_render_task_desc(p_previous_task_id))
-        .add_task(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE, RT_RESET_OCT_TREE))
-        .add_task(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, RT_RUN_BUILD_OCT_TREE, true));
-    p_graph.add_task(get_construction_render_task_desc("dynamic_oct_tree", RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, false, &p_dynamic_mesh));
-    std::string_view capture_previous_task = "dynamic_oct_tree";
+    RendTaskDescVK begin(render_allocator);
+    begin.task_id = "oct_tree_frame_begin";
+    begin.after(p_previous_task_id);
+    begin.create = [allocator = render_allocator]() -> Unique<IRenderTaskVK> {
+        return make_unique<RTOctTreeFrameBeginVK>(allocator, allocator);
+    };
+    p_graph.add_task(std::move(begin));
+    p_graph.add_task(make_static_once(get_reset_render_task_desc("oct_tree_frame_begin")))
+        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE, RT_RESET_OCT_TREE)))
+        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED, RT_RUN_BUILD_OCT_TREE, true)));
+    std::string_view previous = RT_RUN_BUILD_OCT_TREE_DOUBLE_SIDED;
     if (implementation == Implementation::PASS_PUBLISHED) {
-        p_graph.add_task(get_state_update_render_task_desc(capture_previous_task));
-        capture_previous_task = RT_UPDATE_OCT_TREE_STATES;
+        p_graph.add_task(make_static_once(get_state_update_render_task_desc(previous)));
+        previous = RT_UPDATE_OCT_TREE_STATES;
     }
+    auto static_deferred = get_deferred_construction_render_task_desc(false);
+    static_deferred.task_id = "static_oct_tree_deferred";
+    static_deferred.prev.clear();
+    static_deferred.after(previous);
+    p_graph.add_task(make_static_once(std::move(static_deferred), true));
+    p_graph.add_task(get_dynamic_clear_task_desc("static_oct_tree_deferred"));
+    p_graph.add_task(get_construction_render_task_desc("dynamic_oct_tree", "clear_dynamic_oct_tree", false, &p_dynamic_mesh));
+    p_graph.add_task(get_dynamic_publication_task_desc("dynamic_oct_tree"));
     p_graph.add_task(get_debug_capture_render_task_desc(
-        RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG, capture_previous_task, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
+        RT_CAPTURE_OCT_TREE_PRE_DEFERRED_DEBUG, "publish_dynamic_oct_tree", VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
 }
 
 RendTaskDescVK OctTreeRenderFeature::get_state_update_render_task_desc(std::string_view p_previous_task_id) const {
@@ -571,6 +718,51 @@ RendTaskDescVK OctTreeRenderFeature::get_state_update_render_task_desc(std::stri
         return make_unique<RTRunComputePipelineVK>(task_render_allocator, task_base_render_data, task_pipeline, GROUP_COUNT);
     };
     return task_desc;
+}
+
+RendTaskDescVK OctTreeRenderFeature::make_static_once(RendTaskDescVK p_task, bool p_finish) const {
+    auto create = std::move(p_task.create);
+    p_task.create = [create = std::move(create),
+                        allocator = render_allocator,
+                        completed = static_build_completed,
+                        finish = p_finish]() -> Unique<IRenderTaskVK> {
+        auto stage = make_unique<RTOctTreeStaticStageVK>(allocator, create(), completed, finish);
+        return make_unique<RTTriggeredVK>(allocator, std::move(stage), true);
+    };
+    return p_task;
+}
+
+RendTaskDescVK OctTreeRenderFeature::get_dynamic_clear_task_desc(std::string_view p_previous_task_id) const {
+    RendTaskDescVK task(render_allocator);
+    task.task_id = "clear_dynamic_oct_tree";
+    task.after(p_previous_task_id)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_LEAVES, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_VOXEL_CLAIMS, RendResUsageVK::STORAGE_BUFFER);
+    task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_clear_pipeline]() -> Unique<IRenderTaskVK> {
+        constexpr uint32_t groups = static_cast<uint32_t>((std::max(OCT_TREE_MAX_NODE_COUNT, OCT_TREE_CLAIM_WORD_COUNT) + 127) / 128);
+        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{groups, 1, 1});
+    };
+    return task;
+}
+
+RendTaskDescVK OctTreeRenderFeature::get_dynamic_publication_task_desc(std::string_view p_previous_task_id) const {
+    RendTaskDescVK task(render_allocator);
+    task.task_id = "publish_dynamic_oct_tree";
+    task.after(p_previous_task_id)
+        .read(OCT_TREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+        .read(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
+        .write(OCT_TREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER);
+    task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_publication_pipeline]() -> Unique<IRenderTaskVK> {
+        constexpr uint32_t groups = static_cast<uint32_t>((OCT_TREE_MAX_NODE_COUNT + OCT_TREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
+        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{groups, 1, 1});
+    };
+    return task;
 }
 
 } // namespace WhiteBirdEngine

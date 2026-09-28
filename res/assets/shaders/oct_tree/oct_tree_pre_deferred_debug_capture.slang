@@ -58,7 +58,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         captured_oct_tree_info[0] = info;
         DrawIndexedIndirectCommand command;
         command.index_count = 36;
-        command.instance_count = info.leaves_count + deferred_task_count;
+        command.instance_count = info.leaves_count + info.dynamic_leaves_count + deferred_task_count;
         command.first_index = 0;
         command.vertex_offset = 0;
         command.first_instance = 0;

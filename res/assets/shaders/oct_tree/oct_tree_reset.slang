@@ -41,7 +41,7 @@ void main() {
     oct_tree_info[0].deferred_task_count_pong = 0;
 
     [unroll] for (uint i = 0; i < 8; ++i) {
-        tree_nodes[i].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 30;
+        tree_nodes[i].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
         tree_nodes[i].data_index = i;
         tree_nodes[i].parent_index = -1;
     }

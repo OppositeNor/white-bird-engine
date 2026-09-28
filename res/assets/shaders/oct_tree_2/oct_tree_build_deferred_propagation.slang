@@ -14,6 +14,9 @@
 */
 #include "utils/utils.slang"
 #include "oct_tree_2/oct_tree_utils.slang"
+#ifdef WBE_DYNAMIC_BUILD
+#include "oct_tree/oct_tree_dynamic_build.slang"
+#endif
 
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
@@ -39,6 +42,19 @@ struct OctTreeDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "oct_tree_leaves_buffer")]
     uint2 tree_leaves;
+#ifdef WBE_DYNAMIC_BUILD
+    /**
+     * @brief Descriptor-heap reference to oct_tree_dynamic_nodes.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_dynamic_nodes")]
+    uint2 dynamic_nodes;
+    /**
+     * @brief Descriptor-heap reference to oct_tree_dynamic_leaves.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_dynamic_leaves")]
+    uint2 dynamic_leaves;
+#endif
+
 #ifdef WBE_USE_PING_WRITE
     /**
      * @brief Descriptor-heap reference to oct_tree_deferred_list_pong.
@@ -97,7 +113,13 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 
     OctTreeNodeTraceInfo trace_info = task.unfinished_trace_info;
     // Try to allocate the node.
+    #ifdef WBE_DYNAMIC_BUILD
+    RWStructuredBuffer<OctTreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
+    RWStructuredBuffer<OctTreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+    if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, oct_tree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+#else
     if (!try_voxel_allocate(tree_nodes, tree_leaves, pending_children, oct_tree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+#endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
 #ifdef WBE_USE_PING_WRITE
