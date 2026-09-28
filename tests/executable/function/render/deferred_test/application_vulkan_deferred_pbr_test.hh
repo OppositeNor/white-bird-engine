@@ -41,6 +41,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
+#include "input_manager_mocked.hh"
 #include "octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <atomic>
@@ -69,7 +70,8 @@ namespace WhiteBirdEngine {
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
     ApplicationVulkanDeferredPBRTest()
-        : ApplicationGame(RendererCapabilities{.shader_debug = true}) {}
+        : ApplicationGame(RendererCapabilities{.shader_debug = true},
+              make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {}
 
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;

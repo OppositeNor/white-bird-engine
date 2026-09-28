@@ -19,7 +19,7 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -113,7 +113,7 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
 }
 
 void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
-    InputManager* input_manager = InputManager::get_singleton();
+    IInputManager* input_manager = IInputManager::get_singleton();
     if (input_manager == nullptr) {
         return;
     }

@@ -19,7 +19,7 @@
 #include "SDL_events.h"
 #include "SDL_stdinc.h"
 #include "SDL_video.h"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/window/i_window.hh"
 #include <SDL_vulkan.h>
@@ -43,7 +43,7 @@ std::string build_sdl_error_message(std::string_view p_prefix) {
 }
 } // namespace
 
-WindowSDL::WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties)
+WindowSDL::WindowSDL(Ref<IInputManager> p_input_manager, const WindowProperties& p_window_properties)
     : window_properties(p_window_properties), input_manager(p_input_manager) {
     SDL_Init(SDL_INIT_VIDEO);
     window = SDL_CreateWindow(std::string(window_properties.title).c_str(),

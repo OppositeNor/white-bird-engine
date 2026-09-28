@@ -19,7 +19,7 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/game_config/game_config.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/input_manager_regular.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_dummy/renderer_dummy.hh"
@@ -54,7 +54,8 @@ size_t get_worker_thread_count(size_t p_configured_thread_count, size_t p_render
 
 } // namespace
 
-ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities) : renderer_capabilities(p_renderer_capabilities) {
+ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities, Ref<IInputManager> p_input_manager)
+    : renderer_capabilities(p_renderer_capabilities), input_manager(std::move(p_input_manager)) {
     init();
 }
 
@@ -76,7 +77,9 @@ void ApplicationGame::init() {
 
     render_job_buffer = make_ref<JobBufferRingMPSC>(global_allocator(), global_allocator(), 64);
     renderer_allocator = make_ref<RenderAllocator>(global_allocator(), game_config.render_mem_pool_size);
-    input_manager = make_ref<InputManager>(global_allocator());
+    if (input_manager == MEM_NULL) {
+        input_manager = make_ref<InputManagerRegular>(global_allocator());
+    }
     window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
     if (game_config.render_api == "vulkan") {
         renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer, renderer_capabilities);

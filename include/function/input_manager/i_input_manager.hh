@@ -12,14 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_INPUT_MANAGER_HH
-#define WBE_FILE_INPUT_MANAGER_HH
+#ifndef WBE_FILE_I_INPUT_MANAGER_HH
+#define WBE_FILE_I_INPUT_MANAGER_HH
 
 #include "function/input_manager/key_codes.hh"
 #include "utils/interface/i_singleton.hh"
-#include <atomic>
 #include <cstdint>
-#include <type_traits>
 
 namespace WhiteBirdEngine {
 
@@ -59,26 +57,32 @@ struct InputStatus {
         return status_code & KEY_DOWN;
     }
 };
+
 /**
- * @class InputManager
- * @brief Input manager for SDL backend.
- *
+ * @class IInputManager
+ * @brief Input manager interface. The window backend reports key transitions; game code queries key statuses.
+ * @details Only one input manager may exist at a time; constructing a second one throws. Neither copyable nor movable.
+ * Implementations must allow key transitions and status queries from different threads.
  */
-class InputManager final : public ISingleton<InputManager> {
+class IInputManager : public ISingleton<IInputManager> {
 public:
-    InputManager();
-    ~InputManager();
-    InputManager(const InputManager&) = delete;
-    InputManager(InputManager&&) noexcept = delete;
-    InputManager& operator=(const InputManager&) = delete;
-    InputManager& operator=(InputManager&&) noexcept = delete;
+    IInputManager() {
+        singleton = this;
+    }
+    virtual ~IInputManager() override {
+        singleton = nullptr;
+    }
+    IInputManager(const IInputManager&) = delete;
+    IInputManager(IInputManager&&) noexcept = delete;
+    IInputManager& operator=(const IInputManager&) = delete;
+    IInputManager& operator=(IInputManager&&) noexcept = delete;
 
     /**
      * @brief Get the singleton instance.
      *
-     * @return The singleton instance.
+     * @return The singleton instance, or nullptr when no input manager exists.
      */
-    static InputManager* get_singleton() {
+    static IInputManager* get_singleton() {
         return singleton;
     }
 
@@ -88,24 +92,22 @@ public:
      * @param p_key_code The key code.
      * @return The input status.
      */
-    InputStatus get_input_status(KeyCode p_key_code) const;
+    virtual InputStatus get_input_status(KeyCode p_key_code) const = 0;
 
     /**
      * @brief Set the keycode to key down.
      */
-    void set_keydown(KeyCode p_key_code);
+    virtual void set_keydown(KeyCode p_key_code) = 0;
 
     /**
      * @brief Set the keycode to key up.
      */
-    void set_keyup(KeyCode p_key_code);
+    virtual void set_keyup(KeyCode p_key_code) = 0;
 
 private:
-    // Use an atomic keyset to store the key statuses.
-    std::atomic<uint8_t> key_status_map[KeyCode::TOTAL_KEYCODES % 8 == 0 ? KeyCode::TOTAL_KEYCODES / 8 : KeyCode::TOTAL_KEYCODES / 8 + 1] = {};
-    static_assert(std::remove_cvref_t<decltype(key_status_map[0])>::is_always_lock_free, "Key status map must be lock free");
-    inline static InputManager* singleton = nullptr;
+    inline static IInputManager* singleton = nullptr;
 };
+
 } // namespace WhiteBirdEngine
 
 #endif

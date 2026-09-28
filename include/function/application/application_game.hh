@@ -21,7 +21,7 @@
 #include "function/application/i_application.hh"
 #include "function/audio/audio_renderer.hh"
 #include "function/game_config/game_config_options.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/window/i_window.hh"
@@ -43,8 +43,10 @@ public:
      * @brief Initialize the game renderer with requested optional capabilities.
      *
      * @param p_renderer_capabilities Features to request before renderer creation.
+     * @param p_input_manager Input manager receiving window key transitions. MEM_NULL creates an InputManagerRegular.
+     * The application retains shared ownership; it must be the process's only input manager.
      */
-    explicit ApplicationGame(RendererCapabilities p_renderer_capabilities = {});
+    explicit ApplicationGame(RendererCapabilities p_renderer_capabilities = {}, Ref<IInputManager> p_input_manager = MEM_NULL);
     virtual ~ApplicationGame() = default;
     ApplicationGame(const ApplicationGame&) = delete;
     ApplicationGame(ApplicationGame&&) noexcept = delete;
@@ -98,7 +100,7 @@ public:
 private:
     Ref<RenderAllocator> renderer_allocator;
     RendererCapabilities renderer_capabilities;
-    Ref<InputManager> input_manager;
+    Ref<IInputManager> input_manager;
     Ref<IWindow> window;
 
     void init();

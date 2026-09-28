@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/input_manager_regular.hh"
 #include "function/input_manager/key_codes.hh"
 #include <barrier>
 #include <cstddef>
@@ -24,27 +24,27 @@
 namespace WhiteBirdEngine {
 
 TEST(WBEInputManagerTest, TracksSingletonLifetime) {
-    EXPECT_EQ(InputManager::get_singleton(), nullptr);
+    EXPECT_EQ(IInputManager::get_singleton(), nullptr);
 
     {
-        InputManager input_manager;
-        EXPECT_EQ(InputManager::get_singleton(), &input_manager);
+        InputManagerRegular input_manager;
+        EXPECT_EQ(IInputManager::get_singleton(), &input_manager);
     }
 
-    EXPECT_EQ(InputManager::get_singleton(), nullptr);
+    EXPECT_EQ(IInputManager::get_singleton(), nullptr);
 }
 
 TEST(WBEInputManagerTest, RejectedDuplicateDoesNotPoisonSingletonLifetime) {
     {
-        InputManager input_manager;
-        EXPECT_THROW({ InputManager duplicate_input_manager; }, std::runtime_error);
+        InputManagerRegular input_manager;
+        EXPECT_THROW({ InputManagerRegular duplicate_input_manager; }, std::runtime_error);
     }
 
-    EXPECT_NO_THROW({ InputManager recovered_input_manager; });
+    EXPECT_NO_THROW({ InputManagerRegular recovered_input_manager; });
 }
 
 TEST(WBEInputManagerTest, InitializesEveryKeyAsUp) {
-    InputManager input_manager;
+    InputManagerRegular input_manager;
 
     for (int key_code = KEYCODE_0; key_code < TOTAL_KEYCODES; ++key_code) {
         InputStatus status = input_manager.get_input_status(static_cast<KeyCode>(key_code));
@@ -54,7 +54,7 @@ TEST(WBEInputManagerTest, InitializesEveryKeyAsUp) {
 }
 
 TEST(WBEInputManagerTest, TransitionsEveryKeyBetweenDownAndUp) {
-    InputManager input_manager;
+    InputManagerRegular input_manager;
 
     for (int key_code = KEYCODE_0; key_code < TOTAL_KEYCODES; ++key_code) {
         input_manager.set_keydown(static_cast<KeyCode>(key_code));
@@ -76,7 +76,7 @@ TEST(WBEInputManagerTest, TransitionsEveryKeyBetweenDownAndUp) {
 }
 
 TEST(WBEInputManagerTest, KeepsNeighboringAndByteBoundaryKeysIndependent) {
-    InputManager input_manager;
+    InputManagerRegular input_manager;
 
     input_manager.set_keydown(KEYCODE_7);
     EXPECT_TRUE(input_manager.get_input_status(KEYCODE_7).is_down());
@@ -91,7 +91,7 @@ TEST(WBEInputManagerTest, KeepsNeighboringAndByteBoundaryKeysIndependent) {
 }
 
 TEST(WBEInputManagerTest, RepeatedTransitionsAreIdempotent) {
-    InputManager input_manager;
+    InputManagerRegular input_manager;
 
     input_manager.set_keydown(KEYCODE_ESCAPE);
     input_manager.set_keydown(KEYCODE_ESCAPE);
@@ -103,7 +103,7 @@ TEST(WBEInputManagerTest, RepeatedTransitionsAreIdempotent) {
 }
 
 TEST(WBEInputManagerTest, ConcurrentlyUpdatesKeysSharingOneStorageByte) {
-    InputManager input_manager;
+    InputManagerRegular input_manager;
     constexpr size_t THREAD_COUNT = 8;
     constexpr size_t ITERATION_COUNT = 1000;
     std::barrier sync_point(THREAD_COUNT + 1);

@@ -19,7 +19,7 @@
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
@@ -36,6 +36,7 @@
 #include "function/render_vk/static_set_resources_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
+#include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -61,6 +62,9 @@ inline constexpr VkFormat DRAW_SPONZA_INDIRECT_DEPTH_FORMAT = VK_FORMAT_D32_SFLO
 
 class ApplicationVulkanDrawSponzaIndirectTest final : public ApplicationGame {
 public:
+    ApplicationVulkanDrawSponzaIndirectTest()
+        : ApplicationGame({}, make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {}
+
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;
 
@@ -84,7 +88,7 @@ private:
 };
 
 void ApplicationVulkanDrawSponzaIndirectTest::logic_update(double p_delta) {
-    InputManager* input_manager = InputManager::get_singleton();
+    IInputManager* input_manager = IInputManager::get_singleton();
     if (input_manager == nullptr) {
         return;
     }

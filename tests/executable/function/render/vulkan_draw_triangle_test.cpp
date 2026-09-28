@@ -32,6 +32,7 @@
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include "global/global.hh"
+#include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -54,6 +55,9 @@ inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "dr
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
+    ApplicationVulkanDrawPipelineTest()
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+
     virtual void logic_update(double p_delta) override {
     }
 

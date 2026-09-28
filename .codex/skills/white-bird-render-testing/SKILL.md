@@ -1,6 +1,6 @@
 ---
 name: white-bird-render-testing
-description: Capture and inspect White Bird Engine rendering-test PNGs, automate deferred lighting/voxel checks and clean shutdown on Linux/X11, and integrate shared capture hooks in rendering executables.
+description: Capture and inspect White Bird Engine rendering-test PNGs, script executable-test input with WBE_EXEC_TEST_INPUT_SEQUENCE, automate deferred lighting/voxel checks with clean shutdown, and integrate shared capture and input hooks in rendering executables.
 ---
 
 # Rendering test screenshots
@@ -22,6 +22,29 @@ The shared test utility owns environment parsing and one-shot trigger state. Kee
 
 Do not add these hooks to non-rendering unit tests simply because they use renderer mocks.
 
+## Scripted input
+
+Every executable test links the `wbe_executable_test_utilities` static library (`tests/executable/utilities/`, linked through `templates/executable_test.cmake.jinja`). Its `InputManagerMocked` extends `InputManagerRegular` and must be passed as each test application's input manager:
+
+```cpp
+ApplicationVulkanDrawCubeTest()
+    : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+```
+
+Game code queries keys only through `IInputManager::get_singleton()`. `ApplicationGame` creates an `InputManagerRegular` when no manager is supplied; do not construct a second input manager, because the singleton throws. Keep test-only input policy in the utilities library, not in the engine.
+
+`WBE_EXEC_TEST_INPUT_SEQUENCE` is a JSON array replayed in order, parsed with the engine's `ParserJSON`:
+
+```sh
+WBE_EXEC_TEST_INPUT_SEQUENCE='[{"key": "KEYCODE_V", "delay": 3.0, "count": 1}, {"key": "KEYCODE_RIGHT", "duration": 1.0}, {"key": "KEYCODE_F1", "delay": 1.0, "count": 1}]'
+```
+
+- `key`: a `KeyCode` enumerator name.
+- Exactly one of `count` (positive integer: that many `get_input_status()` queries for the key report down) or `duration` (positive seconds of steady-clock time during which the key reports down).
+- Optional `delay`: non-negative seconds before the entry becomes active.
+
+Delays chain from the end of the previous entry and start at the first input query (the first logic tick), so loading time is excluded. Prefer `delay`/`duration` over frame or query counts when timing matters; frame rates are not reliable. Keys outside the active entry, and all keys after the sequence ends, report the real window state; an unset or empty variable replays nothing. Consecutive entries for the same key without a delay form one continuous press, so separate repeated presses with a small `delay`. A malformed sequence or unknown key crashes at startup with an `InputManagerMocked:` message.
+
 ## Capture and inspect
 
 For iterative visual checks, build with `python build.py -t debug` (or the requested target) and run the application. Run only relevant unit tests during iteration; reserve `python validation.py` for final validation unless the user requests otherwise. Inspect the end of failure logs first. Shader/resource compilation is part of the Python build pipeline. Do not edit generated shaders to establish a permanent fix, bypass SPIR-V validation, or invoke CMake directly.
@@ -36,7 +59,7 @@ WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/tmp/wbe-triangle-check.png WBE_CAPTUR
 - `WBE_CAPTURE_FRAME`: nonnegative integer, default `5`; requests once when the renderer counter reaches or exceeds it. The actual capture occurs on the next tick that renders; zero means the first eligible frame, not a guaranteed zero-indexed image.
 - `WBE_WAIT_PROCESS_INJECT=1`: prints the PID and waits for Enter before renderer initialization. Use when attaching Nsight or another injector. Leave unset or set to `0` for unattended captures; preserve stdin access when waiting interactively.
 
-The test continues after capture; it does not automatically exit. Observe the capture log and output file, then close the test window or stop only the process you launched. A timeout or manual stop is not a clean test exit. Respect GUI/GPU execution approvals.
+The test continues after capture; it does not automatically exit. Observe the capture log and output file, then stop only the process you launched. `SIGTERM` is a clean shutdown on POSIX: SDL turns it into `SDL_QUIT`, the same path as closing the window. A timeout or `SIGKILL` is not a clean test exit. Respect GUI/GPU execution approvals.
 
 Open the actual PNG with the local image-viewing tool. Report the path, dimensions, selected frame, and visible result: expected scene content, geometry stability, textures, lighting, and any black frame or exploded vertices. A nonempty PNG alone is not visual validation. Compare equivalent camera/frame settings where possible; do not use image generation to manufacture test evidence.
 
@@ -46,9 +69,9 @@ Vulkan capture requires swapchain transfer-source support and RGBA8/BGRA8 output
 
 Readback stalls the GPU and can change timing. Verify crashes and synchronization fixes in separate runs with capture disabled, long enough to exceed the observed failure window. Report visual correctness separately from stability, including duration, exit reason, and outstanding validation errors; a good screenshot does not establish that a segfault is fixed.
 
-## Automated deferred checks (Linux/X11)
+## Automated deferred checks
 
-Use [scripts/check_deferred.py](scripts/check_deferred.py) for the deferred executable's existing `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read those handlers if they change. This helper does not build, run unit tests, or judge visual correctness. It requires `DISPLAY`, `xdotool`, `taskset`, and `libX11`; request GUI execution permission when the environment requires it.
+Use [scripts/check_deferred.py](scripts/check_deferred.py) for the deferred executable's existing `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read those handlers if they change. This helper does not build, run unit tests, or judge visual correctness. It needs a POSIX platform and a display the renderer can open, but no windowing-system automation tools; request GUI execution permission when the environment requires it.
 
 From the repository root:
 
@@ -58,9 +81,11 @@ python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octre
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2 --mode stability --duration 25
 ```
 
-Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
+Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
 
-The helper limits the owned process to four available CPUs by default (`--cpus` overrides), removes inherited capture settings for stability runs, and targets only the window matching its child PID. It sends `WM_DELETE_WINDOW` through X11 for normal SDL shutdown. Do not substitute `xdotool windowclose`: it can destroy the drawable and cause `BadWindow` errors. Timeouts or forced cleanup are recorded as failures and never called clean exits.
+In capture mode the helper passes all key presses up front through `WBE_EXEC_TEST_INPUT_SEQUENCE`, timed with `delay`: after `--settle` seconds (default 5) from the first logic tick it presses `R`, then `F1` twice, then `V`, then `F1` twice. The first frame is captured through `WBE_CAPTURE_FRAME=15`. It then waits for all five captures, checks that the lighting switch was logged after the initial capture, and fails asking for a larger `--settle` otherwise. Stability mode sends no input and removes inherited capture and input settings.
+
+The helper limits the owned process to four available CPUs by default (`--cpus` overrides) and sends `SIGTERM` to its own child for normal SDL shutdown. Timeouts or forced cleanup (`SIGKILL`) are recorded as failures and never called clean exits.
 
 The demo always renders two animated instances of the cube mesh. Use `--target`, `--repo`, and `--output-dir` for another build or artifact location. Read `--help` for timing controls.
 

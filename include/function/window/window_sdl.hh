@@ -17,7 +17,7 @@
 
 #include "SDL_video.h"
 #include "core/memory/reference_strong.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "i_window.hh"
 #include <atomic>
 #include <vulkan/vulkan_core.h>
@@ -37,7 +37,7 @@ public:
     WindowSDL& operator=(const WindowSDL&) = delete;
     WindowSDL& operator=(WindowSDL&&) noexcept = delete;
 
-    WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties);
+    WindowSDL(Ref<IInputManager> p_input_manager, const WindowProperties& p_window_properties);
 
     virtual WindowType get_window_type() const override {
         return window_type;
@@ -54,7 +54,7 @@ public:
 private:
     WindowType window_type = WindowType::UNKNOWN;
     WindowProperties window_properties;
-    Ref<InputManager> input_manager;
+    Ref<IInputManager> input_manager;
 
     SDL_Window* window = nullptr;
     std::atomic<bool> window_should_close = false;

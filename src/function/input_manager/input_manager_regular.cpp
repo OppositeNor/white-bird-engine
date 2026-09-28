@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/input_manager_regular.hh"
 #include "function/input_manager/key_codes.hh"
 #include <atomic>
 #include <cstdint>
@@ -25,24 +25,16 @@
 
 namespace WhiteBirdEngine {
 
-InputManager::InputManager() {
-    singleton = this;
-}
-
-InputManager::~InputManager() {
-    singleton = nullptr;
-}
-
-InputStatus InputManager::get_input_status(KeyCode p_key_code) const {
+InputStatus InputManagerRegular::get_input_status(KeyCode p_key_code) const {
     return InputStatus{.status_code = static_cast<uint8_t>(
                            key_status_map[p_key_code / 8].load(std::memory_order_acquire) >> (p_key_code % 8) & 0b1)};
 }
 
-void InputManager::set_keydown(KeyCode p_key_code) {
+void InputManagerRegular::set_keydown(KeyCode p_key_code) {
     WBE_SET_ATOMIC_BITSET_TRUE(key_status_map, p_key_code);
 }
 
-void InputManager::set_keyup(KeyCode p_key_code) {
+void InputManagerRegular::set_keyup(KeyCode p_key_code) {
     WBE_SET_ATOMIC_BITSET_FALSE(key_status_map, p_key_code);
 }
 

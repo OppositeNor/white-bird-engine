@@ -33,6 +33,7 @@ add_executable(${TEST_NAME}_{{ exe.name }}
 
 target_link_libraries(${TEST_NAME}_{{ exe.name }}
     ${libs}
+    wbe_executable_test_utilities
     gtest_main
 )
 if (WBE_USE_RPATH_LIBRARY)

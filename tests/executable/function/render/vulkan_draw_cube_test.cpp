@@ -21,7 +21,7 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
-#include "function/input_manager/input_manager.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -40,6 +40,7 @@
 #include "generated/type_uuid.gen.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
+#include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -79,6 +80,9 @@ constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
 
 class ApplicationVulkanDrawCubeTest : public WBE::ApplicationGame {
 public:
+    ApplicationVulkanDrawCubeTest()
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;
 
@@ -142,7 +146,7 @@ int main(int p_argc, char* p_argv[]) {
 }
 
 void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
-    WBE::InputManager* input_manager = WBE::InputManager::get_singleton();
+    WBE::IInputManager* input_manager = WBE::IInputManager::get_singleton();
     if (input_manager == nullptr) {
         return;
     }

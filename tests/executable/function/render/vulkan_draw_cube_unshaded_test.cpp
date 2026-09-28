@@ -32,6 +32,7 @@
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
+#include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -55,6 +56,9 @@ static constexpr std::string_view REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_B
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
+    ApplicationVulkanDrawCubeUnshadedTest()
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+
     virtual void logic_update(double /* p_delta */) override {
     }
 
