@@ -77,7 +77,7 @@ if build_target["generate-tests"]:
 
 # Setup ACP
 acp_dependencies_compiler = WBEACPDependenciesCompiler(
-    Path(root_dir), Path(build_root_dir), Path(dependencies_dir), build_target)
+    Path(root_dir), Path(build_dir), Path(dependencies_dir), build_target)
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
 test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
 acp_compilers_configured = False

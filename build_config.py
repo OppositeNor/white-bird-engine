@@ -37,7 +37,7 @@ target_info = {
     "debug-ninja" : {
         "c-compiler" : "clang",
         "cpp-compiler" : "clang++",
-        "export-directory" : "debug",
+        "export-directory" : "debug-ninja",
         "cmake-build-type" : "Debug",
         "enable_shader_debug" : True,
         "build-shared" : True,
@@ -47,7 +47,7 @@ target_info = {
     "release-ninja" : {
         "c-compiler" : "clang",
         "cpp-compiler" : "clang++",
-        "export-directory" : "release",
+        "export-directory" : "release-ninja",
         "cmake-build-type" : "Release",
         "build-shared" : True,
         "generator" : "Ninja",
@@ -82,7 +82,7 @@ target_info = {
     "debug-gcc-ninja" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "debug-gcc",
+        "export-directory" : "debug-gcc-ninja",
         "cmake-build-type" : "Debug",
         "enable_shader_debug" : True,
         "build-shared" : True,
@@ -92,7 +92,7 @@ target_info = {
     "release-gcc-ninja" : {
         "c-compiler" : "gcc",
         "cpp-compiler" : "g++",
-        "export-directory" : "release-gcc",
+        "export-directory" : "release-gcc-ninja",
         "cmake-build-type" : "Release",
         "build-shared" : True,
         "generator" : "Ninja",
