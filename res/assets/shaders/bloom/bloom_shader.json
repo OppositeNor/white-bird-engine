@@ -7,23 +7,6 @@
             "src": "assets/shaders/bloom/bloom_extract.slang",
             "dst": "assets/shaders/bloom/bloom_extract.spv",
             "metadata": "assets/shaders/bloom/bloom_extract.json"
-        },
-        {
-            "id": "bloom_shader_pong_write",
-            "source_type": "shader",
-            "src": "assets/shaders/bloom/bloom_blur.slang",
-            "dst": "assets/shaders/bloom/bloom_pong_write.spv",
-            "metadata": "assets/shaders/bloom/bloom_pong_write.json"
-        },
-        {
-            "id": "bloom_shader_ping_write",
-            "source_type": "shader",
-            "src": "assets/shaders/bloom/bloom_blur.slang",
-            "dst": "assets/shaders/bloom/bloom_ping_write.spv",
-            "metadata": "assets/shaders/bloom/bloom_ping_write.json",
-            "macros": [
-                {"name": "WBE_USE_PING_WRITE"}
-            ]
         }
     ]
 }

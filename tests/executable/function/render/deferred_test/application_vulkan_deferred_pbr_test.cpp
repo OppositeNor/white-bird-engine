@@ -400,8 +400,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         resource_manager->get_resource<RUShader>("indirect_lighting_rsm_debug_view_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
-    bloom_ping_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_ping_write");
-    bloom_pong_write_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_pong_write");
+    kawase_blur_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_shader");
 
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
@@ -743,12 +742,8 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto bloom_extract_compiled =
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
-    auto bloom_ping_write_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_ping_write", bloom_ping_write_shader_resource);
-    bloom_ping_write_compute_pipeline = bloom_ping_write_compiled.compute_pipeline;
-    auto bloom_pong_write_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_pong_write", bloom_pong_write_shader_resource);
-    bloom_pong_write_compute_pipeline = bloom_pong_write_compiled.compute_pipeline;
+    auto kawase_blur_compiled = ComputePipelineCompilerVK(compute_context).compile("kawase_blur_shader", kawase_blur_shader_resource);
+    kawase_blur_compute_pipeline = kawase_blur_compiled.compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;

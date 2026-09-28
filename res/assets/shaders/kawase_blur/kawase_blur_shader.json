@@ -1,0 +1,12 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "kawase_blur_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/kawase_blur/kawase_blur.slang",
+            "dst": "assets/shaders/kawase_blur/kawase_blur.spv",
+            "metadata": "assets/shaders/kawase_blur/kawase_blur.json"
+        }
+    ]
+}

@@ -120,6 +120,9 @@ private:
     static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
     static constexpr std::string_view GBUFFER_SAMPLER = "gbuffer_sampler";
     static constexpr std::string_view BLOOM_SAMPLER = "bloom_sampler";
+    static constexpr std::string_view KAWASE_BLUR_SOURCE = "kawase_blur_source";
+    static constexpr std::string_view KAWASE_BLUR_DESTINATION = "kawase_blur_destination";
+    static constexpr std::string_view KAWASE_BLUR_SAMPLER = "kawase_blur_sampler";
     static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
     static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
     static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
@@ -200,8 +203,7 @@ private:
     RefRes<RUShader> indirect_lighting_rsm_debug_view_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
     RefRes<RUShader> bloom_extract_shader_resource;
-    RefRes<RUShader> bloom_ping_write_shader_resource;
-    RefRes<RUShader> bloom_pong_write_shader_resource;
+    RefRes<RUShader> kawase_blur_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
@@ -217,8 +219,7 @@ private:
     Ref<ROComputePipelineVK> indirect_lighting_debug_view_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> bloom_ping_write_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> bloom_pong_write_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> kawase_blur_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
     Ref<ROImageVK> gbuffer_albedo_image;

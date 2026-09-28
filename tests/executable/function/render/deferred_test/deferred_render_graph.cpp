@@ -18,6 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -370,8 +371,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_bloom_extent = bloom_extent,
-                           ping_write_pipeline = bloom_ping_write_compute_pipeline,
-                           pong_write_pipeline = bloom_pong_write_compute_pipeline]() -> Unique<IRenderTaskVK> {
+                           blur_pipeline = kawase_blur_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_bloom_extent.width + 7U) / 8U,
             .height = (task_bloom_extent.height + 7U) / 8U,
@@ -379,7 +379,16 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
         };
         RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
         for (uint32_t pass_index = 0; pass_index < BLOOM_BLUR_PASS_COUNT; ++pass_index) {
-            dispatch.add_entry(pass_index % 2U == 0U ? pong_write_pipeline : ping_write_pipeline, dispatch_group_count);
+            const bool write_pong = pass_index % 2U == 0U;
+            PipelineResourceMapVK resource_map(task_render_allocator);
+            resource_map.bind(KAWASE_BLUR_SOURCE, write_pong ? BLOOM_PING_IMAGE_VIEW : BLOOM_PONG_IMAGE_VIEW)
+                .bind(KAWASE_BLUR_DESTINATION, write_pong ? BLOOM_PONG_IMAGE_VIEW : BLOOM_PING_IMAGE_VIEW)
+                .bind(KAWASE_BLUR_SAMPLER, BLOOM_SAMPLER);
+            dispatch.add_entry({
+                .pipeline = blur_pipeline,
+                .group_count = dispatch_group_count,
+                .resource_map = std::move(resource_map),
+            });
         }
         return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
     };
