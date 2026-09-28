@@ -33,13 +33,15 @@
 
 namespace WhiteBirdEngine {
 
-static std::string build_sdl_error_message(std::string_view p_prefix) {
+namespace {
+std::string build_sdl_error_message(std::string_view p_prefix) {
     const char* error_message = SDL_GetError();
     if (error_message == nullptr || error_message[0] == '\0') {
         return std::format("{} SDL did not report additional details.", p_prefix);
     }
     return std::format("{} SDL error: {}.", p_prefix, error_message);
 }
+} // namespace
 
 WindowSDL::WindowSDL(Ref<InputManager> p_input_manager, const WindowProperties& p_window_properties)
     : window_properties(p_window_properties), input_manager(p_input_manager) {

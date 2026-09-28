@@ -254,20 +254,12 @@ void traverse_octree(RWStructuredBuffer<OctreeNode> p_nodes, inout OctreeNodeTra
 }
 
 bool try_reserve_octree_nodes(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
-    uint current_count = p_tree_info[0].node_count;
-    for (;;) {
-        WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
-            current_count <= p_tree_info[0].max_node_count &&
-            p_tree_info[0].max_node_count - current_count >= 8,
-            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        uint original_count;
-        InterlockedCompareExchange(p_tree_info[0].node_count, current_count, current_count + 8, original_count);
-        if (original_count == current_count) {
-            p_children_index = current_count;
-            return true;
-        }
-        current_count = original_count;
-    }
+    InterlockedAdd(p_tree_info[0].node_count, 8, p_children_index);
+    WBE_SHADER_DEBUG_ASSERT(p_children_index / 8 <= 0x001fffffu &&
+        p_children_index <= p_tree_info[0].max_node_count &&
+        p_tree_info[0].max_node_count - p_children_index >= 8,
+        ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+    return true;
 }
 
 bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
@@ -293,20 +285,12 @@ bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
 }
 
 bool try_reserve_octree_leaves(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
-    uint current_count = p_tree_info[0].leaves_count;
-    for (;;) {
-        WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
-            current_count <= p_tree_info[0].max_leaves_count &&
-            p_tree_info[0].max_leaves_count - current_count >= 8,
-            ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-        uint original_count;
-        InterlockedCompareExchange(p_tree_info[0].leaves_count, current_count, current_count + 8, original_count);
-        if (original_count == current_count) {
-            p_children_index = current_count;
-            return true;
-        }
-        current_count = original_count;
-    }
+    InterlockedAdd(p_tree_info[0].leaves_count, 8, p_children_index);
+    WBE_SHADER_DEBUG_ASSERT(p_children_index / 8 <= 0x001fffffu &&
+        p_children_index <= p_tree_info[0].max_leaves_count &&
+        p_tree_info[0].max_leaves_count - p_children_index >= 8,
+        ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+    return true;
 }
 
 bool create_octree_children_leaf(RWStructuredBuffer<OctreeLeaf> p_leaves,
